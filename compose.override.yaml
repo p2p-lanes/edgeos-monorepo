@@ -34,6 +34,13 @@ services:
         condition: service_completed_successfully
     environment:
       - POSTGRES_SERVER=db
+      - SMTP_HOST=mailpit
+      - SMTP_PORT=1025
+      - SMTP_USER=
+      - SMTP_PASSWORD=
+      - SMTP_TLS=False
+      - SMTP_SSL=False
+      - REDIS_URL=redis://redis:6379
     build:
       context: .
       dockerfile: backend/Dockerfile
@@ -104,11 +111,38 @@ services:
     entrypoint: >
       /bin/sh -c "
       mc alias set myminio http://minio:9000 minioadmin minioadmin;
-      mc mb myminio/uploads --ignore-existing;
-      mc anonymous set download myminio/uploads;
+      mc mb myminio/edgeos --ignore-existing;
+      mc anonymous set download myminio/edgeos;
       exit 0;
       "
+
+  mailpit:
+    image: axllent/mailpit
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+    restart: "no"
+
+  redis:
+    image: redis:alpine
+    restart: "no"
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    restart: "no"
+    ports:
+      - "8081:8081"
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    depends_on:
+      - redis
 
 volumes:
   edgeos-db-data:
   minio-data:
+  redis-data:
+  redisinsight-data:
