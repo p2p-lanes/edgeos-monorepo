@@ -141,7 +141,7 @@ function Admin() {
       {isSuperadmin ? (
         <Tabs defaultValue="tenant-users">
           <TabsList>
-            <TabsTrigger value="tenant-users">Tenant Users</TabsTrigger>
+            <TabsTrigger value="tenant-users">Users</TabsTrigger>
             <TabsTrigger value="superadmins">Superadmins</TabsTrigger>
           </TabsList>
 
