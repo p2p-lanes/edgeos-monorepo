@@ -15,6 +15,12 @@ from app.api.human.models import Humans
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
 from app.core.config import settings
+from app.core.redis import (
+    auth_code_store,
+    is_redis_available,
+    login_rate_limiter,
+    pending_human_store,
+)
 from app.services.email import (
     LoginCodeHumanContext,
     LoginCodeUserContext,
@@ -25,10 +31,25 @@ MAX_AUTH_ATTEMPTS = 5
 CODE_EXPIRATION_MINUTES = 15
 
 
+def check_rate_limit(identifier: str) -> None:
+    """Check rate limit and raise exception if exceeded."""
+    is_allowed, remaining = login_rate_limiter.is_allowed(identifier)
+    if not is_allowed:
+        ttl = login_rate_limiter.get_ttl(identifier)
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Too many login attempts. Please try again in {ttl // 60} minutes.",
+            headers={"Retry-After": str(ttl)},
+        )
+
+
 async def login_user(
     session: Session,
     email: str,
 ) -> tuple[str, int]:
+    # Rate limit by email
+    check_rate_limit(f"user:{email.lower()}")
+
     # Find user
     statement = select(Users).where(
         Users.email == email,
@@ -43,13 +64,20 @@ async def login_user(
         )
 
     auth_code = generate_auth_code()
-    code_expiration = create_code_expiration(CODE_EXPIRATION_MINUTES)
 
-    user.auth_code = auth_code
-    user.code_expiration = code_expiration
-    user.auth_attempts = 0
-    session.add(user)
-    session.commit()
+    # Try Redis first, fall back to database
+    if is_redis_available():
+        auth_code_store.store_user_code(user.id, auth_code)
+        logger.debug(f"Auth code stored in Redis for user: {email}")
+    else:
+        # Fall back to database storage
+        code_expiration = create_code_expiration(CODE_EXPIRATION_MINUTES)
+        user.auth_code = auth_code
+        user.code_expiration = code_expiration
+        user.auth_attempts = 0
+        session.add(user)
+        session.commit()
+        logger.debug(f"Auth code stored in database for user: {email}")
 
     logger.info(f"Auth code: {auth_code}")
     if user.tenant_id:
@@ -108,39 +136,55 @@ async def authenticate_user(
             detail="User not found",
         )
 
-    if not user.auth_code or not user.code_expiration:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No authentication code pending",
+    # Try Redis first, fall back to database
+    if is_redis_available():
+        is_valid, error_message = auth_code_store.verify_user_code(user.id, code)
+        if not is_valid:
+            if "Maximum" in error_message:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail=error_message,
+                )
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=error_message,
+            )
+    else:
+        # Fall back to database verification
+        if not user.auth_code or not user.code_expiration:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No authentication code pending",
+            )
+
+        if user.auth_attempts >= MAX_AUTH_ATTEMPTS:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Maximum authentication attempts exceeded. Please request a new code.",
+            )
+
+        is_valid, error_message = is_code_valid(
+            stored_code=user.auth_code,
+            provided_code=code,
+            expiration=user.code_expiration,
         )
 
-    if user.auth_attempts >= MAX_AUTH_ATTEMPTS:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Maximum authentication attempts exceeded. Please request a new code.",
-        )
+        if not is_valid:
+            user.auth_attempts += 1
+            session.add(user)
+            session.commit()
 
-    is_valid, error_message = is_code_valid(
-        stored_code=user.auth_code,
-        provided_code=code,
-        expiration=user.code_expiration,
-    )
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=error_message,
+            )
 
-    if not is_valid:
-        user.auth_attempts += 1
+        # Clear database auth code on success
+        user.auth_code = None
+        user.code_expiration = None
+        user.auth_attempts = 0
         session.add(user)
         session.commit()
-
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=error_message,
-        )
-
-    user.auth_code = None
-    user.code_expiration = None
-    user.auth_attempts = 0
-    session.add(user)
-    session.commit()
 
     logger.info(f"User authenticated successfully: {email}")
     return user
@@ -150,6 +194,9 @@ async def login_human(
     session: Session,
     data: HumanAuth,
 ) -> tuple[str, int]:
+    # Rate limit by tenant + email combination
+    check_rate_limit(f"human:{data.tenant_id}:{data.email.lower()}")
+
     # Check if human already exists
     statement = select(Humans).where(
         Humans.email == data.email,
@@ -157,19 +204,26 @@ async def login_human(
     )
     existing_human = session.exec(statement).first()
 
-    # Generate code and expiration
+    # Generate code
     auth_code = generate_auth_code()
-    code_expiration = create_code_expiration(CODE_EXPIRATION_MINUTES)
 
     tenant = session.get(Tenants, data.tenant_id)
 
     if existing_human:
-        # Human exists: store auth code on human record (like user login)
-        existing_human.auth_code = auth_code
-        existing_human.code_expiration = code_expiration
-        existing_human.auth_attempts = 0
-        session.add(existing_human)
-        session.commit()
+        # Human exists: store auth code
+        if is_redis_available():
+            auth_code_store.store_human_code(
+                data.tenant_id, data.email, auth_code, is_pending=False
+            )
+            logger.debug(f"Auth code stored in Redis for existing human: {data.email}")
+        else:
+            # Fall back to database storage
+            code_expiration = create_code_expiration(CODE_EXPIRATION_MINUTES)
+            existing_human.auth_code = auth_code
+            existing_human.code_expiration = code_expiration
+            existing_human.auth_attempts = 0
+            session.add(existing_human)
+            session.commit()
 
         # Get display name from latest application for email personalization
         display_name = existing_human.display_name
@@ -198,34 +252,50 @@ async def login_human(
         logger.info(f"Auth code sent to existing human: {data.email}")
         return data.email, CODE_EXPIRATION_MINUTES
 
-    # Human doesn't exist: create/update pending human record
-    pending_statement = select(PendingHumans).where(
-        PendingHumans.email == data.email,
-        PendingHumans.tenant_id == data.tenant_id,
-    )
-    pending_human = session.exec(pending_statement).first()
-
-    if pending_human:
-        # Update existing pending record with new auth code
-        pending_human.auth_code = auth_code
-        pending_human.code_expiration = code_expiration
-        pending_human.attempts = 0
-        pending_human.picture_url = data.picture_url
-        pending_human.red_flag = data.red_flag
-    else:
-        # Create new pending record (minimal data)
-        pending_human = PendingHumans(
+    # Human doesn't exist: create pending record
+    if is_redis_available():
+        # Store pending human data and auth code in Redis
+        pending_human_store.store(
             tenant_id=data.tenant_id,
             email=data.email,
-            auth_code=auth_code,
-            code_expiration=code_expiration,
             picture_url=data.picture_url,
             red_flag=data.red_flag,
-            attempts=0,
         )
+        auth_code_store.store_human_code(
+            data.tenant_id, data.email, auth_code, is_pending=True
+        )
+        logger.debug(f"Pending human stored in Redis: {data.email}")
+    else:
+        # Fall back to database storage
+        code_expiration = create_code_expiration(CODE_EXPIRATION_MINUTES)
 
-    session.add(pending_human)
-    session.commit()
+        pending_statement = select(PendingHumans).where(
+            PendingHumans.email == data.email,
+            PendingHumans.tenant_id == data.tenant_id,
+        )
+        pending_human = session.exec(pending_statement).first()
+
+        if pending_human:
+            # Update existing pending record with new auth code
+            pending_human.auth_code = auth_code
+            pending_human.code_expiration = code_expiration
+            pending_human.attempts = 0
+            pending_human.picture_url = data.picture_url
+            pending_human.red_flag = data.red_flag
+        else:
+            # Create new pending record (minimal data)
+            pending_human = PendingHumans(
+                tenant_id=data.tenant_id,
+                email=data.email,
+                auth_code=auth_code,
+                code_expiration=code_expiration,
+                picture_url=data.picture_url,
+                red_flag=data.red_flag,
+                attempts=0,
+            )
+
+        session.add(pending_human)
+        session.commit()
 
     # Send email with code (use email as greeting since no name yet)
     email_service = get_email_service()
@@ -284,28 +354,132 @@ async def authenticate_human(
     existing_human = session.exec(human_statement).first()
 
     if existing_human:
-        # Human exists: authenticate using human record (like user authentication)
-        if not existing_human.auth_code or not existing_human.code_expiration:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No authentication code pending",
+        # Human exists: authenticate
+        if is_redis_available():
+            is_valid, error_message = auth_code_store.verify_human_code(
+                tenant_id, email, code, is_pending=False
+            )
+            if not is_valid:
+                if "Maximum" in error_message:
+                    raise HTTPException(
+                        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                        detail=error_message,
+                    )
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail=error_message,
+                )
+        else:
+            # Fall back to database verification
+            if not existing_human.auth_code or not existing_human.code_expiration:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="No authentication code pending",
+                )
+
+            if existing_human.auth_attempts >= MAX_AUTH_ATTEMPTS:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="Maximum authentication attempts exceeded. Please request a new code.",
+                )
+
+            is_valid, error_message = is_code_valid(
+                stored_code=existing_human.auth_code,
+                provided_code=code,
+                expiration=existing_human.code_expiration,
             )
 
-        if existing_human.auth_attempts >= MAX_AUTH_ATTEMPTS:
+            if not is_valid:
+                existing_human.auth_attempts += 1
+                session.add(existing_human)
+                session.commit()
+
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail=error_message,
+                )
+
+            # Clear auth code and reset attempts
+            existing_human.auth_code = None
+            existing_human.code_expiration = None
+            existing_human.auth_attempts = 0
+            session.add(existing_human)
+            session.commit()
+
+        logger.info(f"Human authenticated successfully: {email}")
+        return existing_human
+
+    # Human doesn't exist: use pending human flow
+    if is_redis_available():
+        # Verify code from Redis
+        is_valid, error_message = auth_code_store.verify_human_code(
+            tenant_id, email, code, is_pending=True
+        )
+        if not is_valid:
+            if "Maximum" in error_message:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail=error_message,
+                )
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=error_message,
+            )
+
+        # Get pending human data from Redis
+        pending_data = pending_human_store.get(tenant_id, email)
+        if not pending_data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No pending registration found",
+            )
+
+        # Create actual human record
+        human = Humans(
+            tenant_id=pending_data["tenant_id"],
+            email=pending_data["email"],
+            picture_url=pending_data["picture_url"],
+            red_flag=pending_data["red_flag"],
+        )
+
+        session.add(human)
+        session.commit()
+        session.refresh(human)
+
+        # Clean up Redis
+        pending_human_store.delete(tenant_id, email)
+    else:
+        # Fall back to database pending human flow
+        pending_statement = select(PendingHumans).where(
+            PendingHumans.email == email,
+            PendingHumans.tenant_id == tenant_id,
+        )
+        pending_human = session.exec(pending_statement).first()
+
+        if not pending_human:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No pending registration found",
+            )
+
+        # Check max attempts
+        if pending_human.attempts >= MAX_AUTH_ATTEMPTS:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Maximum authentication attempts exceeded. Please request a new code.",
+                detail="Maximum verification attempts exceeded. Please request a new code.",
             )
 
+        # Validate code
         is_valid, error_message = is_code_valid(
-            stored_code=existing_human.auth_code,
+            stored_code=pending_human.auth_code,
             provided_code=code,
-            expiration=existing_human.code_expiration,
+            expiration=pending_human.code_expiration,
         )
 
         if not is_valid:
-            existing_human.auth_attempts += 1
-            session.add(existing_human)
+            # Increment attempts
+            pending_human.attempts += 1
+            session.add(pending_human)
             session.commit()
 
             raise HTTPException(
@@ -313,69 +487,21 @@ async def authenticate_human(
                 detail=error_message,
             )
 
-        # Clear auth code and reset attempts
-        existing_human.auth_code = None
-        existing_human.code_expiration = None
-        existing_human.auth_attempts = 0
-        session.add(existing_human)
+        # Create actual human record (minimal - profile data comes from Applications)
+        human = Humans(
+            tenant_id=pending_human.tenant_id,
+            email=pending_human.email,
+            picture_url=pending_human.picture_url,
+            red_flag=pending_human.red_flag,
+        )
+
+        session.add(human)
+
+        # Delete pending human record
+        session.delete(pending_human)
+
         session.commit()
-
-        logger.info(f"Human authenticated successfully: {email}")
-        return existing_human
-
-    # Human doesn't exist: use pending human flow
-    pending_statement = select(PendingHumans).where(
-        PendingHumans.email == email,
-        PendingHumans.tenant_id == tenant_id,
-    )
-    pending_human = session.exec(pending_statement).first()
-
-    if not pending_human:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No pending registration found",
-        )
-
-    # Check max attempts
-    if pending_human.attempts >= MAX_AUTH_ATTEMPTS:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Maximum verification attempts exceeded. Please request a new code.",
-        )
-
-    # Validate code
-    is_valid, error_message = is_code_valid(
-        stored_code=pending_human.auth_code,
-        provided_code=code,
-        expiration=pending_human.code_expiration,
-    )
-
-    if not is_valid:
-        # Increment attempts
-        pending_human.attempts += 1
-        session.add(pending_human)
-        session.commit()
-
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=error_message,
-        )
-
-    # Create actual human record (minimal - profile data comes from Applications)
-    human = Humans(
-        tenant_id=pending_human.tenant_id,
-        email=pending_human.email,
-        picture_url=pending_human.picture_url,
-        red_flag=pending_human.red_flag,
-    )
-
-    session.add(human)
-
-    # Delete pending human record
-    session.delete(pending_human)
-
-    session.commit()
-    session.refresh(human)
+        session.refresh(human)
 
     # Link any existing attendees with matching email to this new human
     from app.api.attendee.crud import attendees_crud
