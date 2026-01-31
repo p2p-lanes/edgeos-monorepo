@@ -1,6 +1,7 @@
 import { useForm } from "@tanstack/react-form"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
+import { DollarSign, Package, Tag, Ticket } from "lucide-react"
 
 import {
   type ProductCategory,
@@ -13,6 +14,7 @@ import {
 } from "@/client"
 import { DangerZone } from "@/components/Common/DangerZone"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -21,7 +23,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { LoadingButton } from "@/components/ui/loading-button"
@@ -32,6 +33,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Separator } from "@/components/ui/separator"
+import { Switch } from "@/components/ui/switch"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
@@ -42,11 +45,15 @@ interface ProductFormProps {
   onSuccess: () => void
 }
 
-const PRODUCT_CATEGORIES: { value: ProductCategory; label: string }[] = [
-  { value: "ticket", label: "Ticket" },
-  { value: "housing", label: "Housing" },
-  { value: "merch", label: "Merchandise" },
-  { value: "other", label: "Other" },
+const PRODUCT_CATEGORIES: {
+  value: ProductCategory
+  label: string
+  icon: typeof Package
+}[] = [
+  { value: "ticket", label: "Ticket", icon: Ticket },
+  { value: "housing", label: "Housing", icon: Package },
+  { value: "merch", label: "Merchandise", icon: Tag },
+  { value: "other", label: "Other", icon: Package },
 ]
 
 const TICKET_DURATIONS: { value: TicketDuration; label: string }[] = [
@@ -161,246 +168,290 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
     return <WorkspaceAlert resource="product" action="create" />
   }
 
+  const getCategoryInfo = (category: ProductCategory) =>
+    PRODUCT_CATEGORIES.find((c) => c.value === category) ||
+    PRODUCT_CATEGORIES[0]
+
+  const getDurationLabel = (duration: TicketDuration) =>
+    TICKET_DURATIONS.find((d) => d.value === duration)?.label || duration
+
+  const getAttendeeLabel = (category: TicketAttendeeCategory) =>
+    ATTENDEE_CATEGORIES.find((c) => c.value === category)?.label || category
+
   return (
     <div className="space-y-6">
-      {isEdit && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Product Information</CardTitle>
-            <CardDescription>Details about this product</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <Label className="text-muted-foreground">Slug</Label>
-                <p className="font-mono text-sm">{defaultValues.slug}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      <Card className="max-w-2xl">
-        <CardHeader>
-          <CardTitle>
-            {readOnly
-              ? "Product Details"
-              : isEdit
-                ? "Edit Product"
-                : "Product Details"}
-          </CardTitle>
-          <CardDescription>
-            {readOnly
-              ? "View product information (read-only)"
-              : isEdit
-                ? "Update the product information"
-                : "Enter the information for the new product/ticket"}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault()
-              if (!readOnly) {
-                form.handleSubmit()
-              }
-            }}
-            className="space-y-6"
-          >
-            <form.Field
-              name="name"
-              validators={{
-                onBlur: ({ value }) =>
-                  !readOnly && !value ? "Name is required" : undefined,
-              }}
-            >
-              {(field) => (
-                <div className="space-y-2">
-                  <Label htmlFor="name">
-                    Name{" "}
-                    {!readOnly && <span className="text-destructive">*</span>}
-                  </Label>
-                  <Input
-                    id="name"
-                    placeholder="General Admission"
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    disabled={readOnly}
-                  />
-                  {field.state.meta.errors.length > 0 && (
-                    <p className="text-destructive text-sm">
-                      {field.state.meta.errors.join(", ")}
-                    </p>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (!readOnly) {
+            form.handleSubmit()
+          }
+        }}
+        className="space-y-6"
+      >
+        <div className="grid gap-6 lg:grid-cols-3">
+          {/* Left Column - Form Fields */}
+          <div className="space-y-6 lg:col-span-2">
+            {/* Basic Information */}
+            <Card>
+              <CardHeader>
+                <CardTitle>
+                  {readOnly
+                    ? "Product Details"
+                    : isEdit
+                      ? "Basic Information"
+                      : "Product Details"}
+                </CardTitle>
+                <CardDescription>
+                  {readOnly
+                    ? "View product information (read-only)"
+                    : isEdit
+                      ? "Update the product name, category, and pricing"
+                      : "Enter the basic information for the new product"}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <form.Field
+                  name="name"
+                  validators={{
+                    onBlur: ({ value }) =>
+                      !readOnly && !value ? "Name is required" : undefined,
+                  }}
+                >
+                  {(field) => (
+                    <div className="space-y-2">
+                      <Label htmlFor="name">
+                        Name{" "}
+                        {!readOnly && (
+                          <span className="text-destructive">*</span>
+                        )}
+                      </Label>
+                      <Input
+                        id="name"
+                        placeholder="General Admission"
+                        value={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                        disabled={readOnly}
+                      />
+                      {field.state.meta.errors.length > 0 && (
+                        <p className="text-destructive text-sm">
+                          {field.state.meta.errors.join(", ")}
+                        </p>
+                      )}
+                    </div>
                   )}
-                </div>
-              )}
-            </form.Field>
+                </form.Field>
 
-            <form.Field name="category">
-              {(field) => (
-                <div className="space-y-2">
-                  <Label htmlFor="category">
-                    Category{" "}
-                    {!readOnly && <span className="text-destructive">*</span>}
-                  </Label>
-                  <Select
-                    value={field.state.value}
-                    onValueChange={(val) =>
-                      field.handleChange(val as ProductCategory)
-                    }
-                    disabled={readOnly}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <form.Field name="category">
+                    {(field) => (
+                      <div className="space-y-2">
+                        <Label htmlFor="category">
+                          Category{" "}
+                          {!readOnly && (
+                            <span className="text-destructive">*</span>
+                          )}
+                        </Label>
+                        <Select
+                          value={field.state.value}
+                          onValueChange={(val) =>
+                            field.handleChange(val as ProductCategory)
+                          }
+                          disabled={readOnly}
+                        >
+                          <SelectTrigger id="category">
+                            <SelectValue placeholder="Select category" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {PRODUCT_CATEGORIES.map((cat) => (
+                              <SelectItem key={cat.value} value={cat.value}>
+                                {cat.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-sm text-muted-foreground">
+                          Tickets have additional options
+                        </p>
+                      </div>
+                    )}
+                  </form.Field>
+
+                  <form.Field
+                    name="price"
+                    validators={{
+                      onBlur: ({ value }) =>
+                        !readOnly && !value ? "Price is required" : undefined,
+                    }}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PRODUCT_CATEGORIES.map((cat) => (
-                        <SelectItem key={cat.value} value={cat.value}>
-                          {cat.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-sm text-muted-foreground">
-                    The type of product (tickets have additional options)
-                  </p>
+                    {(field) => (
+                      <div className="space-y-2">
+                        <Label htmlFor="price">
+                          Price{" "}
+                          {!readOnly && (
+                            <span className="text-destructive">*</span>
+                          )}
+                        </Label>
+                        <Input
+                          id="price"
+                          placeholder="100.00"
+                          type="text"
+                          value={field.state.value}
+                          onBlur={field.handleBlur}
+                          onChange={(e) => field.handleChange(e.target.value)}
+                          disabled={readOnly}
+                        />
+                        {field.state.meta.errors.length > 0 && (
+                          <p className="text-destructive text-sm">
+                            {field.state.meta.errors.join(", ")}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </form.Field>
                 </div>
-              )}
-            </form.Field>
 
-            <form.Field
-              name="price"
-              validators={{
-                onBlur: ({ value }) =>
-                  !readOnly && !value ? "Price is required" : undefined,
-              }}
-            >
-              {(field) => (
-                <div className="space-y-2">
-                  <Label htmlFor="price">
-                    Price{" "}
-                    {!readOnly && <span className="text-destructive">*</span>}
-                  </Label>
-                  <Input
-                    id="price"
-                    placeholder="100.00"
-                    type="text"
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    disabled={readOnly}
-                  />
-                  {field.state.meta.errors.length > 0 && (
-                    <p className="text-destructive text-sm">
-                      {field.state.meta.errors.join(", ")}
-                    </p>
+                <form.Field name="description">
+                  {(field) => (
+                    <div className="space-y-2">
+                      <Label htmlFor="description">Description</Label>
+                      <Input
+                        id="description"
+                        placeholder="Product description..."
+                        value={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                        disabled={readOnly}
+                      />
+                      <p className="text-sm text-muted-foreground">
+                        Optional description shown to customers
+                      </p>
+                    </div>
                   )}
-                </div>
-              )}
-            </form.Field>
+                </form.Field>
+              </CardContent>
+            </Card>
 
-            <form.Field name="description">
-              {(field) => (
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Input
-                    id="description"
-                    placeholder="Product description..."
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    disabled={readOnly}
-                  />
-                </div>
-              )}
-            </form.Field>
-
+            {/* Ticket Options - Only shown when category is "ticket" */}
             <form.Subscribe selector={(state) => state.values.category}>
               {(category) =>
                 category === "ticket" && (
-                  <>
-                    <form.Field name="duration_type">
-                      {(field) => (
-                        <div className="space-y-2">
-                          <Label htmlFor="duration_type">Duration Type</Label>
-                          <Select
-                            value={field.state.value}
-                            onValueChange={(val) =>
-                              field.handleChange(val as TicketDuration)
-                            }
-                            disabled={readOnly}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select duration" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {TICKET_DURATIONS.map((dur) => (
-                                <SelectItem key={dur.value} value={dur.value}>
-                                  {dur.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <p className="text-sm text-muted-foreground">
-                            How long the ticket is valid for
-                          </p>
-                        </div>
-                      )}
-                    </form.Field>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Ticket Options</CardTitle>
+                      <CardDescription>
+                        Configure ticket-specific settings
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <form.Field name="duration_type">
+                          {(field) => (
+                            <div className="space-y-2">
+                              <Label htmlFor="duration_type">Duration</Label>
+                              <Select
+                                value={field.state.value}
+                                onValueChange={(val) =>
+                                  field.handleChange(val as TicketDuration)
+                                }
+                                disabled={readOnly}
+                              >
+                                <SelectTrigger id="duration_type">
+                                  <SelectValue placeholder="Select duration" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {TICKET_DURATIONS.map((dur) => (
+                                    <SelectItem
+                                      key={dur.value}
+                                      value={dur.value}
+                                    >
+                                      {dur.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <p className="text-sm text-muted-foreground">
+                                How long the ticket is valid
+                              </p>
+                            </div>
+                          )}
+                        </form.Field>
 
-                    <form.Field name="attendee_category">
-                      {(field) => (
-                        <div className="space-y-2">
-                          <Label htmlFor="attendee_category">
-                            Attendee Category
-                          </Label>
-                          <Select
-                            value={field.state.value}
-                            onValueChange={(val) =>
-                              field.handleChange(val as TicketAttendeeCategory)
-                            }
-                            disabled={readOnly}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select attendee category" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {ATTENDEE_CATEGORIES.map((cat) => (
-                                <SelectItem key={cat.value} value={cat.value}>
-                                  {cat.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <p className="text-sm text-muted-foreground">
-                            Which type of attendee can purchase this ticket
-                          </p>
-                        </div>
-                      )}
-                    </form.Field>
-                  </>
+                        <form.Field name="attendee_category">
+                          {(field) => (
+                            <div className="space-y-2">
+                              <Label htmlFor="attendee_category">
+                                Attendee Type
+                              </Label>
+                              <Select
+                                value={field.state.value}
+                                onValueChange={(val) =>
+                                  field.handleChange(
+                                    val as TicketAttendeeCategory,
+                                  )
+                                }
+                                disabled={readOnly}
+                              >
+                                <SelectTrigger id="attendee_category">
+                                  <SelectValue placeholder="Select attendee type" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {ATTENDEE_CATEGORIES.map((cat) => (
+                                    <SelectItem
+                                      key={cat.value}
+                                      value={cat.value}
+                                    >
+                                      {cat.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <p className="text-sm text-muted-foreground">
+                                Who can purchase this ticket
+                              </p>
+                            </div>
+                          )}
+                        </form.Field>
+                      </div>
+                    </CardContent>
+                  </Card>
                 )
               }
             </form.Subscribe>
 
-            <form.Field name="is_active">
-              {(field) => (
-                <div className="flex items-center gap-3">
-                  <Checkbox
-                    id="is_active"
-                    checked={field.state.value}
-                    onCheckedChange={(val) => field.handleChange(!!val)}
-                    disabled={readOnly}
-                  />
-                  <Label htmlFor="is_active" className="font-normal">
-                    Active (available for purchase)
-                  </Label>
-                </div>
-              )}
-            </form.Field>
+            {/* Status */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Status</CardTitle>
+                <CardDescription>Control product availability</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form.Field name="is_active">
+                  {(field) => (
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="is_active">Active</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Product is available for purchase
+                        </p>
+                      </div>
+                      <Switch
+                        id="is_active"
+                        checked={field.state.value}
+                        onCheckedChange={(checked) =>
+                          field.handleChange(checked)
+                        }
+                        disabled={readOnly}
+                      />
+                    </div>
+                  )}
+                </form.Field>
+              </CardContent>
+            </Card>
 
-            <div className="flex gap-4 pt-4">
+            {/* Form Actions */}
+            <div className="flex gap-4">
               <Button
                 type="button"
                 variant="outline"
@@ -414,9 +465,132 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
                 </LoadingButton>
               )}
             </div>
-          </form>
-        </CardContent>
-      </Card>
+          </div>
+
+          {/* Right Column - Summary/Preview */}
+          <div className="space-y-6">
+            <form.Subscribe
+              selector={(state) => ({
+                name: state.values.name,
+                price: state.values.price,
+                category: state.values.category,
+                description: state.values.description,
+                is_active: state.values.is_active,
+                duration_type: state.values.duration_type,
+                attendee_category: state.values.attendee_category,
+              })}
+            >
+              {(values) => {
+                const categoryInfo = getCategoryInfo(values.category)
+                const CategoryIcon = categoryInfo.icon
+
+                return (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Preview</CardTitle>
+                      <CardDescription>
+                        How this product will appear
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                          <CategoryIcon className="h-5 w-5 text-primary" />
+                        </div>
+                        <div className="flex-1 space-y-1">
+                          <p className="font-medium leading-none">
+                            {values.name || "Product Name"}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {categoryInfo.label}
+                          </p>
+                        </div>
+                      </div>
+
+                      <Separator />
+
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <DollarSign className="h-4 w-4" />
+                          <span className="text-sm">Price</span>
+                        </div>
+                        <span className="font-semibold">
+                          ${values.price || "0.00"}
+                        </span>
+                      </div>
+
+                      {values.description && (
+                        <>
+                          <Separator />
+                          <p className="text-sm text-muted-foreground">
+                            {values.description}
+                          </p>
+                        </>
+                      )}
+
+                      {values.category === "ticket" && (
+                        <>
+                          <Separator />
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-muted-foreground">
+                                Duration
+                              </span>
+                              <span>
+                                {getDurationLabel(values.duration_type)}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-muted-foreground">For</span>
+                              <span>
+                                {getAttendeeLabel(values.attendee_category)}
+                              </span>
+                            </div>
+                          </div>
+                        </>
+                      )}
+
+                      <Separator />
+
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">
+                          Status
+                        </span>
+                        <Badge
+                          variant={values.is_active ? "default" : "secondary"}
+                        >
+                          {values.is_active ? "Active" : "Inactive"}
+                        </Badge>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              }}
+            </form.Subscribe>
+
+            {isEdit && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Product Details</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Slug</p>
+                    <p className="font-mono text-sm">{defaultValues.slug}</p>
+                  </div>
+                  <Separator />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Product ID</p>
+                    <p className="font-mono text-xs text-muted-foreground">
+                      {defaultValues.id}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </div>
+      </form>
 
       {isEdit && !readOnly && (
         <DangerZone
