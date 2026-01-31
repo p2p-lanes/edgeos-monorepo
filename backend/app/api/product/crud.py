@@ -1,0 +1,66 @@
+import uuid
+
+from sqlmodel import Session, select
+
+from app.api.product.models import Products
+from app.api.product.schemas import ProductCategory, ProductCreate, ProductUpdate
+from app.api.shared.crud import BaseCRUD
+
+
+class ProductsCRUD(BaseCRUD[Products, ProductCreate, ProductUpdate]):
+    """CRUD operations for Products."""
+
+    def __init__(self) -> None:
+        super().__init__(Products)
+
+    def get_by_slug(
+        self, session: Session, slug: str, popup_id: uuid.UUID
+    ) -> Products | None:
+        """Get a product by slug and popup_id."""
+        statement = select(Products).where(
+            Products.slug == slug, Products.popup_id == popup_id
+        )
+        return session.exec(statement).first()
+
+    def find_by_popup(
+        self,
+        session: Session,
+        popup_id: uuid.UUID,
+        skip: int = 0,
+        limit: int = 100,
+        is_active: bool | None = None,
+        category: ProductCategory | None = None,
+    ) -> tuple[list[Products], int]:
+        """Find products by popup_id with optional filters."""
+        statement = select(Products).where(Products.popup_id == popup_id)
+
+        if is_active is not None:
+            statement = statement.where(Products.is_active == is_active)
+
+        if category is not None:
+            statement = statement.where(Products.category == category)
+
+        # Get total count
+        from sqlmodel import func
+
+        count_statement = select(func.count()).select_from(statement.subquery())
+        total = session.exec(count_statement).one()
+
+        # Apply pagination
+        statement = statement.offset(skip).limit(limit)
+        results = list(session.exec(statement).all())
+
+        return results, total
+
+    def get_by_ids(
+        self, session: Session, ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, Products]:
+        """Get multiple products by their IDs and return as a dict."""
+        if not ids:
+            return {}
+        statement = select(Products).where(Products.id.in_(ids))  # type: ignore[attr-defined]
+        products = session.exec(statement).all()
+        return {p.id: p for p in products}
+
+
+products_crud = ProductsCRUD()

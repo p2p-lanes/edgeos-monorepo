@@ -1,0 +1,37 @@
+{
+  "tenant": {
+    "name": "Demo",
+    "slug": "demo"
+  },
+  "popup": {
+    "name": "Demo Popup",
+    "slug": "demo-popup",
+    "status": "active",
+    "requires_approval": false,
+    "allows_spouse": true,
+    "allows_children": true,
+    "allows_coupons": true
+  },
+  "users": {
+    "admin": {
+      "email": "admin@demo.com",
+      "full_name": "Demo Admin",
+      "role": "admin"
+    },
+    "viewer": {
+      "email": "viewer@demo.com",
+      "full_name": "Demo Viewer",
+      "role": "viewer"
+    }
+  },
+  "product": {
+    "name": "General Admission",
+    "slug": "general-admission",
+    "price": "99.00",
+    "description": "Standard entry ticket",
+    "category": "ticket",
+    "attendee_category": "main",
+    "is_active": true,
+    "exclusive": false
+  }
+}
