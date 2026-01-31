@@ -1,0 +1,11 @@
+{
+  "name": "EdgeOS",
+  "private": true,
+  "workspaces": [
+    "backoffice"
+  ],
+  "scripts": {
+    "dev": "bun run --filter backoffice dev",
+    "lint": "bun run --filter backoffice lint"
+  }
+}
