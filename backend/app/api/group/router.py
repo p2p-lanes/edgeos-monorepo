@@ -353,6 +353,13 @@ async def add_group_member(
     # Validate member addition
     crud.groups_crud.validate_member_addition(group, human.id, update_existing=False)
 
+    # Check if human is red-flagged - they are automatically rejected
+    if human.red_flag:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot add red-flagged human to group. They are automatically rejected.",
+        )
+
     # Check for existing application
     application = applications_crud.get_by_human_popup(db, human.id, group.popup_id)
 

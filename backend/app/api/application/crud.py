@@ -19,6 +19,12 @@ from app.api.human.schemas import HumanCreate, HumanUpdate
 from app.api.shared.crud import BaseCRUD
 
 
+class RedFlaggedHumanError(Exception):
+    """Raised when attempting to accept an application from a red-flagged human."""
+
+    pass
+
+
 class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpdate]):
     """CRUD operations for Applications."""
 
@@ -514,13 +520,25 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
     ) -> Applications:
         """Submit an application.
 
+        If the human is red-flagged, the application is automatically rejected.
         If no approval strategy exists or strategy is AUTO_ACCEPT, the application
-        is automatically accepted. Otherwise, sets status to IN_REVIEW for manual review.
+        is automatically accepted.
+        Otherwise, sets status to IN_REVIEW for manual review.
         """
         from app.api.approval_strategy.crud import approval_strategies_crud
         from app.api.approval_strategy.schemas import ApprovalStrategyType
 
         application.submitted_at = datetime.now(timezone.utc)
+
+        # Red-flagged humans are automatically rejected
+        human_red_flag = application.human.red_flag if application.human else False
+        if human_red_flag:
+            application.status = ApplicationStatus.REJECTED.value
+            session.add(application)
+            self.create_snapshot(session, application, "auto_rejected")
+            session.commit()
+            session.refresh(application)
+            return application
 
         # Check approval strategy - no strategy means auto-accept
         strategy = approval_strategies_crud.get_by_popup(session, application.popup_id)
@@ -547,7 +565,18 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         session: Session,
         application: Applications,
     ) -> Applications:
-        """Accept an application and create snapshot."""
+        """Accept an application and create snapshot.
+
+        Raises:
+            RedFlaggedHumanError: If the human is red-flagged and cannot be accepted.
+        """
+        # Red-flagged humans cannot be accepted
+        human_red_flag = application.human.red_flag if application.human else False
+        if human_red_flag:
+            raise RedFlaggedHumanError(
+                "Cannot accept application from a red-flagged human"
+            )
+
         application.status = ApplicationStatus.ACCEPTED.value
         application.accepted_at = datetime.now(timezone.utc)
         session.add(application)

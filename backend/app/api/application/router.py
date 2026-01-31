@@ -194,6 +194,15 @@ async def update_application_admin(
             detail="Cannot approve or reject a draft application. The applicant must submit it first.",
         )
 
+    # Prevent accepting red-flagged humans
+    if app_in.status == ApplicationStatus.ACCEPTED:
+        human_red_flag = application.human.red_flag if application.human else False
+        if human_red_flag:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot accept application from a red-flagged human.",
+            )
+
     # Handle status change to ACCEPTED
     if (
         app_in.status == ApplicationStatus.ACCEPTED
