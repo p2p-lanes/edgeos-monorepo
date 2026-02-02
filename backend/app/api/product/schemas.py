@@ -47,7 +47,9 @@ class ProductBase(SQLModel):
     )
     description: str | None = Field(default=None, nullable=True)
     category: ProductCategory = Field(default=ProductCategory.TICKET, index=True)
-    attendee_category: TicketAttendeeCategory | None = Field(default=None, nullable=True)
+    attendee_category: TicketAttendeeCategory | None = Field(
+        default=None, nullable=True
+    )
     duration_type: TicketDuration | None = Field(default=None, nullable=True)
     start_date: datetime | None = Field(default=None, nullable=True)
     end_date: datetime | None = Field(default=None, nullable=True)
