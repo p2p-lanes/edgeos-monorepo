@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 from fastapi import APIRouter, HTTPException, status
 
 from app.api.human import crud
-from app.api.human.schemas import HumanPublic, HumanUpdate
+from app.api.human.schemas import HumanCreate, HumanPublic, HumanUpdate
 from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, Paging
 from app.core.dependencies.users import CurrentHuman, CurrentUser, TenantSession
@@ -13,6 +13,14 @@ if TYPE_CHECKING:
     from app.api.user.schemas import UserPublic
 
 router = APIRouter(prefix="/humans", tags=["humans"])
+
+
+def _check_superadmin(current_user: "UserPublic") -> None:
+    if current_user.role != UserRole.SUPERADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only superadmins can perform this action",
+        )
 
 
 def _check_write_permission(current_user: "UserPublic") -> None:
@@ -40,6 +48,35 @@ async def list_humans(
             total=total,
         ),
     )
+
+
+@router.post("", response_model=HumanPublic, status_code=status.HTTP_201_CREATED)
+async def create_human(
+    human_in: HumanCreate,
+    db: TenantSession,
+    current_user: CurrentUser,
+) -> HumanPublic:
+    """Create a human (superadmin only, for testing purposes)."""
+    _check_superadmin(current_user)
+
+    # Check if human with this email already exists
+    existing = crud.get_by_email(db, human_in.email)
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Human with this email already exists",
+        )
+
+    # Get tenant_id from session context
+    tenant_id = db.info.get("tenant_id")
+    if not tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Tenant context required",
+        )
+
+    human = crud.create_internal(db, human_in, tenant_id)
+    return HumanPublic.model_validate(human)
 
 
 @router.get("/me", response_model=HumanPublic)
