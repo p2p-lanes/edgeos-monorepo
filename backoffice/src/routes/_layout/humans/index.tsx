@@ -1,7 +1,7 @@
 import { useSuspenseQuery } from "@tanstack/react-query"
 import { createFileRoute, Link } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
-import { AlertCircle, EllipsisVertical, Eye, Pencil } from "lucide-react"
+import { AlertCircle, EllipsisVertical, Eye, Pencil, Plus } from "lucide-react"
 import { Suspense, useState } from "react"
 
 import { type HumanPublic, HumansService } from "@/client"
@@ -129,8 +129,20 @@ function HumansTable() {
   )
 }
 
+function AddHumanButton() {
+  return (
+    <Button asChild>
+      <Link to="/humans/new">
+        <Plus className="mr-2 h-4 w-4" />
+        Create Human
+      </Link>
+    </Button>
+  )
+}
+
 function Humans() {
-  const { needsTenantSelection } = useWorkspace()
+  const { needsTenantSelection, isContextReady } = useWorkspace()
+  const { isSuperadmin } = useAuth()
 
   return (
     <div className="flex flex-col gap-6">
@@ -150,6 +162,7 @@ function Humans() {
             End-users who interact with your popups
           </p>
         </div>
+        {isSuperadmin && isContextReady && <AddHumanButton />}
       </div>
       {!needsTenantSelection && <HumansTable />}
     </div>

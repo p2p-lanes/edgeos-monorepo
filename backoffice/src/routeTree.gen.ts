@@ -27,6 +27,7 @@ import { Route as LayoutAdminIndexRouteImport } from './routes/_layout/admin/ind
 import { Route as LayoutTenantsNewRouteImport } from './routes/_layout/tenants/new'
 import { Route as LayoutProductsNewRouteImport } from './routes/_layout/products/new'
 import { Route as LayoutPopupsNewRouteImport } from './routes/_layout/popups/new'
+import { Route as LayoutHumansNewRouteImport } from './routes/_layout/humans/new'
 import { Route as LayoutGroupsNewRouteImport } from './routes/_layout/groups/new'
 import { Route as LayoutFormBuilderNewRouteImport } from './routes/_layout/form-builder/new'
 import { Route as LayoutCouponsNewRouteImport } from './routes/_layout/coupons/new'
@@ -130,6 +131,11 @@ const LayoutPopupsNewRoute = LayoutPopupsNewRouteImport.update({
   path: '/popups/new',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutHumansNewRoute = LayoutHumansNewRouteImport.update({
+  id: '/humans/new',
+  path: '/humans/new',
+  getParentRoute: () => LayoutRoute,
+} as any)
 const LayoutGroupsNewRoute = LayoutGroupsNewRouteImport.update({
   id: '/groups/new',
   path: '/groups/new',
@@ -207,6 +213,7 @@ export interface FileRoutesByFullPath {
   '/coupons/new': typeof LayoutCouponsNewRoute
   '/form-builder/new': typeof LayoutFormBuilderNewRoute
   '/groups/new': typeof LayoutGroupsNewRoute
+  '/humans/new': typeof LayoutHumansNewRoute
   '/popups/new': typeof LayoutPopupsNewRoute
   '/products/new': typeof LayoutProductsNewRoute
   '/tenants/new': typeof LayoutTenantsNewRoute
@@ -239,6 +246,7 @@ export interface FileRoutesByTo {
   '/coupons/new': typeof LayoutCouponsNewRoute
   '/form-builder/new': typeof LayoutFormBuilderNewRoute
   '/groups/new': typeof LayoutGroupsNewRoute
+  '/humans/new': typeof LayoutHumansNewRoute
   '/popups/new': typeof LayoutPopupsNewRoute
   '/products/new': typeof LayoutProductsNewRoute
   '/tenants/new': typeof LayoutTenantsNewRoute
@@ -273,6 +281,7 @@ export interface FileRoutesById {
   '/_layout/coupons/new': typeof LayoutCouponsNewRoute
   '/_layout/form-builder/new': typeof LayoutFormBuilderNewRoute
   '/_layout/groups/new': typeof LayoutGroupsNewRoute
+  '/_layout/humans/new': typeof LayoutHumansNewRoute
   '/_layout/popups/new': typeof LayoutPopupsNewRoute
   '/_layout/products/new': typeof LayoutProductsNewRoute
   '/_layout/tenants/new': typeof LayoutTenantsNewRoute
@@ -307,6 +316,7 @@ export interface FileRouteTypes {
     | '/coupons/new'
     | '/form-builder/new'
     | '/groups/new'
+    | '/humans/new'
     | '/popups/new'
     | '/products/new'
     | '/tenants/new'
@@ -339,6 +349,7 @@ export interface FileRouteTypes {
     | '/coupons/new'
     | '/form-builder/new'
     | '/groups/new'
+    | '/humans/new'
     | '/popups/new'
     | '/products/new'
     | '/tenants/new'
@@ -372,6 +383,7 @@ export interface FileRouteTypes {
     | '/_layout/coupons/new'
     | '/_layout/form-builder/new'
     | '/_layout/groups/new'
+    | '/_layout/humans/new'
     | '/_layout/popups/new'
     | '/_layout/products/new'
     | '/_layout/tenants/new'
@@ -527,6 +539,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutPopupsNewRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/humans/new': {
+      id: '/_layout/humans/new'
+      path: '/humans/new'
+      fullPath: '/humans/new'
+      preLoaderRoute: typeof LayoutHumansNewRouteImport
+      parentRoute: typeof LayoutRoute
+    }
     '/_layout/groups/new': {
       id: '/_layout/groups/new'
       path: '/groups/new'
@@ -631,6 +650,7 @@ interface LayoutRouteChildren {
   LayoutCouponsNewRoute: typeof LayoutCouponsNewRoute
   LayoutFormBuilderNewRoute: typeof LayoutFormBuilderNewRoute
   LayoutGroupsNewRoute: typeof LayoutGroupsNewRoute
+  LayoutHumansNewRoute: typeof LayoutHumansNewRoute
   LayoutPopupsNewRoute: typeof LayoutPopupsNewRoute
   LayoutProductsNewRoute: typeof LayoutProductsNewRoute
   LayoutTenantsNewRoute: typeof LayoutTenantsNewRoute
@@ -663,6 +683,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutCouponsNewRoute: LayoutCouponsNewRoute,
   LayoutFormBuilderNewRoute: LayoutFormBuilderNewRoute,
   LayoutGroupsNewRoute: LayoutGroupsNewRoute,
+  LayoutHumansNewRoute: LayoutHumansNewRoute,
   LayoutPopupsNewRoute: LayoutPopupsNewRoute,
   LayoutProductsNewRoute: LayoutProductsNewRoute,
   LayoutTenantsNewRoute: LayoutTenantsNewRoute,

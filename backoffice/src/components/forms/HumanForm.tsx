@@ -3,7 +3,12 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import { AlertTriangle, Mail, MapPin, User } from "lucide-react"
 
-import { type HumanPublic, HumansService, type HumanUpdate } from "@/client"
+import {
+  type HumanCreate,
+  type HumanPublic,
+  HumansService,
+  type HumanUpdate,
+} from "@/client"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -23,7 +28,7 @@ import useCustomToast from "@/hooks/useCustomToast"
 import { handleError } from "@/utils"
 
 interface HumanFormProps {
-  defaultValues: HumanPublic
+  defaultValues?: HumanPublic
   onSuccess: () => void
 }
 
@@ -32,12 +37,13 @@ export function HumanForm({ defaultValues, onSuccess }: HumanFormProps) {
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
   const { isAdmin } = useAuth()
+  const isEdit = !!defaultValues
   const readOnly = !isAdmin
 
   const updateMutation = useMutation({
     mutationFn: (data: HumanUpdate) =>
       HumansService.updateHuman({
-        humanId: defaultValues.id,
+        humanId: defaultValues!.id,
         requestBody: data,
       }),
     onSuccess: () => {
@@ -48,36 +54,65 @@ export function HumanForm({ defaultValues, onSuccess }: HumanFormProps) {
     onError: handleError.bind(showErrorToast),
   })
 
+  const createMutation = useMutation({
+    mutationFn: (data: HumanCreate) =>
+      HumansService.createHuman({
+        requestBody: data,
+      }),
+    onSuccess: () => {
+      showSuccessToast("Human created successfully")
+      queryClient.invalidateQueries({ queryKey: ["humans"] })
+      onSuccess()
+    },
+    onError: handleError.bind(showErrorToast),
+  })
+
   const form = useForm({
     defaultValues: {
-      first_name: defaultValues.first_name ?? "",
-      last_name: defaultValues.last_name ?? "",
-      telegram: defaultValues.telegram ?? "",
-      organization: defaultValues.organization ?? "",
-      role: defaultValues.role ?? "",
-      gender: defaultValues.gender ?? "",
-      age: defaultValues.age ?? "",
-      residence: defaultValues.residence ?? "",
-      picture_url: defaultValues.picture_url ?? "",
-      red_flag: defaultValues.red_flag ?? false,
+      email: defaultValues?.email ?? "",
+      first_name: defaultValues?.first_name ?? "",
+      last_name: defaultValues?.last_name ?? "",
+      telegram: defaultValues?.telegram ?? "",
+      organization: defaultValues?.organization ?? "",
+      role: defaultValues?.role ?? "",
+      gender: defaultValues?.gender ?? "",
+      age: defaultValues?.age ?? "",
+      residence: defaultValues?.residence ?? "",
+      picture_url: defaultValues?.picture_url ?? "",
+      red_flag: defaultValues?.red_flag ?? false,
     },
     onSubmit: ({ value }) => {
-      updateMutation.mutate({
-        first_name: value.first_name || null,
-        last_name: value.last_name || null,
-        telegram: value.telegram || null,
-        organization: value.organization || null,
-        role: value.role || null,
-        gender: value.gender || null,
-        age: value.age || null,
-        residence: value.residence || null,
-        picture_url: value.picture_url || null,
-        red_flag: value.red_flag,
-      })
+      if (isEdit) {
+        updateMutation.mutate({
+          first_name: value.first_name || null,
+          last_name: value.last_name || null,
+          telegram: value.telegram || null,
+          organization: value.organization || null,
+          role: value.role || null,
+          gender: value.gender || null,
+          age: value.age || null,
+          residence: value.residence || null,
+          picture_url: value.picture_url || null,
+          red_flag: value.red_flag,
+        })
+      } else {
+        createMutation.mutate({
+          email: value.email,
+          first_name: value.first_name || null,
+          last_name: value.last_name || null,
+          telegram: value.telegram || null,
+          organization: value.organization || null,
+          role: value.role || null,
+          gender: value.gender || null,
+          age: value.age || null,
+          residence: value.residence || null,
+          picture_url: value.picture_url || null,
+        })
+      }
     },
   })
 
-  const isPending = updateMutation.isPending
+  const isPending = updateMutation.isPending || createMutation.isPending
 
   return (
     <div className="space-y-6">
@@ -91,6 +126,49 @@ export function HumanForm({ defaultValues, onSuccess }: HumanFormProps) {
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Left Column - Form Fields */}
           <div className="space-y-6 lg:col-span-2">
+            {/* Email (only for create mode) */}
+            {!isEdit && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Account</CardTitle>
+                  <CardDescription>
+                    Email address for the human (required)
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form.Field
+                    name="email"
+                    validators={{
+                      onChange: ({ value }) => {
+                        if (!value) return "Email is required"
+                        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))
+                          return "Invalid email format"
+                        return undefined
+                      },
+                    }}
+                  >
+                    {(field) => (
+                      <div className="space-y-2">
+                        <Label htmlFor={field.name}>Email *</Label>
+                        <Input
+                          id={field.name}
+                          type="email"
+                          placeholder="john@example.com"
+                          value={field.state.value}
+                          onChange={(e) => field.handleChange(e.target.value)}
+                        />
+                        {field.state.meta.errors.length > 0 && (
+                          <p className="text-sm text-destructive">
+                            {field.state.meta.errors[0]}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </form.Field>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Personal Information */}
             <Card>
               <CardHeader>
@@ -98,7 +176,9 @@ export function HumanForm({ defaultValues, onSuccess }: HumanFormProps) {
                 <CardDescription>
                   {readOnly
                     ? "View profile information (read-only)"
-                    : "Update the human's profile information"}
+                    : isEdit
+                      ? "Update the human's profile information"
+                      : "Enter the human's profile information"}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -254,38 +334,40 @@ export function HumanForm({ defaultValues, onSuccess }: HumanFormProps) {
               </CardContent>
             </Card>
 
-            {/* Status */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Status</CardTitle>
-                <CardDescription>User flags and status</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form.Field name="red_flag">
-                  {(field) => (
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label htmlFor={field.name}>Red Flag</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Mark this user as flagged for review
-                        </p>
+            {/* Status (only for edit mode) */}
+            {isEdit && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Status</CardTitle>
+                  <CardDescription>User flags and status</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form.Field name="red_flag">
+                    {(field) => (
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <Label htmlFor={field.name}>Red Flag</Label>
+                          <p className="text-sm text-muted-foreground">
+                            Mark this user as flagged for review
+                          </p>
+                        </div>
+                        <Switch
+                          id={field.name}
+                          checked={field.state.value}
+                          onCheckedChange={(checked) =>
+                            field.handleChange(checked)
+                          }
+                          disabled={readOnly}
+                        />
                       </div>
-                      <Switch
-                        id={field.name}
-                        checked={field.state.value}
-                        onCheckedChange={(checked) =>
-                          field.handleChange(checked)
-                        }
-                        disabled={readOnly}
-                      />
-                    </div>
-                  )}
-                </form.Field>
-              </CardContent>
-            </Card>
+                    )}
+                  </form.Field>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Form Actions */}
-            {isAdmin && (
+            {(isAdmin || !isEdit) && (
               <div className="flex gap-4">
                 <Button
                   type="button"
@@ -295,7 +377,7 @@ export function HumanForm({ defaultValues, onSuccess }: HumanFormProps) {
                   Cancel
                 </Button>
                 <LoadingButton type="submit" loading={isPending}>
-                  Save Changes
+                  {isEdit ? "Save Changes" : "Create Human"}
                 </LoadingButton>
               </div>
             )}
@@ -305,6 +387,7 @@ export function HumanForm({ defaultValues, onSuccess }: HumanFormProps) {
           <div className="space-y-6">
             <form.Subscribe
               selector={(state) => ({
+                email: state.values.email,
                 first_name: state.values.first_name,
                 last_name: state.values.last_name,
                 organization: state.values.organization,
@@ -355,7 +438,7 @@ export function HumanForm({ defaultValues, onSuccess }: HumanFormProps) {
 
                     <div className="flex items-center gap-2 text-sm">
                       <Mail className="h-4 w-4 text-muted-foreground" />
-                      <span>{defaultValues.email}</span>
+                      <span>{defaultValues?.email || values.email || "—"}</span>
                     </div>
 
                     {values.residence && (
@@ -382,24 +465,26 @@ export function HumanForm({ defaultValues, onSuccess }: HumanFormProps) {
               )}
             </form.Subscribe>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Human Details</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div>
-                  <p className="text-sm text-muted-foreground">Email</p>
-                  <p className="font-medium">{defaultValues.email}</p>
-                </div>
-                <Separator />
-                <div>
-                  <p className="text-sm text-muted-foreground">Human ID</p>
-                  <p className="font-mono text-xs text-muted-foreground">
-                    {defaultValues.id}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+            {isEdit && defaultValues && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Human Details</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Email</p>
+                    <p className="font-medium">{defaultValues.email}</p>
+                  </div>
+                  <Separator />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Human ID</p>
+                    <p className="font-mono text-xs text-muted-foreground">
+                      {defaultValues.id}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       </form>
