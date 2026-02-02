@@ -73,7 +73,7 @@ function ViewAttendee({ attendee }: { attendee: AttendeePublic }) {
           <DialogDescription>{attendee.name}</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <p className="text-sm font-medium text-muted-foreground">Name</p>
               <p className="font-medium">{attendee.name}</p>
@@ -149,7 +149,7 @@ function ViewAttendee({ attendee }: { attendee: AttendeePublic }) {
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4 text-sm text-muted-foreground">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-muted-foreground">
             {attendee.created_at && (
               <div>
                 Created: {new Date(attendee.created_at).toLocaleString()}

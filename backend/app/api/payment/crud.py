@@ -262,6 +262,77 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         return valid_products
 
+    def _validate_product_availability(
+        self,
+        session: Session,
+        requested_products: list[PaymentProductRequest],
+        valid_products: list[Products],
+    ) -> None:
+        """Validate that requested quantities don't exceed product max_quantity.
+
+        Checks against already sold (approved) and reserved (pending) quantities.
+        """
+        products_map = {p.id: p for p in valid_products}
+
+        # Get product IDs that have max_quantity set
+        product_ids_with_limit = [
+            p.id for p in valid_products if p.max_quantity is not None
+        ]
+        if not product_ids_with_limit:
+            return
+
+        # Count sold quantities (approved payments) for products with limits
+        sold_statement = (
+            select(
+                PaymentProducts.product_id,
+                func.sum(PaymentProducts.quantity).label("total_sold"),
+            )
+            .join(Payments, PaymentProducts.payment_id == Payments.id)
+            .where(
+                PaymentProducts.product_id.in_(product_ids_with_limit),  # type: ignore[attr-defined]
+                Payments.status.in_(  # type: ignore[attr-defined]
+                    [PaymentStatus.APPROVED.value, PaymentStatus.PENDING.value]
+                ),
+            )
+            .group_by(PaymentProducts.product_id)
+        )
+        sold_results = session.exec(sold_statement).all()
+        sold_map: dict[uuid.UUID, int] = {
+            row.product_id: int(row.total_sold) for row in sold_results
+        }
+
+        # Aggregate requested quantities per product
+        requested_map: dict[uuid.UUID, int] = {}
+        for req_prod in requested_products:
+            if req_prod.product_id in product_ids_with_limit:
+                requested_map[req_prod.product_id] = (
+                    requested_map.get(req_prod.product_id, 0) + req_prod.quantity
+                )
+
+        # Check availability for each product
+        for product_id, requested_qty in requested_map.items():
+            product = products_map[product_id]
+            max_qty = product.max_quantity
+            sold_qty = sold_map.get(product_id, 0)
+            available_qty = max_qty - sold_qty  # type: ignore[operator]
+
+            if requested_qty > available_qty:
+                logger.error(
+                    "Product %s (%s) quantity exceeded. "
+                    "Requested: %d, Available: %d, Max: %d, Sold: %d",
+                    product.name,
+                    product_id,
+                    requested_qty,
+                    available_qty,
+                    max_qty,
+                    sold_qty,
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Product '{product.name}' has insufficient availability. "
+                    f"Requested: {requested_qty}, Available: {available_qty}",
+                )
+
     def _validate_attendees(
         self,
         session: Session,
@@ -403,6 +474,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         self._validate_application(application)
         valid_products = self._validate_products(session, obj.products, application)
         self._validate_attendees(session, obj.products, application)
+        self._validate_product_availability(session, obj.products, valid_products)
         already_patreon = self._check_patreon_status(
             application, valid_products, obj.edit_passes
         )

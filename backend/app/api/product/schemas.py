@@ -55,6 +55,7 @@ class ProductBase(SQLModel):
     end_date: datetime | None = Field(default=None, nullable=True)
     is_active: bool = Field(default=True)
     exclusive: bool = Field(default=False)
+    max_quantity: int | None = Field(default=None, nullable=True)
 
 
 class ProductPublic(ProductBase):
@@ -81,6 +82,7 @@ class ProductCreate(BaseModel):
     end_date: datetime | None = None
     is_active: bool = True
     exclusive: bool = False
+    max_quantity: int | None = None
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -112,6 +114,7 @@ class ProductUpdate(BaseModel):
     end_date: datetime | None = None
     is_active: bool | None = None
     exclusive: bool | None = None
+    max_quantity: int | None = None
 
 
 class ProductWithQuantity(ProductPublic):

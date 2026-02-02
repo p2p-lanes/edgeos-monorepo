@@ -273,7 +273,7 @@ function ViewApplicationDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <p className="text-sm font-medium text-muted-foreground">Email</p>
               <p>{application.human?.email}</p>
@@ -348,7 +348,7 @@ function ViewApplicationDialog({
                 <hr />
                 <div>
                   <h4 className="font-medium mb-2">Custom Fields</h4>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {Object.entries(application.custom_fields).map(
                       ([key, value]) => (
                         <div key={key}>
@@ -393,7 +393,7 @@ function ViewApplicationDialog({
             </>
           )}
 
-          <div className="grid grid-cols-2 gap-4 text-sm text-muted-foreground">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-muted-foreground">
             {application.submitted_at && (
               <div>
                 Submitted: {new Date(application.submitted_at).toLocaleString()}

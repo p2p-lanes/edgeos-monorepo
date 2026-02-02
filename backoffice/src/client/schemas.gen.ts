@@ -4852,6 +4852,17 @@ export const ProductCreateSchema = {
             type: 'boolean',
             title: 'Exclusive',
             default: false
+        },
+        max_quantity: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Quantity'
         }
     },
     type: 'object',
@@ -4965,6 +4976,17 @@ export const ProductPublicSchema = {
             type: 'boolean',
             title: 'Exclusive',
             default: false
+        },
+        max_quantity: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Quantity'
         },
         id: {
             type: 'string',
@@ -5118,6 +5140,17 @@ export const ProductUpdateSchema = {
                 }
             ],
             title: 'Exclusive'
+        },
+        max_quantity: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Quantity'
         }
     },
     type: 'object',

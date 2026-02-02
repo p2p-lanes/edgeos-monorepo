@@ -949,6 +949,7 @@ export type ProductCreate = {
     end_date?: (string | null);
     is_active?: boolean;
     exclusive?: boolean;
+    max_quantity?: (number | null);
 };
 
 /**
@@ -969,6 +970,7 @@ export type ProductPublic = {
     end_date?: (string | null);
     is_active?: boolean;
     exclusive?: boolean;
+    max_quantity?: (number | null);
     id: string;
 };
 
@@ -988,6 +990,7 @@ export type ProductUpdate = {
     end_date?: (string | null);
     is_active?: (boolean | null);
     exclusive?: (boolean | null);
+    max_quantity?: (number | null);
 };
 
 /**

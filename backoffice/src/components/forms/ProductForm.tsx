@@ -125,11 +125,16 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
         "main") as TicketAttendeeCategory,
       duration_type: (defaultValues?.duration_type ?? "full") as TicketDuration,
       is_active: defaultValues?.is_active ?? true,
+      max_quantity: defaultValues?.max_quantity?.toString() ?? "",
     },
     onSubmit: ({ value }) => {
       if (readOnly) return
 
       const isTicket = value.category === "ticket"
+
+      const maxQty = value.max_quantity
+        ? Number.parseInt(value.max_quantity, 10)
+        : null
 
       if (isEdit) {
         updateMutation.mutate({
@@ -140,6 +145,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
           attendee_category: isTicket ? value.attendee_category : null,
           duration_type: isTicket ? value.duration_type : null,
           is_active: value.is_active,
+          max_quantity: maxQty,
         })
       } else {
         if (!selectedPopupId) {
@@ -155,6 +161,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
           attendee_category: isTicket ? value.attendee_category : undefined,
           duration_type: isTicket ? value.duration_type : undefined,
           is_active: value.is_active,
+          max_quantity: maxQty ?? undefined,
         })
       }
     },
@@ -329,6 +336,45 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
                     </div>
                   )}
                 </form.Field>
+
+                <form.Field
+                  name="max_quantity"
+                  validators={{
+                    onBlur: ({ value }) => {
+                      if (readOnly || !value) return undefined
+                      const num = Number.parseInt(value, 10)
+                      if (Number.isNaN(num) || num < 1) {
+                        return "Max quantity must be a positive number"
+                      }
+                      return undefined
+                    },
+                  }}
+                >
+                  {(field) => (
+                    <div className="space-y-2">
+                      <Label htmlFor="max_quantity">Max Quantity</Label>
+                      <Input
+                        id="max_quantity"
+                        placeholder="Unlimited"
+                        type="number"
+                        min="1"
+                        value={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                        disabled={readOnly}
+                      />
+                      <p className="text-sm text-muted-foreground">
+                        Maximum units available for sale. Leave empty for
+                        unlimited.
+                      </p>
+                      {field.state.meta.errors.length > 0 && (
+                        <p className="text-destructive text-sm">
+                          {field.state.meta.errors.join(", ")}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </form.Field>
               </CardContent>
             </Card>
 
@@ -477,6 +523,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
                 is_active: state.values.is_active,
                 duration_type: state.values.duration_type,
                 attendee_category: state.values.attendee_category,
+                max_quantity: state.values.max_quantity,
               })}
             >
               {(values) => {
@@ -545,6 +592,18 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
                                 {getAttendeeLabel(values.attendee_category)}
                               </span>
                             </div>
+                          </div>
+                        </>
+                      )}
+
+                      {values.max_quantity && (
+                        <>
+                          <Separator />
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">
+                              Inventory
+                            </span>
+                            <span>{values.max_quantity} units</span>
                           </div>
                         </>
                       )}
