@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import HTTPException, status
 from sqlalchemy import desc
@@ -17,6 +17,12 @@ from app.api.attendee.crud import attendees_crud, generate_check_in_code
 from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.human.schemas import HumanCreate, HumanUpdate
 from app.api.shared.crud import BaseCRUD
+
+
+class RedFlaggedHumanError(Exception):
+    """Raised when attempting to accept an application from a red-flagged human."""
+
+    pass
 
 
 class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpdate]):
@@ -102,7 +108,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
     def create_internal(
         self,
         session: Session,
-        app_data: ApplicationCreate,
+        app_data: ApplicationCreate | ApplicationAdminCreate,
         tenant_id: uuid.UUID,
         human_id: uuid.UUID,
         validate_custom_fields: bool = True,
@@ -186,7 +192,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             "in review",
             "accepted",
         ]:
-            data["submitted_at"] = datetime.now(timezone.utc)
+            data["submitted_at"] = datetime.now(UTC)
 
         # Convert status enum to string if needed
         if data.get("status") and hasattr(data["status"], "value"):
@@ -375,11 +381,11 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             data["status"] = data["status"].value
 
         # Always set submitted_at on creation
-        data["submitted_at"] = datetime.now(timezone.utc)
+        data["submitted_at"] = datetime.now(UTC)
 
         # Set accepted_at if status is accepted
         if data.get("status") in [ApplicationStatus.ACCEPTED.value, "accepted"]:
-            data["accepted_at"] = datetime.now(timezone.utc)
+            data["accepted_at"] = datetime.now(UTC)
 
         # Capture the custom fields schema at submission time
         data["custom_fields_schema"] = form_fields_crud.build_schema_for_popup(
@@ -514,23 +520,36 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
     ) -> Applications:
         """Submit an application.
 
+        If the human is red-flagged, the application is automatically rejected.
         If no approval strategy exists or strategy is AUTO_ACCEPT, the application
-        is automatically accepted. Otherwise, sets status to IN_REVIEW for manual review.
+        is automatically accepted.
+        Otherwise, sets status to IN_REVIEW for manual review.
         """
         from app.api.approval_strategy.crud import approval_strategies_crud
         from app.api.approval_strategy.schemas import ApprovalStrategyType
 
-        application.submitted_at = datetime.now(timezone.utc)
+        application.submitted_at = datetime.now(UTC)
+
+        # Red-flagged humans are automatically rejected
+        human_red_flag = application.human.red_flag if application.human else False
+        if human_red_flag:
+            application.status = ApplicationStatus.REJECTED.value
+            session.add(application)
+            self.create_snapshot(session, application, "auto_rejected")
+            session.commit()
+            session.refresh(application)
+            return application
 
         # Check approval strategy - no strategy means auto-accept
         strategy = approval_strategies_crud.get_by_popup(session, application.popup_id)
         should_auto_accept = (
-            strategy is None or strategy.strategy_type == ApprovalStrategyType.AUTO_ACCEPT
+            strategy is None
+            or strategy.strategy_type == ApprovalStrategyType.AUTO_ACCEPT
         )
 
         if should_auto_accept:
             application.status = ApplicationStatus.ACCEPTED.value
-            application.accepted_at = datetime.now(timezone.utc)
+            application.accepted_at = datetime.now(UTC)
             session.add(application)
             self.create_snapshot(session, application, "auto_accepted")
         else:
@@ -547,9 +566,20 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         session: Session,
         application: Applications,
     ) -> Applications:
-        """Accept an application and create snapshot."""
+        """Accept an application and create snapshot.
+
+        Raises:
+            RedFlaggedHumanError: If the human is red-flagged and cannot be accepted.
+        """
+        # Red-flagged humans cannot be accepted
+        human_red_flag = application.human.red_flag if application.human else False
+        if human_red_flag:
+            raise RedFlaggedHumanError(
+                "Cannot accept application from a red-flagged human"
+            )
+
         application.status = ApplicationStatus.ACCEPTED.value
-        application.accepted_at = datetime.now(timezone.utc)
+        application.accepted_at = datetime.now(UTC)
         session.add(application)
 
         # Create snapshot

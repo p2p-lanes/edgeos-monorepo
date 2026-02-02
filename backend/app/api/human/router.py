@@ -83,5 +83,22 @@ async def update_human(
             detail="Human not found",
         )
 
+    # Check if red_flag is being set to True
+    is_being_flagged = human_in.red_flag is True and not human.red_flag
+
     updated = crud.update(db, human, human_in)
+
+    # If human is being flagged, auto-reject all their IN_REVIEW applications
+    if is_being_flagged:
+        from app.api.application.crud import applications_crud
+        from app.api.application.schemas import ApplicationStatus
+
+        applications, _ = applications_crud.find_by_human(db, human_id)
+        for app in applications:
+            if app.status == ApplicationStatus.IN_REVIEW.value:
+                app.status = ApplicationStatus.REJECTED.value
+                db.add(app)
+                applications_crud.create_snapshot(db, app, "auto_rejected")
+        db.commit()
+
     return HumanPublic.model_validate(updated)

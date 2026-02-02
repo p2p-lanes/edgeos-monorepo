@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, HTTPException, status
@@ -194,13 +194,22 @@ async def update_application_admin(
             detail="Cannot approve or reject a draft application. The applicant must submit it first.",
         )
 
+    # Prevent accepting red-flagged humans
+    if app_in.status == ApplicationStatus.ACCEPTED:
+        human_red_flag = application.human.red_flag if application.human else False
+        if human_red_flag:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot accept application from a red-flagged human.",
+            )
+
     # Handle status change to ACCEPTED
     if (
         app_in.status == ApplicationStatus.ACCEPTED
         and application.status != ApplicationStatus.ACCEPTED.value
     ):
         app_in_dict = app_in.model_dump(exclude_unset=True)
-        app_in_dict["accepted_at"] = datetime.now(timezone.utc)
+        app_in_dict["accepted_at"] = datetime.now(UTC)
         app_in_dict["status"] = app_in.status.value
 
         for field, value in app_in_dict.items():
@@ -421,7 +430,7 @@ async def update_my_application(
 
         if update_data["status"] == ApplicationStatus.IN_REVIEW.value:
             if not application.submitted_at:
-                update_data["submitted_at"] = datetime.now(timezone.utc)
+                update_data["submitted_at"] = datetime.now(UTC)
 
     for field, value in update_data.items():
         setattr(application, field, value)

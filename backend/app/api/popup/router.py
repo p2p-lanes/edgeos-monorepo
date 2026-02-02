@@ -4,7 +4,10 @@ from typing import TYPE_CHECKING, Annotated
 from fastapi import APIRouter, Header, HTTPException, status
 
 from app.api.approval_strategy.crud import approval_strategies_crud
-from app.api.approval_strategy.schemas import ApprovalStrategyCreate, ApprovalStrategyType
+from app.api.approval_strategy.schemas import (
+    ApprovalStrategyCreate,
+    ApprovalStrategyType,
+)
 from app.api.popup import crud
 from app.api.popup.schemas import PopupCreate, PopupPublic, PopupUpdate
 from app.api.shared.enums import UserRole
@@ -95,7 +98,9 @@ async def create_popup(
         db,
         popup_id=popup.id,
         tenant_id=popup.tenant_id,
-        strategy_in=ApprovalStrategyCreate(strategy_type=ApprovalStrategyType.AUTO_ACCEPT),
+        strategy_in=ApprovalStrategyCreate(
+            strategy_type=ApprovalStrategyType.AUTO_ACCEPT
+        ),
     )
 
     return PopupPublic.model_validate(popup)

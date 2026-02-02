@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlmodel import Session, func, select
 
@@ -108,7 +108,7 @@ class ApplicationReviewsCRUD(
             existing.decision = review_in.decision
             if review_in.notes is not None:
                 existing.notes = review_in.notes
-            existing.updated_at = datetime.now(timezone.utc)
+            existing.updated_at = datetime.now(UTC)
             session.add(existing)
             session.commit()
             session.refresh(existing)
@@ -155,13 +155,19 @@ class ApplicationReviewsCRUD(
         from sqlalchemy import case, literal
 
         score_case = case(
-            (
+            (  # ty: ignore[invalid-argument-type]
                 ApplicationReviews.decision == ReviewDecision.STRONG_YES,
                 literal(strong_yes_weight),
             ),
-            (ApplicationReviews.decision == ReviewDecision.YES, literal(yes_weight)),
-            (ApplicationReviews.decision == ReviewDecision.NO, literal(no_weight)),
-            (
+            (  # ty: ignore[invalid-argument-type]
+                ApplicationReviews.decision == ReviewDecision.YES,
+                literal(yes_weight),
+            ),
+            (  # ty: ignore[invalid-argument-type]
+                ApplicationReviews.decision == ReviewDecision.NO,
+                literal(no_weight),
+            ),
+            (  # ty: ignore[invalid-argument-type]
                 ApplicationReviews.decision == ReviewDecision.STRONG_NO,
                 literal(strong_no_weight),
             ),

@@ -4,7 +4,7 @@ Approval Calculator Service
 Calculates application status based on reviews and approval strategy.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlmodel import Session
 
@@ -25,15 +25,22 @@ class ApprovalCalculator:
         strategy: ApprovalStrategies | None,
         reviews: list[ApplicationReviews],
         designated_reviewers: list[PopupReviewers],
+        *,
+        human_red_flag: bool = False,
     ) -> ApplicationStatus:
         """
         Determine the application status based on:
         1. Strategy type (auto_accept, threshold, weighted, etc.)
         2. Current reviews
         3. Veto rules (any rejection = reject)
+        4. Red flag status (red-flagged humans are automatically rejected)
 
         Returns ApplicationStatus.IN_REVIEW if no final decision can be made.
         """
+        # Red-flagged humans are automatically rejected
+        if human_red_flag:
+            return ApplicationStatus.REJECTED
+
         # No strategy configured - stay in review (manual mode)
         if not strategy:
             return ApplicationStatus.IN_REVIEW
@@ -150,18 +157,41 @@ class ApprovalCalculator:
         Recalculate and update application status based on current reviews.
 
         This method:
-        1. Fetches the approval strategy for the popup
-        2. Fetches all reviews for the application
-        3. Fetches designated reviewers for the popup
-        4. Calculates the new status
-        5. Updates the application if status changed
+        1. Checks red_flag status (red-flagged humans are auto-rejected)
+        2. Fetches the approval strategy for the popup
+        3. Fetches all reviews for the application
+        4. Fetches designated reviewers for the popup
+        5. Calculates the new status
+        6. Updates the application if status changed
         """
         from app.api.application.crud import applications_crud
         from app.api.application_review.crud import application_reviews_crud
         from app.api.approval_strategy.crud import approval_strategies_crud
+        from app.api.human.crud import humans_crud
         from app.api.popup_reviewer.crud import popup_reviewers_crud
 
-        # Skip if not in review
+        # Skip if already in a final state (accepted, rejected, withdrawn)
+        if application.status not in [
+            ApplicationStatus.IN_REVIEW.value,
+            ApplicationStatus.DRAFT.value,
+        ]:
+            return application
+
+        # Get human red_flag status - fetch fresh from DB to ensure we have latest
+        human = humans_crud.get(session, application.human_id)
+        human_red_flag = human.red_flag if human else False
+
+        # Red-flagged humans are immediately rejected
+        if human_red_flag:
+            if application.status != ApplicationStatus.REJECTED.value:
+                application.status = ApplicationStatus.REJECTED.value
+                session.add(application)
+                applications_crud.create_snapshot(session, application, "auto_rejected")
+                session.commit()
+                session.refresh(application)
+            return application
+
+        # Only proceed with review-based calculation if IN_REVIEW
         if application.status != ApplicationStatus.IN_REVIEW.value:
             return application
 
@@ -178,15 +208,17 @@ class ApprovalCalculator:
             session, application.popup_id
         )
 
-        # Calculate new status
-        new_status = self.calculate_status(strategy, reviews, reviewers)
+        # Calculate new status (human_red_flag is False here since we handled it above)
+        new_status = self.calculate_status(
+            strategy, reviews, reviewers, human_red_flag=False
+        )
 
         # Update if changed
         if new_status.value != application.status:
             application.status = new_status.value
 
             if new_status == ApplicationStatus.ACCEPTED:
-                application.accepted_at = datetime.now(timezone.utc)
+                application.accepted_at = datetime.now(UTC)
                 # Create snapshot
                 applications_crud.create_snapshot(session, application, "accepted")
             elif new_status == ApplicationStatus.REJECTED:

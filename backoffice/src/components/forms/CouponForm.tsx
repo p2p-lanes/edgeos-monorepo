@@ -1,6 +1,7 @@
 import { useForm } from "@tanstack/react-form"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
+import { Percent, Ticket } from "lucide-react"
 
 import {
   type CouponCreate,
@@ -10,6 +11,7 @@ import {
 } from "@/client"
 import { DangerZone } from "@/components/Common/DangerZone"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -21,6 +23,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { LoadingButton } from "@/components/ui/loading-button"
+import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
@@ -122,159 +125,164 @@ export function CouponForm({ defaultValues, onSuccess }: CouponFormProps) {
 
   return (
     <div className="space-y-6">
-      {isEdit && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Coupon Information</CardTitle>
-            <CardDescription>Details about this coupon</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label className="text-muted-foreground">Current Uses</Label>
-              <p className="font-mono text-sm">
-                {defaultValues.current_uses ?? 0}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      <Card className="max-w-2xl">
-        <CardHeader>
-          <CardTitle>
-            {readOnly
-              ? "Coupon Details"
-              : isEdit
-                ? "Edit Coupon"
-                : "Coupon Details"}
-          </CardTitle>
-          <CardDescription>
-            {readOnly
-              ? "View coupon information (read-only)"
-              : isEdit
-                ? "Update the coupon settings"
-                : "Enter the information for the new discount coupon"}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault()
-              if (!readOnly) {
-                form.handleSubmit()
-              }
-            }}
-            className="space-y-6"
-          >
-            <form.Field
-              name="code"
-              validators={{
-                onBlur: ({ value }) =>
-                  !readOnly && !value ? "Code is required" : undefined,
-              }}
-            >
-              {(field) => (
-                <div className="space-y-2">
-                  <Label htmlFor="code">
-                    Code{" "}
-                    {!readOnly && <span className="text-destructive">*</span>}
-                  </Label>
-                  <Input
-                    id="code"
-                    placeholder="SUMMER2025"
-                    className="uppercase"
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    disabled={readOnly}
-                  />
-                  <p className="text-sm text-muted-foreground">
-                    The code users will enter (will be uppercased)
-                  </p>
-                  {field.state.meta.errors.length > 0 && (
-                    <p className="text-destructive text-sm">
-                      {field.state.meta.errors.join(", ")}
-                    </p>
-                  )}
-                </div>
-              )}
-            </form.Field>
-
-            <div className="grid gap-6 md:grid-cols-2">
-              <form.Field
-                name="discount_value"
-                validators={{
-                  onBlur: ({ value }) =>
-                    !readOnly && !value ? "Discount is required" : undefined,
-                }}
-              >
-                {(field) => (
-                  <div className="space-y-2">
-                    <Label htmlFor="discount_value">
-                      Discount %{" "}
-                      {!readOnly && <span className="text-destructive">*</span>}
-                    </Label>
-                    <Input
-                      id="discount_value"
-                      type="number"
-                      min={1}
-                      max={100}
-                      value={field.state.value}
-                      onBlur={field.handleBlur}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                      disabled={readOnly}
-                    />
-                    {field.state.meta.errors.length > 0 && (
-                      <p className="text-destructive text-sm">
-                        {field.state.meta.errors.join(", ")}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (!readOnly) {
+            form.handleSubmit()
+          }
+        }}
+        className="space-y-6"
+      >
+        <div className="grid gap-6 lg:grid-cols-3">
+          {/* Left Column - Form Fields */}
+          <div className="space-y-6 lg:col-span-2">
+            {/* Coupon Details */}
+            <Card>
+              <CardHeader>
+                <CardTitle>
+                  {readOnly
+                    ? "Coupon Details"
+                    : isEdit
+                      ? "Edit Coupon"
+                      : "Coupon Details"}
+                </CardTitle>
+                <CardDescription>
+                  {readOnly
+                    ? "View coupon information (read-only)"
+                    : isEdit
+                      ? "Update the coupon settings"
+                      : "Enter the information for the new discount coupon"}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <form.Field
+                  name="code"
+                  validators={{
+                    onBlur: ({ value }) =>
+                      !readOnly && !value ? "Code is required" : undefined,
+                  }}
+                >
+                  {(field) => (
+                    <div className="space-y-2">
+                      <Label htmlFor="code">
+                        Code{" "}
+                        {!readOnly && (
+                          <span className="text-destructive">*</span>
+                        )}
+                      </Label>
+                      <Input
+                        id="code"
+                        placeholder="SUMMER2025"
+                        className="uppercase"
+                        value={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                        disabled={readOnly}
+                      />
+                      <p className="text-sm text-muted-foreground">
+                        The code users will enter (will be uppercased)
                       </p>
+                      {field.state.meta.errors.length > 0 && (
+                        <p className="text-destructive text-sm">
+                          {field.state.meta.errors.join(", ")}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </form.Field>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <form.Field
+                    name="discount_value"
+                    validators={{
+                      onBlur: ({ value }) =>
+                        !readOnly && !value
+                          ? "Discount is required"
+                          : undefined,
+                    }}
+                  >
+                    {(field) => (
+                      <div className="space-y-2">
+                        <Label htmlFor="discount_value">
+                          Discount %{" "}
+                          {!readOnly && (
+                            <span className="text-destructive">*</span>
+                          )}
+                        </Label>
+                        <Input
+                          id="discount_value"
+                          type="number"
+                          min={1}
+                          max={100}
+                          value={field.state.value}
+                          onBlur={field.handleBlur}
+                          onChange={(e) => field.handleChange(e.target.value)}
+                          disabled={readOnly}
+                        />
+                        {field.state.meta.errors.length > 0 && (
+                          <p className="text-destructive text-sm">
+                            {field.state.meta.errors.join(", ")}
+                          </p>
+                        )}
+                      </div>
                     )}
-                  </div>
-                )}
-              </form.Field>
+                  </form.Field>
 
-              <form.Field name="max_uses">
-                {(field) => (
-                  <div className="space-y-2">
-                    <Label htmlFor="max_uses">Max Uses</Label>
-                    <Input
-                      id="max_uses"
-                      type="number"
-                      min={1}
-                      placeholder="Unlimited"
-                      value={field.state.value}
-                      onBlur={field.handleBlur}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                      disabled={readOnly}
-                    />
-                    <p className="text-sm text-muted-foreground">
-                      Leave empty for unlimited
-                    </p>
-                  </div>
-                )}
-              </form.Field>
-            </div>
-
-            <form.Field name="is_active">
-              {(field) => (
-                <div className="flex items-center justify-between rounded-lg border p-4">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="is_active">Active</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Enable this coupon for use
-                    </p>
-                  </div>
-                  <Switch
-                    id="is_active"
-                    checked={field.state.value}
-                    onCheckedChange={(val) => field.handleChange(val)}
-                    disabled={readOnly}
-                  />
+                  <form.Field name="max_uses">
+                    {(field) => (
+                      <div className="space-y-2">
+                        <Label htmlFor="max_uses">Max Uses</Label>
+                        <Input
+                          id="max_uses"
+                          type="number"
+                          min={1}
+                          placeholder="Unlimited"
+                          value={field.state.value}
+                          onBlur={field.handleBlur}
+                          onChange={(e) => field.handleChange(e.target.value)}
+                          disabled={readOnly}
+                        />
+                        <p className="text-sm text-muted-foreground">
+                          Leave empty for unlimited
+                        </p>
+                      </div>
+                    )}
+                  </form.Field>
                 </div>
-              )}
-            </form.Field>
+              </CardContent>
+            </Card>
 
-            <div className="flex gap-4 pt-4">
+            {/* Status */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Status</CardTitle>
+                <CardDescription>Control coupon availability</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form.Field name="is_active">
+                  {(field) => (
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="is_active">Active</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Enable this coupon for use
+                        </p>
+                      </div>
+                      <Switch
+                        id="is_active"
+                        checked={field.state.value}
+                        onCheckedChange={(val) => field.handleChange(val)}
+                        disabled={readOnly}
+                      />
+                    </div>
+                  )}
+                </form.Field>
+              </CardContent>
+            </Card>
+
+            {/* Form Actions */}
+            <div className="flex gap-4">
               <Button
                 type="button"
                 variant="outline"
@@ -288,9 +296,107 @@ export function CouponForm({ defaultValues, onSuccess }: CouponFormProps) {
                 </LoadingButton>
               )}
             </div>
-          </form>
-        </CardContent>
-      </Card>
+          </div>
+
+          {/* Right Column - Preview */}
+          <div className="space-y-6">
+            <form.Subscribe
+              selector={(state) => ({
+                code: state.values.code,
+                discount_value: state.values.discount_value,
+                max_uses: state.values.max_uses,
+                is_active: state.values.is_active,
+              })}
+            >
+              {(values) => (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Preview</CardTitle>
+                    <CardDescription>
+                      How this coupon will appear
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                        <Ticket className="h-5 w-5 text-primary" />
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <p className="font-mono font-semibold leading-none">
+                          {values.code.toUpperCase() || "CODE"}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Discount Code
+                        </p>
+                      </div>
+                    </div>
+
+                    <Separator />
+
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Percent className="h-4 w-4" />
+                        <span className="text-sm">Discount</span>
+                      </div>
+                      <span className="font-semibold">
+                        {values.discount_value || "0"}% off
+                      </span>
+                    </div>
+
+                    <Separator />
+
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Max Uses</span>
+                      <span>{values.max_uses || "Unlimited"}</span>
+                    </div>
+
+                    {isEdit && (
+                      <>
+                        <Separator />
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">
+                            Current Uses
+                          </span>
+                          <span>{defaultValues?.current_uses ?? 0}</span>
+                        </div>
+                      </>
+                    )}
+
+                    <Separator />
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">
+                        Status
+                      </span>
+                      <Badge
+                        variant={values.is_active ? "default" : "secondary"}
+                      >
+                        {values.is_active ? "Active" : "Inactive"}
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </form.Subscribe>
+
+            {isEdit && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Coupon Details</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Coupon ID</p>
+                    <p className="font-mono text-xs text-muted-foreground">
+                      {defaultValues.id}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </div>
+      </form>
 
       {isEdit && !readOnly && (
         <DangerZone

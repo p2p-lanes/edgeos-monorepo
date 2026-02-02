@@ -183,7 +183,11 @@ async def delete_user(
         )
 
     # Admins cannot delete admins (only themselves, which is blocked below)
-    if current_user.role == UserRole.ADMIN and user.role == UserRole.ADMIN and user.id != current_user.id:
+    if (
+        current_user.role == UserRole.ADMIN
+        and user.role == UserRole.ADMIN
+        and user.id != current_user.id
+    ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Cannot delete other admins",

@@ -111,13 +111,15 @@ class Settings(BaseSettings):
     STORAGE_ACCESS_KEY: str = ""
     STORAGE_SECRET_KEY: str = ""
     STORAGE_BUCKET: str = "uploads"
-    STORAGE_REGION: str = "us-east-1"
+    STORAGE_REGION: str = "us-east-2"
     STORAGE_PUBLIC_URL: str | None = None  # Optional CDN/public URL prefix
 
     @computed_field
     @property
     def storage_enabled(self) -> bool:
         return bool(self.STORAGE_ACCESS_KEY and self.STORAGE_SECRET_KEY)
+
+    REDIS_URL: str | None = None
 
 
 settings = Settings()

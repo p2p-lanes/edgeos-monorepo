@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import UniqueConstraint
@@ -19,23 +19,21 @@ class ApprovalStrategies(ApprovalStrategyBase, table=True):
     Defines the rules for reviewing and accepting applications.
     """
 
-    __table_args__ = (
-        UniqueConstraint("popup_id", name="uq_approval_strategy_popup"),
-    )
+    __table_args__ = (UniqueConstraint("popup_id", name="uq_approval_strategy_popup"),)
 
     id: uuid.UUID = Field(
         default_factory=uuid.uuid4,
         sa_column=Column(
-            UUID(as_uuid=True),  # ty:ignore[no-matching-overload]
+            UUID(as_uuid=True),
             primary_key=True,
         ),
     )
 
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
     )
 
     # Relationships

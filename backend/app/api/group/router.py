@@ -101,16 +101,17 @@ async def get_group(
             for ap in attendee.attendee_products:
                 products.append(ap.product)
 
+        human = application.human
         member = GroupMemberPublic(
             id=application.human_id,
-            first_name=application.first_name,
-            last_name=application.last_name,
-            email=application.email,
-            telegram=application.telegram,
-            organization=application.organization,
-            role=application.role,
-            gender=application.gender,
-            local_resident=application.local_resident,
+            first_name=human.first_name or "",
+            last_name=human.last_name or "",
+            email=human.email,
+            telegram=human.telegram,
+            organization=human.organization,
+            role=human.role,
+            gender=human.gender,
+            local_resident=None,  # TODO: field not on Human model
             products=products,
         )
         members.append(member)
@@ -274,16 +275,17 @@ async def get_my_group(
             for ap in attendee.attendee_products:
                 products.append(ap.product)
 
+        human = application.human
         member = GroupMemberPublic(
             id=application.human_id,
-            first_name=application.first_name,
-            last_name=application.last_name,
-            email=application.email,
-            telegram=application.telegram,
-            organization=application.organization,
-            role=application.role,
-            gender=application.gender,
-            local_resident=application.local_resident,
+            first_name=human.first_name or "",
+            last_name=human.last_name or "",
+            email=human.email,
+            telegram=human.telegram,
+            organization=human.organization,
+            role=human.role,
+            gender=human.gender,
+            local_resident=None,  # TODO: field not on Human model
             products=products,
         )
         members.append(member)
@@ -329,7 +331,7 @@ async def add_group_member(
 ) -> GroupMemberPublic:
     """Add a member to a group (Portal - leader only)."""
     from app.api.application.crud import applications_crud
-    from app.api.application.schemas import ApplicationCreate, ApplicationStatus
+    from app.api.application.schemas import ApplicationAdminCreate, ApplicationStatus
     from app.api.human.crud import humans_crud
 
     group = crud.groups_crud.get(db, group_id)
@@ -353,14 +355,22 @@ async def add_group_member(
     # Validate member addition
     crud.groups_crud.validate_member_addition(group, human.id, update_existing=False)
 
+    # Check if human is red-flagged - they are automatically rejected
+    if human.red_flag:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot add red-flagged human to group. They are automatically rejected.",
+        )
+
     # Check for existing application
     application = applications_crud.get_by_human_popup(db, human.id, group.popup_id)
 
     if not application:
         # Create new application with ACCEPTED status
-        app_data = ApplicationCreate(
+        # Note: local_resident and created_by_leader are not on ApplicationAdminCreate
+        # These would need schema changes to support
+        app_data = ApplicationAdminCreate(
             popup_id=group.popup_id,
-            human_id=human.id,
             group_id=group.id,
             first_name=member_in.first_name,
             last_name=member_in.last_name,
@@ -369,24 +379,26 @@ async def add_group_member(
             organization=member_in.organization,
             role=member_in.role,
             gender=member_in.gender,
-            local_resident=member_in.local_resident,
-            status=ApplicationStatus.ACCEPTED,  # type: ignore[call-arg]
-            created_by_leader=True,
+            status=ApplicationStatus.ACCEPTED,
         )
         application = applications_crud.create_internal(
-            db, app_data, group.tenant_id, human.id
+            db,
+            app_data,
+            group.tenant_id,
+            human.id,
         )
     else:
-        # Update existing application
+        # Update existing application and human profile
         application.group_id = group.id
         application.status = ApplicationStatus.ACCEPTED
-        application.first_name = member_in.first_name
-        application.last_name = member_in.last_name
-        application.telegram = member_in.telegram
-        application.organization = member_in.organization
-        application.role = member_in.role
-        application.gender = member_in.gender
-        application.local_resident = member_in.local_resident
+        # Update human profile
+        human.first_name = member_in.first_name
+        human.last_name = member_in.last_name
+        human.telegram = member_in.telegram
+        human.organization = member_in.organization
+        human.role = member_in.role
+        human.gender = member_in.gender
+        db.add(human)
         db.add(application)
 
     # Add to group members
@@ -395,6 +407,7 @@ async def add_group_member(
 
     db.commit()
     db.refresh(application)
+    db.refresh(human)
 
     # Get products
     products = []
@@ -403,14 +416,14 @@ async def add_group_member(
 
     return GroupMemberPublic(
         id=human.id,
-        first_name=application.first_name,
-        last_name=application.last_name,
-        email=application.email,
-        telegram=application.telegram,
-        organization=application.organization,
-        role=application.role,
-        gender=application.gender,
-        local_resident=application.local_resident,
+        first_name=human.first_name or "",
+        last_name=human.last_name or "",
+        email=human.email,
+        telegram=human.telegram,
+        organization=human.organization,
+        role=human.role,
+        gender=human.gender,
+        local_resident=None,  # TODO: field not on Human model
         products=products,
     )
 
@@ -502,7 +515,7 @@ async def update_group_member(
             detail="Member not found in group",
         )
 
-    # Get application
+    # Get application and human
     application = applications_crud.get_by_human_popup(db, human_id, group.popup_id)
     if not application:
         raise HTTPException(
@@ -510,14 +523,25 @@ async def update_group_member(
             detail="Application not found",
         )
 
-    # Update application fields
-    update_data = member_in.model_dump(exclude_unset=True)
-    for field, value in update_data.items():
-        setattr(application, field, value)
+    # Update human profile fields (not application)
+    from app.api.human.crud import humans_crud
 
-    db.add(application)
+    human = humans_crud.get(db, human_id)
+    if not human:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Human not found",
+        )
+
+    update_data = member_in.model_dump(exclude_unset=True)
+    # Remove local_resident as it doesn't exist on Human model
+    update_data.pop("local_resident", None)
+    for field, value in update_data.items():
+        setattr(human, field, value)
+
+    db.add(human)
     db.commit()
-    db.refresh(application)
+    db.refresh(human)
 
     # Get products
     products = []
@@ -526,14 +550,14 @@ async def update_group_member(
 
     return GroupMemberPublic(
         id=human_id,
-        first_name=application.first_name,
-        last_name=application.last_name,
-        email=application.email,
-        telegram=application.telegram,
-        organization=application.organization,
-        role=application.role,
-        gender=application.gender,
-        local_resident=application.local_resident,
+        first_name=human.first_name or "",
+        last_name=human.last_name or "",
+        email=human.email,
+        telegram=human.telegram,
+        organization=human.organization,
+        role=human.role,
+        gender=human.gender,
+        local_resident=None,  # TODO: field not on Human model
         products=products,
     )
 
@@ -577,13 +601,10 @@ async def remove_group_member(
                     detail="Cannot remove member with purchased products",
                 )
 
-        # If created by leader, delete application
-        if application.created_by_leader:
-            applications_crud.delete(db, application)
-        else:
-            # Just remove group association
-            application.group_id = None
-            db.add(application)
+        # Remove group association (don't delete application)
+        # Note: created_by_leader tracking not implemented on model
+        application.group_id = None
+        db.add(application)
 
     # Remove from group members
     crud.groups_crud.remove_member(db, group.id, human_id)

@@ -241,7 +241,7 @@ async def create_my_payment(
 
 @router.post("/webhook/simplefi", status_code=status.HTTP_200_OK)
 async def simplefi_webhook(
-    db: SessionDep,
+    _db: SessionDep,
     # TODO: Add proper webhook payload schema
     # payload: SimpleFIWebhookPayload,
 ) -> dict:
@@ -262,7 +262,7 @@ async def simplefi_webhook(
 
 @router.post("/webhook/stripe", status_code=status.HTTP_200_OK)
 async def stripe_webhook(
-    db: SessionDep,
+    _db: SessionDep,
     # TODO: Add proper webhook payload schema
 ) -> dict:
     """

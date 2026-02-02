@@ -27,6 +27,7 @@ dependencies = [
     "testcontainers>=4.14.0",
     "cachetools>=6.2.5",
     "boto3>=1.35.0",
+    "redis>=7.1.0",
 ]
 
 [dependency-groups]
@@ -47,7 +48,7 @@ build-backend = "hatchling.build"
 exclude = ["venv", ".venv", "app/alembic"]
 
 [tool.ruff]
-target-version = "py310"
+target-version = "py312"
 exclude = ["alembic"]
 
 [tool.ruff.lint]

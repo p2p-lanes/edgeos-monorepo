@@ -46,11 +46,11 @@ class GroupsCRUD(BaseCRUD[Groups, GroupCreate, GroupUpdate]):
             .where(Groups.id == group_id)
             .options(
                 selectinload(Groups.applications)  # type: ignore[arg-type]
-                .selectinload(Applications.attendees)
-                .selectinload(Attendees.attendee_products)
-                .selectinload(AttendeeProducts.product),
+                .selectinload(Applications.attendees)  # ty: ignore[invalid-argument-type]
+                .selectinload(Attendees.attendee_products)  # ty: ignore[invalid-argument-type]
+                .selectinload(AttendeeProducts.product),  # ty: ignore[invalid-argument-type]
                 selectinload(Groups.applications).selectinload(  # type: ignore[arg-type]
-                    Applications.human
+                    Applications.human  # ty: ignore[invalid-argument-type]
                 ),
             )
         )

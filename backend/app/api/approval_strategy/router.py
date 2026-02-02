@@ -27,7 +27,9 @@ def _check_write_permission(current_user: "UserPublic") -> None:
         )
 
 
-def _get_tenant_id(current_user: "UserPublic", x_tenant_id: uuid.UUID | None) -> uuid.UUID:
+def _get_tenant_id(
+    current_user: "UserPublic", x_tenant_id: uuid.UUID | None
+) -> uuid.UUID:
     """Get tenant_id from user or header."""
     if current_user.role == UserRole.SUPERADMIN:
         if x_tenant_id:
@@ -99,7 +101,9 @@ async def create_or_update_approval_strategy(
     existing = approval_strategies_crud.get_by_popup(db, popup_id)
     if existing:
         # Update existing strategy
-        strategy = approval_strategies_crud.update(db, existing, ApprovalStrategyUpdate(**strategy_in.model_dump()))
+        strategy = approval_strategies_crud.update(
+            db, existing, ApprovalStrategyUpdate(**strategy_in.model_dump())
+        )
     else:
         # Create new strategy
         strategy = approval_strategies_crud.create_for_popup(

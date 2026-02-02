@@ -72,7 +72,7 @@ def handle_integrity_error(_: Request, exc: IntegrityError) -> JSONResponse:
 # Set all CORS enabled origins
 if settings.all_cors_origins:
     application.add_middleware(
-        CORSMiddleware,
+        CORSMiddleware,  # type: ignore[arg-type]
         allow_origins=settings.all_cors_origins,
         allow_credentials=True,
         allow_methods=["*"],

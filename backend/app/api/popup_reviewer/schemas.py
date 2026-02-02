@@ -16,7 +16,9 @@ class PopupReviewerBase(SQLModel):
     tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
 
     # Per-reviewer settings
-    is_required: bool = Field(default=False)  # For ALL_REVIEWERS: must this user review?
+    is_required: bool = Field(
+        default=False
+    )  # For ALL_REVIEWERS: must this user review?
     weight_multiplier: float = Field(default=1.0)  # For WEIGHTED: multiply vote weight
 
 

@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import HTTPException, status
 from sqlmodel import Session, select
@@ -47,7 +47,7 @@ class CouponsCRUD(BaseCRUD[Coupons, CouponCreate, CouponUpdate]):
                 detail="Coupon code is not active",
             )
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         if coupon.start_date and now < coupon.start_date:
             raise HTTPException(

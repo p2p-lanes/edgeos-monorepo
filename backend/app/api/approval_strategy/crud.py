@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlmodel import Session, select
 
@@ -57,7 +57,7 @@ class ApprovalStrategiesCRUD(
         for field, value in update_data.items():
             setattr(db_obj, field, value)
 
-        db_obj.updated_at = datetime.now(timezone.utc)
+        db_obj.updated_at = datetime.now(UTC)
 
         session.add(db_obj)
         session.commit()
