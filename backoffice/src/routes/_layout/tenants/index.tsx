@@ -5,7 +5,7 @@ import {
 } from "@tanstack/react-query"
 import { createFileRoute, Link } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
-import { EllipsisVertical, Key, Pencil, Plus, Trash2 } from "lucide-react"
+import { EllipsisVertical, Pencil, Plus, Trash2 } from "lucide-react"
 import { Suspense, useState } from "react"
 
 import { type TenantPublic, TenantsService } from "@/client"
@@ -13,21 +13,14 @@ import { DataTable } from "@/components/Common/DataTable"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Skeleton } from "@/components/ui/skeleton"
+
 import useCustomToast from "@/hooks/useCustomToast"
 import { handleError } from "@/utils"
 
@@ -53,84 +46,6 @@ function AddTenantButton() {
         Add Tenant
       </Link>
     </Button>
-  )
-}
-
-function ViewCredentials({ tenant }: { tenant: TenantPublic }) {
-  const [isOpen, setIsOpen] = useState(false)
-  const { showErrorToast } = useCustomToast()
-  const [credentials, setCredentials] = useState<{
-    db_host: string
-    db_port: number
-    db_name: string
-    credentials: Array<{
-      credential_type: string
-      db_username: string
-      db_password: string
-    }>
-  } | null>(null)
-
-  const mutation = useMutation({
-    mutationFn: () => TenantsService.getCredentials({ tenantId: tenant.id }),
-    onSuccess: (data) => {
-      setCredentials(data)
-    },
-    onError: handleError.bind(showErrorToast),
-  })
-
-  const handleOpen = () => {
-    setIsOpen(true)
-    mutation.mutate()
-  }
-
-  return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DropdownMenuItem
-        onSelect={(e) => e.preventDefault()}
-        onClick={handleOpen}
-      >
-        <Key className="mr-2 h-4 w-4" />
-        View Credentials
-      </DropdownMenuItem>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Database Credentials</DialogTitle>
-          <DialogDescription>
-            Database credentials for {tenant.name}
-          </DialogDescription>
-        </DialogHeader>
-        {mutation.isPending ? (
-          <Skeleton className="h-32 w-full" />
-        ) : credentials ? (
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Connection Info</p>
-              <div className="rounded bg-muted p-3 font-mono text-sm">
-                <p>Host: {credentials.db_host}</p>
-                <p>Port: {credentials.db_port}</p>
-                <p>Database: {credentials.db_name}</p>
-              </div>
-            </div>
-            {credentials.credentials.map((cred) => (
-              <div key={cred.credential_type} className="space-y-2">
-                <p className="text-sm font-medium capitalize">
-                  {cred.credential_type} User
-                </p>
-                <div className="rounded bg-muted p-3 font-mono text-sm">
-                  <p>Username: {cred.db_username}</p>
-                  <p>Password: {cred.db_password}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : null}
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setIsOpen(false)}>
-            Close
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   )
 }
 
@@ -163,7 +78,6 @@ function TenantActionsMenu({ tenant }: { tenant: TenantPublic }) {
             Edit
           </Link>
         </DropdownMenuItem>
-        <ViewCredentials tenant={tenant} />
         <DropdownMenuItem
           variant="destructive"
           onClick={() => deleteMutation.mutate()}

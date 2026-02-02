@@ -1,7 +1,7 @@
 import { useForm } from "@tanstack/react-form"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
-import { Plus, Trash2 } from "lucide-react"
+import { Mail, Plus, Trash2, User, Users } from "lucide-react"
 import { useState } from "react"
 
 import {
@@ -12,6 +12,7 @@ import {
   FormFieldsService,
 } from "@/client"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -31,6 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Textarea } from "@/components/ui/textarea"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
@@ -490,429 +492,653 @@ export function ApplicationForm({ onSuccess }: ApplicationFormProps) {
 
   return (
     <div className="space-y-6">
-      {/* Profile Information */}
-      <Card className="max-w-2xl">
-        <CardHeader>
-          <CardTitle>Profile Information</CardTitle>
-          <CardDescription>Basic applicant information</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault()
-              form.handleSubmit()
-            }}
-            className="space-y-6"
-          >
-            <div className="grid gap-4 md:grid-cols-2">
-              <form.Field
-                name="first_name"
-                validators={{
-                  onBlur: ({ value }) =>
-                    !value ? "First name is required" : undefined,
-                }}
-              >
-                {(field) => (
-                  <div className="space-y-2">
-                    <Label htmlFor="first_name">
-                      First Name <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="first_name"
-                      value={field.state.value}
-                      onBlur={field.handleBlur}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                    />
-                    {field.state.meta.errors.length > 0 && (
-                      <p className="text-destructive text-sm">
-                        {field.state.meta.errors.join(", ")}
-                      </p>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          form.handleSubmit()
+        }}
+        className="space-y-6"
+      >
+        <div className="grid gap-6 lg:grid-cols-3">
+          {/* Left Column - Form Fields */}
+          <div className="space-y-6 lg:col-span-2">
+            {/* Profile Information */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Profile Information</CardTitle>
+                <CardDescription>Basic applicant information</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <form.Field
+                    name="first_name"
+                    validators={{
+                      onBlur: ({ value }) =>
+                        !value ? "First name is required" : undefined,
+                    }}
+                  >
+                    {(field) => (
+                      <div className="space-y-2">
+                        <Label htmlFor="first_name">
+                          First Name <span className="text-destructive">*</span>
+                        </Label>
+                        <Input
+                          id="first_name"
+                          value={field.state.value}
+                          onBlur={field.handleBlur}
+                          onChange={(e) => field.handleChange(e.target.value)}
+                        />
+                        {field.state.meta.errors.length > 0 && (
+                          <p className="text-destructive text-sm">
+                            {field.state.meta.errors.join(", ")}
+                          </p>
+                        )}
+                      </div>
                     )}
-                  </div>
-                )}
-              </form.Field>
+                  </form.Field>
 
-              <form.Field
-                name="last_name"
-                validators={{
-                  onBlur: ({ value }) =>
-                    !value ? "Last name is required" : undefined,
-                }}
-              >
-                {(field) => (
-                  <div className="space-y-2">
-                    <Label htmlFor="last_name">
-                      Last Name <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="last_name"
-                      value={field.state.value}
-                      onBlur={field.handleBlur}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                    />
-                    {field.state.meta.errors.length > 0 && (
-                      <p className="text-destructive text-sm">
-                        {field.state.meta.errors.join(", ")}
-                      </p>
+                  <form.Field
+                    name="last_name"
+                    validators={{
+                      onBlur: ({ value }) =>
+                        !value ? "Last name is required" : undefined,
+                    }}
+                  >
+                    {(field) => (
+                      <div className="space-y-2">
+                        <Label htmlFor="last_name">
+                          Last Name <span className="text-destructive">*</span>
+                        </Label>
+                        <Input
+                          id="last_name"
+                          value={field.state.value}
+                          onBlur={field.handleBlur}
+                          onChange={(e) => field.handleChange(e.target.value)}
+                        />
+                        {field.state.meta.errors.length > 0 && (
+                          <p className="text-destructive text-sm">
+                            {field.state.meta.errors.join(", ")}
+                          </p>
+                        )}
+                      </div>
                     )}
-                  </div>
-                )}
-              </form.Field>
-            </div>
-
-            <form.Field
-              name="email"
-              validators={{
-                onBlur: ({ value }) =>
-                  !value ? "Email is required" : undefined,
-              }}
-            >
-              {(field) => (
-                <div className="space-y-2">
-                  <Label htmlFor="email">
-                    Email <span className="text-destructive">*</span>
-                  </Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                  />
-                  {field.state.meta.errors.length > 0 && (
-                    <p className="text-destructive text-sm">
-                      {field.state.meta.errors.join(", ")}
-                    </p>
-                  )}
+                  </form.Field>
                 </div>
-              )}
-            </form.Field>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <form.Field name="telegram">
-                {(field) => (
-                  <div className="space-y-2">
-                    <Label htmlFor="telegram">Telegram</Label>
-                    <Input
-                      id="telegram"
-                      placeholder="@username"
-                      value={field.state.value}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                    />
-                  </div>
-                )}
-              </form.Field>
-
-              <form.Field name="organization">
-                {(field) => (
-                  <div className="space-y-2">
-                    <Label htmlFor="organization">Organization</Label>
-                    <Input
-                      id="organization"
-                      value={field.state.value}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                    />
-                  </div>
-                )}
-              </form.Field>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <form.Field name="role">
-                {(field) => (
-                  <div className="space-y-2">
-                    <Label htmlFor="role">Role</Label>
-                    <Input
-                      id="role"
-                      value={field.state.value}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                    />
-                  </div>
-                )}
-              </form.Field>
-
-              <form.Field name="gender">
-                {(field) => (
-                  <div className="space-y-2">
-                    <Label htmlFor="gender">Gender</Label>
-                    <Select
-                      value={field.state.value}
-                      onValueChange={(val) => field.handleChange(val)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="male">Male</SelectItem>
-                        <SelectItem value="female">Female</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                        <SelectItem value="prefer not to say">
-                          Prefer not to say
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </form.Field>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <form.Field name="age">
-                {(field) => (
-                  <div className="space-y-2">
-                    <Label htmlFor="age">Age Range</Label>
-                    <Select
-                      value={field.state.value}
-                      onValueChange={(val) => field.handleChange(val)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="18-24">18-24</SelectItem>
-                        <SelectItem value="25-34">25-34</SelectItem>
-                        <SelectItem value="35-44">35-44</SelectItem>
-                        <SelectItem value="45-54">45-54</SelectItem>
-                        <SelectItem value="55-64">55-64</SelectItem>
-                        <SelectItem value="65+">65+</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </form.Field>
-
-              <form.Field name="residence">
-                {(field) => (
-                  <div className="space-y-2">
-                    <Label htmlFor="residence">Residence</Label>
-                    <Input
-                      id="residence"
-                      value={field.state.value}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                    />
-                  </div>
-                )}
-              </form.Field>
-            </div>
-
-            <form.Field name="referral">
-              {(field) => (
-                <div className="space-y-2">
-                  <Label htmlFor="referral">How did you hear about us?</Label>
-                  <Input
-                    id="referral"
-                    value={field.state.value}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                  />
-                </div>
-              )}
-            </form.Field>
-          </form>
-        </CardContent>
-      </Card>
-
-      {/* Companions (Spouse/Kids) */}
-      <Card className="max-w-2xl">
-        <CardHeader>
-          <CardTitle>Companions</CardTitle>
-          <CardDescription>
-            Add spouse or children attending with the applicant
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {companions.map((companion) => (
-            <div
-              key={companion._id}
-              className="flex items-start gap-4 rounded-lg border p-4"
-            >
-              <div className="flex-1 space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium capitalize text-muted-foreground">
-                    {companion.category === "spouse" ? "Spouse" : "Child"}
-                  </span>
-                </div>
-                <div className="grid gap-4 md:grid-cols-3">
-                  <div className="space-y-2">
-                    <Label>Name *</Label>
-                    <Input
-                      value={companion.name}
-                      onChange={(e) => {
-                        setCompanions((prev) =>
-                          prev.map((c) =>
-                            c._id === companion._id
-                              ? { ...c, name: e.target.value }
-                              : c,
-                          ),
-                        )
-                      }}
-                      placeholder="Full name"
-                    />
-                  </div>
-                  {companion.category === "spouse" && (
+                <form.Field
+                  name="email"
+                  validators={{
+                    onBlur: ({ value }) =>
+                      !value ? "Email is required" : undefined,
+                  }}
+                >
+                  {(field) => (
                     <div className="space-y-2">
-                      <Label>Email</Label>
+                      <Label htmlFor="email">
+                        Email <span className="text-destructive">*</span>
+                      </Label>
                       <Input
+                        id="email"
                         type="email"
-                        value={companion.email || ""}
-                        onChange={(e) => {
-                          setCompanions((prev) =>
-                            prev.map((c) =>
-                              c._id === companion._id
-                                ? { ...c, email: e.target.value || null }
-                                : c,
-                            ),
-                          )
-                        }}
-                        placeholder="Optional"
+                        value={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                      />
+                      {field.state.meta.errors.length > 0 && (
+                        <p className="text-destructive text-sm">
+                          {field.state.meta.errors.join(", ")}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </form.Field>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <form.Field name="telegram">
+                    {(field) => (
+                      <div className="space-y-2">
+                        <Label htmlFor="telegram">Telegram</Label>
+                        <Input
+                          id="telegram"
+                          placeholder="@username"
+                          value={field.state.value}
+                          onChange={(e) => field.handleChange(e.target.value)}
+                        />
+                      </div>
+                    )}
+                  </form.Field>
+
+                  <form.Field name="organization">
+                    {(field) => (
+                      <div className="space-y-2">
+                        <Label htmlFor="organization">Organization</Label>
+                        <Input
+                          id="organization"
+                          value={field.state.value}
+                          onChange={(e) => field.handleChange(e.target.value)}
+                        />
+                      </div>
+                    )}
+                  </form.Field>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <form.Field name="role">
+                    {(field) => (
+                      <div className="space-y-2">
+                        <Label htmlFor="role">Role</Label>
+                        <Input
+                          id="role"
+                          value={field.state.value}
+                          onChange={(e) => field.handleChange(e.target.value)}
+                        />
+                      </div>
+                    )}
+                  </form.Field>
+
+                  <form.Field name="gender">
+                    {(field) => (
+                      <div className="space-y-2">
+                        <Label htmlFor="gender">Gender</Label>
+                        <Select
+                          value={field.state.value}
+                          onValueChange={(val) => field.handleChange(val)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="male">Male</SelectItem>
+                            <SelectItem value="female">Female</SelectItem>
+                            <SelectItem value="other">Other</SelectItem>
+                            <SelectItem value="prefer not to say">
+                              Prefer not to say
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </form.Field>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <form.Field name="age">
+                    {(field) => (
+                      <div className="space-y-2">
+                        <Label htmlFor="age">Age Range</Label>
+                        <Select
+                          value={field.state.value}
+                          onValueChange={(val) => field.handleChange(val)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="18-24">18-24</SelectItem>
+                            <SelectItem value="25-34">25-34</SelectItem>
+                            <SelectItem value="35-44">35-44</SelectItem>
+                            <SelectItem value="45-54">45-54</SelectItem>
+                            <SelectItem value="55-64">55-64</SelectItem>
+                            <SelectItem value="65+">65+</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </form.Field>
+
+                  <form.Field name="residence">
+                    {(field) => (
+                      <div className="space-y-2">
+                        <Label htmlFor="residence">Residence</Label>
+                        <Input
+                          id="residence"
+                          value={field.state.value}
+                          onChange={(e) => field.handleChange(e.target.value)}
+                        />
+                      </div>
+                    )}
+                  </form.Field>
+                </div>
+
+                <form.Field name="referral">
+                  {(field) => (
+                    <div className="space-y-2">
+                      <Label htmlFor="referral">
+                        How did you hear about us?
+                      </Label>
+                      <Input
+                        id="referral"
+                        value={field.state.value}
+                        onChange={(e) => field.handleChange(e.target.value)}
                       />
                     </div>
                   )}
-                  <div className="space-y-2">
-                    <Label>Gender</Label>
-                    <Select
-                      value={companion.gender || ""}
-                      onValueChange={(val) => {
+                </form.Field>
+              </CardContent>
+            </Card>
+
+            {/* Companions (Spouse/Kids) */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Companions</CardTitle>
+                <CardDescription>
+                  Add spouse or children attending with the applicant
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {companions.map((companion) => (
+                  <div
+                    key={companion._id}
+                    className="flex items-start gap-4 rounded-lg border p-4"
+                  >
+                    <div className="flex-1 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium capitalize text-muted-foreground">
+                          {companion.category === "spouse" ? "Spouse" : "Child"}
+                        </span>
+                      </div>
+                      <div className="grid gap-4 md:grid-cols-3">
+                        <div className="space-y-2">
+                          <Label>Name *</Label>
+                          <Input
+                            value={companion.name}
+                            onChange={(e) => {
+                              setCompanions((prev) =>
+                                prev.map((c) =>
+                                  c._id === companion._id
+                                    ? { ...c, name: e.target.value }
+                                    : c,
+                                ),
+                              )
+                            }}
+                            placeholder="Full name"
+                          />
+                        </div>
+                        {companion.category === "spouse" && (
+                          <div className="space-y-2">
+                            <Label>Email</Label>
+                            <Input
+                              type="email"
+                              value={companion.email || ""}
+                              onChange={(e) => {
+                                setCompanions((prev) =>
+                                  prev.map((c) =>
+                                    c._id === companion._id
+                                      ? { ...c, email: e.target.value || null }
+                                      : c,
+                                  ),
+                                )
+                              }}
+                              placeholder="Optional"
+                            />
+                          </div>
+                        )}
+                        <div className="space-y-2">
+                          <Label>Gender</Label>
+                          <Select
+                            value={companion.gender || ""}
+                            onValueChange={(val) => {
+                              setCompanions((prev) =>
+                                prev.map((c) =>
+                                  c._id === companion._id
+                                    ? { ...c, gender: val || null }
+                                    : c,
+                                ),
+                              )
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="male">Male</SelectItem>
+                              <SelectItem value="female">Female</SelectItem>
+                              <SelectItem value="other">Other</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="mt-6"
+                      onClick={() => {
                         setCompanions((prev) =>
-                          prev.map((c) =>
-                            c._id === companion._id
-                              ? { ...c, gender: val || null }
-                              : c,
-                          ),
+                          prev.filter((c) => c._id !== companion._id),
                         )
                       }}
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="male">Male</SelectItem>
-                        <SelectItem value="female">Female</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
-                </div>
-              </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="mt-6"
-                onClick={() => {
-                  setCompanions((prev) =>
-                    prev.filter((c) => c._id !== companion._id),
-                  )
-                }}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          ))}
+                ))}
 
-          <div className="flex gap-2">
-            {!hasSpouse && (
+                <div className="flex gap-2">
+                  {!hasSpouse && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setCompanions((prev) => [
+                          ...prev,
+                          {
+                            _id: crypto.randomUUID(),
+                            name: "",
+                            category: "spouse",
+                            email: null,
+                            gender: null,
+                          },
+                        ])
+                      }}
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Spouse
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setCompanions((prev) => [
+                        ...prev,
+                        {
+                          _id: crypto.randomUUID(),
+                          name: "",
+                          category: "kid",
+                          email: null,
+                          gender: null,
+                        },
+                      ])
+                    }}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Kid
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Custom Fields */}
+            {sortedCustomFields.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Custom Fields</CardTitle>
+                  <CardDescription>
+                    Additional questions for this popup
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {Object.entries(fieldsBySection).map(([section, fields]) => (
+                    <div key={section} className="space-y-4">
+                      {Object.keys(fieldsBySection).length > 1 && (
+                        <h4 className="font-medium capitalize">{section}</h4>
+                      )}
+                      <div className="space-y-4">
+                        {fields.map(([name, field]) =>
+                          renderCustomField(name, field),
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Form Actions */}
+            <div className="flex gap-4">
               <Button
                 type="button"
                 variant="outline"
-                size="sm"
+                onClick={() => navigate({ to: "/applications" })}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={createMutation.isPending}
                 onClick={() => {
-                  setCompanions((prev) => [
-                    ...prev,
-                    {
-                      _id: crypto.randomUUID(),
-                      name: "",
-                      category: "spouse",
-                      email: null,
-                      gender: null,
-                    },
-                  ])
+                  setSavingAsDraft(true)
+                  form.handleSubmit()
                 }}
               >
-                <Plus className="mr-2 h-4 w-4" />
-                Add Spouse
+                Save as Draft
               </Button>
-            )}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setCompanions((prev) => [
-                  ...prev,
-                  {
-                    _id: crypto.randomUUID(),
-                    name: "",
-                    category: "kid",
-                    email: null,
-                    gender: null,
-                  },
-                ])
-              }}
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Add Kid
-            </Button>
+              <LoadingButton
+                type="submit"
+                loading={createMutation.isPending && !savingAsDraft}
+                onClick={() => {
+                  setSavingAsDraft(false)
+                  form.handleSubmit()
+                }}
+              >
+                Submit Application
+              </LoadingButton>
+            </div>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Custom Fields */}
-      {sortedCustomFields.length > 0 && (
-        <Card className="max-w-2xl">
-          <CardHeader>
-            <CardTitle>Custom Fields</CardTitle>
-            <CardDescription>
-              Additional questions for this popup
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {Object.entries(fieldsBySection).map(([section, fields]) => (
-              <div key={section} className="space-y-4">
-                {Object.keys(fieldsBySection).length > 1 && (
-                  <h4 className="font-medium capitalize">{section}</h4>
-                )}
-                <div className="space-y-4">
-                  {fields.map(([name, field]) =>
-                    renderCustomField(name, field),
-                  )}
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
+          {/* Right Column - Preview */}
+          <div className="space-y-6">
+            <form.Subscribe
+              selector={(state) => ({
+                first_name: state.values.first_name,
+                last_name: state.values.last_name,
+                email: state.values.email,
+                organization: state.values.organization,
+                role: state.values.role,
+                gender: state.values.gender,
+                age: state.values.age,
+                residence: state.values.residence,
+                referral: state.values.referral,
+                telegram: state.values.telegram,
+                custom_fields: state.values.custom_fields,
+              })}
+            >
+              {(values) => {
+                const fullName =
+                  `${values.first_name} ${values.last_name}`.trim()
 
-      {/* Actions */}
-      <div className="flex gap-4">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => navigate({ to: "/applications" })}
-        >
-          Cancel
-        </Button>
-        <Button
-          type="button"
-          variant="secondary"
-          disabled={createMutation.isPending}
-          onClick={() => {
-            setSavingAsDraft(true)
-            form.handleSubmit()
-          }}
-        >
-          Save as Draft
-        </Button>
-        <LoadingButton
-          type="submit"
-          loading={createMutation.isPending && !savingAsDraft}
-          onClick={() => {
-            setSavingAsDraft(false)
-            form.handleSubmit()
-          }}
-        >
-          Submit Application
-        </LoadingButton>
-      </div>
+                return (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Preview</CardTitle>
+                      <CardDescription>
+                        Application summary preview
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                          <User className="h-5 w-5 text-primary" />
+                        </div>
+                        <div className="flex-1 space-y-1">
+                          <p className="font-medium leading-none">
+                            {fullName || "Applicant Name"}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {values.organization || "Organization"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <Separator />
+
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2 text-sm">
+                          <Mail className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-muted-foreground">
+                            {values.email || "email@example.com"}
+                          </span>
+                        </div>
+
+                        {values.role && (
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">Role</span>
+                            <span>{values.role}</span>
+                          </div>
+                        )}
+
+                        {values.gender && (
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">
+                              Gender
+                            </span>
+                            <span className="capitalize">{values.gender}</span>
+                          </div>
+                        )}
+
+                        {values.age && (
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">Age</span>
+                            <span>{values.age}</span>
+                          </div>
+                        )}
+
+                        {values.residence && (
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">
+                              Residence
+                            </span>
+                            <span>{values.residence}</span>
+                          </div>
+                        )}
+
+                        {values.telegram && (
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">
+                              Telegram
+                            </span>
+                            <span>{values.telegram}</span>
+                          </div>
+                        )}
+
+                        {values.referral && (
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">
+                              Referral
+                            </span>
+                            <span>{values.referral}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Custom Fields Preview */}
+                      {Object.entries(values.custom_fields).some(
+                        ([, v]) =>
+                          v !== "" &&
+                          v !== false &&
+                          !(Array.isArray(v) && v.length === 0),
+                      ) && (
+                        <>
+                          <Separator />
+                          <div className="space-y-2">
+                            <p className="text-sm font-medium text-muted-foreground">
+                              Custom Fields
+                            </p>
+                            {Object.entries(values.custom_fields).map(
+                              ([key, value]) => {
+                                if (
+                                  value === "" ||
+                                  value === false ||
+                                  (Array.isArray(value) && value.length === 0)
+                                )
+                                  return null
+
+                                const fieldDef = schema?.custom_fields?.[key]
+                                const label =
+                                  fieldDef?.label ||
+                                  key
+                                    .split("_")
+                                    .map(
+                                      (w) =>
+                                        w.charAt(0).toUpperCase() + w.slice(1),
+                                    )
+                                    .join(" ")
+
+                                let displayValue: string
+                                if (typeof value === "boolean") {
+                                  displayValue = value ? "Yes" : "No"
+                                } else if (Array.isArray(value)) {
+                                  displayValue = value.join(", ")
+                                } else {
+                                  displayValue = String(value)
+                                }
+
+                                return (
+                                  <div
+                                    key={key}
+                                    className="flex items-start justify-between text-sm"
+                                  >
+                                    <span className="text-muted-foreground">
+                                      {label}
+                                    </span>
+                                    <span className="text-right max-w-[60%] break-words">
+                                      {displayValue}
+                                    </span>
+                                  </div>
+                                )
+                              },
+                            )}
+                          </div>
+                        </>
+                      )}
+
+                      <Separator />
+
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">
+                          Status
+                        </span>
+                        <Badge variant="outline">Draft</Badge>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              }}
+            </form.Subscribe>
+
+            {/* Companions Preview */}
+            {companions.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">
+                    <div className="flex items-center gap-2">
+                      <Users className="h-4 w-4" />
+                      Companions ({companions.length})
+                    </div>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {companions.map((companion) => (
+                    <div
+                      key={companion._id}
+                      className="flex items-center justify-between rounded-lg border p-2 text-sm"
+                    >
+                      <div>
+                        <p className="font-medium">
+                          {companion.name || "Unnamed"}
+                        </p>
+                        <p className="text-xs text-muted-foreground capitalize">
+                          {companion.category}
+                        </p>
+                      </div>
+                      {companion.gender && (
+                        <span className="text-xs text-muted-foreground capitalize">
+                          {companion.gender}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </div>
+      </form>
     </div>
   )
 }

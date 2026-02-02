@@ -32,6 +32,7 @@ import { Route as LayoutGroupsNewRouteImport } from './routes/_layout/groups/new
 import { Route as LayoutFormBuilderNewRouteImport } from './routes/_layout/form-builder/new'
 import { Route as LayoutCouponsNewRouteImport } from './routes/_layout/coupons/new'
 import { Route as LayoutApplicationsNewRouteImport } from './routes/_layout/applications/new'
+import { Route as LayoutApplicationsIdRouteImport } from './routes/_layout/applications/$id'
 import { Route as LayoutAdminNewRouteImport } from './routes/_layout/admin/new'
 import { Route as LayoutTenantsIdEditRouteImport } from './routes/_layout/tenants/$id.edit'
 import { Route as LayoutProductsIdEditRouteImport } from './routes/_layout/products/$id.edit'
@@ -156,6 +157,11 @@ const LayoutApplicationsNewRoute = LayoutApplicationsNewRouteImport.update({
   path: '/applications/new',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutApplicationsIdRoute = LayoutApplicationsIdRouteImport.update({
+  id: '/applications/$id',
+  path: '/applications/$id',
+  getParentRoute: () => LayoutRoute,
+} as any)
 const LayoutAdminNewRoute = LayoutAdminNewRouteImport.update({
   id: '/admin/new',
   path: '/admin/new',
@@ -209,6 +215,7 @@ export interface FileRoutesByFullPath {
   '/payments': typeof LayoutPaymentsRoute
   '/settings': typeof LayoutSettingsRoute
   '/admin/new': typeof LayoutAdminNewRoute
+  '/applications/$id': typeof LayoutApplicationsIdRoute
   '/applications/new': typeof LayoutApplicationsNewRoute
   '/coupons/new': typeof LayoutCouponsNewRoute
   '/form-builder/new': typeof LayoutFormBuilderNewRoute
@@ -242,6 +249,7 @@ export interface FileRoutesByTo {
   '/settings': typeof LayoutSettingsRoute
   '/': typeof LayoutIndexRoute
   '/admin/new': typeof LayoutAdminNewRoute
+  '/applications/$id': typeof LayoutApplicationsIdRoute
   '/applications/new': typeof LayoutApplicationsNewRoute
   '/coupons/new': typeof LayoutCouponsNewRoute
   '/form-builder/new': typeof LayoutFormBuilderNewRoute
@@ -277,6 +285,7 @@ export interface FileRoutesById {
   '/_layout/settings': typeof LayoutSettingsRoute
   '/_layout/': typeof LayoutIndexRoute
   '/_layout/admin/new': typeof LayoutAdminNewRoute
+  '/_layout/applications/$id': typeof LayoutApplicationsIdRoute
   '/_layout/applications/new': typeof LayoutApplicationsNewRoute
   '/_layout/coupons/new': typeof LayoutCouponsNewRoute
   '/_layout/form-builder/new': typeof LayoutFormBuilderNewRoute
@@ -312,6 +321,7 @@ export interface FileRouteTypes {
     | '/payments'
     | '/settings'
     | '/admin/new'
+    | '/applications/$id'
     | '/applications/new'
     | '/coupons/new'
     | '/form-builder/new'
@@ -345,6 +355,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/'
     | '/admin/new'
+    | '/applications/$id'
     | '/applications/new'
     | '/coupons/new'
     | '/form-builder/new'
@@ -379,6 +390,7 @@ export interface FileRouteTypes {
     | '/_layout/settings'
     | '/_layout/'
     | '/_layout/admin/new'
+    | '/_layout/applications/$id'
     | '/_layout/applications/new'
     | '/_layout/coupons/new'
     | '/_layout/form-builder/new'
@@ -574,6 +586,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutApplicationsNewRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/applications/$id': {
+      id: '/_layout/applications/$id'
+      path: '/applications/$id'
+      fullPath: '/applications/$id'
+      preLoaderRoute: typeof LayoutApplicationsIdRouteImport
+      parentRoute: typeof LayoutRoute
+    }
     '/_layout/admin/new': {
       id: '/_layout/admin/new'
       path: '/admin/new'
@@ -646,6 +665,7 @@ interface LayoutRouteChildren {
   LayoutSettingsRoute: typeof LayoutSettingsRoute
   LayoutIndexRoute: typeof LayoutIndexRoute
   LayoutAdminNewRoute: typeof LayoutAdminNewRoute
+  LayoutApplicationsIdRoute: typeof LayoutApplicationsIdRoute
   LayoutApplicationsNewRoute: typeof LayoutApplicationsNewRoute
   LayoutCouponsNewRoute: typeof LayoutCouponsNewRoute
   LayoutFormBuilderNewRoute: typeof LayoutFormBuilderNewRoute
@@ -679,6 +699,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutSettingsRoute: LayoutSettingsRoute,
   LayoutIndexRoute: LayoutIndexRoute,
   LayoutAdminNewRoute: LayoutAdminNewRoute,
+  LayoutApplicationsIdRoute: LayoutApplicationsIdRoute,
   LayoutApplicationsNewRoute: LayoutApplicationsNewRoute,
   LayoutCouponsNewRoute: LayoutCouponsNewRoute,
   LayoutFormBuilderNewRoute: LayoutFormBuilderNewRoute,
