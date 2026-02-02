@@ -7,10 +7,7 @@ import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
 import { cn } from "@/lib/utils"
 
-import edgeosIcon from "/assets/images/edgeos-icon.svg"
-import edgeosIconLight from "/assets/images/edgeos-icon-light.svg"
-import edgeosLogo from "/assets/images/edgeos-logo.svg"
-import edgeosLogoLight from "/assets/images/edgeos-logo-light.svg"
+import favicon from "/assets/images/favicon.png"
 
 interface LogoProps {
   variant?: "full" | "icon" | "responsive"
@@ -35,52 +32,94 @@ export function Logo({
     staleTime: 5 * 60 * 1000,
   })
 
-  const defaultFullLogo = isDark ? edgeosLogoLight : edgeosLogo
-  const defaultIconLogo = isDark ? edgeosIconLight : edgeosIcon
-
   const tenantLogo = tenant?.image_url
   const tenantIcon = tenant?.icon_url
 
   const shouldUseTenantLogo = !isSuperadmin && (tenantLogo || tenantIcon)
 
-  const fullLogo =
-    shouldUseTenantLogo && tenantLogo ? tenantLogo : defaultFullLogo
-  const iconLogo =
-    shouldUseTenantLogo && tenantIcon ? tenantIcon : defaultIconLogo
-
   const altText = tenant?.name || "EdgeOS"
+
+  // Default EdgeOS logo: PNG icon + text
+  const DefaultFullLogo = ({
+    className: logoClassName,
+  }: {
+    className?: string
+  }) => (
+    <div className={cn("flex items-center gap-2", logoClassName)}>
+      <img src={favicon} alt={altText} className="size-8 object-contain" />
+      <span
+        className={cn(
+          "text-xl font-semibold",
+          isDark ? "text-slate-50" : "text-slate-900",
+        )}
+      >
+        EdgeOS
+      </span>
+    </div>
+  )
+
+  const DefaultIconLogo = ({
+    className: iconClassName,
+  }: {
+    className?: string
+  }) => (
+    <img
+      src={favicon}
+      alt={altText}
+      className={cn("size-10 object-contain", iconClassName)}
+    />
+  )
 
   const content =
     variant === "responsive" ? (
       <>
-        <img
-          src={fullLogo}
-          alt={altText}
-          className={cn(
-            "h-10 w-auto object-contain group-data-[collapsible=icon]:hidden",
-            className,
-          )}
-        />
-        <img
-          src={iconLogo}
-          alt={altText}
-          className={cn(
-            "size-10 object-contain hidden group-data-[collapsible=icon]:block",
-            className,
-          )}
-        />
-      </>
-    ) : (
-      <img
-        src={variant === "full" ? fullLogo : iconLogo}
-        alt={altText}
-        className={cn(
-          variant === "full"
-            ? "h-10 w-auto object-contain"
-            : "size-10 object-contain",
-          className,
+        {shouldUseTenantLogo && tenantLogo ? (
+          <img
+            src={tenantLogo}
+            alt={altText}
+            className={cn(
+              "h-10 w-auto object-contain group-data-[collapsible=icon]:hidden",
+              className,
+            )}
+          />
+        ) : (
+          <div className="group-data-[collapsible=icon]:hidden">
+            <DefaultFullLogo className={className} />
+          </div>
         )}
+        {shouldUseTenantLogo && tenantIcon ? (
+          <img
+            src={tenantIcon}
+            alt={altText}
+            className={cn(
+              "size-10 object-contain hidden group-data-[collapsible=icon]:block",
+              className,
+            )}
+          />
+        ) : (
+          <div className="hidden group-data-[collapsible=icon]:block">
+            <DefaultIconLogo className={className} />
+          </div>
+        )}
+      </>
+    ) : variant === "full" ? (
+      shouldUseTenantLogo && tenantLogo ? (
+        <img
+          src={tenantLogo}
+          alt={altText}
+          className={cn("h-10 w-auto object-contain", className)}
+        />
+      ) : (
+        <DefaultFullLogo className={className} />
+      )
+    ) : shouldUseTenantLogo && tenantIcon ? (
+      <img
+        src={tenantIcon}
+        alt={altText}
+        className={cn("size-10 object-contain", className)}
       />
+    ) : (
+      <DefaultIconLogo className={className} />
     )
 
   if (!asLink) {
