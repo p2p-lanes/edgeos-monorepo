@@ -576,6 +576,22 @@ export type HumanAuth = {
 };
 
 /**
+ * Human schema for creation.
+ */
+export type HumanCreate = {
+    email: string;
+    first_name?: (string | null);
+    last_name?: (string | null);
+    telegram?: (string | null);
+    organization?: (string | null);
+    role?: (string | null);
+    gender?: (string | null);
+    age?: (string | null);
+    residence?: (string | null);
+    picture_url?: (string | null);
+};
+
+/**
  * Human schema for API responses.
  */
 export type HumanPublic = {
@@ -1564,6 +1580,13 @@ export type HumansListHumansData = {
 };
 
 export type HumansListHumansResponse = (ListModel_HumanPublic_);
+
+export type HumansCreateHumanData = {
+    requestBody: HumanCreate;
+    xTenantId?: (string | null);
+};
+
+export type HumansCreateHumanResponse = (HumanPublic);
 
 export type HumansGetCurrentHumanInfoResponse = (HumanPublic);
 
