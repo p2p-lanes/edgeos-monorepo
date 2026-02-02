@@ -261,7 +261,22 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                 </form.Field>
 
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <form.Field name="start_date">
+                  <form.Field
+                    name="start_date"
+                    validators={{
+                      onChange: ({ value }) => {
+                        if (readOnly || !value || isEdit) return undefined
+                        const today = new Date()
+                        today.setHours(0, 0, 0, 0)
+                        const startDate = new Date(value)
+                        startDate.setHours(0, 0, 0, 0)
+                        if (startDate < today) {
+                          return "Start date must be today or in the future"
+                        }
+                        return undefined
+                      },
+                    }}
+                  >
                     {(field) => (
                       <div className="space-y-2">
                         <Label htmlFor="start_date">Start Date</Label>
@@ -272,11 +287,32 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                           disabled={readOnly}
                           placeholder="Select start date"
                         />
+                        {field.state.meta.errors.length > 0 && (
+                          <p className="text-destructive text-sm">
+                            {field.state.meta.errors.join(", ")}
+                          </p>
+                        )}
                       </div>
                     )}
                   </form.Field>
 
-                  <form.Field name="end_date">
+                  <form.Field
+                    name="end_date"
+                    validators={{
+                      onChange: ({ value, fieldApi }) => {
+                        if (readOnly || !value) return undefined
+                        const startDateValue =
+                          fieldApi.form.getFieldValue("start_date")
+                        if (!startDateValue) return undefined
+                        const startDate = new Date(startDateValue)
+                        const endDate = new Date(value)
+                        if (endDate < startDate) {
+                          return "End date cannot be before start date"
+                        }
+                        return undefined
+                      },
+                    }}
+                  >
                     {(field) => (
                       <div className="space-y-2">
                         <Label htmlFor="end_date">End Date</Label>
@@ -287,6 +323,11 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                           disabled={readOnly}
                           placeholder="Select end date"
                         />
+                        {field.state.meta.errors.length > 0 && (
+                          <p className="text-destructive text-sm">
+                            {field.state.meta.errors.join(", ")}
+                          </p>
+                        )}
                       </div>
                     )}
                   </form.Field>
