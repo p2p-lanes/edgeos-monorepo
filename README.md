@@ -167,7 +167,7 @@ All tenant-scoped tables include a `tenant_id` column with RLS policies that ens
 ## Project Structure
 
 ```
-EdgeOS/
+edgeos-monorepo/
 ├── backend/                 # FastAPI backend
 │   ├── app/
 │   │   ├── api/            # API modules (router, crud, models, schemas)
