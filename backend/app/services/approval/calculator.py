@@ -4,7 +4,7 @@ Approval Calculator Service
 Calculates application status based on reviews and approval strategy.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlmodel import Session
 
@@ -218,7 +218,7 @@ class ApprovalCalculator:
             application.status = new_status.value
 
             if new_status == ApplicationStatus.ACCEPTED:
-                application.accepted_at = datetime.now(timezone.utc)
+                application.accepted_at = datetime.now(UTC)
                 # Create snapshot
                 applications_crud.create_snapshot(session, application, "accepted")
             elif new_status == ApplicationStatus.REJECTED:

@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, HTTPException, status
@@ -209,7 +209,7 @@ async def update_application_admin(
         and application.status != ApplicationStatus.ACCEPTED.value
     ):
         app_in_dict = app_in.model_dump(exclude_unset=True)
-        app_in_dict["accepted_at"] = datetime.now(timezone.utc)
+        app_in_dict["accepted_at"] = datetime.now(UTC)
         app_in_dict["status"] = app_in.status.value
 
         for field, value in app_in_dict.items():
@@ -430,7 +430,7 @@ async def update_my_application(
 
         if update_data["status"] == ApplicationStatus.IN_REVIEW.value:
             if not application.submitted_at:
-                update_data["submitted_at"] = datetime.now(timezone.utc)
+                update_data["submitted_at"] = datetime.now(UTC)
 
     for field, value in update_data.items():
         setattr(application, field, value)
