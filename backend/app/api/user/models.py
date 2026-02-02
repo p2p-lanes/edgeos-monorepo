@@ -19,7 +19,7 @@ class Users(UserBase, table=True):
     id: uuid.UUID = Field(
         default_factory=uuid.uuid4,
         sa_column=Column(
-            UUID(as_uuid=True),  # ty:ignore[no-matching-overload]
+            UUID(as_uuid=True),
             primary_key=True,
         ),
     )
