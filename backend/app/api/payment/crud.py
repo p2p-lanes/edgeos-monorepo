@@ -49,7 +49,7 @@ def _get_credit(application: Applications, discount_value: Decimal) -> Decimal:
         if not patreon:
             total += subtotal
 
-    credit = Decimal(str(application.credit)) if application.credit else Decimal("0")
+    credit = Decimal(str(application.credit)) if application.credit else Decimal("0")  # type: ignore[attr-defined]
     return _get_discounted_price(total, discount_value) + credit
 
 
@@ -173,7 +173,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         """Find payments by popup_id via their applications."""
         statement = (
             select(Payments)
-            .join(Applications, Payments.application_id == Applications.id)
+            .join(Applications, Payments.application_id == Applications.id)  # type: ignore[arg-type]
             .where(Applications.popup_id == popup_id)
         )
         if status_filter:
@@ -297,7 +297,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         if edit_passes and is_buying_patreon and not already_patreon:
             logger.error(
-                "Cannot edit passes for Patreon products. %s", application.email
+                "Cannot edit passes for Patreon products. %s",
+                application.email,  # type: ignore[attr-defined]
             )
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -314,7 +315,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         already_patreon: bool,
     ) -> PaymentPreview:
         """Calculate all discounts and return payment preview."""
-        discount_assigned = Decimal(str(application.discount_assigned or 0))
+        discount_assigned = Decimal(str(application.discount_assigned or 0))  # type: ignore[attr-defined]
 
         response = PaymentPreview(
             application_id=application.id,
@@ -420,8 +421,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             .where(Applications.id == application_id)
             .options(
                 selectinload(Applications.attendees)  # type: ignore[arg-type]
-                .selectinload(Attendees.attendee_products)
-                .selectinload(AttendeeProducts.product),
+                .selectinload(Attendees.attendee_products)  # ty: ignore[invalid-argument-type]
+                .selectinload(AttendeeProducts.product),  # ty: ignore[invalid-argument-type]
                 selectinload(Applications.human),  # type: ignore[arg-type]
                 selectinload(Applications.group),  # type: ignore[arg-type]
             )

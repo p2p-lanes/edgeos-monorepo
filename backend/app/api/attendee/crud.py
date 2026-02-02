@@ -76,12 +76,16 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         total = session.exec(count_statement).one()
 
         # Eager load relationships to avoid N+1 queries
-        statement = base_statement.options(
-            selectinload(Attendees.attendee_products).selectinload(  # type: ignore[arg-type]
-                AttendeeProducts.product
-            ),
-            selectinload(Attendees.application),  # type: ignore[arg-type]
-        ).offset(skip).limit(limit)
+        statement = (
+            base_statement.options(
+                selectinload(Attendees.attendee_products).selectinload(  # type: ignore[arg-type]
+                    AttendeeProducts.product  # ty: ignore[invalid-argument-type]
+                ),
+                selectinload(Attendees.application),  # type: ignore[arg-type]
+            )
+            .offset(skip)
+            .limit(limit)
+        )
         results = list(session.exec(statement).all())
         return results, total
 
@@ -178,14 +182,18 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         total = session.exec(count_statement).one()
 
         # Eager load relationships to avoid N+1 queries
-        statement = base_statement.options(
-            selectinload(Attendees.attendee_products).selectinload(  # type: ignore[arg-type]
-                AttendeeProducts.product
-            ),
-            selectinload(Attendees.application).selectinload(  # type: ignore[arg-type]
-                Applications.popup
-            ),
-        ).offset(skip).limit(limit)
+        statement = (
+            base_statement.options(
+                selectinload(Attendees.attendee_products).selectinload(  # type: ignore[arg-type]
+                    AttendeeProducts.product  # ty: ignore[invalid-argument-type]
+                ),
+                selectinload(Attendees.application).selectinload(  # type: ignore[arg-type]
+                    Applications.popup  # ty: ignore[invalid-argument-type]
+                ),
+            )
+            .offset(skip)
+            .limit(limit)
+        )
         results = list(session.exec(statement).all())
 
         return results, total

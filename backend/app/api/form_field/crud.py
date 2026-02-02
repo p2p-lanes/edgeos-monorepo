@@ -30,7 +30,7 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
         statement = (
             select(FormFields)
             .where(FormFields.popup_id == popup_id)
-            .order_by(FormFields.section, FormFields.position)
+            .order_by(FormFields.section, FormFields.position)  # type: ignore[arg-type]
         )
 
         count_statement = select(func.count()).select_from(statement.subquery())
