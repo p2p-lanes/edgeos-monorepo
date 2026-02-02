@@ -4747,7 +4747,14 @@ export const ProductCreateSchema = {
             title: 'Name'
         },
         slug: {
-            type: 'string',
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
             title: 'Slug'
         },
         price: {
@@ -4848,7 +4855,7 @@ export const ProductCreateSchema = {
         }
     },
     type: 'object',
-    required: ['popup_id', 'name', 'slug', 'price'],
+    required: ['popup_id', 'name', 'price'],
     title: 'ProductCreate',
     description: 'Product schema for creation.'
 } as const;

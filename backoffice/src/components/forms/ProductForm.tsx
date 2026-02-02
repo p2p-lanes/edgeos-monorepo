@@ -149,7 +149,6 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
         createMutation.mutate({
           popup_id: selectedPopupId,
           name: value.name,
-          slug: "",
           price: value.price,
           description: value.description || undefined,
           category: value.category,

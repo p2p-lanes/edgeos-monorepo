@@ -938,7 +938,7 @@ export type ProductCategory = 'ticket' | 'housing' | 'merch' | 'other';
 export type ProductCreate = {
     popup_id: string;
     name: string;
-    slug: string;
+    slug?: (string | null);
     price: (number | string);
     compare_price?: (number | string | null);
     description?: (string | null);
