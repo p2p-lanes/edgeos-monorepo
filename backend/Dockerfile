@@ -1,4 +1,4 @@
-FROM python:3.12-slim-trixie
+FROM public.ecr.aws/docker/library/python:3.12-slim-bookworm
 
 ENV PYTHONUNBUFFERED=1
 

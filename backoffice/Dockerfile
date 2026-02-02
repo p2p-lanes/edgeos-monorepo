@@ -1,5 +1,6 @@
 # Stage 0, "build-stage", based on Bun, to build and compile the backoffice
-FROM oven/bun:1 AS build-stage
+FROM public.ecr.aws/docker/library/node:20-alpine AS build-stage
+RUN npm install -g bun
 
 WORKDIR /app
 
@@ -18,7 +19,7 @@ RUN bun run build
 
 
 # Stage 1, based on Nginx, to have only the compiled app, ready for production with Nginx
-FROM nginx:1
+FROM public.ecr.aws/docker/library/nginx:alpine
 
 COPY --from=build-stage /app/backoffice/dist/ /usr/share/nginx/html
 
