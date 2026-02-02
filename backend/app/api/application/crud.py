@@ -1,5 +1,6 @@
 import uuid
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from fastapi import HTTPException, status
 from sqlalchemy import desc
@@ -17,6 +18,9 @@ from app.api.attendee.crud import attendees_crud, generate_check_in_code
 from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.human.schemas import HumanCreate, HumanUpdate
 from app.api.shared.crud import BaseCRUD
+
+if TYPE_CHECKING:
+    from app.api.human.models import Humans
 
 
 class RedFlaggedHumanError(Exception):
@@ -427,9 +431,48 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 check_in_prefix=prefix,
             )
 
+        # Apply approval strategy if status is IN_REVIEW
+        if application.status == ApplicationStatus.IN_REVIEW.value:
+            self._apply_approval_strategy(session, application, human)
+
         session.commit()
         session.refresh(application)
         return application
+
+    def _apply_approval_strategy(
+        self,
+        session: Session,
+        application: "Applications",
+        human: "Humans",
+    ) -> None:
+        """Apply approval strategy to determine final status.
+
+        - Red-flagged humans → REJECTED
+        - No strategy or AUTO_ACCEPT → ACCEPTED
+        - Other strategies → IN_REVIEW (unchanged)
+        """
+        from app.api.approval_strategy.crud import approval_strategies_crud
+        from app.api.approval_strategy.schemas import ApprovalStrategyType
+
+        # Red-flagged humans are automatically rejected
+        if human.red_flag:
+            application.status = ApplicationStatus.REJECTED.value
+            self.create_snapshot(session, application, "auto_rejected")
+            return
+
+        # Check approval strategy
+        strategy = approval_strategies_crud.get_by_popup(session, application.popup_id)
+        should_auto_accept = (
+            strategy is None
+            or strategy.strategy_type == ApprovalStrategyType.AUTO_ACCEPT
+        )
+
+        if should_auto_accept:
+            application.status = ApplicationStatus.ACCEPTED.value
+            application.accepted_at = datetime.now(UTC)
+            self.create_snapshot(session, application, "auto_accepted")
+        else:
+            self.create_snapshot(session, application, "submitted")
 
     def update_with_profile(
         self,
