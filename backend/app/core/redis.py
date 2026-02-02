@@ -71,7 +71,7 @@ class RateLimiter:
                 client.setex(key, self.window_seconds, 1)
                 return True, self.max_requests - 1
 
-            current_count = int(current)
+            current_count = int(current)  # type: ignore[arg-type]
             if current_count >= self.max_requests:
                 # Get TTL for retry-after header
                 return False, 0
@@ -93,7 +93,7 @@ class RateLimiter:
         key = self._get_key(identifier)
         try:
             ttl = client.ttl(key)
-            return max(0, ttl)
+            return max(0, ttl)  # type: ignore[type-var]
         except redis.RedisError:
             return 0
 
@@ -175,7 +175,7 @@ class AuthCodeStore:
         try:
             # Check attempts first
             attempts = client.get(attempts_key)
-            if attempts is not None and int(attempts) >= self.max_attempts:
+            if attempts is not None and int(attempts) >= self.max_attempts:  # type: ignore[arg-type]
                 return (
                     False,
                     "Maximum authentication attempts exceeded. Please request a new code.",
@@ -273,11 +273,13 @@ class PendingHumanStore:
             if not data:
                 return None
 
+            # With decode_responses=True, hgetall returns dict[str, str]
+            str_data: dict[str, str] = data  # type: ignore[assignment]
             return {
-                "tenant_id": uuid.UUID(data["tenant_id"]),
-                "email": data["email"],
-                "picture_url": data["picture_url"] or None,
-                "red_flag": data["red_flag"] == "1",
+                "tenant_id": uuid.UUID(str_data["tenant_id"]),
+                "email": str_data["email"],
+                "picture_url": str_data["picture_url"] or None,
+                "red_flag": str_data["red_flag"] == "1",
             }
         except (redis.RedisError, KeyError, ValueError) as e:
             logger.warning(f"Failed to get pending human: {e}")
