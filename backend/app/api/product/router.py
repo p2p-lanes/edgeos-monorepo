@@ -13,6 +13,7 @@ from app.api.product.schemas import (
 from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, Paging
 from app.core.dependencies.users import CurrentUser, TenantSession
+from app.utils.utils import slugify
 
 if TYPE_CHECKING:
     from app.api.user.schemas import UserPublic
@@ -85,8 +86,11 @@ async def create_product(
     """Create a new product."""
     _check_write_permission(current_user)
 
+    # Auto-generate slug from name if not provided
+    slug = product_in.slug if product_in.slug else slugify(product_in.name)
+
     # Check for existing product with same slug in popup
-    existing = crud.products_crud.get_by_slug(db, product_in.slug, product_in.popup_id)
+    existing = crud.products_crud.get_by_slug(db, slug, product_in.popup_id)
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -108,11 +112,12 @@ async def create_product(
     else:
         tenant_id = current_user.tenant_id
 
-    # Create internal schema with tenant_id
+    # Create internal schema with tenant_id and generated slug
     from app.api.product.models import Products
 
     product_data = product_in.model_dump()
     product_data["tenant_id"] = tenant_id
+    product_data["slug"] = slug
     product = Products(**product_data)
 
     db.add(product)

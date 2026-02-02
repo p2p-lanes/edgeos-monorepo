@@ -70,7 +70,7 @@ class ProductCreate(BaseModel):
 
     popup_id: uuid.UUID
     name: str
-    slug: str
+    slug: str | None = None
     price: Decimal
     compare_price: Decimal | None = None
     description: str | None = None
