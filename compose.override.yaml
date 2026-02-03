@@ -17,6 +17,7 @@ services:
       retries: 5
 
   prestart:
+    pull_policy: build
     depends_on:
       db:
         condition: service_healthy
@@ -24,6 +25,7 @@ services:
       - POSTGRES_SERVER=db
 
   backend:
+    pull_policy: build
     restart: "no"
     ports:
       - "8000:8000"
@@ -74,6 +76,7 @@ services:
       - ADMINER_DESIGN=pepa-linha-dark
 
   backoffice:
+    pull_policy: build
     restart: "no"
     ports:
       - "5173:80"

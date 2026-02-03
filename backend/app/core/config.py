@@ -104,7 +104,6 @@ class Settings(BaseSettings):
     EMAIL_TEST_USER: EmailStr = "test@example.com"
 
     SUPERADMIN: EmailStr = Field(...)
-    SUPERADMIN_PASSWORD: str = Field(...)
 
     # Storage configuration (S3-compatible)
     STORAGE_ENDPOINT_URL: str | None = None  # None = AWS S3

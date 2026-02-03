@@ -46,73 +46,44 @@ EdgeOS provides a complete solution for managing events (called "popups"), atten
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## Quick Start (Self-Hosting)
+## Quick Start (Local Development)
 
 ### Prerequisites
 
 - [Docker](https://www.docker.com/) and Docker Compose
-- [uv](https://docs.astral.sh/uv/) (for Python backend development)
-- [Bun](https://bun.sh/) (for frontend development)
 
-### 1. Clone and Configure
+### 1. Clone and Start
 
 ```bash
 git clone <repository-url>
 cd EdgeOS
 
-# Copy environment template and configure
+# Copy environment template (works out of the box for local dev)
 cp .env.example .env
-```
 
-### 2. Configure Environment Variables
-
-Edit `.env` with your settings:
-
-```bash
-# Required
-PROJECT_NAME=EdgeOS
-DOMAIN=localhost
-
-# Database
-POSTGRES_SERVER=db
-POSTGRES_USER=edgeos
-POSTGRES_PASSWORD=<strong-password>
-POSTGRES_DB=edgeos
-
-# Security
-SECRET_KEY=<generate-with: openssl rand -hex 32>
-
-# Initial Superadmin
-SUPERADMIN=admin@yourdomain.com
-SUPERADMIN_PASSWORD=<initial-password>
-
-# Email (optional but recommended)
-SMTP_HOST=smtp.example.com
-SMTP_USER=noreply@yourdomain.com
-SMTP_PASSWORD=<smtp-password>
-EMAILS_FROM_EMAIL=noreply@yourdomain.com
-
-# Frontend
-VITE_API_URL=http://localhost:8000
-```
-
-### 3. Start Services
-
-```bash
-# Development mode with hot reload
+# Start all services with hot reload
 docker compose watch
-
-# Or production mode
-docker compose up -d
 ```
 
-### 4. Access the Application
+That's it. The default `.env.example` is pre-configured for local development with:
+- PostgreSQL database (via Docker)
+- Mailpit for email testing (view emails at http://localhost:8025)
+- MinIO for S3-compatible file storage
+- Redis for caching
 
-- **Backoffice Dashboard**: http://localhost:5173
-- **API Documentation**: http://localhost:8000/docs
-- **API ReDoc**: http://localhost:8000/redoc
+### 2. Access the Application
 
-Login with the superadmin credentials you configured.
+| Service | URL | Description |
+|---------|-----|-------------|
+| **Backoffice** | http://localhost:5173 | React dashboard |
+| **API Docs** | http://localhost:8000/docs | Swagger UI |
+| **API ReDoc** | http://localhost:8000/redoc | ReDoc documentation |
+| **Mailpit** | http://localhost:8025 | Email testing inbox |
+| **Adminer** | http://localhost:8080 | Database admin UI |
+| **MinIO Console** | http://localhost:9001 | File storage admin |
+| **Redis Commander** | http://localhost:8081 | Redis admin UI |
+
+Login with the default superadmin: `admin@example.com` (check Mailpit for the login code).
 
 ## Database Structure
 
@@ -189,14 +160,27 @@ edgeos-monorepo/
 
 ## Development
 
-### Backend Development
+For most development, using Docker (`docker compose watch`) is recommended as it provides hot reload and all dependencies configured.
+
+### Development Outside Docker
+
+If you prefer running services locally without Docker:
+
+#### Prerequisites
+
+- [uv](https://docs.astral.sh/uv/) (for Python backend)
+- [Bun](https://bun.sh/) (for React frontend)
+- PostgreSQL 15+ (running locally or remotely)
+
+#### Backend Development
 
 ```bash
 cd backend
 
 # Install dependencies
 uv sync
-source .venv/bin/activate
+source .venv/bin/activate  # Linux/Mac
+# .venv\Scripts\activate   # Windows
 
 # Run development server
 fastapi dev app/main.py
@@ -209,7 +193,7 @@ bash scripts/lint.sh
 bash scripts/format.sh
 ```
 
-### Frontend Development
+#### Frontend Development
 
 ```bash
 cd backoffice
@@ -247,35 +231,77 @@ alembic downgrade -1
 
 ### Environment Variables
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `PROJECT_NAME` | Yes | Application name |
-| `DOMAIN` | Yes | Primary domain |
-| `POSTGRES_SERVER` | Yes | Database host (`db` for Docker) |
-| `POSTGRES_USER` | Yes | Database username |
-| `POSTGRES_PASSWORD` | Yes | Database password |
-| `POSTGRES_DB` | Yes | Database name |
-| `SECRET_KEY` | Yes | JWT signing key (32+ hex chars) |
-| `SUPERADMIN` | Yes | Initial superadmin email |
-| `SUPERADMIN_PASSWORD` | Yes | Initial superadmin password |
-| `SMTP_HOST` | No | SMTP server for emails |
-| `SMTP_USER` | No | SMTP username |
-| `SMTP_PASSWORD` | No | SMTP password |
-| `SMTP_PORT` | No | SMTP port (default: 587) |
-| `EMAILS_FROM_EMAIL` | No | From address for emails |
-| `VITE_API_URL` | Yes | Backend URL for frontend |
-| `S3_BUCKET` | No | S3 bucket for file uploads |
-| `AWS_ACCESS_KEY_ID` | No | AWS credentials for S3 |
-| `AWS_SECRET_ACCESS_KEY` | No | AWS credentials for S3 |
-| `SENTRY_DSN` | No | Sentry DSN for error tracking |
+#### Core Configuration
 
-### Docker Services
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `DOMAIN` | Yes | `localhost` | Primary domain |
+| `BACKOFFICE_HOST` | Yes | `http://localhost:5173` | Backoffice URL (for CORS/emails) |
+| `ENVIRONMENT` | No | `dev` | Environment (`dev`, `staging`, `production`) |
+| `PROJECT_NAME` | No | `EdgeOS` | Application name |
+| `STACK_NAME` | No | `edgeos` | Docker stack name |
+
+#### Security (Required)
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `SECRET_KEY` | Yes | `changeme...` | JWT signing key. Generate with: `openssl rand -hex 32` |
+| `SUPERADMIN` | Yes | `admin@example.com` | Initial superadmin email address |
+| `BACKEND_CORS_ORIGINS` | No | `http://localhost,...` | Comma-separated list of allowed CORS origins |
+
+#### Database (Required)
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `POSTGRES_SERVER` | Yes | `db` | Database host (`db` for Docker, your host for external) |
+| `POSTGRES_PORT` | No | `5432` | Database port |
+| `POSTGRES_USER` | Yes | `postgres` | Database username |
+| `POSTGRES_PASSWORD` | Yes | `changeme...` | Database password |
+| `POSTGRES_DB` | Yes | `edgeos` | Database name |
+| `POSTGRES_SSL_MODE` | No | `prefer` | SSL mode (`prefer`, `require`, `disable`) |
+
+#### Email (Optional but recommended)
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `SMTP_HOST` | No | - | SMTP server (empty = emails disabled) |
+| `SMTP_PORT` | No | `587` | SMTP port |
+| `SMTP_USER` | No | - | SMTP username |
+| `SMTP_PASSWORD` | No | - | SMTP password |
+| `SENDER_EMAIL` | No | `noreply@example.com` | From address for emails |
+| `SMTP_TLS` | No | `True` | Use TLS |
+| `SMTP_SSL` | No | `False` | Use SSL |
+
+#### File Storage (Optional)
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `STORAGE_ENDPOINT_URL` | No | `http://localhost:9000` | S3-compatible endpoint |
+| `STORAGE_ACCESS_KEY` | No | `minioadmin` | S3 access key |
+| `STORAGE_SECRET_KEY` | No | `minioadmin` | S3 secret key |
+| `STORAGE_BUCKET` | No | `edgeos` | S3 bucket name |
+| `STORAGE_REGION` | No | `us-east-2` | S3 region |
+| `STORAGE_PUBLIC_URL` | No | `http://localhost:9000/edgeos` | Public URL for file access |
+
+#### Other Services (Optional)
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `REDIS_URL` | No | `redis://redis:6379` | Redis connection URL |
+| `SENTRY_DSN` | No | - | Sentry DSN for error tracking |
+
+### Docker Services (Development)
 
 | Service | Port | Description |
 |---------|------|-------------|
-| `backend` | 8000 | FastAPI application |
-| `backoffice` | 5173 (dev) / 80 (prod) | React dashboard |
+| `backend` | 8000 | FastAPI application (hot reload enabled) |
+| `backoffice` | 5173 | React dashboard |
 | `db` | 5432 | PostgreSQL database |
+| `mailpit` | 8025 (web), 1025 (smtp) | Email testing |
+| `adminer` | 8080 | Database admin UI |
+| `minio` | 9000 (api), 9001 (console) | S3-compatible storage |
+| `redis` | 6379 | Redis cache |
+| `redis-commander` | 8081 | Redis admin UI |
 | `prestart` | - | Runs migrations before backend |
 
 ## API Documentation
@@ -308,33 +334,95 @@ For tenant-scoped endpoints:
 | **ADMIN** | Full CRUD within their tenant, can create ADMIN/VIEWER users |
 | **VIEWER** | Read-only access within their tenant |
 
-## Additional Setup Steps
+## Additional Notes
 
-### Email Configuration
+### Email in Development
 
-For passwordless authentication to work, configure SMTP settings. For development, you can use services like:
-- [Mailpit](https://github.com/axllent/mailpit) (local testing)
-- [Mailtrap](https://mailtrap.io/) (dev/staging)
-- [SendGrid](https://sendgrid.com/), [AWS SES](https://aws.amazon.com/ses/) (production)
+Email is pre-configured with Mailpit when using `docker compose watch`. All emails are captured and viewable at http://localhost:8025 (no actual emails are sent).
 
-### File Storage (Optional)
+### Email in Production
 
-For file uploads (e.g., attendee photos), configure S3-compatible storage:
+For production, configure a real SMTP provider:
+- [SendGrid](https://sendgrid.com/)
+- [AWS SES](https://aws.amazon.com/ses/)
+- [Mailgun](https://www.mailgun.com/)
+- [Postmark](https://postmarkapp.com/)
+
+### File Storage in Development
+
+MinIO (S3-compatible) is pre-configured when using `docker compose watch`. Access the MinIO console at http://localhost:9001 (login: minioadmin/minioadmin).
+
+### File Storage in Production
+
+For production file uploads, use a managed S3-compatible service:
 - AWS S3
-- MinIO (self-hosted)
 - DigitalOcean Spaces
 - Cloudflare R2
+- MinIO (self-hosted)
 
-### Production Deployment
+## Production Deployment
 
-For production:
+For production, you must properly configure the environment variables. The `.env.example` defaults are NOT suitable for production.
 
-1. Use a managed PostgreSQL database (AWS RDS, DigitalOcean, etc.)
-2. Set up proper SSL/TLS certificates
-3. Configure a reverse proxy (nginx, Traefik, Caddy)
-4. Set up monitoring and logging (Sentry, CloudWatch, etc.)
-5. Use strong, unique passwords and secrets
-6. Enable database backups
+### Required Changes for Production
+
+1. **Generate a secure `SECRET_KEY`**:
+   ```bash
+   openssl rand -hex 32
+   ```
+
+2. **Set strong database credentials**:
+   ```bash
+   POSTGRES_PASSWORD=<strong-unique-password>
+   POSTGRES_SSL_MODE=require
+   ```
+
+3. **Configure your domain**:
+   ```bash
+   DOMAIN=yourdomain.com
+   BACKOFFICE_HOST=https://app.yourdomain.com
+   ENVIRONMENT=production
+   ```
+
+4. **Configure email (required for passwordless auth)**:
+   ```bash
+   SMTP_HOST=smtp.yourdomain.com
+   SMTP_USER=noreply@yourdomain.com
+   SMTP_PASSWORD=<smtp-password>
+   SENDER_EMAIL=noreply@yourdomain.com
+   ```
+
+5. **Configure file storage** (use a real S3 service):
+   ```bash
+   STORAGE_ENDPOINT_URL=https://s3.amazonaws.com
+   STORAGE_ACCESS_KEY=<aws-access-key>
+   STORAGE_SECRET_KEY=<aws-secret-key>
+   STORAGE_BUCKET=your-bucket-name
+   STORAGE_PUBLIC_URL=https://your-bucket-name.s3.amazonaws.com
+   ```
+
+6. **Set the superadmin email** to a real address:
+   ```bash
+   SUPERADMIN=admin@yourdomain.com
+   ```
+
+### Production Infrastructure Recommendations
+
+- Use a managed PostgreSQL database (AWS RDS, DigitalOcean, Supabase, etc.)
+- Set up SSL/TLS certificates (Let's Encrypt, Cloudflare, etc.)
+- Configure a reverse proxy (nginx, Traefik, Caddy)
+- Set up monitoring and logging (`SENTRY_DSN` for error tracking)
+- Enable database backups
+- Use managed S3-compatible storage (AWS S3, DigitalOcean Spaces, Cloudflare R2)
+
+### Production Docker Command
+
+```bash
+# Production mode (no hot reload, no dev services)
+docker compose -f compose.yaml up -d
+```
+
+Note: Production compose does NOT include the development services (db, mailpit, minio, redis, adminer). You must provide external services for database, email, and storage.
 
 ## License
 

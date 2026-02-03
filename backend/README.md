@@ -15,8 +15,13 @@ FastAPI backend with PostgreSQL Row-Level Security (RLS) for multi-tenant data i
 
 ### With Docker (Recommended)
 
+From the project root:
+
 ```bash
-# From project root
+# Copy environment template (works out of the box)
+cp .env.example .env
+
+# Start all services with hot reload
 docker compose watch
 
 # View logs
@@ -26,12 +31,25 @@ docker compose logs -f backend
 docker compose exec backend bash
 ```
 
-### Local Development
+The default `.env.example` is pre-configured for local development. No changes needed.
+
+### Local Development (without Docker)
+
+If you prefer running outside Docker, you need a PostgreSQL database running separately:
 
 ```bash
 # Install dependencies
 uv sync
-source .venv/bin/activate
+source .venv/bin/activate  # Linux/Mac
+# .venv\Scripts\activate   # Windows
+
+# Set environment variables (or use .env file)
+export POSTGRES_SERVER=localhost
+export POSTGRES_USER=postgres
+export POSTGRES_PASSWORD=yourpassword
+export POSTGRES_DB=edgeos
+export SECRET_KEY=dev-secret-key
+export SUPERADMIN=admin@example.com
 
 # Run development server
 fastapi dev app/main.py
@@ -216,10 +234,10 @@ uv run ruff format app    # Format
    ```python
    from sqlmodel import SQLModel, Field
    from uuid import UUID
-   
+
    class ResourceBase(SQLModel):
        name: str
-   
+
    class Resources(ResourceBase, table=True):
        id: UUID | None = Field(default_factory=uuid4, primary_key=True)
        tenant_id: UUID = Field(foreign_key="tenants.id")
@@ -228,21 +246,21 @@ uv run ruff format app    # Format
    ```python
    class ResourceCreate(ResourceBase):
        pass
-   
+
    class ResourceUpdate(SQLModel):
        name: str | None = None
-   
+
    class ResourcePublic(ResourceBase):
        id: UUID
    ```
 4. Add `crud.py`:
    ```python
    from app.api.shared.crud import BaseCRUD
-   
+
    class ResourceCRUD(BaseCRUD[Resources, ResourceCreate, ResourceUpdate]):
        def __init__(self):
            super().__init__(Resources)
-   
+
    resource_crud = ResourceCRUD()
    ```
 5. Add `router.py` with endpoints
@@ -252,17 +270,38 @@ uv run ruff format app    # Format
 
 ## Environment Variables
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `POSTGRES_SERVER` | Yes | Database host |
-| `POSTGRES_USER` | Yes | Database user |
-| `POSTGRES_PASSWORD` | Yes | Database password |
-| `POSTGRES_DB` | Yes | Database name |
-| `SECRET_KEY` | Yes | JWT signing key |
-| `SUPERADMIN` | Yes | Initial superadmin email |
-| `SUPERADMIN_PASSWORD` | Yes | Initial superadmin password |
-| `SMTP_HOST` | No | Email SMTP server |
-| `S3_BUCKET` | No | S3 bucket for uploads |
+See the root `.env.example` for a complete list with defaults. Key variables:
+
+### Required
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `POSTGRES_SERVER` | `db` | Database host (`db` for Docker) |
+| `POSTGRES_PORT` | `5432` | Database port |
+| `POSTGRES_USER` | `postgres` | Database user |
+| `POSTGRES_PASSWORD` | - | Database password |
+| `POSTGRES_DB` | `edgeos` | Database name |
+| `SECRET_KEY` | - | JWT signing key (generate with `openssl rand -hex 32`) |
+| `SUPERADMIN` | `admin@example.com` | Initial superadmin email |
+
+### Optional
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `POSTGRES_SSL_MODE` | `prefer` | SSL mode (`prefer`, `require`, `disable`) |
+| `SMTP_HOST` | - | SMTP server (empty = emails disabled) |
+| `SMTP_PORT` | `587` | SMTP port |
+| `SMTP_USER` | - | SMTP username |
+| `SMTP_PASSWORD` | - | SMTP password |
+| `SENDER_EMAIL` | `noreply@example.com` | From address for emails |
+| `STORAGE_ENDPOINT_URL` | `http://localhost:9000` | S3-compatible endpoint |
+| `STORAGE_ACCESS_KEY` | `minioadmin` | S3 access key |
+| `STORAGE_SECRET_KEY` | `minioadmin` | S3 secret key |
+| `STORAGE_BUCKET` | `edgeos` | S3 bucket name |
+| `REDIS_URL` | `redis://redis:6379` | Redis connection URL |
+| `SENTRY_DSN` | - | Sentry DSN for error tracking |
+
+For local development with Docker, all defaults work out of the box. For production, see the main README.
 
 ## API Documentation
 
