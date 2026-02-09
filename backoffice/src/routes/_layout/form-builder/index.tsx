@@ -74,6 +74,7 @@ function getFormFieldsQueryOptions(
   popupId: string | null,
   page: number,
   pageSize: number,
+  search?: string,
 ) {
   return {
     queryFn: () =>
@@ -81,8 +82,9 @@ function getFormFieldsQueryOptions(
         skip: page * pageSize,
         limit: pageSize,
         popupId: popupId || undefined,
+        search: search || undefined,
       }),
-    queryKey: ["form-fields", popupId, { page, pageSize }],
+    queryKey: ["form-fields", popupId, { page, pageSize, search }],
   }
 }
 
@@ -431,19 +433,9 @@ function FormFieldsTableContent({ reorderMode }: { reorderMode: boolean }) {
       selectedPopupId,
       pagination.pageIndex,
       pagination.pageSize,
+      search,
     ),
   )
-
-  const filtered = search
-    ? formFields.results.filter((f) => {
-        const term = search.toLowerCase()
-        return (
-          f.label.toLowerCase().includes(term) ||
-          f.name.toLowerCase().includes(term) ||
-          f.field_type.toLowerCase().includes(term)
-        )
-      })
-    : formFields.results
 
   if (reorderMode && !search && formFields.results.length > 0) {
     return <SortableFieldList fields={formFields.results} />
@@ -452,16 +444,14 @@ function FormFieldsTableContent({ reorderMode }: { reorderMode: boolean }) {
   return (
     <DataTable
       columns={columns}
-      data={filtered}
+      data={formFields.results}
       searchPlaceholder="Search by label, name, or type..."
       hiddenOnMobile={["name", "section", "required", "position"]}
       searchValue={search}
       onSearchChange={setSearch}
       serverPagination={{
-        total: search ? filtered.length : formFields.paging.total,
-        pagination: search
-          ? { pageIndex: 0, pageSize: formFields.paging.total }
-          : pagination,
+        total: formFields.paging.total,
+        pagination: pagination,
         onPaginationChange: setPagination,
       }}
       emptyState={

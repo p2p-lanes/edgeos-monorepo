@@ -45,6 +45,7 @@ function getCouponsQueryOptions(
   popupId: string | null,
   page: number,
   pageSize: number,
+  search?: string,
 ) {
   return {
     queryFn: () =>
@@ -52,8 +53,9 @@ function getCouponsQueryOptions(
         popupId: popupId ?? undefined,
         skip: page * pageSize,
         limit: pageSize,
+        search: search || undefined,
       }),
-    queryKey: ["coupons", { popupId, page, pageSize }],
+    queryKey: ["coupons", { popupId, page, pageSize, search }],
   }
 }
 
@@ -217,32 +219,25 @@ function CouponsTableContent({ popupId }: { popupId: string | null }) {
   )
 
   const { data: coupons } = useSuspenseQuery(
-    getCouponsQueryOptions(popupId, pagination.pageIndex, pagination.pageSize),
+    getCouponsQueryOptions(
+      popupId,
+      pagination.pageIndex,
+      pagination.pageSize,
+      search,
+    ),
   )
-
-  const filtered = search
-    ? coupons.results.filter((c) => {
-        const term = search.toLowerCase()
-        return (
-          c.code.toLowerCase().includes(term) ||
-          String(c.discount_value).includes(term)
-        )
-      })
-    : coupons.results
 
   return (
     <DataTable
       columns={columns}
-      data={filtered}
-      searchPlaceholder="Search by code or discount..."
+      data={coupons.results}
+      searchPlaceholder="Search by code..."
       hiddenOnMobile={["current_uses", "is_active"]}
       searchValue={search}
       onSearchChange={setSearch}
       serverPagination={{
-        total: search ? filtered.length : coupons.paging.total,
-        pagination: search
-          ? { pageIndex: 0, pageSize: coupons.paging.total }
-          : pagination,
+        total: coupons.paging.total,
+        pagination: pagination,
         onPaginationChange: setPagination,
       }}
       emptyState={

@@ -53,6 +53,7 @@ function getGroupsQueryOptions(
   popupId: string | null,
   page: number,
   pageSize: number,
+  search?: string,
 ) {
   return {
     queryFn: () =>
@@ -60,8 +61,9 @@ function getGroupsQueryOptions(
         popupId: popupId ?? undefined,
         skip: page * pageSize,
         limit: pageSize,
+        search: search || undefined,
       }),
-    queryKey: ["groups", { popupId, page, pageSize }],
+    queryKey: ["groups", { popupId, page, pageSize, search }],
   }
 }
 
@@ -293,28 +295,21 @@ function GroupsTableContent() {
       selectedPopupId,
       pagination.pageIndex,
       pagination.pageSize,
+      search,
     ),
   )
-
-  const filtered = search
-    ? (groups?.results ?? []).filter((g) =>
-        g.name.toLowerCase().includes(search.toLowerCase()),
-      )
-    : (groups?.results ?? [])
 
   return (
     <DataTable
       columns={columns}
-      data={filtered}
+      data={groups?.results ?? []}
       searchPlaceholder="Search by name..."
       hiddenOnMobile={["max_members", "is_ambassador_group"]}
       searchValue={search}
       onSearchChange={setSearch}
       serverPagination={{
-        total: search ? filtered.length : groups.paging.total,
-        pagination: search
-          ? { pageIndex: 0, pageSize: groups.paging.total }
-          : pagination,
+        total: groups?.paging?.total ?? 0,
+        pagination: pagination,
         onPaginationChange: setPagination,
       }}
       emptyState={

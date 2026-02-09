@@ -49,11 +49,19 @@ import {
 } from "@/hooks/useTableSearchParams"
 import { createErrorHandler } from "@/utils"
 
-function getPopupsQueryOptions(page: number, pageSize: number) {
+function getPopupsQueryOptions(
+  page: number,
+  pageSize: number,
+  search?: string,
+) {
   return {
     queryFn: () =>
-      PopupsService.listPopups({ skip: page * pageSize, limit: pageSize }),
-    queryKey: ["popups", { page, pageSize }],
+      PopupsService.listPopups({
+        skip: page * pageSize,
+        limit: pageSize,
+        search: search || undefined,
+      }),
+    queryKey: ["popups", { page, pageSize, search }],
   }
 }
 
@@ -231,32 +239,20 @@ function PopupsTableContent() {
   )
 
   const { data: popups } = useSuspenseQuery(
-    getPopupsQueryOptions(pagination.pageIndex, pagination.pageSize),
+    getPopupsQueryOptions(pagination.pageIndex, pagination.pageSize, search),
   )
-
-  const filtered = search
-    ? popups.results.filter((p) => {
-        const term = search.toLowerCase()
-        return (
-          p.name.toLowerCase().includes(term) ||
-          (p.status ?? "").toLowerCase().includes(term)
-        )
-      })
-    : popups.results
 
   return (
     <DataTable
       columns={columns}
-      data={filtered}
-      searchPlaceholder="Search by name or status..."
+      data={popups.results}
+      searchPlaceholder="Search by name..."
       hiddenOnMobile={["start_date", "end_date"]}
       searchValue={search}
       onSearchChange={setSearch}
       serverPagination={{
-        total: search ? filtered.length : popups.paging.total,
-        pagination: search
-          ? { pageIndex: 0, pageSize: popups.paging.total }
-          : pagination,
+        total: popups.paging.total,
+        pagination: pagination,
         onPaginationChange: setPagination,
       }}
       emptyState={

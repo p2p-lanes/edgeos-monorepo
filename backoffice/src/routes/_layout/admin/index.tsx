@@ -25,6 +25,7 @@ function getTenantUsersQueryOptions(
   tenantId: string | null,
   page: number,
   pageSize: number,
+  search?: string,
 ) {
   return {
     queryFn: () =>
@@ -32,21 +33,27 @@ function getTenantUsersQueryOptions(
         skip: page * pageSize,
         limit: pageSize,
         tenantId: tenantId || undefined,
+        search: search || undefined,
       }),
-    queryKey: ["users", "tenant", tenantId, { page, pageSize }],
+    queryKey: ["users", "tenant", tenantId, { page, pageSize, search }],
     enabled: !!tenantId,
   }
 }
 
-function getSuperadminsQueryOptions(page: number, pageSize: number) {
+function getSuperadminsQueryOptions(
+  page: number,
+  pageSize: number,
+  search?: string,
+) {
   return {
     queryFn: () =>
       UsersService.listUsers({
         skip: page * pageSize,
         limit: pageSize,
         role: "superadmin",
+        search: search || undefined,
       }),
-    queryKey: ["users", "superadmins", { page, pageSize }],
+    queryKey: ["users", "superadmins", { page, pageSize, search }],
   }
 }
 
@@ -86,6 +93,7 @@ function TenantUsersTableContent({ tenantId }: { tenantId: string | null }) {
       tenantId,
       pagination.pageIndex,
       pagination.pageSize,
+      search,
     ),
   )
 
@@ -93,17 +101,7 @@ function TenantUsersTableContent({ tenantId }: { tenantId: string | null }) {
     (user: UserPublic) => user.role !== "superadmin",
   )
 
-  const filtered = search
-    ? tenantUsers.filter((u: UserPublic) => {
-        const term = search.toLowerCase()
-        return (
-          (u.full_name ?? "").toLowerCase().includes(term) ||
-          u.email.toLowerCase().includes(term)
-        )
-      })
-    : tenantUsers
-
-  const tableData: UserTableData[] = filtered.map((user: UserPublic) => ({
+  const tableData: UserTableData[] = tenantUsers.map((user: UserPublic) => ({
     ...user,
     isCurrentUser: currentUser?.id === user.id,
   }))
@@ -117,10 +115,8 @@ function TenantUsersTableContent({ tenantId }: { tenantId: string | null }) {
       searchValue={search}
       onSearchChange={setSearch}
       serverPagination={{
-        total: search ? filtered.length : users.paging.total,
-        pagination: search
-          ? { pageIndex: 0, pageSize: users.paging.total }
-          : pagination,
+        total: users.paging.total,
+        pagination: pagination,
         onPaginationChange: setPagination,
       }}
       emptyState={
@@ -153,20 +149,14 @@ function SuperadminsTableContent() {
   const [search, setSearch] = useState("")
 
   const { data: users } = useSuspenseQuery(
-    getSuperadminsQueryOptions(pagination.pageIndex, pagination.pageSize),
+    getSuperadminsQueryOptions(
+      pagination.pageIndex,
+      pagination.pageSize,
+      search,
+    ),
   )
 
-  const filtered = search
-    ? users.results.filter((u: UserPublic) => {
-        const term = search.toLowerCase()
-        return (
-          (u.full_name ?? "").toLowerCase().includes(term) ||
-          u.email.toLowerCase().includes(term)
-        )
-      })
-    : users.results
-
-  const tableData: UserTableData[] = filtered.map((user: UserPublic) => ({
+  const tableData: UserTableData[] = users.results.map((user: UserPublic) => ({
     ...user,
     isCurrentUser: currentUser?.id === user.id,
   }))
@@ -183,10 +173,8 @@ function SuperadminsTableContent() {
         setPagination((prev) => ({ ...prev, pageIndex: 0 }))
       }}
       serverPagination={{
-        total: search ? filtered.length : users.paging.total,
-        pagination: search
-          ? { pageIndex: 0, pageSize: users.paging.total }
-          : pagination,
+        total: users.paging.total,
+        pagination: pagination,
         onPaginationChange: setPagination,
       }}
       emptyState={

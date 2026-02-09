@@ -66,6 +66,7 @@ function getApplicationsQueryOptions(
   popupId: string | null,
   page: number,
   pageSize: number,
+  search?: string,
 ) {
   return {
     queryFn: () =>
@@ -73,8 +74,9 @@ function getApplicationsQueryOptions(
         skip: page * pageSize,
         limit: pageSize,
         popupId: popupId || undefined,
+        search: search || undefined,
       }),
-    queryKey: ["applications", popupId, { page, pageSize }],
+    queryKey: ["applications", popupId, { page, pageSize, search }],
   }
 }
 
@@ -352,6 +354,7 @@ function ApplicationsTableContent() {
       selectedPopupId,
       pagination.pageIndex,
       pagination.pageSize,
+      search,
     ),
   )
 
@@ -431,30 +434,17 @@ function ApplicationsTableContent() {
   const columns = getColumns(isWeightedVoting)
   const canBulkReview = isAdmin && !isWeightedVoting
 
-  const filtered = search
-    ? applications.results.filter((app) => {
-        const term = search.toLowerCase()
-        const name =
-          `${app.human?.first_name ?? ""} ${app.human?.last_name ?? ""}`.toLowerCase()
-        const email = (app.human?.email ?? "").toLowerCase()
-        const org = (app.human?.organization ?? "").toLowerCase()
-        return name.includes(term) || email.includes(term) || org.includes(term)
-      })
-    : applications.results
-
   return (
     <DataTable
       columns={columns}
-      data={filtered}
+      data={applications.results}
       searchPlaceholder="Search by name, email, or organization..."
       hiddenOnMobile={["human.organization", "attendees", "red_flag"]}
       searchValue={search}
       onSearchChange={setSearch}
       serverPagination={{
-        total: search ? filtered.length : applications.paging.total,
-        pagination: search
-          ? { pageIndex: 0, pageSize: applications.paging.total }
-          : pagination,
+        total: applications.paging.total,
+        pagination: pagination,
         onPaginationChange: setPagination,
       }}
       emptyState={

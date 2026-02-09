@@ -32,11 +32,19 @@ import {
   validateTableSearch,
 } from "@/hooks/useTableSearchParams"
 
-function getHumansQueryOptions(page: number, pageSize: number) {
+function getHumansQueryOptions(
+  page: number,
+  pageSize: number,
+  search?: string,
+) {
   return {
     queryFn: () =>
-      HumansService.listHumans({ skip: page * pageSize, limit: pageSize }),
-    queryKey: ["humans", { page, pageSize }],
+      HumansService.listHumans({
+        skip: page * pageSize,
+        limit: pageSize,
+        search: search || undefined,
+      }),
+    queryKey: ["humans", { page, pageSize, search }],
   }
 }
 
@@ -135,34 +143,20 @@ function HumansTableContent() {
   )
 
   const { data: humans } = useSuspenseQuery(
-    getHumansQueryOptions(pagination.pageIndex, pagination.pageSize),
+    getHumansQueryOptions(pagination.pageIndex, pagination.pageSize, search),
   )
-
-  const filtered = search
-    ? humans.results.filter((h) => {
-        const term = search.toLowerCase()
-        const name = `${h.first_name ?? ""} ${h.last_name ?? ""}`.toLowerCase()
-        return (
-          name.includes(term) ||
-          (h.email ?? "").toLowerCase().includes(term) ||
-          (h.organization ?? "").toLowerCase().includes(term)
-        )
-      })
-    : humans.results
 
   return (
     <DataTable
       columns={columns}
-      data={filtered}
+      data={humans.results}
       searchPlaceholder="Search by name, email, or organization..."
       hiddenOnMobile={["organization", "red_flag"]}
       searchValue={search}
       onSearchChange={setSearch}
       serverPagination={{
-        total: search ? filtered.length : humans.paging.total,
-        pagination: search
-          ? { pageIndex: 0, pageSize: humans.paging.total }
-          : pagination,
+        total: humans.paging.total,
+        pagination: pagination,
         onPaginationChange: setPagination,
       }}
       emptyState={

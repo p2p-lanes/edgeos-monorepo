@@ -30,11 +30,19 @@ import {
 } from "@/hooks/useTableSearchParams"
 import { createErrorHandler } from "@/utils"
 
-function getTenantsQueryOptions(page: number, pageSize: number) {
+function getTenantsQueryOptions(
+  page: number,
+  pageSize: number,
+  search?: string,
+) {
   return {
     queryFn: () =>
-      TenantsService.listTenants({ skip: page * pageSize, limit: pageSize }),
-    queryKey: ["tenants", { page, pageSize }],
+      TenantsService.listTenants({
+        skip: page * pageSize,
+        limit: pageSize,
+        search: search || undefined,
+      }),
+    queryKey: ["tenants", { page, pageSize, search }],
   }
 }
 
@@ -138,28 +146,20 @@ function TenantsTableContent() {
   )
 
   const { data: tenants } = useSuspenseQuery(
-    getTenantsQueryOptions(pagination.pageIndex, pagination.pageSize),
+    getTenantsQueryOptions(pagination.pageIndex, pagination.pageSize, search),
   )
-
-  const filtered = search
-    ? tenants.results.filter((t) =>
-        t.name.toLowerCase().includes(search.toLowerCase()),
-      )
-    : tenants.results
 
   return (
     <DataTable
       columns={columns}
-      data={filtered}
+      data={tenants.results}
       searchPlaceholder="Search by name..."
       hiddenOnMobile={["sender_email", "deleted"]}
       searchValue={search}
       onSearchChange={setSearch}
       serverPagination={{
-        total: search ? filtered.length : tenants.paging.total,
-        pagination: search
-          ? { pageIndex: 0, pageSize: tenants.paging.total }
-          : pagination,
+        total: tenants.paging.total,
+        pagination: pagination,
         onPaginationChange: setPagination,
       }}
       emptyState={

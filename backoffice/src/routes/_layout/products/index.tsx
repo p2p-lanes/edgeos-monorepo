@@ -52,6 +52,9 @@ function getProductsQueryOptions(
   popupId: string | null,
   page: number,
   pageSize: number,
+  search?: string,
+  sortBy?: string,
+  sortOrder?: "asc" | "desc",
 ) {
   return {
     queryFn: () =>
@@ -59,8 +62,15 @@ function getProductsQueryOptions(
         skip: page * pageSize,
         limit: pageSize,
         popupId: popupId || undefined,
+        search: search || undefined,
+        sortBy: sortBy || undefined,
+        sortOrder: sortOrder || undefined,
       }),
-    queryKey: ["products", popupId, { page, pageSize }],
+    queryKey: [
+      "products",
+      popupId,
+      { page, pageSize, search, sortBy, sortOrder },
+    ],
   }
 }
 
@@ -183,7 +193,7 @@ const columns: ColumnDef<ProductPublic>[] = [
     accessorKey: "attendee_category",
     header: "Category",
     cell: ({ row }) => (
-      <StatusBadge status={row.original.attendee_category || "N/A"} />
+      <StatusBadge status={row.original.category || "N/A"} />
     ),
   },
   {
@@ -206,44 +216,44 @@ const columns: ColumnDef<ProductPublic>[] = [
 function ProductsTableContent() {
   const { selectedPopupId } = useWorkspace()
   const searchParams = Route.useSearch()
-  const { search, pagination, setSearch, setPagination } = useTableSearchParams(
-    searchParams,
-    "/products",
-  )
+  const {
+    search,
+    pagination,
+    sorting,
+    sortBy,
+    sortOrder,
+    setSearch,
+    setPagination,
+    setSorting,
+  } = useTableSearchParams(searchParams, "/products")
 
   const { data: products } = useSuspenseQuery(
     getProductsQueryOptions(
       selectedPopupId,
       pagination.pageIndex,
       pagination.pageSize,
+      search,
+      sortBy,
+      sortOrder,
     ),
   )
-
-  const filtered = search
-    ? products.results.filter((p) => {
-        const term = search.toLowerCase()
-        return (
-          p.name.toLowerCase().includes(term) ||
-          String(p.price).includes(term) ||
-          (p.attendee_category ?? "").toLowerCase().includes(term)
-        )
-      })
-    : products.results
 
   return (
     <DataTable
       columns={columns}
-      data={filtered}
-      searchPlaceholder="Search by name, price, or category..."
+      data={products.results}
+      searchPlaceholder="Search by name..."
       hiddenOnMobile={["attendee_category", "is_active"]}
       searchValue={search}
       onSearchChange={setSearch}
       serverPagination={{
-        total: search ? filtered.length : products.paging.total,
-        pagination: search
-          ? { pageIndex: 0, pageSize: products.paging.total }
-          : pagination,
+        total: products.paging.total,
+        pagination: pagination,
         onPaginationChange: setPagination,
+      }}
+      serverSorting={{
+        sorting: sorting,
+        onSortingChange: setSorting,
       }}
       emptyState={
         !search ? (
