@@ -926,7 +926,7 @@ export function ApplicationForm({ onSuccess }: ApplicationFormProps) {
                 Save as Draft
               </Button>
               <LoadingButton
-                type="submit"
+                type="button"
                 loading={createMutation.isPending && !savingAsDraft}
                 onClick={() => {
                   setSavingAsDraft(false)
