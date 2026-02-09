@@ -1,6 +1,7 @@
 import { QueryErrorResetBoundary } from "@tanstack/react-query"
-import { AlertCircle, RefreshCw } from "lucide-react"
+import { AlertCircle, FileQuestion, RefreshCw } from "lucide-react"
 import { Component, type ErrorInfo, type ReactNode } from "react"
+import { EmptyState } from "@/components/Common/EmptyState"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 
@@ -50,8 +51,13 @@ class ErrorBoundaryInner extends Component<
         errorMessage.includes("not found")
 
       if (is404) {
-        // For 404s, just show empty state - parent component will handle
-        return null
+        return (
+          <EmptyState
+            icon={FileQuestion}
+            title="Not found"
+            description="The requested resource could not be found."
+          />
+        )
       }
 
       return (

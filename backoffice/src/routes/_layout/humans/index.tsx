@@ -1,14 +1,22 @@
 import { useSuspenseQuery } from "@tanstack/react-query"
 import { createFileRoute, Link } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
-import { AlertCircle, EllipsisVertical, Eye, Pencil, Plus } from "lucide-react"
+import {
+  AlertCircle,
+  EllipsisVertical,
+  Eye,
+  Pencil,
+  Plus,
+  Users,
+} from "lucide-react"
 import { Suspense, useState } from "react"
 
 import { type HumanPublic, HumansService } from "@/client"
-import { DataTable } from "@/components/Common/DataTable"
+import { DataTable, SortableHeader } from "@/components/Common/DataTable"
+import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
+import { StatusBadge } from "@/components/Common/StatusBadge"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -19,16 +27,22 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
+import {
+  useTableSearchParams,
+  validateTableSearch,
+} from "@/hooks/useTableSearchParams"
 
-function getHumansQueryOptions() {
+function getHumansQueryOptions(page: number, pageSize: number) {
   return {
-    queryFn: () => HumansService.listHumans({ skip: 0, limit: 100 }),
-    queryKey: ["humans"],
+    queryFn: () =>
+      HumansService.listHumans({ skip: page * pageSize, limit: pageSize }),
+    queryKey: ["humans", { page, pageSize }],
   }
 }
 
 export const Route = createFileRoute("/_layout/humans/")({
   component: Humans,
+  validateSearch: validateTableSearch,
   head: () => ({
     meta: [{ title: "Humans - EdgeOS" }],
   }),
@@ -69,7 +83,9 @@ function HumanActionsMenu({ human }: { human: HumanPublic }) {
 const columns: ColumnDef<HumanPublic>[] = [
   {
     id: "name",
-    header: "Name",
+    header: ({ column }) => <SortableHeader label="Name" column={column} />,
+    accessorFn: (row) =>
+      `${row.first_name ?? ""} ${row.last_name ?? ""}`.trim(),
     cell: ({ row }) => {
       const firstName = row.original.first_name ?? ""
       const lastName = row.original.last_name ?? ""
@@ -79,7 +95,7 @@ const columns: ColumnDef<HumanPublic>[] = [
   },
   {
     accessorKey: "email",
-    header: "Email",
+    header: ({ column }) => <SortableHeader label="Email" column={column} />,
     cell: ({ row }) => (
       <span className="font-medium">{row.original.email}</span>
     ),
@@ -96,12 +112,9 @@ const columns: ColumnDef<HumanPublic>[] = [
   {
     accessorKey: "red_flag",
     header: "Status",
-    cell: ({ row }) =>
-      row.original.red_flag ? (
-        <Badge variant="destructive">Flagged</Badge>
-      ) : (
-        <Badge variant="secondary">Active</Badge>
-      ),
+    cell: ({ row }) => (
+      <StatusBadge status={row.original.red_flag ? "flagged" : "active"} />
+    ),
   },
   {
     id: "actions",
@@ -115,8 +128,54 @@ const columns: ColumnDef<HumanPublic>[] = [
 ]
 
 function HumansTableContent() {
-  const { data: humans } = useSuspenseQuery(getHumansQueryOptions())
-  return <DataTable columns={columns} data={humans.results} />
+  const searchParams = Route.useSearch()
+  const { search, pagination, setSearch, setPagination } = useTableSearchParams(
+    searchParams,
+    "/humans",
+  )
+
+  const { data: humans } = useSuspenseQuery(
+    getHumansQueryOptions(pagination.pageIndex, pagination.pageSize),
+  )
+
+  const filtered = search
+    ? humans.results.filter((h) => {
+        const term = search.toLowerCase()
+        const name = `${h.first_name ?? ""} ${h.last_name ?? ""}`.toLowerCase()
+        return (
+          name.includes(term) ||
+          (h.email ?? "").toLowerCase().includes(term) ||
+          (h.organization ?? "").toLowerCase().includes(term)
+        )
+      })
+    : humans.results
+
+  return (
+    <DataTable
+      columns={columns}
+      data={filtered}
+      searchPlaceholder="Search by name, email, or organization..."
+      hiddenOnMobile={["organization", "red_flag"]}
+      searchValue={search}
+      onSearchChange={setSearch}
+      serverPagination={{
+        total: search ? filtered.length : humans.paging.total,
+        pagination: search
+          ? { pageIndex: 0, pageSize: humans.paging.total }
+          : pagination,
+        onPaginationChange: setPagination,
+      }}
+      emptyState={
+        !search ? (
+          <EmptyState
+            icon={Users}
+            title="No humans yet"
+            description="Humans will appear here once end-users register through your popups."
+          />
+        ) : undefined
+      }
+    />
+  )
 }
 
 function HumansTable() {

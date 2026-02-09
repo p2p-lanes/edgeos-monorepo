@@ -24,6 +24,7 @@ export function FormPageLayout({
         <Button
           variant="ghost"
           size="icon"
+          aria-label="Go back"
           onClick={() => navigate({ to: backTo })}
         >
           <ArrowLeft className="h-4 w-4" />

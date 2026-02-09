@@ -5,14 +5,15 @@ import {
 } from "@tanstack/react-query"
 import { createFileRoute, Link } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
-import { EllipsisVertical, Eye, Pencil, Plus, Trash2 } from "lucide-react"
+import { EllipsisVertical, Eye, Pencil, Plus, Tag, Trash2 } from "lucide-react"
 import { Suspense, useState } from "react"
 
 import { type CouponPublic, CouponsService } from "@/client"
-import { DataTable } from "@/components/Common/DataTable"
+import { DataTable, SortableHeader } from "@/components/Common/DataTable"
+import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
+import { StatusBadge } from "@/components/Common/StatusBadge"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -34,28 +35,36 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
-import { handleError } from "@/utils"
+import {
+  useTableSearchParams,
+  validateTableSearch,
+} from "@/hooks/useTableSearchParams"
+import { createErrorHandler } from "@/utils"
 
-function getCouponsQueryOptions(popupId: string | null) {
+function getCouponsQueryOptions(
+  popupId: string | null,
+  page: number,
+  pageSize: number,
+) {
   return {
     queryFn: () =>
       CouponsService.listCoupons({
         popupId: popupId ?? undefined,
-        skip: 0,
-        limit: 100,
+        skip: page * pageSize,
+        limit: pageSize,
       }),
-    queryKey: ["coupons", { popupId }],
+    queryKey: ["coupons", { popupId, page, pageSize }],
   }
 }
 
 export const Route = createFileRoute("/_layout/coupons/")({
   component: Coupons,
+  validateSearch: validateTableSearch,
   head: () => ({
     meta: [{ title: "Coupons - EdgeOS" }],
   }),
 })
 
-// Add Coupon Button - Links to dedicated create page
 function AddCouponButton() {
   return (
     <Button asChild>
@@ -67,7 +76,6 @@ function AddCouponButton() {
   )
 }
 
-// Delete Coupon Dialog
 function DeleteCoupon({
   coupon,
   onSuccess,
@@ -86,7 +94,7 @@ function DeleteCoupon({
       setIsOpen(false)
       onSuccess()
     },
-    onError: handleError.bind(showErrorToast),
+    onError: createErrorHandler(showErrorToast),
     onSettled: () => queryClient.invalidateQueries({ queryKey: ["coupons"] }),
   })
 
@@ -125,7 +133,6 @@ function DeleteCoupon({
   )
 }
 
-// Actions Menu
 function CouponActionsMenu({ coupon }: { coupon: CouponPublic }) {
   const [open, setOpen] = useState(false)
   const { isAdmin } = useAuth()
@@ -164,14 +171,14 @@ function CouponActionsMenu({ coupon }: { coupon: CouponPublic }) {
 const columns: ColumnDef<CouponPublic>[] = [
   {
     accessorKey: "code",
-    header: "Code",
+    header: ({ column }) => <SortableHeader label="Code" column={column} />,
     cell: ({ row }) => (
       <span className="font-mono font-medium">{row.original.code}</span>
     ),
   },
   {
     accessorKey: "discount_value",
-    header: "Discount",
+    header: ({ column }) => <SortableHeader label="Discount" column={column} />,
     cell: ({ row }) => <span>{row.original.discount_value}%</span>,
   },
   {
@@ -188,9 +195,7 @@ const columns: ColumnDef<CouponPublic>[] = [
     accessorKey: "is_active",
     header: "Status",
     cell: ({ row }) => (
-      <Badge variant={row.original.is_active ? "default" : "secondary"}>
-        {row.original.is_active ? "Active" : "Inactive"}
-      </Badge>
+      <StatusBadge status={row.original.is_active ? "active" : "inactive"} />
     ),
   },
   {
@@ -205,8 +210,60 @@ const columns: ColumnDef<CouponPublic>[] = [
 ]
 
 function CouponsTableContent({ popupId }: { popupId: string | null }) {
-  const { data: coupons } = useSuspenseQuery(getCouponsQueryOptions(popupId))
-  return <DataTable columns={columns} data={coupons.results} />
+  const searchParams = Route.useSearch()
+  const { search, pagination, setSearch, setPagination } = useTableSearchParams(
+    searchParams,
+    "/coupons",
+  )
+
+  const { data: coupons } = useSuspenseQuery(
+    getCouponsQueryOptions(popupId, pagination.pageIndex, pagination.pageSize),
+  )
+
+  const filtered = search
+    ? coupons.results.filter((c) => {
+        const term = search.toLowerCase()
+        return (
+          c.code.toLowerCase().includes(term) ||
+          String(c.discount_value).includes(term)
+        )
+      })
+    : coupons.results
+
+  return (
+    <DataTable
+      columns={columns}
+      data={filtered}
+      searchPlaceholder="Search by code or discount..."
+      hiddenOnMobile={["current_uses", "is_active"]}
+      searchValue={search}
+      onSearchChange={setSearch}
+      serverPagination={{
+        total: search ? filtered.length : coupons.paging.total,
+        pagination: search
+          ? { pageIndex: 0, pageSize: coupons.paging.total }
+          : pagination,
+        onPaginationChange: setPagination,
+      }}
+      emptyState={
+        !search ? (
+          <EmptyState
+            icon={Tag}
+            title="No coupons yet"
+            description="Create discount codes to offer special pricing to your attendees."
+            action={
+              <Button asChild>
+                <Link to="/coupons/new">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Coupon
+                </Link>
+              </Button>
+            }
+          />
+        ) : undefined
+      }
+    />
+  )
 }
 
 function Coupons() {

@@ -1,8 +1,7 @@
 import { useForm } from "@tanstack/react-form"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
-import { Percent, Star, Users } from "lucide-react"
-
+import { Percent, Users } from "lucide-react"
 import {
   type GroupAdminUpdate,
   type GroupCreate,
@@ -10,6 +9,7 @@ import {
   GroupsService,
 } from "@/client"
 import { DangerZone } from "@/components/Common/DangerZone"
+import { FieldError } from "@/components/Common/FieldError"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -24,12 +24,15 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { LoadingButton } from "@/components/ui/loading-button"
 import { Separator } from "@/components/ui/separator"
-import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
-import { handleError } from "@/utils"
+import {
+  UnsavedChangesDialog,
+  useUnsavedChanges,
+} from "@/hooks/useUnsavedChanges"
+import { createErrorHandler } from "@/utils"
 
 interface GroupFormProps {
   defaultValues?: GroupPublic
@@ -48,12 +51,17 @@ export function GroupForm({ defaultValues, onSuccess }: GroupFormProps) {
   const createMutation = useMutation({
     mutationFn: (data: GroupCreate) =>
       GroupsService.createGroup({ requestBody: data }),
-    onSuccess: () => {
-      showSuccessToast("Group created successfully")
+    onSuccess: (data) => {
+      showSuccessToast("Group created successfully", {
+        label: "View",
+        onClick: () =>
+          navigate({ to: "/groups/$id/edit", params: { id: data.id } }),
+      })
       queryClient.invalidateQueries({ queryKey: ["groups"] })
+      form.reset()
       onSuccess()
     },
-    onError: handleError.bind(showErrorToast),
+    onError: createErrorHandler(showErrorToast),
   })
 
   const updateMutation = useMutation({
@@ -65,9 +73,10 @@ export function GroupForm({ defaultValues, onSuccess }: GroupFormProps) {
     onSuccess: () => {
       showSuccessToast("Group updated successfully")
       queryClient.invalidateQueries({ queryKey: ["groups"] })
+      form.reset()
       onSuccess()
     },
-    onError: handleError.bind(showErrorToast),
+    onError: createErrorHandler(showErrorToast),
   })
 
   const deleteMutation = useMutation({
@@ -77,7 +86,7 @@ export function GroupForm({ defaultValues, onSuccess }: GroupFormProps) {
       queryClient.invalidateQueries({ queryKey: ["groups"] })
       navigate({ to: "/groups" })
     },
-    onError: handleError.bind(showErrorToast),
+    onError: createErrorHandler(showErrorToast),
   })
 
   const form = useForm({
@@ -88,7 +97,10 @@ export function GroupForm({ defaultValues, onSuccess }: GroupFormProps) {
         defaultValues?.discount_percentage?.toString() ?? "0",
       max_members: defaultValues?.max_members?.toString() ?? "",
       welcome_message: defaultValues?.welcome_message ?? "",
-      is_ambassador_group: defaultValues?.is_ambassador_group ?? false,
+      whitelisted_emails:
+        defaultValues?.whitelisted_emails
+          ?.map((e: { email: string }) => e.email)
+          .join("\n") ?? "",
     },
     onSubmit: ({ value }) => {
       if (readOnly) return
@@ -99,7 +111,12 @@ export function GroupForm({ defaultValues, onSuccess }: GroupFormProps) {
           discount_percentage: Number(value.discount_percentage) || 0,
           max_members: value.max_members ? Number(value.max_members) : null,
           welcome_message: value.welcome_message || undefined,
-          is_ambassador_group: value.is_ambassador_group,
+          whitelisted_emails: value.whitelisted_emails
+            ? value.whitelisted_emails
+                .split("\n")
+                .map((e: string) => e.trim())
+                .filter(Boolean)
+            : undefined,
         })
       } else {
         if (!selectedPopupId) {
@@ -115,11 +132,18 @@ export function GroupForm({ defaultValues, onSuccess }: GroupFormProps) {
             ? Number(value.max_members)
             : undefined,
           welcome_message: value.welcome_message || undefined,
-          is_ambassador_group: value.is_ambassador_group,
+          whitelisted_emails: value.whitelisted_emails
+            ? value.whitelisted_emails
+                .split("\n")
+                .map((e: string) => e.trim())
+                .filter(Boolean)
+            : undefined,
         })
       }
     },
   })
+
+  const blocker = useUnsavedChanges(form)
 
   const isPending = createMutation.isPending || updateMutation.isPending
 
@@ -184,11 +208,7 @@ export function GroupForm({ defaultValues, onSuccess }: GroupFormProps) {
                         onChange={(e) => field.handleChange(e.target.value)}
                         disabled={readOnly}
                       />
-                      {field.state.meta.errors.length > 0 && (
-                        <p className="text-destructive text-sm">
-                          {field.state.meta.errors.join(", ")}
-                        </p>
-                      )}
+                      <FieldError errors={field.state.meta.errors} />
                     </div>
                   )}
                 </form.Field>
@@ -271,33 +291,26 @@ export function GroupForm({ defaultValues, onSuccess }: GroupFormProps) {
                     </div>
                   )}
                 </form.Field>
-              </CardContent>
-            </Card>
 
-            {/* Settings */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Settings</CardTitle>
-                <CardDescription>Configure group behavior</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form.Field name="is_ambassador_group">
+                <form.Field name="whitelisted_emails">
                   {(field) => (
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label htmlFor="is_ambassador_group">
-                          Ambassador Group
-                        </Label>
-                        <p className="text-sm text-muted-foreground">
-                          Mark as an ambassador/affiliate group
-                        </p>
-                      </div>
-                      <Switch
-                        id="is_ambassador_group"
-                        checked={field.state.value}
-                        onCheckedChange={(val) => field.handleChange(val)}
+                    <div className="space-y-2">
+                      <Label htmlFor="whitelisted_emails">
+                        Whitelisted Emails
+                      </Label>
+                      <Textarea
+                        id="whitelisted_emails"
+                        placeholder={"email1@example.com\nemail2@example.com"}
+                        value={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                        rows={5}
                         disabled={readOnly}
                       />
+                      <p className="text-sm text-muted-foreground">
+                        One email per line. Leave empty for an open group that
+                        accepts all applications.
+                      </p>
                     </div>
                   )}
                 </form.Field>
@@ -329,7 +342,7 @@ export function GroupForm({ defaultValues, onSuccess }: GroupFormProps) {
                 description: state.values.description,
                 discount_percentage: state.values.discount_percentage,
                 max_members: state.values.max_members,
-                is_ambassador_group: state.values.is_ambassador_group,
+                whitelisted_emails: state.values.whitelisted_emails,
               })}
             >
               {(values) => (
@@ -346,14 +359,9 @@ export function GroupForm({ defaultValues, onSuccess }: GroupFormProps) {
                         <Users className="h-5 w-5 text-primary" />
                       </div>
                       <div className="flex-1 space-y-1">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium leading-none">
-                            {values.name || "Group Name"}
-                          </p>
-                          {values.is_ambassador_group && (
-                            <Star className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500" />
-                          )}
-                        </div>
+                        <p className="font-medium leading-none">
+                          {values.name || "Group Name"}
+                        </p>
                         <p className="text-sm text-muted-foreground">
                           Registration Group
                         </p>
@@ -392,14 +400,18 @@ export function GroupForm({ defaultValues, onSuccess }: GroupFormProps) {
 
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">
-                        Type
+                        Access
                       </span>
                       <Badge
                         variant={
-                          values.is_ambassador_group ? "default" : "secondary"
+                          values.whitelisted_emails?.trim()
+                            ? "default"
+                            : "secondary"
                         }
                       >
-                        {values.is_ambassador_group ? "Ambassador" : "Standard"}
+                        {values.whitelisted_emails?.trim()
+                          ? "Restricted"
+                          : "Open"}
                       </Badge>
                     </div>
                   </CardContent>
@@ -440,6 +452,7 @@ export function GroupForm({ defaultValues, onSuccess }: GroupFormProps) {
           resourceName={defaultValues.name}
         />
       )}
+      <UnsavedChangesDialog blocker={blocker} />
     </div>
   )
 }

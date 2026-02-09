@@ -2,7 +2,6 @@ import { useForm } from "@tanstack/react-form"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import { DollarSign, Package, Tag, Ticket } from "lucide-react"
-
 import {
   type ProductCategory,
   type ProductCreate,
@@ -13,6 +12,7 @@ import {
   type TicketDuration,
 } from "@/client"
 import { DangerZone } from "@/components/Common/DangerZone"
+import { FieldError } from "@/components/Common/FieldError"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -38,7 +38,11 @@ import { Switch } from "@/components/ui/switch"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
-import { handleError } from "@/utils"
+import {
+  UnsavedChangesDialog,
+  useUnsavedChanges,
+} from "@/hooks/useUnsavedChanges"
+import { createErrorHandler } from "@/utils"
 
 interface ProductFormProps {
   defaultValues?: ProductPublic
@@ -82,12 +86,17 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
   const createMutation = useMutation({
     mutationFn: (data: ProductCreate) =>
       ProductsService.createProduct({ requestBody: data }),
-    onSuccess: () => {
-      showSuccessToast("Product created successfully")
+    onSuccess: (data) => {
+      showSuccessToast("Product created successfully", {
+        label: "View",
+        onClick: () =>
+          navigate({ to: "/products/$id/edit", params: { id: data.id } }),
+      })
       queryClient.invalidateQueries({ queryKey: ["products"] })
+      form.reset()
       onSuccess()
     },
-    onError: handleError.bind(showErrorToast),
+    onError: createErrorHandler(showErrorToast),
   })
 
   const updateMutation = useMutation({
@@ -99,9 +108,10 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
     onSuccess: () => {
       showSuccessToast("Product updated successfully")
       queryClient.invalidateQueries({ queryKey: ["products"] })
+      form.reset()
       onSuccess()
     },
-    onError: handleError.bind(showErrorToast),
+    onError: createErrorHandler(showErrorToast),
   })
 
   const deleteMutation = useMutation({
@@ -112,7 +122,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
       queryClient.invalidateQueries({ queryKey: ["products"] })
       navigate({ to: "/products" })
     },
-    onError: handleError.bind(showErrorToast),
+    onError: createErrorHandler(showErrorToast),
   })
 
   const form = useForm({
@@ -166,6 +176,8 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
       }
     },
   })
+
+  const blocker = useUnsavedChanges(form)
 
   const isPending = createMutation.isPending || updateMutation.isPending
 
@@ -240,11 +252,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
                         onChange={(e) => field.handleChange(e.target.value)}
                         disabled={readOnly}
                       />
-                      {field.state.meta.errors.length > 0 && (
-                        <p className="text-destructive text-sm">
-                          {field.state.meta.errors.join(", ")}
-                        </p>
-                      )}
+                      <FieldError errors={field.state.meta.errors} />
                     </div>
                   )}
                 </form.Field>
@@ -308,11 +316,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
                           onChange={(e) => field.handleChange(e.target.value)}
                           disabled={readOnly}
                         />
-                        {field.state.meta.errors.length > 0 && (
-                          <p className="text-destructive text-sm">
-                            {field.state.meta.errors.join(", ")}
-                          </p>
-                        )}
+                        <FieldError errors={field.state.meta.errors} />
                       </div>
                     )}
                   </form.Field>
@@ -367,11 +371,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
                         Maximum units available for sale. Leave empty for
                         unlimited.
                       </p>
-                      {field.state.meta.errors.length > 0 && (
-                        <p className="text-destructive text-sm">
-                          {field.state.meta.errors.join(", ")}
-                        </p>
-                      )}
+                      <FieldError errors={field.state.meta.errors} />
                     </div>
                   )}
                 </form.Field>
@@ -659,6 +659,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
           resourceName={defaultValues.name}
         />
       )}
+      <UnsavedChangesDialog blocker={blocker} />
     </div>
   )
 }

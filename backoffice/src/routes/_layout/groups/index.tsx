@@ -17,10 +17,11 @@ import {
 import { Suspense, useState } from "react"
 
 import { type GroupPublic, GroupsService } from "@/client"
-import { DataTable } from "@/components/Common/DataTable"
+import { DataTable, SortableHeader } from "@/components/Common/DataTable"
+import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
+import { StatusBadge } from "@/components/Common/StatusBadge"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -42,28 +43,36 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
-import { handleError } from "@/utils"
+import {
+  useTableSearchParams,
+  validateTableSearch,
+} from "@/hooks/useTableSearchParams"
+import { createErrorHandler } from "@/utils"
 
-function getGroupsQueryOptions(popupId: string | null) {
+function getGroupsQueryOptions(
+  popupId: string | null,
+  page: number,
+  pageSize: number,
+) {
   return {
     queryFn: () =>
       GroupsService.listGroups({
         popupId: popupId ?? undefined,
-        skip: 0,
-        limit: 100,
+        skip: page * pageSize,
+        limit: pageSize,
       }),
-    queryKey: ["groups", { popupId }],
+    queryKey: ["groups", { popupId, page, pageSize }],
   }
 }
 
 export const Route = createFileRoute("/_layout/groups/")({
   component: Groups,
+  validateSearch: validateTableSearch,
   head: () => ({
     meta: [{ title: "Groups - EdgeOS" }],
   }),
 })
 
-// Add Group Button - Links to dedicated create page
 function AddGroupButton() {
   return (
     <Button asChild>
@@ -75,7 +84,6 @@ function AddGroupButton() {
   )
 }
 
-// View Group Members Dialog
 function ViewGroupMembers({ group }: { group: GroupPublic }) {
   const [isOpen, setIsOpen] = useState(false)
 
@@ -143,7 +151,6 @@ function ViewGroupMembers({ group }: { group: GroupPublic }) {
   )
 }
 
-// Delete Group Dialog
 function DeleteGroup({
   group,
   onSuccess,
@@ -162,7 +169,7 @@ function DeleteGroup({
       setIsOpen(false)
       onSuccess()
     },
-    onError: handleError.bind(showErrorToast),
+    onError: createErrorHandler(showErrorToast),
     onSettled: () => queryClient.invalidateQueries({ queryKey: ["groups"] }),
   })
 
@@ -201,7 +208,6 @@ function DeleteGroup({
   )
 }
 
-// Actions Menu
 function GroupActionsMenu({ group }: { group: GroupPublic }) {
   const [open, setOpen] = useState(false)
   const { isAdmin } = useAuth()
@@ -241,12 +247,12 @@ function GroupActionsMenu({ group }: { group: GroupPublic }) {
 const columns: ColumnDef<GroupPublic>[] = [
   {
     accessorKey: "name",
-    header: "Name",
+    header: ({ column }) => <SortableHeader label="Name" column={column} />,
     cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
   },
   {
     accessorKey: "discount_percentage",
-    header: "Discount",
+    header: ({ column }) => <SortableHeader label="Discount" column={column} />,
     cell: ({ row }) => <span>{row.original.discount_percentage}%</span>,
   },
   {
@@ -258,9 +264,9 @@ const columns: ColumnDef<GroupPublic>[] = [
     accessorKey: "is_ambassador_group",
     header: "Type",
     cell: ({ row }) => (
-      <Badge variant={row.original.is_ambassador_group ? "default" : "outline"}>
-        {row.original.is_ambassador_group ? "Ambassador" : "Regular"}
-      </Badge>
+      <StatusBadge
+        status={row.original.is_ambassador_group ? "ambassador" : "regular"}
+      />
     ),
   },
   {
@@ -276,10 +282,60 @@ const columns: ColumnDef<GroupPublic>[] = [
 
 function GroupsTableContent() {
   const { selectedPopupId } = useWorkspace()
-  const { data: groups } = useSuspenseQuery(
-    getGroupsQueryOptions(selectedPopupId),
+  const searchParams = Route.useSearch()
+  const { search, pagination, setSearch, setPagination } = useTableSearchParams(
+    searchParams,
+    "/groups",
   )
-  return <DataTable columns={columns} data={groups?.results ?? []} />
+
+  const { data: groups } = useSuspenseQuery(
+    getGroupsQueryOptions(
+      selectedPopupId,
+      pagination.pageIndex,
+      pagination.pageSize,
+    ),
+  )
+
+  const filtered = search
+    ? (groups?.results ?? []).filter((g) =>
+        g.name.toLowerCase().includes(search.toLowerCase()),
+      )
+    : (groups?.results ?? [])
+
+  return (
+    <DataTable
+      columns={columns}
+      data={filtered}
+      searchPlaceholder="Search by name..."
+      hiddenOnMobile={["max_members", "is_ambassador_group"]}
+      searchValue={search}
+      onSearchChange={setSearch}
+      serverPagination={{
+        total: search ? filtered.length : groups.paging.total,
+        pagination: search
+          ? { pageIndex: 0, pageSize: groups.paging.total }
+          : pagination,
+        onPaginationChange: setPagination,
+      }}
+      emptyState={
+        !search ? (
+          <EmptyState
+            icon={Users}
+            title="No groups yet"
+            description="Create groups to manage team registrations and offer group discounts."
+            action={
+              <Button asChild>
+                <Link to="/groups/new">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Group
+                </Link>
+              </Button>
+            }
+          />
+        ) : undefined
+      }
+    />
+  )
 }
 
 function Groups() {

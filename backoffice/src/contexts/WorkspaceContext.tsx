@@ -2,8 +2,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   createContext,
   type ReactNode,
+  useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
 } from "react"
 import { TenantsService } from "@/client"
@@ -66,44 +68,69 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [isSuperadmin, selectedTenantId, tenants])
 
   // Persist tenant selection and invalidate queries
-  const setSelectedTenantId = (id: string | null) => {
-    setSelectedTenantIdState(id)
-    if (id) {
-      localStorage.setItem(TENANT_STORAGE_KEY, id)
-    } else {
-      localStorage.removeItem(TENANT_STORAGE_KEY)
-    }
-    // Clear popup selection when tenant changes
-    setSelectedPopupIdState(null)
-    localStorage.removeItem(POPUP_STORAGE_KEY)
-    // Invalidate all queries since tenant changed
-    queryClient.invalidateQueries()
-  }
+  const setSelectedTenantId = useCallback(
+    (id: string | null) => {
+      setSelectedTenantIdState(id)
+      if (id) {
+        localStorage.setItem(TENANT_STORAGE_KEY, id)
+      } else {
+        localStorage.removeItem(TENANT_STORAGE_KEY)
+      }
+      // Clear popup selection when tenant changes
+      setSelectedPopupIdState(null)
+      localStorage.removeItem(POPUP_STORAGE_KEY)
+      // Invalidate tenant-scoped queries
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const key = query.queryKey[0]
+          return [
+            "products",
+            "coupons",
+            "groups",
+            "applications",
+            "attendees",
+            "payments",
+            "popups",
+            "humans",
+            "form-fields",
+            "form-fields-schema",
+            "approval-strategies",
+            "popup-reviewers",
+            "application-reviews",
+          ].includes(key as string)
+        },
+      })
+    },
+    [queryClient],
+  )
 
   // Persist popup selection and invalidate popup-scoped queries
-  const setSelectedPopupId = (id: string | null) => {
-    setSelectedPopupIdState(id)
-    if (id) {
-      localStorage.setItem(POPUP_STORAGE_KEY, id)
-    } else {
-      localStorage.removeItem(POPUP_STORAGE_KEY)
-    }
-    // Invalidate popup-scoped queries
-    queryClient.invalidateQueries({
-      predicate: (query) => {
-        const key = query.queryKey[0]
-        return [
-          "products",
-          "coupons",
-          "groups",
-          "applications",
-          "attendees",
-          "payments",
-          "form-builder",
-        ].includes(key as string)
-      },
-    })
-  }
+  const setSelectedPopupId = useCallback(
+    (id: string | null) => {
+      setSelectedPopupIdState(id)
+      if (id) {
+        localStorage.setItem(POPUP_STORAGE_KEY, id)
+      } else {
+        localStorage.removeItem(POPUP_STORAGE_KEY)
+      }
+      // Invalidate popup-scoped queries
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const key = query.queryKey[0]
+          return [
+            "products",
+            "coupons",
+            "groups",
+            "applications",
+            "attendees",
+            "payments",
+            "form-builder",
+          ].includes(key as string)
+        },
+      })
+    },
+    [queryClient],
+  )
 
   // Derived state
   const isSuperadminUser = isSuperadmin
@@ -122,19 +149,31 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }
   }, [user, isSuperadminUser, selectedTenantId])
 
+  const value = useMemo(
+    () => ({
+      selectedTenantId,
+      setSelectedTenantId,
+      selectedPopupId,
+      setSelectedPopupId,
+      effectiveTenantId,
+      isContextReady,
+      needsTenantSelection,
+      needsPopupSelection,
+    }),
+    [
+      selectedTenantId,
+      setSelectedTenantId,
+      selectedPopupId,
+      setSelectedPopupId,
+      effectiveTenantId,
+      isContextReady,
+      needsTenantSelection,
+      needsPopupSelection,
+    ],
+  )
+
   return (
-    <WorkspaceContext.Provider
-      value={{
-        selectedTenantId,
-        setSelectedTenantId,
-        selectedPopupId,
-        setSelectedPopupId,
-        effectiveTenantId,
-        isContextReady,
-        needsTenantSelection,
-        needsPopupSelection,
-      }}
-    >
+    <WorkspaceContext.Provider value={value}>
       {children}
     </WorkspaceContext.Provider>
   )

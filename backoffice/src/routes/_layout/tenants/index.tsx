@@ -5,13 +5,14 @@ import {
 } from "@tanstack/react-query"
 import { createFileRoute, Link } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
-import { EllipsisVertical, Pencil, Plus, Trash2 } from "lucide-react"
+import { Building, EllipsisVertical, Pencil, Plus, Trash2 } from "lucide-react"
 import { Suspense, useState } from "react"
 
 import { type TenantPublic, TenantsService } from "@/client"
-import { DataTable } from "@/components/Common/DataTable"
+import { DataTable, SortableHeader } from "@/components/Common/DataTable"
+import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
-import { Badge } from "@/components/ui/badge"
+import { StatusBadge } from "@/components/Common/StatusBadge"
 import { Button } from "@/components/ui/button"
 
 import {
@@ -23,17 +24,23 @@ import {
 
 import { Skeleton } from "@/components/ui/skeleton"
 import useCustomToast from "@/hooks/useCustomToast"
-import { handleError } from "@/utils"
+import {
+  useTableSearchParams,
+  validateTableSearch,
+} from "@/hooks/useTableSearchParams"
+import { createErrorHandler } from "@/utils"
 
-function getTenantsQueryOptions() {
+function getTenantsQueryOptions(page: number, pageSize: number) {
   return {
-    queryFn: () => TenantsService.listTenants({ skip: 0, limit: 100 }),
-    queryKey: ["tenants"],
+    queryFn: () =>
+      TenantsService.listTenants({ skip: page * pageSize, limit: pageSize }),
+    queryKey: ["tenants", { page, pageSize }],
   }
 }
 
 export const Route = createFileRoute("/_layout/tenants/")({
   component: Tenants,
+  validateSearch: validateTableSearch,
   head: () => ({
     meta: [{ title: "Tenants - EdgeOS" }],
   }),
@@ -61,7 +68,7 @@ function TenantActionsMenu({ tenant }: { tenant: TenantPublic }) {
       showSuccessToast("Tenant deleted")
       setOpen(false)
     },
-    onError: handleError.bind(showErrorToast),
+    onError: createErrorHandler(showErrorToast),
     onSettled: () => queryClient.invalidateQueries({ queryKey: ["tenants"] }),
   })
 
@@ -94,7 +101,7 @@ function TenantActionsMenu({ tenant }: { tenant: TenantPublic }) {
 const columns: ColumnDef<TenantPublic>[] = [
   {
     accessorKey: "name",
-    header: "Name",
+    header: ({ column }) => <SortableHeader label="Name" column={column} />,
     cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
   },
   {
@@ -110,9 +117,7 @@ const columns: ColumnDef<TenantPublic>[] = [
     accessorKey: "deleted",
     header: "Status",
     cell: ({ row }) => (
-      <Badge variant={row.original.deleted ? "destructive" : "default"}>
-        {row.original.deleted ? "Deleted" : "Active"}
-      </Badge>
+      <StatusBadge status={row.original.deleted ? "deleted" : "active"} />
     ),
   },
   {
@@ -126,8 +131,56 @@ const columns: ColumnDef<TenantPublic>[] = [
 ]
 
 function TenantsTableContent() {
-  const { data: tenants } = useSuspenseQuery(getTenantsQueryOptions())
-  return <DataTable columns={columns} data={tenants.results} />
+  const searchParams = Route.useSearch()
+  const { search, pagination, setSearch, setPagination } = useTableSearchParams(
+    searchParams,
+    "/tenants",
+  )
+
+  const { data: tenants } = useSuspenseQuery(
+    getTenantsQueryOptions(pagination.pageIndex, pagination.pageSize),
+  )
+
+  const filtered = search
+    ? tenants.results.filter((t) =>
+        t.name.toLowerCase().includes(search.toLowerCase()),
+      )
+    : tenants.results
+
+  return (
+    <DataTable
+      columns={columns}
+      data={filtered}
+      searchPlaceholder="Search by name..."
+      hiddenOnMobile={["sender_email", "deleted"]}
+      searchValue={search}
+      onSearchChange={setSearch}
+      serverPagination={{
+        total: search ? filtered.length : tenants.paging.total,
+        pagination: search
+          ? { pageIndex: 0, pageSize: tenants.paging.total }
+          : pagination,
+        onPaginationChange: setPagination,
+      }}
+      emptyState={
+        !search ? (
+          <EmptyState
+            icon={Building}
+            title="No tenants yet"
+            description="Create your first tenant to start managing organizations."
+            action={
+              <Button asChild>
+                <Link to="/tenants/new">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Tenant
+                </Link>
+              </Button>
+            }
+          />
+        ) : undefined
+      }
+    />
+  )
 }
 
 function Tenants() {

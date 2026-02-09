@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import { Mail, Plus, Trash2, User, Users } from "lucide-react"
 import { useState } from "react"
-
 import {
   type ApplicationAdminCreate,
   type ApplicationStatus,
@@ -11,6 +10,8 @@ import {
   type CompanionCreate,
   FormFieldsService,
 } from "@/client"
+import { FieldError } from "@/components/Common/FieldError"
+import { FormErrorSummary } from "@/components/Common/FormErrorSummary"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -37,7 +38,11 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Textarea } from "@/components/ui/textarea"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useCustomToast from "@/hooks/useCustomToast"
-import { handleError } from "@/utils"
+import {
+  UnsavedChangesDialog,
+  useUnsavedChanges,
+} from "@/hooks/useUnsavedChanges"
+import { createErrorHandler } from "@/utils"
 
 // Type for the application schema response
 interface FormFieldSchema {
@@ -100,12 +105,17 @@ export function ApplicationForm({ onSuccess }: ApplicationFormProps) {
   const createMutation = useMutation({
     mutationFn: (data: ApplicationAdminCreate) =>
       ApplicationsService.createApplicationAdmin({ requestBody: data }),
-    onSuccess: () => {
-      showSuccessToast("Application created successfully")
+    onSuccess: (data) => {
+      showSuccessToast("Application created successfully", {
+        label: "View",
+        onClick: () =>
+          navigate({ to: "/applications/$id", params: { id: data.id } }),
+      })
       queryClient.invalidateQueries({ queryKey: ["applications"] })
+      form.reset()
       onSuccess()
     },
-    onError: handleError.bind(showErrorToast),
+    onError: createErrorHandler(showErrorToast),
   })
 
   // Build initial custom fields values
@@ -184,6 +194,8 @@ export function ApplicationForm({ onSuccess }: ApplicationFormProps) {
     },
   })
 
+  const blocker = useUnsavedChanges(form)
+
   // Show alert if no popup selected
   if (!isContextReady) {
     return <WorkspaceAlert resource="application" action="create" />
@@ -200,10 +212,18 @@ export function ApplicationForm({ onSuccess }: ApplicationFormProps) {
       )
     : []
 
-  // Group custom fields by section
+  // Split custom fields: no section -> inline with base fields, with section -> separate cards
+  const unsectionedFields = sortedCustomFields.filter(
+    ([, field]) => !field.section,
+  )
+  const sectionedFields = sortedCustomFields.filter(
+    ([, field]) => !!field.section,
+  )
+
+  // Group sectioned fields by section name
   const fieldsBySection: Record<string, [string, FormFieldSchema][]> = {}
-  for (const [name, field] of sortedCustomFields) {
-    const section = field.section || "custom"
+  for (const [name, field] of sectionedFields) {
+    const section = field.section!
     if (!fieldsBySection[section]) {
       fieldsBySection[section] = []
     }
@@ -499,6 +519,16 @@ export function ApplicationForm({ onSuccess }: ApplicationFormProps) {
         }}
         className="space-y-6"
       >
+        <FormErrorSummary
+          form={form}
+          fieldLabels={{
+            first_name: "First Name",
+            last_name: "Last Name",
+            email: "Email",
+            organization: "Organization",
+            role: "Role",
+          }}
+        />
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Left Column - Form Fields */}
           <div className="space-y-6 lg:col-span-2">
@@ -528,11 +558,7 @@ export function ApplicationForm({ onSuccess }: ApplicationFormProps) {
                           onBlur={field.handleBlur}
                           onChange={(e) => field.handleChange(e.target.value)}
                         />
-                        {field.state.meta.errors.length > 0 && (
-                          <p className="text-destructive text-sm">
-                            {field.state.meta.errors.join(", ")}
-                          </p>
-                        )}
+                        <FieldError errors={field.state.meta.errors} />
                       </div>
                     )}
                   </form.Field>
@@ -555,11 +581,7 @@ export function ApplicationForm({ onSuccess }: ApplicationFormProps) {
                           onBlur={field.handleBlur}
                           onChange={(e) => field.handleChange(e.target.value)}
                         />
-                        {field.state.meta.errors.length > 0 && (
-                          <p className="text-destructive text-sm">
-                            {field.state.meta.errors.join(", ")}
-                          </p>
-                        )}
+                        <FieldError errors={field.state.meta.errors} />
                       </div>
                     )}
                   </form.Field>
@@ -584,11 +606,7 @@ export function ApplicationForm({ onSuccess }: ApplicationFormProps) {
                         onBlur={field.handleBlur}
                         onChange={(e) => field.handleChange(e.target.value)}
                       />
-                      {field.state.meta.errors.length > 0 && (
-                        <p className="text-destructive text-sm">
-                          {field.state.meta.errors.join(", ")}
-                        </p>
-                      )}
+                      <FieldError errors={field.state.meta.errors} />
                     </div>
                   )}
                 </form.Field>
@@ -714,6 +732,17 @@ export function ApplicationForm({ onSuccess }: ApplicationFormProps) {
                     </div>
                   )}
                 </form.Field>
+
+                {unsectionedFields.length > 0 && (
+                  <>
+                    <Separator />
+                    <div className="space-y-4">
+                      {unsectionedFields.map(([name, field]) =>
+                        renderCustomField(name, field),
+                      )}
+                    </div>
+                  </>
+                )}
               </CardContent>
             </Card>
 
@@ -803,6 +832,7 @@ export function ApplicationForm({ onSuccess }: ApplicationFormProps) {
                       type="button"
                       variant="ghost"
                       size="icon"
+                      aria-label="Remove companion"
                       className="mt-6"
                       onClick={() => {
                         setCompanions((prev) =>
@@ -862,31 +892,18 @@ export function ApplicationForm({ onSuccess }: ApplicationFormProps) {
               </CardContent>
             </Card>
 
-            {/* Custom Fields */}
-            {sortedCustomFields.length > 0 && (
-              <Card>
+            {Object.entries(fieldsBySection).map(([section, fields]) => (
+              <Card key={section}>
                 <CardHeader>
-                  <CardTitle>Custom Fields</CardTitle>
-                  <CardDescription>
-                    Additional questions for this popup
-                  </CardDescription>
+                  <CardTitle className="capitalize">{section}</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-6">
-                  {Object.entries(fieldsBySection).map(([section, fields]) => (
-                    <div key={section} className="space-y-4">
-                      {Object.keys(fieldsBySection).length > 1 && (
-                        <h4 className="font-medium capitalize">{section}</h4>
-                      )}
-                      <div className="space-y-4">
-                        {fields.map(([name, field]) =>
-                          renderCustomField(name, field),
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                <CardContent className="space-y-4">
+                  {fields.map(([name, field]) =>
+                    renderCustomField(name, field),
+                  )}
                 </CardContent>
               </Card>
-            )}
+            ))}
 
             {/* Form Actions */}
             <div className="flex gap-4">
@@ -1032,60 +1049,115 @@ export function ApplicationForm({ onSuccess }: ApplicationFormProps) {
                           v !== "" &&
                           v !== false &&
                           !(Array.isArray(v) && v.length === 0),
-                      ) && (
-                        <>
-                          <Separator />
-                          <div className="space-y-2">
-                            <p className="text-sm font-medium text-muted-foreground">
-                              Custom Fields
-                            </p>
-                            {Object.entries(values.custom_fields).map(
-                              ([key, value]) => {
-                                if (
-                                  value === "" ||
-                                  value === false ||
-                                  (Array.isArray(value) && value.length === 0)
+                      ) &&
+                        (() => {
+                          const renderPreviewField = (
+                            key: string,
+                            value: unknown,
+                          ) => {
+                            if (
+                              value === "" ||
+                              value === false ||
+                              (Array.isArray(value) && value.length === 0)
+                            )
+                              return null
+
+                            const fieldDef = schema?.custom_fields?.[key]
+                            const label =
+                              fieldDef?.label ||
+                              key
+                                .split("_")
+                                .map(
+                                  (w) => w.charAt(0).toUpperCase() + w.slice(1),
                                 )
-                                  return null
+                                .join(" ")
 
-                                const fieldDef = schema?.custom_fields?.[key]
-                                const label =
-                                  fieldDef?.label ||
-                                  key
-                                    .split("_")
-                                    .map(
-                                      (w) =>
-                                        w.charAt(0).toUpperCase() + w.slice(1),
-                                    )
-                                    .join(" ")
+                            let displayValue: string
+                            if (typeof value === "boolean") {
+                              displayValue = value ? "Yes" : "No"
+                            } else if (Array.isArray(value)) {
+                              displayValue = value.join(", ")
+                            } else {
+                              displayValue = String(value)
+                            }
 
-                                let displayValue: string
-                                if (typeof value === "boolean") {
-                                  displayValue = value ? "Yes" : "No"
-                                } else if (Array.isArray(value)) {
-                                  displayValue = value.join(", ")
-                                } else {
-                                  displayValue = String(value)
-                                }
+                            return (
+                              <div
+                                key={key}
+                                className="flex items-start justify-between text-sm"
+                              >
+                                <span className="text-muted-foreground">
+                                  {label}
+                                </span>
+                                <span className="text-right max-w-[60%] break-words">
+                                  {displayValue}
+                                </span>
+                              </div>
+                            )
+                          }
 
-                                return (
-                                  <div
-                                    key={key}
-                                    className="flex items-start justify-between text-sm"
-                                  >
-                                    <span className="text-muted-foreground">
-                                      {label}
-                                    </span>
-                                    <span className="text-right max-w-[60%] break-words">
-                                      {displayValue}
-                                    </span>
-                                  </div>
-                                )
-                              },
-                            )}
-                          </div>
-                        </>
-                      )}
+                          const previewUnsectioned = Object.entries(
+                            values.custom_fields,
+                          ).filter(
+                            ([key]) => !schema?.custom_fields?.[key]?.section,
+                          )
+                          const previewSectioned: Record<
+                            string,
+                            [string, unknown][]
+                          > = {}
+                          for (const [key, value] of Object.entries(
+                            values.custom_fields,
+                          )) {
+                            const section =
+                              schema?.custom_fields?.[key]?.section
+                            if (section) {
+                              if (!previewSectioned[section])
+                                previewSectioned[section] = []
+                              previewSectioned[section].push([key, value])
+                            }
+                          }
+
+                          return (
+                            <>
+                              {previewUnsectioned.some(
+                                ([, v]) =>
+                                  v !== "" &&
+                                  v !== false &&
+                                  !(Array.isArray(v) && v.length === 0),
+                              ) && (
+                                <div className="space-y-2">
+                                  {previewUnsectioned.map(([key, value]) =>
+                                    renderPreviewField(key, value),
+                                  )}
+                                </div>
+                              )}
+                              {Object.entries(previewSectioned).map(
+                                ([section, fields]) => {
+                                  const hasValues = fields.some(
+                                    ([, v]) =>
+                                      v !== "" &&
+                                      v !== false &&
+                                      !(Array.isArray(v) && v.length === 0),
+                                  )
+                                  if (!hasValues) return null
+                                  return (
+                                    <div key={section}>
+                                      <Separator />
+                                      <div className="space-y-2 pt-4">
+                                        <p className="text-sm font-medium text-muted-foreground capitalize">
+                                          {section}
+                                        </p>
+                                        {fields.map(([key, value]) =>
+                                          renderPreviewField(key, value),
+                                        )}
+                                      </div>
+                                    </div>
+                                  )
+                                },
+                              )}
+                            </>
+                          )
+                        })()}
 
                       <Separator />
 
@@ -1139,6 +1211,7 @@ export function ApplicationForm({ onSuccess }: ApplicationFormProps) {
           </div>
         </div>
       </form>
+      <UnsavedChangesDialog blocker={blocker} />
     </div>
   )
 }

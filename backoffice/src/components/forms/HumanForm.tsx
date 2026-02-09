@@ -2,13 +2,13 @@ import { useForm } from "@tanstack/react-form"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import { AlertTriangle, Mail, MapPin, User } from "lucide-react"
-
 import {
   type HumanCreate,
   type HumanPublic,
   HumansService,
   type HumanUpdate,
 } from "@/client"
+import { FieldError } from "@/components/Common/FieldError"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -25,7 +25,11 @@ import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
-import { handleError } from "@/utils"
+import {
+  UnsavedChangesDialog,
+  useUnsavedChanges,
+} from "@/hooks/useUnsavedChanges"
+import { createErrorHandler } from "@/utils"
 
 interface HumanFormProps {
   defaultValues?: HumanPublic
@@ -49,9 +53,10 @@ export function HumanForm({ defaultValues, onSuccess }: HumanFormProps) {
     onSuccess: () => {
       showSuccessToast("Human updated successfully")
       queryClient.invalidateQueries({ queryKey: ["humans"] })
+      form.reset()
       onSuccess()
     },
-    onError: handleError.bind(showErrorToast),
+    onError: createErrorHandler(showErrorToast),
   })
 
   const createMutation = useMutation({
@@ -62,9 +67,10 @@ export function HumanForm({ defaultValues, onSuccess }: HumanFormProps) {
     onSuccess: () => {
       showSuccessToast("Human created successfully")
       queryClient.invalidateQueries({ queryKey: ["humans"] })
+      form.reset()
       onSuccess()
     },
-    onError: handleError.bind(showErrorToast),
+    onError: createErrorHandler(showErrorToast),
   })
 
   const form = useForm({
@@ -112,6 +118,8 @@ export function HumanForm({ defaultValues, onSuccess }: HumanFormProps) {
     },
   })
 
+  const blocker = useUnsavedChanges(form)
+
   const isPending = updateMutation.isPending || createMutation.isPending
 
   return (
@@ -157,11 +165,7 @@ export function HumanForm({ defaultValues, onSuccess }: HumanFormProps) {
                           value={field.state.value}
                           onChange={(e) => field.handleChange(e.target.value)}
                         />
-                        {field.state.meta.errors.length > 0 && (
-                          <p className="text-sm text-destructive">
-                            {field.state.meta.errors[0]}
-                          </p>
-                        )}
+                        <FieldError errors={field.state.meta.errors} />
                       </div>
                     )}
                   </form.Field>
@@ -488,6 +492,7 @@ export function HumanForm({ defaultValues, onSuccess }: HumanFormProps) {
           </div>
         </div>
       </form>
+      <UnsavedChangesDialog blocker={blocker} />
     </div>
   )
 }

@@ -12,7 +12,6 @@ import {
   Mail,
   Type,
 } from "lucide-react"
-
 import {
   type FormFieldCreate,
   type FormFieldPublic,
@@ -20,6 +19,8 @@ import {
   type FormFieldUpdate,
 } from "@/client"
 import { DangerZone } from "@/components/Common/DangerZone"
+import { FieldError } from "@/components/Common/FieldError"
+import { FormErrorSummary } from "@/components/Common/FormErrorSummary"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -46,7 +47,11 @@ import { Textarea } from "@/components/ui/textarea"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
-import { handleError } from "@/utils"
+import {
+  UnsavedChangesDialog,
+  useUnsavedChanges,
+} from "@/hooks/useUnsavedChanges"
+import { createErrorHandler } from "@/utils"
 
 const FIELD_TYPES = [
   { value: "text", label: "Text", icon: Type },
@@ -80,12 +85,17 @@ export function FormFieldForm({
   const createMutation = useMutation({
     mutationFn: (data: FormFieldCreate) =>
       FormFieldsService.createFormField({ requestBody: data }),
-    onSuccess: () => {
-      showSuccessToast("Form field created successfully")
+    onSuccess: (data) => {
+      showSuccessToast("Form field created successfully", {
+        label: "View",
+        onClick: () =>
+          navigate({ to: "/form-builder/$id/edit", params: { id: data.id } }),
+      })
       queryClient.invalidateQueries({ queryKey: ["form-fields"] })
+      form.reset()
       onSuccess()
     },
-    onError: handleError.bind(showErrorToast),
+    onError: createErrorHandler(showErrorToast),
   })
 
   const updateMutation = useMutation({
@@ -97,9 +107,10 @@ export function FormFieldForm({
     onSuccess: () => {
       showSuccessToast("Form field updated successfully")
       queryClient.invalidateQueries({ queryKey: ["form-fields"] })
+      form.reset()
       onSuccess()
     },
-    onError: handleError.bind(showErrorToast),
+    onError: createErrorHandler(showErrorToast),
   })
 
   const deleteMutation = useMutation({
@@ -110,7 +121,7 @@ export function FormFieldForm({
       queryClient.invalidateQueries({ queryKey: ["form-fields"] })
       navigate({ to: "/form-builder" })
     },
-    onError: handleError.bind(showErrorToast),
+    onError: createErrorHandler(showErrorToast),
   })
 
   const form = useForm({
@@ -166,6 +177,8 @@ export function FormFieldForm({
     },
   })
 
+  const blocker = useUnsavedChanges(form)
+
   const isPending = createMutation.isPending || updateMutation.isPending
 
   // Show alert if no popup selected (only for create mode)
@@ -187,6 +200,15 @@ export function FormFieldForm({
         }}
         className="space-y-6"
       >
+        <FormErrorSummary
+          form={form}
+          fieldLabels={{
+            name: "Field Name",
+            label: "Label",
+            field_type: "Field Type",
+            section: "Section",
+          }}
+        />
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Left Column - Form Fields */}
           <div className="space-y-6 lg:col-span-2">
@@ -236,11 +258,7 @@ export function FormFieldForm({
                         <p className="text-sm text-muted-foreground">
                           Internal identifier (no spaces)
                         </p>
-                        {field.state.meta.errors.length > 0 && (
-                          <p className="text-destructive text-sm">
-                            {field.state.meta.errors.join(", ")}
-                          </p>
-                        )}
+                        <FieldError errors={field.state.meta.errors} />
                       </div>
                     )}
                   </form.Field>
@@ -271,11 +289,7 @@ export function FormFieldForm({
                         <p className="text-sm text-muted-foreground">
                           Label shown to users
                         </p>
-                        {field.state.meta.errors.length > 0 && (
-                          <p className="text-destructive text-sm">
-                            {field.state.meta.errors.join(", ")}
-                          </p>
-                        )}
+                        <FieldError errors={field.state.meta.errors} />
                       </div>
                     )}
                   </form.Field>
@@ -633,6 +647,7 @@ export function FormFieldForm({
           resourceName={defaultValues.label}
         />
       )}
+      <UnsavedChangesDialog blocker={blocker} />
     </div>
   )
 }

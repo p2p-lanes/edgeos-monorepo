@@ -27,9 +27,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Switch } from "@/components/ui/switch"
 import useCustomToast from "@/hooks/useCustomToast"
-import { handleError } from "@/utils"
+import { createErrorHandler } from "@/utils"
 
 interface ApprovalStrategyFormProps {
   popupId: string
@@ -99,7 +98,7 @@ export function ApprovalStrategyForm({
         queryKey: ["approval-strategy", popupId],
       })
     },
-    onError: (err) => handleError.call(showErrorToast, err as ApiError),
+    onError: (err) => createErrorHandler(showErrorToast)(err as ApiError),
   })
 
   const deleteMutation = useMutation({
@@ -111,7 +110,7 @@ export function ApprovalStrategyForm({
         queryKey: ["approval-strategy", popupId],
       })
     },
-    onError: (err) => handleError.call(showErrorToast, err as ApiError),
+    onError: (err) => createErrorHandler(showErrorToast)(err as ApiError),
   })
 
   if (isLoading) {
@@ -206,7 +205,6 @@ function ApprovalStrategyFormInner({
       yes_weight: strategy.yes_weight,
       no_weight: strategy.no_weight,
       strong_no_weight: strategy.strong_no_weight,
-      rejection_is_veto: strategy.rejection_is_veto,
     },
     onSubmit: ({ value }) => {
       if (readOnly) return
@@ -439,31 +437,6 @@ function ApprovalStrategyFormInner({
               </form.Field>
             </div>
           </>
-        )}
-
-        {/* Veto Setting (for non-auto strategies) */}
-        {strategyType !== "auto_accept" && (
-          <form.Field name="rejection_is_veto">
-            {(field) => (
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="rejection_is_veto">Rejection is Veto</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Any rejection instantly rejects the application
-                  </p>
-                </div>
-                <Switch
-                  id="rejection_is_veto"
-                  checked={field.state.value}
-                  onCheckedChange={(checked) => {
-                    field.handleChange(checked)
-                    setTimeout(() => form.handleSubmit(), 0)
-                  }}
-                  disabled={readOnly}
-                />
-              </div>
-            )}
-          </form.Field>
         )}
 
         {/* Save indicator */}

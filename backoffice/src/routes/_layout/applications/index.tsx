@@ -1,5 +1,6 @@
 import {
   useMutation,
+  useQuery,
   useQueryClient,
   useSuspenseQuery,
 } from "@tanstack/react-query"
@@ -7,8 +8,11 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
 import {
   AlertTriangle,
+  ClipboardList,
+  Download,
   EllipsisVertical,
   Eye,
+  ListChecks,
   Plus,
   ThumbsDown,
   ThumbsUp,
@@ -16,13 +20,17 @@ import {
 import { Suspense, useState } from "react"
 
 import {
+  type ApiError,
   type ApplicationPublic,
   ApplicationReviewsService,
   ApplicationsService,
+  ApprovalStrategiesService,
   type ReviewDecision,
 } from "@/client"
-import { DataTable } from "@/components/Common/DataTable"
+import { DataTable, SortableHeader } from "@/components/Common/DataTable"
+import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
+import { StatusBadge } from "@/components/Common/StatusBadge"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -47,43 +55,37 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
-import { handleError } from "@/utils"
+import {
+  useTableSearchParams,
+  validateTableSearch,
+} from "@/hooks/useTableSearchParams"
+import { exportToCsv } from "@/lib/export"
+import { createErrorHandler } from "@/utils"
 
-function getApplicationsQueryOptions(popupId: string | null) {
+function getApplicationsQueryOptions(
+  popupId: string | null,
+  page: number,
+  pageSize: number,
+) {
   return {
     queryFn: () =>
       ApplicationsService.listApplications({
-        skip: 0,
-        limit: 100,
+        skip: page * pageSize,
+        limit: pageSize,
         popupId: popupId || undefined,
       }),
-    queryKey: ["applications", popupId],
+    queryKey: ["applications", popupId, { page, pageSize }],
   }
 }
 
 export const Route = createFileRoute("/_layout/applications/")({
   component: Applications,
+  validateSearch: validateTableSearch,
   head: () => ({
     meta: [{ title: "Applications - EdgeOS" }],
   }),
 })
 
-const getStatusBadgeVariant = (
-  status: string,
-): "default" | "secondary" | "destructive" | "outline" => {
-  switch (status) {
-    case "accepted":
-      return "default"
-    case "in review":
-      return "secondary"
-    case "rejected":
-      return "destructive"
-    default:
-      return "outline"
-  }
-}
-
-// Submit Review Dialog (follows approval flow)
 function SubmitReviewDialog({
   application,
   decision,
@@ -108,11 +110,46 @@ function SubmitReviewDialog({
         applicationId: application.id,
         requestBody: { decision },
       }),
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ["applications"] })
+      const previousData = queryClient.getQueriesData({
+        queryKey: ["applications"],
+      })
+      const newStatus =
+        decision === "yes" || decision === "strong_yes"
+          ? "accepted"
+          : "rejected"
+      queryClient.setQueriesData(
+        { queryKey: ["applications"] },
+        (
+          old:
+            | {
+                results: ApplicationPublic[]
+                paging: { limit: number; offset: number; total: number }
+              }
+            | undefined,
+        ) => {
+          if (!old?.results) return old
+          return {
+            ...old,
+            results: old.results.map((a) =>
+              a.id === application.id ? { ...a, status: newStatus } : a,
+            ),
+          }
+        },
+      )
+      return { previousData }
+    },
     onSuccess: () => {
       showSuccessToast(`Review submitted: ${decision.replace("_", " ")}`)
       onOpenChange(false)
     },
-    onError: handleError.bind(showErrorToast),
+    onError: (err, _, context) => {
+      context?.previousData?.forEach(([key, data]) => {
+        queryClient.setQueryData(key, data)
+      })
+      createErrorHandler(showErrorToast)(err as ApiError)
+    },
     onSettled: () =>
       queryClient.invalidateQueries({ queryKey: ["applications"] }),
   })
@@ -151,11 +188,12 @@ function SubmitReviewDialog({
 
 type DialogType = "approve" | "reject" | null
 
-// Actions Menu - dialogs rendered outside dropdown to persist state
 function ApplicationActionsMenu({
   application,
+  isWeightedVoting = false,
 }: {
   application: ApplicationPublic
+  isWeightedVoting?: boolean
 }) {
   const navigate = useNavigate()
   const [dropdownOpen, setDropdownOpen] = useState(false)
@@ -168,8 +206,8 @@ function ApplicationActionsMenu({
     setActiveDialog(dialog)
   }
 
-  // Only show review actions for applications that are in review (not draft, not already decided)
-  const canReview = isAdmin && currentStatus === "in review"
+  const canReview =
+    isAdmin && currentStatus === "in review" && !isWeightedVoting
 
   return (
     <>
@@ -212,7 +250,6 @@ function ApplicationActionsMenu({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Dialogs rendered outside dropdown so state persists when dropdown closes */}
       <SubmitReviewDialog
         application={application}
         decision="yes"
@@ -232,10 +269,12 @@ function ApplicationActionsMenu({
   )
 }
 
-const columns: ColumnDef<ApplicationPublic>[] = [
+const getColumns = (
+  isWeightedVoting: boolean,
+): ColumnDef<ApplicationPublic>[] => [
   {
     accessorKey: "human.first_name",
-    header: "Name",
+    header: ({ column }) => <SortableHeader label="Name" column={column} />,
     cell: ({ row }) => (
       <Link
         to="/applications/$id"
@@ -248,7 +287,7 @@ const columns: ColumnDef<ApplicationPublic>[] = [
   },
   {
     accessorKey: "human.email",
-    header: "Email",
+    header: ({ column }) => <SortableHeader label="Email" column={column} />,
     cell: ({ row }) => (
       <span className="text-muted-foreground">{row.original.human?.email}</span>
     ),
@@ -264,12 +303,8 @@ const columns: ColumnDef<ApplicationPublic>[] = [
   },
   {
     accessorKey: "status",
-    header: "Status",
-    cell: ({ row }) => (
-      <Badge variant={getStatusBadgeVariant(row.original.status)}>
-        {row.original.status}
-      </Badge>
-    ),
+    header: ({ column }) => <SortableHeader label="Status" column={column} />,
+    cell: ({ row }) => <StatusBadge status={row.original.status} />,
   },
   {
     accessorKey: "attendees",
@@ -292,7 +327,10 @@ const columns: ColumnDef<ApplicationPublic>[] = [
     header: () => <span className="sr-only">Actions</span>,
     cell: ({ row }) => (
       <div className="flex justify-end">
-        <ApplicationActionsMenu application={row.original} />
+        <ApplicationActionsMenu
+          application={row.original}
+          isWeightedVoting={isWeightedVoting}
+        />
       </div>
     ),
   },
@@ -300,13 +338,183 @@ const columns: ColumnDef<ApplicationPublic>[] = [
 
 function ApplicationsTableContent() {
   const { selectedPopupId } = useWorkspace()
-  const { data: applications } = useSuspenseQuery(
-    getApplicationsQueryOptions(selectedPopupId),
+  const { isAdmin } = useAuth()
+  const queryClient = useQueryClient()
+  const { showSuccessToast, showErrorToast } = useCustomToast()
+  const searchParams = Route.useSearch()
+  const { search, pagination, setSearch, setPagination } = useTableSearchParams(
+    searchParams,
+    "/applications",
   )
-  return <DataTable columns={columns} data={applications.results} />
+
+  const { data: applications } = useSuspenseQuery(
+    getApplicationsQueryOptions(
+      selectedPopupId,
+      pagination.pageIndex,
+      pagination.pageSize,
+    ),
+  )
+
+  const { data: approvalStrategy } = useQuery({
+    queryKey: ["approval-strategy", selectedPopupId],
+    queryFn: () =>
+      ApprovalStrategiesService.getApprovalStrategy({
+        popupId: selectedPopupId!,
+      }),
+    enabled: !!selectedPopupId,
+    retry: false,
+  })
+
+  const bulkReviewMutation = useMutation({
+    mutationFn: async ({
+      ids,
+      decision,
+    }: {
+      ids: string[]
+      decision: ReviewDecision
+    }) => {
+      await Promise.all(
+        ids.map((id) =>
+          ApplicationReviewsService.submitReview({
+            applicationId: id,
+            requestBody: { decision },
+          }),
+        ),
+      )
+    },
+    onMutate: async ({ ids, decision }) => {
+      await queryClient.cancelQueries({ queryKey: ["applications"] })
+      const previousData = queryClient.getQueriesData({
+        queryKey: ["applications"],
+      })
+      const idSet = new Set(ids)
+      const newStatus =
+        decision === "yes" || decision === "strong_yes"
+          ? "accepted"
+          : "rejected"
+      queryClient.setQueriesData(
+        { queryKey: ["applications"] },
+        (
+          old:
+            | {
+                results: ApplicationPublic[]
+                paging: { limit: number; offset: number; total: number }
+              }
+            | undefined,
+        ) => {
+          if (!old?.results) return old
+          return {
+            ...old,
+            results: old.results.map((a) =>
+              idSet.has(a.id) ? { ...a, status: newStatus } : a,
+            ),
+          }
+        },
+      )
+      return { previousData }
+    },
+    onSuccess: (_, { ids, decision }) => {
+      const action = decision === "yes" ? "approved" : "rejected"
+      showSuccessToast(`${ids.length} application(s) ${action}`)
+    },
+    onError: (err, _, context) => {
+      context?.previousData?.forEach(([key, data]) => {
+        queryClient.setQueryData(key, data)
+      })
+      createErrorHandler(showErrorToast)(err as ApiError)
+    },
+    onSettled: () =>
+      queryClient.invalidateQueries({ queryKey: ["applications"] }),
+  })
+
+  const isWeightedVoting = approvalStrategy?.strategy_type === "weighted"
+  const columns = getColumns(isWeightedVoting)
+  const canBulkReview = isAdmin && !isWeightedVoting
+
+  const filtered = search
+    ? applications.results.filter((app) => {
+        const term = search.toLowerCase()
+        const name =
+          `${app.human?.first_name ?? ""} ${app.human?.last_name ?? ""}`.toLowerCase()
+        const email = (app.human?.email ?? "").toLowerCase()
+        const org = (app.human?.organization ?? "").toLowerCase()
+        return name.includes(term) || email.includes(term) || org.includes(term)
+      })
+    : applications.results
+
+  return (
+    <DataTable
+      columns={columns}
+      data={filtered}
+      searchPlaceholder="Search by name, email, or organization..."
+      hiddenOnMobile={["human.organization", "attendees", "red_flag"]}
+      searchValue={search}
+      onSearchChange={setSearch}
+      serverPagination={{
+        total: search ? filtered.length : applications.paging.total,
+        pagination: search
+          ? { pageIndex: 0, pageSize: applications.paging.total }
+          : pagination,
+        onPaginationChange: setPagination,
+      }}
+      emptyState={
+        !search ? (
+          <EmptyState
+            icon={ClipboardList}
+            title="No applications yet"
+            description="Applications will appear here once people apply to your popup."
+          />
+        ) : undefined
+      }
+      selectable={canBulkReview}
+      bulkActions={
+        canBulkReview
+          ? (selectedRows) => {
+              const reviewable = (selectedRows as ApplicationPublic[]).filter(
+                (app) => app.status === "in review",
+              )
+              return (
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    disabled={
+                      reviewable.length === 0 || bulkReviewMutation.isPending
+                    }
+                    onClick={() =>
+                      bulkReviewMutation.mutate({
+                        ids: reviewable.map((a) => a.id),
+                        decision: "yes",
+                      })
+                    }
+                  >
+                    <ThumbsUp className="mr-1.5 h-3.5 w-3.5" />
+                    Approve ({reviewable.length})
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    disabled={
+                      reviewable.length === 0 || bulkReviewMutation.isPending
+                    }
+                    onClick={() =>
+                      bulkReviewMutation.mutate({
+                        ids: reviewable.map((a) => a.id),
+                        decision: "no",
+                      })
+                    }
+                  >
+                    <ThumbsDown className="mr-1.5 h-3.5 w-3.5" />
+                    Reject ({reviewable.length})
+                  </Button>
+                </div>
+              )
+            }
+          : undefined
+      }
+    />
+  )
 }
 
-// Add Application Button (Superadmin only - for testing)
 function AddApplicationButton() {
   return (
     <Button asChild>
@@ -319,8 +527,34 @@ function AddApplicationButton() {
 }
 
 function Applications() {
-  const { isSuperadmin } = useAuth()
-  const { isContextReady } = useWorkspace()
+  const { isAdmin, isSuperadmin } = useAuth()
+  const { isContextReady, selectedPopupId } = useWorkspace()
+  const [isExporting, setIsExporting] = useState(false)
+
+  const handleExport = async () => {
+    if (!selectedPopupId) return
+    setIsExporting(true)
+    try {
+      const data = await ApplicationsService.listApplications({
+        skip: 0,
+        limit: 10000,
+        popupId: selectedPopupId,
+      })
+      exportToCsv(
+        "applications",
+        data.results as unknown as Record<string, unknown>[],
+        [
+          { key: "human.first_name", label: "First Name" },
+          { key: "human.last_name", label: "Last Name" },
+          { key: "human.email", label: "Email" },
+          { key: "human.organization", label: "Organization" },
+          { key: "status", label: "Status" },
+        ],
+      )
+    } finally {
+      setIsExporting(false)
+    }
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -331,7 +565,27 @@ function Applications() {
             Review and manage registration applications
           </p>
         </div>
-        {isSuperadmin && isContextReady && <AddApplicationButton />}
+        <div className="flex items-center gap-2">
+          {isContextReady && isAdmin && (
+            <Button variant="outline" asChild>
+              <Link to="/applications/review-queue">
+                <ListChecks className="mr-2 h-4 w-4" />
+                Review Queue
+              </Link>
+            </Button>
+          )}
+          {isContextReady && (
+            <Button
+              variant="outline"
+              onClick={handleExport}
+              disabled={isExporting}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              {isExporting ? "Exporting..." : "Export CSV"}
+            </Button>
+          )}
+          {isSuperadmin && isContextReady && <AddApplicationButton />}
+        </div>
       </div>
       {!isContextReady ? (
         <WorkspaceAlert resource="applications" />

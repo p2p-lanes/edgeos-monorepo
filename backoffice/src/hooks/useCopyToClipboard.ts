@@ -1,5 +1,5 @@
 // source: https://usehooks-ts.com/react-hook/use-copy-to-clipboard
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 
 type CopiedValue = string | null
 
@@ -7,6 +7,15 @@ type CopyFn = (text: string) => Promise<boolean>
 
 export function useCopyToClipboard(): [CopiedValue, CopyFn] {
   const [copiedText, setCopiedText] = useState<CopiedValue>(null)
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+    }
+  }, [])
 
   const copy: CopyFn = useCallback(async (text) => {
     if (!navigator?.clipboard) {
@@ -18,7 +27,10 @@ export function useCopyToClipboard(): [CopiedValue, CopyFn] {
       await navigator.clipboard.writeText(text)
       setCopiedText(text)
 
-      setTimeout(() => setCopiedText(null), 2000)
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+      timeoutRef.current = setTimeout(() => setCopiedText(null), 2000)
 
       return true
     } catch (error) {

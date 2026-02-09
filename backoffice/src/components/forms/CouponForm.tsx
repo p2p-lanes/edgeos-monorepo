@@ -2,7 +2,6 @@ import { useForm } from "@tanstack/react-form"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import { Percent, Ticket } from "lucide-react"
-
 import {
   type CouponCreate,
   type CouponPublic,
@@ -10,6 +9,7 @@ import {
   type CouponUpdate,
 } from "@/client"
 import { DangerZone } from "@/components/Common/DangerZone"
+import { FieldError } from "@/components/Common/FieldError"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -28,7 +28,11 @@ import { Switch } from "@/components/ui/switch"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
-import { handleError } from "@/utils"
+import {
+  UnsavedChangesDialog,
+  useUnsavedChanges,
+} from "@/hooks/useUnsavedChanges"
+import { createErrorHandler } from "@/utils"
 
 interface CouponFormProps {
   defaultValues?: CouponPublic
@@ -47,12 +51,17 @@ export function CouponForm({ defaultValues, onSuccess }: CouponFormProps) {
   const createMutation = useMutation({
     mutationFn: (data: CouponCreate) =>
       CouponsService.createCoupon({ requestBody: data }),
-    onSuccess: () => {
-      showSuccessToast("Coupon created successfully")
+    onSuccess: (data) => {
+      showSuccessToast("Coupon created successfully", {
+        label: "View",
+        onClick: () =>
+          navigate({ to: "/coupons/$id/edit", params: { id: data.id } }),
+      })
       queryClient.invalidateQueries({ queryKey: ["coupons"] })
+      form.reset()
       onSuccess()
     },
-    onError: handleError.bind(showErrorToast),
+    onError: createErrorHandler(showErrorToast),
   })
 
   const updateMutation = useMutation({
@@ -64,9 +73,10 @@ export function CouponForm({ defaultValues, onSuccess }: CouponFormProps) {
     onSuccess: () => {
       showSuccessToast("Coupon updated successfully")
       queryClient.invalidateQueries({ queryKey: ["coupons"] })
+      form.reset()
       onSuccess()
     },
-    onError: handleError.bind(showErrorToast),
+    onError: createErrorHandler(showErrorToast),
   })
 
   const deleteMutation = useMutation({
@@ -77,7 +87,7 @@ export function CouponForm({ defaultValues, onSuccess }: CouponFormProps) {
       queryClient.invalidateQueries({ queryKey: ["coupons"] })
       navigate({ to: "/coupons" })
     },
-    onError: handleError.bind(showErrorToast),
+    onError: createErrorHandler(showErrorToast),
   })
 
   const form = useForm({
@@ -115,6 +125,8 @@ export function CouponForm({ defaultValues, onSuccess }: CouponFormProps) {
       }
     },
   })
+
+  const blocker = useUnsavedChanges(form)
 
   const isPending = createMutation.isPending || updateMutation.isPending
 
@@ -183,11 +195,7 @@ export function CouponForm({ defaultValues, onSuccess }: CouponFormProps) {
                       <p className="text-sm text-muted-foreground">
                         The code users will enter (will be uppercased)
                       </p>
-                      {field.state.meta.errors.length > 0 && (
-                        <p className="text-destructive text-sm">
-                          {field.state.meta.errors.join(", ")}
-                        </p>
-                      )}
+                      <FieldError errors={field.state.meta.errors} />
                     </div>
                   )}
                 </form.Field>
@@ -220,11 +228,7 @@ export function CouponForm({ defaultValues, onSuccess }: CouponFormProps) {
                           onChange={(e) => field.handleChange(e.target.value)}
                           disabled={readOnly}
                         />
-                        {field.state.meta.errors.length > 0 && (
-                          <p className="text-destructive text-sm">
-                            {field.state.meta.errors.join(", ")}
-                          </p>
-                        )}
+                        <FieldError errors={field.state.meta.errors} />
                       </div>
                     )}
                   </form.Field>
@@ -407,6 +411,7 @@ export function CouponForm({ defaultValues, onSuccess }: CouponFormProps) {
           resourceName={defaultValues.code}
         />
       )}
+      <UnsavedChangesDialog blocker={blocker} />
     </div>
   )
 }

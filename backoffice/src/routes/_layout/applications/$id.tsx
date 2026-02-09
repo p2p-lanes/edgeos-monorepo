@@ -5,6 +5,10 @@ import {
   ArrowLeft,
   Building,
   Calendar,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Circle,
   Mail,
   MapPin,
   MessageCircle,
@@ -16,15 +20,18 @@ import {
 import { Suspense, useState } from "react"
 
 import {
+  type ApiError,
   type ApplicationPublic,
   ApplicationReviewsService,
   ApplicationsService,
+  ApprovalStrategiesService,
   FormFieldsService,
   type ReviewDecision,
   type ReviewSummary,
 } from "@/client"
 import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
+import { StatusBadge } from "@/components/Common/StatusBadge"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -48,7 +55,7 @@ import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
-import { handleError } from "@/utils"
+import { createErrorHandler } from "@/utils"
 
 export const Route = createFileRoute("/_layout/applications/$id")({
   component: ViewApplicationPage,
@@ -82,38 +89,91 @@ function getApplicationQueryOptions(applicationId: string) {
   }
 }
 
-const getStatusBadgeVariant = (
-  status: string,
-): "default" | "secondary" | "destructive" | "outline" => {
-  switch (status) {
-    case "accepted":
-      return "default"
-    case "in review":
-      return "secondary"
-    case "rejected":
-      return "destructive"
-    default:
-      return "outline"
-  }
-}
+// Application Status Stepper
+function ApplicationStatusStepper({
+  application,
+}: {
+  application: ApplicationPublic
+}) {
+  const status = application.status
 
-const getDecisionBadgeVariant = (
-  decision: string,
-): "default" | "secondary" | "destructive" | "outline" => {
-  switch (decision) {
-    case "strong_yes":
-    case "yes":
-      return "default"
-    case "strong_no":
-    case "no":
-      return "destructive"
-    default:
-      return "outline"
-  }
-}
+  const steps = [
+    {
+      label: "Submitted",
+      date: application.submitted_at,
+      completed:
+        status === "in review" ||
+        status === "accepted" ||
+        status === "rejected",
+      active: status === "draft" || status === "in review",
+    },
+    {
+      label: "In Review",
+      date: null,
+      completed: status === "accepted" || status === "rejected",
+      active: status === "in review",
+    },
+    {
+      label: status === "rejected" ? "Rejected" : "Accepted",
+      date: application.accepted_at,
+      completed: status === "accepted" || status === "rejected",
+      active: false,
+    },
+  ]
 
-const formatDecision = (decision: string): string => {
-  return decision.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+  return (
+    <div className="flex items-center justify-between gap-2">
+      {steps.map((step, idx) => (
+        <div
+          key={step.label}
+          className="flex items-center flex-1 last:flex-none"
+        >
+          <div className="flex flex-col items-center gap-1">
+            <div
+              className={`flex h-8 w-8 items-center justify-center rounded-full border-2 ${
+                step.completed
+                  ? status === "rejected" && idx === steps.length - 1
+                    ? "border-destructive bg-destructive text-destructive-foreground"
+                    : "border-primary bg-primary text-primary-foreground"
+                  : step.active
+                    ? "border-primary text-primary"
+                    : "border-muted-foreground/30 text-muted-foreground/30"
+              }`}
+            >
+              {step.completed ? (
+                <Check className="h-4 w-4" />
+              ) : (
+                <Circle className="h-3 w-3" />
+              )}
+            </div>
+            <span
+              className={`text-xs font-medium ${
+                step.completed || step.active
+                  ? "text-foreground"
+                  : "text-muted-foreground/50"
+              }`}
+            >
+              {step.label}
+            </span>
+            {step.date && (
+              <span className="text-[10px] text-muted-foreground">
+                {new Date(step.date).toLocaleDateString()}
+              </span>
+            )}
+          </div>
+          {idx < steps.length - 1 && (
+            <div
+              className={`h-0.5 flex-1 mx-2 mt-[-20px] ${
+                steps[idx + 1].completed || steps[idx + 1].active
+                  ? "bg-primary"
+                  : "bg-muted-foreground/20"
+              }`}
+            />
+          )}
+        </div>
+      ))}
+    </div>
+  )
 }
 
 // Review Summary Component
@@ -175,9 +235,7 @@ function ReviewSummaryCard({ summary }: { summary: ReviewSummary }) {
                       </p>
                     )}
                   </div>
-                  <Badge variant={getDecisionBadgeVariant(review.decision)}>
-                    {formatDecision(review.decision)}
-                  </Badge>
+                  <StatusBadge status={review.decision} />
                 </div>
               ))}
             </div>
@@ -225,7 +283,7 @@ function SubmitReviewDialog({
       onOpenChange(false)
       onSuccess()
     },
-    onError: handleError.bind(showErrorToast),
+    onError: createErrorHandler(showErrorToast),
   })
 
   const actionVerb =
@@ -260,6 +318,142 @@ function SubmitReviewDialog({
   )
 }
 
+// Weighted Voting Card - shows all 4 voting options for weighted strategy
+function WeightedVotingCard({
+  application,
+  onSuccess,
+}: {
+  application: ApplicationPublic
+  onSuccess: () => void
+}) {
+  const { showSuccessToast, showErrorToast } = useCustomToast()
+  const [selectedDecision, setSelectedDecision] =
+    useState<ReviewDecision | null>(null)
+  const [dialogOpen, setDialogOpen] = useState(false)
+
+  const mutation = useMutation({
+    mutationFn: (decision: ReviewDecision) =>
+      ApplicationReviewsService.submitReview({
+        applicationId: application.id,
+        requestBody: { decision },
+      }),
+    onSuccess: (_, decision) => {
+      showSuccessToast(`Review submitted: ${decision.replace("_", " ")}`)
+      setDialogOpen(false)
+      setSelectedDecision(null)
+      onSuccess()
+    },
+    onError: (err) => createErrorHandler(showErrorToast)(err as ApiError),
+  })
+
+  const handleVote = (decision: ReviewDecision) => {
+    setSelectedDecision(decision)
+    setDialogOpen(true)
+  }
+
+  const getDecisionLabel = (decision: ReviewDecision) => {
+    switch (decision) {
+      case "strong_yes":
+        return "Strong Yes"
+      case "yes":
+        return "Yes"
+      case "no":
+        return "No"
+      case "strong_no":
+        return "Strong No"
+      default:
+        return decision
+    }
+  }
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Cast Your Vote</CardTitle>
+          <CardDescription>
+            Weighted voting - your vote contributes to the final score
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              variant="outline"
+              className="w-full border-green-600 text-green-600 hover:bg-green-50 hover:text-green-700"
+              onClick={() => handleVote("strong_yes")}
+            >
+              <ChevronUp className="mr-1 h-4 w-4" />
+              <ChevronUp className="-ml-3 h-4 w-4" />
+              Strong Yes
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full border-green-500 text-green-500 hover:bg-green-50 hover:text-green-600"
+              onClick={() => handleVote("yes")}
+            >
+              <ThumbsUp className="mr-2 h-4 w-4" />
+              Yes
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full border-red-500 text-red-500 hover:bg-red-50 hover:text-red-600"
+              onClick={() => handleVote("no")}
+            >
+              <ThumbsDown className="mr-2 h-4 w-4" />
+              No
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full border-red-600 text-red-600 hover:bg-red-50 hover:text-red-700"
+              onClick={() => handleVote("strong_no")}
+            >
+              <ChevronDown className="mr-1 h-4 w-4" />
+              <ChevronDown className="-ml-3 h-4 w-4" />
+              Strong No
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              Confirm Vote:{" "}
+              {selectedDecision && getDecisionLabel(selectedDecision)}
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to vote "
+              {selectedDecision && getDecisionLabel(selectedDecision)}" for the
+              application from "{application.human?.first_name}{" "}
+              {application.human?.last_name}"? This will submit your review and
+              may update the application status.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
+            <LoadingButton
+              variant={
+                selectedDecision === "no" || selectedDecision === "strong_no"
+                  ? "destructive"
+                  : "default"
+              }
+              loading={mutation.isPending}
+              onClick={() =>
+                selectedDecision && mutation.mutate(selectedDecision)
+              }
+            >
+              Submit Vote
+            </LoadingButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
+
 function ViewApplicationContent({ applicationId }: { applicationId: string }) {
   const navigate = useNavigate()
   const { isAdmin } = useAuth()
@@ -291,6 +485,18 @@ function ViewApplicationContent({ applicationId }: { applicationId: string }) {
     enabled: application.status !== "draft",
   })
 
+  // Fetch approval strategy to determine voting UI
+  const { data: approvalStrategy } = useQuery({
+    queryKey: ["approval-strategy", application.popup_id],
+    queryFn: () =>
+      ApprovalStrategiesService.getApprovalStrategy({
+        popupId: application.popup_id,
+      }),
+    retry: false,
+  })
+
+  const isWeightedVoting = approvalStrategy?.strategy_type === "weighted"
+
   const getFieldLabel = (fieldName: string): string => {
     if (schema?.custom_fields?.[fieldName]?.label) {
       return schema.custom_fields[fieldName].label
@@ -320,6 +526,43 @@ function ViewApplicationContent({ applicationId }: { applicationId: string }) {
     return String(value)
   }
 
+  // Group custom fields by section using schema info
+  const getCustomFieldsBySection = () => {
+    if (
+      !application.custom_fields ||
+      Object.keys(application.custom_fields).length === 0
+    ) {
+      return {
+        unsectioned: [] as [string, unknown][],
+        sectioned: {} as Record<string, [string, unknown][]>,
+      }
+    }
+    const entries = Object.entries(application.custom_fields)
+    const sorted = schema?.custom_fields
+      ? entries.sort(([a], [b]) => {
+          const posA = schema.custom_fields[a]?.position ?? 0
+          const posB = schema.custom_fields[b]?.position ?? 0
+          return posA - posB
+        })
+      : entries
+    const unsectioned: [string, unknown][] = []
+    const sectioned: Record<string, [string, unknown][]> = {}
+    for (const [key, value] of sorted) {
+      const section = schema?.custom_fields?.[key]?.section
+      if (section) {
+        if (!sectioned[section]) sectioned[section] = []
+        sectioned[section].push([key, value])
+      } else {
+        unsectioned.push([key, value])
+      }
+    }
+    return { unsectioned, sectioned }
+  }
+  const {
+    unsectioned: unsectionedCustomFields,
+    sectioned: sectionedCustomFields,
+  } = getCustomFieldsBySection()
+
   const canReview = isAdmin && application.status === "in review"
 
   const handleReviewSuccess = () => {
@@ -329,6 +572,13 @@ function ViewApplicationContent({ applicationId }: { applicationId: string }) {
 
   return (
     <div className="space-y-6">
+      {application.status !== "draft" && (
+        <Card>
+          <CardContent className="pt-6">
+            <ApplicationStatusStepper application={application} />
+          </CardContent>
+        </Card>
+      )}
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Left Column - Main Content */}
         <div className="space-y-6 lg:col-span-2">
@@ -358,9 +608,7 @@ function ViewApplicationContent({ applicationId }: { applicationId: string }) {
                       Flagged
                     </Badge>
                   )}
-                  <Badge variant={getStatusBadgeVariant(application.status)}>
-                    {application.status}
-                  </Badge>
+                  <StatusBadge status={application.status} />
                 </div>
               </div>
             </CardHeader>
@@ -430,38 +678,44 @@ function ViewApplicationContent({ applicationId }: { applicationId: string }) {
                     <p className="font-medium">{application.referral}</p>
                   </div>
                 )}
+                {unsectionedCustomFields.length > 0 &&
+                  unsectionedCustomFields.map(([key, value]) => (
+                    <div key={key}>
+                      <p className="text-sm text-muted-foreground">
+                        {getFieldLabel(key)}
+                      </p>
+                      <p className="font-medium">
+                        {formatFieldValue(key, value)}
+                      </p>
+                    </div>
+                  ))}
               </div>
             </CardContent>
           </Card>
 
-          {/* Custom Fields */}
-          {application.custom_fields &&
-            Object.keys(application.custom_fields).length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Custom Fields</CardTitle>
-                  <CardDescription>
-                    Additional information provided by the applicant
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    {Object.entries(application.custom_fields).map(
-                      ([key, value]) => (
-                        <div key={key}>
-                          <p className="text-sm text-muted-foreground">
-                            {getFieldLabel(key)}
-                          </p>
-                          <p className="font-medium">
-                            {formatFieldValue(key, value)}
-                          </p>
-                        </div>
-                      ),
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+          {Object.entries(sectionedCustomFields).map(([section, fields]) => (
+            <Card key={section}>
+              <CardHeader>
+                <CardTitle className="text-base capitalize">
+                  {section}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {fields.map(([key, value]) => (
+                    <div key={key}>
+                      <p className="text-sm text-muted-foreground">
+                        {getFieldLabel(key)}
+                      </p>
+                      <p className="font-medium">
+                        {formatFieldValue(key, value)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
 
           {/* Attendees */}
           {application.attendees && application.attendees.length > 0 && (
@@ -503,32 +757,38 @@ function ViewApplicationContent({ applicationId }: { applicationId: string }) {
 
         {/* Right Column - Status & Actions */}
         <div className="space-y-6">
-          {/* Review Actions */}
-          {canReview && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Review Actions</CardTitle>
-                <CardDescription>Submit your review decision</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Button
-                  className="w-full"
-                  onClick={() => setApproveDialogOpen(true)}
-                >
-                  <ThumbsUp className="mr-2 h-4 w-4" />
-                  Approve
-                </Button>
-                <Button
-                  variant="destructive"
-                  className="w-full"
-                  onClick={() => setRejectDialogOpen(true)}
-                >
-                  <ThumbsDown className="mr-2 h-4 w-4" />
-                  Reject
-                </Button>
-              </CardContent>
-            </Card>
-          )}
+          {/* Review Actions - show weighted voting or simple approve/reject */}
+          {canReview &&
+            (isWeightedVoting ? (
+              <WeightedVotingCard
+                application={application}
+                onSuccess={handleReviewSuccess}
+              />
+            ) : (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Review Actions</CardTitle>
+                  <CardDescription>Submit your review decision</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Button
+                    className="w-full"
+                    onClick={() => setApproveDialogOpen(true)}
+                  >
+                    <ThumbsUp className="mr-2 h-4 w-4" />
+                    Approve
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    className="w-full"
+                    onClick={() => setRejectDialogOpen(true)}
+                  >
+                    <ThumbsDown className="mr-2 h-4 w-4" />
+                    Reject
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
 
           {/* Review Summary */}
           {application.status !== "draft" && reviewSummary && (

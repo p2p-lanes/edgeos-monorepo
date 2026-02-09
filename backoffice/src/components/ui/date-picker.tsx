@@ -19,6 +19,7 @@ interface DatePickerProps {
   placeholder?: string
   className?: string
   id?: string
+  defaultMonth?: Date
 }
 
 /**
@@ -32,6 +33,7 @@ export function DatePicker({
   placeholder = "Pick a date",
   className,
   id,
+  defaultMonth,
 }: DatePickerProps) {
   // Parse YYYY-MM-DD or ISO string to Date object
   const parseDate = (val: string): Date | undefined => {
@@ -72,8 +74,10 @@ export function DatePicker({
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">
         <Calendar
+          key={defaultMonth?.getTime()}
           mode="single"
           selected={date}
+          defaultMonth={date ?? defaultMonth}
           onSelect={(newDate) => onChange(formatDate(newDate))}
           initialFocus
         />

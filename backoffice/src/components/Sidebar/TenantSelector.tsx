@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
 import { Building2 } from "lucide-react"
-import { useEffect } from "react"
 
 import { TenantsService } from "@/client"
 import { Label } from "@/components/ui/label"
@@ -25,13 +24,6 @@ export function TenantSelector() {
     queryKey: ["tenants"],
     queryFn: () => TenantsService.listTenants({ skip: 0, limit: 100 }),
   })
-
-  // Auto-select first tenant if none selected
-  useEffect(() => {
-    if (!selectedTenantId && tenants?.results?.length) {
-      setSelectedTenantId(tenants.results[0].id)
-    }
-  }, [tenants, selectedTenantId, setSelectedTenantId])
 
   if (isLoading) {
     return (

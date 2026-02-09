@@ -16,7 +16,7 @@ import {
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import { LoadingButton } from "@/components/ui/loading-button"
 import useCustomToast from "@/hooks/useCustomToast"
-import { handleError } from "@/utils"
+import { createErrorHandler } from "@/utils"
 
 interface DeleteUserProps {
   id: string
@@ -39,7 +39,7 @@ const DeleteUser = ({ id, onSuccess }: DeleteUserProps) => {
       setIsOpen(false)
       onSuccess()
     },
-    onError: handleError.bind(showErrorToast),
+    onError: createErrorHandler(showErrorToast),
     onSettled: () => {
       queryClient.invalidateQueries()
     },

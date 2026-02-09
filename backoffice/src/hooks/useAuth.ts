@@ -8,7 +8,7 @@ import {
   UsersService,
   type UserVerify,
 } from "@/client"
-import { handleError } from "@/utils"
+import { createErrorHandler } from "@/utils"
 import useCustomToast from "./useCustomToast"
 
 const isLoggedIn = () => {
@@ -58,7 +58,7 @@ const useAuth = () => {
     onSuccess: (response) => {
       showSuccessToast(`Verification code sent to ${response.email}`)
     },
-    onError: handleError.bind(showErrorToast),
+    onError: createErrorHandler(showErrorToast),
   })
 
   // Step 2: Verify code and get token
@@ -72,7 +72,7 @@ const useAuth = () => {
       queryClient.invalidateQueries({ queryKey: ["currentUser"] })
       navigate({ to: "/" })
     },
-    onError: handleError.bind(showErrorToast),
+    onError: createErrorHandler(showErrorToast),
   })
 
   const logout = () => {

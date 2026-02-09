@@ -1,17 +1,27 @@
 import { useQuery } from "@tanstack/react-query"
 import { createFileRoute, Link } from "@tanstack/react-router"
 import {
+  AlertTriangle,
+  ArrowRight,
   CheckCircle,
   Clock,
   CreditCard,
   DollarSign,
   FileText,
+  ListChecks,
   TrendingUp,
   Users,
   XCircle,
 } from "lucide-react"
 
-import { DashboardService } from "@/client"
+import {
+  type ApplicationPublic,
+  ApplicationReviewsService,
+  DashboardService,
+  type PaymentPublic,
+  PaymentsService,
+} from "@/client"
+import { StatusBadge } from "@/components/Common/StatusBadge"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import {
   Card,
@@ -142,6 +152,17 @@ function Dashboard() {
           </p>
         </div>
       </div>
+
+      {/* Needs Attention */}
+      {isContextReady && isAdmin && (
+        <NeedsAttention
+          inReview={applications?.in_review ?? 0}
+          pendingPayments={payments?.pending ?? 0}
+          selectedPopupId={selectedPopupId}
+          isSuperadmin={isSuperadmin}
+          selectedTenantId={selectedTenantId}
+        />
+      )}
 
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -366,6 +387,15 @@ function Dashboard() {
         </Card>
       </div>
 
+      {/* Recent Activity */}
+      {isContextReady && isAdmin && selectedPopupId && (
+        <RecentActivity
+          selectedPopupId={selectedPopupId}
+          isSuperadmin={isSuperadmin}
+          selectedTenantId={selectedTenantId}
+        />
+      )}
+
       {/* Quick Actions for Admins */}
       {isAdmin && (
         <div>
@@ -395,6 +425,207 @@ function Dashboard() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function NeedsAttention({
+  inReview,
+  pendingPayments,
+  selectedPopupId,
+  isSuperadmin,
+  selectedTenantId,
+}: {
+  inReview: number
+  pendingPayments: number
+  selectedPopupId: string | null
+  isSuperadmin: boolean
+  selectedTenantId: string | null | undefined
+}) {
+  const { data: pendingReviews } = useQuery({
+    queryKey: ["pending-reviews-count", selectedPopupId],
+    queryFn: () =>
+      ApplicationReviewsService.listPendingReviews({
+        popupId: selectedPopupId || undefined,
+        skip: 0,
+        limit: 1,
+        xTenantId: isSuperadmin ? selectedTenantId : undefined,
+      }),
+    enabled: !!selectedPopupId,
+  })
+
+  const myPendingCount = pendingReviews?.paging?.total ?? 0
+  const items = [
+    {
+      show: myPendingCount > 0,
+      icon: ListChecks,
+      label: `${myPendingCount} application${myPendingCount !== 1 ? "s" : ""} awaiting your review`,
+      href: "/applications/review-queue",
+      variant: "warning" as const,
+    },
+    {
+      show: inReview > 0 && inReview !== myPendingCount,
+      icon: Clock,
+      label: `${inReview} application${inReview !== 1 ? "s" : ""} in review`,
+      href: "/applications",
+      variant: "default" as const,
+    },
+    {
+      show: pendingPayments > 0,
+      icon: CreditCard,
+      label: `${pendingPayments} pending payment${pendingPayments !== 1 ? "s" : ""} to approve`,
+      href: "/payments",
+      variant: "warning" as const,
+    },
+  ].filter((item) => item.show)
+
+  if (items.length === 0) return null
+
+  return (
+    <div>
+      <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
+        <AlertTriangle className="h-4 w-4 text-yellow-500" />
+        Needs Attention
+      </h2>
+      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+        {items.map((item) => (
+          <Link key={item.href} to={item.href}>
+            <Card className="transition-colors hover:bg-muted/50 cursor-pointer">
+              <CardContent className="flex items-center gap-3 p-4">
+                <item.icon
+                  className={`h-5 w-5 shrink-0 ${item.variant === "warning" ? "text-yellow-500" : "text-muted-foreground"}`}
+                />
+                <span className="text-sm font-medium flex-1">{item.label}</span>
+                <ArrowRight className="h-4 w-4 text-muted-foreground" />
+              </CardContent>
+            </Card>
+          </Link>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function RecentActivity({
+  selectedPopupId,
+  isSuperadmin,
+  selectedTenantId,
+}: {
+  selectedPopupId: string
+  isSuperadmin: boolean
+  selectedTenantId: string | null | undefined
+}) {
+  const tenantHeader = isSuperadmin ? selectedTenantId : undefined
+
+  const { data: recentApps } = useQuery({
+    queryKey: ["recent-applications", selectedPopupId],
+    queryFn: () =>
+      ApplicationReviewsService.listPendingReviews({
+        popupId: selectedPopupId,
+        skip: 0,
+        limit: 5,
+        xTenantId: tenantHeader,
+      }),
+  })
+
+  const { data: recentPayments } = useQuery({
+    queryKey: ["recent-payments", selectedPopupId],
+    queryFn: () =>
+      PaymentsService.listPayments({
+        popupId: selectedPopupId,
+        skip: 0,
+        limit: 5,
+        xTenantId: tenantHeader,
+      }),
+  })
+
+  const apps = (recentApps?.results ?? []) as unknown as ApplicationPublic[]
+  const payments = (recentPayments?.results ?? []) as PaymentPublic[]
+
+  if (apps.length === 0 && payments.length === 0) return null
+
+  return (
+    <div>
+      <h2 className="text-lg font-semibold mb-3">Recent Activity</h2>
+      <div className="grid gap-4 md:grid-cols-2">
+        {apps.length > 0 && (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Pending Applications
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {apps.map((app) => (
+                <Link
+                  key={app.id}
+                  to="/applications/$id"
+                  params={{ id: app.id }}
+                  className="flex items-center justify-between rounded-md border p-2.5 hover:bg-muted/50 transition-colors"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium truncate">
+                      {app.human?.first_name} {app.human?.last_name}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {app.human?.email}
+                    </p>
+                  </div>
+                  <StatusBadge status={app.status} className="ml-2 shrink-0" />
+                </Link>
+              ))}
+              {(recentApps?.paging?.total ?? 0) > 5 && (
+                <Link
+                  to="/applications/review-queue"
+                  className="text-xs text-primary hover:underline flex items-center gap-1 pt-1"
+                >
+                  View all {recentApps?.paging?.total} pending
+                  <ArrowRight className="h-3 w-3" />
+                </Link>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {payments.length > 0 && (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <CreditCard className="h-4 w-4" />
+                Recent Payments
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {payments.map((payment) => (
+                <div
+                  key={payment.id}
+                  className="flex items-center justify-between rounded-md border p-2.5"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium font-mono">
+                      ${payment.amount} {payment.currency}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {payment.source || "—"}
+                      {payment.created_at && (
+                        <>
+                          {" "}
+                          • {new Date(payment.created_at).toLocaleDateString()}
+                        </>
+                      )}
+                    </p>
+                  </div>
+                  <StatusBadge
+                    status={payment.status ?? ""}
+                    className="ml-2 shrink-0"
+                  />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   )
 }

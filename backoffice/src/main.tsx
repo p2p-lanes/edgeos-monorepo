@@ -40,6 +40,11 @@ const handleApiError = (error: Error) => {
   // Let the UI handle showing the tenant selector
 }
 const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30 * 1000,
+    },
+  },
   queryCache: new QueryCache({
     onError: handleApiError,
   }),

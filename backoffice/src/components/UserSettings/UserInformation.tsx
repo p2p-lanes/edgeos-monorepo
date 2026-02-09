@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label"
 import { LoadingButton } from "@/components/ui/loading-button"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
-import { handleError } from "@/utils"
+import { createErrorHandler } from "@/utils"
 
 const UserInformation = () => {
   const { user: currentUser } = useAuth()
@@ -29,7 +29,7 @@ const UserInformation = () => {
       showSuccessToast("Profile updated successfully")
       queryClient.invalidateQueries({ queryKey: ["currentUser"] })
     },
-    onError: handleError.bind(showErrorToast),
+    onError: createErrorHandler(showErrorToast),
   })
 
   const form = useForm({

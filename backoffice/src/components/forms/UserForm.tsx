@@ -3,7 +3,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import { Crown, Shield, User } from "lucide-react"
 import { z } from "zod"
-
 import {
   type UserCreate,
   type UserPublic,
@@ -12,6 +11,7 @@ import {
   type UserUpdate,
 } from "@/client"
 import { DangerZone } from "@/components/Common/DangerZone"
+import { FieldError } from "@/components/Common/FieldError"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -35,7 +35,11 @@ import { Separator } from "@/components/ui/separator"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
-import { handleError } from "@/utils"
+import {
+  UnsavedChangesDialog,
+  useUnsavedChanges,
+} from "@/hooks/useUnsavedChanges"
+import { createErrorHandler } from "@/utils"
 
 const emailSchema = z.string().email({ message: "Invalid email address" })
 const roleSchema = z.enum(["superadmin", "admin", "viewer"] as const)
@@ -93,9 +97,10 @@ export function UserForm({ defaultValues, onSuccess }: UserFormProps) {
         "User created successfully. They can now log in with their email.",
       )
       queryClient.invalidateQueries({ queryKey: ["users"] })
+      form.reset()
       onSuccess()
     },
-    onError: handleError.bind(showErrorToast),
+    onError: createErrorHandler(showErrorToast),
   })
 
   const updateMutation = useMutation({
@@ -107,9 +112,10 @@ export function UserForm({ defaultValues, onSuccess }: UserFormProps) {
     onSuccess: () => {
       showSuccessToast("User updated successfully")
       queryClient.invalidateQueries({ queryKey: ["users"] })
+      form.reset()
       onSuccess()
     },
-    onError: handleError.bind(showErrorToast),
+    onError: createErrorHandler(showErrorToast),
   })
 
   const deleteMutation = useMutation({
@@ -119,7 +125,7 @@ export function UserForm({ defaultValues, onSuccess }: UserFormProps) {
       queryClient.invalidateQueries({ queryKey: ["users"] })
       navigate({ to: "/admin" })
     },
-    onError: handleError.bind(showErrorToast),
+    onError: createErrorHandler(showErrorToast),
   })
 
   const form = useForm({
@@ -146,6 +152,8 @@ export function UserForm({ defaultValues, onSuccess }: UserFormProps) {
       }
     },
   })
+
+  const blocker = useUnsavedChanges(form)
 
   const isPending = createMutation.isPending || updateMutation.isPending
 
@@ -202,11 +210,7 @@ export function UserForm({ defaultValues, onSuccess }: UserFormProps) {
                           onBlur={field.handleBlur}
                           onChange={(e) => field.handleChange(e.target.value)}
                         />
-                        {field.state.meta.errors.length > 0 && (
-                          <p className="text-destructive text-sm">
-                            {field.state.meta.errors.join(", ")}
-                          </p>
-                        )}
+                        <FieldError errors={field.state.meta.errors} />
                       </div>
                     )}
                   </form.Field>
@@ -277,11 +281,7 @@ export function UserForm({ defaultValues, onSuccess }: UserFormProps) {
                           You cannot change your own role
                         </p>
                       )}
-                      {field.state.meta.errors.length > 0 && (
-                        <p className="text-destructive text-sm">
-                          {field.state.meta.errors.join(", ")}
-                        </p>
-                      )}
+                      <FieldError errors={field.state.meta.errors} />
                     </div>
                   )}
                 </form.Field>
@@ -404,6 +404,7 @@ export function UserForm({ defaultValues, onSuccess }: UserFormProps) {
           resourceName={defaultValues.email}
         />
       )}
+      <UnsavedChangesDialog blocker={blocker} />
     </div>
   )
 }

@@ -1,11 +1,19 @@
 import { useSuspenseQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
-import { Copy, EllipsisVertical, Eye, QrCode } from "lucide-react"
+import {
+  Copy,
+  Download,
+  EllipsisVertical,
+  Eye,
+  QrCode,
+  Users,
+} from "lucide-react"
 import { Suspense, useState } from "react"
 
 import { type AttendeePublic, AttendeesService } from "@/client"
-import { DataTable } from "@/components/Common/DataTable"
+import { DataTable, SortableHeader } from "@/components/Common/DataTable"
+import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { Badge } from "@/components/ui/badge"
@@ -27,34 +35,45 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
+import { useCopyToClipboard } from "@/hooks/useCopyToClipboard"
 import useCustomToast from "@/hooks/useCustomToast"
+import {
+  useTableSearchParams,
+  validateTableSearch,
+} from "@/hooks/useTableSearchParams"
+import { exportToCsv } from "@/lib/export"
 
-function getAttendeesQueryOptions(popupId: string | null) {
+function getAttendeesQueryOptions(
+  popupId: string | null,
+  page: number,
+  pageSize: number,
+) {
   return {
     queryFn: () =>
       AttendeesService.listAttendees({
-        skip: 0,
-        limit: 100,
+        skip: page * pageSize,
+        limit: pageSize,
         popupId: popupId || undefined,
       }),
-    queryKey: ["attendees", popupId],
+    queryKey: ["attendees", popupId, { page, pageSize }],
   }
 }
 
 export const Route = createFileRoute("/_layout/attendees")({
   component: Attendees,
+  validateSearch: validateTableSearch,
   head: () => ({
     meta: [{ title: "Attendees - EdgeOS" }],
   }),
 })
 
-// View Attendee Dialog
 function ViewAttendee({ attendee }: { attendee: AttendeePublic }) {
   const [isOpen, setIsOpen] = useState(false)
+  const [, copy] = useCopyToClipboard()
   const { showSuccessToast } = useCustomToast()
 
   const copyToClipboard = (text: string, label: string) => {
-    navigator.clipboard.writeText(text)
+    copy(text)
     showSuccessToast(`${label} copied to clipboard`)
   }
 
@@ -109,6 +128,7 @@ function ViewAttendee({ attendee }: { attendee: AttendeePublic }) {
               <Button
                 variant="outline"
                 size="icon"
+                aria-label="Copy check-in code"
                 onClick={() =>
                   copyToClipboard(attendee.check_in_code, "Check-in code")
                 }
@@ -140,8 +160,8 @@ function ViewAttendee({ attendee }: { attendee: AttendeePublic }) {
                 Products
               </p>
               <div className="flex flex-wrap gap-2">
-                {attendee.products.map((product, idx) => (
-                  <Badge key={idx} variant="secondary">
+                {attendee.products.map((product) => (
+                  <Badge key={String(product)} variant="secondary">
                     {String(product)}
                   </Badge>
                 ))}
@@ -172,13 +192,13 @@ function ViewAttendee({ attendee }: { attendee: AttendeePublic }) {
   )
 }
 
-// Actions Menu
 function AttendeeActionsMenu({ attendee }: { attendee: AttendeePublic }) {
   const [open, setOpen] = useState(false)
+  const [, copy] = useCopyToClipboard()
   const { showSuccessToast } = useCustomToast()
 
   const copyCheckInCode = () => {
-    navigator.clipboard.writeText(attendee.check_in_code)
+    copy(attendee.check_in_code)
     showSuccessToast("Check-in code copied")
     setOpen(false)
   }
@@ -204,12 +224,12 @@ function AttendeeActionsMenu({ attendee }: { attendee: AttendeePublic }) {
 const columns: ColumnDef<AttendeePublic>[] = [
   {
     accessorKey: "name",
-    header: "Name",
+    header: ({ column }) => <SortableHeader label="Name" column={column} />,
     cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
   },
   {
     accessorKey: "email",
-    header: "Email",
+    header: ({ column }) => <SortableHeader label="Email" column={column} />,
     cell: ({ row }) => (
       <span className="text-muted-foreground">
         {row.original.email || "N/A"}
@@ -250,14 +270,88 @@ const columns: ColumnDef<AttendeePublic>[] = [
 
 function AttendeesTableContent() {
   const { selectedPopupId } = useWorkspace()
-  const { data: attendees } = useSuspenseQuery(
-    getAttendeesQueryOptions(selectedPopupId),
+  const searchParams = Route.useSearch()
+  const { search, pagination, setSearch, setPagination } = useTableSearchParams(
+    searchParams,
+    "/attendees",
   )
-  return <DataTable columns={columns} data={attendees.results} />
+
+  const { data: attendees } = useSuspenseQuery(
+    getAttendeesQueryOptions(
+      selectedPopupId,
+      pagination.pageIndex,
+      pagination.pageSize,
+    ),
+  )
+
+  const filtered = search
+    ? attendees.results.filter((a) => {
+        const term = search.toLowerCase()
+        return (
+          (a.name ?? "").toLowerCase().includes(term) ||
+          (a.email ?? "").toLowerCase().includes(term) ||
+          (a.check_in_code ?? "").toLowerCase().includes(term)
+        )
+      })
+    : attendees.results
+
+  return (
+    <DataTable
+      columns={columns}
+      data={filtered}
+      searchPlaceholder="Search by name, email, or check-in code..."
+      hiddenOnMobile={["check_in_code", "gender", "category"]}
+      searchValue={search}
+      onSearchChange={setSearch}
+      serverPagination={{
+        total: search ? filtered.length : attendees.paging.total,
+        pagination: search
+          ? { pageIndex: 0, pageSize: attendees.paging.total }
+          : pagination,
+        onPaginationChange: setPagination,
+      }}
+      emptyState={
+        !search ? (
+          <EmptyState
+            icon={Users}
+            title="No attendees yet"
+            description="Attendees will appear here once applications are approved and check-ins begin."
+          />
+        ) : undefined
+      }
+    />
+  )
 }
 
 function Attendees() {
   const { isContextReady } = useWorkspace()
+  const { selectedPopupId } = useWorkspace()
+  const [isExporting, setIsExporting] = useState(false)
+
+  const handleExport = async () => {
+    if (!selectedPopupId) return
+    setIsExporting(true)
+    try {
+      const data = await AttendeesService.listAttendees({
+        skip: 0,
+        limit: 10000,
+        popupId: selectedPopupId,
+      })
+      exportToCsv(
+        "attendees",
+        data.results as unknown as Record<string, unknown>[],
+        [
+          { key: "name", label: "Name" },
+          { key: "email", label: "Email" },
+          { key: "category", label: "Category" },
+          { key: "check_in_code", label: "Check-in Code" },
+          { key: "gender", label: "Gender" },
+        ],
+      )
+    } finally {
+      setIsExporting(false)
+    }
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -268,6 +362,16 @@ function Attendees() {
             Manage event attendees and check-ins
           </p>
         </div>
+        {isContextReady && (
+          <Button
+            variant="outline"
+            onClick={handleExport}
+            disabled={isExporting}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            {isExporting ? "Exporting..." : "Export CSV"}
+          </Button>
+        )}
       </div>
       {!isContextReady ? (
         <WorkspaceAlert resource="attendees" />

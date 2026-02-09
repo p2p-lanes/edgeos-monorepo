@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query"
 import {
   Building2,
   Calendar,
@@ -11,7 +12,9 @@ import {
   Users,
   UsersRound,
 } from "lucide-react"
+import { useMemo } from "react"
 
+import { ApplicationReviewsService, PaymentsService } from "@/client"
 import { SidebarAppearance } from "@/components/Common/Appearance"
 import { Logo } from "@/components/Common/Logo"
 import { Separator } from "@/components/ui/separator"
@@ -23,6 +26,7 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
 } from "@/components/ui/sidebar"
+import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
 import { type Item, Main } from "./Main"
 import { User as UserComponent } from "./User"
@@ -52,14 +56,6 @@ const popupItems: Item[] = [
   { icon: FormInput, title: "Form Builder", path: "/form-builder" },
 ]
 
-// Registration/attendee items
-const registrationItems: Item[] = [
-  { icon: FileText, title: "Applications", path: "/applications" },
-  { icon: Users, title: "Attendees", path: "/attendees" },
-  { icon: User, title: "Humans", path: "/humans" },
-  { icon: CreditCard, title: "Payments", path: "/payments" },
-]
-
 // Admin items (admins and superadmins)
 const adminItems: Item[] = [{ icon: Users, title: "Users", path: "/admin" }]
 
@@ -70,6 +66,55 @@ const superadminItems: Item[] = [
 
 export function AppSidebar() {
   const { user: currentUser, isAdmin, isSuperadmin } = useAuth()
+  const { isContextReady, selectedPopupId } = useWorkspace()
+
+  const { data: pendingReviews } = useQuery({
+    queryKey: ["pending-reviews-count", selectedPopupId],
+    queryFn: () =>
+      ApplicationReviewsService.listPendingReviews({
+        popupId: selectedPopupId!,
+        limit: 1,
+      }),
+    enabled: isContextReady && isAdmin,
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+  })
+
+  const { data: pendingPayments } = useQuery({
+    queryKey: ["pending-payments-count", selectedPopupId],
+    queryFn: () =>
+      PaymentsService.listPayments({
+        popupId: selectedPopupId!,
+        paymentStatus: "pending",
+        limit: 1,
+      }),
+    enabled: isContextReady && isAdmin,
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+  })
+
+  const pendingReviewCount = pendingReviews?.paging?.total ?? 0
+  const pendingPaymentCount = pendingPayments?.paging?.total ?? 0
+
+  const registrationItemsWithBadges: Item[] = useMemo(
+    () => [
+      {
+        icon: FileText,
+        title: "Applications",
+        path: "/applications",
+        badge: pendingReviewCount,
+      },
+      { icon: Users, title: "Attendees", path: "/attendees" },
+      { icon: User, title: "Humans", path: "/humans" },
+      {
+        icon: CreditCard,
+        title: "Payments",
+        path: "/payments",
+        badge: pendingPaymentCount,
+      },
+    ],
+    [pendingReviewCount, pendingPaymentCount],
+  )
 
   // For admins (non-superadmin), get their tenant-specific items
   const adminNavigationItems =
@@ -99,7 +144,7 @@ export function AppSidebar() {
         {/* Registration section */}
         <SidebarGroup>
           <SidebarGroupLabel>Registrations</SidebarGroupLabel>
-          <Main items={registrationItems} />
+          <Main items={registrationItemsWithBadges} />
         </SidebarGroup>
 
         {/* Admin section (visible to admins+) */}

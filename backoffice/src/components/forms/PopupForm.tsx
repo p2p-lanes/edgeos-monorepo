@@ -1,5 +1,5 @@
 import { useForm } from "@tanstack/react-form"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import {
   Baby,
@@ -12,14 +12,16 @@ import {
   Ticket,
   X,
 } from "lucide-react"
-
 import {
+  ApprovalStrategiesService,
   type PopupCreate,
   type PopupPublic,
   PopupsService,
   type PopupUpdate,
 } from "@/client"
 import { DangerZone } from "@/components/Common/DangerZone"
+import { FieldError } from "@/components/Common/FieldError"
+import { FormErrorSummary } from "@/components/Common/FormErrorSummary"
 import { ApprovalStrategyForm } from "@/components/forms/ApprovalStrategyForm"
 import { ReviewersManager } from "@/components/forms/ReviewersManager"
 import { Badge } from "@/components/ui/badge"
@@ -47,7 +49,11 @@ import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
-import { handleError } from "@/utils"
+import {
+  UnsavedChangesDialog,
+  useUnsavedChanges,
+} from "@/hooks/useUnsavedChanges"
+import { createErrorHandler } from "@/utils"
 
 interface PopupFormProps {
   defaultValues?: PopupPublic
@@ -70,12 +76,17 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
   const createMutation = useMutation({
     mutationFn: (data: PopupCreate) =>
       PopupsService.createPopup({ requestBody: data }),
-    onSuccess: () => {
-      showSuccessToast("Popup created successfully")
+    onSuccess: (data) => {
+      showSuccessToast("Popup created successfully", {
+        label: "View",
+        onClick: () =>
+          navigate({ to: "/popups/$id/edit", params: { id: data.id } }),
+      })
       queryClient.invalidateQueries({ queryKey: ["popups"] })
+      form.reset()
       onSuccess()
     },
-    onError: handleError.bind(showErrorToast),
+    onError: createErrorHandler(showErrorToast),
   })
 
   const updateMutation = useMutation({
@@ -87,9 +98,10 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
     onSuccess: () => {
       showSuccessToast("Popup updated successfully")
       queryClient.invalidateQueries({ queryKey: ["popups"] })
+      form.reset()
       onSuccess()
     },
-    onError: handleError.bind(showErrorToast),
+    onError: createErrorHandler(showErrorToast),
   })
 
   const deleteMutation = useMutation({
@@ -99,7 +111,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
       queryClient.invalidateQueries({ queryKey: ["popups"] })
       navigate({ to: "/popups" })
     },
-    onError: handleError.bind(showErrorToast),
+    onError: createErrorHandler(showErrorToast),
   })
 
   const formatDateForInput = (date: string | null | undefined) => {
@@ -166,6 +178,8 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
     },
   })
 
+  const blocker = useUnsavedChanges(form)
+
   const isPending = createMutation.isPending || updateMutation.isPending
 
   return (
@@ -180,6 +194,15 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         }}
         className="space-y-6"
       >
+        <FormErrorSummary
+          form={form}
+          fieldLabels={{
+            name: "Popup Name",
+            slug: "Slug",
+            start_date: "Start Date",
+            end_date: "End Date",
+          }}
+        />
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Left Column - Form Fields */}
           <div className="space-y-6 lg:col-span-2">
@@ -225,11 +248,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                         onChange={(e) => field.handleChange(e.target.value)}
                         disabled={readOnly}
                       />
-                      {field.state.meta.errors.length > 0 && (
-                        <p className="text-destructive text-sm">
-                          {field.state.meta.errors.join(", ")}
-                        </p>
-                      )}
+                      <FieldError errors={field.state.meta.errors} />
                     </div>
                   )}
                 </form.Field>
@@ -287,50 +306,58 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                           disabled={readOnly}
                           placeholder="Select start date"
                         />
-                        {field.state.meta.errors.length > 0 && (
-                          <p className="text-destructive text-sm">
-                            {field.state.meta.errors.join(", ")}
-                          </p>
-                        )}
+                        <FieldError errors={field.state.meta.errors} />
                       </div>
                     )}
                   </form.Field>
 
-                  <form.Field
-                    name="end_date"
-                    validators={{
-                      onChange: ({ value, fieldApi }) => {
-                        if (readOnly || !value) return undefined
-                        const startDateValue =
-                          fieldApi.form.getFieldValue("start_date")
-                        if (!startDateValue) return undefined
-                        const startDate = new Date(startDateValue)
-                        const endDate = new Date(value)
-                        if (endDate < startDate) {
-                          return "End date cannot be before start date"
-                        }
-                        return undefined
-                      },
+                  <form.Subscribe selector={(state) => state.values.start_date}>
+                    {(startDate) => {
+                      const startDateAsDate = startDate
+                        ? (() => {
+                            const [y, m, d] = startDate
+                              .slice(0, 10)
+                              .split("-")
+                              .map(Number)
+                            return new Date(y, m - 1, d)
+                          })()
+                        : undefined
+                      return (
+                        <form.Field
+                          name="end_date"
+                          validators={{
+                            onChange: ({ value, fieldApi }) => {
+                              if (readOnly || !value) return undefined
+                              const startDateValue =
+                                fieldApi.form.getFieldValue("start_date")
+                              if (!startDateValue) return undefined
+                              const sd = new Date(startDateValue)
+                              const endDate = new Date(value)
+                              if (endDate < sd) {
+                                return "End date cannot be before start date"
+                              }
+                              return undefined
+                            },
+                          }}
+                        >
+                          {(field) => (
+                            <div className="space-y-2">
+                              <Label htmlFor="end_date">End Date</Label>
+                              <DatePicker
+                                id="end_date"
+                                value={field.state.value}
+                                onChange={field.handleChange}
+                                disabled={readOnly}
+                                placeholder="Select end date"
+                                defaultMonth={startDateAsDate}
+                              />
+                              <FieldError errors={field.state.meta.errors} />
+                            </div>
+                          )}
+                        </form.Field>
+                      )
                     }}
-                  >
-                    {(field) => (
-                      <div className="space-y-2">
-                        <Label htmlFor="end_date">End Date</Label>
-                        <DatePicker
-                          id="end_date"
-                          value={field.state.value}
-                          onChange={field.handleChange}
-                          disabled={readOnly}
-                          placeholder="Select end date"
-                        />
-                        {field.state.meta.errors.length > 0 && (
-                          <p className="text-destructive text-sm">
-                            {field.state.meta.errors.join(", ")}
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </form.Field>
+                  </form.Subscribe>
                 </div>
               </CardContent>
             </Card>
@@ -739,9 +766,9 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         <ApprovalStrategyForm popupId={defaultValues!.id} readOnly={readOnly} />
       )}
 
-      {/* Reviewers Manager (only for edit mode) - Full width */}
+      {/* Reviewers Manager (only for edit mode when review is enabled) - Full width */}
       {isEdit && (
-        <ReviewersManager
+        <ConditionalReviewersManager
           popupId={defaultValues!.id}
           tenantId={defaultValues!.tenant_id}
           readOnly={readOnly}
@@ -757,6 +784,43 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
           resourceName={defaultValues.name}
         />
       )}
+      <UnsavedChangesDialog blocker={blocker} />
     </div>
+  )
+}
+
+/**
+ * Wrapper component that conditionally renders ReviewersManager
+ * based on approval strategy (only show when review is enabled, not auto_accept)
+ */
+function ConditionalReviewersManager({
+  popupId,
+  tenantId,
+  readOnly,
+}: {
+  popupId: string
+  tenantId: string
+  readOnly?: boolean
+}) {
+  const { data: strategy, isLoading } = useQuery({
+    queryKey: ["approval-strategy", popupId],
+    queryFn: () => ApprovalStrategiesService.getApprovalStrategy({ popupId }),
+    retry: false,
+  })
+
+  // Don't show reviewers if:
+  // - Still loading
+  // - No strategy exists (auto-accept by default)
+  // - Strategy is auto_accept
+  if (isLoading) return null
+  if (!strategy) return null
+  if (strategy.strategy_type === "auto_accept") return null
+
+  return (
+    <ReviewersManager
+      popupId={popupId}
+      tenantId={tenantId}
+      readOnly={readOnly}
+    />
   )
 }

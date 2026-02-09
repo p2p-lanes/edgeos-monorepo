@@ -8,6 +8,7 @@ import type { ColumnDef } from "@tanstack/react-table"
 import { format } from "date-fns"
 import {
   AlertCircle,
+  CalendarDays,
   EllipsisVertical,
   Eye,
   Pencil,
@@ -17,7 +18,8 @@ import {
 import { Suspense, useState } from "react"
 
 import { type PopupPublic, PopupsService } from "@/client"
-import { DataTable } from "@/components/Common/DataTable"
+import { DataTable, SortableHeader } from "@/components/Common/DataTable"
+import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
@@ -41,17 +43,23 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
-import { handleError } from "@/utils"
+import {
+  useTableSearchParams,
+  validateTableSearch,
+} from "@/hooks/useTableSearchParams"
+import { createErrorHandler } from "@/utils"
 
-function getPopupsQueryOptions() {
+function getPopupsQueryOptions(page: number, pageSize: number) {
   return {
-    queryFn: () => PopupsService.listPopups({ skip: 0, limit: 100 }),
-    queryKey: ["popups"],
+    queryFn: () =>
+      PopupsService.listPopups({ skip: page * pageSize, limit: pageSize }),
+    queryKey: ["popups", { page, pageSize }],
   }
 }
 
 export const Route = createFileRoute("/_layout/popups/")({
   component: Popups,
+  validateSearch: validateTableSearch,
   head: () => ({
     meta: [{ title: "Popups - EdgeOS" }],
   }),
@@ -68,7 +76,6 @@ function AddPopupButton() {
   )
 }
 
-// Delete Popup Dialog
 function DeletePopup({
   popup,
   onSuccess,
@@ -87,7 +94,7 @@ function DeletePopup({
       setIsOpen(false)
       onSuccess()
     },
-    onError: handleError.bind(showErrorToast),
+    onError: createErrorHandler(showErrorToast),
     onSettled: () => queryClient.invalidateQueries({ queryKey: ["popups"] }),
   })
 
@@ -126,7 +133,6 @@ function DeletePopup({
   )
 }
 
-// Actions Menu
 function PopupActionsMenu({ popup }: { popup: PopupPublic }) {
   const [open, setOpen] = useState(false)
   const { isAdmin } = useAuth()
@@ -162,7 +168,6 @@ function PopupActionsMenu({ popup }: { popup: PopupPublic }) {
   )
 }
 
-// Format date string for display
 function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return "—"
   try {
@@ -172,16 +177,15 @@ function formatDate(dateStr: string | null | undefined): string {
   }
 }
 
-// Table columns
 const columns: ColumnDef<PopupPublic>[] = [
   {
     accessorKey: "name",
-    header: "Name",
+    header: ({ column }) => <SortableHeader label="Name" column={column} />,
     cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
   },
   {
     accessorKey: "status",
-    header: "Status",
+    header: ({ column }) => <SortableHeader label="Status" column={column} />,
     cell: ({ row }) => (
       <span className="capitalize text-muted-foreground">
         {row.original.status}
@@ -190,7 +194,9 @@ const columns: ColumnDef<PopupPublic>[] = [
   },
   {
     accessorKey: "start_date",
-    header: "Start Date",
+    header: ({ column }) => (
+      <SortableHeader label="Start Date" column={column} />
+    ),
     cell: ({ row }) => (
       <span className="text-muted-foreground">
         {formatDate(row.original.start_date)}
@@ -199,7 +205,7 @@ const columns: ColumnDef<PopupPublic>[] = [
   },
   {
     accessorKey: "end_date",
-    header: "End Date",
+    header: ({ column }) => <SortableHeader label="End Date" column={column} />,
     cell: ({ row }) => (
       <span className="text-muted-foreground">
         {formatDate(row.original.end_date)}
@@ -218,8 +224,60 @@ const columns: ColumnDef<PopupPublic>[] = [
 ]
 
 function PopupsTableContent() {
-  const { data: popups } = useSuspenseQuery(getPopupsQueryOptions())
-  return <DataTable columns={columns} data={popups.results} />
+  const searchParams = Route.useSearch()
+  const { search, pagination, setSearch, setPagination } = useTableSearchParams(
+    searchParams,
+    "/popups",
+  )
+
+  const { data: popups } = useSuspenseQuery(
+    getPopupsQueryOptions(pagination.pageIndex, pagination.pageSize),
+  )
+
+  const filtered = search
+    ? popups.results.filter((p) => {
+        const term = search.toLowerCase()
+        return (
+          p.name.toLowerCase().includes(term) ||
+          (p.status ?? "").toLowerCase().includes(term)
+        )
+      })
+    : popups.results
+
+  return (
+    <DataTable
+      columns={columns}
+      data={filtered}
+      searchPlaceholder="Search by name or status..."
+      hiddenOnMobile={["start_date", "end_date"]}
+      searchValue={search}
+      onSearchChange={setSearch}
+      serverPagination={{
+        total: search ? filtered.length : popups.paging.total,
+        pagination: search
+          ? { pageIndex: 0, pageSize: popups.paging.total }
+          : pagination,
+        onPaginationChange: setPagination,
+      }}
+      emptyState={
+        !search ? (
+          <EmptyState
+            icon={CalendarDays}
+            title="No popups yet"
+            description="Create your first popup to start managing events."
+            action={
+              <Button asChild>
+                <Link to="/popups/new">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Popup
+                </Link>
+              </Button>
+            }
+          />
+        ) : undefined
+      }
+    />
+  )
 }
 
 function PopupsTable() {
@@ -236,7 +294,6 @@ function Popups() {
   const { isAdmin, isSuperadmin } = useAuth()
   const { needsTenantSelection, effectiveTenantId } = useWorkspace()
 
-  // For superadmins, we need a tenant selected before they can manage popups
   const canManagePopups = isAdmin && (!isSuperadmin || !!effectiveTenantId)
 
   return (

@@ -1,11 +1,12 @@
 import { useSuspenseQuery } from "@tanstack/react-query"
 import { createFileRoute, Link } from "@tanstack/react-router"
-import { AlertCircle, Plus } from "lucide-react"
-import { Suspense } from "react"
+import { AlertCircle, Plus, Users } from "lucide-react"
+import { Suspense, useState } from "react"
 
 import { type UserPublic, UsersService } from "@/client"
 import { columns, type UserTableData } from "@/components/Admin/columns"
 import { DataTable } from "@/components/Common/DataTable"
+import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import PendingUsers from "@/components/Pending/PendingUsers"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -13,34 +14,45 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
+import {
+  useTableSearchParams,
+  validateTableSearch,
+} from "@/hooks/useTableSearchParams"
 
-function getTenantUsersQueryOptions(tenantId: string | null) {
+const PAGE_SIZE = 25
+
+function getTenantUsersQueryOptions(
+  tenantId: string | null,
+  page: number,
+  pageSize: number,
+) {
   return {
     queryFn: () =>
       UsersService.listUsers({
-        skip: 0,
-        limit: 100,
+        skip: page * pageSize,
+        limit: pageSize,
         tenantId: tenantId || undefined,
       }),
-    queryKey: ["users", "tenant", tenantId],
+    queryKey: ["users", "tenant", tenantId, { page, pageSize }],
     enabled: !!tenantId,
   }
 }
 
-function getSuperadminsQueryOptions() {
+function getSuperadminsQueryOptions(page: number, pageSize: number) {
   return {
     queryFn: () =>
       UsersService.listUsers({
-        skip: 0,
-        limit: 100,
+        skip: page * pageSize,
+        limit: pageSize,
         role: "superadmin",
       }),
-    queryKey: ["users", "superadmins"],
+    queryKey: ["users", "superadmins", { page, pageSize }],
   }
 }
 
 export const Route = createFileRoute("/_layout/admin/")({
   component: Admin,
+  validateSearch: validateTableSearch,
   head: () => ({
     meta: [
       {
@@ -50,7 +62,6 @@ export const Route = createFileRoute("/_layout/admin/")({
   }),
 })
 
-// Add User Button - Links to dedicated create page
 function AddUserButton() {
   return (
     <Button asChild>
@@ -64,31 +75,131 @@ function AddUserButton() {
 
 function TenantUsersTableContent({ tenantId }: { tenantId: string | null }) {
   const { user: currentUser } = useAuth()
-  const { data: users } = useSuspenseQuery(getTenantUsersQueryOptions(tenantId))
+  const searchParams = Route.useSearch()
+  const { search, pagination, setSearch, setPagination } = useTableSearchParams(
+    searchParams,
+    "/admin",
+  )
 
-  // Filter out superadmins from tenant users view
+  const { data: users } = useSuspenseQuery(
+    getTenantUsersQueryOptions(
+      tenantId,
+      pagination.pageIndex,
+      pagination.pageSize,
+    ),
+  )
+
   const tenantUsers = users.results.filter(
     (user: UserPublic) => user.role !== "superadmin",
   )
 
-  const tableData: UserTableData[] = tenantUsers.map((user: UserPublic) => ({
+  const filtered = search
+    ? tenantUsers.filter((u: UserPublic) => {
+        const term = search.toLowerCase()
+        return (
+          (u.full_name ?? "").toLowerCase().includes(term) ||
+          u.email.toLowerCase().includes(term)
+        )
+      })
+    : tenantUsers
+
+  const tableData: UserTableData[] = filtered.map((user: UserPublic) => ({
     ...user,
     isCurrentUser: currentUser?.id === user.id,
   }))
 
-  return <DataTable columns={columns} data={tableData} />
+  return (
+    <DataTable
+      columns={columns}
+      data={tableData}
+      searchPlaceholder="Search by name or email..."
+      hiddenOnMobile={["role", "deleted"]}
+      searchValue={search}
+      onSearchChange={setSearch}
+      serverPagination={{
+        total: search ? filtered.length : users.paging.total,
+        pagination: search
+          ? { pageIndex: 0, pageSize: users.paging.total }
+          : pagination,
+        onPaginationChange: setPagination,
+      }}
+      emptyState={
+        !search ? (
+          <EmptyState
+            icon={Users}
+            title="No users yet"
+            description="Add users to manage access for this tenant."
+            action={
+              <Button asChild>
+                <Link to="/admin/new">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add User
+                </Link>
+              </Button>
+            }
+          />
+        ) : undefined
+      }
+    />
+  )
 }
 
 function SuperadminsTableContent() {
   const { user: currentUser } = useAuth()
-  const { data: users } = useSuspenseQuery(getSuperadminsQueryOptions())
+  const [pagination, setPagination] = useState({
+    pageIndex: 0,
+    pageSize: PAGE_SIZE,
+  })
+  const [search, setSearch] = useState("")
 
-  const tableData: UserTableData[] = users.results.map((user: UserPublic) => ({
+  const { data: users } = useSuspenseQuery(
+    getSuperadminsQueryOptions(pagination.pageIndex, pagination.pageSize),
+  )
+
+  const filtered = search
+    ? users.results.filter((u: UserPublic) => {
+        const term = search.toLowerCase()
+        return (
+          (u.full_name ?? "").toLowerCase().includes(term) ||
+          u.email.toLowerCase().includes(term)
+        )
+      })
+    : users.results
+
+  const tableData: UserTableData[] = filtered.map((user: UserPublic) => ({
     ...user,
     isCurrentUser: currentUser?.id === user.id,
   }))
 
-  return <DataTable columns={columns} data={tableData} />
+  return (
+    <DataTable
+      columns={columns}
+      data={tableData}
+      searchPlaceholder="Search by name or email..."
+      hiddenOnMobile={["role", "deleted"]}
+      searchValue={search}
+      onSearchChange={(value) => {
+        setSearch(value)
+        setPagination((prev) => ({ ...prev, pageIndex: 0 }))
+      }}
+      serverPagination={{
+        total: search ? filtered.length : users.paging.total,
+        pagination: search
+          ? { pageIndex: 0, pageSize: users.paging.total }
+          : pagination,
+        onPaginationChange: setPagination,
+      }}
+      emptyState={
+        !search ? (
+          <EmptyState
+            icon={Users}
+            title="No superadmins"
+            description="Superadmin accounts will appear here."
+          />
+        ) : undefined
+      }
+    />
+  )
 }
 
 function TenantUsersTable({ tenantId }: { tenantId: string | null }) {
@@ -154,7 +265,6 @@ function Admin() {
           </TabsContent>
         </Tabs>
       ) : (
-        // Non-superadmin sees only their tenant's users
         <TenantUsersTable tenantId={effectiveTenantId} />
       )}
     </div>

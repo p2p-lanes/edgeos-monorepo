@@ -5,14 +5,22 @@ import {
 } from "@tanstack/react-query"
 import { createFileRoute, Link } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
-import { EllipsisVertical, Eye, Pencil, Plus, Trash2 } from "lucide-react"
+import {
+  EllipsisVertical,
+  Eye,
+  Package,
+  Pencil,
+  Plus,
+  Trash2,
+} from "lucide-react"
 import { Suspense, useState } from "react"
 
 import { type ProductPublic, ProductsService } from "@/client"
-import { DataTable } from "@/components/Common/DataTable"
+import { DataTable, SortableHeader } from "@/components/Common/DataTable"
+import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
+import { StatusBadge } from "@/components/Common/StatusBadge"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -34,22 +42,31 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
-import { handleError } from "@/utils"
+import {
+  useTableSearchParams,
+  validateTableSearch,
+} from "@/hooks/useTableSearchParams"
+import { createErrorHandler } from "@/utils"
 
-function getProductsQueryOptions(popupId: string | null) {
+function getProductsQueryOptions(
+  popupId: string | null,
+  page: number,
+  pageSize: number,
+) {
   return {
     queryFn: () =>
       ProductsService.listProducts({
-        skip: 0,
-        limit: 100,
+        skip: page * pageSize,
+        limit: pageSize,
         popupId: popupId || undefined,
       }),
-    queryKey: ["products", popupId],
+    queryKey: ["products", popupId, { page, pageSize }],
   }
 }
 
 export const Route = createFileRoute("/_layout/products/")({
   component: Products,
+  validateSearch: validateTableSearch,
   head: () => ({
     meta: [{ title: "Products - EdgeOS" }],
   }),
@@ -79,7 +96,7 @@ function ProductActionsMenu({ product }: { product: ProductPublic }) {
       showSuccessToast("Product deleted")
       setDeleteDialogOpen(false)
     },
-    onError: handleError.bind(showErrorToast),
+    onError: createErrorHandler(showErrorToast),
     onSettled: () => queryClient.invalidateQueries({ queryKey: ["products"] }),
   })
 
@@ -154,28 +171,26 @@ function ProductActionsMenu({ product }: { product: ProductPublic }) {
 const columns: ColumnDef<ProductPublic>[] = [
   {
     accessorKey: "name",
-    header: "Name",
+    header: ({ column }) => <SortableHeader label="Name" column={column} />,
     cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
   },
   {
     accessorKey: "price",
-    header: "Price",
+    header: ({ column }) => <SortableHeader label="Price" column={column} />,
     cell: ({ row }) => <span className="font-mono">${row.original.price}</span>,
   },
   {
     accessorKey: "attendee_category",
     header: "Category",
     cell: ({ row }) => (
-      <Badge variant="outline">{row.original.attendee_category || "N/A"}</Badge>
+      <StatusBadge status={row.original.attendee_category || "N/A"} />
     ),
   },
   {
     accessorKey: "is_active",
     header: "Status",
     cell: ({ row }) => (
-      <Badge variant={row.original.is_active ? "default" : "secondary"}>
-        {row.original.is_active ? "Active" : "Inactive"}
-      </Badge>
+      <StatusBadge status={row.original.is_active ? "active" : "inactive"} />
     ),
   },
   {
@@ -190,10 +205,65 @@ const columns: ColumnDef<ProductPublic>[] = [
 
 function ProductsTableContent() {
   const { selectedPopupId } = useWorkspace()
-  const { data: products } = useSuspenseQuery(
-    getProductsQueryOptions(selectedPopupId),
+  const searchParams = Route.useSearch()
+  const { search, pagination, setSearch, setPagination } = useTableSearchParams(
+    searchParams,
+    "/products",
   )
-  return <DataTable columns={columns} data={products.results} />
+
+  const { data: products } = useSuspenseQuery(
+    getProductsQueryOptions(
+      selectedPopupId,
+      pagination.pageIndex,
+      pagination.pageSize,
+    ),
+  )
+
+  const filtered = search
+    ? products.results.filter((p) => {
+        const term = search.toLowerCase()
+        return (
+          p.name.toLowerCase().includes(term) ||
+          String(p.price).includes(term) ||
+          (p.attendee_category ?? "").toLowerCase().includes(term)
+        )
+      })
+    : products.results
+
+  return (
+    <DataTable
+      columns={columns}
+      data={filtered}
+      searchPlaceholder="Search by name, price, or category..."
+      hiddenOnMobile={["attendee_category", "is_active"]}
+      searchValue={search}
+      onSearchChange={setSearch}
+      serverPagination={{
+        total: search ? filtered.length : products.paging.total,
+        pagination: search
+          ? { pageIndex: 0, pageSize: products.paging.total }
+          : pagination,
+        onPaginationChange: setPagination,
+      }}
+      emptyState={
+        !search ? (
+          <EmptyState
+            icon={Package}
+            title="No products yet"
+            description="Create your first product or ticket to start selling."
+            action={
+              <Button asChild>
+                <Link to="/products/new">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Product
+                </Link>
+              </Button>
+            }
+          />
+        ) : undefined
+      }
+    />
+  )
 }
 
 function Products() {

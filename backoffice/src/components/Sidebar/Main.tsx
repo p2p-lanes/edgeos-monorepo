@@ -5,6 +5,7 @@ import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
@@ -14,6 +15,7 @@ export type Item = {
   icon: LucideIcon
   title: string
   path: string
+  badge?: number
 }
 
 interface MainProps {
@@ -50,6 +52,9 @@ export function Main({ items }: MainProps) {
                     <span>{item.title}</span>
                   </RouterLink>
                 </SidebarMenuButton>
+                {item.badge != null && item.badge > 0 && (
+                  <SidebarMenuBadge>{item.badge}</SidebarMenuBadge>
+                )}
               </SidebarMenuItem>
             )
           })}

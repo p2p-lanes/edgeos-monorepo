@@ -31,6 +31,7 @@ import { Route as LayoutHumansNewRouteImport } from './routes/_layout/humans/new
 import { Route as LayoutGroupsNewRouteImport } from './routes/_layout/groups/new'
 import { Route as LayoutFormBuilderNewRouteImport } from './routes/_layout/form-builder/new'
 import { Route as LayoutCouponsNewRouteImport } from './routes/_layout/coupons/new'
+import { Route as LayoutApplicationsReviewQueueRouteImport } from './routes/_layout/applications/review-queue'
 import { Route as LayoutApplicationsNewRouteImport } from './routes/_layout/applications/new'
 import { Route as LayoutApplicationsIdRouteImport } from './routes/_layout/applications/$id'
 import { Route as LayoutAdminNewRouteImport } from './routes/_layout/admin/new'
@@ -152,6 +153,12 @@ const LayoutCouponsNewRoute = LayoutCouponsNewRouteImport.update({
   path: '/coupons/new',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutApplicationsReviewQueueRoute =
+  LayoutApplicationsReviewQueueRouteImport.update({
+    id: '/applications/review-queue',
+    path: '/applications/review-queue',
+    getParentRoute: () => LayoutRoute,
+  } as any)
 const LayoutApplicationsNewRoute = LayoutApplicationsNewRouteImport.update({
   id: '/applications/new',
   path: '/applications/new',
@@ -217,6 +224,7 @@ export interface FileRoutesByFullPath {
   '/admin/new': typeof LayoutAdminNewRoute
   '/applications/$id': typeof LayoutApplicationsIdRoute
   '/applications/new': typeof LayoutApplicationsNewRoute
+  '/applications/review-queue': typeof LayoutApplicationsReviewQueueRoute
   '/coupons/new': typeof LayoutCouponsNewRoute
   '/form-builder/new': typeof LayoutFormBuilderNewRoute
   '/groups/new': typeof LayoutGroupsNewRoute
@@ -251,6 +259,7 @@ export interface FileRoutesByTo {
   '/admin/new': typeof LayoutAdminNewRoute
   '/applications/$id': typeof LayoutApplicationsIdRoute
   '/applications/new': typeof LayoutApplicationsNewRoute
+  '/applications/review-queue': typeof LayoutApplicationsReviewQueueRoute
   '/coupons/new': typeof LayoutCouponsNewRoute
   '/form-builder/new': typeof LayoutFormBuilderNewRoute
   '/groups/new': typeof LayoutGroupsNewRoute
@@ -287,6 +296,7 @@ export interface FileRoutesById {
   '/_layout/admin/new': typeof LayoutAdminNewRoute
   '/_layout/applications/$id': typeof LayoutApplicationsIdRoute
   '/_layout/applications/new': typeof LayoutApplicationsNewRoute
+  '/_layout/applications/review-queue': typeof LayoutApplicationsReviewQueueRoute
   '/_layout/coupons/new': typeof LayoutCouponsNewRoute
   '/_layout/form-builder/new': typeof LayoutFormBuilderNewRoute
   '/_layout/groups/new': typeof LayoutGroupsNewRoute
@@ -323,6 +333,7 @@ export interface FileRouteTypes {
     | '/admin/new'
     | '/applications/$id'
     | '/applications/new'
+    | '/applications/review-queue'
     | '/coupons/new'
     | '/form-builder/new'
     | '/groups/new'
@@ -357,6 +368,7 @@ export interface FileRouteTypes {
     | '/admin/new'
     | '/applications/$id'
     | '/applications/new'
+    | '/applications/review-queue'
     | '/coupons/new'
     | '/form-builder/new'
     | '/groups/new'
@@ -392,6 +404,7 @@ export interface FileRouteTypes {
     | '/_layout/admin/new'
     | '/_layout/applications/$id'
     | '/_layout/applications/new'
+    | '/_layout/applications/review-queue'
     | '/_layout/coupons/new'
     | '/_layout/form-builder/new'
     | '/_layout/groups/new'
@@ -579,6 +592,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutCouponsNewRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/applications/review-queue': {
+      id: '/_layout/applications/review-queue'
+      path: '/applications/review-queue'
+      fullPath: '/applications/review-queue'
+      preLoaderRoute: typeof LayoutApplicationsReviewQueueRouteImport
+      parentRoute: typeof LayoutRoute
+    }
     '/_layout/applications/new': {
       id: '/_layout/applications/new'
       path: '/applications/new'
@@ -667,6 +687,7 @@ interface LayoutRouteChildren {
   LayoutAdminNewRoute: typeof LayoutAdminNewRoute
   LayoutApplicationsIdRoute: typeof LayoutApplicationsIdRoute
   LayoutApplicationsNewRoute: typeof LayoutApplicationsNewRoute
+  LayoutApplicationsReviewQueueRoute: typeof LayoutApplicationsReviewQueueRoute
   LayoutCouponsNewRoute: typeof LayoutCouponsNewRoute
   LayoutFormBuilderNewRoute: typeof LayoutFormBuilderNewRoute
   LayoutGroupsNewRoute: typeof LayoutGroupsNewRoute
@@ -701,6 +722,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutAdminNewRoute: LayoutAdminNewRoute,
   LayoutApplicationsIdRoute: LayoutApplicationsIdRoute,
   LayoutApplicationsNewRoute: LayoutApplicationsNewRoute,
+  LayoutApplicationsReviewQueueRoute: LayoutApplicationsReviewQueueRoute,
   LayoutCouponsNewRoute: LayoutCouponsNewRoute,
   LayoutFormBuilderNewRoute: LayoutFormBuilderNewRoute,
   LayoutGroupsNewRoute: LayoutGroupsNewRoute,

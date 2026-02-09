@@ -2,7 +2,6 @@ import { useForm } from "@tanstack/react-form"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import { Building2, Mail } from "lucide-react"
-
 import {
   type TenantCreate,
   type TenantPublic,
@@ -10,6 +9,7 @@ import {
   type TenantUpdate,
 } from "@/client"
 import { DangerZone } from "@/components/Common/DangerZone"
+import { FieldError } from "@/components/Common/FieldError"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -25,7 +25,11 @@ import { Label } from "@/components/ui/label"
 import { LoadingButton } from "@/components/ui/loading-button"
 import { Separator } from "@/components/ui/separator"
 import useCustomToast from "@/hooks/useCustomToast"
-import { handleError } from "@/utils"
+import {
+  UnsavedChangesDialog,
+  useUnsavedChanges,
+} from "@/hooks/useUnsavedChanges"
+import { createErrorHandler } from "@/utils"
 
 interface TenantFormProps {
   defaultValues?: TenantPublic
@@ -44,9 +48,10 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
     onSuccess: () => {
       showSuccessToast("Tenant created successfully")
       queryClient.invalidateQueries({ queryKey: ["tenants"] })
+      form.reset()
       onSuccess()
     },
-    onError: handleError.bind(showErrorToast),
+    onError: createErrorHandler(showErrorToast),
   })
 
   const updateMutation = useMutation({
@@ -60,9 +65,10 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
       queryClient.invalidateQueries({
         queryKey: ["tenants", defaultValues!.id],
       })
+      form.reset()
       onSuccess()
     },
-    onError: handleError.bind(showErrorToast),
+    onError: createErrorHandler(showErrorToast),
   })
 
   const deleteMutation = useMutation({
@@ -73,7 +79,7 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
       queryClient.invalidateQueries({ queryKey: ["tenants"] })
       navigate({ to: "/tenants" })
     },
-    onError: handleError.bind(showErrorToast),
+    onError: createErrorHandler(showErrorToast),
   })
 
   const form = useForm({
@@ -103,6 +109,8 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
       }
     },
   })
+
+  const blocker = useUnsavedChanges(form)
 
   const isPending = createMutation.isPending || updateMutation.isPending
 
@@ -151,11 +159,7 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
                           onBlur={field.handleBlur}
                           onChange={(e) => field.handleChange(e.target.value)}
                         />
-                        {field.state.meta.errors.length > 0 && (
-                          <p className="text-destructive text-sm">
-                            {field.state.meta.errors.join(", ")}
-                          </p>
-                        )}
+                        <FieldError errors={field.state.meta.errors} />
                       </div>
                     )}
                   </form.Field>
@@ -190,11 +194,7 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
                         <p className="text-sm text-muted-foreground">
                           Email for notifications
                         </p>
-                        {field.state.meta.errors.length > 0 && (
-                          <p className="text-destructive text-sm">
-                            {field.state.meta.errors.join(", ")}
-                          </p>
-                        )}
+                        <FieldError errors={field.state.meta.errors} />
                       </div>
                     )}
                   </form.Field>
@@ -396,6 +396,7 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
           resourceName={defaultValues.name}
         />
       )}
+      <UnsavedChangesDialog blocker={blocker} />
     </div>
   )
 }

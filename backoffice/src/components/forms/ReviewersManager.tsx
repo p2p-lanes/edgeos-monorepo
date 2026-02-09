@@ -37,7 +37,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { Switch } from "@/components/ui/switch"
 import useCustomToast from "@/hooks/useCustomToast"
-import { handleError } from "@/utils"
+import { createErrorHandler } from "@/utils"
 
 interface ReviewersManagerProps {
   popupId: string
@@ -95,7 +95,7 @@ export function ReviewersManager({
       setSelectedUserId("")
       setIsRequired(false)
     },
-    onError: (err) => handleError.call(showErrorToast, err as ApiError),
+    onError: (err) => createErrorHandler(showErrorToast)(err as ApiError),
   })
 
   const removeMutation = useMutation({
@@ -105,7 +105,7 @@ export function ReviewersManager({
       showSuccessToast("Reviewer removed")
       queryClient.invalidateQueries({ queryKey: ["popup-reviewers", popupId] })
     },
-    onError: (err) => handleError.call(showErrorToast, err as ApiError),
+    onError: (err) => createErrorHandler(showErrorToast)(err as ApiError),
   })
 
   const handleAddReviewer = () => {

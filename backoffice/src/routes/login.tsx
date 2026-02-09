@@ -1,9 +1,10 @@
 import { useForm } from "@tanstack/react-form"
 import { createFileRoute, redirect } from "@tanstack/react-router"
-import { useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { z } from "zod"
 
 import { AuthLayout } from "@/components/Common/AuthLayout"
+import { FieldError } from "@/components/Common/FieldError"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -39,6 +40,28 @@ function Login() {
   const { requestCodeMutation, verifyCodeMutation } = useAuth()
   const [step, setStep] = useState<"email" | "verify">("email")
   const [submittedEmail, setSubmittedEmail] = useState("")
+  const [cooldown, setCooldown] = useState(0)
+  const cooldownRef = useRef<ReturnType<typeof setInterval>>(null)
+
+  const startCooldown = useCallback(() => {
+    setCooldown(60)
+    if (cooldownRef.current) clearInterval(cooldownRef.current)
+    cooldownRef.current = setInterval(() => {
+      setCooldown((prev) => {
+        if (prev <= 1) {
+          if (cooldownRef.current) clearInterval(cooldownRef.current)
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (cooldownRef.current) clearInterval(cooldownRef.current)
+    }
+  }, [])
 
   // Email form (Step 1)
   const emailForm = useForm({
@@ -54,6 +77,7 @@ function Login() {
             setSubmittedEmail(value.email)
             verifyForm.reset()
             setStep("verify")
+            startCooldown()
           },
         },
       )
@@ -80,11 +104,26 @@ function Login() {
   }
 
   const handleResendCode = () => {
-    requestCodeMutation.mutate({ email: submittedEmail })
+    requestCodeMutation.mutate(
+      { email: submittedEmail },
+      { onSuccess: () => startCooldown() },
+    )
   }
 
   return (
     <AuthLayout>
+      <div className="flex justify-center gap-2 mb-4">
+        <div
+          className={`h-1.5 w-8 rounded-full transition-colors ${
+            step === "email" ? "bg-primary" : "bg-muted-foreground/30"
+          }`}
+        />
+        <div
+          className={`h-1.5 w-8 rounded-full transition-colors ${
+            step === "verify" ? "bg-primary" : "bg-muted-foreground/30"
+          }`}
+        />
+      </div>
       {step === "email" ? (
         <form
           onSubmit={(e) => {
@@ -126,11 +165,7 @@ function Login() {
                     onBlur={field.handleBlur}
                     onChange={(e) => field.handleChange(e.target.value)}
                   />
-                  {field.state.meta.errors.length > 0 && (
-                    <p className="text-destructive text-xs">
-                      {field.state.meta.errors.join(", ")}
-                    </p>
-                  )}
+                  <FieldError errors={field.state.meta.errors} />
                 </div>
               )}
             </emailForm.Field>
@@ -191,11 +226,7 @@ function Login() {
                     onBlur={field.handleBlur}
                     onChange={(e) => field.handleChange(e.target.value)}
                   />
-                  {field.state.meta.errors.length > 0 && (
-                    <p className="text-destructive text-xs">
-                      {field.state.meta.errors.join(", ")}
-                    </p>
-                  )}
+                  <FieldError errors={field.state.meta.errors} />
                 </div>
               )}
             </verifyForm.Field>
@@ -209,14 +240,21 @@ function Login() {
             </LoadingButton>
 
             <div className="flex flex-col gap-2 text-center text-sm">
+              <p className="text-muted-foreground text-xs">
+                Didn't receive the code? Check your spam folder or try again.
+              </p>
               <Button
                 type="button"
                 variant="link"
                 onClick={handleResendCode}
-                disabled={requestCodeMutation.isPending}
+                disabled={requestCodeMutation.isPending || cooldown > 0}
                 className="text-muted-foreground"
               >
-                {requestCodeMutation.isPending ? "Sending..." : "Resend code"}
+                {requestCodeMutation.isPending
+                  ? "Sending..."
+                  : cooldown > 0
+                    ? `Resend code (${cooldown}s)`
+                    : "Resend code"}
               </Button>
               <Button
                 type="button"
