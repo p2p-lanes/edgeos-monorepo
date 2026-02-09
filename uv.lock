@@ -79,7 +79,6 @@ dependencies = [
     { name = "sentry-sdk", extra = ["fastapi"] },
     { name = "sqlmodel" },
     { name = "tenacity" },
-    { name = "testcontainers" },
 ]
 
 [package.dev-dependencies]
@@ -88,6 +87,7 @@ dev = [
     { name = "pre-commit" },
     { name = "pytest" },
     { name = "ruff" },
+    { name = "testcontainers" },
     { name = "ty" },
     { name = "types-passlib" },
 ]
@@ -116,7 +116,6 @@ requires-dist = [
     { name = "sentry-sdk", extras = ["fastapi"], specifier = ">=1.40.6,<2.0.0" },
     { name = "sqlmodel", specifier = ">=0.0.21,<1.0.0" },
     { name = "tenacity", specifier = ">=8.2.3,<9.0.0" },
-    { name = "testcontainers", specifier = ">=4.14.0" },
 ]
 
 [package.metadata.requires-dev]
@@ -125,6 +124,7 @@ dev = [
     { name = "pre-commit", specifier = ">=3.6.2,<4.0.0" },
     { name = "pytest", specifier = ">=7.4.3,<8.0.0" },
     { name = "ruff", specifier = ">=0.2.2,<1.0.0" },
+    { name = "testcontainers", specifier = ">=4.14.0" },
     { name = "ty", specifier = ">=0.0.13" },
     { name = "types-passlib", specifier = ">=1.7.7.20240106,<2.0.0.0" },
 ]
