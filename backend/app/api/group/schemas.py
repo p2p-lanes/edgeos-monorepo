@@ -32,6 +32,8 @@ class GroupPublic(GroupBase):
     id: uuid.UUID
     created_at: datetime | None = None
     updated_at: datetime | None = None
+    whitelisted_emails: list["GroupWhitelistedEmailPublic"] = []
+    is_open: bool = True  # True if no whitelisted emails (accepts all)
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -48,6 +50,7 @@ class GroupCreate(BaseModel):
     welcome_message: str | None = None
     is_ambassador_group: bool = False
     ambassador_id: uuid.UUID | None = None
+    whitelisted_emails: list[str] | None = None  # List of email strings to whitelist
 
     @field_validator("discount_percentage")
     @classmethod
@@ -78,6 +81,17 @@ class GroupAdminUpdate(BaseModel):
     welcome_message: str | None = None
     is_ambassador_group: bool | None = None
     ambassador_id: uuid.UUID | None = None
+    whitelisted_emails: list[str] | None = None  # List of email strings to whitelist
+
+
+class GroupWhitelistedEmailPublic(BaseModel):
+    """Schema for whitelisted email response."""
+
+    id: uuid.UUID
+    email: str
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ========================

@@ -1,5 +1,4 @@
-import random
-import string
+import secrets
 import uuid
 
 from fastapi import HTTPException, status
@@ -7,14 +6,19 @@ from sqlalchemy import desc
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, func, select
 
-from app.api.group.models import GroupLeaders, GroupMembers, Groups
+from app.api.group.models import (
+    GroupLeaders,
+    GroupMembers,
+    Groups,
+    GroupWhitelistedEmails,
+)
 from app.api.group.schemas import GroupCreate, GroupUpdate
 from app.api.shared.crud import BaseCRUD
 
 
-def generate_random_slug(length: int = 4) -> str:
-    """Generate a random lowercase string for slug."""
-    return "".join(random.choices(string.ascii_lowercase, k=length))
+def generate_random_slug() -> str:
+    """Generate a random hex string for slug (8 characters)."""
+    return secrets.token_hex(4)
 
 
 class GroupsCRUD(BaseCRUD[Groups, GroupCreate, GroupUpdate]):
@@ -185,6 +189,173 @@ class GroupsCRUD(BaseCRUD[Groups, GroupCreate, GroupUpdate]):
         while self.get_by_slug(session, slug, popup_id):
             slug = f"{prefix}-{generate_random_slug()}"
         return slug
+
+    def create_ambassador_group(
+        self,
+        session: Session,
+        *,
+        tenant_id: uuid.UUID,
+        popup_id: uuid.UUID,
+        popup_slug: str,
+        human_id: uuid.UUID,
+        human_name: str,
+    ) -> Groups:
+        """Create an ambassador group for a human.
+
+        Args:
+            session: Database session
+            tenant_id: Tenant ID
+            popup_id: Popup ID
+            popup_slug: Popup slug (used as prefix for group slug)
+            human_id: Human ID (ambassador)
+            human_name: Human's full name
+
+        Returns:
+            Created Groups model
+        """
+        from loguru import logger
+
+        # Generate unique slug using popup slug as prefix
+        slug = f"{popup_slug}-{generate_random_slug()}"
+        while self.get_by_slug(session, slug, popup_id):
+            logger.info("Ambassador group slug already exists: %s", slug)
+            slug = f"{popup_slug}-{generate_random_slug()}"
+
+        description = (
+            "You're invited to skip the application process and proceed directly to checkout. "
+            "Provide your information below to secure your ticket(s)!"
+        )
+        welcome_message = f"This is a personal invite link from {human_name}."
+
+        group = Groups(
+            tenant_id=tenant_id,
+            popup_id=popup_id,
+            name=f"{human_name} Invite List",
+            slug=slug,
+            description=description,
+            discount_percentage=0,
+            max_members=None,
+            welcome_message=welcome_message,
+            is_ambassador_group=True,
+            ambassador_id=human_id,
+        )
+        session.add(group)
+        session.flush()  # Get group ID
+
+        # Add human as leader
+        leader = GroupLeaders(
+            tenant_id=tenant_id,
+            group_id=group.id,
+            human_id=human_id,
+        )
+        session.add(leader)
+
+        logger.info("Ambassador group created: %s %s", group.id, group.slug)
+
+        return group
+
+    def get_ambassador_group(
+        self,
+        session: Session,
+        popup_id: uuid.UUID,
+        human_id: uuid.UUID,
+    ) -> Groups | None:
+        """Get existing ambassador group for a human in a popup."""
+        statement = select(Groups).where(
+            Groups.popup_id == popup_id,
+            Groups.ambassador_id == human_id,
+        )
+        return session.exec(statement).first()
+
+    def create(
+        self,
+        session: Session,
+        obj_in: GroupCreate,
+        tenant_id: uuid.UUID | None = None,
+    ) -> Groups:
+        """Create a group with optional whitelisted emails."""
+        data = obj_in.model_dump(exclude={"whitelisted_emails"})
+        if tenant_id:
+            data["tenant_id"] = tenant_id
+
+        group = Groups(**data)
+        session.add(group)
+        session.flush()  # Get group ID
+
+        # Add whitelisted emails if provided
+        if hasattr(obj_in, "whitelisted_emails") and obj_in.whitelisted_emails:
+            for email in obj_in.whitelisted_emails:
+                wl_email = GroupWhitelistedEmails(
+                    tenant_id=group.tenant_id,
+                    group_id=group.id,
+                    email=email.lower().strip(),
+                )
+                session.add(wl_email)
+
+        session.commit()
+        session.refresh(group)
+        return group
+
+    def update_whitelisted_emails(
+        self,
+        session: Session,
+        group: Groups,
+        emails: list[str],
+        tenant_id: uuid.UUID,
+    ) -> Groups:
+        """Update whitelisted emails for a group (replace all)."""
+        # Delete existing whitelisted emails
+        for wl in list(group.whitelisted_emails):
+            session.delete(wl)
+
+        # Add new whitelisted emails
+        for email in emails:
+            wl_email = GroupWhitelistedEmails(
+                tenant_id=tenant_id,
+                group_id=group.id,
+                email=email.lower().strip(),
+            )
+            session.add(wl_email)
+
+        session.commit()
+        session.refresh(group)
+        return group
+
+    def update(
+        self,
+        session: Session,
+        db_obj: Groups,
+        obj_in: GroupUpdate,
+    ) -> Groups:
+        """Update a group with optional whitelisted emails update."""
+        # Handle whitelisted_emails update if provided
+        whitelisted_emails = getattr(obj_in, "whitelisted_emails", None)
+        if whitelisted_emails is not None:
+            self.update_whitelisted_emails(
+                session, db_obj, whitelisted_emails, db_obj.tenant_id
+            )
+
+        # Update other fields
+        update_data = obj_in.model_dump(
+            exclude_unset=True, exclude={"whitelisted_emails"}
+        )
+        for field, value in update_data.items():
+            setattr(db_obj, field, value)
+
+        session.add(db_obj)
+        session.commit()
+        session.refresh(db_obj)
+        return db_obj
+
+    def is_email_whitelisted(
+        self, session: Session, group_id: uuid.UUID, email: str
+    ) -> bool:
+        """Check if email is whitelisted for a group."""
+        stmt = select(GroupWhitelistedEmails).where(
+            GroupWhitelistedEmails.group_id == group_id,
+            func.lower(GroupWhitelistedEmails.email) == email.lower(),
+        )
+        return session.exec(stmt).first() is not None
 
 
 groups_crud = GroupsCRUD()

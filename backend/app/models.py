@@ -34,7 +34,13 @@ from app.api.form_field.models import FormFields
 from app.api.form_field.schemas import FormFieldCreate, FormFieldPublic, FormFieldUpdate
 
 # Group models
-from app.api.group.models import GroupLeaders, GroupMembers, GroupProducts, Groups
+from app.api.group.models import (
+    GroupLeaders,
+    GroupMembers,
+    GroupProducts,
+    Groups,
+    GroupWhitelistedEmails,
+)
 from app.api.group.schemas import GroupCreate, GroupPublic, GroupUpdate
 
 # Core models
@@ -101,6 +107,7 @@ __all__ = [
     "GroupLeaders",
     "GroupMembers",
     "GroupProducts",
+    "GroupWhitelistedEmails",
     "GroupCreate",
     "GroupPublic",
     "GroupUpdate",

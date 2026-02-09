@@ -1,5 +1,4 @@
 import uuid
-from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, HTTPException, status
 
@@ -18,28 +17,17 @@ from app.api.group.schemas import (
     GroupWithMembers,
 )
 from app.api.shared.enums import UserRole
-from app.api.shared.response import ListModel, Paging
+from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
     CurrentHuman,
     CurrentUser,
+    CurrentWriter,
     SessionDep,
     TenantSession,
 )
 from app.utils.utils import slugify
 
-if TYPE_CHECKING:
-    from app.api.user.schemas import UserPublic
-
 router = APIRouter(prefix="/groups", tags=["groups"])
-
-
-def _check_write_permission(current_user: "UserPublic") -> None:
-    """Check if user has write permission."""
-    if current_user.role == UserRole.VIEWER:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Viewer role does not have write access",
-        )
 
 
 def _check_leader_permission(group: Groups, human_id: uuid.UUID) -> None:
@@ -61,8 +49,8 @@ async def list_groups(
     db: TenantSession,
     _: CurrentUser,
     popup_id: uuid.UUID | None = None,
-    skip: int = 0,
-    limit: int = 100,
+    skip: PaginationSkip = 0,
+    limit: PaginationLimit = 100,
 ) -> ListModel[GroupPublic]:
     """List all groups (BO only)."""
     if popup_id:
@@ -111,7 +99,7 @@ async def get_group(
             organization=human.organization,
             role=human.role,
             gender=human.gender,
-            local_resident=None,  # TODO: field not on Human model
+            local_resident=None,
             products=products,
         )
         members.append(member)
@@ -126,10 +114,9 @@ async def get_group(
 async def create_group(
     group_in: GroupCreate,
     db: TenantSession,
-    current_user: CurrentUser,
+    current_user: CurrentWriter,
 ) -> GroupPublic:
     """Create a new group (BO only)."""
-    _check_write_permission(current_user)
 
     # Generate slug if not provided
     slug = group_in.slug or slugify(group_in.name)
@@ -174,10 +161,9 @@ async def update_group(
     group_id: uuid.UUID,
     group_in: GroupAdminUpdate,
     db: TenantSession,
-    current_user: CurrentUser,
+    _current_user: CurrentWriter,
 ) -> GroupPublic:
     """Update a group (BO only - full admin access)."""
-    _check_write_permission(current_user)
 
     group = crud.groups_crud.get(db, group_id)
     if not group:
@@ -203,10 +189,9 @@ async def update_group(
 async def delete_group(
     group_id: uuid.UUID,
     db: TenantSession,
-    current_user: CurrentUser,
+    _current_user: CurrentWriter,
 ) -> None:
     """Delete a group (BO only)."""
-    _check_write_permission(current_user)
 
     group = crud.groups_crud.get(db, group_id)
     if not group:
@@ -236,8 +221,8 @@ async def delete_group(
 async def list_my_groups(
     db: SessionDep,
     current_human: CurrentHuman,
-    skip: int = 0,
-    limit: int = 100,
+    skip: PaginationSkip = 0,
+    limit: PaginationLimit = 100,
 ) -> ListModel[GroupPublic]:
     """List groups where current human is a leader (Portal)."""
     groups, total = crud.groups_crud.find_by_leader(
@@ -285,7 +270,7 @@ async def get_my_group(
             organization=human.organization,
             role=human.role,
             gender=human.gender,
-            local_resident=None,  # TODO: field not on Human model
+            local_resident=None,
             products=products,
         )
         members.append(member)
@@ -423,7 +408,7 @@ async def add_group_member(
         organization=human.organization,
         role=human.role,
         gender=human.gender,
-        local_resident=None,  # TODO: field not on Human model
+        local_resident=None,
         products=products,
     )
 
@@ -557,7 +542,7 @@ async def update_group_member(
         organization=human.organization,
         role=human.role,
         gender=human.gender,
-        local_resident=None,  # TODO: field not on Human model
+        local_resident=None,
         products=products,
     )
 

@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
-from sqlmodel import Column, DateTime, Field, Relationship, func
+from sqlmodel import Column, DateTime, Field, Relationship, SQLModel, func
 
 from app.api.group.schemas import (
     GroupBase,
@@ -38,6 +38,33 @@ class GroupProducts(GroupProductsBase, table=True):
     """Link table for group products."""
 
     __tablename__ = "group_products"
+
+
+class GroupWhitelistedEmails(SQLModel, table=True):
+    """Whitelisted emails for group membership."""
+
+    __tablename__ = "group_whitelisted_emails"
+    __table_args__ = (
+        UniqueConstraint("group_id", "email", name="uq_group_whitelisted_email"),
+    )
+
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        sa_column=Column(
+            UUID(as_uuid=True),
+            primary_key=True,
+        ),
+    )
+    tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
+    group_id: uuid.UUID = Field(foreign_key="groups.id", index=True)
+    email: str = Field(index=True)
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_column=Column(DateTime(timezone=True), server_default=func.now()),
+    )
+
+    # Relationship
+    group: "Groups" = Relationship(back_populates="whitelisted_emails")
 
 
 class Groups(GroupBase, table=True):
@@ -96,6 +123,21 @@ class Groups(GroupBase, table=True):
     # Payments associated with this group's discount
     payments: list["Payments"] = Relationship(back_populates="group")
 
+    # Whitelisted emails for membership
+    whitelisted_emails: list["GroupWhitelistedEmails"] = Relationship(
+        back_populates="group",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
+    )
+
     def is_leader(self, human_id: uuid.UUID) -> bool:
         """Check if a human is a leader of this group."""
         return any(leader.id == human_id for leader in self.leaders)
+
+    @property
+    def is_open(self) -> bool:
+        """A group is open if it has no whitelisted emails."""
+        return len(self.whitelisted_emails) == 0
+
+    def has_whitelisted_email(self, email: str) -> bool:
+        """Check if email is whitelisted (case-insensitive)."""
+        return email.lower() in [e.email.lower() for e in self.whitelisted_emails]
