@@ -41,7 +41,7 @@ import {
   useTableSearchParams,
   validateTableSearch,
 } from "@/hooks/useTableSearchParams"
-import { exportToCsv } from "@/lib/export"
+import { exportToCsv, fetchAllPages } from "@/lib/export"
 
 function getAttendeesQueryOptions(
   popupId: string | null,
@@ -332,14 +332,16 @@ function Attendees() {
     if (!selectedPopupId) return
     setIsExporting(true)
     try {
-      const data = await AttendeesService.listAttendees({
-        skip: 0,
-        limit: 10000,
-        popupId: selectedPopupId,
-      })
+      const results = await fetchAllPages((skip, limit) =>
+        AttendeesService.listAttendees({
+          skip,
+          limit,
+          popupId: selectedPopupId,
+        }),
+      )
       exportToCsv(
         "attendees",
-        data.results as unknown as Record<string, unknown>[],
+        results as unknown as Record<string, unknown>[],
         [
           { key: "name", label: "Name" },
           { key: "email", label: "Email" },

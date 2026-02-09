@@ -59,7 +59,7 @@ import {
   useTableSearchParams,
   validateTableSearch,
 } from "@/hooks/useTableSearchParams"
-import { exportToCsv } from "@/lib/export"
+import { exportToCsv, fetchAllPages } from "@/lib/export"
 import { createErrorHandler } from "@/utils"
 
 function getApplicationsQueryOptions(
@@ -525,14 +525,16 @@ function Applications() {
     if (!selectedPopupId) return
     setIsExporting(true)
     try {
-      const data = await ApplicationsService.listApplications({
-        skip: 0,
-        limit: 10000,
-        popupId: selectedPopupId,
-      })
+      const results = await fetchAllPages((skip, limit) =>
+        ApplicationsService.listApplications({
+          skip,
+          limit,
+          popupId: selectedPopupId,
+        }),
+      )
       exportToCsv(
         "applications",
-        data.results as unknown as Record<string, unknown>[],
+        results as unknown as Record<string, unknown>[],
         [
           { key: "human.first_name", label: "First Name" },
           { key: "human.last_name", label: "Last Name" },

@@ -50,7 +50,7 @@ import {
   useTableSearchParams,
   validateTableSearch,
 } from "@/hooks/useTableSearchParams"
-import { exportToCsv } from "@/lib/export"
+import { exportToCsv, fetchAllPages } from "@/lib/export"
 import { createErrorHandler } from "@/utils"
 
 function getPaymentsQueryOptions(
@@ -582,14 +582,16 @@ function Payments() {
     if (!selectedPopupId) return
     setIsExporting(true)
     try {
-      const data = await PaymentsService.listPayments({
-        skip: 0,
-        limit: 10000,
-        popupId: selectedPopupId,
-      })
+      const results = await fetchAllPages((skip, limit) =>
+        PaymentsService.listPayments({
+          skip,
+          limit,
+          popupId: selectedPopupId,
+        }),
+      )
       exportToCsv(
         "payments",
-        data.results as unknown as Record<string, unknown>[],
+        results as unknown as Record<string, unknown>[],
         [
           { key: "amount", label: "Amount" },
           { key: "currency", label: "Currency" },
