@@ -1,3 +1,26 @@
+const PAGE_LIMIT = 1000
+
+export async function fetchAllPages<T>(
+  fetchPage: (
+    skip: number,
+    limit: number,
+  ) => Promise<{ results: T[]; paging: { total: number } }>,
+): Promise<T[]> {
+  const first = await fetchPage(0, PAGE_LIMIT)
+  const { total } = first.paging
+
+  if (total <= PAGE_LIMIT) return first.results
+
+  const remaining = Math.ceil((total - PAGE_LIMIT) / PAGE_LIMIT)
+  const pages = await Promise.all(
+    Array.from({ length: remaining }, (_, i) =>
+      fetchPage((i + 1) * PAGE_LIMIT, PAGE_LIMIT),
+    ),
+  )
+
+  return [first, ...pages].flatMap((p) => p.results)
+}
+
 export function exportToCsv<T extends Record<string, unknown>>(
   filename: string,
   data: T[],
