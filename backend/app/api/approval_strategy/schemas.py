@@ -40,9 +40,6 @@ class ApprovalStrategyBase(SQLModel):
     no_weight: int = Field(default=-1)
     strong_no_weight: int = Field(default=-2)
 
-    # Veto behavior
-    rejection_is_veto: bool = Field(default=True)
-
 
 class ApprovalStrategyCreate(BaseModel):
     """Schema for creating an approval strategy."""
@@ -55,7 +52,6 @@ class ApprovalStrategyCreate(BaseModel):
     yes_weight: int = 1
     no_weight: int = -1
     strong_no_weight: int = -2
-    rejection_is_veto: bool = True
 
 
 class ApprovalStrategyUpdate(BaseModel):
@@ -69,7 +65,6 @@ class ApprovalStrategyUpdate(BaseModel):
     yes_weight: int | None = None
     no_weight: int | None = None
     strong_no_weight: int | None = None
-    rejection_is_veto: bool | None = None
 
 
 class ApprovalStrategyPublic(BaseModel):
@@ -87,7 +82,6 @@ class ApprovalStrategyPublic(BaseModel):
     yes_weight: int
     no_weight: int
     strong_no_weight: int
-    rejection_is_veto: bool
 
     created_at: datetime | None = None
     updated_at: datetime | None = None

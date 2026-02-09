@@ -49,16 +49,6 @@ class ApprovalCalculator:
         if strategy.strategy_type == ApprovalStrategyType.AUTO_ACCEPT:
             return ApplicationStatus.ACCEPTED
 
-        # Check for veto (instant rejection)
-        if strategy.rejection_is_veto:
-            rejections = [
-                r
-                for r in reviews
-                if r.decision in [ReviewDecision.NO, ReviewDecision.STRONG_NO]
-            ]
-            if rejections:
-                return ApplicationStatus.REJECTED
-
         # Calculate based on strategy type
         match strategy.strategy_type:
             case ApprovalStrategyType.ANY_REVIEWER:
