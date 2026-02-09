@@ -12,7 +12,7 @@ import {
   Users,
   UsersRound,
 } from "lucide-react"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 
 import {
   CommandDialog,
@@ -25,6 +25,7 @@ import {
   CommandShortcut,
 } from "@/components/ui/command"
 import useAuth from "@/hooks/useAuth"
+import { CREATE_ROUTES, formatShortcut, SHORTCUTS } from "@/lib/shortcuts"
 
 const pages = [
   { label: "Dashboard", to: "/", icon: Home },
@@ -43,25 +44,19 @@ const adminPages = [{ label: "Users", to: "/admin", icon: Users }]
 
 const superadminPages = [{ label: "Tenants", to: "/tenants", icon: Users }]
 
-const createActions = [
-  { label: "New Popup", to: "/popups/new", icon: Plus },
-  { label: "New Product", to: "/products/new", icon: Plus },
-  { label: "New Coupon", to: "/coupons/new", icon: Plus },
-  { label: "New Group", to: "/groups/new", icon: Plus },
-  { label: "New Form Field", to: "/form-builder/new", icon: Plus },
-]
+const createActions = Object.values(CREATE_ROUTES).map((route) => ({
+  label: route.label,
+  to: route.path,
+  icon: Plus,
+}))
 
 export function CommandPalette() {
   const [open, setOpen] = useState(false)
   const navigate = useNavigate()
   const { isAdmin, isSuperadmin } = useAuth()
-  const isMac = useMemo(
-    () =>
-      typeof navigator !== "undefined" &&
-      /Mac|iPhone|iPad/.test(navigator.userAgent),
-    [],
-  )
-  const modifierKey = isMac ? "\u2318" : "Ctrl+"
+  const isMac =
+    typeof navigator !== "undefined" &&
+    /Mac|iPhone|iPad/.test(navigator.userAgent)
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -74,13 +69,10 @@ export function CommandPalette() {
     return () => document.removeEventListener("keydown", down)
   }, [])
 
-  const runCommand = useCallback(
-    (to: string) => {
-      setOpen(false)
-      navigate({ to })
-    },
-    [navigate],
-  )
+  const runCommand = (to: string) => {
+    setOpen(false)
+    navigate({ to })
+  }
 
   const allPages = [
     ...pages,
@@ -119,10 +111,14 @@ export function CommandPalette() {
         )}
         <CommandSeparator />
         <CommandGroup heading="Shortcuts">
-          <CommandItem disabled>
-            Command Palette
-            <CommandShortcut>{modifierKey}K</CommandShortcut>
-          </CommandItem>
+          {SHORTCUTS.map((shortcut) => (
+            <CommandItem key={shortcut.id} disabled>
+              {shortcut.label}
+              <CommandShortcut>
+                {formatShortcut(shortcut, isMac)}
+              </CommandShortcut>
+            </CommandItem>
+          ))}
         </CommandGroup>
       </CommandList>
     </CommandDialog>

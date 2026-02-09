@@ -7,7 +7,7 @@ import {
   useMatches,
 } from "@tanstack/react-router"
 import { ChevronRight, Home } from "lucide-react"
-import { Fragment } from "react"
+import { Fragment, useEffect, useState } from "react"
 import {
   ApplicationsService,
   CouponsService,
@@ -20,6 +20,7 @@ import {
   UsersService,
 } from "@/client"
 import { CommandPalette } from "@/components/Common/CommandPalette"
+import { ShortcutsDialog } from "@/components/Common/ShortcutsDialog"
 import AppSidebar from "@/components/Sidebar/AppSidebar"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
@@ -30,6 +31,7 @@ import {
 } from "@/components/ui/sidebar"
 import { useWorkspace, WorkspaceProvider } from "@/contexts/WorkspaceContext"
 import useAuth, { isLoggedIn } from "@/hooks/useAuth"
+import useGlobalShortcuts from "@/hooks/useGlobalShortcuts"
 
 export const Route = createFileRoute("/_layout")({
   component: () => (
@@ -262,7 +264,7 @@ function WorkspaceIndicator() {
   if (!popupName && !tenantName) return null
 
   return (
-    <div className="ml-auto flex items-center gap-1.5">
+    <div className="flex items-center gap-1.5">
       {isSuperadmin && tenantName && (
         <Badge variant="outline" className="max-w-[140px] truncate text-xs">
           {tenantName}
@@ -277,17 +279,59 @@ function WorkspaceIndicator() {
   )
 }
 
+function ShortcutsHint() {
+  const [modifier, setModifier] = useState("Ctrl")
+
+  useEffect(() => {
+    if (
+      typeof navigator !== "undefined" &&
+      /Mac|iPhone|iPad/.test(navigator.userAgent)
+    ) {
+      setModifier("⌘")
+    }
+  }, [])
+
+  return (
+    <div className="hidden items-center gap-3 text-xs text-muted-foreground md:flex">
+      <div className="flex items-center gap-1">
+        <span>Search</span>
+        <kbd className="bg-muted text-muted-foreground pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border px-1.5 font-mono text-[10px] font-medium opacity-100">
+          <span className="text-xs">{modifier}</span>K
+        </kbd>
+      </div>
+      <div className="flex items-center gap-1">
+        <span>More</span>
+        <kbd className="bg-muted text-muted-foreground pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border px-1.5 font-mono text-[10px] font-medium opacity-100">
+          <span className="text-xs">{modifier}</span>/
+        </kbd>
+      </div>
+    </div>
+  )
+}
+
 function Layout() {
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
+
+  const toggleShortcutsDialog = () => {
+    setShortcutsOpen((prev) => !prev)
+  }
+
+  useGlobalShortcuts({ onShortcutsDialogToggle: toggleShortcutsDialog })
+
   return (
     <SidebarProvider>
       <AppSidebar />
       <CommandPalette />
+      <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
       <SidebarInset>
         <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-2 border-b bg-background px-4">
           <SidebarTrigger className="-ml-1 text-muted-foreground" />
           <Separator orientation="vertical" className="h-4" />
           <Breadcrumbs />
-          <WorkspaceIndicator />
+          <div className="ml-auto flex items-center gap-4">
+            <ShortcutsHint />
+            <WorkspaceIndicator />
+          </div>
         </header>
         <main className="flex-1 p-6 md:p-8">
           <div className="mx-auto max-w-7xl">
