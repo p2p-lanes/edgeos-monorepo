@@ -457,6 +457,18 @@ export const ApplicationCreateSchema = {
             ],
             title: 'Human Id'
         },
+        group_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Group Id'
+        },
         companions: {
             anyOf: [
                 {
@@ -991,11 +1003,6 @@ export const ApprovalStrategyCreateSchema = {
             type: 'integer',
             title: 'Strong No Weight',
             default: -2
-        },
-        rejection_is_veto: {
-            type: 'boolean',
-            title: 'Rejection Is Veto',
-            default: true
         }
     },
     type: 'object',
@@ -1051,10 +1058,6 @@ export const ApprovalStrategyPublicSchema = {
             type: 'integer',
             title: 'Strong No Weight'
         },
-        rejection_is_veto: {
-            type: 'boolean',
-            title: 'Rejection Is Veto'
-        },
         created_at: {
             anyOf: [
                 {
@@ -1081,7 +1084,7 @@ export const ApprovalStrategyPublicSchema = {
         }
     },
     type: 'object',
-    required: ['id', 'popup_id', 'tenant_id', 'strategy_type', 'required_approvals', 'accept_threshold', 'reject_threshold', 'strong_yes_weight', 'yes_weight', 'no_weight', 'strong_no_weight', 'rejection_is_veto'],
+    required: ['id', 'popup_id', 'tenant_id', 'strategy_type', 'required_approvals', 'accept_threshold', 'reject_threshold', 'strong_yes_weight', 'yes_weight', 'no_weight', 'strong_no_weight'],
     title: 'ApprovalStrategyPublic',
     description: 'ApprovalStrategy schema for API responses.'
 } as const;
@@ -1181,17 +1184,6 @@ export const ApprovalStrategyUpdateSchema = {
                 }
             ],
             title: 'Strong No Weight'
-        },
-        rejection_is_veto: {
-            anyOf: [
-                {
-                    type: 'boolean'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Rejection Is Veto'
         }
     },
     type: 'object',
@@ -2201,6 +2193,20 @@ export const GroupAdminUpdateSchema = {
                 }
             ],
             title: 'Ambassador Id'
+        },
+        whitelisted_emails: {
+            anyOf: [
+                {
+                    items: {
+                        type: 'string'
+                    },
+                    type: 'array'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Whitelisted Emails'
         }
     },
     type: 'object',
@@ -2292,6 +2298,20 @@ export const GroupCreateSchema = {
                 }
             ],
             title: 'Ambassador Id'
+        },
+        whitelisted_emails: {
+            anyOf: [
+                {
+                    items: {
+                        type: 'string'
+                    },
+                    type: 'array'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Whitelisted Emails'
         }
     },
     type: 'object',
@@ -2786,6 +2806,19 @@ export const GroupPublicSchema = {
                 }
             ],
             title: 'Updated At'
+        },
+        whitelisted_emails: {
+            items: {
+                '$ref': '#/components/schemas/GroupWhitelistedEmailPublic'
+            },
+            type: 'array',
+            title: 'Whitelisted Emails',
+            default: []
+        },
+        is_open: {
+            type: 'boolean',
+            title: 'Is Open',
+            default: true
         }
     },
     type: 'object',
@@ -2833,6 +2866,29 @@ export const GroupUpdateSchema = {
     type: 'object',
     title: 'GroupUpdate',
     description: 'Group schema for updates (limited fields for leaders).'
+} as const;
+
+export const GroupWhitelistedEmailPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        email: {
+            type: 'string',
+            title: 'Email'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'email', 'created_at'],
+    title: 'GroupWhitelistedEmailPublic',
+    description: 'Schema for whitelisted email response.'
 } as const;
 
 export const GroupWithMembersSchema = {
@@ -2939,6 +2995,19 @@ export const GroupWithMembersSchema = {
                 }
             ],
             title: 'Updated At'
+        },
+        whitelisted_emails: {
+            items: {
+                '$ref': '#/components/schemas/GroupWhitelistedEmailPublic'
+            },
+            type: 'array',
+            title: 'Whitelisted Emails',
+            default: []
+        },
+        is_open: {
+            type: 'boolean',
+            title: 'Is Open',
+            default: true
         },
         members: {
             items: {
@@ -3772,6 +3841,39 @@ export const PaymentPreviewSchema = {
                 }
             ],
             title: 'Group Id'
+        },
+        status: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Status'
+        },
+        external_id: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'External Id'
+        },
+        checkout_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Checkout Url'
         }
     },
     type: 'object',
@@ -4148,6 +4250,17 @@ export const PaymentUpdateSchema = {
                 }
             ],
             title: 'Rate'
+        },
+        currency: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Currency'
         }
     },
     type: 'object',
@@ -4872,7 +4985,8 @@ export const ProductCreateSchema = {
         price: {
             anyOf: [
                 {
-                    type: 'number'
+                    type: 'number',
+                    minimum: 0
                 },
                 {
                     type: 'string',
@@ -4884,7 +4998,8 @@ export const ProductCreateSchema = {
         compare_price: {
             anyOf: [
                 {
-                    type: 'number'
+                    type: 'number',
+                    minimum: 0
                 },
                 {
                     type: 'string',
@@ -5139,7 +5254,8 @@ export const ProductUpdateSchema = {
         price: {
             anyOf: [
                 {
-                    type: 'number'
+                    type: 'number',
+                    minimum: 0
                 },
                 {
                     type: 'string',
@@ -5154,7 +5270,8 @@ export const ProductUpdateSchema = {
         compare_price: {
             anyOf: [
                 {
-                    type: 'number'
+                    type: 'number',
+                    minimum: 0
                 },
                 {
                     type: 'string',
@@ -5322,6 +5439,223 @@ export const ReviewSummarySchema = {
     required: ['total_reviews', 'strong_yes_count', 'yes_count', 'no_count', 'strong_no_count', 'reviews'],
     title: 'ReviewSummary',
     description: 'Summary of reviews for an application.'
+} as const;
+
+export const SimpleFICardPaymentSchema = {
+    properties: {
+        provider: {
+            type: 'string',
+            title: 'Provider'
+        },
+        status: {
+            type: 'string',
+            title: 'Status'
+        },
+        coin: {
+            type: 'string',
+            title: 'Coin',
+            default: 'USD'
+        }
+    },
+    type: 'object',
+    required: ['provider', 'status'],
+    title: 'SimpleFICardPayment',
+    description: 'Card payment info from SimpleFI.'
+} as const;
+
+export const SimpleFIDataSchema = {
+    properties: {
+        payment_request: {
+            '$ref': '#/components/schemas/SimpleFIPaymentRequest'
+        },
+        new_payment: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/SimpleFIPaymentInfo'
+                },
+                {
+                    '$ref': '#/components/schemas/SimpleFICardPayment'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'New Payment'
+        }
+    },
+    type: 'object',
+    required: ['payment_request'],
+    title: 'SimpleFIData',
+    description: 'Data payload from SimpleFI webhook.'
+} as const;
+
+export const SimpleFIPaymentInfoSchema = {
+    properties: {
+        coin: {
+            type: 'string',
+            title: 'Coin'
+        },
+        hash: {
+            type: 'string',
+            title: 'Hash'
+        },
+        amount: {
+            type: 'number',
+            title: 'Amount'
+        },
+        paid_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Paid At'
+        }
+    },
+    type: 'object',
+    required: ['coin', 'hash', 'amount', 'paid_at'],
+    title: 'SimpleFIPaymentInfo',
+    description: 'Payment info from SimpleFI.'
+} as const;
+
+export const SimpleFIPaymentRequestSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            title: 'Id'
+        },
+        order_id: {
+            type: 'integer',
+            title: 'Order Id'
+        },
+        amount: {
+            type: 'number',
+            title: 'Amount'
+        },
+        amount_paid: {
+            type: 'number',
+            title: 'Amount Paid'
+        },
+        currency: {
+            type: 'string',
+            title: 'Currency'
+        },
+        reference: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Reference'
+        },
+        status: {
+            type: 'string',
+            title: 'Status'
+        },
+        status_detail: {
+            type: 'string',
+            title: 'Status Detail'
+        },
+        transactions: {
+            items: {
+                '$ref': '#/components/schemas/SimpleFITransaction'
+            },
+            type: 'array',
+            title: 'Transactions'
+        },
+        card_payment: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/SimpleFICardPayment'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        payments: {
+            items: {
+                '$ref': '#/components/schemas/SimpleFIPaymentInfo'
+            },
+            type: 'array',
+            title: 'Payments'
+        }
+    },
+    type: 'object',
+    required: ['id', 'order_id', 'amount', 'amount_paid', 'currency', 'reference', 'status', 'status_detail', 'transactions', 'payments'],
+    title: 'SimpleFIPaymentRequest',
+    description: 'Payment request details from SimpleFI.'
+} as const;
+
+export const SimpleFIPriceDetailsSchema = {
+    properties: {
+        currency: {
+            type: 'string',
+            title: 'Currency'
+        },
+        final_amount: {
+            type: 'number',
+            title: 'Final Amount'
+        },
+        rate: {
+            type: 'number',
+            title: 'Rate'
+        }
+    },
+    type: 'object',
+    required: ['currency', 'final_amount', 'rate'],
+    title: 'SimpleFIPriceDetails',
+    description: 'Price details for a SimpleFI transaction.'
+} as const;
+
+export const SimpleFITransactionSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            title: 'Id'
+        },
+        coin: {
+            type: 'string',
+            title: 'Coin'
+        },
+        chain_id: {
+            type: 'integer',
+            title: 'Chain Id'
+        },
+        status: {
+            type: 'string',
+            title: 'Status'
+        },
+        price_details: {
+            '$ref': '#/components/schemas/SimpleFIPriceDetails'
+        }
+    },
+    type: 'object',
+    required: ['id', 'coin', 'chain_id', 'status', 'price_details'],
+    title: 'SimpleFITransaction',
+    description: 'Transaction details from SimpleFI.'
+} as const;
+
+export const SimpleFIWebhookPayloadSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            title: 'Id'
+        },
+        event_type: {
+            type: 'string',
+            title: 'Event Type'
+        },
+        entity_type: {
+            type: 'string',
+            title: 'Entity Type'
+        },
+        entity_id: {
+            type: 'string',
+            title: 'Entity Id'
+        },
+        data: {
+            '$ref': '#/components/schemas/SimpleFIData'
+        }
+    },
+    type: 'object',
+    required: ['id', 'event_type', 'entity_type', 'entity_id', 'data'],
+    title: 'SimpleFIWebhookPayload',
+    description: 'SimpleFI webhook payload schema.'
 } as const;
 
 export const TenantCreateSchema = {

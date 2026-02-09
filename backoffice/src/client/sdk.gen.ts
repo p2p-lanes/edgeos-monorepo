@@ -3,7 +3,7 @@
 import type { CancelablePromise } from './core/CancelablePromise';
 import { OpenAPI } from './core/OpenAPI';
 import { request as __request } from './core/request';
-import type { ApplicationReviewsListReviewsData, ApplicationReviewsListReviewsResponse, ApplicationReviewsSubmitReviewData, ApplicationReviewsSubmitReviewResponse, ApplicationReviewsGetReviewSummaryData, ApplicationReviewsGetReviewSummaryResponse, ApplicationReviewsListPendingReviewsData, ApplicationReviewsListPendingReviewsResponse, ApplicationReviewsListMyReviewsData, ApplicationReviewsListMyReviewsResponse, ApplicationsListApplicationsData, ApplicationsListApplicationsResponse, ApplicationsCreateApplicationAdminData, ApplicationsCreateApplicationAdminResponse, ApplicationsGetApplicationData, ApplicationsGetApplicationResponse, ApplicationsUpdateApplicationAdminData, ApplicationsUpdateApplicationAdminResponse, ApplicationsDeleteApplicationData, ApplicationsDeleteApplicationResponse, ApplicationsListMyApplicationsData, ApplicationsListMyApplicationsResponse, ApplicationsListMyTicketsResponse, ApplicationsGetMyApplicationData, ApplicationsGetMyApplicationResponse, ApplicationsUpdateMyApplicationData, ApplicationsUpdateMyApplicationResponse, ApplicationsCreateMyApplicationData, ApplicationsCreateMyApplicationResponse, ApplicationsAddMyAttendeeData, ApplicationsAddMyAttendeeResponse, ApplicationsUpdateMyAttendeeData, ApplicationsUpdateMyAttendeeResponse, ApplicationsDeleteMyAttendeeData, ApplicationsDeleteMyAttendeeResponse, ApprovalStrategiesGetApprovalStrategyData, ApprovalStrategiesGetApprovalStrategyResponse, ApprovalStrategiesCreateOrUpdateApprovalStrategyData, ApprovalStrategiesCreateOrUpdateApprovalStrategyResponse, ApprovalStrategiesUpdateApprovalStrategyData, ApprovalStrategiesUpdateApprovalStrategyResponse, ApprovalStrategiesDeleteApprovalStrategyData, ApprovalStrategiesDeleteApprovalStrategyResponse, AttendeesListAttendeesData, AttendeesListAttendeesResponse, AttendeesGetAttendeeData, AttendeesGetAttendeeResponse, AttendeesUpdateAttendeeData, AttendeesUpdateAttendeeResponse, AttendeesDeleteAttendeeData, AttendeesDeleteAttendeeResponse, AttendeesGetByCheckInCodeData, AttendeesGetByCheckInCodeResponse, AttendeesGetTicketsByEmailData, AttendeesGetTicketsByEmailResponse, AuthUserLoginData, AuthUserLoginResponse, AuthUserAuthenticateData, AuthUserAuthenticateResponse, AuthHumanLoginData, AuthHumanLoginResponse, AuthHumanAuthenticateData, AuthHumanAuthenticateResponse, CouponsListCouponsData, CouponsListCouponsResponse, CouponsCreateCouponData, CouponsCreateCouponResponse, CouponsGetCouponData, CouponsGetCouponResponse, CouponsUpdateCouponData, CouponsUpdateCouponResponse, CouponsDeleteCouponData, CouponsDeleteCouponResponse, CouponsValidateCouponData, CouponsValidateCouponResponse, DashboardGetDashboardStatsData, DashboardGetDashboardStatsResponse, FormFieldsListFormFieldsData, FormFieldsListFormFieldsResponse, FormFieldsCreateFormFieldData, FormFieldsCreateFormFieldResponse, FormFieldsGetFormFieldData, FormFieldsGetFormFieldResponse, FormFieldsUpdateFormFieldData, FormFieldsUpdateFormFieldResponse, FormFieldsDeleteFormFieldData, FormFieldsDeleteFormFieldResponse, FormFieldsGetApplicationSchemaData, FormFieldsGetApplicationSchemaResponse, GroupsListGroupsData, GroupsListGroupsResponse, GroupsCreateGroupData, GroupsCreateGroupResponse, GroupsGetGroupData, GroupsGetGroupResponse, GroupsUpdateGroupData, GroupsUpdateGroupResponse, GroupsDeleteGroupData, GroupsDeleteGroupResponse, GroupsListMyGroupsData, GroupsListMyGroupsResponse, GroupsGetMyGroupData, GroupsGetMyGroupResponse, GroupsUpdateMyGroupData, GroupsUpdateMyGroupResponse, GroupsAddGroupMemberData, GroupsAddGroupMemberResponse, GroupsAddGroupMembersBatchData, GroupsAddGroupMembersBatchResponse, GroupsUpdateGroupMemberData, GroupsUpdateGroupMemberResponse, GroupsRemoveGroupMemberData, GroupsRemoveGroupMemberResponse, GroupsGetGroupPublicData, GroupsGetGroupPublicResponse, HumansListHumansData, HumansListHumansResponse, HumansCreateHumanData, HumansCreateHumanResponse, HumansGetCurrentHumanInfoResponse, HumansGetHumanData, HumansGetHumanResponse, HumansUpdateHumanData, HumansUpdateHumanResponse, PaymentsListPaymentsData, PaymentsListPaymentsResponse, PaymentsGetPaymentData, PaymentsGetPaymentResponse, PaymentsUpdatePaymentData, PaymentsUpdatePaymentResponse, PaymentsApprovePaymentData, PaymentsApprovePaymentResponse, PaymentsListMyPaymentsData, PaymentsListMyPaymentsResponse, PaymentsPreviewMyPaymentData, PaymentsPreviewMyPaymentResponse, PaymentsCreateMyPaymentData, PaymentsCreateMyPaymentResponse, PaymentsSimplefiWebhookResponse, PaymentsStripeWebhookResponse, PopupReviewersListReviewersData, PopupReviewersListReviewersResponse, PopupReviewersAddReviewerData, PopupReviewersAddReviewerResponse, PopupReviewersUpdateReviewerData, PopupReviewersUpdateReviewerResponse, PopupReviewersRemoveReviewerData, PopupReviewersRemoveReviewerResponse, PopupsListPopupsData, PopupsListPopupsResponse, PopupsCreatePopupData, PopupsCreatePopupResponse, PopupsGetPopupData, PopupsGetPopupResponse, PopupsUpdatePopupData, PopupsUpdatePopupResponse, PopupsDeletePopupData, PopupsDeletePopupResponse, ProductsListProductsData, ProductsListProductsResponse, ProductsCreateProductData, ProductsCreateProductResponse, ProductsGetProductData, ProductsGetProductResponse, ProductsUpdateProductData, ProductsUpdateProductResponse, ProductsDeleteProductData, ProductsDeleteProductResponse, TenantsListTenantsData, TenantsListTenantsResponse, TenantsCreateTenantData, TenantsCreateTenantResponse, TenantsGetTenantData, TenantsGetTenantResponse, TenantsUpdateTenantData, TenantsUpdateTenantResponse, TenantsDeleteTenantData, TenantsDeleteTenantResponse, TenantsGetCredentialsData, TenantsGetCredentialsResponse, TenantsDeleteCredentialsData, TenantsDeleteCredentialsResponse, UploadsGetPresignedUploadUrlData, UploadsGetPresignedUploadUrlResponse, UsersListUsersData, UsersListUsersResponse, UsersCreateUserData, UsersCreateUserResponse, UsersGetCurrentUserInfoResponse, UsersGetUserData, UsersGetUserResponse, UsersUpdateUserData, UsersUpdateUserResponse, UsersDeleteUserData, UsersDeleteUserResponse } from './types.gen';
+import type { ApplicationReviewsListReviewsData, ApplicationReviewsListReviewsResponse, ApplicationReviewsSubmitReviewData, ApplicationReviewsSubmitReviewResponse, ApplicationReviewsGetReviewSummaryData, ApplicationReviewsGetReviewSummaryResponse, ApplicationReviewsListPendingReviewsData, ApplicationReviewsListPendingReviewsResponse, ApplicationReviewsListMyReviewsData, ApplicationReviewsListMyReviewsResponse, ApplicationsListApplicationsData, ApplicationsListApplicationsResponse, ApplicationsCreateApplicationAdminData, ApplicationsCreateApplicationAdminResponse, ApplicationsGetApplicationData, ApplicationsGetApplicationResponse, ApplicationsUpdateApplicationAdminData, ApplicationsUpdateApplicationAdminResponse, ApplicationsDeleteApplicationData, ApplicationsDeleteApplicationResponse, ApplicationsListMyApplicationsData, ApplicationsListMyApplicationsResponse, ApplicationsListMyTicketsResponse, ApplicationsGetMyApplicationData, ApplicationsGetMyApplicationResponse, ApplicationsUpdateMyApplicationData, ApplicationsUpdateMyApplicationResponse, ApplicationsCreateMyApplicationData, ApplicationsCreateMyApplicationResponse, ApplicationsAddMyAttendeeData, ApplicationsAddMyAttendeeResponse, ApplicationsUpdateMyAttendeeData, ApplicationsUpdateMyAttendeeResponse, ApplicationsDeleteMyAttendeeData, ApplicationsDeleteMyAttendeeResponse, ApprovalStrategiesGetApprovalStrategyData, ApprovalStrategiesGetApprovalStrategyResponse, ApprovalStrategiesCreateOrUpdateApprovalStrategyData, ApprovalStrategiesCreateOrUpdateApprovalStrategyResponse, ApprovalStrategiesUpdateApprovalStrategyData, ApprovalStrategiesUpdateApprovalStrategyResponse, ApprovalStrategiesDeleteApprovalStrategyData, ApprovalStrategiesDeleteApprovalStrategyResponse, AttendeesListAttendeesData, AttendeesListAttendeesResponse, AttendeesGetAttendeeData, AttendeesGetAttendeeResponse, AttendeesUpdateAttendeeData, AttendeesUpdateAttendeeResponse, AttendeesDeleteAttendeeData, AttendeesDeleteAttendeeResponse, AttendeesGetByCheckInCodeData, AttendeesGetByCheckInCodeResponse, AttendeesGetTicketsByEmailData, AttendeesGetTicketsByEmailResponse, AuthUserLoginData, AuthUserLoginResponse, AuthUserAuthenticateData, AuthUserAuthenticateResponse, AuthHumanLoginData, AuthHumanLoginResponse, AuthHumanAuthenticateData, AuthHumanAuthenticateResponse, CouponsListCouponsData, CouponsListCouponsResponse, CouponsCreateCouponData, CouponsCreateCouponResponse, CouponsGetCouponData, CouponsGetCouponResponse, CouponsUpdateCouponData, CouponsUpdateCouponResponse, CouponsDeleteCouponData, CouponsDeleteCouponResponse, CouponsValidateCouponData, CouponsValidateCouponResponse, DashboardGetDashboardStatsData, DashboardGetDashboardStatsResponse, FormFieldsListFormFieldsData, FormFieldsListFormFieldsResponse, FormFieldsCreateFormFieldData, FormFieldsCreateFormFieldResponse, FormFieldsGetFormFieldData, FormFieldsGetFormFieldResponse, FormFieldsUpdateFormFieldData, FormFieldsUpdateFormFieldResponse, FormFieldsDeleteFormFieldData, FormFieldsDeleteFormFieldResponse, FormFieldsGetApplicationSchemaData, FormFieldsGetApplicationSchemaResponse, GroupsListGroupsData, GroupsListGroupsResponse, GroupsCreateGroupData, GroupsCreateGroupResponse, GroupsGetGroupData, GroupsGetGroupResponse, GroupsUpdateGroupData, GroupsUpdateGroupResponse, GroupsDeleteGroupData, GroupsDeleteGroupResponse, GroupsListMyGroupsData, GroupsListMyGroupsResponse, GroupsGetMyGroupData, GroupsGetMyGroupResponse, GroupsUpdateMyGroupData, GroupsUpdateMyGroupResponse, GroupsAddGroupMemberData, GroupsAddGroupMemberResponse, GroupsAddGroupMembersBatchData, GroupsAddGroupMembersBatchResponse, GroupsUpdateGroupMemberData, GroupsUpdateGroupMemberResponse, GroupsRemoveGroupMemberData, GroupsRemoveGroupMemberResponse, GroupsGetGroupPublicData, GroupsGetGroupPublicResponse, HumansListHumansData, HumansListHumansResponse, HumansCreateHumanData, HumansCreateHumanResponse, HumansGetCurrentHumanInfoResponse, HumansGetHumanData, HumansGetHumanResponse, HumansUpdateHumanData, HumansUpdateHumanResponse, PaymentsListPaymentsData, PaymentsListPaymentsResponse, PaymentsGetPaymentData, PaymentsGetPaymentResponse, PaymentsUpdatePaymentData, PaymentsUpdatePaymentResponse, PaymentsApprovePaymentData, PaymentsApprovePaymentResponse, PaymentsListMyPaymentsData, PaymentsListMyPaymentsResponse, PaymentsPreviewMyPaymentData, PaymentsPreviewMyPaymentResponse, PaymentsCreateMyPaymentData, PaymentsCreateMyPaymentResponse, PaymentsSimplefiWebhookData, PaymentsSimplefiWebhookResponse, PopupReviewersListReviewersData, PopupReviewersListReviewersResponse, PopupReviewersAddReviewerData, PopupReviewersAddReviewerResponse, PopupReviewersUpdateReviewerData, PopupReviewersUpdateReviewerResponse, PopupReviewersRemoveReviewerData, PopupReviewersRemoveReviewerResponse, PopupsListPopupsData, PopupsListPopupsResponse, PopupsCreatePopupData, PopupsCreatePopupResponse, PopupsGetPopupData, PopupsGetPopupResponse, PopupsUpdatePopupData, PopupsUpdatePopupResponse, PopupsDeletePopupData, PopupsDeletePopupResponse, ProductsListProductsData, ProductsListProductsResponse, ProductsCreateProductData, ProductsCreateProductResponse, ProductsGetProductData, ProductsGetProductResponse, ProductsUpdateProductData, ProductsUpdateProductResponse, ProductsDeleteProductData, ProductsDeleteProductResponse, TenantsListTenantsData, TenantsListTenantsResponse, TenantsCreateTenantData, TenantsCreateTenantResponse, TenantsGetTenantData, TenantsGetTenantResponse, TenantsUpdateTenantData, TenantsUpdateTenantResponse, TenantsDeleteTenantData, TenantsDeleteTenantResponse, TenantsGetCredentialsData, TenantsGetCredentialsResponse, TenantsDeleteCredentialsData, TenantsDeleteCredentialsResponse, UploadsGetPresignedUploadUrlData, UploadsGetPresignedUploadUrlResponse, UsersListUsersData, UsersListUsersResponse, UsersCreateUserData, UsersCreateUserResponse, UsersGetCurrentUserInfoResponse, UsersGetUserData, UsersGetUserResponse, UsersUpdateUserData, UsersUpdateUserResponse, UsersDeleteUserData, UsersDeleteUserResponse } from './types.gen';
 
 export class ApplicationReviewsService {
     /**
@@ -11,8 +11,8 @@ export class ApplicationReviewsService {
      * List reviews for an application.
      * @param data The data for the request.
      * @param data.applicationId
-     * @param data.skip
-     * @param data.limit
+     * @param data.skip Number of items to skip
+     * @param data.limit Maximum number of items to return
      * @param data.xTenantId
      * @returns ListModel_ApplicationReviewPublic_ Successful Response
      * @throws ApiError
@@ -97,14 +97,14 @@ export class ApplicationReviewsService {
      * List Pending Reviews
      * List applications pending review by the current user.
      *
-     * Returns applications where:
-     * 1. User is a designated reviewer for the popup
-     * 2. Application is in IN_REVIEW status
-     * 3. User has not yet submitted a review
+     * Returns IN_REVIEW applications the user has not yet reviewed.
+     * If the user is a designated reviewer, scopes to their assigned popups.
+     * Otherwise (admin without reviewer assignment), returns all IN_REVIEW
+     * applications they haven't reviewed yet.
      * @param data The data for the request.
      * @param data.popupId
-     * @param data.skip
-     * @param data.limit
+     * @param data.skip Number of items to skip
+     * @param data.limit Maximum number of items to return
      * @param data.xTenantId
      * @returns ListModel Successful Response
      * @throws ApiError
@@ -131,8 +131,8 @@ export class ApplicationReviewsService {
      * List My Reviews
      * List reviews submitted by the current user.
      * @param data The data for the request.
-     * @param data.skip
-     * @param data.limit
+     * @param data.skip Number of items to skip
+     * @param data.limit Maximum number of items to return
      * @param data.xTenantId
      * @returns ListModel_ApplicationReviewPublic_ Successful Response
      * @throws ApiError
@@ -163,8 +163,8 @@ export class ApplicationsService {
      * @param data.popupId
      * @param data.humanId
      * @param data.statusFilter
-     * @param data.skip
-     * @param data.limit
+     * @param data.skip Number of items to skip
+     * @param data.limit Maximum number of items to return
      * @param data.xTenantId
      * @returns ListModel_ApplicationPublic_ Successful Response
      * @throws ApiError
@@ -298,8 +298,8 @@ export class ApplicationsService {
      * List My Applications
      * List applications for the current human (Portal).
      * @param data The data for the request.
-     * @param data.skip
-     * @param data.limit
+     * @param data.skip Number of items to skip
+     * @param data.limit Maximum number of items to return
      * @returns ListModel_ApplicationPublic_ Successful Response
      * @throws ApiError
      */
@@ -591,8 +591,8 @@ export class AttendeesService {
      * @param data.applicationId
      * @param data.popupId
      * @param data.email
-     * @param data.skip
-     * @param data.limit
+     * @param data.skip Number of items to skip
+     * @param data.limit Maximum number of items to return
      * @param data.xTenantId
      * @returns ListModel_AttendeePublic_ Successful Response
      * @throws ApiError
@@ -836,8 +836,8 @@ export class CouponsService {
      * @param data The data for the request.
      * @param data.popupId
      * @param data.isActive
-     * @param data.skip
-     * @param data.limit
+     * @param data.skip Number of items to skip
+     * @param data.limit Maximum number of items to return
      * @param data.xTenantId
      * @returns ListModel_CouponPublic_ Successful Response
      * @throws ApiError
@@ -1022,8 +1022,8 @@ export class FormFieldsService {
      * List Form Fields
      * @param data The data for the request.
      * @param data.popupId
-     * @param data.skip
-     * @param data.limit
+     * @param data.skip Number of items to skip
+     * @param data.limit Maximum number of items to return
      * @param data.xTenantId
      * @returns ListModel_FormFieldPublic_ Successful Response
      * @throws ApiError
@@ -1179,8 +1179,8 @@ export class GroupsService {
      * List all groups (BO only).
      * @param data The data for the request.
      * @param data.popupId
-     * @param data.skip
-     * @param data.limit
+     * @param data.skip Number of items to skip
+     * @param data.limit Maximum number of items to return
      * @param data.xTenantId
      * @returns ListModel_GroupPublic_ Successful Response
      * @throws ApiError
@@ -1309,8 +1309,8 @@ export class GroupsService {
      * List My Groups
      * List groups where current human is a leader (Portal).
      * @param data The data for the request.
-     * @param data.skip
-     * @param data.limit
+     * @param data.skip Number of items to skip
+     * @param data.limit Maximum number of items to return
      * @returns ListModel_GroupPublic_ Successful Response
      * @throws ApiError
      */
@@ -1496,8 +1496,8 @@ export class HumansService {
     /**
      * List Humans
      * @param data The data for the request.
-     * @param data.skip
-     * @param data.limit
+     * @param data.skip Number of items to skip
+     * @param data.limit Maximum number of items to return
      * @param data.xTenantId
      * @returns ListModel_HumanPublic_ Successful Response
      * @throws ApiError
@@ -1616,8 +1616,8 @@ export class PaymentsService {
      * @param data.applicationId
      * @param data.externalId
      * @param data.paymentStatus
-     * @param data.skip
-     * @param data.limit
+     * @param data.skip Number of items to skip
+     * @param data.limit Maximum number of items to return
      * @param data.xTenantId
      * @returns ListModel_PaymentPublic_ Successful Response
      * @throws ApiError
@@ -1726,8 +1726,8 @@ export class PaymentsService {
      * List payments for an application owned by current human (Portal).
      * @param data The data for the request.
      * @param data.applicationId
-     * @param data.skip
-     * @param data.limit
+     * @param data.skip Number of items to skip
+     * @param data.limit Maximum number of items to return
      * @returns ListModel_PaymentPublic_ Successful Response
      * @throws ApiError
      */
@@ -1801,28 +1801,21 @@ export class PaymentsService {
      * Webhook endpoint for SimpleFI payment notifications.
      *
      * Called by SimpleFI when payment status changes.
+     * Validates signature using the popup's simplefi_api_key.
+     * @param data The data for the request.
+     * @param data.requestBody
      * @returns unknown Successful Response
      * @throws ApiError
      */
-    public static simplefiWebhook(): CancelablePromise<PaymentsSimplefiWebhookResponse> {
+    public static simplefiWebhook(data: PaymentsSimplefiWebhookData): CancelablePromise<PaymentsSimplefiWebhookResponse> {
         return __request(OpenAPI, {
             method: 'POST',
-            url: '/api/v1/payments/webhook/simplefi'
-        });
-    }
-    
-    /**
-     * Stripe Webhook
-     * Webhook endpoint for Stripe payment notifications.
-     *
-     * Called by Stripe when payment status changes.
-     * @returns unknown Successful Response
-     * @throws ApiError
-     */
-    public static stripeWebhook(): CancelablePromise<PaymentsStripeWebhookResponse> {
-        return __request(OpenAPI, {
-            method: 'POST',
-            url: '/api/v1/payments/webhook/stripe'
+            url: '/api/v1/payments/webhook/simplefi',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
         });
     }
 }
@@ -1833,8 +1826,8 @@ export class PopupReviewersService {
      * List designated reviewers for a popup.
      * @param data The data for the request.
      * @param data.popupId
-     * @param data.skip
-     * @param data.limit
+     * @param data.skip Number of items to skip
+     * @param data.limit Maximum number of items to return
      * @param data.xTenantId
      * @returns ListModel_PopupReviewerPublic_ Successful Response
      * @throws ApiError
@@ -1949,8 +1942,8 @@ export class PopupsService {
     /**
      * List Popups
      * @param data The data for the request.
-     * @param data.skip
-     * @param data.limit
+     * @param data.skip Number of items to skip
+     * @param data.limit Maximum number of items to return
      * @param data.xTenantId
      * @returns ListModel_PopupPublic_ Successful Response
      * @throws ApiError
@@ -2079,8 +2072,8 @@ export class ProductsService {
      * @param data.popupId
      * @param data.isActive
      * @param data.category
-     * @param data.skip
-     * @param data.limit
+     * @param data.skip Number of items to skip
+     * @param data.limit Maximum number of items to return
      * @param data.xTenantId
      * @returns ListModel_ProductPublic_ Successful Response
      * @throws ApiError
@@ -2212,8 +2205,8 @@ export class TenantsService {
     /**
      * List Tenants
      * @param data The data for the request.
-     * @param data.skip
-     * @param data.limit
+     * @param data.skip Number of items to skip
+     * @param data.limit Maximum number of items to return
      * @returns ListModel_TenantPublic_ Successful Response
      * @throws ApiError
      */
@@ -2385,8 +2378,8 @@ export class UsersService {
     /**
      * List Users
      * @param data The data for the request.
-     * @param data.skip
-     * @param data.limit
+     * @param data.skip Number of items to skip
+     * @param data.limit Maximum number of items to return
      * @param data.tenantId
      * @param data.role
      * @returns ListModel_UserPublic_ Successful Response

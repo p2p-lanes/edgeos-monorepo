@@ -72,6 +72,7 @@ export type ApplicationCreate = {
 } | null);
     status?: (UserSettableStatus | null);
     human_id?: (string | null);
+    group_id?: (string | null);
     companions?: (Array<CompanionCreate> | null);
 };
 
@@ -180,7 +181,6 @@ export type ApprovalStrategyCreate = {
     yes_weight?: number;
     no_weight?: number;
     strong_no_weight?: number;
-    rejection_is_veto?: boolean;
 };
 
 /**
@@ -198,7 +198,6 @@ export type ApprovalStrategyPublic = {
     yes_weight: number;
     no_weight: number;
     strong_no_weight: number;
-    rejection_is_veto: boolean;
     created_at?: (string | null);
     updated_at?: (string | null);
 };
@@ -220,7 +219,6 @@ export type ApprovalStrategyUpdate = {
     yes_weight?: (number | null);
     no_weight?: (number | null);
     strong_no_weight?: (number | null);
-    rejection_is_veto?: (boolean | null);
 };
 
 /**
@@ -426,6 +424,7 @@ export type GroupAdminUpdate = {
     welcome_message?: (string | null);
     is_ambassador_group?: (boolean | null);
     ambassador_id?: (string | null);
+    whitelisted_emails?: (Array<(string)> | null);
 };
 
 /**
@@ -441,6 +440,7 @@ export type GroupCreate = {
     welcome_message?: (string | null);
     is_ambassador_group?: boolean;
     ambassador_id?: (string | null);
+    whitelisted_emails?: (Array<(string)> | null);
 };
 
 /**
@@ -530,6 +530,8 @@ export type GroupPublic = {
     id: string;
     created_at?: (string | null);
     updated_at?: (string | null);
+    whitelisted_emails?: Array<GroupWhitelistedEmailPublic>;
+    is_open?: boolean;
 };
 
 /**
@@ -539,6 +541,15 @@ export type GroupUpdate = {
     description?: (string | null);
     welcome_message?: (string | null);
     max_members?: (number | null);
+};
+
+/**
+ * Schema for whitelisted email response.
+ */
+export type GroupWhitelistedEmailPublic = {
+    id: string;
+    email: string;
+    created_at: string;
 };
 
 /**
@@ -558,6 +569,8 @@ export type GroupWithMembers = {
     id: string;
     created_at?: (string | null);
     updated_at?: (string | null);
+    whitelisted_emails?: Array<GroupWhitelistedEmailPublic>;
+    is_open?: boolean;
     members?: Array<GroupMemberPublic>;
 };
 
@@ -735,6 +748,9 @@ export type PaymentPreview = {
     coupon_code?: (string | null);
     discount_value?: (string | null);
     group_id?: (string | null);
+    status?: (string | null);
+    external_id?: (string | null);
+    checkout_url?: (string | null);
 };
 
 /**
@@ -818,6 +834,7 @@ export type PaymentUpdate = {
     external_id?: (string | null);
     source?: (PaymentSource | null);
     rate?: (number | string | null);
+    currency?: (string | null);
 };
 
 export type PopupCreate = {
@@ -1027,6 +1044,83 @@ export type ReviewSummary = {
     reviews: Array<ApplicationReviewPublic>;
 };
 
+/**
+ * Card payment info from SimpleFI.
+ */
+export type SimpleFICardPayment = {
+    provider: string;
+    status: string;
+    coin?: string;
+};
+
+/**
+ * Data payload from SimpleFI webhook.
+ */
+export type SimpleFIData = {
+    payment_request: SimpleFIPaymentRequest;
+    new_payment?: (SimpleFIPaymentInfo | SimpleFICardPayment | null);
+};
+
+/**
+ * Payment info from SimpleFI.
+ */
+export type SimpleFIPaymentInfo = {
+    coin: string;
+    hash: string;
+    amount: number;
+    paid_at: string;
+};
+
+/**
+ * Payment request details from SimpleFI.
+ */
+export type SimpleFIPaymentRequest = {
+    id: string;
+    order_id: number;
+    amount: number;
+    amount_paid: number;
+    currency: string;
+    reference: {
+        [key: string]: unknown;
+    };
+    status: string;
+    status_detail: string;
+    transactions: Array<SimpleFITransaction>;
+    card_payment?: (SimpleFICardPayment | null);
+    payments: Array<SimpleFIPaymentInfo>;
+};
+
+/**
+ * Price details for a SimpleFI transaction.
+ */
+export type SimpleFIPriceDetails = {
+    currency: string;
+    final_amount: number;
+    rate: number;
+};
+
+/**
+ * Transaction details from SimpleFI.
+ */
+export type SimpleFITransaction = {
+    id: string;
+    coin: string;
+    chain_id: number;
+    status: string;
+    price_details: SimpleFIPriceDetails;
+};
+
+/**
+ * SimpleFI webhook payload schema.
+ */
+export type SimpleFIWebhookPayload = {
+    id: string;
+    event_type: string;
+    entity_type: string;
+    entity_id: string;
+    data: SimpleFIData;
+};
+
 export type TenantCreate = {
     name: string;
     slug?: string;
@@ -1148,7 +1242,13 @@ export type ValidationError = {
 
 export type ApplicationReviewsListReviewsData = {
     applicationId: string;
+    /**
+     * Maximum number of items to return
+     */
     limit?: number;
+    /**
+     * Number of items to skip
+     */
     skip?: number;
     xTenantId?: (string | null);
 };
@@ -1171,8 +1271,14 @@ export type ApplicationReviewsGetReviewSummaryData = {
 export type ApplicationReviewsGetReviewSummaryResponse = (ReviewSummary);
 
 export type ApplicationReviewsListPendingReviewsData = {
+    /**
+     * Maximum number of items to return
+     */
     limit?: number;
     popupId?: (string | null);
+    /**
+     * Number of items to skip
+     */
     skip?: number;
     xTenantId?: (string | null);
 };
@@ -1180,7 +1286,13 @@ export type ApplicationReviewsListPendingReviewsData = {
 export type ApplicationReviewsListPendingReviewsResponse = (ListModel);
 
 export type ApplicationReviewsListMyReviewsData = {
+    /**
+     * Maximum number of items to return
+     */
     limit?: number;
+    /**
+     * Number of items to skip
+     */
     skip?: number;
     xTenantId?: (string | null);
 };
@@ -1189,8 +1301,14 @@ export type ApplicationReviewsListMyReviewsResponse = (ListModel_ApplicationRevi
 
 export type ApplicationsListApplicationsData = {
     humanId?: (string | null);
+    /**
+     * Maximum number of items to return
+     */
     limit?: number;
     popupId?: (string | null);
+    /**
+     * Number of items to skip
+     */
     skip?: number;
     statusFilter?: (ApplicationStatus | null);
     xTenantId?: (string | null);
@@ -1228,7 +1346,13 @@ export type ApplicationsDeleteApplicationData = {
 export type ApplicationsDeleteApplicationResponse = (void);
 
 export type ApplicationsListMyApplicationsData = {
+    /**
+     * Maximum number of items to return
+     */
     limit?: number;
+    /**
+     * Number of items to skip
+     */
     skip?: number;
 };
 
@@ -1310,8 +1434,14 @@ export type ApprovalStrategiesDeleteApprovalStrategyResponse = (void);
 export type AttendeesListAttendeesData = {
     applicationId?: (string | null);
     email?: (string | null);
+    /**
+     * Maximum number of items to return
+     */
     limit?: number;
     popupId?: (string | null);
+    /**
+     * Number of items to skip
+     */
     skip?: number;
     xTenantId?: (string | null);
 };
@@ -1380,8 +1510,14 @@ export type AuthHumanAuthenticateResponse = (Token);
 
 export type CouponsListCouponsData = {
     isActive?: (boolean | null);
+    /**
+     * Maximum number of items to return
+     */
     limit?: number;
     popupId?: (string | null);
+    /**
+     * Number of items to skip
+     */
     skip?: number;
     xTenantId?: (string | null);
 };
@@ -1434,8 +1570,14 @@ export type DashboardGetDashboardStatsData = {
 export type DashboardGetDashboardStatsResponse = (DashboardStats);
 
 export type FormFieldsListFormFieldsData = {
+    /**
+     * Maximum number of items to return
+     */
     limit?: number;
     popupId?: (string | null);
+    /**
+     * Number of items to skip
+     */
     skip?: number;
     xTenantId?: (string | null);
 };
@@ -1481,8 +1623,14 @@ export type FormFieldsGetApplicationSchemaResponse = ({
 });
 
 export type GroupsListGroupsData = {
+    /**
+     * Maximum number of items to return
+     */
     limit?: number;
     popupId?: (string | null);
+    /**
+     * Number of items to skip
+     */
     skip?: number;
     xTenantId?: (string | null);
 };
@@ -1519,7 +1667,13 @@ export type GroupsDeleteGroupData = {
 export type GroupsDeleteGroupResponse = (void);
 
 export type GroupsListMyGroupsData = {
+    /**
+     * Maximum number of items to return
+     */
     limit?: number;
+    /**
+     * Number of items to skip
+     */
     skip?: number;
 };
 
@@ -1574,7 +1728,13 @@ export type GroupsGetGroupPublicData = {
 export type GroupsGetGroupPublicResponse = (GroupPublic);
 
 export type HumansListHumansData = {
+    /**
+     * Maximum number of items to return
+     */
     limit?: number;
+    /**
+     * Number of items to skip
+     */
     skip?: number;
     xTenantId?: (string | null);
 };
@@ -1608,9 +1768,15 @@ export type HumansUpdateHumanResponse = (HumanPublic);
 export type PaymentsListPaymentsData = {
     applicationId?: (string | null);
     externalId?: (string | null);
+    /**
+     * Maximum number of items to return
+     */
     limit?: number;
     paymentStatus?: (PaymentStatus | null);
     popupId?: (string | null);
+    /**
+     * Number of items to skip
+     */
     skip?: number;
     xTenantId?: (string | null);
 };
@@ -1641,7 +1807,13 @@ export type PaymentsApprovePaymentResponse = (PaymentPublic);
 
 export type PaymentsListMyPaymentsData = {
     applicationId: string;
+    /**
+     * Maximum number of items to return
+     */
     limit?: number;
+    /**
+     * Number of items to skip
+     */
     skip?: number;
 };
 
@@ -1659,17 +1831,23 @@ export type PaymentsCreateMyPaymentData = {
 
 export type PaymentsCreateMyPaymentResponse = ((PaymentPublic | PaymentPreview));
 
+export type PaymentsSimplefiWebhookData = {
+    requestBody: SimpleFIWebhookPayload;
+};
+
 export type PaymentsSimplefiWebhookResponse = ({
     [key: string]: unknown;
 });
 
-export type PaymentsStripeWebhookResponse = ({
-    [key: string]: unknown;
-});
-
 export type PopupReviewersListReviewersData = {
+    /**
+     * Maximum number of items to return
+     */
     limit?: number;
     popupId: string;
+    /**
+     * Number of items to skip
+     */
     skip?: number;
     xTenantId?: (string | null);
 };
@@ -1702,7 +1880,13 @@ export type PopupReviewersRemoveReviewerData = {
 export type PopupReviewersRemoveReviewerResponse = (void);
 
 export type PopupsListPopupsData = {
+    /**
+     * Maximum number of items to return
+     */
     limit?: number;
+    /**
+     * Number of items to skip
+     */
     skip?: number;
     xTenantId?: (string | null);
 };
@@ -1741,8 +1925,14 @@ export type PopupsDeletePopupResponse = (void);
 export type ProductsListProductsData = {
     category?: (ProductCategory | null);
     isActive?: (boolean | null);
+    /**
+     * Maximum number of items to return
+     */
     limit?: number;
     popupId?: (string | null);
+    /**
+     * Number of items to skip
+     */
     skip?: number;
     xTenantId?: (string | null);
 };
@@ -1779,7 +1969,13 @@ export type ProductsDeleteProductData = {
 export type ProductsDeleteProductResponse = (void);
 
 export type TenantsListTenantsData = {
+    /**
+     * Maximum number of items to return
+     */
     limit?: number;
+    /**
+     * Number of items to skip
+     */
     skip?: number;
 };
 
@@ -1829,8 +2025,14 @@ export type UploadsGetPresignedUploadUrlData = {
 export type UploadsGetPresignedUploadUrlResponse = (PresignedUrlResponse);
 
 export type UsersListUsersData = {
+    /**
+     * Maximum number of items to return
+     */
     limit?: number;
     role?: (UserRole | null);
+    /**
+     * Number of items to skip
+     */
     skip?: number;
     tenantId?: (string | null);
 };
