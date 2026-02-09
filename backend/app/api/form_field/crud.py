@@ -205,7 +205,7 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
                 "type": field.field_type,
                 "label": field.label,
                 "required": field.required,
-                "section": field.section or "custom",
+                "section": field.section or None,
                 "position": field.position,
             }
             if field.options:
@@ -215,10 +215,15 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
             if field.help_text:
                 custom_fields[field.name]["help_text"] = field.help_text
 
+        sections = ["profile", "application"]
+        for f in custom_fields.values():
+            if f["section"] and f["section"] not in sections:
+                sections.append(f["section"])
+
         return {
             "base_fields": base_fields,
             "custom_fields": custom_fields,
-            "sections": ["profile", "application", "custom"],
+            "sections": sections,
         }
 
 

@@ -1,5 +1,4 @@
 import uuid
-from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, HTTPException, status
 
@@ -11,23 +10,11 @@ from app.api.product.schemas import (
     ProductUpdate,
 )
 from app.api.shared.enums import UserRole
-from app.api.shared.response import ListModel, Paging
-from app.core.dependencies.users import CurrentUser, TenantSession
+from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
+from app.core.dependencies.users import CurrentUser, CurrentWriter, TenantSession
 from app.utils.utils import slugify
 
-if TYPE_CHECKING:
-    from app.api.user.schemas import UserPublic
-
 router = APIRouter(prefix="/products", tags=["products"])
-
-
-def _check_write_permission(current_user: "UserPublic") -> None:
-    """Check if user has write permission."""
-    if current_user.role == UserRole.VIEWER:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Viewer role does not have write access",
-        )
 
 
 @router.get("", response_model=ListModel[ProductPublic])
@@ -37,8 +24,8 @@ async def list_products(
     popup_id: uuid.UUID | None = None,
     is_active: bool | None = None,
     category: ProductCategory | None = None,
-    skip: int = 0,
-    limit: int = 100,
+    skip: PaginationSkip = 0,
+    limit: PaginationLimit = 100,
 ) -> ListModel[ProductPublic]:
     """List all products with optional filters."""
     if popup_id:
@@ -81,21 +68,13 @@ async def get_product(
 async def create_product(
     product_in: ProductCreate,
     db: TenantSession,
-    current_user: CurrentUser,
+    current_user: CurrentWriter,
 ) -> ProductPublic:
     """Create a new product."""
-    _check_write_permission(current_user)
 
-    # Auto-generate slug from name if not provided
-    slug = product_in.slug if product_in.slug else slugify(product_in.name)
-
-    # Check for existing product with same slug in popup
-    existing = crud.products_crud.get_by_slug(db, slug, product_in.popup_id)
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="A product with this slug already exists in this popup",
-        )
+    # Auto-generate unique slug from name if not provided
+    base_slug = product_in.slug if product_in.slug else slugify(product_in.name)
+    slug = crud.products_crud.generate_unique_slug(db, base_slug, product_in.popup_id)
 
     # Set tenant_id based on user role
     if current_user.role == UserRole.SUPERADMIN:
@@ -132,10 +111,9 @@ async def update_product(
     product_id: uuid.UUID,
     product_in: ProductUpdate,
     db: TenantSession,
-    current_user: CurrentUser,
+    _current_user: CurrentWriter,
 ) -> ProductPublic:
     """Update a product."""
-    _check_write_permission(current_user)
 
     product = crud.products_crud.get(db, product_id)
 
@@ -145,14 +123,16 @@ async def update_product(
             detail="Product not found",
         )
 
-    # Check slug uniqueness if being updated
-    if product_in.slug and product_in.slug != product.slug:
-        existing = crud.products_crud.get_by_slug(db, product_in.slug, product.popup_id)
-        if existing:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="A product with this slug already exists in this popup",
-            )
+    # Auto-regenerate slug when name changes and no explicit slug is provided
+    if product_in.name and not product_in.slug and product_in.name != product.name:
+        new_base_slug = slugify(product_in.name)
+        product_in.slug = crud.products_crud.generate_unique_slug(
+            db, new_base_slug, product.popup_id
+        )
+    elif product_in.slug and product_in.slug != product.slug:
+        product_in.slug = crud.products_crud.generate_unique_slug(
+            db, product_in.slug, product.popup_id
+        )
 
     updated = crud.products_crud.update(db, product, product_in)
     return ProductPublic.model_validate(updated)
@@ -162,10 +142,9 @@ async def update_product(
 async def delete_product(
     product_id: uuid.UUID,
     db: TenantSession,
-    current_user: CurrentUser,
+    _current_user: CurrentWriter,
 ) -> None:
     """Delete a product."""
-    _check_write_permission(current_user)
 
     product = crud.products_crud.get(db, product_id)
 

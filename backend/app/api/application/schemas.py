@@ -129,6 +129,7 @@ class ApplicationCreate(BaseModel):
     custom_fields: dict | None = None
     status: UserSettableStatus | None = None
     human_id: uuid.UUID | None = None
+    group_id: uuid.UUID | None = None  # Optional group to join
 
     # Companions (spouse/kids) to create along with application
     companions: list[CompanionCreate] | None = None

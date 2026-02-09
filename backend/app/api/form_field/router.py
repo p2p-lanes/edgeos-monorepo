@@ -1,26 +1,15 @@
 import uuid
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, status
 
 from app.api.form_field import crud
 from app.api.form_field.schemas import FormFieldCreate, FormFieldPublic, FormFieldUpdate
 from app.api.shared.enums import UserRole
-from app.api.shared.response import ListModel, Paging
-from app.core.dependencies.users import CurrentUser, TenantSession
-
-if TYPE_CHECKING:
-    from app.api.user.schemas import UserPublic
+from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
+from app.core.dependencies.users import CurrentUser, CurrentWriter, TenantSession
 
 router = APIRouter(prefix="/form-fields", tags=["form-fields"])
-
-
-def _check_write_permission(current_user: "UserPublic") -> None:
-    if current_user.role == UserRole.VIEWER:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Viewer role does not have write access",
-        )
 
 
 @router.get("", response_model=ListModel[FormFieldPublic])
@@ -28,8 +17,8 @@ async def list_form_fields(
     db: TenantSession,
     _: CurrentUser,
     popup_id: uuid.UUID | None = None,
-    skip: int = 0,
-    limit: int = 100,
+    skip: PaginationSkip = 0,
+    limit: PaginationLimit = 100,
 ) -> ListModel[FormFieldPublic]:
     if popup_id:
         fields, total = crud.form_fields_crud.find_by_popup(
@@ -65,10 +54,8 @@ async def get_form_field(
 async def create_form_field(
     field_in: FormFieldCreate,
     db: TenantSession,
-    current_user: CurrentUser,
+    current_user: CurrentWriter,
 ) -> FormFieldPublic:
-    _check_write_permission(current_user)
-
     existing = crud.form_fields_crud.get_by_name(db, field_in.name, field_in.popup_id)
     if existing:
         raise HTTPException(
@@ -107,10 +94,8 @@ async def update_form_field(
     field_id: uuid.UUID,
     field_in: FormFieldUpdate,
     db: TenantSession,
-    current_user: CurrentUser,
+    _current_user: CurrentWriter,
 ) -> FormFieldPublic:
-    _check_write_permission(current_user)
-
     field = crud.form_fields_crud.get(db, field_id)
 
     if not field:
@@ -135,10 +120,8 @@ async def update_form_field(
 async def delete_form_field(
     field_id: uuid.UUID,
     db: TenantSession,
-    current_user: CurrentUser,
+    _current_user: CurrentWriter,
 ) -> None:
-    _check_write_permission(current_user)
-
     field = crud.form_fields_crud.get(db, field_id)
 
     if not field:

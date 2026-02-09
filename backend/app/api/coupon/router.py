@@ -1,5 +1,4 @@
 import uuid
-from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, HTTPException, status
 
@@ -11,27 +10,16 @@ from app.api.coupon.schemas import (
     CouponValidate,
 )
 from app.api.shared.enums import UserRole
-from app.api.shared.response import ListModel, Paging
+from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
     CurrentHuman,
     CurrentUser,
+    CurrentWriter,
     SessionDep,
     TenantSession,
 )
 
-if TYPE_CHECKING:
-    from app.api.user.schemas import UserPublic
-
 router = APIRouter(prefix="/coupons", tags=["coupons"])
-
-
-def _check_write_permission(current_user: "UserPublic") -> None:
-    """Check if user has write permission."""
-    if current_user.role == UserRole.VIEWER:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Viewer role does not have write access",
-        )
 
 
 @router.get("", response_model=ListModel[CouponPublic])
@@ -40,8 +28,8 @@ async def list_coupons(
     _: CurrentUser,
     popup_id: uuid.UUID | None = None,
     is_active: bool | None = None,
-    skip: int = 0,
-    limit: int = 100,
+    skip: PaginationSkip = 0,
+    limit: PaginationLimit = 100,
 ) -> ListModel[CouponPublic]:
     """List all coupons with optional filters (BO only)."""
     if popup_id:
@@ -99,10 +87,9 @@ async def validate_coupon(
 async def create_coupon(
     coupon_in: CouponCreate,
     db: TenantSession,
-    current_user: CurrentUser,
+    current_user: CurrentWriter,
 ) -> CouponPublic:
     """Create a new coupon (BO only)."""
-    _check_write_permission(current_user)
 
     # Check for existing coupon with same code in popup
     existing = crud.coupons_crud.get_by_code(db, coupon_in.code, coupon_in.popup_id)
@@ -145,10 +132,9 @@ async def update_coupon(
     coupon_id: uuid.UUID,
     coupon_in: CouponUpdate,
     db: TenantSession,
-    current_user: CurrentUser,
+    _current_user: CurrentWriter,
 ) -> CouponPublic:
     """Update a coupon (BO only)."""
-    _check_write_permission(current_user)
 
     coupon = crud.coupons_crud.get(db, coupon_id)
 
@@ -175,10 +161,9 @@ async def update_coupon(
 async def delete_coupon(
     coupon_id: uuid.UUID,
     db: TenantSession,
-    current_user: CurrentUser,
+    _current_user: CurrentWriter,
 ) -> None:
     """Delete a coupon (BO only)."""
-    _check_write_permission(current_user)
 
     coupon = crud.coupons_crud.get(db, coupon_id)
 

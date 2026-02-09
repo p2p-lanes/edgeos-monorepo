@@ -1,5 +1,4 @@
 import uuid
-from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, HTTPException, status
 from sqlmodel import select
@@ -12,24 +11,12 @@ from app.api.application_review.schemas import (
     ReviewSummary,
 )
 from app.api.shared.enums import UserRole
-from app.api.shared.response import ListModel, Paging
+from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.api.user.models import Users
 from app.core.db import engine
-from app.core.dependencies.users import CurrentUser, TenantSession
-
-if TYPE_CHECKING:
-    from app.api.user.schemas import UserPublic
+from app.core.dependencies.users import CurrentUser, CurrentWriter, TenantSession
 
 router = APIRouter(prefix="/applications", tags=["application-reviews"])
-
-
-def _check_write_permission(current_user: "UserPublic") -> None:
-    """Check if user has write permission."""
-    if current_user.role == UserRole.VIEWER:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Viewer role does not have write access",
-        )
 
 
 def _review_to_public(
@@ -98,8 +85,8 @@ async def list_reviews(
     application_id: uuid.UUID,
     db: TenantSession,
     _: CurrentUser,
-    skip: int = 0,
-    limit: int = 100,
+    skip: PaginationSkip = 0,
+    limit: PaginationLimit = 100,
 ) -> ListModel[ApplicationReviewPublic]:
     """List reviews for an application."""
     from app.api.application.crud import applications_crud
@@ -178,7 +165,7 @@ async def submit_review(
     application_id: uuid.UUID,
     review_in: ApplicationReviewCreate,
     db: TenantSession,
-    current_user: CurrentUser,
+    current_user: CurrentWriter,
 ) -> ApplicationReviewPublic:
     """Submit or update a review for an application.
 
@@ -188,8 +175,6 @@ async def submit_review(
     from app.api.application.crud import applications_crud
     from app.api.application.schemas import ApplicationStatus
     from app.services.approval.calculator import approval_calculator
-
-    _check_write_permission(current_user)
 
     # Verify application exists
     application = applications_crud.get(db, application_id)
@@ -236,57 +221,56 @@ async def submit_review(
 @router.get("/pending-review", response_model=ListModel)
 async def list_pending_reviews(
     db: TenantSession,
-    current_user: CurrentUser,
+    current_user: CurrentWriter,
     popup_id: uuid.UUID | None = None,
-    skip: int = 0,
-    limit: int = 100,
+    skip: PaginationSkip = 0,
+    limit: PaginationLimit = 100,
 ):
     """List applications pending review by the current user.
 
-    Returns applications where:
-    1. User is a designated reviewer for the popup
-    2. Application is in IN_REVIEW status
-    3. User has not yet submitted a review
+    Returns IN_REVIEW applications the user has not yet reviewed.
+    If the user is a designated reviewer, scopes to their assigned popups.
+    Otherwise (admin without reviewer assignment), returns all IN_REVIEW
+    applications they haven't reviewed yet.
     """
     from app.api.application.crud import applications_crud
     from app.api.application.schemas import ApplicationPublic, ApplicationStatus
     from app.api.popup_reviewer.crud import popup_reviewers_crud
 
-    _check_write_permission(current_user)
-
-    # Get popups where user is a reviewer
     reviewer_assignments = popup_reviewers_crud.find_by_user(db, current_user.id)
-    if not reviewer_assignments:
-        return ListModel(
-            results=[],
-            paging=Paging(offset=skip, limit=limit, total=0),
-        )
 
-    popup_ids = [r.popup_id for r in reviewer_assignments]
-    if popup_id and popup_id in popup_ids:
-        popup_ids = [popup_id]
-    elif popup_id:
-        # User requested a popup they're not a reviewer for
-        return ListModel(
-            results=[],
-            paging=Paging(offset=skip, limit=limit, total=0),
-        )
-
-    # Find applications in review for those popups that user hasn't reviewed
-    pending_apps = []
-    for pid in popup_ids:
-        apps, _ = applications_crud.find_by_popup(
-            db, pid, limit=1000, status_filter=ApplicationStatus.IN_REVIEW
-        )
-        for app in apps:
-            # Check if user has already reviewed this application
-            existing_review = application_reviews_crud.get_by_application_reviewer(
-                db, app.id, current_user.id
+    if reviewer_assignments:
+        popup_ids = [r.popup_id for r in reviewer_assignments]
+        if popup_id and popup_id in popup_ids:
+            popup_ids = [popup_id]
+        elif popup_id:
+            return ListModel(
+                results=[],
+                paging=Paging(offset=skip, limit=limit, total=0),
             )
-            if not existing_review:
-                pending_apps.append(app)
 
-    # Apply pagination
+        candidates = []
+        for pid in popup_ids:
+            apps, _ = applications_crud.find_by_popup(
+                db, pid, limit=1000, status_filter=ApplicationStatus.IN_REVIEW
+            )
+            candidates.extend(apps)
+    else:
+        candidates, _ = applications_crud.find_by_status(
+            db,
+            status_filter=ApplicationStatus.IN_REVIEW,
+            popup_id=popup_id,
+            limit=1000,
+        )
+
+    pending_apps = []
+    for app in candidates:
+        existing_review = application_reviews_crud.get_by_application_reviewer(
+            db, app.id, current_user.id
+        )
+        if not existing_review:
+            pending_apps.append(app)
+
     total = len(pending_apps)
     paginated = pending_apps[skip : skip + limit]
 
@@ -299,12 +283,11 @@ async def list_pending_reviews(
 @router.get("/my-reviews", response_model=ListModel[ApplicationReviewPublic])
 async def list_my_reviews(
     db: TenantSession,
-    current_user: CurrentUser,
-    skip: int = 0,
-    limit: int = 100,
+    current_user: CurrentWriter,
+    skip: PaginationSkip = 0,
+    limit: PaginationLimit = 100,
 ) -> ListModel[ApplicationReviewPublic]:
     """List reviews submitted by the current user."""
-    _check_write_permission(current_user)
 
     reviews, total = application_reviews_crud.find_by_reviewer(
         db, current_user.id, skip, limit

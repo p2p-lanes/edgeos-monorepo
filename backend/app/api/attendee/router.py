@@ -1,5 +1,4 @@
 import uuid
-from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, HTTPException, status
 
@@ -10,23 +9,10 @@ from app.api.attendee.schemas import (
     AttendeeWithTickets,
     TicketProduct,
 )
-from app.api.shared.enums import UserRole
-from app.api.shared.response import ListModel, Paging
-from app.core.dependencies.users import CurrentUser, TenantSession
-
-if TYPE_CHECKING:
-    from app.api.user.schemas import UserPublic
+from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
+from app.core.dependencies.users import CurrentUser, CurrentWriter, TenantSession
 
 router = APIRouter(prefix="/attendees", tags=["attendees"])
-
-
-def _check_write_permission(current_user: "UserPublic") -> None:
-    """Check if user has write permission."""
-    if current_user.role == UserRole.VIEWER:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Viewer role does not have write access",
-        )
 
 
 # Note: Most attendee operations are done through the application routes
@@ -40,8 +26,8 @@ async def list_attendees(
     application_id: uuid.UUID | None = None,
     popup_id: uuid.UUID | None = None,
     email: str | None = None,
-    skip: int = 0,
-    limit: int = 100,
+    skip: PaginationSkip = 0,
+    limit: PaginationLimit = 100,
 ) -> ListModel[AttendeePublic]:
     """List attendees with optional filters (BO only)."""
     if application_id:
@@ -66,9 +52,9 @@ async def list_attendees(
         for ap in a.attendee_products:
             from app.api.product.schemas import ProductWithQuantity
 
-            product_data = ap.product.__dict__.copy()
-            product_data["quantity"] = ap.quantity
-            products.append(ProductWithQuantity(**product_data))
+            product = ProductWithQuantity.model_validate(ap.product)
+            product.quantity = ap.quantity
+            products.append(product)
 
         attendee_data = AttendeePublic.model_validate(a)
         attendee_data.products = products
@@ -114,10 +100,9 @@ async def update_attendee(
     attendee_id: uuid.UUID,
     attendee_in: AttendeeUpdate,
     db: TenantSession,
-    current_user: CurrentUser,
+    _current_user: CurrentWriter,
 ) -> AttendeePublic:
     """Update an attendee (BO only)."""
-    _check_write_permission(current_user)
 
     attendee = crud.attendees_crud.get(db, attendee_id)
     if not attendee:
@@ -146,10 +131,9 @@ async def update_attendee(
 async def delete_attendee(
     attendee_id: uuid.UUID,
     db: TenantSession,
-    current_user: CurrentUser,
+    _current_user: CurrentWriter,
 ) -> None:
     """Delete an attendee (BO only)."""
-    _check_write_permission(current_user)
 
     attendee = crud.attendees_crud.get(db, attendee_id)
     if not attendee:

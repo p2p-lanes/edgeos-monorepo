@@ -35,15 +35,16 @@ api_router.include_router(coupon.router)
 api_router.include_router(group.router)
 api_router.include_router(form_field.router)
 
+# Approval system resources (registered before application so static paths
+# like /applications/pending-review are matched before /{application_id})
+api_router.include_router(approval_strategy.router)
+api_router.include_router(popup_reviewer.router)
+api_router.include_router(application_review.router)
+
 # Application flow resources
 api_router.include_router(application.router)
 api_router.include_router(attendee.router)
 api_router.include_router(payment.router)
-
-# Approval system resources
-api_router.include_router(approval_strategy.router)
-api_router.include_router(popup_reviewer.router)
-api_router.include_router(application_review.router)
 
 # Utility resources
 api_router.include_router(upload.router)

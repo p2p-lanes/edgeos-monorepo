@@ -72,8 +72,8 @@ class ProductCreate(BaseModel):
     popup_id: uuid.UUID
     name: str
     slug: str | None = None
-    price: Decimal
-    compare_price: Decimal | None = None
+    price: Decimal = Field(ge=0)
+    compare_price: Decimal | None = Field(default=None, ge=0)
     description: str | None = None
     category: ProductCategory = ProductCategory.TICKET
     attendee_category: TicketAttendeeCategory | None = None
@@ -104,8 +104,8 @@ class ProductUpdate(BaseModel):
 
     name: str | None = None
     slug: str | None = None
-    price: Decimal | None = None
-    compare_price: Decimal | None = None
+    price: Decimal | None = Field(default=None, ge=0)
+    compare_price: Decimal | None = Field(default=None, ge=0)
     description: str | None = None
     category: ProductCategory | None = None
     attendee_category: TicketAttendeeCategory | None = None

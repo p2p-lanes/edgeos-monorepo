@@ -10,21 +10,12 @@ from app.api.approval_strategy.schemas import (
     ApprovalStrategyUpdate,
 )
 from app.api.shared.enums import UserRole
-from app.core.dependencies.users import CurrentUser, TenantSession
+from app.core.dependencies.users import CurrentUser, CurrentWriter, TenantSession
 
 if TYPE_CHECKING:
     from app.api.user.schemas import UserPublic
 
 router = APIRouter(prefix="/popups", tags=["approval-strategies"])
-
-
-def _check_write_permission(current_user: "UserPublic") -> None:
-    """Check if user has write permission."""
-    if current_user.role == UserRole.VIEWER:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Viewer role does not have write access",
-        )
 
 
 def _get_tenant_id(
@@ -82,12 +73,10 @@ async def create_or_update_approval_strategy(
     popup_id: uuid.UUID,
     strategy_in: ApprovalStrategyCreate,
     db: TenantSession,
-    current_user: CurrentUser,
+    _current_user: CurrentWriter,
 ) -> ApprovalStrategyPublic:
     """Create or update approval strategy for a popup."""
     from app.api.popup.crud import popups_crud
-
-    _check_write_permission(current_user)
 
     # Verify popup exists
     popup = popups_crud.get(db, popup_id)
@@ -118,12 +107,10 @@ async def update_approval_strategy(
     popup_id: uuid.UUID,
     strategy_in: ApprovalStrategyUpdate,
     db: TenantSession,
-    current_user: CurrentUser,
+    _current_user: CurrentWriter,
 ) -> ApprovalStrategyPublic:
     """Update approval strategy for a popup."""
     from app.api.popup.crud import popups_crud
-
-    _check_write_permission(current_user)
 
     # Verify popup exists
     popup = popups_crud.get(db, popup_id)
@@ -148,12 +135,10 @@ async def update_approval_strategy(
 async def delete_approval_strategy(
     popup_id: uuid.UUID,
     db: TenantSession,
-    current_user: CurrentUser,
+    _current_user: CurrentWriter,
 ) -> None:
     """Delete approval strategy for a popup (revert to manual review)."""
     from app.api.popup.crud import popups_crud
-
-    _check_write_permission(current_user)
 
     # Verify popup exists
     popup = popups_crud.get(db, popup_id)

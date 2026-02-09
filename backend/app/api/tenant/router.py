@@ -3,7 +3,7 @@ import uuid
 from fastapi import APIRouter, HTTPException, status
 
 from app.api.shared.enums import CredentialType, UserRole
-from app.api.shared.response import ListModel, Paging
+from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.api.tenant import crud
 from app.api.tenant.credential_schemas import CredentialInfo, TenantCredentialResponse
 from app.api.tenant.schemas import TenantCreate, TenantPublic, TenantUpdate
@@ -18,8 +18,8 @@ router = APIRouter(prefix="/tenants", tags=["tenants"])
 async def list_tenants(
     db: SessionDep,
     _: CurrentSuperadmin,
-    skip: int = 0,
-    limit: int = 100,
+    skip: PaginationSkip = 0,
+    limit: PaginationLimit = 100,
 ) -> ListModel[TenantPublic]:
     tenants, total = crud.find(db, skip=skip, limit=limit)
 

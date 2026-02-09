@@ -22,6 +22,20 @@ class ProductsCRUD(BaseCRUD[Products, ProductCreate, ProductUpdate]):
         )
         return session.exec(statement).first()
 
+    def generate_unique_slug(
+        self, session: Session, base_slug: str, popup_id: uuid.UUID
+    ) -> str:
+        """Generate a unique slug within a popup by appending a numeric suffix if needed."""
+        if not self.get_by_slug(session, base_slug, popup_id):
+            return base_slug
+
+        counter = 1
+        while True:
+            candidate = f"{base_slug}-{counter}"
+            if not self.get_by_slug(session, candidate, popup_id):
+                return candidate
+            counter += 1
+
     def find_by_popup(
         self,
         session: Session,

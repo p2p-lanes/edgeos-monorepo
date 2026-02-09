@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, status
 from loguru import logger
 
 from app.api.shared.enums import UserRole
-from app.api.shared.response import ListModel, Paging
+from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.api.user import crud
 from app.api.user.schemas import UserCreate, UserPublic, UserUpdate
 from app.core.dependencies.users import CurrentAdmin, CurrentUser, SessionDep
@@ -22,8 +22,8 @@ ROLE_HIERARCHY = {
 async def list_users(
     db: SessionDep,
     current_user: CurrentAdmin,
-    skip: int = 0,
-    limit: int = 100,
+    skip: PaginationSkip = 0,
+    limit: PaginationLimit = 100,
     tenant_id: uuid.UUID | None = None,
     role: UserRole | None = None,
 ) -> ListModel[UserPublic]:

@@ -109,6 +109,40 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
 
         return results, total
 
+    def find_by_status(
+        self,
+        session: Session,
+        status_filter: ApplicationStatus,
+        popup_id: uuid.UUID | None = None,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> tuple[list[Applications], int]:
+        """Find applications by status with optional popup filter and eager loading."""
+        base_statement = select(Applications).where(
+            Applications.status == status_filter.value
+        )
+
+        if popup_id:
+            base_statement = base_statement.where(Applications.popup_id == popup_id)
+
+        count_statement = select(func.count()).select_from(base_statement.subquery())
+        total = session.exec(count_statement).one()
+
+        statement = (
+            base_statement.options(
+                selectinload(Applications.attendees)  # type: ignore[arg-type]
+                .selectinload(Attendees.attendee_products)  # type: ignore[arg-type]
+                .selectinload(AttendeeProducts.product),  # type: ignore[arg-type]
+                selectinload(Applications.human),  # type: ignore[arg-type]
+            )
+            .order_by(desc(Applications.created_at))  # type: ignore[arg-type]
+            .offset(skip)
+            .limit(limit)
+        )
+        results = list(session.exec(statement).all())
+
+        return results, total
+
     def create_internal(
         self,
         session: Session,
@@ -151,6 +185,31 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Human not found",
             )
+
+        # Validate group whitelist if group_id provided
+        if hasattr(app_data, "group_id") and app_data.group_id:
+            from app.api.group.crud import groups_crud
+
+            group = groups_crud.get(session, app_data.group_id)
+            if not group:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Group not found",
+                )
+
+            # Check if group belongs to same popup
+            if group.popup_id != app_data.popup_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Group does not belong to this popup",
+                )
+
+            # Check whitelist (skip if group is open - has no whitelisted emails)
+            if not group.is_open and not group.has_whitelisted_email(human.email):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Your email is not whitelisted for this group",
+                )
 
         # Update human profile with any provided profile fields
         profile_fields = [

@@ -6,8 +6,13 @@ from fastapi import APIRouter, HTTPException, status
 from app.api.human import crud
 from app.api.human.schemas import HumanCreate, HumanPublic, HumanUpdate
 from app.api.shared.enums import UserRole
-from app.api.shared.response import ListModel, Paging
-from app.core.dependencies.users import CurrentHuman, CurrentUser, TenantSession
+from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
+from app.core.dependencies.users import (
+    CurrentHuman,
+    CurrentUser,
+    CurrentWriter,
+    TenantSession,
+)
 
 if TYPE_CHECKING:
     from app.api.user.schemas import UserPublic
@@ -23,20 +28,12 @@ def _check_superadmin(current_user: "UserPublic") -> None:
         )
 
 
-def _check_write_permission(current_user: "UserPublic") -> None:
-    if current_user.role == UserRole.VIEWER:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Viewer role does not have write access",
-        )
-
-
 @router.get("", response_model=ListModel[HumanPublic])
 async def list_humans(
     db: TenantSession,
     _: CurrentUser,
-    skip: int = 0,
-    limit: int = 100,
+    skip: PaginationSkip = 0,
+    limit: PaginationLimit = 100,
 ) -> ListModel[HumanPublic]:
     humans, total = crud.find(db, skip=skip, limit=limit)
 
@@ -108,10 +105,8 @@ async def update_human(
     human_id: uuid.UUID,
     human_in: HumanUpdate,
     db: TenantSession,
-    current_user: CurrentUser,
+    _current_user: CurrentWriter,
 ) -> HumanPublic:
-    _check_write_permission(current_user)
-
     human = crud.get(db, human_id)
 
     if not human:

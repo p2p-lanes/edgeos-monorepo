@@ -1,6 +1,5 @@
 import uuid
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, HTTPException, status
 
@@ -20,28 +19,37 @@ from app.api.attendee.schemas import (
     AttendeeWithTickets,
 )
 from app.api.shared.enums import UserRole
-from app.api.shared.response import ListModel, Paging
+from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
     CurrentHuman,
     CurrentUser,
-    SessionDep,
+    CurrentWriter,
+    HumanTenantSession,
     TenantSession,
 )
 from app.services.email import ApplicationReceivedContext, get_email_service
 
-if TYPE_CHECKING:
-    from app.api.user.schemas import UserPublic
-
 router = APIRouter(prefix="/applications", tags=["applications"])
 
-
-def _check_write_permission(current_user: "UserPublic") -> None:
-    """Check if user has write permission."""
-    if current_user.role == UserRole.VIEWER:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Viewer role does not have write access",
-        )
+# Valid admin status transitions: current_status -> set of allowed next statuses
+ALLOWED_ADMIN_TRANSITIONS: dict[str, set[str]] = {
+    ApplicationStatus.DRAFT.value: {
+        ApplicationStatus.IN_REVIEW.value,
+        ApplicationStatus.WITHDRAWN.value,
+    },
+    ApplicationStatus.IN_REVIEW.value: {
+        ApplicationStatus.ACCEPTED.value,
+        ApplicationStatus.REJECTED.value,
+        ApplicationStatus.WITHDRAWN.value,
+    },
+    ApplicationStatus.ACCEPTED.value: {
+        ApplicationStatus.WITHDRAWN.value,
+    },
+    ApplicationStatus.REJECTED.value: {
+        ApplicationStatus.IN_REVIEW.value,
+    },
+    ApplicationStatus.WITHDRAWN.value: set(),  # terminal state
+}
 
 
 def _build_application_public(application) -> ApplicationPublic:
@@ -52,9 +60,9 @@ def _build_application_public(application) -> ApplicationPublic:
         for ap in a.attendee_products:
             from app.api.product.schemas import ProductWithQuantity
 
-            product_data = ap.product.__dict__.copy()
-            product_data["quantity"] = ap.quantity
-            products.append(ProductWithQuantity(**product_data))
+            product = ProductWithQuantity.model_validate(ap.product)
+            product.quantity = ap.quantity
+            products.append(product)
 
         attendee_data = AttendeePublic.model_validate(a)
         attendee_data.products = products
@@ -78,8 +86,8 @@ async def list_applications(
     popup_id: uuid.UUID | None = None,
     human_id: uuid.UUID | None = None,
     status_filter: ApplicationStatus | None = None,
-    skip: int = 0,
-    limit: int = 100,
+    skip: PaginationSkip = 0,
+    limit: PaginationLimit = 100,
 ) -> ListModel[ApplicationPublic]:
     """List applications with optional filters (BO only)."""
     if popup_id:
@@ -109,14 +117,13 @@ async def list_applications(
 async def create_application_admin(
     app_in: ApplicationAdminCreate,
     db: TenantSession,
-    current_user: CurrentUser,
+    current_user: CurrentWriter,
 ) -> ApplicationPublic:
     """Create an application as admin (BO only - superadmin for testing).
 
     This endpoint allows creating applications on behalf of users.
     A Human record will be found or created based on the email.
     """
-    _check_write_permission(current_user)
 
     # For now, only superadmins can create applications via backoffice
     if current_user.role != UserRole.SUPERADMIN:
@@ -172,10 +179,9 @@ async def update_application_admin(
     application_id: uuid.UUID,
     app_in: ApplicationAdminUpdate,
     db: TenantSession,
-    current_user: CurrentUser,
+    _current_user: CurrentWriter,
 ) -> ApplicationPublic:
     """Update an application (BO - admin access with extended fields)."""
-    _check_write_permission(current_user)
 
     application = crud.applications_crud.get(db, application_id)
     if not application:
@@ -184,15 +190,16 @@ async def update_application_admin(
             detail="Application not found",
         )
 
-    # Prevent approving/rejecting draft applications - they must be submitted first
-    if application.status == ApplicationStatus.DRAFT.value and app_in.status in [
-        ApplicationStatus.ACCEPTED,
-        ApplicationStatus.REJECTED,
-    ]:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot approve or reject a draft application. The applicant must submit it first.",
-        )
+    # Validate state transition
+    if app_in.status is not None:
+        current = application.status
+        requested = app_in.status.value
+        allowed = ALLOWED_ADMIN_TRANSITIONS.get(current, set())
+        if requested != current and requested not in allowed:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot transition from '{current}' to '{requested}'",
+            )
 
     # Prevent accepting red-flagged humans
     if app_in.status == ApplicationStatus.ACCEPTED:
@@ -233,10 +240,9 @@ async def update_application_admin(
 async def delete_application(
     application_id: uuid.UUID,
     db: TenantSession,
-    current_user: CurrentUser,
+    _current_user: CurrentWriter,
 ) -> None:
     """Delete an application (BO only)."""
-    _check_write_permission(current_user)
 
     application = crud.applications_crud.get(db, application_id)
     if not application:
@@ -255,10 +261,10 @@ async def delete_application(
 
 @router.get("/my/applications", response_model=ListModel[ApplicationPublic])
 async def list_my_applications(
-    db: SessionDep,
+    db: HumanTenantSession,
     current_human: CurrentHuman,
-    skip: int = 0,
-    limit: int = 100,
+    skip: PaginationSkip = 0,
+    limit: PaginationLimit = 100,
 ) -> ListModel[ApplicationPublic]:
     """List applications for the current human (Portal)."""
     applications, total = crud.applications_crud.find_by_human(
@@ -275,7 +281,7 @@ async def list_my_applications(
 
 @router.get("/my/tickets", response_model=list[AttendeeWithTickets])
 async def list_my_tickets(
-    db: SessionDep,
+    db: HumanTenantSession,
     current_human: CurrentHuman,
 ) -> list[AttendeeWithTickets]:
     """List all tickets for the current human (Portal).
@@ -331,7 +337,7 @@ async def list_my_tickets(
 @router.get("/my/{popup_id}", response_model=ApplicationPublic)
 async def get_my_application(
     popup_id: uuid.UUID,
-    db: SessionDep,
+    db: HumanTenantSession,
     current_human: CurrentHuman,
 ) -> ApplicationPublic:
     """Get current human's application for a popup (Portal)."""
@@ -353,7 +359,7 @@ async def get_my_application(
 )
 async def create_my_application(
     app_in: ApplicationCreate,
-    db: SessionDep,
+    db: HumanTenantSession,
     current_human: CurrentHuman,
 ) -> ApplicationPublic:
     """Create an application for the current human (Portal)."""
@@ -398,7 +404,7 @@ async def create_my_application(
 async def update_my_application(
     popup_id: uuid.UUID,
     app_in: ApplicationUpdate,
-    db: SessionDep,
+    db: HumanTenantSession,
     current_human: CurrentHuman,
 ) -> ApplicationPublic:
     """Update current human's application (Portal)."""
@@ -439,14 +445,6 @@ async def update_my_application(
     db.commit()
     db.refresh(application)
 
-    # Send application received email if newly submitted
-    if (
-        application.status == ApplicationStatus.IN_REVIEW.value
-        and "status" in update_data
-    ):
-        # TODO: Send email
-        pass
-
     return _build_application_public(application)
 
 
@@ -463,7 +461,7 @@ async def update_my_application(
 async def add_my_attendee(
     popup_id: uuid.UUID,
     attendee_in: AttendeeCreate,
-    db: SessionDep,
+    db: HumanTenantSession,
     current_human: CurrentHuman,
 ) -> ApplicationPublic:
     """Add an attendee to current human's application (Portal)."""
@@ -497,7 +495,7 @@ async def update_my_attendee(
     popup_id: uuid.UUID,
     attendee_id: uuid.UUID,
     attendee_in: AttendeeUpdate,
-    db: SessionDep,
+    db: HumanTenantSession,
     current_human: CurrentHuman,
 ) -> ApplicationPublic:
     """Update an attendee in current human's application (Portal)."""
@@ -545,7 +543,7 @@ async def update_my_attendee(
 async def delete_my_attendee(
     popup_id: uuid.UUID,
     attendee_id: uuid.UUID,
-    db: SessionDep,
+    db: HumanTenantSession,
     current_human: CurrentHuman,
 ) -> ApplicationPublic:
     """Delete an attendee from current human's application (Portal)."""

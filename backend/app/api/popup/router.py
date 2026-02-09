@@ -1,5 +1,5 @@
 import uuid
-from typing import TYPE_CHECKING, Annotated
+from typing import Annotated
 
 from fastapi import APIRouter, Header, HTTPException, status
 
@@ -11,29 +11,18 @@ from app.api.approval_strategy.schemas import (
 from app.api.popup import crud
 from app.api.popup.schemas import PopupCreate, PopupPublic, PopupUpdate
 from app.api.shared.enums import UserRole
-from app.api.shared.response import ListModel, Paging
-from app.core.dependencies.users import CurrentUser, TenantSession
-
-if TYPE_CHECKING:
-    from app.api.user.schemas import UserPublic
+from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
+from app.core.dependencies.users import CurrentUser, CurrentWriter, TenantSession
 
 router = APIRouter(prefix="/popups", tags=["popups"])
-
-
-def _check_write_permission(current_user: "UserPublic") -> None:
-    if current_user.role == UserRole.VIEWER:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Viewer role does not have write access",
-        )
 
 
 @router.get("", response_model=ListModel[PopupPublic])
 async def list_popups(
     db: TenantSession,
     _: CurrentUser,
-    skip: int = 0,
-    limit: int = 100,
+    skip: PaginationSkip = 0,
+    limit: PaginationLimit = 100,
 ) -> ListModel[PopupPublic]:
     popups, total = crud.find(db, skip=skip, limit=limit)
 
@@ -68,11 +57,9 @@ async def get_popup(
 async def create_popup(
     popup_in: PopupCreate,
     db: TenantSession,
-    current_user: CurrentUser,
+    current_user: CurrentWriter,
     x_tenant_id: Annotated[str | None, Header(alias="X-Tenant-Id")] = None,
 ) -> PopupPublic:
-    _check_write_permission(current_user)
-
     if current_user.role == UserRole.SUPERADMIN:
         if x_tenant_id:
             popup_in.tenant_id = uuid.UUID(x_tenant_id)
@@ -111,10 +98,8 @@ async def update_popup(
     popup_id: uuid.UUID,
     popup_in: PopupUpdate,
     db: TenantSession,
-    current_user: CurrentUser,
+    _current_user: CurrentWriter,
 ) -> PopupPublic:
-    _check_write_permission(current_user)
-
     popup = crud.get(db, popup_id)
 
     if not popup:
@@ -139,10 +124,8 @@ async def update_popup(
 async def delete_popup(
     popup_id: uuid.UUID,
     db: TenantSession,
-    current_user: CurrentUser,
+    _current_user: CurrentWriter,
 ) -> None:
-    _check_write_permission(current_user)
-
     popup = crud.get(db, popup_id)
 
     if not popup:
