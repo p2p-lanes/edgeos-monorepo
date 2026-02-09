@@ -235,11 +235,10 @@ alembic downgrade -1
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `DOMAIN` | Yes | `localhost` | Primary domain |
-| `BACKOFFICE_HOST` | Yes | `http://localhost:5173` | Backoffice URL (for CORS/emails) |
+| `BACKOFFICE_URL` | Yes | `http://localhost:5173` | Backoffice URL (for CORS/emails) |
+| `BACKEND_URL` | Yes | `http://localhost:8000` | Backend URL |
 | `ENVIRONMENT` | No | `dev` | Environment (`dev`, `staging`, `production`) |
 | `PROJECT_NAME` | No | `EdgeOS` | Application name |
-| `STACK_NAME` | No | `edgeos` | Docker stack name |
 
 #### Security (Required)
 
@@ -377,10 +376,10 @@ For production, you must properly configure the environment variables. The `.env
    POSTGRES_SSL_MODE=require
    ```
 
-3. **Configure your domain**:
+3. **Configure your URLs**:
    ```bash
-   DOMAIN=yourdomain.com
-   BACKOFFICE_HOST=https://app.yourdomain.com
+   BACKOFFICE_URL=https://app.yourdomain.com
+   BACKEND_URL=https://api.yourdomain.com
    ENVIRONMENT=production
    ```
 
