@@ -1306,6 +1306,7 @@ export type ApplicationsListApplicationsData = {
      */
     limit?: number;
     popupId?: (string | null);
+    search?: (string | null);
     /**
      * Number of items to skip
      */
@@ -1515,6 +1516,7 @@ export type CouponsListCouponsData = {
      */
     limit?: number;
     popupId?: (string | null);
+    search?: (string | null);
     /**
      * Number of items to skip
      */
@@ -1575,6 +1577,7 @@ export type FormFieldsListFormFieldsData = {
      */
     limit?: number;
     popupId?: (string | null);
+    search?: (string | null);
     /**
      * Number of items to skip
      */
@@ -1628,6 +1631,7 @@ export type GroupsListGroupsData = {
      */
     limit?: number;
     popupId?: (string | null);
+    search?: (string | null);
     /**
      * Number of items to skip
      */
@@ -1732,6 +1736,7 @@ export type HumansListHumansData = {
      * Maximum number of items to return
      */
     limit?: number;
+    search?: (string | null);
     /**
      * Number of items to skip
      */
@@ -1884,6 +1889,7 @@ export type PopupsListPopupsData = {
      * Maximum number of items to return
      */
     limit?: number;
+    search?: (string | null);
     /**
      * Number of items to skip
      */
@@ -1930,10 +1936,13 @@ export type ProductsListProductsData = {
      */
     limit?: number;
     popupId?: (string | null);
+    search?: (string | null);
     /**
      * Number of items to skip
      */
     skip?: number;
+    sortBy?: (string | null);
+    sortOrder?: 'asc' | 'desc';
     xTenantId?: (string | null);
 };
 
@@ -1973,6 +1982,7 @@ export type TenantsListTenantsData = {
      * Maximum number of items to return
      */
     limit?: number;
+    search?: (string | null);
     /**
      * Number of items to skip
      */
@@ -2030,6 +2040,7 @@ export type UsersListUsersData = {
      */
     limit?: number;
     role?: (UserRole | null);
+    search?: (string | null);
     /**
      * Number of items to skip
      */

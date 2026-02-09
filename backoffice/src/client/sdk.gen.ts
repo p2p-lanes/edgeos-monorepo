@@ -163,6 +163,7 @@ export class ApplicationsService {
      * @param data.popupId
      * @param data.humanId
      * @param data.statusFilter
+     * @param data.search
      * @param data.skip Number of items to skip
      * @param data.limit Maximum number of items to return
      * @param data.xTenantId
@@ -180,6 +181,7 @@ export class ApplicationsService {
                 popup_id: data.popupId,
                 human_id: data.humanId,
                 status_filter: data.statusFilter,
+                search: data.search,
                 skip: data.skip,
                 limit: data.limit
             },
@@ -836,6 +838,7 @@ export class CouponsService {
      * @param data The data for the request.
      * @param data.popupId
      * @param data.isActive
+     * @param data.search
      * @param data.skip Number of items to skip
      * @param data.limit Maximum number of items to return
      * @param data.xTenantId
@@ -852,6 +855,7 @@ export class CouponsService {
             query: {
                 popup_id: data.popupId,
                 is_active: data.isActive,
+                search: data.search,
                 skip: data.skip,
                 limit: data.limit
             },
@@ -1022,6 +1026,7 @@ export class FormFieldsService {
      * List Form Fields
      * @param data The data for the request.
      * @param data.popupId
+     * @param data.search
      * @param data.skip Number of items to skip
      * @param data.limit Maximum number of items to return
      * @param data.xTenantId
@@ -1037,6 +1042,7 @@ export class FormFieldsService {
             },
             query: {
                 popup_id: data.popupId,
+                search: data.search,
                 skip: data.skip,
                 limit: data.limit
             },
@@ -1179,6 +1185,7 @@ export class GroupsService {
      * List all groups (BO only).
      * @param data The data for the request.
      * @param data.popupId
+     * @param data.search
      * @param data.skip Number of items to skip
      * @param data.limit Maximum number of items to return
      * @param data.xTenantId
@@ -1194,6 +1201,7 @@ export class GroupsService {
             },
             query: {
                 popup_id: data.popupId,
+                search: data.search,
                 skip: data.skip,
                 limit: data.limit
             },
@@ -1496,6 +1504,7 @@ export class HumansService {
     /**
      * List Humans
      * @param data The data for the request.
+     * @param data.search
      * @param data.skip Number of items to skip
      * @param data.limit Maximum number of items to return
      * @param data.xTenantId
@@ -1510,6 +1519,7 @@ export class HumansService {
                 'X-Tenant-Id': data.xTenantId
             },
             query: {
+                search: data.search,
                 skip: data.skip,
                 limit: data.limit
             },
@@ -1942,6 +1952,7 @@ export class PopupsService {
     /**
      * List Popups
      * @param data The data for the request.
+     * @param data.search
      * @param data.skip Number of items to skip
      * @param data.limit Maximum number of items to return
      * @param data.xTenantId
@@ -1956,6 +1967,7 @@ export class PopupsService {
                 'X-Tenant-Id': data.xTenantId
             },
             query: {
+                search: data.search,
                 skip: data.skip,
                 limit: data.limit
             },
@@ -2072,6 +2084,9 @@ export class ProductsService {
      * @param data.popupId
      * @param data.isActive
      * @param data.category
+     * @param data.search
+     * @param data.sortBy
+     * @param data.sortOrder
      * @param data.skip Number of items to skip
      * @param data.limit Maximum number of items to return
      * @param data.xTenantId
@@ -2089,6 +2104,9 @@ export class ProductsService {
                 popup_id: data.popupId,
                 is_active: data.isActive,
                 category: data.category,
+                search: data.search,
+                sort_by: data.sortBy,
+                sort_order: data.sortOrder,
                 skip: data.skip,
                 limit: data.limit
             },
@@ -2205,6 +2223,7 @@ export class TenantsService {
     /**
      * List Tenants
      * @param data The data for the request.
+     * @param data.search
      * @param data.skip Number of items to skip
      * @param data.limit Maximum number of items to return
      * @returns ListModel_TenantPublic_ Successful Response
@@ -2215,6 +2234,7 @@ export class TenantsService {
             method: 'GET',
             url: '/api/v1/tenants',
             query: {
+                search: data.search,
                 skip: data.skip,
                 limit: data.limit
             },
@@ -2382,6 +2402,7 @@ export class UsersService {
      * @param data.limit Maximum number of items to return
      * @param data.tenantId
      * @param data.role
+     * @param data.search
      * @returns ListModel_UserPublic_ Successful Response
      * @throws ApiError
      */
@@ -2393,7 +2414,8 @@ export class UsersService {
                 skip: data.skip,
                 limit: data.limit,
                 tenant_id: data.tenantId,
-                role: data.role
+                role: data.role,
+                search: data.search
             },
             errors: {
                 422: 'Validation Error'
