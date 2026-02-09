@@ -52,6 +52,11 @@ interface ServerPaginationProps {
   onPaginationChange: (pagination: PaginationState) => void
 }
 
+interface ServerSortingProps {
+  sorting: SortingState
+  onSortingChange: (sorting: SortingState) => void
+}
+
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
   data: TData[]
@@ -59,6 +64,7 @@ interface DataTableProps<TData, TValue> {
   searchValue?: string
   onSearchChange?: (value: string) => void
   serverPagination?: ServerPaginationProps
+  serverSorting?: ServerSortingProps
   emptyState?: ReactNode
   selectable?: boolean
   bulkActions?: (selectedRows: TData[]) => ReactNode
@@ -104,12 +110,23 @@ export function DataTable<TData, TValue>({
   searchValue,
   onSearchChange,
   serverPagination,
+  serverSorting,
   emptyState,
   selectable,
   bulkActions,
   hiddenOnMobile,
 }: DataTableProps<TData, TValue>) {
-  const [sorting, setSorting] = useState<SortingState>([])
+  const [localSorting, setLocalSorting] = useState<SortingState>([])
+  const sorting = serverSorting ? serverSorting.sorting : localSorting
+  const handleSortingChange = serverSorting
+    ? (updater: SortingState | ((prev: SortingState) => SortingState)) => {
+        const next =
+          typeof updater === "function"
+            ? updater(serverSorting.sorting)
+            : updater
+        serverSorting.onSortingChange(next)
+      }
+    : setLocalSorting
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const isMobile = useIsMobile()
 
@@ -166,11 +183,12 @@ export function DataTable<TData, TValue>({
     data,
     columns: allColumns,
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
     ...(!isServerPaginated && {
       getPaginationRowModel: getPaginationRowModel(),
     }),
-    onSortingChange: setSorting,
+    ...(serverSorting && { manualSorting: true }),
+    ...(!serverSorting && { getSortedRowModel: getSortedRowModel() }),
+    onSortingChange: handleSortingChange,
     ...(selectable && {
       onRowSelectionChange: setRowSelection,
     }),

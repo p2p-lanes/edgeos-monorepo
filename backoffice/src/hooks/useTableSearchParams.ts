@@ -1,16 +1,21 @@
 import { useNavigate } from "@tanstack/react-router"
-import { useCallback } from "react"
+import type { SortingState } from "@tanstack/react-table"
+import { useCallback, useMemo } from "react"
 
 export interface TableSearchParams {
   page?: number
   pageSize?: number
   search?: string
+  sortBy?: string
+  sortOrder?: "asc" | "desc"
 }
 
 export const defaultTableSearch: Required<TableSearchParams> = {
   page: 0,
   pageSize: 25,
   search: "",
+  sortBy: "",
+  sortOrder: "desc",
 }
 
 export function validateTableSearch(
@@ -24,6 +29,11 @@ export function validateTableSearch(
         ? raw.pageSize
         : 25,
     search: typeof raw.search === "string" ? raw.search : "",
+    sortBy: typeof raw.sortBy === "string" ? raw.sortBy : "",
+    sortOrder:
+      raw.sortOrder === "asc" || raw.sortOrder === "desc"
+        ? raw.sortOrder
+        : "desc",
   }
 }
 
@@ -33,8 +43,15 @@ export function useTableSearchParams(params: TableSearchParams, from: string) {
   const page = params.page ?? 0
   const pageSize = params.pageSize ?? 25
   const search = params.search ?? ""
+  const sortBy = params.sortBy ?? ""
+  const sortOrder = params.sortOrder ?? "desc"
 
   const pagination = { pageIndex: page, pageSize }
+
+  const sorting: SortingState = useMemo(
+    () => (sortBy ? [{ id: sortBy, desc: sortOrder === "desc" }] : []),
+    [sortBy, sortOrder],
+  )
 
   const setSearch = useCallback(
     (value: string) => {
@@ -66,5 +83,35 @@ export function useTableSearchParams(params: TableSearchParams, from: string) {
     [navigate, from],
   )
 
-  return { search, pagination, setSearch, setPagination }
+  const setSorting = useCallback(
+    (sortingState: SortingState) => {
+      const col = sortingState[0]
+      navigate({
+        to: from,
+        search: (prev: TableSearchParams) => ({
+          ...prev,
+          sortBy: col?.id || undefined,
+          sortOrder: col
+            ? col.desc
+              ? ("desc" as const)
+              : ("asc" as const)
+            : undefined,
+          page: 0,
+        }),
+        replace: true,
+      })
+    },
+    [navigate, from],
+  )
+
+  return {
+    search,
+    pagination,
+    sorting,
+    sortBy,
+    sortOrder,
+    setSearch,
+    setPagination,
+    setSorting,
+  }
 }
