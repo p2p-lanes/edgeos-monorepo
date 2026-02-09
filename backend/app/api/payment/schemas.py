@@ -139,6 +139,11 @@ class PaymentPreview(BaseModel):
     discount_value: Decimal | None = None
     group_id: uuid.UUID | None = None
 
+    # Payment provider response (populated on creation)
+    status: str | None = None
+    external_id: str | None = None
+    checkout_url: str | None = None
+
 
 class PaymentPublic(PaymentBase):
     """Payment schema for API responses."""
@@ -158,6 +163,7 @@ class PaymentUpdate(BaseModel):
     external_id: str | None = None
     source: PaymentSource | None = None
     rate: Decimal | None = None
+    currency: str | None = None
 
 
 class PaymentFilter(BaseModel):
@@ -166,3 +172,76 @@ class PaymentFilter(BaseModel):
     application_id: uuid.UUID | None = None
     external_id: str | None = None
     status: PaymentStatus | None = None
+
+
+# ========================
+# SimpleFI Webhook Schemas
+# ========================
+
+
+class SimpleFICardPayment(BaseModel):
+    """Card payment info from SimpleFI."""
+
+    provider: str
+    status: str
+    coin: str = "USD"
+
+
+class SimpleFIPriceDetails(BaseModel):
+    """Price details for a SimpleFI transaction."""
+
+    currency: str
+    final_amount: float
+    rate: float
+
+
+class SimpleFITransaction(BaseModel):
+    """Transaction details from SimpleFI."""
+
+    id: str
+    coin: str
+    chain_id: int
+    status: str
+    price_details: SimpleFIPriceDetails
+
+
+class SimpleFIPaymentInfo(BaseModel):
+    """Payment info from SimpleFI."""
+
+    coin: str
+    hash: str
+    amount: float
+    paid_at: datetime
+
+
+class SimpleFIPaymentRequest(BaseModel):
+    """Payment request details from SimpleFI."""
+
+    id: str
+    order_id: int
+    amount: float
+    amount_paid: float
+    currency: str
+    reference: dict
+    status: str
+    status_detail: str
+    transactions: list[SimpleFITransaction]
+    card_payment: SimpleFICardPayment | None = None
+    payments: list[SimpleFIPaymentInfo]
+
+
+class SimpleFIData(BaseModel):
+    """Data payload from SimpleFI webhook."""
+
+    payment_request: SimpleFIPaymentRequest
+    new_payment: SimpleFIPaymentInfo | SimpleFICardPayment | None = None
+
+
+class SimpleFIWebhookPayload(BaseModel):
+    """SimpleFI webhook payload schema."""
+
+    id: str
+    event_type: str
+    entity_type: str
+    entity_id: str
+    data: SimpleFIData

@@ -1,5 +1,6 @@
 import uuid
 from decimal import ROUND_HALF_UP, Decimal
+from typing import TYPE_CHECKING
 
 from fastapi import HTTPException, status
 from loguru import logger
@@ -8,6 +9,9 @@ from sqlalchemy.orm import selectinload
 from sqlmodel import Session, func, select
 
 from app.api.application.models import Applications
+
+if TYPE_CHECKING:
+    from app.api.group.models import Groups
 from app.api.application.schemas import ApplicationStatus
 from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.coupon.crud import coupons_crud
@@ -17,6 +21,7 @@ from app.api.payment.schemas import (
     PaymentFilter,
     PaymentPreview,
     PaymentProductRequest,
+    PaymentSource,
     PaymentStatus,
     PaymentUpdate,
 )
@@ -484,9 +489,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
     def _get_application_with_products(
         self, session: Session, application_id: uuid.UUID
     ) -> Applications | None:
-        """Get application with eager loaded attendees and products.
+        """Get application with eager loaded attendees, products, and popup.
 
-        This avoids N+1 queries when calculating credits and checking patreon status.
+        This avoids N+1 queries when calculating credits, checking patreon status,
+        and accessing popup settings (e.g., simplefi_api_key).
         """
         statement = (
             select(Applications)
@@ -497,6 +503,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 .selectinload(AttendeeProducts.product),  # ty: ignore[invalid-argument-type]
                 selectinload(Applications.human),  # type: ignore[arg-type]
                 selectinload(Applications.group),  # type: ignore[arg-type]
+                selectinload(Applications.popup),  # type: ignore[arg-type]
             )
         )
         return session.exec(statement).first()
@@ -510,7 +517,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         Create a payment with all validations and discount calculations.
 
         For zero-amount payments, returns (None, preview) with status approved.
-        For paid payments, returns (payment, preview) with checkout info.
+        For paid payments, returns (payment, preview) with checkout info from SimpleFI.
         """
         preview = self.preview_payment(session, obj)
 
@@ -539,18 +546,64 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             session.refresh(application)
 
             # Return preview with approved status
+            preview.status = PaymentStatus.APPROVED.value
             return None, preview
 
-        # Get product details for snapshot
+        # Validate popup has SimpleFI API key configured
+        if not application.popup or not application.popup.simplefi_api_key:
+            logger.error(
+                "Popup %s does not have SimpleFI API key configured",
+                application.popup_id,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Payment provider not configured for this popup",
+            )
+
+        # Get product details for snapshot and SimpleFI reference
         product_ids = [p.product_id for p in obj.products]
         statement = select(Products).where(Products.id.in_(product_ids))  # type: ignore[attr-defined]
         products_map = {p.id: p for p in session.exec(statement).all()}
 
-        # Create payment record
+        # Create SimpleFI payment request
+        from app.services.simplefi import get_simplefi_client
+
+        simplefi_client = get_simplefi_client(application.popup.simplefi_api_key)
+
+        # Build reference for SimpleFI (useful for debugging/tracking)
+        reference = {
+            "email": application.human.email if application.human else "",
+            "application_id": str(application.id),
+            "products": [
+                {
+                    "product_id": str(req_prod.product_id),
+                    "name": products_map[req_prod.product_id].name
+                    if req_prod.product_id in products_map
+                    else "",
+                    "quantity": req_prod.quantity,
+                    "attendee_id": str(req_prod.attendee_id),
+                }
+                for req_prod in obj.products
+            ],
+        }
+
+        try:
+            simplefi_response = simplefi_client.create_payment(
+                amount=preview.amount,
+                reference=reference,
+            )
+        except Exception as e:
+            logger.error("Failed to create SimpleFI payment: %s", e)
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Failed to create payment with payment provider",
+            ) from e
+
+        # Create payment record with SimpleFI data
         payment = Payments(
             tenant_id=application.tenant_id,
             application_id=obj.application_id,
-            status=PaymentStatus.PENDING.value,
+            status=simplefi_response.status,
             amount=preview.amount,
             currency=preview.currency,
             coupon_id=preview.coupon_id,
@@ -558,6 +611,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             discount_value=preview.discount_value,
             edit_passes=obj.edit_passes,
             group_id=preview.group_id,
+            external_id=simplefi_response.id,
+            checkout_url=simplefi_response.checkout_url,
+            source=PaymentSource.SIMPLEFI.value,
         )
 
         session.add(payment)
@@ -587,17 +643,26 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         session.commit()
         session.refresh(payment)
 
+        # Update preview with SimpleFI response data
+        preview.status = simplefi_response.status
+        preview.external_id = simplefi_response.id
+        preview.checkout_url = simplefi_response.checkout_url
+
         return payment, preview
 
     def approve_payment(
         self,
         session: Session,
         payment_id: uuid.UUID,
+        *,
+        currency: str | None = None,
+        rate: Decimal | None = None,
     ) -> Payments:
         """
         Approve a payment and add products to attendees.
 
         This is called when payment is confirmed (e.g., webhook from payment provider).
+        All changes are committed atomically -- on failure, everything is rolled back.
         """
         payment = self.get(session, payment_id)
         if not payment:
@@ -609,24 +674,146 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         if payment.status == PaymentStatus.APPROVED.value:
             return payment  # Already approved
 
-        # Add products to attendees
-        products_to_add = [
-            PaymentProductRequest(
-                product_id=pp.product_id,
-                attendee_id=pp.attendee_id,
-                quantity=pp.quantity,
+        try:
+            # Use existing currency or default to USD for manual approvals
+            final_currency = currency or payment.currency or "USD"
+            source = (
+                PaymentSource.STRIPE
+                if final_currency == "USD"
+                else PaymentSource.SIMPLEFI
             )
-            for pp in payment.products_snapshot
-        ]
-        self._add_products_to_attendees(session, products_to_add)
 
-        # Update payment status
-        payment.status = PaymentStatus.APPROVED.value
-        session.add(payment)
-        session.commit()
-        session.refresh(payment)
+            # Set payment fields directly (no intermediate commit)
+            payment.status = PaymentStatus.APPROVED.value
+            payment.currency = final_currency
+            if rate is not None:
+                payment.rate = rate
+            payment.source = source.value
+            session.add(payment)
+
+            # Clear existing products if editing passes
+            if payment.edit_passes:
+                self._clear_application_products(session, payment)
+
+            # Add products to attendees
+            products_to_add = [
+                PaymentProductRequest(
+                    product_id=pp.product_id,
+                    attendee_id=pp.attendee_id,
+                    quantity=pp.quantity,
+                )
+                for pp in payment.products_snapshot
+            ]
+            self._add_products_to_attendees(session, products_to_add)
+
+            # Create ambassador group if patreon product was purchased
+            self._create_ambassador_group(session, payment)
+
+            # Single atomic commit for the entire operation
+            session.commit()
+            session.refresh(payment)
+
+        except HTTPException:
+            session.rollback()
+            raise
+        except Exception:
+            session.rollback()
+            logger.exception("Failed to approve payment %s", payment_id)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to approve payment",
+            )
 
         return payment
+
+    def _clear_application_products(
+        self,
+        session: Session,
+        payment: Payments,
+    ) -> None:
+        """Clear all existing products for attendees in this payment's application.
+
+        Used when edit_passes=True to replace existing products with new ones.
+        """
+        # Get all attendee IDs from this payment's products
+        attendee_ids = {pp.attendee_id for pp in payment.products_snapshot}
+
+        if not attendee_ids:
+            return
+
+        # Delete all AttendeeProducts for these attendees
+        statement = select(AttendeeProducts).where(
+            AttendeeProducts.attendee_id.in_(attendee_ids)  # type: ignore[attr-defined]
+        )
+        existing_products = list(session.exec(statement).all())
+
+        for ap in existing_products:
+            session.delete(ap)
+
+        session.flush()
+        logger.info(
+            "Cleared %d existing products for %d attendees (payment %s, edit_passes=True)",
+            len(existing_products),
+            len(attendee_ids),
+            payment.id,
+        )
+
+    def _create_ambassador_group(
+        self,
+        session: Session,
+        payment: Payments,
+    ) -> "Groups | None":
+        """Create an ambassador group when a payment is approved.
+
+        Returns the created group or None if the human already has an ambassador group
+        for this popup.
+        """
+        from app.api.group.crud import groups_crud
+
+        # Get application with popup
+        application = session.get(Applications, payment.application_id)
+        if not application or not application.human_id:
+            logger.warning(
+                "Cannot create ambassador group: application or human not found for payment %s",
+                payment.id,
+            )
+            return None
+
+        human = application.human
+        popup = application.popup
+
+        if not human or not popup:
+            logger.warning(
+                "Cannot create ambassador group: missing human or popup for payment %s",
+                payment.id,
+            )
+            return None
+
+        # Check if human already has an ambassador group for this popup
+        existing_group = groups_crud.get_ambassador_group(session, popup.id, human.id)
+        if existing_group:
+            logger.info(
+                "Ambassador group already exists for %s",
+                human.email,
+            )
+            return existing_group
+
+        # Build full name
+        first_name = human.first_name or ""
+        last_name = human.last_name or ""
+        full_name = f"{first_name} {last_name}".strip()
+
+        # Create ambassador group using the CRUD service
+        group = groups_crud.create_ambassador_group(
+            session,
+            tenant_id=application.tenant_id,
+            popup_id=popup.id,
+            popup_slug=popup.slug,
+            human_id=human.id,
+            human_name=full_name,
+        )
+
+        return group
 
     def _add_products_to_attendees(
         self,
@@ -667,7 +854,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 )
                 session.add(attendee_product)
 
-        session.commit()
+        session.flush()
 
     def update_status(
         self,

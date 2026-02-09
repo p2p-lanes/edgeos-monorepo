@@ -1,7 +1,6 @@
 import uuid
-from typing import TYPE_CHECKING
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Request, status
 
 from app.api.payment.crud import payments_crud
 from app.api.payment.schemas import (
@@ -11,12 +10,15 @@ from app.api.payment.schemas import (
     PaymentPublic,
     PaymentStatus,
     PaymentUpdate,
+    SimpleFIWebhookPayload,
 )
-from app.api.shared.enums import UserRole
-from app.api.shared.response import ListModel, Paging
+from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
+from app.core.config import settings
 from app.core.dependencies.users import (
     CurrentHuman,
     CurrentUser,
+    CurrentWriter,
+    HumanTenantSession,
     SessionDep,
     TenantSession,
 )
@@ -26,19 +28,7 @@ from app.services.email import (
     get_email_service,
 )
 
-if TYPE_CHECKING:
-    from app.api.user.schemas import UserPublic
-
 router = APIRouter(prefix="/payments", tags=["payments"])
-
-
-def _check_write_permission(current_user: "UserPublic") -> None:
-    """Check if user has write permission."""
-    if current_user.role == UserRole.VIEWER:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Viewer role does not have write access",
-        )
 
 
 async def _send_payment_confirmed_email(payment) -> None:
@@ -80,6 +70,8 @@ async def _send_payment_confirmed_email(payment) -> None:
         )
 
     email_service = get_email_service()
+
+    portal_url = f"https://{tenant.slug}.{settings.PORTAL_URL}"
     await email_service.send_payment_confirmed(
         to=human.email,
         subject=f"Payment Confirmed for {popup.name}",
@@ -94,7 +86,7 @@ async def _send_payment_confirmed_email(payment) -> None:
             if payment_model.discount_value
             else None,
             original_amount=original_amount,
-            portal_url=popup.portal_url,
+            portal_url=portal_url,
         ),
         from_address=tenant.sender_email,
         from_name=tenant.sender_name,
@@ -117,8 +109,8 @@ async def list_payments(
     application_id: uuid.UUID | None = None,
     external_id: str | None = None,
     payment_status: PaymentStatus | None = None,
-    skip: int = 0,
-    limit: int = 100,
+    skip: PaginationSkip = 0,
+    limit: PaginationLimit = 100,
 ) -> ListModel[PaymentPublic]:
     """List payments with optional filters (BO only)."""
     if popup_id:
@@ -164,10 +156,9 @@ async def update_payment(
     payment_id: uuid.UUID,
     payment_in: PaymentUpdate,
     db: TenantSession,
-    current_user: CurrentUser,
+    _current_user: CurrentWriter,
 ) -> PaymentPublic:
     """Update a payment (BO only)."""
-    _check_write_permission(current_user)
 
     payment = payments_crud.get(db, payment_id)
     if not payment:
@@ -197,10 +188,9 @@ async def update_payment(
 async def approve_payment(
     payment_id: uuid.UUID,
     db: TenantSession,
-    current_user: CurrentUser,
+    _current_user: CurrentWriter,
 ) -> PaymentPublic:
     """Manually approve a payment (BO only)."""
-    _check_write_permission(current_user)
 
     payment = payments_crud.approve_payment(db, payment_id)
 
@@ -218,10 +208,10 @@ async def approve_payment(
 @router.get("/my/{application_id}", response_model=ListModel[PaymentPublic])
 async def list_my_payments(
     application_id: uuid.UUID,
-    db: SessionDep,
+    db: HumanTenantSession,
     current_human: CurrentHuman,
-    skip: int = 0,
-    limit: int = 100,
+    skip: PaginationSkip = 0,
+    limit: PaginationLimit = 100,
 ) -> ListModel[PaymentPublic]:
     """List payments for an application owned by current human (Portal)."""
     from app.api.application.crud import applications_crud
@@ -247,7 +237,7 @@ async def list_my_payments(
 @router.post("/my/preview", response_model=PaymentPreview)
 async def preview_my_payment(
     payment_in: PaymentCreate,
-    db: SessionDep,
+    db: HumanTenantSession,
     current_human: CurrentHuman,
 ) -> PaymentPreview:
     """
@@ -276,7 +266,7 @@ async def preview_my_payment(
 )
 async def create_my_payment(
     payment_in: PaymentCreate,
-    db: SessionDep,
+    db: HumanTenantSession,
     current_human: CurrentHuman,
 ) -> PaymentPublic | PaymentPreview:
     """
@@ -304,13 +294,6 @@ async def create_my_payment(
     if payment is None:
         return preview
 
-    # TODO: Create payment with external provider (SimpleFI/Stripe)
-    # payment.external_id = external_response["id"]
-    # payment.checkout_url = external_response["checkout_url"]
-    # payment.status = external_response["status"]
-    # db.commit()
-    # db.refresh(payment)
-
     return PaymentPublic.model_validate(payment)
 
 
@@ -321,35 +304,113 @@ async def create_my_payment(
 
 @router.post("/webhook/simplefi", status_code=status.HTTP_200_OK)
 async def simplefi_webhook(
-    _db: SessionDep,
-    # TODO: Add proper webhook payload schema
-    # payload: SimpleFIWebhookPayload,
+    request: Request,
+    payload: SimpleFIWebhookPayload,
+    db: SessionDep,
 ) -> dict:
     """
     Webhook endpoint for SimpleFI payment notifications.
 
     Called by SimpleFI when payment status changes.
+    Validates signature using the popup's simplefi_api_key.
     """
-    # TODO: Implement webhook handling
-    # 1. Validate webhook signature
-    # 2. Find payment by external_id
-    # 3. Update payment status
-    # 4. If approved, add products to attendees
-    # 5. Send confirmation email
+    from decimal import Decimal
 
-    return {"status": "ok"}
+    from loguru import logger
 
+    from app.core.redis import webhook_cache
+    from app.services.simplefi import verify_webhook_signature
 
-@router.post("/webhook/stripe", status_code=status.HTTP_200_OK)
-async def stripe_webhook(
-    _db: SessionDep,
-    # TODO: Add proper webhook payload schema
-) -> dict:
-    """
-    Webhook endpoint for Stripe payment notifications.
+    payment_request_id = payload.data.payment_request.id
+    event_type = payload.event_type
 
-    Called by Stripe when payment status changes.
-    """
-    # TODO: Implement webhook handling
+    logger.info(
+        "SimpleFI webhook received - payment_request_id: %s, event_type: %s",
+        payment_request_id,
+        event_type,
+    )
 
-    return {"status": "ok"}
+    # Deduplication check
+    fingerprint = f"simplefi:{payment_request_id}:{event_type}"
+    if not webhook_cache.add(fingerprint):
+        logger.info(
+            "Webhook already processed (fingerprint: %s). Skipping...", fingerprint
+        )
+        return {"message": "Webhook already processed"}
+
+    # Only process payment events - return 200 for unknown types to prevent retries
+    if event_type not in ["new_payment", "new_card_payment"]:
+        logger.info("Event type %s not supported. Skipping...", event_type)
+        return {
+            "status": "ignored",
+            "message": f"Event type {event_type} not supported",
+        }
+
+    # Find payment by external_id
+    payment = payments_crud.get_by_external_id(db, payment_request_id)
+    if not payment:
+        logger.warning("Payment not found for external_id: %s", payment_request_id)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Payment not found",
+        )
+
+    # Validate webhook signature using popup's simplefi_api_key
+    signature = request.headers.get("X-SimpleFI-Signature")
+    raw_body = await request.body()
+    api_key = (
+        payment.application.popup.simplefi_api_key
+        if payment.application and payment.application.popup
+        else None
+    )
+    if not verify_webhook_signature(raw_body, signature, api_key):
+        logger.warning("Invalid SimpleFI webhook signature for payment %s", payment.id)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid webhook signature",
+        )
+
+    payment_request_status = payload.data.payment_request.status
+
+    # Skip if status unchanged
+    if payment.status == payment_request_status:
+        logger.info(
+            "Payment status unchanged (%s). Skipping...", payment_request_status
+        )
+        return {"message": "Payment status unchanged"}
+
+    # Extract currency and rate from transaction
+    currency = "USD"
+    rate = Decimal("1")
+    if payload.data.new_payment:
+        currency = payload.data.new_payment.coin
+        for t in payload.data.payment_request.transactions:
+            if t.coin == currency:
+                rate = Decimal(str(t.price_details.rate))
+                break
+
+    # Update payment based on status
+    if payment_request_status == "approved":
+        payment = payments_crud.approve_payment(
+            db,
+            payment.id,
+            currency=currency,
+            rate=rate,
+        )
+        # Send confirmation email
+        await _send_payment_confirmed_email(payment)
+        logger.info("Payment %s approved via SimpleFI webhook", payment.id)
+    else:
+        # Mark as expired for other statuses
+        payments_crud.update(
+            db,
+            payment,
+            PaymentUpdate(status=PaymentStatus.EXPIRED),
+        )
+        logger.info(
+            "Payment %s marked as expired (status: %s)",
+            payment.id,
+            payment_request_status,
+        )
+
+    return {"message": "Payment status updated successfully"}
