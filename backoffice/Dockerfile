@@ -10,7 +10,7 @@ COPY backoffice/package.json /app/backoffice/
 
 WORKDIR /app/backoffice
 
-RUN bun install
+RUN bun install --frozen-lockfile
 
 COPY ./backoffice /app/backoffice
 ARG VITE_API_URL
@@ -19,7 +19,7 @@ RUN bun run build
 
 
 # Stage 1, based on Nginx, to have only the compiled app, ready for production with Nginx
-FROM public.ecr.aws/docker/library/nginx:alpine
+FROM public.ecr.aws/docker/library/nginx:1.28-alpine
 
 COPY --from=build-stage /app/backoffice/dist/ /usr/share/nginx/html
 

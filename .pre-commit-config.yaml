@@ -2,7 +2,7 @@
 # See https://pre-commit.com/hooks.html for more hooks
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.4.0
+    rev: v6.0.0
     hooks:
       - id: check-added-large-files
       - id: check-toml
@@ -21,7 +21,7 @@ repos:
     hooks:
       - id: local-biome-check
         name: biome check
-        entry: npm run lint
+        entry: bun run lint
         language: system
         types: [text]
         files: ^backoffice/
@@ -30,19 +30,19 @@ repos:
         name: ruff check
         entry: uv run ruff check --force-exclude --fix --exit-non-zero-on-fix
         require_serial: true
-        language: unsupported
+        language: python
         types: [python]
 
       - id: local-ruff-format
         name: ruff format
         entry: uv run ruff format --force-exclude --exit-non-zero-on-format
         require_serial: true
-        language: unsupported
+        language: python
         types: [python]
 
       - id: generate-backoffice-sdk
         name: Generate Backoffice SDK
         entry: bash ./scripts/generate-client.sh
         pass_filenames: false
-        language: unsupported
+        language: system
         files: ^backend/.*$|^scripts/generate-client\.sh$
