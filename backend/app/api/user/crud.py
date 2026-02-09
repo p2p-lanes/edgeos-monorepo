@@ -1,7 +1,8 @@
 import uuid
 
 from loguru import logger
-from sqlmodel import Session, func, select
+from sqlalchemy import or_
+from sqlmodel import Session, col, func, select
 
 from app.api.shared.crud import BaseCRUD
 from app.api.shared.enums import UserRole
@@ -24,8 +25,10 @@ class UsersCRUD(BaseCRUD[Users, UserCreate, UserUpdate]):
         role: UserRole | None = None,
         skip: int = 0,
         limit: int = 100,
+        search: str | None = None,
     ) -> tuple[list[Users], int]:
         """Find users with optional filters."""
+
         statement = select(Users).where(Users.deleted == False)  # noqa: E712
 
         if tenant_id is not None:
@@ -33,6 +36,16 @@ class UsersCRUD(BaseCRUD[Users, UserCreate, UserUpdate]):
 
         if role is not None:
             statement = statement.where(Users.role == role)
+
+        # Apply text search if provided
+        if search:
+            search_term = f"%{search}%"
+            statement = statement.where(
+                or_(
+                    col(Users.full_name).ilike(search_term),
+                    col(Users.email).ilike(search_term),
+                )
+            )
 
         count_statement = select(func.count()).select_from(statement.subquery())
         total = session.exec(count_statement).one()

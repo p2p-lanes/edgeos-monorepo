@@ -32,10 +32,17 @@ def _check_superadmin(current_user: "UserPublic") -> None:
 async def list_humans(
     db: TenantSession,
     _: CurrentUser,
+    search: str | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[HumanPublic]:
-    humans, total = crud.find(db, skip=skip, limit=limit)
+    humans, total = crud.find(
+        db,
+        skip=skip,
+        limit=limit,
+        search=search,
+        search_fields=["first_name", "last_name", "email", "organization"],
+    )
 
     return ListModel[HumanPublic](
         results=[HumanPublic.model_validate(h) for h in humans],

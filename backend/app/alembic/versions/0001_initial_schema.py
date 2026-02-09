@@ -174,13 +174,13 @@ def upgrade() -> None:
         sa.Column('allows_spouse', sa.Boolean(), nullable=True),
         sa.Column('allows_children', sa.Boolean(), nullable=True),
         sa.Column('allows_coupons', sa.Boolean(), nullable=True),
-        sa.Column('image_url', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-        sa.Column('icon_url', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-        sa.Column('express_checkout_background', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-        sa.Column('web_url', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-        sa.Column('blog_url', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-        sa.Column('twitter_url', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-        sa.Column('simplefi_api_key', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column('image_url', sa.String(), nullable=True),
+        sa.Column('icon_url', sa.String(), nullable=True),
+        sa.Column('express_checkout_background', sa.String(), nullable=True),
+        sa.Column('web_url', sa.String(), nullable=True),
+        sa.Column('blog_url', sa.String(), nullable=True),
+        sa.Column('twitter_url', sa.String(), nullable=True),
+        sa.Column('simplefi_api_key', sa.String(), nullable=True),
     )
 
     # -------------------------------------------------------------------------

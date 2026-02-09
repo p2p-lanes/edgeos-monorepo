@@ -2,6 +2,7 @@ import uuid
 from typing import Any
 
 from pydantic import BaseModel
+from sqlalchemy import asc, desc, or_
 from sqlmodel import Session, SQLModel, func, select
 
 
@@ -27,6 +28,10 @@ class BaseCRUD[
         session: Session,
         skip: int = 0,
         limit: int = 100,
+        search: str | None = None,
+        search_fields: list[str] | None = None,
+        sort_by: str | None = None,
+        sort_order: str = "desc",
         **filters: Any,
     ) -> tuple[list[ModelType], int]:
         statement = select(self.model)
@@ -35,16 +40,39 @@ class BaseCRUD[
             if value is not None:
                 statement = statement.where(getattr(self.model, field) == value)
 
+        # Apply text search if provided
+        if search and search_fields:
+            search_term = f"%{search}%"
+            search_conditions = [
+                getattr(self.model, field).ilike(search_term)
+                for field in search_fields
+                if hasattr(self.model, field)
+            ]
+            if search_conditions:
+                statement = statement.where(or_(*search_conditions))
+
         count_statement = select(func.count()).select_from(statement.subquery())
         total = session.exec(count_statement).one()
 
-        if hasattr(self.model, "created_at"):
-            statement = statement.order_by(self.model.created_at.desc())
+        statement = self._apply_sorting(statement, sort_by, sort_order)
 
         statement = statement.offset(skip).limit(limit)
         results = list(session.exec(statement).all())
 
         return results, total
+
+    def _apply_sorting(
+        self,
+        statement: Any,
+        sort_by: str | None = None,
+        sort_order: str = "desc",
+    ) -> Any:
+        order_fn = desc if sort_order == "desc" else asc
+        if sort_by and hasattr(self.model, sort_by):
+            statement = statement.order_by(order_fn(getattr(self.model, sort_by)))
+        elif hasattr(self.model, "created_at"):
+            statement = statement.order_by(self.model.created_at.desc())  # type: ignore[union-attr]
+        return statement
 
     def create(self, session: Session, obj_in: CreateSchemaType) -> ModelType:
         db_obj = self.model(**obj_in.model_dump())

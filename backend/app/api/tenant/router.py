@@ -18,10 +18,13 @@ router = APIRouter(prefix="/tenants", tags=["tenants"])
 async def list_tenants(
     db: SessionDep,
     _: CurrentSuperadmin,
+    search: str | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[TenantPublic]:
-    tenants, total = crud.find(db, skip=skip, limit=limit)
+    tenants, total = crud.find(
+        db, skip=skip, limit=limit, search=search, search_fields=["name"]
+    )
 
     return ListModel[TenantPublic](
         results=[TenantPublic.model_validate(t) for t in tenants],

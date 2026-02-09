@@ -3,9 +3,9 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from fastapi import HTTPException, status
-from sqlalchemy import desc
+from sqlalchemy import desc, or_
 from sqlalchemy.orm import selectinload
-from sqlmodel import Session, func, select
+from sqlmodel import Session, col, func, select
 
 from app.api.application.models import Applications, ApplicationSnapshots
 from app.api.application.schemas import (
@@ -16,6 +16,7 @@ from app.api.application.schemas import (
 )
 from app.api.attendee.crud import attendees_crud, generate_check_in_code
 from app.api.attendee.models import AttendeeProducts, Attendees
+from app.api.human.models import Humans
 from app.api.human.schemas import HumanCreate, HumanUpdate
 from app.api.shared.crud import BaseCRUD
 
@@ -81,6 +82,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         skip: int = 0,
         limit: int = 100,
         status_filter: ApplicationStatus | None = None,
+        search: str | None = None,
     ) -> tuple[list[Applications], int]:
         """Find applications by popup_id with optional status filter and eager loading."""
         base_statement = select(Applications).where(Applications.popup_id == popup_id)
@@ -88,6 +90,20 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         if status_filter:
             base_statement = base_statement.where(
                 Applications.status == status_filter.value
+            )
+
+        # Apply text search if provided - search in human fields
+        if search:
+            search_term = f"%{search}%"
+            base_statement = base_statement.join(
+                Humans, Applications.human_id == Humans.id  # type: ignore[arg-type]
+            ).where(
+                or_(
+                    col(Humans.first_name).ilike(search_term),
+                    col(Humans.last_name).ilike(search_term),
+                    col(Humans.email).ilike(search_term),
+                    col(Humans.organization).ilike(search_term),
+                )
             )
 
         count_statement = select(func.count()).select_from(base_statement.subquery())

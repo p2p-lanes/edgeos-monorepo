@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime
 
 from fastapi import HTTPException, status
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from app.api.coupon.models import Coupons
 from app.api.coupon.schemas import CouponCreate, CouponUpdate
@@ -91,12 +91,18 @@ class CouponsCRUD(BaseCRUD[Coupons, CouponCreate, CouponUpdate]):
         skip: int = 0,
         limit: int = 100,
         is_active: bool | None = None,
+        search: str | None = None,
     ) -> tuple[list[Coupons], int]:
         """Find coupons by popup_id with optional filters."""
         statement = select(Coupons).where(Coupons.popup_id == popup_id)
 
         if is_active is not None:
             statement = statement.where(Coupons.is_active == is_active)
+
+        # Apply text search if provided
+        if search:
+            search_term = f"%{search}%"
+            statement = statement.where(col(Coupons.code).ilike(search_term))
 
         # Get total count
         from sqlmodel import func

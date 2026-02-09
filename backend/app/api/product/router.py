@@ -1,4 +1,5 @@
 import uuid
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException, status
 
@@ -24,6 +25,9 @@ async def list_products(
     popup_id: uuid.UUID | None = None,
     is_active: bool | None = None,
     category: ProductCategory | None = None,
+    search: str | None = None,
+    sort_by: str | None = None,
+    sort_order: Literal["asc", "desc"] = "desc",
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[ProductPublic]:
@@ -36,9 +40,20 @@ async def list_products(
             limit=limit,
             is_active=is_active,
             category=category,
+            search=search,
+            sort_by=sort_by,
+            sort_order=sort_order,
         )
     else:
-        products, total = crud.products_crud.find(db, skip=skip, limit=limit)
+        products, total = crud.products_crud.find(
+            db,
+            skip=skip,
+            limit=limit,
+            search=search,
+            search_fields=["name"],
+            sort_by=sort_by,
+            sort_order=sort_order,
+        )
 
     return ListModel[ProductPublic](
         results=[ProductPublic.model_validate(p) for p in products],

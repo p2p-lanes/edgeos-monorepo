@@ -26,13 +26,14 @@ async def list_users(
     limit: PaginationLimit = 100,
     tenant_id: uuid.UUID | None = None,
     role: UserRole | None = None,
+    search: str | None = None,
 ) -> ListModel[UserPublic]:
     # Admins can only see users in their tenant
     if current_user.role == UserRole.ADMIN:
         tenant_id = current_user.tenant_id
 
     users, total = crud.find_filtered(
-        db, tenant_id=tenant_id, role=role, skip=skip, limit=limit
+        db, tenant_id=tenant_id, role=role, skip=skip, limit=limit, search=search
     )
 
     return ListModel[UserPublic](

@@ -21,10 +21,13 @@ router = APIRouter(prefix="/popups", tags=["popups"])
 async def list_popups(
     db: TenantSession,
     _: CurrentUser,
+    search: str | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[PopupPublic]:
-    popups, total = crud.find(db, skip=skip, limit=limit)
+    popups, total = crud.find(
+        db, skip=skip, limit=limit, search=search, search_fields=["name"]
+    )
 
     return ListModel[PopupPublic](
         results=[PopupPublic.model_validate(p) for p in popups],

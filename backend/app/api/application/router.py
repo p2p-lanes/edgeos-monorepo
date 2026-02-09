@@ -86,6 +86,7 @@ async def list_applications(
     popup_id: uuid.UUID | None = None,
     human_id: uuid.UUID | None = None,
     status_filter: ApplicationStatus | None = None,
+    search: str | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[ApplicationPublic]:
@@ -97,6 +98,7 @@ async def list_applications(
             skip=skip,
             limit=limit,
             status_filter=status_filter,
+            search=search,
         )
     elif human_id:
         applications, total = crud.applications_crud.find_by_human(

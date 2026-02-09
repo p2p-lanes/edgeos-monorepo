@@ -1,10 +1,12 @@
 import uuid
 
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from app.api.product.models import Products
 from app.api.product.schemas import ProductCategory, ProductCreate, ProductUpdate
 from app.api.shared.crud import BaseCRUD
+
+SORT_FIELDS = {"name", "price", "attendee_category", "is_active"}
 
 
 class ProductsCRUD(BaseCRUD[Products, ProductCreate, ProductUpdate]):
@@ -44,6 +46,9 @@ class ProductsCRUD(BaseCRUD[Products, ProductCreate, ProductUpdate]):
         limit: int = 100,
         is_active: bool | None = None,
         category: ProductCategory | None = None,
+        search: str | None = None,
+        sort_by: str | None = None,
+        sort_order: str = "desc",
     ) -> tuple[list[Products], int]:
         """Find products by popup_id with optional filters."""
         statement = select(Products).where(Products.popup_id == popup_id)
@@ -54,13 +59,18 @@ class ProductsCRUD(BaseCRUD[Products, ProductCreate, ProductUpdate]):
         if category is not None:
             statement = statement.where(Products.category == category)
 
-        # Get total count
+        if search:
+            search_term = f"%{search}%"
+            statement = statement.where(col(Products.name).ilike(search_term))
+
         from sqlmodel import func
 
         count_statement = select(func.count()).select_from(statement.subquery())
         total = session.exec(count_statement).one()
 
-        # Apply pagination
+        validated_sort = sort_by if sort_by in SORT_FIELDS else None
+        statement = self._apply_sorting(statement, validated_sort, sort_order)
+
         statement = statement.offset(skip).limit(limit)
         results = list(session.exec(statement).all())
 

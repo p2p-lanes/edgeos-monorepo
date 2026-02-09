@@ -5,7 +5,7 @@ import uuid
 from dataclasses import dataclass
 
 from loguru import logger
-from psycopg.sql import SQL, Identifier, Literal
+from psycopg.sql import SQL, Composable, Identifier, Literal
 from pydantic import PostgresDsn
 from sqlalchemy import Engine, event, text
 from sqlmodel import Session, create_engine, select
@@ -195,9 +195,10 @@ def generate_db_username() -> str:
     return f"usr_{secrets.token_hex(8)}"
 
 
-def _exec_ddl(session: Session, query: SQL) -> None:
+def _exec_ddl(session: Session, query: Composable) -> None:
     """Execute a DDL statement safely using psycopg.sql via the raw connection."""
     raw_conn = session.connection().connection.dbapi_connection
+    assert raw_conn is not None
     cursor = raw_conn.cursor()
     cursor.execute(query)
     cursor.close()

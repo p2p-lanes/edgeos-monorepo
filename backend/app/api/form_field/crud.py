@@ -1,7 +1,8 @@
 import uuid
 from typing import Any
 
-from sqlmodel import Session, func, select
+from sqlalchemy import or_
+from sqlmodel import Session, col, func, select
 
 from app.api.form_field.models import FormFields
 from app.api.form_field.schemas import FormFieldCreate, FormFieldType, FormFieldUpdate
@@ -26,12 +27,24 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
         popup_id: uuid.UUID,
         skip: int = 0,
         limit: int = 100,
+        search: str | None = None,
     ) -> tuple[list[FormFields], int]:
         statement = (
             select(FormFields)
             .where(FormFields.popup_id == popup_id)
             .order_by(FormFields.section, FormFields.position)  # type: ignore[arg-type]
         )
+
+        # Apply text search if provided
+        if search:
+            search_term = f"%{search}%"
+            statement = statement.where(
+                or_(
+                    col(FormFields.label).ilike(search_term),
+                    col(FormFields.name).ilike(search_term),
+                    col(FormFields.field_type).ilike(search_term),
+                )
+            )
 
         count_statement = select(func.count()).select_from(statement.subquery())
         total = session.exec(count_statement).one()

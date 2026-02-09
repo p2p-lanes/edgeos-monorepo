@@ -4,7 +4,7 @@ import uuid
 from fastapi import HTTPException, status
 from sqlalchemy import desc
 from sqlalchemy.orm import selectinload
-from sqlmodel import Session, func, select
+from sqlmodel import Session, col, func, select
 
 from app.api.group.models import (
     GroupLeaders,
@@ -91,9 +91,15 @@ class GroupsCRUD(BaseCRUD[Groups, GroupCreate, GroupUpdate]):
         popup_id: uuid.UUID,
         skip: int = 0,
         limit: int = 100,
+        search: str | None = None,
     ) -> tuple[list[Groups], int]:
         """Find groups by popup_id."""
         statement = select(Groups).where(Groups.popup_id == popup_id)
+
+        # Apply text search if provided
+        if search:
+            search_term = f"%{search}%"
+            statement = statement.where(col(Groups.name).ilike(search_term))
 
         count_statement = select(func.count()).select_from(statement.subquery())
         total = session.exec(count_statement).one()

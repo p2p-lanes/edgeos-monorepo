@@ -49,16 +49,19 @@ async def list_groups(
     db: TenantSession,
     _: CurrentUser,
     popup_id: uuid.UUID | None = None,
+    search: str | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[GroupPublic]:
     """List all groups (BO only)."""
     if popup_id:
         groups, total = crud.groups_crud.find_by_popup(
-            db, popup_id=popup_id, skip=skip, limit=limit
+            db, popup_id=popup_id, skip=skip, limit=limit, search=search
         )
     else:
-        groups, total = crud.groups_crud.find(db, skip=skip, limit=limit)
+        groups, total = crud.groups_crud.find(
+            db, skip=skip, limit=limit, search=search, search_fields=["name"]
+        )
 
     return ListModel[GroupPublic](
         results=[GroupPublic.model_validate(g) for g in groups],

@@ -17,15 +17,18 @@ async def list_form_fields(
     db: TenantSession,
     _: CurrentUser,
     popup_id: uuid.UUID | None = None,
+    search: str | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[FormFieldPublic]:
     if popup_id:
         fields, total = crud.form_fields_crud.find_by_popup(
-            db, popup_id=popup_id, skip=skip, limit=limit
+            db, popup_id=popup_id, skip=skip, limit=limit, search=search
         )
     else:
-        fields, total = crud.form_fields_crud.find(db, skip=skip, limit=limit)
+        fields, total = crud.form_fields_crud.find(
+            db, skip=skip, limit=limit, search=search, search_fields=["label", "name"]
+        )
 
     return ListModel[FormFieldPublic](
         results=[FormFieldPublic.model_validate(f) for f in fields],

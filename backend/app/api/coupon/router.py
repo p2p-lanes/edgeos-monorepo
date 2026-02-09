@@ -28,6 +28,7 @@ async def list_coupons(
     _: CurrentUser,
     popup_id: uuid.UUID | None = None,
     is_active: bool | None = None,
+    search: str | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[CouponPublic]:
@@ -39,9 +40,12 @@ async def list_coupons(
             skip=skip,
             limit=limit,
             is_active=is_active,
+            search=search,
         )
     else:
-        coupons, total = crud.coupons_crud.find(db, skip=skip, limit=limit)
+        coupons, total = crud.coupons_crud.find(
+            db, skip=skip, limit=limit, search=search, search_fields=["code"]
+        )
 
     return ListModel[CouponPublic](
         results=[CouponPublic.model_validate(c) for c in coupons],
