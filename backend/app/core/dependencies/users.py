@@ -148,10 +148,22 @@ def get_admin(
     return current_user
 
 
+def require_write_permission(
+    current_user: Annotated["UserPublic", Depends(get_current_user)],
+) -> "UserPublic":
+    if current_user.role == UserRole.VIEWER:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Viewer role does not have write access",
+        )
+    return current_user
+
+
 CurrentUser = Annotated["UserPublic", Depends(get_current_user)]
 CurrentHuman = Annotated["HumanPublic", Depends(get_current_human)]
 CurrentSuperadmin = Annotated["UserPublic", Depends(get_superadmin)]
 CurrentAdmin = Annotated["UserPublic", Depends(get_admin)]
+CurrentWriter = Annotated["UserPublic", Depends(require_write_permission)]
 
 
 def get_current_tenant(
@@ -267,3 +279,45 @@ def get_tenant_session(
 
 
 TenantSession = Annotated[Session, Depends(get_tenant_session)]
+
+
+def get_human_tenant_session(
+    current_human: CurrentHuman,
+    db: SessionDep,
+) -> Generator[Session]:
+    """Yield a tenant-scoped DB session for portal (human) routes.
+
+    Uses the human's tenant_id to obtain a CRUD-scoped engine with RLS,
+    mirroring the pattern used by get_tenant_session for backoffice users.
+    """
+    from app.api.shared.enums import CredentialType
+    from app.core.tenant_db import tenant_connection_manager
+
+    if not current_human.tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Human has no tenant assigned",
+        )
+
+    cached_cred = tenant_connection_manager.get_credential(
+        db, current_human.tenant_id, CredentialType.CRUD
+    )
+
+    if not cached_cred:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tenant credentials not configured",
+        )
+
+    tenant_engine = tenant_connection_manager.get_engine(
+        current_human.tenant_id,
+        CredentialType.CRUD,
+        cached_cred.username,
+        cached_cred.password,
+    )
+
+    with Session(tenant_engine) as tenant_session:
+        yield tenant_session
+
+
+HumanTenantSession = Annotated[Session, Depends(get_human_tenant_session)]

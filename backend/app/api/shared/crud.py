@@ -32,11 +32,14 @@ class BaseCRUD[
         statement = select(self.model)
 
         for field, value in filters.items():
-            if not value:
+            if value is not None:
                 statement = statement.where(getattr(self.model, field) == value)
 
         count_statement = select(func.count()).select_from(statement.subquery())
         total = session.exec(count_statement).one()
+
+        if hasattr(self.model, "created_at"):
+            statement = statement.order_by(self.model.created_at.desc())
 
         statement = statement.offset(skip).limit(limit)
         results = list(session.exec(statement).all())
@@ -70,6 +73,10 @@ class BaseCRUD[
         session.commit()
 
     def soft_delete(self, session: Session, db_obj: ModelType) -> ModelType:
+        if not hasattr(db_obj, "deleted"):
+            raise ValueError(
+                f"{type(db_obj).__name__} does not support soft delete (missing 'deleted' field)"
+            )
         db_obj.deleted = True
         session.add(db_obj)
         session.commit()
