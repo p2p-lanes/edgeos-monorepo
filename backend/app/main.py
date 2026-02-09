@@ -62,6 +62,14 @@ def handle_integrity_error(_: Request, exc: IntegrityError) -> JSONResponse:
             status_code=status.HTTP_403_FORBIDDEN,
             content={"detail": "Access denied by security policy"},
         )
+    # Detect unique constraint violations (PostgreSQL error code 23505)
+    pgcode = getattr(exc.orig, "pgcode", None)
+    if pgcode == "23505":
+        logger.warning(f"Unique constraint violation: {error_msg}")
+        return JSONResponse(
+            status_code=status.HTTP_409_CONFLICT,
+            content={"detail": "A record with this data already exists"},
+        )
     logger.error(f"Integrity error: {error_msg}")
     return JSONResponse(
         status_code=status.HTTP_400_BAD_REQUEST,
@@ -75,14 +83,27 @@ if settings.all_cors_origins:
         CORSMiddleware,  # type: ignore[arg-type]
         allow_origins=settings.all_cors_origins,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "X-Tenant-Id"],
     )
 
 
 @application.get("/health-check", tags=["utils"], include_in_schema=False)
-async def health_check() -> bool:
-    return True
+async def health_check():
+    from sqlmodel import Session, text
+
+    from app.core.db import engine
+
+    try:
+        with Session(engine) as session:
+            session.exec(text("SELECT 1"))
+        return {"status": "healthy"}
+    except Exception:
+        logger.error("Health check failed: database unreachable")
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={"status": "unhealthy", "detail": "Database unreachable"},
+        )
 
 
 application.include_router(api_router, prefix=settings.API_V1_STR)

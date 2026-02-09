@@ -40,15 +40,42 @@ def get_redis() -> redis.Redis | None:
 
 
 class RateLimiter:
-    """Rate limiter using Redis sliding window."""
+    """Rate limiter using Redis sliding window with in-memory fallback."""
 
     def __init__(self, prefix: str, max_requests: int, window_seconds: int):
         self.prefix = prefix
         self.max_requests = max_requests
         self.window_seconds = window_seconds
+        # In-memory fallback (half the normal limit)
+        self._memory: dict[str, list[float]] = {}
+        self._lock = __import__("threading").Lock()
 
     def _get_key(self, identifier: str) -> str:
         return f"ratelimit:{self.prefix}:{identifier}"
+
+    def _is_allowed_memory(self, identifier: str) -> tuple[bool, int]:
+        """In-memory sliding window fallback (half the normal limit)."""
+        import time
+
+        now = time.time()
+        memory_limit = max(1, self.max_requests // 2)
+
+        with self._lock:
+            if identifier not in self._memory:
+                self._memory[identifier] = []
+
+            # Remove expired entries
+            window_start = now - self.window_seconds
+            self._memory[identifier] = [
+                t for t in self._memory[identifier] if t > window_start
+            ]
+
+            current_count = len(self._memory[identifier])
+            if current_count >= memory_limit:
+                return False, 0
+
+            self._memory[identifier].append(now)
+            return True, memory_limit - current_count - 1
 
     def is_allowed(self, identifier: str) -> tuple[bool, int]:
         """
@@ -59,8 +86,7 @@ class RateLimiter:
         """
         client = get_redis()
         if client is None:
-            # Redis not available, allow all requests
-            return True, self.max_requests
+            return self._is_allowed_memory(identifier)
 
         key = self._get_key(identifier)
 
@@ -82,7 +108,7 @@ class RateLimiter:
 
         except redis.RedisError as e:
             logger.warning(f"Redis error in rate limiter: {e}")
-            return True, self.max_requests
+            return self._is_allowed_memory(identifier)
 
     def get_ttl(self, identifier: str) -> int:
         """Get remaining TTL for the rate limit window."""
@@ -315,3 +341,72 @@ pending_human_store = PendingHumanStore(expiration_minutes=15)
 def is_redis_available() -> bool:
     """Check if Redis is configured and available."""
     return get_redis() is not None
+
+
+class WebhookCache:
+    """Deduplication cache for webhook events.
+
+    Uses Redis if available, otherwise falls back to in-memory dict.
+    In-memory fallback is not suitable for multi-instance deployments.
+    """
+
+    PREFIX = "webhook"
+
+    def __init__(self, ttl_seconds: int = 3600):
+        self.ttl_seconds = ttl_seconds
+        self._memory_cache: dict[str, float] = {}
+
+    def _get_key(self, fingerprint: str) -> str:
+        return f"{self.PREFIX}:{fingerprint}"
+
+    def add(self, fingerprint: str) -> bool:
+        """
+        Try to add a fingerprint to the cache.
+
+        Returns True if fingerprint was added (not seen before).
+        Returns False if fingerprint already exists (duplicate).
+        """
+        client = get_redis()
+
+        if client is not None:
+            return self._add_redis(client, fingerprint)
+        return self._add_memory(fingerprint)
+
+    def _add_redis(self, client: redis.Redis, fingerprint: str) -> bool:
+        """Add fingerprint to Redis cache."""
+        key = self._get_key(fingerprint)
+        try:
+            # SETNX returns True if key was set, False if it already existed
+            was_set = client.setnx(key, "1")
+            if was_set:
+                client.expire(key, self.ttl_seconds)
+            return bool(was_set)
+        except redis.RedisError as e:
+            logger.warning(f"Redis error in webhook cache: {e}")
+            # On Redis error, allow processing (fail open)
+            return True
+
+    def _add_memory(self, fingerprint: str) -> bool:
+        """Add fingerprint to in-memory cache (fallback)."""
+        import time
+
+        now = time.time()
+
+        # Clean expired entries periodically
+        self._cleanup_memory(now)
+
+        if fingerprint in self._memory_cache:
+            return False
+
+        self._memory_cache[fingerprint] = now + self.ttl_seconds
+        return True
+
+    def _cleanup_memory(self, now: float) -> None:
+        """Remove expired entries from memory cache."""
+        expired = [k for k, v in self._memory_cache.items() if v < now]
+        for k in expired:
+            del self._memory_cache[k]
+
+
+# Webhook deduplication cache
+webhook_cache = WebhookCache(ttl_seconds=3600)

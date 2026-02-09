@@ -1,8 +1,11 @@
+import re
 import secrets
+import threading
 import uuid
 from dataclasses import dataclass
 
 from loguru import logger
+from psycopg.sql import SQL, Identifier, Literal
 from pydantic import PostgresDsn
 from sqlalchemy import Engine, event, text
 from sqlmodel import Session, create_engine, select
@@ -10,6 +13,23 @@ from sqlmodel import Session, create_engine, select
 from app.api.shared.enums import CredentialType
 from app.core.config import settings
 from app.utils.encryption import decrypt, encrypt
+
+_SAFE_IDENTIFIER_RE = re.compile(r"^[a-z][a-z0-9_]{0,62}$")
+
+
+def _validate_identifier(value: str, label: str = "identifier") -> str:
+    """Validate that a value is safe for use as a SQL identifier.
+
+    Only lowercase letters, digits, and underscores are allowed.
+    Raises ValueError if the value doesn't match.
+    """
+    if not _SAFE_IDENTIFIER_RE.match(value):
+        raise ValueError(
+            f"Unsafe SQL {label}: {value!r}. "
+            "Only lowercase letters, digits, and underscores are allowed."
+        )
+    return value
+
 
 CREDENTIAL_TYPE_ROLES = {
     CredentialType.CRUD: "tenant_role",
@@ -27,12 +47,14 @@ class TenantConnectionManager:
     _instance: "TenantConnectionManager | None" = None
     _engines: dict[tuple[uuid.UUID, CredentialType], Engine]
     _credentials: dict[tuple[uuid.UUID, CredentialType], CachedCredential]
+    _lock: threading.Lock
 
     def __new__(cls) -> "TenantConnectionManager":
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._engines = {}
             cls._instance._credentials = {}
+            cls._instance._lock = threading.Lock()
         return cls._instance
 
     def get_credential(
@@ -45,8 +67,9 @@ class TenantConnectionManager:
         from app.api.tenant.credential_models import TenantCredentials
 
         cache_key = (tenant_id, credential_type)
-        if cache_key in self._credentials:
-            return self._credentials[cache_key]
+        with self._lock:
+            if cache_key in self._credentials:
+                return self._credentials[cache_key]
 
         # Not in cache - fetch from database
         credential = session.exec(
@@ -63,7 +86,8 @@ class TenantConnectionManager:
             username=credential.db_username,
             password=decrypt(credential.db_password_encrypted),
         )
-        self._credentials[cache_key] = cached
+        with self._lock:
+            self._credentials[cache_key] = cached
         logger.debug(
             f"Cached {credential_type.value} credential for tenant {tenant_id}"
         )
@@ -73,12 +97,13 @@ class TenantConnectionManager:
         self, tenant_id: uuid.UUID, credential_type: CredentialType | None = None
     ) -> None:
         """Remove credential from cache (call when credentials change)."""
-        if credential_type is not None:
-            cache_key = (tenant_id, credential_type)
-            self._credentials.pop(cache_key, None)
-        else:
-            for cred_type in CredentialType:
-                self._credentials.pop((tenant_id, cred_type), None)
+        with self._lock:
+            if credential_type is not None:
+                cache_key = (tenant_id, credential_type)
+                self._credentials.pop(cache_key, None)
+            else:
+                for cred_type in CredentialType:
+                    self._credentials.pop((tenant_id, cred_type), None)
 
     def get_engine(
         self,
@@ -88,52 +113,63 @@ class TenantConnectionManager:
         db_password: str,
     ) -> Engine:
         cache_key = (tenant_id, credential_type)
-        if cache_key not in self._engines:
-            connection_string = self._build_connection_string(db_username, db_password)
-            engine = create_engine(
-                connection_string,
-                pool_size=5,
-                max_overflow=10,  # Allow burst connections beyond pool_size
-                pool_pre_ping=True,
-                pool_recycle=3600,  # Recycle connections after 1 hour
-                pool_timeout=30,  # Wait max 30s for a connection from pool
+        with self._lock:
+            if cache_key in self._engines:
+                return self._engines[cache_key]
+
+        connection_string = self._build_connection_string(db_username, db_password)
+        engine = create_engine(
+            connection_string,
+            pool_size=5,
+            max_overflow=10,  # Allow burst connections beyond pool_size
+            pool_pre_ping=True,
+            pool_recycle=3600,  # Recycle connections after 1 hour
+            pool_timeout=30,  # Wait max 30s for a connection from pool
+        )
+
+        @event.listens_for(engine, "checkout")
+        def set_tenant_context(
+            dbapi_connection,
+            connection_record,  # noqa: ARG001
+            connection_proxy,  # noqa: ARG001
+        ):
+            cursor = dbapi_connection.cursor()
+            cursor.execute(
+                SQL("SET app.tenant_id = {}").format(Literal(str(tenant_id)))
             )
+            cursor.close()
 
-            @event.listens_for(engine, "checkout")
-            def set_tenant_context(
-                dbapi_connection,
-                connection_record,  # noqa: ARG001
-                connection_proxy,  # noqa: ARG001
-            ):
-                cursor = dbapi_connection.cursor()
-                cursor.execute(f"SET app.tenant_id = '{tenant_id}'")
-                cursor.close()
-
+        with self._lock:
+            # Double-check after acquiring lock (another thread may have created it)
+            if cache_key in self._engines:
+                engine.dispose()
+                return self._engines[cache_key]
             self._engines[cache_key] = engine
-            logger.info(
-                f"Created {credential_type.value} database engine for tenant {tenant_id}"
-            )
 
-        return self._engines[cache_key]
+        logger.info(
+            f"Created {credential_type.value} database engine for tenant {tenant_id}"
+        )
+        return engine
 
     def remove_engine(
         self, tenant_id: uuid.UUID, credential_type: CredentialType | None = None
     ) -> None:
-        if credential_type is not None:
-            cache_key = (tenant_id, credential_type)
-            if cache_key in self._engines:
-                self._engines[cache_key].dispose()
-                del self._engines[cache_key]
-                logger.info(
-                    f"Removed {credential_type.value} database engine for tenant {tenant_id}"
-                )
-        else:
-            for cred_type in CredentialType:
-                cache_key = (tenant_id, cred_type)
+        with self._lock:
+            if credential_type is not None:
+                cache_key = (tenant_id, credential_type)
                 if cache_key in self._engines:
                     self._engines[cache_key].dispose()
                     del self._engines[cache_key]
-            logger.info(f"Removed all database engines for tenant {tenant_id}")
+                    logger.info(
+                        f"Removed {credential_type.value} database engine for tenant {tenant_id}"
+                    )
+            else:
+                for cred_type in CredentialType:
+                    cache_key = (tenant_id, cred_type)
+                    if cache_key in self._engines:
+                        self._engines[cache_key].dispose()
+                        del self._engines[cache_key]
+                logger.info(f"Removed all database engines for tenant {tenant_id}")
         # Also invalidate cached credentials
         self.invalidate_credential(tenant_id, credential_type)
 
@@ -159,6 +195,14 @@ def generate_db_username() -> str:
     return f"usr_{secrets.token_hex(8)}"
 
 
+def _exec_ddl(session: Session, query: SQL) -> None:
+    """Execute a DDL statement safely using psycopg.sql via the raw connection."""
+    raw_conn = session.connection().connection.dbapi_connection
+    cursor = raw_conn.cursor()
+    cursor.execute(query)
+    cursor.close()
+
+
 def create_tenant_db_user(
     session: Session,
     username: str,
@@ -166,15 +210,25 @@ def create_tenant_db_user(
     credential_type: CredentialType,
 ) -> None:
     role = CREDENTIAL_TYPE_ROLES[credential_type]
-    escaped_password = password.replace("'", "''")
-    session.exec(text(f"CREATE USER {username} WITH PASSWORD '{escaped_password}'"))
-    session.exec(text(f"GRANT {role} TO {username}"))
+    _validate_identifier(username, "username")
+    _validate_identifier(role, "role")
+    _exec_ddl(
+        session,
+        SQL("CREATE USER {} WITH PASSWORD {}").format(
+            Identifier(username), Literal(password)
+        ),
+    )
+    _exec_ddl(
+        session,
+        SQL("GRANT {} TO {}").format(Identifier(role), Identifier(username)),
+    )
     session.commit()
 
     logger.info(f"Created PostgreSQL user {username} with role {role}")
 
 
 def drop_tenant_db_user(session: Session, username: str) -> None:
+    _validate_identifier(username, "username")
     session.exec(
         text(
             """
@@ -186,9 +240,16 @@ def drop_tenant_db_user(session: Session, username: str) -> None:
     )
 
     for role in CREDENTIAL_TYPE_ROLES.values():
-        session.exec(text(f"REVOKE {role} FROM {username}"))
+        _validate_identifier(role, "role")
+        _exec_ddl(
+            session,
+            SQL("REVOKE {} FROM {}").format(Identifier(role), Identifier(username)),
+        )
 
-    session.exec(text(f"DROP USER IF EXISTS {username}"))
+    _exec_ddl(
+        session,
+        SQL("DROP USER IF EXISTS {}").format(Identifier(username)),
+    )
     session.commit()
 
     logger.info(f"Dropped PostgreSQL user {username}")
@@ -260,7 +321,11 @@ def revoke_tenant_credentials(session: Session, tenant_id: uuid.UUID) -> bool:
         ).scalar()
 
         if result == 0:
-            session.exec(text(f"DROP ROLE IF EXISTS {role}"))
+            _validate_identifier(role, "role")
+            _exec_ddl(
+                session,
+                SQL("DROP ROLE IF EXISTS {}").format(Identifier(role)),
+            )
             logger.info(f"Dropped PostgreSQL role {role} (no longer in use)")
 
     session.commit()

@@ -1,4 +1,3 @@
-import secrets
 from enum import StrEnum
 from typing import Annotated, Any, Self
 from urllib.parse import quote
@@ -40,10 +39,10 @@ class Settings(BaseSettings):
         extra="ignore",
     )
     API_V1_STR: str = "/api/v1"
-    SECRET_KEY: str = secrets.token_urlsafe(32)
+    SECRET_KEY: str = Field(...)
     # 60 minutes * 24 hours * 8 days = 8 days
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8
-    FRONTEND_HOST: str = "http://localhost:5173"
+    BACKOFFICE_URL: str = "http://localhost:5173"
     ENVIRONMENT: Environment = Environment.DEV
 
     BACKEND_CORS_ORIGINS: Annotated[
@@ -54,7 +53,7 @@ class Settings(BaseSettings):
     @property
     def all_cors_origins(self) -> list[str]:
         return [str(origin).rstrip("/") for origin in self.BACKEND_CORS_ORIGINS] + [
-            self.FRONTEND_HOST
+            self.BACKOFFICE_URL
         ]
 
     PROJECT_NAME: str = Field(...)
@@ -62,9 +61,9 @@ class Settings(BaseSettings):
     POSTGRES_SERVER: str = Field(...)
     POSTGRES_PORT: int = 5432
     POSTGRES_USER: str = Field(...)
-    POSTGRES_PASSWORD: str = ""
+    POSTGRES_PASSWORD: str = Field(...)
     POSTGRES_DB: str = ""
-    POSTGRES_SSL_MODE: str = "prefer"
+    POSTGRES_SSL_MODE: str = "require"
 
     @computed_field
     @property
@@ -119,6 +118,17 @@ class Settings(BaseSettings):
         return bool(self.STORAGE_ACCESS_KEY and self.STORAGE_SECRET_KEY)
 
     REDIS_URL: str | None = None
+
+    # SimpleFI payment provider
+    BACKEND_URL: str = "http://localhost:8000"
+    PORTAL_URL: str = "http://localhost:3000"
+
+    @computed_field
+    @property
+    def SIMPLEFI_API_URL(self) -> str:
+        if self.ENVIRONMENT == Environment.PRODUCTION:
+            return "https://api.simplefi.tech"
+        return "https://api-dev.simplefi.tech"
 
 
 settings = Settings()

@@ -1,5 +1,6 @@
 import base64
 import hashlib
+from functools import lru_cache
 
 from cryptography.fernet import Fernet
 
@@ -11,6 +12,7 @@ def _get_fernet_key() -> bytes:
     return base64.urlsafe_b64encode(key_bytes)
 
 
+@lru_cache(maxsize=1)
 def _get_fernet() -> Fernet:
     return Fernet(_get_fernet_key())
 
