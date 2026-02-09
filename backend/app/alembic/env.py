@@ -13,7 +13,7 @@ config = context.config
 db_url = settings.SQLALCHEMY_DATABASE_URI.encoded_string().replace("%", "%%")
 config.set_main_option("sqlalchemy.url", db_url)
 
-if not config.config_file_name:
+if config.config_file_name:
     fileConfig(config.config_file_name)
 
 target_metadata = SQLModel.metadata

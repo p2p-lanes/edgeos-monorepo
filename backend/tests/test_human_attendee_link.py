@@ -9,8 +9,7 @@ This tests the flow where:
 
 import uuid
 
-import pytest
-from sqlmodel import Session, select
+from sqlmodel import Session
 
 from app.api.attendee.crud import attendees_crud
 from app.api.attendee.models import Attendees

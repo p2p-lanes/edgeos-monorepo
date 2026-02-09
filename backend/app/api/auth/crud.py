@@ -79,7 +79,6 @@ async def login_user(
         session.commit()
         logger.debug(f"Auth code stored in database for user: {email}")
 
-    logger.info(f"Auth code: {auth_code}")
     if user.tenant_id:
         tenant = session.get(Tenants, user.tenant_id)
         if not tenant:
