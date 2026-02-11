@@ -186,3 +186,7 @@ export function useWorkspace() {
   }
   return context
 }
+
+export function useOptionalWorkspace() {
+  return useContext(WorkspaceContext)
+}

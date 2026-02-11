@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router"
 
 import { TenantsService } from "@/client"
 import { useTheme } from "@/components/theme-provider"
-import { useWorkspace } from "@/contexts/WorkspaceContext"
+import { useOptionalWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
 import { cn } from "@/lib/utils"
 
@@ -22,7 +22,8 @@ export function Logo({
 }: LogoProps) {
   const { resolvedTheme } = useTheme()
   const { isSuperadmin } = useAuth()
-  const { effectiveTenantId } = useWorkspace()
+  const workspace = useOptionalWorkspace()
+  const effectiveTenantId = workspace?.effectiveTenantId
   const isDark = resolvedTheme === "dark"
 
   const { data: tenant, isError: _tenantError } = useQuery({
