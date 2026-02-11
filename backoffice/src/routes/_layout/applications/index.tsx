@@ -25,6 +25,7 @@ import {
   ApplicationReviewsService,
   ApplicationsService,
   ApprovalStrategiesService,
+  FormFieldsService,
   type ReviewDecision,
 } from "@/client"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
@@ -61,6 +62,14 @@ import {
 } from "@/hooks/useTableSearchParams"
 import { exportToCsv, fetchAllPages } from "@/lib/export"
 import { createErrorHandler } from "@/utils"
+
+/** Schema shape returned by FormFieldsService.getApplicationSchema */
+interface ApplicationSchema {
+  custom_fields: Record<
+    string,
+    { label: string; position?: number; [key: string]: unknown }
+  >
+}
 
 function getApplicationsQueryOptions(
   popupId: string | null,
@@ -521,6 +530,17 @@ function Applications() {
   const { isContextReady, selectedPopupId } = useWorkspace()
   const [isExporting, setIsExporting] = useState(false)
 
+  const { data: formSchema } = useQuery({
+    queryKey: ["form-fields-schema", selectedPopupId],
+    queryFn: async () => {
+      const result = await FormFieldsService.getApplicationSchema({
+        popupId: selectedPopupId!,
+      })
+      return result as unknown as ApplicationSchema
+    },
+    enabled: !!selectedPopupId,
+  })
+
   const handleExport = async () => {
     if (!selectedPopupId) return
     setIsExporting(true)
@@ -532,16 +552,34 @@ function Applications() {
           popupId: selectedPopupId,
         }),
       )
+
+      const baseColumns = [
+        { key: "human.email", label: "Email" },
+        { key: "human.first_name", label: "First Name" },
+        { key: "human.last_name", label: "Last Name" },
+        { key: "status", label: "Status" },
+        { key: "referral", label: "Referral" },
+        { key: "human.telegram", label: "Telegram" },
+        { key: "human.organization", label: "Organization" },
+        { key: "human.role", label: "Role" },
+        { key: "human.gender", label: "Gender" },
+        { key: "human.age", label: "Age Range" },
+        { key: "human.residence", label: "Residence" },
+      ]
+
+      const customColumns = formSchema?.custom_fields
+        ? Object.entries(formSchema.custom_fields)
+            .sort(([, a], [, b]) => (a.position ?? 0) - (b.position ?? 0))
+            .map(([name, field]) => ({
+              key: `custom_fields.${name}`,
+              label: field.label,
+            }))
+        : []
+
       exportToCsv(
         "applications",
         results as unknown as Record<string, unknown>[],
-        [
-          { key: "human.first_name", label: "First Name" },
-          { key: "human.last_name", label: "Last Name" },
-          { key: "human.email", label: "Email" },
-          { key: "human.organization", label: "Organization" },
-          { key: "status", label: "Status" },
-        ],
+        [...baseColumns, ...customColumns],
       )
     } finally {
       setIsExporting(false)
