@@ -1,10 +1,14 @@
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Annotated
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Header, HTTPException, status
 
 from app.api.human import crud
-from app.api.human.schemas import HumanCreate, HumanPublic, HumanUpdate
+from app.api.human.schemas import (
+    HumanCreate,
+    HumanPublic,
+    HumanUpdate,
+)
 from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
@@ -59,6 +63,7 @@ async def create_human(
     human_in: HumanCreate,
     db: TenantSession,
     current_user: CurrentUser,
+    x_tenant_id: Annotated[str | None, Header(alias="X-Tenant-Id")] = None,
 ) -> HumanPublic:
     """Create a human (superadmin only, for testing purposes)."""
     _check_superadmin(current_user)
@@ -71,8 +76,14 @@ async def create_human(
             detail="Human with this email already exists",
         )
 
-    # Get tenant_id from session context
-    tenant_id = db.info.get("tenant_id")
+    # Resolve tenant_id: superadmins must provide X-Tenant-Id header,
+    # regular users use their own tenant_id (though currently only superadmins reach here)
+    tenant_id: uuid.UUID | None = None
+    if x_tenant_id:
+        tenant_id = uuid.UUID(x_tenant_id)
+    elif current_user.tenant_id:
+        tenant_id = current_user.tenant_id
+
     if not tenant_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
