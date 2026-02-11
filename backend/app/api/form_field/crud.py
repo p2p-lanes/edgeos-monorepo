@@ -145,7 +145,10 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
         """
         fields, _ = self.find_by_popup(session, popup_id, skip=0, limit=1000)
 
-        # Base fields that come from the Human profile
+        # Base fields that live on the Application model.
+        # Human profile fields (telegram, organization, role, gender, age,
+        # residence) are NOT included here — they belong to the Human entity
+        # and are imported via /humans/batch.
         base_fields = {
             "first_name": {
                 "type": "text",
@@ -162,44 +165,6 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
             "email": {
                 "type": "email",
                 "label": "Email",
-                "required": False,
-                "section": "profile",
-            },
-            "telegram": {
-                "type": "text",
-                "label": "Telegram",
-                "required": False,
-                "section": "profile",
-            },
-            "organization": {
-                "type": "text",
-                "label": "Organization",
-                "required": False,
-                "section": "profile",
-            },
-            "role": {
-                "type": "text",
-                "label": "Role",
-                "required": False,
-                "section": "profile",
-            },
-            "gender": {
-                "type": "select",
-                "label": "Gender",
-                "required": False,
-                "section": "profile",
-                "options": ["male", "female", "other", "prefer not to say"],
-            },
-            "age": {
-                "type": "select",
-                "label": "Age Range",
-                "required": False,
-                "section": "profile",
-                "options": ["18-24", "25-34", "35-44", "45-54", "55-64", "65+"],
-            },
-            "residence": {
-                "type": "text",
-                "label": "Residence",
                 "required": False,
                 "section": "profile",
             },

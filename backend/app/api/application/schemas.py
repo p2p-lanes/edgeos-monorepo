@@ -184,8 +184,8 @@ class ApplicationAdminCreate(BaseModel):
     popup_id: uuid.UUID
 
     # Profile fields (will be saved to Human)
-    first_name: str
-    last_name: str
+    first_name: str | None = None
+    last_name: str | None = None
     email: str  # Required for admin creation
     telegram: str | None = None
     organization: str | None = None

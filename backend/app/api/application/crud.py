@@ -391,6 +391,12 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         # Find or create human by email
         human = humans_crud.get_by_email(session, app_data.email)
         if not human:
+            if not app_data.first_name or not app_data.last_name:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Human with email '{app_data.email}' not found. "
+                    "first_name and last_name are required to create a new human record.",
+                )
             # Create new human
             human = humans_crud.create_internal(
                 session,
