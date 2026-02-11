@@ -23,6 +23,8 @@ from app.api.approval_strategy.schemas import (
 )
 from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.attendee.schemas import AttendeeCreate, AttendeePublic, AttendeeUpdate
+from app.api.check_in.models import CheckIns
+from app.api.check_in.schemas import CheckInCreate, CheckInPublic, CheckInUpdate
 
 # Auth
 from app.api.auth.pending_human_models import PendingHumans
@@ -123,6 +125,11 @@ __all__ = [
     "AttendeeCreate",
     "AttendeePublic",
     "AttendeeUpdate",
+    # Check-ins
+    "CheckIns",
+    "CheckInCreate",
+    "CheckInPublic",
+    "CheckInUpdate",
     # Payments
     "Payments",
     "PaymentProducts",

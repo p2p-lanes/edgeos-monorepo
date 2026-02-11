@@ -96,7 +96,8 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         if search:
             search_term = f"%{search}%"
             base_statement = base_statement.join(
-                Humans, Applications.human_id == Humans.id  # type: ignore[arg-type]
+                Humans,
+                Applications.human_id == Humans.id,  # type: ignore[arg-type]
             ).where(
                 or_(
                     col(Humans.first_name).ilike(search_term),
