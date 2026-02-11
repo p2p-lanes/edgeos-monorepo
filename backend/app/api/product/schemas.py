@@ -15,6 +15,7 @@ class ProductCategory(str, Enum):
     HOUSING = "housing"
     MERCH = "merch"
     OTHER = "other"
+    PATREON = "patreon"
 
 
 class TicketDuration(str, Enum):
@@ -115,6 +116,53 @@ class ProductUpdate(BaseModel):
     is_active: bool | None = None
     exclusive: bool | None = None
     max_quantity: int | None = None
+
+
+class ProductBatchItem(BaseModel):
+    """Single product in a batch import (popup_id is top-level)."""
+
+    name: str
+    slug: str | None = None
+    price: Decimal = Field(ge=0)
+    compare_price: Decimal | None = Field(default=None, ge=0)
+    description: str | None = None
+    category: ProductCategory = ProductCategory.TICKET
+    attendee_category: TicketAttendeeCategory | None = None
+    duration_type: TicketDuration | None = None
+    start_date: datetime | None = None
+    end_date: datetime | None = None
+    is_active: bool = True
+    exclusive: bool = False
+    max_quantity: int | None = None
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    @model_validator(mode="after")
+    def validate_ticket_fields(self) -> "ProductBatchItem":
+        """Validate that ticket-specific fields are only set for tickets."""
+        if self.category != ProductCategory.TICKET:
+            if self.attendee_category is not None:
+                raise ValueError(
+                    "attendee_category can only be set for ticket products"
+                )
+            if self.duration_type is not None:
+                raise ValueError("duration_type can only be set for ticket products")
+        return self
+
+
+class ProductBatch(BaseModel):
+    """Schema for batch product creation."""
+
+    popup_id: uuid.UUID
+    products: list[ProductBatchItem]
+
+
+class ProductBatchResult(ProductPublic):
+    """Schema for batch product result."""
+
+    success: bool
+    err_msg: str | None = None
+    row_number: int
 
 
 class ProductWithQuantity(ProductPublic):

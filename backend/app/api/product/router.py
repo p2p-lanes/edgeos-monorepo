@@ -2,9 +2,12 @@ import uuid
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, status
+from loguru import logger
 
 from app.api.product import crud
 from app.api.product.schemas import (
+    ProductBatch,
+    ProductBatchResult,
     ProductCategory,
     ProductCreate,
     ProductPublic,
@@ -12,7 +15,12 @@ from app.api.product.schemas import (
 )
 from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
-from app.core.dependencies.users import CurrentUser, CurrentWriter, TenantSession
+from app.core.dependencies.users import (
+    CurrentSuperadmin,
+    CurrentUser,
+    CurrentWriter,
+    TenantSession,
+)
 from app.utils.utils import slugify
 
 router = APIRouter(prefix="/products", tags=["products"])
@@ -59,6 +67,76 @@ async def list_products(
         results=[ProductPublic.model_validate(p) for p in products],
         paging=Paging(offset=skip, limit=limit, total=total),
     )
+
+
+@router.post(
+    "/batch",
+    response_model=list[ProductBatchResult],
+    status_code=status.HTTP_207_MULTI_STATUS,
+)
+async def create_products_batch(
+    batch: ProductBatch,
+    db: TenantSession,
+    _current_user: CurrentSuperadmin,
+) -> list[ProductBatchResult]:
+    """Batch-create products (superadmin only)."""
+    from app.api.popup.crud import popups_crud
+    from app.api.product.models import Products
+
+    popup = popups_crud.get(db, batch.popup_id)
+    if not popup:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Popup not found",
+        )
+    tenant_id = popup.tenant_id
+
+    results: list[ProductBatchResult] = []
+    for idx, item in enumerate(batch.products):
+        try:
+            with db.begin_nested():
+                base_slug = item.slug if item.slug else slugify(item.name)
+                slug = crud.products_crud.generate_unique_slug(
+                    db, base_slug, batch.popup_id
+                )
+
+                product_data = item.model_dump()
+                product_data["tenant_id"] = tenant_id
+                product_data["popup_id"] = batch.popup_id
+                product_data["slug"] = slug
+                product = Products(**product_data)
+
+                db.add(product)
+                db.flush()
+
+                results.append(
+                    ProductBatchResult(
+                        **ProductPublic.model_validate(product).model_dump(),
+                        success=True,
+                        err_msg=None,
+                        row_number=idx + 1,
+                    )
+                )
+        except Exception as e:
+            logger.warning(f"Failed to create product row {idx + 1}: {e}")
+            results.append(
+                ProductBatchResult(
+                    id=uuid.uuid4(),
+                    tenant_id=tenant_id,
+                    popup_id=batch.popup_id,
+                    name=item.name,
+                    slug="",
+                    price=item.price,
+                    category=item.category,
+                    is_active=item.is_active,
+                    success=False,
+                    err_msg=str(e),
+                    row_number=idx + 1,
+                )
+            )
+
+    db.commit()
+    return results
 
 
 @router.get("/{product_id}", response_model=ProductPublic)
