@@ -8,11 +8,25 @@ export const ApplicationAdminCreateSchema = {
             title: 'Popup Id'
         },
         first_name: {
-            type: 'string',
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
             title: 'First Name'
         },
         last_name: {
-            type: 'string',
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
             title: 'Last Name'
         },
         email: {
@@ -154,7 +168,7 @@ export const ApplicationAdminCreateSchema = {
         }
     },
     type: 'object',
-    required: ['popup_id', 'first_name', 'last_name', 'email'],
+    required: ['popup_id', 'email'],
     title: 'ApplicationAdminCreate',
     description: `Application schema for admin creation.
 
@@ -4953,9 +4967,311 @@ export const PresignedUrlResponseSchema = {
     description: 'Response with presigned URL for upload.'
 } as const;
 
+export const ProductBatchSchema = {
+    properties: {
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        products: {
+            items: {
+                '$ref': '#/components/schemas/ProductBatchItem'
+            },
+            type: 'array',
+            title: 'Products'
+        }
+    },
+    type: 'object',
+    required: ['popup_id', 'products'],
+    title: 'ProductBatch',
+    description: 'Schema for batch product creation.'
+} as const;
+
+export const ProductBatchItemSchema = {
+    properties: {
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        slug: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Slug'
+        },
+        price: {
+            anyOf: [
+                {
+                    type: 'number',
+                    minimum: 0
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                }
+            ],
+            title: 'Price'
+        },
+        compare_price: {
+            anyOf: [
+                {
+                    type: 'number',
+                    minimum: 0
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Compare Price'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        category: {
+            '$ref': '#/components/schemas/ProductCategory',
+            default: 'ticket'
+        },
+        attendee_category: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TicketAttendeeCategory'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        duration_type: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TicketDuration'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        start_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Start Date'
+        },
+        end_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'End Date'
+        },
+        is_active: {
+            type: 'boolean',
+            title: 'Is Active',
+            default: true
+        },
+        exclusive: {
+            type: 'boolean',
+            title: 'Exclusive',
+            default: false
+        },
+        max_quantity: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Quantity'
+        }
+    },
+    type: 'object',
+    required: ['name', 'price'],
+    title: 'ProductBatchItem',
+    description: 'Single product in a batch import (popup_id is top-level).'
+} as const;
+
+export const ProductBatchResultSchema = {
+    properties: {
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        slug: {
+            type: 'string',
+            title: 'Slug'
+        },
+        price: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Price'
+        },
+        compare_price: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Compare Price'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        category: {
+            '$ref': '#/components/schemas/ProductCategory',
+            default: 'ticket'
+        },
+        attendee_category: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TicketAttendeeCategory'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        duration_type: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TicketDuration'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        start_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Start Date'
+        },
+        end_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'End Date'
+        },
+        is_active: {
+            type: 'boolean',
+            title: 'Is Active',
+            default: true
+        },
+        exclusive: {
+            type: 'boolean',
+            title: 'Exclusive',
+            default: false
+        },
+        max_quantity: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Quantity'
+        },
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        success: {
+            type: 'boolean',
+            title: 'Success'
+        },
+        err_msg: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Err Msg'
+        },
+        row_number: {
+            type: 'integer',
+            title: 'Row Number'
+        }
+    },
+    type: 'object',
+    required: ['tenant_id', 'popup_id', 'name', 'slug', 'price', 'id', 'success', 'row_number'],
+    title: 'ProductBatchResult',
+    description: 'Schema for batch product result.'
+} as const;
+
 export const ProductCategorySchema = {
     type: 'string',
-    enum: ['ticket', 'housing', 'merch', 'other'],
+    enum: ['ticket', 'housing', 'merch', 'other', 'patreon'],
     title: 'ProductCategory',
     description: 'Product categories determining which fields are relevant.'
 } as const;

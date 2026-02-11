@@ -9,8 +9,8 @@
  */
 export type ApplicationAdminCreate = {
     popup_id: string;
-    first_name: string;
-    last_name: string;
+    first_name?: (string | null);
+    last_name?: (string | null);
     email: string;
     telegram?: (string | null);
     organization?: (string | null);
@@ -961,9 +961,61 @@ export type PresignedUrlResponse = {
 };
 
 /**
+ * Schema for batch product creation.
+ */
+export type ProductBatch = {
+    popup_id: string;
+    products: Array<ProductBatchItem>;
+};
+
+/**
+ * Single product in a batch import (popup_id is top-level).
+ */
+export type ProductBatchItem = {
+    name: string;
+    slug?: (string | null);
+    price: (number | string);
+    compare_price?: (number | string | null);
+    description?: (string | null);
+    category?: ProductCategory;
+    attendee_category?: (TicketAttendeeCategory | null);
+    duration_type?: (TicketDuration | null);
+    start_date?: (string | null);
+    end_date?: (string | null);
+    is_active?: boolean;
+    exclusive?: boolean;
+    max_quantity?: (number | null);
+};
+
+/**
+ * Schema for batch product result.
+ */
+export type ProductBatchResult = {
+    tenant_id: string;
+    popup_id: string;
+    name: string;
+    slug: string;
+    price: string;
+    compare_price?: (string | null);
+    description?: (string | null);
+    category?: ProductCategory;
+    attendee_category?: (TicketAttendeeCategory | null);
+    duration_type?: (TicketDuration | null);
+    start_date?: (string | null);
+    end_date?: (string | null);
+    is_active?: boolean;
+    exclusive?: boolean;
+    max_quantity?: (number | null);
+    id: string;
+    success: boolean;
+    err_msg?: (string | null);
+    row_number: number;
+};
+
+/**
  * Product categories determining which fields are relevant.
  */
-export type ProductCategory = 'ticket' | 'housing' | 'merch' | 'other';
+export type ProductCategory = 'ticket' | 'housing' | 'merch' | 'other' | 'patreon';
 
 /**
  * Product schema for creation.
@@ -1954,6 +2006,13 @@ export type ProductsCreateProductData = {
 };
 
 export type ProductsCreateProductResponse = (ProductPublic);
+
+export type ProductsCreateProductsBatchData = {
+    requestBody: ProductBatch;
+    xTenantId?: (string | null);
+};
+
+export type ProductsCreateProductsBatchResponse = (Array<ProductBatchResult>);
 
 export type ProductsGetProductData = {
     productId: string;
