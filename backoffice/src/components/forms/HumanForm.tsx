@@ -21,6 +21,13 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { LoadingButton } from "@/components/ui/loading-button"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
 import useAuth from "@/hooks/useAuth"
@@ -30,6 +37,23 @@ import {
   useUnsavedChanges,
 } from "@/hooks/useUnsavedChanges"
 import { createErrorHandler } from "@/utils"
+
+const GENDER_OPTIONS = [
+  { value: "male", label: "Male" },
+  { value: "female", label: "Female" },
+  { value: "non_binary", label: "Non Binary" },
+  { value: "prefer_not_to_say", label: "Prefer not to say" },
+]
+
+const AGE_OPTIONS = [
+  { value: "under_18", label: "Under 18" },
+  { value: "18_24", label: "18-24" },
+  { value: "25_34", label: "25-34" },
+  { value: "35_44", label: "35-44" },
+  { value: "45_54", label: "45-54" },
+  { value: "55_plus", label: "55+" },
+  { value: "prefer_not_to_say", label: "Prefer not to say" },
+]
 
 interface HumanFormProps {
   defaultValues?: HumanPublic
@@ -125,6 +149,7 @@ export function HumanForm({ defaultValues, onSuccess }: HumanFormProps) {
   return (
     <div className="space-y-6">
       <form
+        noValidate
         onSubmit={(e) => {
           e.preventDefault()
           form.handleSubmit()
@@ -223,13 +248,22 @@ export function HumanForm({ defaultValues, onSuccess }: HumanFormProps) {
                     {(field) => (
                       <div className="space-y-2">
                         <Label htmlFor={field.name}>Gender</Label>
-                        <Input
-                          id={field.name}
-                          placeholder="Gender"
+                        <Select
                           value={field.state.value}
-                          onChange={(e) => field.handleChange(e.target.value)}
+                          onValueChange={(val) => field.handleChange(val)}
                           disabled={readOnly}
-                        />
+                        >
+                          <SelectTrigger id={field.name}>
+                            <SelectValue placeholder="Select gender" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {GENDER_OPTIONS.map((opt) => (
+                              <SelectItem key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     )}
                   </form.Field>
@@ -238,13 +272,22 @@ export function HumanForm({ defaultValues, onSuccess }: HumanFormProps) {
                     {(field) => (
                       <div className="space-y-2">
                         <Label htmlFor={field.name}>Age</Label>
-                        <Input
-                          id={field.name}
-                          placeholder="Age range"
+                        <Select
                           value={field.state.value}
-                          onChange={(e) => field.handleChange(e.target.value)}
+                          onValueChange={(val) => field.handleChange(val)}
                           disabled={readOnly}
-                        />
+                        >
+                          <SelectTrigger id={field.name}>
+                            <SelectValue placeholder="Select age range" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {AGE_OPTIONS.map((opt) => (
+                              <SelectItem key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     )}
                   </form.Field>
@@ -306,35 +349,37 @@ export function HumanForm({ defaultValues, onSuccess }: HumanFormProps) {
                   </form.Field>
                 </div>
 
-                <form.Field name="telegram">
-                  {(field) => (
-                    <div className="space-y-2">
-                      <Label htmlFor={field.name}>Telegram</Label>
-                      <Input
-                        id={field.name}
-                        placeholder="@username"
-                        value={field.state.value}
-                        onChange={(e) => field.handleChange(e.target.value)}
-                        disabled={readOnly}
-                      />
-                    </div>
-                  )}
-                </form.Field>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <form.Field name="telegram">
+                    {(field) => (
+                      <div className="space-y-2">
+                        <Label htmlFor={field.name}>Telegram</Label>
+                        <Input
+                          id={field.name}
+                          placeholder="@username"
+                          value={field.state.value}
+                          onChange={(e) => field.handleChange(e.target.value)}
+                          disabled={readOnly}
+                        />
+                      </div>
+                    )}
+                  </form.Field>
 
-                <form.Field name="picture_url">
-                  {(field) => (
-                    <div className="space-y-2">
-                      <Label htmlFor={field.name}>Picture URL</Label>
-                      <Input
-                        id={field.name}
-                        placeholder="https://..."
-                        value={field.state.value}
-                        onChange={(e) => field.handleChange(e.target.value)}
-                        disabled={readOnly}
-                      />
-                    </div>
-                  )}
-                </form.Field>
+                  <form.Field name="picture_url">
+                    {(field) => (
+                      <div className="space-y-2">
+                        <Label htmlFor={field.name}>Picture URL</Label>
+                        <Input
+                          id={field.name}
+                          placeholder="https://..."
+                          value={field.state.value}
+                          onChange={(e) => field.handleChange(e.target.value)}
+                          disabled={readOnly}
+                        />
+                      </div>
+                    )}
+                  </form.Field>
+                </div>
               </CardContent>
             </Card>
 

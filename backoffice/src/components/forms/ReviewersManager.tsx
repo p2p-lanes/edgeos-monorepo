@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Trash2, UserPlus } from "lucide-react"
+import type * as React from "react"
 import { useState } from "react"
 
 import {
@@ -37,18 +38,21 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { Switch } from "@/components/ui/switch"
 import useCustomToast from "@/hooks/useCustomToast"
+import { cn } from "@/lib/utils"
 import { createErrorHandler } from "@/utils"
 
 interface ReviewersManagerProps {
   popupId: string
   tenantId: string
   readOnly?: boolean
+  variant?: "card" | "inline"
 }
 
 export function ReviewersManager({
   popupId,
   tenantId,
   readOnly = false,
+  variant = "card",
 }: ReviewersManagerProps) {
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
@@ -119,63 +123,57 @@ export function ReviewersManager({
 
   if (loadingReviewers) {
     return (
-      <Card className="max-w-2xl">
-        <CardHeader>
-          <CardTitle>Reviewers</CardTitle>
-          <CardDescription>Loading...</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <SectionShell
+        variant={variant}
+        title="Reviewers"
+        description="Loading..."
+      >
+        <div className="space-y-4">
           <Skeleton className="h-12 w-full" />
           <Skeleton className="h-12 w-full" />
-        </CardContent>
-      </Card>
+        </div>
+      </SectionShell>
     )
   }
 
   return (
     <>
-      <Card className="max-w-2xl">
-        <CardHeader>
-          <div className="flex items-start justify-between">
-            <div>
-              <CardTitle>Reviewers</CardTitle>
-              <CardDescription>
-                Users who can review and approve applications for this popup
-              </CardDescription>
-            </div>
-            {!readOnly && availableUsers.length > 0 && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setIsAddDialogOpen(true)}
-              >
-                <UserPlus className="h-4 w-4 mr-1" />
-                Add Reviewer
-              </Button>
-            )}
+      <SectionShell
+        variant={variant}
+        title="Reviewers"
+        description="Users who can review and approve applications for this popup"
+        action={
+          !readOnly && availableUsers.length > 0 ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsAddDialogOpen(true)}
+            >
+              <UserPlus className="h-4 w-4 mr-1" />
+              Add Reviewer
+            </Button>
+          ) : undefined
+        }
+      >
+        {reviewers.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No reviewers assigned. Any admin user can review applications.
+          </p>
+        ) : (
+          <div className="max-h-[420px] space-y-3 overflow-y-auto">
+            {reviewers.map((reviewer) => (
+              <ReviewerRow
+                key={reviewer.id}
+                reviewer={reviewer}
+                onRemove={() => removeMutation.mutate(reviewer.user_id)}
+                isRemoving={removeMutation.isPending}
+                readOnly={readOnly}
+              />
+            ))}
           </div>
-        </CardHeader>
-        <CardContent>
-          {reviewers.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No reviewers assigned. Any admin user can review applications.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {reviewers.map((reviewer) => (
-                <ReviewerRow
-                  key={reviewer.id}
-                  reviewer={reviewer}
-                  onRemove={() => removeMutation.mutate(reviewer.user_id)}
-                  isRemoving={removeMutation.isPending}
-                  readOnly={readOnly}
-                />
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        )}
+      </SectionShell>
 
       {/* Add Reviewer Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
@@ -296,12 +294,70 @@ function ReviewerRow({
           variant="ghost"
           size="sm"
           className="text-destructive hover:text-destructive"
-          onClick={onRemove}
+          onClick={() => {
+            if (
+              window.confirm("Are you sure you want to remove this reviewer?")
+            ) {
+              onRemove()
+            }
+          }}
           disabled={isRemoving}
         >
           <Trash2 className="h-4 w-4" />
         </Button>
       )}
     </div>
+  )
+}
+
+function SectionShell({
+  variant,
+  title,
+  description,
+  action,
+  children,
+}: {
+  variant: "card" | "inline"
+  title: string
+  description?: string
+  action?: React.ReactNode
+  children: React.ReactNode
+}) {
+  if (variant === "inline") {
+    return (
+      <div className="space-y-4">
+        <div
+          className={cn("flex items-start justify-between", action && "gap-4")}
+        >
+          <div className="space-y-1">
+            <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              {title}
+            </h3>
+            {description && (
+              <p className="text-xs text-muted-foreground">{description}</p>
+            )}
+          </div>
+          {action}
+        </div>
+        {children}
+      </div>
+    )
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div
+          className={cn("flex items-start justify-between", action && "gap-4")}
+        >
+          <div>
+            <CardTitle>{title}</CardTitle>
+            {description && <CardDescription>{description}</CardDescription>}
+          </div>
+          {action}
+        </div>
+      </CardHeader>
+      <CardContent>{children}</CardContent>
+    </Card>
   )
 }

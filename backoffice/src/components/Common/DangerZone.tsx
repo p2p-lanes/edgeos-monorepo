@@ -3,13 +3,6 @@ import { useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import {
   Dialog,
   DialogClose,
   DialogContent,
@@ -27,57 +20,80 @@ interface DangerZoneProps {
   isDeleting: boolean
   confirmText?: string
   resourceName: string
+  variant?: "card" | "inline"
 }
 
 export function DangerZone({
-  title = "Danger Zone",
   description,
   onDelete,
   isDeleting,
   confirmText = "Delete",
   resourceName,
+  variant = "card",
 }: DangerZoneProps) {
   const [isOpen, setIsOpen] = useState(false)
 
+  const trigger = (
+    <Button
+      variant="destructive"
+      size="sm"
+      className="shrink-0"
+      onClick={() => setIsOpen(true)}
+    >
+      <Trash2 className="mr-2 h-4 w-4" />
+      {confirmText}
+    </Button>
+  )
+
+  const dialog = (
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      {trigger}
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Confirm Deletion</DialogTitle>
+          <DialogDescription>
+            Are you sure you want to delete "{resourceName}"? This action cannot
+            be undone.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="outline" disabled={isDeleting}>
+              Cancel
+            </Button>
+          </DialogClose>
+          <LoadingButton
+            variant="destructive"
+            loading={isDeleting}
+            onClick={() => {
+              onDelete()
+            }}
+          >
+            Delete
+          </LoadingButton>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+
+  if (variant === "inline") {
+    return (
+      <div className="space-y-3">
+        <h3 className="text-xs font-medium uppercase tracking-wider text-destructive">
+          Danger Zone
+        </h3>
+        <div className="flex items-center justify-between gap-4">
+          <p className="text-sm text-muted-foreground">{description}</p>
+          {dialog}
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <Card className="border-destructive">
-      <CardHeader>
-        <CardTitle className="text-destructive">{title}</CardTitle>
-        <CardDescription>{description}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
-          <Button variant="destructive" onClick={() => setIsOpen(true)}>
-            <Trash2 className="mr-2 h-4 w-4" />
-            {confirmText}
-          </Button>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Confirm Deletion</DialogTitle>
-              <DialogDescription>
-                Are you sure you want to delete "{resourceName}"? This action
-                cannot be undone.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <DialogClose asChild>
-                <Button variant="outline" disabled={isDeleting}>
-                  Cancel
-                </Button>
-              </DialogClose>
-              <LoadingButton
-                variant="destructive"
-                loading={isDeleting}
-                onClick={() => {
-                  onDelete()
-                }}
-              >
-                Delete
-              </LoadingButton>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </CardContent>
-    </Card>
+    <div className="flex items-center justify-between rounded-lg border border-destructive p-4">
+      <p className="text-sm text-muted-foreground">{description}</p>
+      {dialog}
+    </div>
   )
 }

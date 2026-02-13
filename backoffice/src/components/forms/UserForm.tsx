@@ -1,7 +1,7 @@
 import { useForm } from "@tanstack/react-form"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
-import { Crown, Shield, User } from "lucide-react"
+import { Mail, Shield } from "lucide-react"
 import { z } from "zod"
 import {
   type UserCreate,
@@ -15,14 +15,11 @@ import { FieldError } from "@/components/Common/FieldError"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+  HeroInput,
+  InlineRow,
+  InlineSection,
+} from "@/components/ui/inline-form"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { LoadingButton } from "@/components/ui/loading-button"
 import {
   Select,
@@ -48,25 +45,21 @@ const ROLE_OPTIONS: {
   value: UserRole
   label: string
   description: string
-  icon: typeof User
 }[] = [
   {
     value: "superadmin",
     label: "Superadmin",
     description: "Full platform access",
-    icon: Crown,
   },
   {
     value: "admin",
     label: "Admin",
     description: "Full tenant access",
-    icon: Shield,
   },
   {
     value: "viewer",
     label: "Viewer",
     description: "Read-only access",
-    icon: User,
   },
 ]
 
@@ -84,7 +77,6 @@ export function UserForm({ defaultValues, onSuccess }: UserFormProps) {
   const isEdit = !!defaultValues
   const isCurrentUser = currentUser?.id === defaultValues?.id
 
-  // Filter role options based on current user role
   const availableRoles = isSuperadmin
     ? ROLE_OPTIONS
     : ROLE_OPTIONS.filter((r) => r.value !== "superadmin")
@@ -154,255 +146,190 @@ export function UserForm({ defaultValues, onSuccess }: UserFormProps) {
   })
 
   const blocker = useUnsavedChanges(form)
-
   const isPending = createMutation.isPending || updateMutation.isPending
 
-  const getRoleInfo = (role: UserRole) =>
-    ROLE_OPTIONS.find((r) => r.value === role) || ROLE_OPTIONS[2]
+  const getRoleBadgeVariant = (role: UserRole) => {
+    if (role === "superadmin") return "default" as const
+    if (role === "admin") return "secondary" as const
+    return "outline" as const
+  }
 
   return (
     <div className="space-y-6">
       <form
+        noValidate
         onSubmit={(e) => {
           e.preventDefault()
           form.handleSubmit()
         }}
-        className="space-y-6"
+        className="mx-auto max-w-2xl space-y-6"
       >
-        <div className="grid gap-6 lg:grid-cols-3">
-          {/* Left Column - Form Fields */}
-          <div className="space-y-6 lg:col-span-2">
-            {/* User Details */}
-            <Card>
-              <CardHeader>
-                <CardTitle>{isEdit ? "Edit User" : "User Details"}</CardTitle>
-                <CardDescription>
-                  {isEdit
-                    ? "Update the user's information and role"
-                    : "Create a new user. They will receive a login code via email when they sign in."}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {!isEdit && (
-                  <form.Field
-                    name="email"
-                    validators={{
-                      onBlur: ({ value }) => {
-                        const result = emailSchema.safeParse(value)
-                        return result.success
-                          ? undefined
-                          : result.error.issues[0].message
-                      },
-                    }}
+        {/* Hero: Full Name + Role Badge */}
+        <div className="space-y-3">
+          <form.Field name="full_name">
+            {(field) => (
+              <HeroInput
+                placeholder="Full Name"
+                value={field.state.value}
+                onBlur={field.handleBlur}
+                onChange={(e) => field.handleChange(e.target.value)}
+              />
+            )}
+          </form.Field>
+
+          <form.Field
+            name="role"
+            validators={{
+              onBlur: ({ value }) => {
+                const result = roleSchema.safeParse(value)
+                return result.success
+                  ? undefined
+                  : result.error.issues[0].message
+              },
+            }}
+          >
+            {(field) => (
+              <div>
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={field.state.value}
+                    onValueChange={(val) => field.handleChange(val as UserRole)}
+                    disabled={isCurrentUser}
                   >
-                    {(field) => (
-                      <div className="space-y-2">
-                        <Label htmlFor={field.name}>
-                          Email <span className="text-destructive">*</span>
-                        </Label>
-                        <Input
-                          id={field.name}
-                          placeholder="user@example.com"
-                          type="email"
-                          autoComplete="off"
-                          spellCheck={false}
-                          value={field.state.value}
-                          onBlur={field.handleBlur}
-                          onChange={(e) => field.handleChange(e.target.value)}
-                        />
-                        <FieldError errors={field.state.meta.errors} />
-                      </div>
-                    )}
-                  </form.Field>
-                )}
-
-                <form.Field name="full_name">
-                  {(field) => (
-                    <div className="space-y-2">
-                      <Label htmlFor={field.name}>Full Name</Label>
-                      <Input
-                        id={field.name}
-                        placeholder="John Doe"
-                        type="text"
-                        autoComplete="off"
-                        value={field.state.value}
-                        onBlur={field.handleBlur}
-                        onChange={(e) => field.handleChange(e.target.value)}
-                      />
-                    </div>
+                    <SelectTrigger className="w-auto border-0 bg-transparent p-0 shadow-none focus:ring-0">
+                      <Badge variant={getRoleBadgeVariant(field.state.value)}>
+                        <SelectValue />
+                      </Badge>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableRoles.map((role) => (
+                        <SelectItem
+                          key={role.value}
+                          value={role.value}
+                          textValue={role.label}
+                        >
+                          <div className="flex flex-col">
+                            <span>{role.label}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {role.description}
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {isCurrentUser && (
+                    <span className="text-xs text-muted-foreground">
+                      (cannot change own role)
+                    </span>
                   )}
-                </form.Field>
+                </div>
+                <FieldError errors={field.state.meta.errors} />
+              </div>
+            )}
+          </form.Field>
+        </div>
 
-                <form.Field
-                  name="role"
-                  validators={{
-                    onBlur: ({ value }) => {
-                      const result = roleSchema.safeParse(value)
-                      return result.success
-                        ? undefined
-                        : result.error.issues[0].message
-                    },
-                  }}
-                >
-                  {(field) => (
-                    <div className="space-y-2">
-                      <Label>
-                        Role <span className="text-destructive">*</span>
-                      </Label>
-                      <Select
-                        value={field.state.value}
-                        onValueChange={(val) =>
-                          field.handleChange(val as UserRole)
-                        }
-                        disabled={isCurrentUser}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a role" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {availableRoles.map((role) => (
-                            <SelectItem
-                              key={role.value}
-                              value={role.value}
-                              textValue={role.label}
-                            >
-                              <div className="flex flex-col">
-                                <span>{role.label}</span>
-                                <span className="text-xs text-muted-foreground">
-                                  {role.description}
-                                </span>
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {isCurrentUser && (
-                        <p className="text-sm text-muted-foreground">
-                          You cannot change your own role
-                        </p>
-                      )}
-                      <FieldError errors={field.state.meta.errors} />
-                    </div>
-                  )}
-                </form.Field>
-              </CardContent>
-            </Card>
-
-            {/* Form Actions */}
-            <div className="flex gap-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => navigate({ to: "/admin" })}
-              >
-                Cancel
-              </Button>
-              <LoadingButton type="submit" loading={isPending}>
-                {isEdit ? "Save Changes" : "Create User"}
-              </LoadingButton>
+        {/* User metadata (edit only) */}
+        {isEdit && (
+          <div className="flex gap-6 text-sm text-muted-foreground">
+            <div>
+              <span className="text-xs uppercase tracking-wider">Email</span>
+              <p className="font-mono">{defaultValues.email}</p>
+            </div>
+            <div>
+              <span className="text-xs uppercase tracking-wider">ID</span>
+              <p className="font-mono text-xs">{defaultValues.id}</p>
             </div>
           </div>
+        )}
 
-          {/* Right Column - Preview */}
-          <div className="space-y-6">
-            <form.Subscribe
-              selector={(state) => ({
-                email: state.values.email,
-                full_name: state.values.full_name,
-                role: state.values.role,
-              })}
-            >
-              {(values) => {
-                const roleInfo = getRoleInfo(values.role)
-                const RoleIcon = roleInfo.icon
+        <Separator />
 
-                return (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base">Preview</CardTitle>
-                      <CardDescription>
-                        How this user will appear
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="flex items-start gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                          <RoleIcon className="h-5 w-5 text-primary" />
-                        </div>
-                        <div className="flex-1 space-y-1">
-                          <p className="font-medium leading-none">
-                            {values.full_name ||
-                              (isEdit ? defaultValues?.email : values.email) ||
-                              "User Name"}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {isEdit ? defaultValues?.email : values.email}
-                          </p>
-                        </div>
-                      </div>
-
-                      <Separator />
-
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">
-                          Role
-                        </span>
-                        <Badge
-                          variant={
-                            values.role === "superadmin"
-                              ? "default"
-                              : values.role === "admin"
-                                ? "secondary"
-                                : "outline"
-                          }
-                        >
-                          {roleInfo.label}
-                        </Badge>
-                      </div>
-
-                      <Separator />
-
-                      <div className="text-sm text-muted-foreground">
-                        {roleInfo.description}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )
+        {/* Account */}
+        <InlineSection title="Account">
+          {!isEdit && (
+            <form.Field
+              name="email"
+              validators={{
+                onBlur: ({ value }) => {
+                  const result = emailSchema.safeParse(value)
+                  return result.success
+                    ? undefined
+                    : result.error.issues[0].message
+                },
               }}
-            </form.Subscribe>
+            >
+              {(field) => (
+                <div>
+                  <InlineRow
+                    icon={<Mail className="h-4 w-4 text-muted-foreground" />}
+                    label="Email"
+                  >
+                    <Input
+                      placeholder="user@example.com"
+                      type="email"
+                      autoComplete="off"
+                      spellCheck={false}
+                      value={field.state.value}
+                      onBlur={field.handleBlur}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      className="max-w-xs text-sm"
+                    />
+                  </InlineRow>
+                  <FieldError errors={field.state.meta.errors} />
+                </div>
+              )}
+            </form.Field>
+          )}
 
-            {isEdit && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">User Details</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Email</p>
-                    <p className="font-medium">{defaultValues.email}</p>
-                  </div>
-                  <Separator />
-                  <div>
-                    <p className="text-sm text-muted-foreground">User ID</p>
-                    <p className="font-mono text-xs text-muted-foreground">
-                      {defaultValues.id}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
+          {isEdit && (
+            <InlineRow
+              icon={<Shield className="h-4 w-4 text-muted-foreground" />}
+              label="Role"
+              description={
+                ROLE_OPTIONS.find((r) => r.value === defaultValues.role)
+                  ?.description
+              }
+            >
+              <Badge variant={getRoleBadgeVariant(defaultValues.role)}>
+                {
+                  ROLE_OPTIONS.find((r) => r.value === defaultValues.role)
+                    ?.label
+                }
+              </Badge>
+            </InlineRow>
+          )}
+        </InlineSection>
+
+        <Separator />
+
+        {/* Form Actions */}
+        <div className="flex gap-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => navigate({ to: "/admin" })}
+          >
+            Cancel
+          </Button>
+          <LoadingButton type="submit" loading={isPending}>
+            {isEdit ? "Save Changes" : "Create User"}
+          </LoadingButton>
         </div>
       </form>
 
       {isEdit && !isCurrentUser && (
-        <DangerZone
-          description="Once you delete this user, they will no longer be able to access the platform. This action cannot be undone."
-          onDelete={() => deleteMutation.mutate()}
-          isDeleting={deleteMutation.isPending}
-          confirmText="Delete User"
-          resourceName={defaultValues.email}
-        />
+        <div className="mx-auto max-w-2xl">
+          <DangerZone
+            description="Once you delete this user, they will no longer be able to access the platform. This action cannot be undone."
+            onDelete={() => deleteMutation.mutate()}
+            isDeleting={deleteMutation.isPending}
+            confirmText="Delete User"
+            resourceName={defaultValues.email}
+            variant="inline"
+          />
+        </div>
       )}
       <UnsavedChangesDialog blocker={blocker} />
     </div>

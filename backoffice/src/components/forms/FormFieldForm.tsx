@@ -22,7 +22,6 @@ import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
 import { FormErrorSummary } from "@/components/Common/FormErrorSummary"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -186,12 +185,10 @@ export function FormFieldForm({
     return <WorkspaceAlert resource="form field" action="create" />
   }
 
-  const getFieldTypeInfo = (type: string) =>
-    FIELD_TYPES.find((t) => t.value === type) || FIELD_TYPES[0]
-
   return (
     <div className="space-y-6">
       <form
+        noValidate
         onSubmit={(e) => {
           e.preventDefault()
           if (!readOnly) {
@@ -209,9 +206,8 @@ export function FormFieldForm({
             section: "Section",
           }}
         />
-        <div className="grid gap-6 lg:grid-cols-3">
-          {/* Left Column - Form Fields */}
-          <div className="space-y-6 lg:col-span-2">
+        <div>
+          <div className="space-y-6">
             {/* Basic Configuration */}
             <Card>
               <CardHeader>
@@ -421,16 +417,9 @@ export function FormFieldForm({
                     </div>
                   )}
                 </form.Field>
-              </CardContent>
-            </Card>
 
-            {/* Settings */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Settings</CardTitle>
-                <CardDescription>Field validation and behavior</CardDescription>
-              </CardHeader>
-              <CardContent>
+                <Separator />
+
                 <form.Field name="required">
                   {(field) => (
                     <div className="flex items-center justify-between">
@@ -467,173 +456,6 @@ export function FormFieldForm({
                 </LoadingButton>
               )}
             </div>
-          </div>
-
-          {/* Right Column - Preview */}
-          <div className="space-y-6">
-            <form.Subscribe
-              selector={(state) => ({
-                name: state.values.name,
-                label: state.values.label,
-                field_type: state.values.field_type,
-                section: state.values.section,
-                position: state.values.position,
-                required: state.values.required,
-                placeholder: state.values.placeholder,
-                help_text: state.values.help_text,
-                options: state.values.options,
-              })}
-            >
-              {(values) => {
-                const typeInfo = getFieldTypeInfo(values.field_type)
-                const TypeIcon = typeInfo.icon
-
-                return (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base">Preview</CardTitle>
-                      <CardDescription>
-                        How this field will appear
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="flex items-start gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                          <TypeIcon className="h-5 w-5 text-primary" />
-                        </div>
-                        <div className="flex-1 space-y-1">
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium leading-none">
-                              {values.label || "Field Label"}
-                            </p>
-                            {values.required && (
-                              <span className="text-destructive">*</span>
-                            )}
-                          </div>
-                          <p className="text-sm text-muted-foreground">
-                            {typeInfo.label}
-                          </p>
-                        </div>
-                      </div>
-
-                      <Separator />
-
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">Name</span>
-                          <code className="font-mono text-xs">
-                            {values.name || "field_name"}
-                          </code>
-                        </div>
-
-                        {values.section && (
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">
-                              Section
-                            </span>
-                            <span>{values.section}</span>
-                          </div>
-                        )}
-
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">
-                            Position
-                          </span>
-                          <span>{values.position || "0"}</span>
-                        </div>
-                      </div>
-
-                      {values.placeholder && (
-                        <>
-                          <Separator />
-                          <div className="space-y-1">
-                            <p className="text-xs text-muted-foreground">
-                              Placeholder
-                            </p>
-                            <p className="text-sm italic text-muted-foreground">
-                              {values.placeholder}
-                            </p>
-                          </div>
-                        </>
-                      )}
-
-                      {values.help_text && (
-                        <>
-                          <Separator />
-                          <p className="text-sm text-muted-foreground">
-                            {values.help_text}
-                          </p>
-                        </>
-                      )}
-
-                      {(values.field_type === "select" ||
-                        values.field_type === "multiselect") &&
-                        values.options && (
-                          <>
-                            <Separator />
-                            <div className="space-y-2">
-                              <p className="text-xs text-muted-foreground">
-                                Options
-                              </p>
-                              <div className="flex flex-wrap gap-1">
-                                {values.options
-                                  .split("\n")
-                                  .filter((o) => o.trim())
-                                  .slice(0, 5)
-                                  .map((opt, i) => (
-                                    <Badge key={i} variant="secondary">
-                                      {opt.trim()}
-                                    </Badge>
-                                  ))}
-                                {values.options
-                                  .split("\n")
-                                  .filter((o) => o.trim()).length > 5 && (
-                                  <Badge variant="outline">
-                                    +
-                                    {values.options
-                                      .split("\n")
-                                      .filter((o) => o.trim()).length - 5}{" "}
-                                    more
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-                          </>
-                        )}
-
-                      <Separator />
-
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">
-                          Required
-                        </span>
-                        <Badge
-                          variant={values.required ? "default" : "secondary"}
-                        >
-                          {values.required ? "Yes" : "No"}
-                        </Badge>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )
-              }}
-            </form.Subscribe>
-
-            {isEdit && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Field Details</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Field ID</p>
-                    <p className="font-mono text-xs text-muted-foreground">
-                      {defaultValues.id}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
           </div>
         </div>
       </form>

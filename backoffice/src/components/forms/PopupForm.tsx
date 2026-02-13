@@ -4,13 +4,13 @@ import { useNavigate } from "@tanstack/react-router"
 import {
   Baby,
   Calendar,
-  Check,
+  FileText,
   Globe,
   Heart,
+  Image,
   Key,
-  Sparkles,
   Ticket,
-  X,
+  Twitter,
 } from "lucide-react"
 import {
   ApprovalStrategiesService,
@@ -26,15 +26,13 @@ import { ApprovalStrategyForm } from "@/components/forms/ApprovalStrategyForm"
 import { ReviewersManager } from "@/components/forms/ReviewersManager"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
 import { DatePicker } from "@/components/ui/date-picker"
 import { ImageUpload } from "@/components/ui/image-upload"
+import {
+  HeroInput,
+  InlineRow,
+  InlineSection,
+} from "@/components/ui/inline-form"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { LoadingButton } from "@/components/ui/loading-button"
@@ -119,15 +117,6 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
     return date.slice(0, 10)
   }
 
-  const formatDateForDisplay = (date: string) => {
-    if (!date) return "Not set"
-    return new Date(date).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    })
-  }
-
   const form = useForm({
     defaultValues: {
       name: defaultValues?.name ?? "",
@@ -179,7 +168,6 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
   })
 
   const blocker = useUnsavedChanges(form)
-
   const isPending = createMutation.isPending || updateMutation.isPending
 
   return (
@@ -192,7 +180,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
             form.handleSubmit()
           }
         }}
-        className="space-y-6"
+        className="mx-auto max-w-2xl space-y-6"
       >
         <FormErrorSummary
           form={form}
@@ -203,604 +191,443 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
             end_date: "End Date",
           }}
         />
-        <div className="grid gap-6 lg:grid-cols-3">
-          {/* Left Column - Form Fields */}
-          <div className="space-y-6 lg:col-span-2">
-            {/* Basic Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle>
-                  {readOnly
-                    ? "Popup Details"
-                    : isEdit
-                      ? "Basic Information"
-                      : "Popup Details"}
-                </CardTitle>
-                <CardDescription>
-                  {readOnly
-                    ? "View popup information (read-only)"
-                    : isEdit
-                      ? "Update the popup configuration"
-                      : "Enter the basic information for the new popup"}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
+
+        {/* Hero: Name + Status */}
+        <div className="space-y-3">
+          <form.Field
+            name="name"
+            validators={{
+              onBlur: ({ value }) =>
+                !readOnly && !value ? "Name is required" : undefined,
+            }}
+          >
+            {(field) => (
+              <div>
+                <HeroInput
+                  placeholder="Popup Name"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  disabled={readOnly}
+                />
+                <FieldError errors={field.state.meta.errors} />
+              </div>
+            )}
+          </form.Field>
+
+          <form.Field name="status">
+            {(field) => (
+              <div className="flex items-center gap-2">
+                <Select
+                  value={field.state.value}
+                  onValueChange={(value) =>
+                    field.handleChange(value as typeof field.state.value)
+                  }
+                  disabled={readOnly}
+                >
+                  <SelectTrigger className="w-auto border-0 bg-transparent p-0 shadow-none focus:ring-0">
+                    <Badge
+                      variant={
+                        field.state.value === "active" ? "default" : "secondary"
+                      }
+                    >
+                      <SelectValue />
+                    </Badge>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {POPUP_STATUSES.map((status) => (
+                      <SelectItem key={status.value} value={status.value}>
+                        {status.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </form.Field>
+        </div>
+
+        {/* Popup Details - right after identity (edit only) */}
+        {isEdit && (
+          <div className="flex gap-6 text-sm text-muted-foreground">
+            <div>
+              <span className="text-xs uppercase tracking-wider">Slug</span>
+              <p className="font-mono">{defaultValues.slug}</p>
+            </div>
+            <div>
+              <span className="text-xs uppercase tracking-wider">ID</span>
+              <p className="font-mono text-xs">{defaultValues.id}</p>
+            </div>
+          </div>
+        )}
+
+        <Separator />
+
+        {/* Cover Image */}
+        <form.Field name="image_url">
+          {(field) => (
+            <div className="space-y-2">
+              <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Cover Image
+              </Label>
+              <ImageUpload
+                value={field.state.value || null}
+                onChange={(url) => field.handleChange(url ?? "")}
+                disabled={readOnly}
+              />
+            </div>
+          )}
+        </form.Field>
+
+        <Separator />
+
+        {/* Event Details */}
+        <InlineSection title="Event Details">
+          <form.Field
+            name="start_date"
+            validators={{
+              onChange: ({ value }) => {
+                if (readOnly || !value || isEdit) return undefined
+                const today = new Date()
+                today.setHours(0, 0, 0, 0)
+                const startDate = new Date(value)
+                startDate.setHours(0, 0, 0, 0)
+                if (startDate < today) {
+                  return "Start date must be today or in the future"
+                }
+                return undefined
+              },
+            }}
+          >
+            {(field) => (
+              <div>
+                <InlineRow
+                  icon={<Calendar className="h-4 w-4 text-muted-foreground" />}
+                  label="Start Date"
+                >
+                  <DatePicker
+                    id="start_date"
+                    value={field.state.value}
+                    onChange={field.handleChange}
+                    disabled={readOnly}
+                    placeholder="Select date"
+                    className="w-auto"
+                  />
+                </InlineRow>
+                <FieldError errors={field.state.meta.errors} />
+              </div>
+            )}
+          </form.Field>
+
+          <form.Subscribe selector={(state) => state.values.start_date}>
+            {(startDate) => {
+              const startDateAsDate = startDate
+                ? (() => {
+                    const [y, m, d] = startDate
+                      .slice(0, 10)
+                      .split("-")
+                      .map(Number)
+                    return new Date(y, m - 1, d)
+                  })()
+                : undefined
+              return (
                 <form.Field
-                  name="name"
+                  name="end_date"
                   validators={{
-                    onBlur: ({ value }) =>
-                      !readOnly && !value ? "Name is required" : undefined,
+                    onChange: ({ value, fieldApi }) => {
+                      if (readOnly || !value) return undefined
+                      const startDateValue =
+                        fieldApi.form.getFieldValue("start_date")
+                      if (!startDateValue) return undefined
+                      const sd = new Date(startDateValue)
+                      const endDate = new Date(value)
+                      if (endDate < sd) {
+                        return "End date cannot be before start date"
+                      }
+                      return undefined
+                    },
                   }}
                 >
                   {(field) => (
-                    <div className="space-y-2">
-                      <Label htmlFor="name">
-                        Name{" "}
-                        {!readOnly && (
-                          <span className="text-destructive">*</span>
-                        )}
-                      </Label>
-                      <Input
-                        id="name"
-                        placeholder="My Event 2025"
-                        value={field.state.value}
-                        onBlur={field.handleBlur}
-                        onChange={(e) => field.handleChange(e.target.value)}
-                        disabled={readOnly}
-                      />
+                    <div>
+                      <InlineRow
+                        icon={
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                        }
+                        label="End Date"
+                      >
+                        <DatePicker
+                          id="end_date"
+                          value={field.state.value}
+                          onChange={field.handleChange}
+                          disabled={readOnly}
+                          placeholder="Select date"
+                          defaultMonth={startDateAsDate}
+                          className="w-auto"
+                        />
+                      </InlineRow>
                       <FieldError errors={field.state.meta.errors} />
                     </div>
                   )}
                 </form.Field>
+              )
+            }}
+          </form.Subscribe>
+        </InlineSection>
 
-                <form.Field name="status">
-                  {(field) => (
-                    <div className="space-y-2">
-                      <Label htmlFor="status">Status</Label>
-                      <Select
-                        value={field.state.value}
-                        onValueChange={(value) =>
-                          field.handleChange(value as typeof field.state.value)
-                        }
-                        disabled={readOnly}
-                      >
-                        <SelectTrigger id="status">
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {POPUP_STATUSES.map((status) => (
-                            <SelectItem key={status.value} value={status.value}>
-                              {status.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                </form.Field>
+        <Separator />
 
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <form.Field
-                    name="start_date"
-                    validators={{
-                      onChange: ({ value }) => {
-                        if (readOnly || !value || isEdit) return undefined
-                        const today = new Date()
-                        today.setHours(0, 0, 0, 0)
-                        const startDate = new Date(value)
-                        startDate.setHours(0, 0, 0, 0)
-                        if (startDate < today) {
-                          return "Start date must be today or in the future"
-                        }
-                        return undefined
-                      },
-                    }}
-                  >
-                    {(field) => (
-                      <div className="space-y-2">
-                        <Label htmlFor="start_date">Start Date</Label>
-                        <DatePicker
-                          id="start_date"
-                          value={field.state.value}
-                          onChange={field.handleChange}
-                          disabled={readOnly}
-                          placeholder="Select start date"
-                        />
-                        <FieldError errors={field.state.meta.errors} />
-                      </div>
-                    )}
-                  </form.Field>
-
-                  <form.Subscribe selector={(state) => state.values.start_date}>
-                    {(startDate) => {
-                      const startDateAsDate = startDate
-                        ? (() => {
-                            const [y, m, d] = startDate
-                              .slice(0, 10)
-                              .split("-")
-                              .map(Number)
-                            return new Date(y, m - 1, d)
-                          })()
-                        : undefined
-                      return (
-                        <form.Field
-                          name="end_date"
-                          validators={{
-                            onChange: ({ value, fieldApi }) => {
-                              if (readOnly || !value) return undefined
-                              const startDateValue =
-                                fieldApi.form.getFieldValue("start_date")
-                              if (!startDateValue) return undefined
-                              const sd = new Date(startDateValue)
-                              const endDate = new Date(value)
-                              if (endDate < sd) {
-                                return "End date cannot be before start date"
-                              }
-                              return undefined
-                            },
-                          }}
-                        >
-                          {(field) => (
-                            <div className="space-y-2">
-                              <Label htmlFor="end_date">End Date</Label>
-                              <DatePicker
-                                id="end_date"
-                                value={field.state.value}
-                                onChange={field.handleChange}
-                                disabled={readOnly}
-                                placeholder="Select end date"
-                                defaultMonth={startDateAsDate}
-                              />
-                              <FieldError errors={field.state.meta.errors} />
-                            </div>
-                          )}
-                        </form.Field>
-                      )
-                    }}
-                  </form.Subscribe>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Features */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Features</CardTitle>
-                <CardDescription>
-                  Configure what features are enabled for this popup
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <form.Field name="allows_spouse">
-                  {(field) => (
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label htmlFor="allows_spouse">Allows Spouse</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Attendees can register their spouse
-                        </p>
-                      </div>
-                      <Switch
-                        id="allows_spouse"
-                        checked={field.state.value}
-                        onCheckedChange={(checked) =>
-                          field.handleChange(checked)
-                        }
-                        disabled={readOnly}
-                      />
-                    </div>
-                  )}
-                </form.Field>
-
-                <form.Field name="allows_children">
-                  {(field) => (
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label htmlFor="allows_children">Allows Children</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Attendees can register their children
-                        </p>
-                      </div>
-                      <Switch
-                        id="allows_children"
-                        checked={field.state.value}
-                        onCheckedChange={(checked) =>
-                          field.handleChange(checked)
-                        }
-                        disabled={readOnly}
-                      />
-                    </div>
-                  )}
-                </form.Field>
-
-                <form.Field name="allows_coupons">
-                  {(field) => (
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label htmlFor="allows_coupons">Allows Coupons</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Enable discount coupons for this popup
-                        </p>
-                      </div>
-                      <Switch
-                        id="allows_coupons"
-                        checked={field.state.value}
-                        onCheckedChange={(checked) =>
-                          field.handleChange(checked)
-                        }
-                        disabled={readOnly}
-                      />
-                    </div>
-                  )}
-                </form.Field>
-              </CardContent>
-            </Card>
-
-            {/* Images */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Images</CardTitle>
-                <CardDescription>
-                  Upload images for the popup branding
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <form.Field name="image_url">
-                  {(field) => (
-                    <div className="space-y-2">
-                      <Label>Cover Image</Label>
-                      <ImageUpload
-                        value={field.state.value || null}
-                        onChange={(url) => field.handleChange(url ?? "")}
-                        disabled={readOnly}
-                      />
-                      <p className="text-sm text-muted-foreground">
-                        Main image displayed on the popup page
-                      </p>
-                    </div>
-                  )}
-                </form.Field>
-
-                <form.Field name="icon_url">
-                  {(field) => (
-                    <div className="space-y-2">
-                      <Label>Icon</Label>
-                      <ImageUpload
-                        value={field.state.value || null}
-                        onChange={(url) => field.handleChange(url ?? "")}
-                        disabled={readOnly}
-                      />
-                      <p className="text-sm text-muted-foreground">
-                        Small icon used in navigation and listings
-                      </p>
-                    </div>
-                  )}
-                </form.Field>
-
-                <form.Field name="express_checkout_background">
-                  {(field) => (
-                    <div className="space-y-2">
-                      <Label>Express Checkout Background</Label>
-                      <ImageUpload
-                        value={field.state.value || null}
-                        onChange={(url) => field.handleChange(url ?? "")}
-                        disabled={readOnly}
-                      />
-                      <p className="text-sm text-muted-foreground">
-                        Background image for the express checkout page
-                      </p>
-                    </div>
-                  )}
-                </form.Field>
-              </CardContent>
-            </Card>
-
-            {/* URLs & Links */}
-            <Card>
-              <CardHeader>
-                <CardTitle>URLs & Links</CardTitle>
-                <CardDescription>
-                  External links and resources for this popup
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <form.Field name="web_url">
-                  {(field) => (
-                    <div className="space-y-2">
-                      <Label htmlFor="web_url">Website URL</Label>
-                      <Input
-                        id="web_url"
-                        type="url"
-                        placeholder="https://example.com"
-                        value={field.state.value}
-                        onChange={(e) => field.handleChange(e.target.value)}
-                        disabled={readOnly}
-                      />
-                    </div>
-                  )}
-                </form.Field>
-
-                <form.Field name="blog_url">
-                  {(field) => (
-                    <div className="space-y-2">
-                      <Label htmlFor="blog_url">Blog URL</Label>
-                      <Input
-                        id="blog_url"
-                        type="url"
-                        placeholder="https://example.com/blog"
-                        value={field.state.value}
-                        onChange={(e) => field.handleChange(e.target.value)}
-                        disabled={readOnly}
-                      />
-                    </div>
-                  )}
-                </form.Field>
-
-                <form.Field name="twitter_url">
-                  {(field) => (
-                    <div className="space-y-2">
-                      <Label htmlFor="twitter_url">Twitter URL</Label>
-                      <Input
-                        id="twitter_url"
-                        type="url"
-                        placeholder="https://twitter.com/example"
-                        value={field.state.value}
-                        onChange={(e) => field.handleChange(e.target.value)}
-                        disabled={readOnly}
-                      />
-                    </div>
-                  )}
-                </form.Field>
-              </CardContent>
-            </Card>
-
-            {/* Integrations */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Integrations</CardTitle>
-                <CardDescription>
-                  Third-party service configurations
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <form.Field name="simplefi_api_key">
-                  {(field) => (
-                    <div className="space-y-2">
-                      <Label htmlFor="simplefi_api_key">SimpleFi API Key</Label>
-                      <Input
-                        id="simplefi_api_key"
-                        type="password"
-                        placeholder="Enter API key"
-                        value={field.state.value}
-                        onChange={(e) => field.handleChange(e.target.value)}
-                        disabled={readOnly}
-                      />
-                      <p className="text-sm text-muted-foreground">
-                        API key for SimpleFi payment integration
-                      </p>
-                    </div>
-                  )}
-                </form.Field>
-              </CardContent>
-            </Card>
-
-            {/* Form Actions */}
-            <div className="flex gap-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => navigate({ to: "/popups" })}
+        {/* Event Options */}
+        <InlineSection title="Event Options">
+          <form.Field name="allows_spouse">
+            {(field) => (
+              <InlineRow
+                icon={<Heart className="h-4 w-4 text-muted-foreground" />}
+                label="Spouse Registration"
+                description="Attendees can register their spouse"
               >
-                {readOnly ? "Back" : "Cancel"}
-              </Button>
-              {!readOnly && (
-                <LoadingButton type="submit" loading={isPending}>
-                  {isEdit ? "Save Changes" : "Create Popup"}
-                </LoadingButton>
-              )}
-            </div>
-          </div>
-
-          {/* Right Column - Preview & Details */}
-          <div className="space-y-6">
-            <form.Subscribe
-              selector={(state) => ({
-                name: state.values.name,
-                status: state.values.status,
-                start_date: state.values.start_date,
-                end_date: state.values.end_date,
-                allows_spouse: state.values.allows_spouse,
-                allows_children: state.values.allows_children,
-                allows_coupons: state.values.allows_coupons,
-                icon_url: state.values.icon_url,
-                web_url: state.values.web_url,
-                simplefi_api_key: state.values.simplefi_api_key,
-              })}
-            >
-              {(values) => (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">Preview</CardTitle>
-                    <CardDescription>
-                      How this popup will appear
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-start gap-3">
-                      {values.icon_url ? (
-                        <img
-                          src={values.icon_url}
-                          alt="Icon"
-                          className="h-10 w-10 rounded-lg object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                          <Sparkles className="h-5 w-5 text-primary" />
-                        </div>
-                      )}
-                      <div className="flex-1 space-y-1">
-                        <p className="font-medium leading-none">
-                          {values.name || "Popup Name"}
-                        </p>
-                        <p className="text-sm text-muted-foreground">Event</p>
-                      </div>
-                    </div>
-
-                    <Separator />
-
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">
-                        Status
-                      </span>
-                      <Badge
-                        variant={
-                          values.status === "active" ? "default" : "secondary"
-                        }
-                      >
-                        {values.status === "active" ? "Active" : "Draft"}
-                      </Badge>
-                    </div>
-
-                    <Separator />
-
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Calendar className="h-4 w-4" />
-                        <span className="text-sm">Event Dates</span>
-                      </div>
-                      <div className="text-sm">
-                        {formatDateForDisplay(values.start_date)} -{" "}
-                        {formatDateForDisplay(values.end_date)}
-                      </div>
-                    </div>
-
-                    <Separator />
-
-                    <div className="space-y-2">
-                      <p className="text-sm text-muted-foreground">Features</p>
-                      <div className="space-y-1.5">
-                        <div className="flex items-center gap-2 text-sm">
-                          {values.allows_spouse ? (
-                            <Check className="h-3.5 w-3.5 text-green-500" />
-                          ) : (
-                            <X className="h-3.5 w-3.5 text-muted-foreground" />
-                          )}
-                          <Heart className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span>Spouse Registration</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm">
-                          {values.allows_children ? (
-                            <Check className="h-3.5 w-3.5 text-green-500" />
-                          ) : (
-                            <X className="h-3.5 w-3.5 text-muted-foreground" />
-                          )}
-                          <Baby className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span>Children Registration</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm">
-                          {values.allows_coupons ? (
-                            <Check className="h-3.5 w-3.5 text-green-500" />
-                          ) : (
-                            <X className="h-3.5 w-3.5 text-muted-foreground" />
-                          )}
-                          <Ticket className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span>Discount Coupons</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {(values.web_url || values.simplefi_api_key) && (
-                      <>
-                        <Separator />
-                        <div className="space-y-1.5">
-                          {values.web_url && (
-                            <div className="flex items-center gap-2 text-sm">
-                              <Globe className="h-3.5 w-3.5 text-muted-foreground" />
-                              <span className="truncate text-muted-foreground">
-                                Website configured
-                              </span>
-                            </div>
-                          )}
-                          {values.simplefi_api_key && (
-                            <div className="flex items-center gap-2 text-sm">
-                              <Key className="h-3.5 w-3.5 text-muted-foreground" />
-                              <span className="text-muted-foreground">
-                                SimpleFi configured
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
-            </form.Subscribe>
-
-            {isEdit && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Popup Details</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Slug</p>
-                    <p className="font-mono text-sm">{defaultValues.slug}</p>
-                  </div>
-                  <Separator />
-                  <div>
-                    <p className="text-sm text-muted-foreground">Popup ID</p>
-                    <p className="font-mono text-xs text-muted-foreground">
-                      {defaultValues.id}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
+                <Switch
+                  id="allows_spouse"
+                  checked={field.state.value}
+                  onCheckedChange={(checked) => field.handleChange(checked)}
+                  disabled={readOnly}
+                />
+              </InlineRow>
             )}
-          </div>
+          </form.Field>
+
+          <form.Field name="allows_children">
+            {(field) => (
+              <InlineRow
+                icon={<Baby className="h-4 w-4 text-muted-foreground" />}
+                label="Children Registration"
+                description="Attendees can register their children"
+              >
+                <Switch
+                  id="allows_children"
+                  checked={field.state.value}
+                  onCheckedChange={(checked) => field.handleChange(checked)}
+                  disabled={readOnly}
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+
+          <form.Field name="allows_coupons">
+            {(field) => (
+              <InlineRow
+                icon={<Ticket className="h-4 w-4 text-muted-foreground" />}
+                label="Discount Coupons"
+                description="Enable discount coupons for this popup"
+              >
+                <Switch
+                  id="allows_coupons"
+                  checked={field.state.value}
+                  onCheckedChange={(checked) => field.handleChange(checked)}
+                  disabled={readOnly}
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+        </InlineSection>
+
+        <Separator />
+
+        {/* Branding */}
+        <InlineSection title="Branding">
+          <form.Field name="icon_url">
+            {(field) => (
+              <div className="space-y-2 py-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+                    <Image className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <p className="text-sm font-medium">Icon</p>
+                </div>
+                <ImageUpload
+                  value={field.state.value || null}
+                  onChange={(url) => field.handleChange(url ?? "")}
+                  disabled={readOnly}
+                />
+              </div>
+            )}
+          </form.Field>
+
+          <form.Field name="express_checkout_background">
+            {(field) => (
+              <div className="space-y-2 py-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+                    <Image className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <p className="text-sm font-medium">Checkout Background</p>
+                </div>
+                <ImageUpload
+                  value={field.state.value || null}
+                  onChange={(url) => field.handleChange(url ?? "")}
+                  disabled={readOnly}
+                />
+              </div>
+            )}
+          </form.Field>
+        </InlineSection>
+
+        <Separator />
+
+        {/* Links */}
+        <InlineSection title="Links">
+          <form.Field name="web_url">
+            {(field) => (
+              <InlineRow
+                icon={<Globe className="h-4 w-4 text-muted-foreground" />}
+                label="Website"
+              >
+                <Input
+                  id="web_url"
+                  type="url"
+                  placeholder="https://example.com"
+                  value={field.state.value}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  disabled={readOnly}
+                  className="max-w-xs text-sm"
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+
+          <form.Field name="blog_url">
+            {(field) => (
+              <InlineRow
+                icon={<FileText className="h-4 w-4 text-muted-foreground" />}
+                label="Blog"
+              >
+                <Input
+                  id="blog_url"
+                  type="url"
+                  placeholder="https://example.com/blog"
+                  value={field.state.value}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  disabled={readOnly}
+                  className="max-w-xs text-sm"
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+
+          <form.Field name="twitter_url">
+            {(field) => (
+              <InlineRow
+                icon={<Twitter className="h-4 w-4 text-muted-foreground" />}
+                label="Twitter"
+              >
+                <Input
+                  id="twitter_url"
+                  type="url"
+                  placeholder="https://twitter.com/example"
+                  value={field.state.value}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  disabled={readOnly}
+                  className="max-w-xs text-sm"
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+        </InlineSection>
+
+        <Separator />
+
+        {/* Integrations */}
+        <InlineSection title="Integrations">
+          <form.Field name="simplefi_api_key">
+            {(field) => (
+              <InlineRow
+                icon={<Key className="h-4 w-4 text-muted-foreground" />}
+                label="SimpleFi"
+                description="Payment integration API key"
+              >
+                <Input
+                  id="simplefi_api_key"
+                  type="password"
+                  placeholder="Enter API key"
+                  value={field.state.value}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  disabled={readOnly}
+                  className="max-w-xs text-sm"
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+        </InlineSection>
+
+        {/* Approval strategy + Reviewers (edit only) */}
+        {isEdit && (
+          <>
+            <Separator />
+
+            <ApprovalStrategyForm
+              popupId={defaultValues!.id}
+              readOnly={readOnly}
+              variant="inline"
+            />
+
+            <Separator />
+
+            <ConditionalReviewersManager
+              popupId={defaultValues!.id}
+              tenantId={defaultValues!.tenant_id}
+              readOnly={readOnly}
+              variant="inline"
+            />
+          </>
+        )}
+
+        <Separator />
+
+        {/* Form Actions */}
+        <div className="flex gap-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => navigate({ to: "/popups" })}
+          >
+            {readOnly ? "Back" : "Cancel"}
+          </Button>
+          {!readOnly && (
+            <LoadingButton type="submit" loading={isPending}>
+              {isEdit ? "Save Changes" : "Create Popup"}
+            </LoadingButton>
+          )}
         </div>
       </form>
 
-      {/* Approval Strategy (only for edit mode) - Full width */}
-      {isEdit && (
-        <ApprovalStrategyForm popupId={defaultValues!.id} readOnly={readOnly} />
-      )}
-
-      {/* Reviewers Manager (only for edit mode when review is enabled) - Full width */}
-      {isEdit && (
-        <ConditionalReviewersManager
-          popupId={defaultValues!.id}
-          tenantId={defaultValues!.tenant_id}
-          readOnly={readOnly}
-        />
-      )}
-
       {isEdit && !readOnly && (
-        <DangerZone
-          description="Once you delete this popup, all associated products, groups, coupons, and attendee data will be permanently removed. This action cannot be undone."
-          onDelete={() => deleteMutation.mutate()}
-          isDeleting={deleteMutation.isPending}
-          confirmText="Delete Popup"
-          resourceName={defaultValues.name}
-        />
+        <div className="mx-auto max-w-2xl">
+          <DangerZone
+            description="Once you delete this popup, all associated products, groups, coupons, and attendee data will be permanently removed. This action cannot be undone."
+            onDelete={() => deleteMutation.mutate()}
+            isDeleting={deleteMutation.isPending}
+            confirmText="Delete Popup"
+            resourceName={defaultValues.name}
+            variant="inline"
+          />
+        </div>
       )}
+
       <UnsavedChangesDialog blocker={blocker} />
     </div>
   )
 }
 
-/**
- * Wrapper component that conditionally renders ReviewersManager
- * based on approval strategy (only show when review is enabled, not auto_accept)
- */
 function ConditionalReviewersManager({
   popupId,
   tenantId,
   readOnly,
+  variant,
 }: {
   popupId: string
   tenantId: string
   readOnly?: boolean
+  variant?: "card" | "inline"
 }) {
   const { data: strategy, isLoading } = useQuery({
     queryKey: ["approval-strategy", popupId],
@@ -808,10 +635,6 @@ function ConditionalReviewersManager({
     retry: false,
   })
 
-  // Don't show reviewers if:
-  // - Still loading
-  // - No strategy exists (auto-accept by default)
-  // - Strategy is auto_accept
   if (isLoading) return null
   if (!strategy) return null
   if (strategy.strategy_type === "auto_accept") return null
@@ -821,6 +644,7 @@ function ConditionalReviewersManager({
       popupId={popupId}
       tenantId={tenantId}
       readOnly={readOnly}
+      variant={variant}
     />
   )
 }

@@ -1,6 +1,8 @@
 import { useForm } from "@tanstack/react-form"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Info, Trash2 } from "lucide-react"
+import { ChevronDown, Info, ShieldCheck, Trash2 } from "lucide-react"
+import type * as React from "react"
+import { useState } from "react"
 
 import {
   type ApiError,
@@ -17,6 +19,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
+import { InlineRow } from "@/components/ui/inline-form"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -28,11 +36,13 @@ import {
 } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import useCustomToast from "@/hooks/useCustomToast"
+import { cn } from "@/lib/utils"
 import { createErrorHandler } from "@/utils"
 
 interface ApprovalStrategyFormProps {
   popupId: string
   readOnly?: boolean
+  variant?: "card" | "inline"
 }
 
 const STRATEGY_TYPES = [
@@ -69,6 +79,7 @@ type StrategyType = (typeof STRATEGY_TYPES)[number]["value"]
 export function ApprovalStrategyForm({
   popupId,
   readOnly = false,
+  variant = "card",
 }: ApprovalStrategyFormProps) {
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
@@ -115,30 +126,28 @@ export function ApprovalStrategyForm({
 
   if (isLoading) {
     return (
-      <Card className="max-w-2xl">
-        <CardHeader>
-          <CardTitle>Application Review</CardTitle>
-          <CardDescription>Loading...</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <SectionShell
+        variant={variant}
+        title="Application Review"
+        description="Loading..."
+      >
+        <div className="space-y-4">
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-10 w-full" />
-        </CardContent>
-      </Card>
+        </div>
+      </SectionShell>
     )
   }
 
   // No strategy configured - show simple state with option to enable
   if (hasNoStrategy) {
     return (
-      <Card className="max-w-2xl">
-        <CardHeader>
-          <CardTitle>Application Review</CardTitle>
-          <CardDescription>
-            Configure how applications are reviewed before acceptance
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <SectionShell
+        variant={variant}
+        title="Application Review"
+        description="Configure how applications are reviewed before acceptance"
+      >
+        <div className="space-y-4">
           <Alert>
             <Info className="h-4 w-4" />
             <AlertDescription>
@@ -161,14 +170,15 @@ export function ApprovalStrategyForm({
                 : "Enable Application Review"}
             </Button>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </SectionShell>
     )
   }
 
   // Strategy exists - render the form with loaded data
   return (
     <ApprovalStrategyFormInner
+      variant={variant}
       strategy={strategy!}
       readOnly={readOnly}
       onSave={(data) => saveMutation.mutate(data)}
@@ -181,6 +191,7 @@ export function ApprovalStrategyForm({
 
 // Inner component that only renders when strategy data is available
 function ApprovalStrategyFormInner({
+  variant = "card",
   strategy,
   readOnly,
   onSave,
@@ -188,6 +199,7 @@ function ApprovalStrategyFormInner({
   isSaving,
   isDeleting,
 }: {
+  variant?: "card" | "inline"
   strategy: ApprovalStrategyPublic
   readOnly: boolean
   onSave: (data: ApprovalStrategyCreate) => void
@@ -223,225 +235,573 @@ function ApprovalStrategyFormInner({
   const selectedStrategy = STRATEGY_TYPES.find((s) => s.value === strategyType)
 
   return (
-    <Card className="max-w-2xl">
-      <CardHeader>
-        <div className="flex items-start justify-between">
-          <div>
-            <CardTitle>Application Review</CardTitle>
-            <CardDescription>
-              Configure how applications are reviewed and accepted
-            </CardDescription>
-          </div>
-          {!readOnly && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="text-destructive hover:text-destructive"
-              onClick={onDelete}
-              disabled={isDeleting}
-            >
-              <Trash2 className="h-4 w-4 mr-1" />
-              Disable Review
-            </Button>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Strategy Type */}
-        <form.Field name="strategy_type">
-          {(field) => (
-            <div className="space-y-2">
-              <Label htmlFor="strategy_type">Review Strategy</Label>
-              <Select
-                value={field.state.value}
-                onValueChange={(value) => {
-                  field.handleChange(value as StrategyType)
-                  // Auto-save when strategy type changes
-                  setTimeout(() => form.handleSubmit(), 0)
-                }}
-                disabled={readOnly}
-              >
-                <SelectTrigger id="strategy_type">
-                  <SelectValue placeholder="Select strategy" />
-                </SelectTrigger>
-                <SelectContent>
-                  {STRATEGY_TYPES.map((type) => (
-                    <SelectItem key={type.value} value={type.value}>
-                      {type.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {selectedStrategy && (
-                <p className="text-sm text-muted-foreground">
-                  {selectedStrategy.description}
-                </p>
-              )}
-            </div>
-          )}
-        </form.Field>
-
-        {/* Auto Accept Info */}
-        {strategyType === "auto_accept" && (
-          <Alert>
-            <Info className="h-4 w-4" />
-            <AlertDescription>
-              All applications will be automatically accepted when submitted. No
-              manual review is required.
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {/* Threshold Settings */}
-        {strategyType === "threshold" && (
-          <form.Field name="required_approvals">
+    <SectionShell
+      variant={variant}
+      title="Application Review"
+      description="Configure how applications are reviewed and accepted"
+      action={
+        !readOnly ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="text-destructive hover:text-destructive"
+            onClick={onDelete}
+            disabled={isDeleting}
+          >
+            <Trash2 className="h-4 w-4 mr-1" />
+            Disable Review
+          </Button>
+        ) : undefined
+      }
+    >
+      {variant === "inline" ? (
+        <InlineStrategyFields
+          form={form}
+          strategyType={strategyType}
+          selectedStrategy={selectedStrategy}
+          readOnly={readOnly}
+          handleFieldBlur={handleFieldBlur}
+          isSaving={isSaving}
+        />
+      ) : (
+        <div className="space-y-6">
+          {/* Strategy Type */}
+          <form.Field name="strategy_type">
             {(field) => (
               <div className="space-y-2">
-                <Label htmlFor="required_approvals">Required Approvals</Label>
-                <Input
-                  id="required_approvals"
-                  type="number"
-                  min={1}
+                <Label htmlFor="strategy_type">Review Strategy</Label>
+                <Select
                   value={field.state.value}
-                  onChange={(e) => field.handleChange(Number(e.target.value))}
-                  onBlur={handleFieldBlur}
+                  onValueChange={(value) => {
+                    field.handleChange(value as StrategyType)
+                    setTimeout(() => form.handleSubmit(), 0)
+                  }}
                   disabled={readOnly}
-                />
-                <p className="text-sm text-muted-foreground">
-                  Number of reviewer approvals needed to accept an application
-                </p>
+                >
+                  <SelectTrigger id="strategy_type">
+                    <SelectValue placeholder="Select strategy" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STRATEGY_TYPES.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        {type.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedStrategy && (
+                  <p className="text-sm text-muted-foreground">
+                    {selectedStrategy.description}
+                  </p>
+                )}
               </div>
             )}
           </form.Field>
+
+          {strategyType === "auto_accept" && (
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertDescription>
+                All applications will be automatically accepted when submitted.
+                No manual review is required.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {strategyType === "threshold" && (
+            <form.Field name="required_approvals">
+              {(field) => (
+                <div className="space-y-2">
+                  <Label htmlFor="required_approvals">Required Approvals</Label>
+                  <Input
+                    id="required_approvals"
+                    type="number"
+                    min={1}
+                    value={field.state.value}
+                    onChange={(e) => field.handleChange(Number(e.target.value))}
+                    onBlur={handleFieldBlur}
+                    disabled={readOnly}
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    Number of reviewer approvals needed to accept an application
+                  </p>
+                </div>
+              )}
+            </form.Field>
+          )}
+
+          {strategyType === "weighted" && (
+            <>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <form.Field name="accept_threshold">
+                  {(field) => (
+                    <div className="space-y-2">
+                      <Label htmlFor="accept_threshold">Accept Threshold</Label>
+                      <Input
+                        id="accept_threshold"
+                        type="number"
+                        value={field.state.value}
+                        onChange={(e) =>
+                          field.handleChange(Number(e.target.value))
+                        }
+                        onBlur={handleFieldBlur}
+                        disabled={readOnly}
+                      />
+                      <p className="text-sm text-muted-foreground">
+                        Points needed to accept
+                      </p>
+                    </div>
+                  )}
+                </form.Field>
+
+                <form.Field name="reject_threshold">
+                  {(field) => (
+                    <div className="space-y-2">
+                      <Label htmlFor="reject_threshold">Reject Threshold</Label>
+                      <Input
+                        id="reject_threshold"
+                        type="number"
+                        value={field.state.value}
+                        onChange={(e) =>
+                          field.handleChange(Number(e.target.value))
+                        }
+                        onBlur={handleFieldBlur}
+                        disabled={readOnly}
+                      />
+                      <p className="text-sm text-muted-foreground">
+                        Points to reject (negative)
+                      </p>
+                    </div>
+                  )}
+                </form.Field>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <form.Field name="strong_yes_weight">
+                  {(field) => (
+                    <div className="space-y-2">
+                      <Label htmlFor="strong_yes_weight">
+                        Strong Yes Weight
+                      </Label>
+                      <Input
+                        id="strong_yes_weight"
+                        type="number"
+                        value={field.state.value}
+                        onChange={(e) =>
+                          field.handleChange(Number(e.target.value))
+                        }
+                        onBlur={handleFieldBlur}
+                        disabled={readOnly}
+                      />
+                    </div>
+                  )}
+                </form.Field>
+
+                <form.Field name="yes_weight">
+                  {(field) => (
+                    <div className="space-y-2">
+                      <Label htmlFor="yes_weight">Yes Weight</Label>
+                      <Input
+                        id="yes_weight"
+                        type="number"
+                        value={field.state.value}
+                        onChange={(e) =>
+                          field.handleChange(Number(e.target.value))
+                        }
+                        onBlur={handleFieldBlur}
+                        disabled={readOnly}
+                      />
+                    </div>
+                  )}
+                </form.Field>
+
+                <form.Field name="no_weight">
+                  {(field) => (
+                    <div className="space-y-2">
+                      <Label htmlFor="no_weight">No Weight</Label>
+                      <Input
+                        id="no_weight"
+                        type="number"
+                        value={field.state.value}
+                        onChange={(e) =>
+                          field.handleChange(Number(e.target.value))
+                        }
+                        onBlur={handleFieldBlur}
+                        disabled={readOnly}
+                      />
+                    </div>
+                  )}
+                </form.Field>
+
+                <form.Field name="strong_no_weight">
+                  {(field) => (
+                    <div className="space-y-2">
+                      <Label htmlFor="strong_no_weight">Strong No Weight</Label>
+                      <Input
+                        id="strong_no_weight"
+                        type="number"
+                        value={field.state.value}
+                        onChange={(e) =>
+                          field.handleChange(Number(e.target.value))
+                        }
+                        onBlur={handleFieldBlur}
+                        disabled={readOnly}
+                      />
+                    </div>
+                  )}
+                </form.Field>
+              </div>
+            </>
+          )}
+
+          {isSaving && (
+            <p className="text-sm text-muted-foreground">Saving...</p>
+          )}
+        </div>
+      )}
+    </SectionShell>
+  )
+}
+
+function InlineStrategyFields({
+  form,
+  strategyType,
+  selectedStrategy,
+  readOnly,
+  handleFieldBlur,
+  isSaving,
+}: {
+  // biome-ignore lint/suspicious/noExplicitAny: private component, form type is inferred from parent
+  form: any
+  strategyType: StrategyType
+  selectedStrategy: (typeof STRATEGY_TYPES)[number] | undefined
+  readOnly: boolean
+  handleFieldBlur: () => void
+  isSaving: boolean
+}) {
+  const [configOpen, setConfigOpen] = useState(false)
+  const hasConfig = strategyType === "threshold" || strategyType === "weighted"
+
+  return (
+    <div className="divide-y divide-border">
+      {/* Strategy Type */}
+      <form.Field name="strategy_type">
+        {(field: any) => (
+          <InlineRow
+            icon={<ShieldCheck className="h-4 w-4 text-muted-foreground" />}
+            label="Review Strategy"
+            description={selectedStrategy?.description}
+          >
+            <Select
+              value={field.state.value}
+              onValueChange={(value) => {
+                field.handleChange(value as StrategyType)
+                setTimeout(() => form.handleSubmit(), 0)
+              }}
+              disabled={readOnly}
+            >
+              <SelectTrigger className="w-auto text-sm">
+                <SelectValue placeholder="Select strategy" />
+              </SelectTrigger>
+              <SelectContent>
+                {STRATEGY_TYPES.map((type) => (
+                  <SelectItem key={type.value} value={type.value}>
+                    {type.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </InlineRow>
         )}
+      </form.Field>
 
-        {/* Weighted Voting Settings */}
-        {strategyType === "weighted" && (
-          <>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <form.Field name="accept_threshold">
-                {(field) => (
-                  <div className="space-y-2">
-                    <Label htmlFor="accept_threshold">Accept Threshold</Label>
-                    <Input
-                      id="accept_threshold"
-                      type="number"
-                      value={field.state.value}
-                      onChange={(e) =>
-                        field.handleChange(Number(e.target.value))
-                      }
-                      onBlur={handleFieldBlur}
-                      disabled={readOnly}
-                    />
-                    <p className="text-sm text-muted-foreground">
-                      Points needed to accept
-                    </p>
-                  </div>
+      {/* Auto Accept Info */}
+      {strategyType === "auto_accept" && (
+        <div className="py-3">
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertDescription>
+              All applications will be automatically accepted. No manual review
+              required.
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
+
+      {/* Collapsible config for threshold / weighted */}
+      {hasConfig && (
+        <div className="py-3">
+          <Collapsible open={configOpen} onOpenChange={setConfigOpen}>
+            <CollapsibleTrigger asChild>
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <ChevronDown
+                  className={cn(
+                    "h-4 w-4 transition-transform",
+                    configOpen && "rotate-180",
+                  )}
+                />
+                Configure{" "}
+                {strategyType === "threshold" ? "threshold" : "weights"}
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="mt-3 space-y-4 rounded-lg border bg-muted/30 p-4">
+                {/* Threshold */}
+                {strategyType === "threshold" && (
+                  <form.Field name="required_approvals">
+                    {(field: any) => (
+                      <div className="space-y-1">
+                        <Label
+                          htmlFor="required_approvals"
+                          className="text-xs text-muted-foreground"
+                        >
+                          Required Approvals
+                        </Label>
+                        <Input
+                          id="required_approvals"
+                          type="number"
+                          min={1}
+                          value={field.state.value}
+                          onChange={(e) =>
+                            field.handleChange(Number(e.target.value))
+                          }
+                          onBlur={handleFieldBlur}
+                          disabled={readOnly}
+                          className="h-8 max-w-24 text-sm"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Approvals needed to accept an application
+                        </p>
+                      </div>
+                    )}
+                  </form.Field>
                 )}
-              </form.Field>
 
-              <form.Field name="reject_threshold">
-                {(field) => (
-                  <div className="space-y-2">
-                    <Label htmlFor="reject_threshold">Reject Threshold</Label>
-                    <Input
-                      id="reject_threshold"
-                      type="number"
-                      value={field.state.value}
-                      onChange={(e) =>
-                        field.handleChange(Number(e.target.value))
-                      }
-                      onBlur={handleFieldBlur}
-                      disabled={readOnly}
-                    />
-                    <p className="text-sm text-muted-foreground">
-                      Points to reject (negative)
-                    </p>
-                  </div>
+                {/* Weighted */}
+                {strategyType === "weighted" && (
+                  <>
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground">
+                        Thresholds
+                      </p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <form.Field name="accept_threshold">
+                          {(field: any) => (
+                            <div className="space-y-1">
+                              <Label
+                                htmlFor="accept_threshold"
+                                className="text-xs text-muted-foreground"
+                              >
+                                Accept
+                              </Label>
+                              <Input
+                                id="accept_threshold"
+                                type="number"
+                                value={field.state.value}
+                                onChange={(e) =>
+                                  field.handleChange(Number(e.target.value))
+                                }
+                                onBlur={handleFieldBlur}
+                                disabled={readOnly}
+                                className="h-8 max-w-24 text-sm"
+                              />
+                            </div>
+                          )}
+                        </form.Field>
+                        <form.Field name="reject_threshold">
+                          {(field: any) => (
+                            <div className="space-y-1">
+                              <Label
+                                htmlFor="reject_threshold"
+                                className="text-xs text-muted-foreground"
+                              >
+                                Reject
+                              </Label>
+                              <Input
+                                id="reject_threshold"
+                                type="number"
+                                value={field.state.value}
+                                onChange={(e) =>
+                                  field.handleChange(Number(e.target.value))
+                                }
+                                onBlur={handleFieldBlur}
+                                disabled={readOnly}
+                                className="h-8 max-w-24 text-sm"
+                              />
+                            </div>
+                          )}
+                        </form.Field>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground">
+                        Vote Weights
+                      </p>
+                      <div className="grid grid-cols-4 gap-3">
+                        <form.Field name="strong_yes_weight">
+                          {(field: any) => (
+                            <div className="space-y-1">
+                              <Label
+                                htmlFor="strong_yes_weight"
+                                className="text-xs text-muted-foreground"
+                              >
+                                Strong Yes
+                              </Label>
+                              <Input
+                                id="strong_yes_weight"
+                                type="number"
+                                value={field.state.value}
+                                onChange={(e) =>
+                                  field.handleChange(Number(e.target.value))
+                                }
+                                onBlur={handleFieldBlur}
+                                disabled={readOnly}
+                                className="h-8 text-sm"
+                              />
+                            </div>
+                          )}
+                        </form.Field>
+                        <form.Field name="yes_weight">
+                          {(field: any) => (
+                            <div className="space-y-1">
+                              <Label
+                                htmlFor="yes_weight"
+                                className="text-xs text-muted-foreground"
+                              >
+                                Yes
+                              </Label>
+                              <Input
+                                id="yes_weight"
+                                type="number"
+                                value={field.state.value}
+                                onChange={(e) =>
+                                  field.handleChange(Number(e.target.value))
+                                }
+                                onBlur={handleFieldBlur}
+                                disabled={readOnly}
+                                className="h-8 text-sm"
+                              />
+                            </div>
+                          )}
+                        </form.Field>
+                        <form.Field name="no_weight">
+                          {(field: any) => (
+                            <div className="space-y-1">
+                              <Label
+                                htmlFor="no_weight"
+                                className="text-xs text-muted-foreground"
+                              >
+                                No
+                              </Label>
+                              <Input
+                                id="no_weight"
+                                type="number"
+                                value={field.state.value}
+                                onChange={(e) =>
+                                  field.handleChange(Number(e.target.value))
+                                }
+                                onBlur={handleFieldBlur}
+                                disabled={readOnly}
+                                className="h-8 text-sm"
+                              />
+                            </div>
+                          )}
+                        </form.Field>
+                        <form.Field name="strong_no_weight">
+                          {(field: any) => (
+                            <div className="space-y-1">
+                              <Label
+                                htmlFor="strong_no_weight"
+                                className="text-xs text-muted-foreground"
+                              >
+                                Strong No
+                              </Label>
+                              <Input
+                                id="strong_no_weight"
+                                type="number"
+                                value={field.state.value}
+                                onChange={(e) =>
+                                  field.handleChange(Number(e.target.value))
+                                }
+                                onBlur={handleFieldBlur}
+                                disabled={readOnly}
+                                className="h-8 text-sm"
+                              />
+                            </div>
+                          )}
+                        </form.Field>
+                      </div>
+                    </div>
+                  </>
                 )}
-              </form.Field>
-            </div>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        </div>
+      )}
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <form.Field name="strong_yes_weight">
-                {(field) => (
-                  <div className="space-y-2">
-                    <Label htmlFor="strong_yes_weight">Strong Yes Weight</Label>
-                    <Input
-                      id="strong_yes_weight"
-                      type="number"
-                      value={field.state.value}
-                      onChange={(e) =>
-                        field.handleChange(Number(e.target.value))
-                      }
-                      onBlur={handleFieldBlur}
-                      disabled={readOnly}
-                    />
-                  </div>
-                )}
-              </form.Field>
+      {isSaving && (
+        <div className="py-3">
+          <p className="text-sm text-muted-foreground">Saving...</p>
+        </div>
+      )}
+    </div>
+  )
+}
 
-              <form.Field name="yes_weight">
-                {(field) => (
-                  <div className="space-y-2">
-                    <Label htmlFor="yes_weight">Yes Weight</Label>
-                    <Input
-                      id="yes_weight"
-                      type="number"
-                      value={field.state.value}
-                      onChange={(e) =>
-                        field.handleChange(Number(e.target.value))
-                      }
-                      onBlur={handleFieldBlur}
-                      disabled={readOnly}
-                    />
-                  </div>
-                )}
-              </form.Field>
+function SectionShell({
+  variant,
+  title,
+  description,
+  action,
+  children,
+}: {
+  variant: "card" | "inline"
+  title: string
+  description?: string
+  action?: React.ReactNode
+  children: React.ReactNode
+}) {
+  if (variant === "inline") {
+    return (
+      <div className="space-y-4">
+        <div
+          className={cn("flex items-start justify-between", action && "gap-4")}
+        >
+          <div className="space-y-1">
+            <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              {title}
+            </h3>
+            {description && (
+              <p className="text-xs text-muted-foreground">{description}</p>
+            )}
+          </div>
+          {action}
+        </div>
+        {children}
+      </div>
+    )
+  }
 
-              <form.Field name="no_weight">
-                {(field) => (
-                  <div className="space-y-2">
-                    <Label htmlFor="no_weight">No Weight</Label>
-                    <Input
-                      id="no_weight"
-                      type="number"
-                      value={field.state.value}
-                      onChange={(e) =>
-                        field.handleChange(Number(e.target.value))
-                      }
-                      onBlur={handleFieldBlur}
-                      disabled={readOnly}
-                    />
-                  </div>
-                )}
-              </form.Field>
-
-              <form.Field name="strong_no_weight">
-                {(field) => (
-                  <div className="space-y-2">
-                    <Label htmlFor="strong_no_weight">Strong No Weight</Label>
-                    <Input
-                      id="strong_no_weight"
-                      type="number"
-                      value={field.state.value}
-                      onChange={(e) =>
-                        field.handleChange(Number(e.target.value))
-                      }
-                      onBlur={handleFieldBlur}
-                      disabled={readOnly}
-                    />
-                  </div>
-                )}
-              </form.Field>
-            </div>
-          </>
-        )}
-
-        {/* Save indicator */}
-        {isSaving && <p className="text-sm text-muted-foreground">Saving...</p>}
-      </CardContent>
+  return (
+    <Card>
+      <CardHeader>
+        <div
+          className={cn("flex items-start justify-between", action && "gap-4")}
+        >
+          <div>
+            <CardTitle>{title}</CardTitle>
+            {description && <CardDescription>{description}</CardDescription>}
+          </div>
+          {action}
+        </div>
+      </CardHeader>
+      <CardContent>{children}</CardContent>
     </Card>
   )
 }

@@ -1,7 +1,7 @@
 import { useForm } from "@tanstack/react-form"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
-import { Percent, Users } from "lucide-react"
+import { Mail, MessageSquare, Percent, Users } from "lucide-react"
 import {
   type GroupAdminUpdate,
   type GroupCreate,
@@ -11,17 +11,13 @@ import {
 import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+  HeroInput,
+  InlineRow,
+  InlineSection,
+} from "@/components/ui/inline-form"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { LoadingButton } from "@/components/ui/loading-button"
 import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
@@ -147,7 +143,6 @@ export function GroupForm({ defaultValues, onSuccess }: GroupFormProps) {
 
   const isPending = createMutation.isPending || updateMutation.isPending
 
-  // Show alert if no popup selected (only for create mode)
   if (!isEdit && !isContextReady) {
     return <WorkspaceAlert resource="group" action="create" />
   }
@@ -155,302 +150,207 @@ export function GroupForm({ defaultValues, onSuccess }: GroupFormProps) {
   return (
     <div className="space-y-6">
       <form
+        noValidate
         onSubmit={(e) => {
           e.preventDefault()
           if (!readOnly) {
             form.handleSubmit()
           }
         }}
-        className="space-y-6"
+        className="mx-auto max-w-2xl space-y-6"
       >
-        <div className="grid gap-6 lg:grid-cols-3">
-          {/* Left Column - Form Fields */}
-          <div className="space-y-6 lg:col-span-2">
-            {/* Basic Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle>
-                  {readOnly
-                    ? "Group Details"
-                    : isEdit
-                      ? "Basic Information"
-                      : "Group Details"}
-                </CardTitle>
-                <CardDescription>
-                  {readOnly
-                    ? "View group information (read-only)"
-                    : isEdit
-                      ? "Update the group settings"
-                      : "Enter the information for the new registration group"}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <form.Field
-                  name="name"
-                  validators={{
-                    onBlur: ({ value }) =>
-                      !readOnly && !value ? "Name is required" : undefined,
-                  }}
-                >
-                  {(field) => (
-                    <div className="space-y-2">
-                      <Label htmlFor="name">
-                        Name{" "}
-                        {!readOnly && (
-                          <span className="text-destructive">*</span>
-                        )}
-                      </Label>
-                      <Input
-                        id="name"
-                        placeholder="VIP Group"
-                        value={field.state.value}
-                        onBlur={field.handleBlur}
-                        onChange={(e) => field.handleChange(e.target.value)}
-                        disabled={readOnly}
-                      />
-                      <FieldError errors={field.state.meta.errors} />
-                    </div>
-                  )}
-                </form.Field>
+        {/* Hero: Name */}
+        <div className="space-y-3">
+          <form.Field
+            name="name"
+            validators={{
+              onBlur: ({ value }) =>
+                !readOnly && !value ? "Name is required" : undefined,
+            }}
+          >
+            {(field) => (
+              <div>
+                <HeroInput
+                  placeholder="Group Name"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  disabled={readOnly}
+                />
+                <FieldError errors={field.state.meta.errors} />
+              </div>
+            )}
+          </form.Field>
+        </div>
 
-                <form.Field name="description">
-                  {(field) => (
-                    <div className="space-y-2">
-                      <Label htmlFor="description">Description</Label>
-                      <Textarea
-                        id="description"
-                        placeholder="Group description..."
-                        value={field.state.value}
-                        onBlur={field.handleBlur}
-                        onChange={(e) => field.handleChange(e.target.value)}
-                        disabled={readOnly}
-                      />
-                    </div>
-                  )}
-                </form.Field>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <form.Field name="discount_percentage">
-                    {(field) => (
-                      <div className="space-y-2">
-                        <Label htmlFor="discount_percentage">Discount %</Label>
-                        <Input
-                          id="discount_percentage"
-                          type="number"
-                          min={0}
-                          max={100}
-                          value={field.state.value}
-                          onBlur={field.handleBlur}
-                          onChange={(e) => field.handleChange(e.target.value)}
-                          disabled={readOnly}
-                        />
-                        <p className="text-sm text-muted-foreground">
-                          Discount for group members
-                        </p>
-                      </div>
-                    )}
-                  </form.Field>
-
-                  <form.Field name="max_members">
-                    {(field) => (
-                      <div className="space-y-2">
-                        <Label htmlFor="max_members">Max Members</Label>
-                        <Input
-                          id="max_members"
-                          type="number"
-                          min={1}
-                          placeholder="Unlimited"
-                          value={field.state.value}
-                          onBlur={field.handleBlur}
-                          onChange={(e) => field.handleChange(e.target.value)}
-                          disabled={readOnly}
-                        />
-                        <p className="text-sm text-muted-foreground">
-                          Leave empty for unlimited
-                        </p>
-                      </div>
-                    )}
-                  </form.Field>
-                </div>
-
-                <form.Field name="welcome_message">
-                  {(field) => (
-                    <div className="space-y-2">
-                      <Label htmlFor="welcome_message">Welcome Message</Label>
-                      <Textarea
-                        id="welcome_message"
-                        placeholder="Welcome to the group!"
-                        value={field.state.value}
-                        onBlur={field.handleBlur}
-                        onChange={(e) => field.handleChange(e.target.value)}
-                        disabled={readOnly}
-                      />
-                      <p className="text-sm text-muted-foreground">
-                        Message shown to members when they join
-                      </p>
-                    </div>
-                  )}
-                </form.Field>
-
-                <form.Field name="whitelisted_emails">
-                  {(field) => (
-                    <div className="space-y-2">
-                      <Label htmlFor="whitelisted_emails">
-                        Whitelisted Emails
-                      </Label>
-                      <Textarea
-                        id="whitelisted_emails"
-                        placeholder={"email1@example.com\nemail2@example.com"}
-                        value={field.state.value}
-                        onBlur={field.handleBlur}
-                        onChange={(e) => field.handleChange(e.target.value)}
-                        rows={5}
-                        disabled={readOnly}
-                      />
-                      <p className="text-sm text-muted-foreground">
-                        One email per line. Leave empty for an open group that
-                        accepts all applications.
-                      </p>
-                    </div>
-                  )}
-                </form.Field>
-              </CardContent>
-            </Card>
-
-            {/* Form Actions */}
-            <div className="flex gap-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => navigate({ to: "/groups" })}
-              >
-                {readOnly ? "Back" : "Cancel"}
-              </Button>
-              {!readOnly && (
-                <LoadingButton type="submit" loading={isPending}>
-                  {isEdit ? "Save Changes" : "Create Group"}
-                </LoadingButton>
-              )}
+        {/* Group metadata (edit only) */}
+        {isEdit && (
+          <div className="flex gap-6 text-sm text-muted-foreground">
+            <div>
+              <span className="text-xs uppercase tracking-wider">Slug</span>
+              <p className="font-mono">{defaultValues.slug}</p>
+            </div>
+            <div>
+              <span className="text-xs uppercase tracking-wider">ID</span>
+              <p className="font-mono text-xs">{defaultValues.id}</p>
             </div>
           </div>
+        )}
 
-          {/* Right Column - Preview */}
-          <div className="space-y-6">
-            <form.Subscribe
-              selector={(state) => ({
-                name: state.values.name,
-                description: state.values.description,
-                discount_percentage: state.values.discount_percentage,
-                max_members: state.values.max_members,
-                whitelisted_emails: state.values.whitelisted_emails,
-              })}
-            >
-              {(values) => (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">Preview</CardTitle>
-                    <CardDescription>
-                      How this group will appear
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-start gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                        <Users className="h-5 w-5 text-primary" />
-                      </div>
-                      <div className="flex-1 space-y-1">
-                        <p className="font-medium leading-none">
-                          {values.name || "Group Name"}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          Registration Group
-                        </p>
-                      </div>
-                    </div>
+        <Separator />
 
-                    {values.description && (
-                      <>
-                        <Separator />
-                        <p className="text-sm text-muted-foreground">
-                          {values.description}
-                        </p>
-                      </>
-                    )}
+        {/* Description */}
+        <form.Field name="description">
+          {(field) => (
+            <div className="space-y-2">
+              <p className="px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Description
+              </p>
+              <Textarea
+                placeholder="Group description..."
+                rows={2}
+                value={field.state.value}
+                onBlur={field.handleBlur}
+                onChange={(e) => field.handleChange(e.target.value)}
+                disabled={readOnly}
+              />
+            </div>
+          )}
+        </form.Field>
 
-                    <Separator />
+        <Separator />
 
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Percent className="h-4 w-4" />
-                        <span className="text-sm">Discount</span>
-                      </div>
-                      <span className="font-semibold">
-                        {values.discount_percentage || "0"}%
-                      </span>
-                    </div>
-
-                    <Separator />
-
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Max Members</span>
-                      <span>{values.max_members || "Unlimited"}</span>
-                    </div>
-
-                    <Separator />
-
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">
-                        Access
-                      </span>
-                      <Badge
-                        variant={
-                          values.whitelisted_emails?.trim()
-                            ? "default"
-                            : "secondary"
-                        }
-                      >
-                        {values.whitelisted_emails?.trim()
-                          ? "Restricted"
-                          : "Open"}
-                      </Badge>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </form.Subscribe>
-
-            {isEdit && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Group Details</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Slug</p>
-                    <p className="font-mono text-sm">{defaultValues.slug}</p>
-                  </div>
-                  <Separator />
-                  <div>
-                    <p className="text-sm text-muted-foreground">Group ID</p>
-                    <p className="font-mono text-xs text-muted-foreground">
-                      {defaultValues.id}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
+        {/* Settings */}
+        <InlineSection title="Settings">
+          <form.Field name="discount_percentage">
+            {(field) => (
+              <InlineRow
+                icon={<Percent className="h-4 w-4 text-muted-foreground" />}
+                label="Discount %"
+                description="Discount for group members"
+              >
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  disabled={readOnly}
+                  className="max-w-24 text-sm"
+                />
+              </InlineRow>
             )}
+          </form.Field>
+
+          <form.Field name="max_members">
+            {(field) => (
+              <InlineRow
+                icon={<Users className="h-4 w-4 text-muted-foreground" />}
+                label="Max Members"
+                description="Leave empty for unlimited"
+              >
+                <Input
+                  type="number"
+                  min={1}
+                  placeholder="Unlimited"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  disabled={readOnly}
+                  className="max-w-32 text-sm"
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+        </InlineSection>
+
+        <Separator />
+
+        {/* Communication */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-3 px-1">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+              <MessageSquare className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Welcome Message
+            </p>
           </div>
+          <form.Field name="welcome_message">
+            {(field) => (
+              <Textarea
+                placeholder="Welcome to the group!"
+                value={field.state.value}
+                onBlur={field.handleBlur}
+                onChange={(e) => field.handleChange(e.target.value)}
+                disabled={readOnly}
+              />
+            )}
+          </form.Field>
+        </div>
+
+        <Separator />
+
+        {/* Access Control */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-3 px-1">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+              <Mail className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Whitelisted Emails
+              </p>
+              <p className="text-xs text-muted-foreground">
+                One email per line. Leave empty for an open group.
+              </p>
+            </div>
+          </div>
+          <form.Field name="whitelisted_emails">
+            {(field) => (
+              <Textarea
+                placeholder={"email1@example.com\nemail2@example.com"}
+                value={field.state.value}
+                onBlur={field.handleBlur}
+                onChange={(e) => field.handleChange(e.target.value)}
+                rows={5}
+                disabled={readOnly}
+              />
+            )}
+          </form.Field>
+        </div>
+
+        <Separator />
+
+        {/* Form Actions */}
+        <div className="flex gap-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => navigate({ to: "/groups" })}
+          >
+            {readOnly ? "Back" : "Cancel"}
+          </Button>
+          {!readOnly && (
+            <LoadingButton type="submit" loading={isPending}>
+              {isEdit ? "Save Changes" : "Create Group"}
+            </LoadingButton>
+          )}
         </div>
       </form>
 
       {isEdit && !readOnly && (
-        <DangerZone
-          description="Once you delete this group, all member associations will be removed. This action cannot be undone."
-          onDelete={() => deleteMutation.mutate()}
-          isDeleting={deleteMutation.isPending}
-          confirmText="Delete Group"
-          resourceName={defaultValues.name}
-        />
+        <div className="mx-auto max-w-2xl">
+          <DangerZone
+            description="Once you delete this group, all member associations will be removed. This action cannot be undone."
+            onDelete={() => deleteMutation.mutate()}
+            isDeleting={deleteMutation.isPending}
+            confirmText="Delete Group"
+            resourceName={defaultValues.name}
+            variant="inline"
+          />
+        </div>
       )}
       <UnsavedChangesDialog blocker={blocker} />
     </div>

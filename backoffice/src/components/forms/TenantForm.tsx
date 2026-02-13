@@ -1,7 +1,7 @@
 import { useForm } from "@tanstack/react-form"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
-import { Building2, Mail } from "lucide-react"
+import { Image, Mail, User } from "lucide-react"
 import {
   type TenantCreate,
   type TenantPublic,
@@ -10,18 +10,14 @@ import {
 } from "@/client"
 import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
 import { ImageUpload } from "@/components/ui/image-upload"
+import {
+  HeroInput,
+  InlineRow,
+  InlineSection,
+} from "@/components/ui/inline-form"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { LoadingButton } from "@/components/ui/loading-button"
 import { Separator } from "@/components/ui/separator"
 import useCustomToast from "@/hooks/useCustomToast"
@@ -111,290 +107,187 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
   })
 
   const blocker = useUnsavedChanges(form)
-
   const isPending = createMutation.isPending || updateMutation.isPending
 
   return (
     <div className="space-y-6">
       <form
+        noValidate
         onSubmit={(e) => {
           e.preventDefault()
           form.handleSubmit()
         }}
-        className="space-y-6"
+        className="mx-auto max-w-2xl space-y-6"
       >
-        <div className="grid gap-6 lg:grid-cols-3">
-          {/* Left Column - Form Fields */}
-          <div className="space-y-6 lg:col-span-2">
-            {/* Basic Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle>
-                  {isEdit ? "Basic Information" : "Tenant Details"}
-                </CardTitle>
-                <CardDescription>
-                  {isEdit
-                    ? "Update the tenant's configuration"
-                    : "Enter the basic information for the new tenant"}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {!isEdit && (
-                  <form.Field
-                    name="name"
-                    validators={{
-                      onBlur: ({ value }) =>
-                        !value ? "Name is required" : undefined,
-                    }}
-                  >
-                    {(field) => (
-                      <div className="space-y-2">
-                        <Label htmlFor="name">
-                          Name <span className="text-destructive">*</span>
-                        </Label>
-                        <Input
-                          id="name"
-                          placeholder="Acme Corp"
-                          value={field.state.value}
-                          onBlur={field.handleBlur}
-                          onChange={(e) => field.handleChange(e.target.value)}
-                        />
-                        <FieldError errors={field.state.meta.errors} />
-                      </div>
-                    )}
-                  </form.Field>
-                )}
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <form.Field
-                    name="sender_email"
-                    validators={{
-                      onBlur: ({ value }) => {
-                        if (
-                          value &&
-                          !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
-                        ) {
-                          return "Invalid email address"
-                        }
-                        return undefined
-                      },
-                    }}
-                  >
-                    {(field) => (
-                      <div className="space-y-2">
-                        <Label htmlFor="sender_email">Sender Email</Label>
-                        <Input
-                          id="sender_email"
-                          placeholder="noreply@acme.com"
-                          type="email"
-                          value={field.state.value}
-                          onBlur={field.handleBlur}
-                          onChange={(e) => field.handleChange(e.target.value)}
-                        />
-                        <p className="text-sm text-muted-foreground">
-                          Email for notifications
-                        </p>
-                        <FieldError errors={field.state.meta.errors} />
-                      </div>
-                    )}
-                  </form.Field>
-
-                  <form.Field name="sender_name">
-                    {(field) => (
-                      <div className="space-y-2">
-                        <Label htmlFor="sender_name">Sender Name</Label>
-                        <Input
-                          id="sender_name"
-                          placeholder="Acme Events"
-                          value={field.state.value}
-                          onBlur={field.handleBlur}
-                          onChange={(e) => field.handleChange(e.target.value)}
-                        />
-                        <p className="text-sm text-muted-foreground">
-                          Display name for emails
-                        </p>
-                      </div>
-                    )}
-                  </form.Field>
+        {/* Hero: Name */}
+        <div className="space-y-3">
+          {isEdit ? (
+            <h2 className="text-3xl font-semibold">{defaultValues.name}</h2>
+          ) : (
+            <form.Field
+              name="name"
+              validators={{
+                onBlur: ({ value }) =>
+                  !value ? "Name is required" : undefined,
+              }}
+            >
+              {(field) => (
+                <div>
+                  <HeroInput
+                    placeholder="Tenant Name"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                  />
+                  <FieldError errors={field.state.meta.errors} />
                 </div>
-              </CardContent>
-            </Card>
+              )}
+            </form.Field>
+          )}
+        </div>
 
-            {/* Branding */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Branding</CardTitle>
-                <CardDescription>
-                  Upload images for tenant branding
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <form.Field name="image_url">
-                  {(field) => (
-                    <div className="space-y-2">
-                      <Label>Cover Image</Label>
-                      <ImageUpload
-                        value={field.state.value || null}
-                        onChange={(url) => field.handleChange(url ?? "")}
-                      />
-                      <p className="text-sm text-muted-foreground">
-                        Main image for tenant branding
-                      </p>
-                    </div>
-                  )}
-                </form.Field>
-
-                <form.Field name="icon_url">
-                  {(field) => (
-                    <div className="space-y-2">
-                      <Label>Icon</Label>
-                      <ImageUpload
-                        value={field.state.value || null}
-                        onChange={(url) => field.handleChange(url ?? "")}
-                      />
-                      <p className="text-sm text-muted-foreground">
-                        Small icon for navigation
-                      </p>
-                    </div>
-                  )}
-                </form.Field>
-              </CardContent>
-            </Card>
-
-            {/* Form Actions */}
-            <div className="flex gap-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => navigate({ to: "/tenants" })}
-              >
-                Cancel
-              </Button>
-              <LoadingButton type="submit" loading={isPending}>
-                {isEdit ? "Save Changes" : "Create Tenant"}
-              </LoadingButton>
+        {/* Tenant metadata (edit only) */}
+        {isEdit && (
+          <div className="flex gap-6 text-sm text-muted-foreground">
+            <div>
+              <span className="text-xs uppercase tracking-wider">ID</span>
+              <p className="font-mono text-xs">{defaultValues.id}</p>
             </div>
           </div>
+        )}
 
-          {/* Right Column - Preview */}
-          <div className="space-y-6">
-            <form.Subscribe
-              selector={(state) => ({
-                name: state.values.name,
-                sender_email: state.values.sender_email,
-                sender_name: state.values.sender_name,
-                icon_url: state.values.icon_url,
-              })}
-            >
-              {(values) => (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">Preview</CardTitle>
-                    <CardDescription>
-                      How this tenant will appear
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-start gap-3">
-                      {values.icon_url ? (
-                        <img
-                          src={values.icon_url}
-                          alt="Icon"
-                          className="h-10 w-10 rounded-lg object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                          <Building2 className="h-5 w-5 text-primary" />
-                        </div>
-                      )}
-                      <div className="flex-1 space-y-1">
-                        <p className="font-medium leading-none">
-                          {isEdit
-                            ? defaultValues?.name
-                            : values.name || "Tenant Name"}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          Organization
-                        </p>
-                      </div>
-                    </div>
+        <Separator />
 
-                    {(values.sender_email || values.sender_name) && (
-                      <>
-                        <Separator />
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2 text-muted-foreground">
-                            <Mail className="h-4 w-4" />
-                            <span className="text-sm">Email Settings</span>
-                          </div>
-                          {values.sender_name && (
-                            <p className="text-sm">
-                              From: {values.sender_name}
-                            </p>
-                          )}
-                          {values.sender_email && (
-                            <p className="text-sm text-muted-foreground">
-                              {values.sender_email}
-                            </p>
-                          )}
-                        </div>
-                      </>
-                    )}
+        {/* Email Settings */}
+        <InlineSection title="Email Settings">
+          <form.Field
+            name="sender_email"
+            validators={{
+              onBlur: ({ value }) => {
+                if (value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+                  return "Invalid email address"
+                }
+                return undefined
+              },
+            }}
+          >
+            {(field) => (
+              <div>
+                <InlineRow
+                  icon={<Mail className="h-4 w-4 text-muted-foreground" />}
+                  label="Sender Email"
+                  description="Email for notifications"
+                >
+                  <Input
+                    placeholder="noreply@acme.com"
+                    type="email"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    className="max-w-xs text-sm"
+                  />
+                </InlineRow>
+                <FieldError errors={field.state.meta.errors} />
+              </div>
+            )}
+          </form.Field>
 
-                    {isEdit && (
-                      <>
-                        <Separator />
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">
-                            Status
-                          </span>
-                          <Badge
-                            variant={
-                              defaultValues?.deleted ? "destructive" : "default"
-                            }
-                          >
-                            {defaultValues?.deleted ? "Deleted" : "Active"}
-                          </Badge>
-                        </div>
-                      </>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
-            </form.Subscribe>
+          <form.Field name="sender_name">
+            {(field) => (
+              <InlineRow
+                icon={<User className="h-4 w-4 text-muted-foreground" />}
+                label="Sender Name"
+                description="Display name for emails"
+              >
+                <Input
+                  placeholder="Acme Events"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  className="max-w-xs text-sm"
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+        </InlineSection>
 
-            {isEdit && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Tenant Details</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Name</p>
-                    <p className="font-medium">{defaultValues.name}</p>
+        <Separator />
+
+        {/* Branding */}
+        <InlineSection title="Branding">
+          <form.Field name="image_url">
+            {(field) => (
+              <div className="space-y-2 py-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+                    <Image className="h-4 w-4 text-muted-foreground" />
                   </div>
-                  <Separator />
                   <div>
-                    <p className="text-sm text-muted-foreground">Tenant ID</p>
-                    <p className="font-mono text-xs text-muted-foreground">
-                      {defaultValues.id}
+                    <p className="text-sm font-medium">Cover Image</p>
+                    <p className="text-xs text-muted-foreground">
+                      Main image for tenant branding
                     </p>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+                <ImageUpload
+                  value={field.state.value || null}
+                  onChange={(url) => field.handleChange(url ?? "")}
+                />
+              </div>
             )}
-          </div>
+          </form.Field>
+
+          <form.Field name="icon_url">
+            {(field) => (
+              <div className="space-y-2 py-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+                    <Image className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Icon</p>
+                    <p className="text-xs text-muted-foreground">
+                      Small icon for navigation
+                    </p>
+                  </div>
+                </div>
+                <ImageUpload
+                  value={field.state.value || null}
+                  onChange={(url) => field.handleChange(url ?? "")}
+                />
+              </div>
+            )}
+          </form.Field>
+        </InlineSection>
+
+        <Separator />
+
+        {/* Form Actions */}
+        <div className="flex gap-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => navigate({ to: "/tenants" })}
+          >
+            Cancel
+          </Button>
+          <LoadingButton type="submit" loading={isPending}>
+            {isEdit ? "Save Changes" : "Create Tenant"}
+          </LoadingButton>
         </div>
       </form>
 
       {isEdit && (
-        <DangerZone
-          description="Once you delete this tenant, all associated data will be permanently removed. This action cannot be undone."
-          onDelete={() => deleteMutation.mutate()}
-          isDeleting={deleteMutation.isPending}
-          confirmText="Delete Tenant"
-          resourceName={defaultValues.name}
-        />
+        <div className="mx-auto max-w-2xl">
+          <DangerZone
+            description="Once you delete this tenant, all associated data will be permanently removed. This action cannot be undone."
+            onDelete={() => deleteMutation.mutate()}
+            isDeleting={deleteMutation.isPending}
+            confirmText="Delete Tenant"
+            resourceName={defaultValues.name}
+            variant="inline"
+          />
+        </div>
       )}
       <UnsavedChangesDialog blocker={blocker} />
     </div>
