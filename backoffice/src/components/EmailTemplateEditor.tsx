@@ -1,0 +1,765 @@
+import Editor, { type OnMount } from "@monaco-editor/react"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useBlocker } from "@tanstack/react-router"
+import {
+  Braces,
+  ChevronRight,
+  Eye,
+  FileCode,
+  Loader2,
+  RotateCcw,
+  Save,
+  Send,
+  Trash2,
+} from "lucide-react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import type {
+  EmailTemplatePublic,
+  PopupPublic,
+  TemplateTypeInfo,
+  TemplateVariable,
+} from "@/client"
+
+import { EmailTemplatesService, PopupsService } from "@/client"
+import { useTheme } from "@/components/theme-provider"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { LoadingButton } from "@/components/ui/loading-button"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable"
+import { Switch } from "@/components/ui/switch"
+import { Textarea } from "@/components/ui/textarea"
+import useCustomToast from "@/hooks/useCustomToast"
+import { createErrorHandler } from "@/utils"
+
+interface EmailTemplateEditorProps {
+  templateType: string
+  popupId: string
+  existingTemplate?: EmailTemplatePublic
+  typeInfo: TemplateTypeInfo
+  onSave: () => void
+}
+
+export function EmailTemplateEditor({
+  templateType,
+  popupId,
+  existingTemplate,
+  typeInfo,
+  onSave,
+}: EmailTemplateEditorProps) {
+  const queryClient = useQueryClient()
+  const { showSuccessToast, showErrorToast } = useCustomToast()
+  const { resolvedTheme } = useTheme()
+
+  const editorRef = useRef<Parameters<OnMount>[0] | null>(null)
+  const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const subjectInputRef = useRef<HTMLInputElement>(null)
+  const lastFocusedRef = useRef<"editor" | "subject">("editor")
+
+  const [htmlContent, setHtmlContent] = useState(
+    existingTemplate?.html_content ?? "",
+  )
+  const [subject, setSubject] = useState(existingTemplate?.subject ?? "")
+  const [isActive, setIsActive] = useState(existingTemplate?.is_active ?? true)
+  const [previewHtml, setPreviewHtml] = useState("")
+  const [sendTestOpen, setSendTestOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [loadDefaultConfirmOpen, setLoadDefaultConfirmOpen] = useState(false)
+  const [testEmail, setTestEmail] = useState("")
+  const [testVariablesJson, setTestVariablesJson] = useState("")
+  const [showPreview, setShowPreview] = useState(true)
+
+  const isEdit = !!existingTemplate
+
+  // =========================================================================
+  // Queries
+  // =========================================================================
+
+  const { data: defaultTemplate } = useQuery({
+    queryKey: ["email-template-default", templateType],
+    queryFn: () =>
+      EmailTemplatesService.getDefaultTemplate({
+        templateType: templateType,
+      }),
+  })
+
+  const { data: popupData } = useQuery({
+    queryKey: ["popup", popupId],
+    queryFn: () => PopupsService.getPopup({ popupId }),
+  })
+
+  // =========================================================================
+  // Dirty state tracking
+  // =========================================================================
+
+  const initialHtmlRef = useRef(existingTemplate?.html_content ?? "")
+  const initialSubjectRef = useRef(existingTemplate?.subject ?? "")
+  const initialIsActiveRef = useRef(existingTemplate?.is_active ?? true)
+
+  const isDirty =
+    htmlContent !== initialHtmlRef.current ||
+    subject !== initialSubjectRef.current ||
+    isActive !== initialIsActiveRef.current
+
+  useEffect(() => {
+    if (
+      !existingTemplate &&
+      defaultTemplate?.html_content &&
+      !initialHtmlRef.current
+    ) {
+      initialHtmlRef.current = defaultTemplate.html_content
+    }
+  }, [defaultTemplate, existingTemplate])
+
+  const blocker = useBlocker({
+    shouldBlockFn: () =>
+      htmlContent !== initialHtmlRef.current ||
+      subject !== initialSubjectRef.current ||
+      isActive !== initialIsActiveRef.current,
+    enableBeforeUnload: () => isDirty,
+    disabled: !isDirty,
+    withResolver: true,
+  })
+
+  useEffect(() => {
+    if (!isDirty) return
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+    }
+    window.addEventListener("beforeunload", handler)
+    return () => window.removeEventListener("beforeunload", handler)
+  }, [isDirty])
+
+  const resetDirtyState = () => {
+    initialHtmlRef.current = htmlContent
+    initialSubjectRef.current = subject
+    initialIsActiveRef.current = isActive
+  }
+
+  // =========================================================================
+  // Effects
+  // =========================================================================
+
+  const fetchPreview = useCallback(
+    (content: string, subjectValue: string) => {
+      if (previewTimerRef.current) clearTimeout(previewTimerRef.current)
+      previewTimerRef.current = setTimeout(async () => {
+        if (!content.trim()) {
+          setPreviewHtml("")
+          return
+        }
+        try {
+          const result = await EmailTemplatesService.previewTemplate({
+            requestBody: {
+              html_content: content,
+              template_type: templateType,
+              subject: subjectValue || undefined,
+              preview_variables: getPopupPreviewVariables(popupData),
+            },
+          })
+          setPreviewHtml(result.rendered_html)
+        } catch {
+          // Preview errors are non-critical
+        }
+      }, 500)
+    },
+    [templateType, popupData],
+  )
+
+  useEffect(() => {
+    if (htmlContent) {
+      fetchPreview(htmlContent, subject)
+    }
+    return () => {
+      if (previewTimerRef.current) clearTimeout(previewTimerRef.current)
+    }
+  }, [htmlContent, subject, fetchPreview])
+
+  useEffect(() => {
+    if (!existingTemplate && defaultTemplate?.html_content && !htmlContent) {
+      setHtmlContent(defaultTemplate.html_content)
+    }
+  }, [defaultTemplate, existingTemplate, htmlContent])
+
+  // =========================================================================
+  // Editor actions
+  // =========================================================================
+
+  const handleEditorMount: OnMount = (editor) => {
+    editorRef.current = editor
+    editor.onDidFocusEditorText(() => {
+      lastFocusedRef.current = "editor"
+    })
+    setTimeout(() => {
+      editor.getAction("editor.action.formatDocument")?.run()
+    }, 300)
+  }
+
+  const insertVariable = (varName: string) => {
+    const text = `{{ ${varName} }}`
+
+    if (lastFocusedRef.current === "subject") {
+      const input = subjectInputRef.current
+      if (!input) return
+      const start = input.selectionStart ?? input.value.length
+      const end = input.selectionEnd ?? input.value.length
+      const newValue =
+        input.value.substring(0, start) + text + input.value.substring(end)
+      setSubject(newValue)
+      setTimeout(() => {
+        input.selectionStart = input.selectionEnd = start + text.length
+        input.focus()
+      }, 0)
+      return
+    }
+
+    const editor = editorRef.current
+    if (!editor) return
+    editor.trigger("keyboard", "type", { text })
+    editor.focus()
+  }
+
+  const loadDefault = () => {
+    if (defaultTemplate?.html_content) {
+      setHtmlContent(defaultTemplate.html_content)
+      setTimeout(() => {
+        editorRef.current?.getAction("editor.action.formatDocument")?.run()
+      }, 100)
+    }
+  }
+
+  const handleLoadDefault = () => {
+    if (isDirty) {
+      setLoadDefaultConfirmOpen(true)
+    } else {
+      loadDefault()
+    }
+  }
+
+  const confirmLoadDefault = () => {
+    loadDefault()
+    setLoadDefaultConfirmOpen(false)
+  }
+
+  // =========================================================================
+  // Send Test helpers
+  // =========================================================================
+
+  const openSendTest = () => {
+    const popupVars = getPopupPreviewVariables(popupData)
+    const placeholders: Record<string, string> = {}
+    for (const v of typeInfo.variables) {
+      if (!(v.name in popupVars)) {
+        placeholders[v.name] = `{{${v.name}}}`
+      }
+    }
+    setTestVariablesJson(
+      JSON.stringify({ ...placeholders, ...popupVars }, null, 2),
+    )
+    setSendTestOpen(true)
+  }
+
+  // =========================================================================
+  // Mutations
+  // =========================================================================
+
+  const createMutation = useMutation({
+    mutationFn: (data: {
+      html_content: string
+      subject?: string
+      is_active: boolean
+    }) =>
+      EmailTemplatesService.createEmailTemplate({
+        requestBody: {
+          popup_id: popupId,
+          template_type: templateType,
+          html_content: data.html_content,
+          subject: data.subject,
+          is_active: data.is_active,
+        },
+      }),
+    onSuccess: () => {
+      showSuccessToast("Template created")
+      resetDirtyState()
+      queryClient.invalidateQueries({ queryKey: ["email-templates"] })
+      onSave()
+    },
+    onError: createErrorHandler(showErrorToast),
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: (data: {
+      html_content?: string
+      subject?: string
+      is_active?: boolean
+    }) =>
+      EmailTemplatesService.updateEmailTemplate({
+        templateId: existingTemplate!.id,
+        requestBody: data,
+      }),
+    onSuccess: () => {
+      showSuccessToast("Template saved")
+      resetDirtyState()
+      queryClient.invalidateQueries({ queryKey: ["email-templates"] })
+      onSave()
+    },
+    onError: createErrorHandler(showErrorToast),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: () =>
+      EmailTemplatesService.deleteEmailTemplate({
+        templateId: existingTemplate!.id,
+      }),
+    onSuccess: () => {
+      showSuccessToast("Custom template deleted, reverting to default")
+      resetDirtyState()
+      queryClient.invalidateQueries({ queryKey: ["email-templates"] })
+      setDeleteOpen(false)
+      onSave()
+    },
+    onError: createErrorHandler(showErrorToast),
+  })
+
+  const sendTestMutation = useMutation({
+    mutationFn: ({
+      email,
+      customVariables,
+    }: {
+      email: string
+      customVariables?: Record<string, unknown>
+    }) =>
+      EmailTemplatesService.sendTestEmail({
+        requestBody: {
+          html_content: htmlContent,
+          template_type: templateType,
+          subject: subject || undefined,
+          to_email: email,
+          custom_variables: customVariables,
+        },
+      }),
+    onSuccess: () => {
+      showSuccessToast("Test email sent!")
+      setSendTestOpen(false)
+      setTestEmail("")
+    },
+    onError: createErrorHandler(showErrorToast),
+  })
+
+  const handleSave = () => {
+    if (isEdit) {
+      updateMutation.mutate({
+        html_content: htmlContent,
+        subject: subject || undefined,
+        is_active: isActive,
+      })
+    } else {
+      createMutation.mutate({
+        html_content: htmlContent,
+        subject: subject || undefined,
+        is_active: isActive,
+      })
+    }
+  }
+
+  const handleSendTest = () => {
+    try {
+      const variables = JSON.parse(testVariablesJson) as Record<string, unknown>
+      sendTestMutation.mutate({ email: testEmail, customVariables: variables })
+    } catch {
+      showErrorToast("Invalid JSON in test variables")
+    }
+  }
+
+  const isSaving = createMutation.isPending || updateMutation.isPending
+
+  return (
+    <div className="flex h-[calc(100vh-180px)] flex-col gap-2">
+      {/* Single toolbar: subject + all actions */}
+      <div className="flex items-center gap-2">
+        <Input
+          ref={subjectInputRef}
+          placeholder={typeInfo.default_subject}
+          value={subject}
+          onChange={(e) => setSubject(e.target.value)}
+          onFocus={() => {
+            lastFocusedRef.current = "subject"
+          }}
+          className="max-w-sm"
+          aria-label="Subject line"
+        />
+        <div className="flex items-center gap-1.5">
+          <Switch
+            id="is-active"
+            checked={isActive}
+            onCheckedChange={setIsActive}
+          />
+          <Label htmlFor="is-active" className="whitespace-nowrap text-xs">
+            Active
+          </Label>
+        </div>
+
+        <div className="mx-0.5 h-5 w-px bg-border" />
+
+        <Button variant="outline" size="sm" onClick={handleLoadDefault}>
+          <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+          Default
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowPreview(!showPreview)}
+        >
+          {showPreview ? (
+            <>
+              <FileCode className="mr-1.5 h-3.5 w-3.5" />
+              Code
+            </>
+          ) : (
+            <>
+              <Eye className="mr-1.5 h-3.5 w-3.5" />
+              Preview
+            </>
+          )}
+        </Button>
+
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm">
+              <Braces className="mr-1.5 h-3.5 w-3.5" />
+              Variables
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-72 p-3" align="start">
+            <p className="mb-2 text-xs font-medium text-muted-foreground">
+              Click to insert at cursor
+            </p>
+            <VariableGroups
+              variables={typeInfo.variables}
+              popupData={popupData}
+              onInsert={insertVariable}
+            />
+          </PopoverContent>
+        </Popover>
+
+        <div className="flex-1" />
+
+        {isEdit && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setDeleteOpen(true)}
+          >
+            <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+            Delete
+          </Button>
+        )}
+        <Button variant="outline" size="sm" onClick={openSendTest}>
+          <Send className="mr-1.5 h-3.5 w-3.5" />
+          Test
+        </Button>
+        <LoadingButton size="sm" loading={isSaving} onClick={handleSave}>
+          <Save className="mr-1.5 h-3.5 w-3.5" />
+          Save
+        </LoadingButton>
+      </div>
+
+      {/* Editor + Preview */}
+      <div className="min-h-0 flex-1 rounded-md border">
+        {showPreview ? (
+          <ResizablePanelGroup direction="horizontal">
+            <ResizablePanel defaultSize={50} minSize={30}>
+              <Editor
+                height="100%"
+                defaultLanguage="html"
+                value={htmlContent}
+                onChange={(value) => setHtmlContent(value ?? "")}
+                onMount={handleEditorMount}
+                theme={resolvedTheme === "dark" ? "vs-dark" : "light"}
+                options={{
+                  minimap: { enabled: false },
+                  wordWrap: "on",
+                  fontSize: 13,
+                  lineNumbers: "on",
+                  scrollBeyondLastLine: false,
+                  automaticLayout: true,
+                }}
+              />
+            </ResizablePanel>
+            <ResizableHandle withHandle />
+            <ResizablePanel defaultSize={50} minSize={30}>
+              <div className="h-full overflow-auto bg-white">
+                {previewHtml ? (
+                  <iframe
+                    srcDoc={previewHtml}
+                    title="Email Preview"
+                    className="h-full w-full border-0"
+                    sandbox=""
+                  />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-muted-foreground">
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Loading preview...
+                  </div>
+                )}
+              </div>
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        ) : (
+          <Editor
+            height="100%"
+            defaultLanguage="html"
+            value={htmlContent}
+            onChange={(value) => setHtmlContent(value ?? "")}
+            onMount={handleEditorMount}
+            theme={resolvedTheme === "dark" ? "vs-dark" : "light"}
+            options={{
+              minimap: { enabled: false },
+              wordWrap: "on",
+              fontSize: 13,
+              lineNumbers: "on",
+              scrollBeyondLastLine: false,
+              automaticLayout: true,
+            }}
+          />
+        )}
+      </div>
+
+      {/* Send Test Dialog */}
+      <Dialog open={sendTestOpen} onOpenChange={setSendTestOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Send Test Email</DialogTitle>
+            <DialogDescription>
+              Send a test email to verify the template. Edit the variables below
+              to customize the test data.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-4">
+            <div>
+              <Label htmlFor="test-email">Email Address</Label>
+              <Input
+                id="test-email"
+                type="email"
+                placeholder="you@example.com"
+                value={testEmail}
+                onChange={(e) => setTestEmail(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="test-variables">Test Variables (JSON)</Label>
+              <Textarea
+                id="test-variables"
+                className="mt-1.5 min-h-48 font-mono text-xs"
+                value={testVariablesJson}
+                onChange={(e) => setTestVariablesJson(e.target.value)}
+                spellCheck={false}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
+            <LoadingButton
+              loading={sendTestMutation.isPending}
+              disabled={!testEmail}
+              onClick={handleSendTest}
+            >
+              <Send className="mr-2 h-4 w-4" />
+              Send
+            </LoadingButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Load Default Confirmation Dialog */}
+      <Dialog
+        open={loadDefaultConfirmOpen}
+        onOpenChange={setLoadDefaultConfirmOpen}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Load Default Template</DialogTitle>
+            <DialogDescription>
+              You have unsaved changes. Loading the default template will
+              discard your current changes. Are you sure?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setLoadDefaultConfirmOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmLoadDefault}>
+              Discard & Load Default
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Custom Template</DialogTitle>
+            <DialogDescription>
+              This will delete the custom template and revert to the default.
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline" disabled={deleteMutation.isPending}>
+                Cancel
+              </Button>
+            </DialogClose>
+            <LoadingButton
+              variant="destructive"
+              loading={deleteMutation.isPending}
+              onClick={() => deleteMutation.mutate()}
+            >
+              Delete
+            </LoadingButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Unsaved Changes Navigation Dialog */}
+      {blocker.status === "blocked" && (
+        <Dialog open onOpenChange={(open) => !open && blocker.reset()}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Unsaved changes</DialogTitle>
+              <DialogDescription>
+                You have unsaved changes that will be lost if you leave this
+                page. Are you sure you want to continue?
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={blocker.reset}>
+                Stay on page
+              </Button>
+              <Button variant="destructive" onClick={blocker.proceed}>
+                Discard changes
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+    </div>
+  )
+}
+
+// =============================================================================
+// Variable groups popover content
+// =============================================================================
+
+/** Map popup variable names to their corresponding PopupPublic field. */
+const POPUP_FIELD_MAP: Record<string, keyof PopupPublic> = {
+  popup_name: "name",
+  popup_icon_url: "icon_url",
+  popup_web_url: "web_url",
+  popup_blog_url: "blog_url",
+  popup_twitter_url: "twitter_url",
+  popup_start_date: "start_date",
+  popup_end_date: "end_date",
+}
+
+/** Extract real popup data as preview variables (popup_name, popup_start_date, etc.). */
+function getPopupPreviewVariables(
+  popup?: PopupPublic,
+): Record<string, unknown> {
+  if (!popup) return {}
+  const vars: Record<string, unknown> = {}
+  for (const [varName, field] of Object.entries(POPUP_FIELD_MAP)) {
+    const value = popup[field]
+    if (value == null) continue
+    // Format date fields for display
+    if (field === "start_date" || field === "end_date") {
+      vars[varName] = new Date(value as string).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      })
+    } else {
+      vars[varName] = value
+    }
+  }
+  return vars
+}
+
+function VariableGroups({
+  variables,
+  popupData,
+  onInsert,
+}: {
+  variables: Array<TemplateVariable>
+  popupData?: PopupPublic
+  onInsert: (name: string) => void
+}) {
+  const grouped = new Map<string, Array<TemplateVariable>>()
+  for (const v of variables) {
+    // Filter Event variables without content in the popup
+    const popupField = POPUP_FIELD_MAP[v.name]
+    if (popupField && popupData && !popupData[popupField]) continue
+
+    const group = v.group ?? "General"
+    if (!grouped.has(group)) grouped.set(group, [])
+    grouped.get(group)!.push(v)
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      {[...grouped.entries()].map(([group, vars]) => (
+        <Collapsible key={group} defaultOpen>
+          <CollapsibleTrigger className="flex w-full items-center gap-1 rounded-sm px-1 py-0.5 text-xs font-semibold text-muted-foreground hover:bg-accent/50 [&[data-state=open]>svg]:rotate-90">
+            <ChevronRight className="h-3 w-3 transition-transform" />
+            {group}
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="flex flex-wrap gap-1.5 py-1 pl-4">
+              {vars.map((v) => (
+                <Badge
+                  key={v.name}
+                  variant="outline"
+                  className="cursor-pointer hover:bg-accent"
+                  onClick={() => onInsert(v.name)}
+                  title={`${v.description}\n{{ ${v.name} }}`}
+                >
+                  {v.label ?? v.name}
+                </Badge>
+              ))}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      ))}
+    </div>
+  )
+}

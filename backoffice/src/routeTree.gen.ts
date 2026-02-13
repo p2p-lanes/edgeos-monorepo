@@ -21,6 +21,7 @@ import { Route as LayoutPopupsIndexRouteImport } from './routes/_layout/popups/i
 import { Route as LayoutHumansIndexRouteImport } from './routes/_layout/humans/index'
 import { Route as LayoutGroupsIndexRouteImport } from './routes/_layout/groups/index'
 import { Route as LayoutFormBuilderIndexRouteImport } from './routes/_layout/form-builder/index'
+import { Route as LayoutEmailTemplatesIndexRouteImport } from './routes/_layout/email-templates/index'
 import { Route as LayoutCouponsIndexRouteImport } from './routes/_layout/coupons/index'
 import { Route as LayoutApplicationsIndexRouteImport } from './routes/_layout/applications/index'
 import { Route as LayoutAdminIndexRouteImport } from './routes/_layout/admin/index'
@@ -41,6 +42,7 @@ import { Route as LayoutPopupsIdEditRouteImport } from './routes/_layout/popups/
 import { Route as LayoutHumansIdEditRouteImport } from './routes/_layout/humans/$id.edit'
 import { Route as LayoutGroupsIdEditRouteImport } from './routes/_layout/groups/$id.edit'
 import { Route as LayoutFormBuilderIdEditRouteImport } from './routes/_layout/form-builder/$id.edit'
+import { Route as LayoutEmailTemplatesTypeEditRouteImport } from './routes/_layout/email-templates/$type.edit'
 import { Route as LayoutCouponsIdEditRouteImport } from './routes/_layout/coupons/$id.edit'
 import { Route as LayoutAdminIdEditRouteImport } from './routes/_layout/admin/$id.edit'
 
@@ -103,6 +105,12 @@ const LayoutFormBuilderIndexRoute = LayoutFormBuilderIndexRouteImport.update({
   path: '/form-builder/',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutEmailTemplatesIndexRoute =
+  LayoutEmailTemplatesIndexRouteImport.update({
+    id: '/email-templates/',
+    path: '/email-templates/',
+    getParentRoute: () => LayoutRoute,
+  } as any)
 const LayoutCouponsIndexRoute = LayoutCouponsIndexRouteImport.update({
   id: '/coupons/',
   path: '/coupons/',
@@ -204,6 +212,12 @@ const LayoutFormBuilderIdEditRoute = LayoutFormBuilderIdEditRouteImport.update({
   path: '/form-builder/$id/edit',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutEmailTemplatesTypeEditRoute =
+  LayoutEmailTemplatesTypeEditRouteImport.update({
+    id: '/email-templates/$type/edit',
+    path: '/email-templates/$type/edit',
+    getParentRoute: () => LayoutRoute,
+  } as any)
 const LayoutCouponsIdEditRoute = LayoutCouponsIdEditRouteImport.update({
   id: '/coupons/$id/edit',
   path: '/coupons/$id/edit',
@@ -235,6 +249,7 @@ export interface FileRoutesByFullPath {
   '/admin/': typeof LayoutAdminIndexRoute
   '/applications/': typeof LayoutApplicationsIndexRoute
   '/coupons/': typeof LayoutCouponsIndexRoute
+  '/email-templates/': typeof LayoutEmailTemplatesIndexRoute
   '/form-builder/': typeof LayoutFormBuilderIndexRoute
   '/groups/': typeof LayoutGroupsIndexRoute
   '/humans/': typeof LayoutHumansIndexRoute
@@ -243,6 +258,7 @@ export interface FileRoutesByFullPath {
   '/tenants/': typeof LayoutTenantsIndexRoute
   '/admin/$id/edit': typeof LayoutAdminIdEditRoute
   '/coupons/$id/edit': typeof LayoutCouponsIdEditRoute
+  '/email-templates/$type/edit': typeof LayoutEmailTemplatesTypeEditRoute
   '/form-builder/$id/edit': typeof LayoutFormBuilderIdEditRoute
   '/groups/$id/edit': typeof LayoutGroupsIdEditRoute
   '/humans/$id/edit': typeof LayoutHumansIdEditRoute
@@ -270,6 +286,7 @@ export interface FileRoutesByTo {
   '/admin': typeof LayoutAdminIndexRoute
   '/applications': typeof LayoutApplicationsIndexRoute
   '/coupons': typeof LayoutCouponsIndexRoute
+  '/email-templates': typeof LayoutEmailTemplatesIndexRoute
   '/form-builder': typeof LayoutFormBuilderIndexRoute
   '/groups': typeof LayoutGroupsIndexRoute
   '/humans': typeof LayoutHumansIndexRoute
@@ -278,6 +295,7 @@ export interface FileRoutesByTo {
   '/tenants': typeof LayoutTenantsIndexRoute
   '/admin/$id/edit': typeof LayoutAdminIdEditRoute
   '/coupons/$id/edit': typeof LayoutCouponsIdEditRoute
+  '/email-templates/$type/edit': typeof LayoutEmailTemplatesTypeEditRoute
   '/form-builder/$id/edit': typeof LayoutFormBuilderIdEditRoute
   '/groups/$id/edit': typeof LayoutGroupsIdEditRoute
   '/humans/$id/edit': typeof LayoutHumansIdEditRoute
@@ -307,6 +325,7 @@ export interface FileRoutesById {
   '/_layout/admin/': typeof LayoutAdminIndexRoute
   '/_layout/applications/': typeof LayoutApplicationsIndexRoute
   '/_layout/coupons/': typeof LayoutCouponsIndexRoute
+  '/_layout/email-templates/': typeof LayoutEmailTemplatesIndexRoute
   '/_layout/form-builder/': typeof LayoutFormBuilderIndexRoute
   '/_layout/groups/': typeof LayoutGroupsIndexRoute
   '/_layout/humans/': typeof LayoutHumansIndexRoute
@@ -315,6 +334,7 @@ export interface FileRoutesById {
   '/_layout/tenants/': typeof LayoutTenantsIndexRoute
   '/_layout/admin/$id/edit': typeof LayoutAdminIdEditRoute
   '/_layout/coupons/$id/edit': typeof LayoutCouponsIdEditRoute
+  '/_layout/email-templates/$type/edit': typeof LayoutEmailTemplatesTypeEditRoute
   '/_layout/form-builder/$id/edit': typeof LayoutFormBuilderIdEditRoute
   '/_layout/groups/$id/edit': typeof LayoutGroupsIdEditRoute
   '/_layout/humans/$id/edit': typeof LayoutHumansIdEditRoute
@@ -344,6 +364,7 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/applications/'
     | '/coupons/'
+    | '/email-templates/'
     | '/form-builder/'
     | '/groups/'
     | '/humans/'
@@ -352,6 +373,7 @@ export interface FileRouteTypes {
     | '/tenants/'
     | '/admin/$id/edit'
     | '/coupons/$id/edit'
+    | '/email-templates/$type/edit'
     | '/form-builder/$id/edit'
     | '/groups/$id/edit'
     | '/humans/$id/edit'
@@ -379,6 +401,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/applications'
     | '/coupons'
+    | '/email-templates'
     | '/form-builder'
     | '/groups'
     | '/humans'
@@ -387,6 +410,7 @@ export interface FileRouteTypes {
     | '/tenants'
     | '/admin/$id/edit'
     | '/coupons/$id/edit'
+    | '/email-templates/$type/edit'
     | '/form-builder/$id/edit'
     | '/groups/$id/edit'
     | '/humans/$id/edit'
@@ -415,6 +439,7 @@ export interface FileRouteTypes {
     | '/_layout/admin/'
     | '/_layout/applications/'
     | '/_layout/coupons/'
+    | '/_layout/email-templates/'
     | '/_layout/form-builder/'
     | '/_layout/groups/'
     | '/_layout/humans/'
@@ -423,6 +448,7 @@ export interface FileRouteTypes {
     | '/_layout/tenants/'
     | '/_layout/admin/$id/edit'
     | '/_layout/coupons/$id/edit'
+    | '/_layout/email-templates/$type/edit'
     | '/_layout/form-builder/$id/edit'
     | '/_layout/groups/$id/edit'
     | '/_layout/humans/$id/edit'
@@ -520,6 +546,13 @@ declare module '@tanstack/react-router' {
       path: '/form-builder'
       fullPath: '/form-builder/'
       preLoaderRoute: typeof LayoutFormBuilderIndexRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/email-templates/': {
+      id: '/_layout/email-templates/'
+      path: '/email-templates'
+      fullPath: '/email-templates/'
+      preLoaderRoute: typeof LayoutEmailTemplatesIndexRouteImport
       parentRoute: typeof LayoutRoute
     }
     '/_layout/coupons/': {
@@ -662,6 +695,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutFormBuilderIdEditRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/email-templates/$type/edit': {
+      id: '/_layout/email-templates/$type/edit'
+      path: '/email-templates/$type/edit'
+      fullPath: '/email-templates/$type/edit'
+      preLoaderRoute: typeof LayoutEmailTemplatesTypeEditRouteImport
+      parentRoute: typeof LayoutRoute
+    }
     '/_layout/coupons/$id/edit': {
       id: '/_layout/coupons/$id/edit'
       path: '/coupons/$id/edit'
@@ -698,6 +738,7 @@ interface LayoutRouteChildren {
   LayoutAdminIndexRoute: typeof LayoutAdminIndexRoute
   LayoutApplicationsIndexRoute: typeof LayoutApplicationsIndexRoute
   LayoutCouponsIndexRoute: typeof LayoutCouponsIndexRoute
+  LayoutEmailTemplatesIndexRoute: typeof LayoutEmailTemplatesIndexRoute
   LayoutFormBuilderIndexRoute: typeof LayoutFormBuilderIndexRoute
   LayoutGroupsIndexRoute: typeof LayoutGroupsIndexRoute
   LayoutHumansIndexRoute: typeof LayoutHumansIndexRoute
@@ -706,6 +747,7 @@ interface LayoutRouteChildren {
   LayoutTenantsIndexRoute: typeof LayoutTenantsIndexRoute
   LayoutAdminIdEditRoute: typeof LayoutAdminIdEditRoute
   LayoutCouponsIdEditRoute: typeof LayoutCouponsIdEditRoute
+  LayoutEmailTemplatesTypeEditRoute: typeof LayoutEmailTemplatesTypeEditRoute
   LayoutFormBuilderIdEditRoute: typeof LayoutFormBuilderIdEditRoute
   LayoutGroupsIdEditRoute: typeof LayoutGroupsIdEditRoute
   LayoutHumansIdEditRoute: typeof LayoutHumansIdEditRoute
@@ -733,6 +775,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutAdminIndexRoute: LayoutAdminIndexRoute,
   LayoutApplicationsIndexRoute: LayoutApplicationsIndexRoute,
   LayoutCouponsIndexRoute: LayoutCouponsIndexRoute,
+  LayoutEmailTemplatesIndexRoute: LayoutEmailTemplatesIndexRoute,
   LayoutFormBuilderIndexRoute: LayoutFormBuilderIndexRoute,
   LayoutGroupsIndexRoute: LayoutGroupsIndexRoute,
   LayoutHumansIndexRoute: LayoutHumansIndexRoute,
@@ -741,6 +784,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutTenantsIndexRoute: LayoutTenantsIndexRoute,
   LayoutAdminIdEditRoute: LayoutAdminIdEditRoute,
   LayoutCouponsIdEditRoute: LayoutCouponsIdEditRoute,
+  LayoutEmailTemplatesTypeEditRoute: LayoutEmailTemplatesTypeEditRoute,
   LayoutFormBuilderIdEditRoute: LayoutFormBuilderIdEditRoute,
   LayoutGroupsIdEditRoute: LayoutGroupsIdEditRoute,
   LayoutHumansIdEditRoute: LayoutHumansIdEditRoute,

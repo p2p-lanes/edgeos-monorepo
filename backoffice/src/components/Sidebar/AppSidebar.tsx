@@ -6,6 +6,7 @@ import {
   FileText,
   FormInput,
   Home,
+  Mail,
   Package,
   Tag,
   User,
@@ -54,6 +55,7 @@ const popupItems: Item[] = [
   { icon: Tag, title: "Coupons", path: "/coupons" },
   { icon: UsersRound, title: "Groups", path: "/groups" },
   { icon: FormInput, title: "Form Builder", path: "/form-builder" },
+  { icon: Mail, title: "Email Templates", path: "/email-templates" },
 ]
 
 // Admin items (admins and superadmins)
