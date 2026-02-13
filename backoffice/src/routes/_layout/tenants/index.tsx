@@ -1,7 +1,8 @@
 import {
+  keepPreviousData,
   useMutation,
+  useQuery,
   useQueryClient,
-  useSuspenseQuery,
 } from "@tanstack/react-query"
 import { createFileRoute, Link } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
@@ -145,9 +146,16 @@ function TenantsTableContent() {
     "/tenants",
   )
 
-  const { data: tenants } = useSuspenseQuery(
-    getTenantsQueryOptions(pagination.pageIndex, pagination.pageSize, search),
-  )
+  const { data: tenants } = useQuery({
+    ...getTenantsQueryOptions(
+      pagination.pageIndex,
+      pagination.pageSize,
+      search,
+    ),
+    placeholderData: keepPreviousData,
+  })
+
+  if (!tenants) return <Skeleton className="h-64 w-full" />
 
   return (
     <DataTable

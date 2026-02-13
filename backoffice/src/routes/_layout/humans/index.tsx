@@ -1,4 +1,4 @@
-import { useSuspenseQuery } from "@tanstack/react-query"
+import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { createFileRoute, Link } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
 import {
@@ -142,9 +142,12 @@ function HumansTableContent() {
     "/humans",
   )
 
-  const { data: humans } = useSuspenseQuery(
-    getHumansQueryOptions(pagination.pageIndex, pagination.pageSize, search),
-  )
+  const { data: humans } = useQuery({
+    ...getHumansQueryOptions(pagination.pageIndex, pagination.pageSize, search),
+    placeholderData: keepPreviousData,
+  })
+
+  if (!humans) return <Skeleton className="h-64 w-full" />
 
   return (
     <DataTable

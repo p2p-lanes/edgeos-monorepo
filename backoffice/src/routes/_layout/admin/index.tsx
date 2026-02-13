@@ -1,4 +1,4 @@
-import { useSuspenseQuery } from "@tanstack/react-query"
+import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { AlertCircle, Plus, Users } from "lucide-react"
 import { Suspense, useState } from "react"
@@ -11,6 +11,7 @@ import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import PendingUsers from "@/components/Pending/PendingUsers"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
@@ -88,14 +89,17 @@ function TenantUsersTableContent({ tenantId }: { tenantId: string | null }) {
     "/admin",
   )
 
-  const { data: users } = useSuspenseQuery(
-    getTenantUsersQueryOptions(
+  const { data: users } = useQuery({
+    ...getTenantUsersQueryOptions(
       tenantId,
       pagination.pageIndex,
       pagination.pageSize,
       search,
     ),
-  )
+    placeholderData: keepPreviousData,
+  })
+
+  if (!users) return <Skeleton className="h-64 w-full" />
 
   const tenantUsers = users.results.filter(
     (user: UserPublic) => user.role !== "superadmin",
@@ -148,13 +152,16 @@ function SuperadminsTableContent() {
   })
   const [search, setSearch] = useState("")
 
-  const { data: users } = useSuspenseQuery(
-    getSuperadminsQueryOptions(
+  const { data: users } = useQuery({
+    ...getSuperadminsQueryOptions(
       pagination.pageIndex,
       pagination.pageSize,
       search,
     ),
-  )
+    placeholderData: keepPreviousData,
+  })
+
+  if (!users) return <Skeleton className="h-64 w-full" />
 
   const tableData: UserTableData[] = users.results.map((user: UserPublic) => ({
     ...user,

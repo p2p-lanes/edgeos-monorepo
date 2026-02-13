@@ -1,7 +1,8 @@
 import {
+  keepPreviousData,
   useMutation,
+  useQuery,
   useQueryClient,
-  useSuspenseQuery,
 } from "@tanstack/react-query"
 import { createFileRoute, Link } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
@@ -218,14 +219,17 @@ function CouponsTableContent({ popupId }: { popupId: string | null }) {
     "/coupons",
   )
 
-  const { data: coupons } = useSuspenseQuery(
-    getCouponsQueryOptions(
+  const { data: coupons } = useQuery({
+    ...getCouponsQueryOptions(
       popupId,
       pagination.pageIndex,
       pagination.pageSize,
       search,
     ),
-  )
+    placeholderData: keepPreviousData,
+  })
+
+  if (!coupons) return <Skeleton className="h-64 w-full" />
 
   return (
     <DataTable

@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
+import { useLocation, useNavigate } from "@tanstack/react-router"
 import { Building2 } from "lucide-react"
 
 import { TenantsService } from "@/client"
@@ -15,6 +16,15 @@ import { useWorkspace } from "@/contexts/WorkspaceContext"
 
 export function TenantSelector() {
   const { selectedTenantId, setSelectedTenantId } = useWorkspace()
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  const handleTenantChange = (value: string) => {
+    setSelectedTenantId(value)
+    if (/\/(new|edit)/.test(location.pathname)) {
+      navigate({ to: "/" })
+    }
+  }
 
   const {
     data: tenants,
@@ -48,10 +58,7 @@ export function TenantSelector() {
         <Building2 className="h-3 w-3" />
         Tenant
       </Label>
-      <Select
-        value={selectedTenantId ?? ""}
-        onValueChange={setSelectedTenantId}
-      >
+      <Select value={selectedTenantId ?? ""} onValueChange={handleTenantChange}>
         <SelectTrigger className="w-full">
           <SelectValue placeholder="Select tenant" />
         </SelectTrigger>

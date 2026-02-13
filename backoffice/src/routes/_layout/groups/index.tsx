@@ -1,8 +1,8 @@
 import {
+  keepPreviousData,
   useMutation,
   useQuery,
   useQueryClient,
-  useSuspenseQuery,
 } from "@tanstack/react-query"
 import { createFileRoute, Link } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
@@ -290,25 +290,28 @@ function GroupsTableContent() {
     "/groups",
   )
 
-  const { data: groups } = useSuspenseQuery(
-    getGroupsQueryOptions(
+  const { data: groups } = useQuery({
+    ...getGroupsQueryOptions(
       selectedPopupId,
       pagination.pageIndex,
       pagination.pageSize,
       search,
     ),
-  )
+    placeholderData: keepPreviousData,
+  })
+
+  if (!groups) return <Skeleton className="h-64 w-full" />
 
   return (
     <DataTable
       columns={columns}
-      data={groups?.results ?? []}
+      data={groups.results}
       searchPlaceholder="Search by name..."
       hiddenOnMobile={["max_members", "is_ambassador_group"]}
       searchValue={search}
       onSearchChange={setSearch}
       serverPagination={{
-        total: groups?.paging?.total ?? 0,
+        total: groups.paging.total,
         pagination: pagination,
         onPaginationChange: setPagination,
       }}

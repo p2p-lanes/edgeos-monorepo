@@ -1,8 +1,8 @@
 import {
+  keepPreviousData,
   useMutation,
   useQuery,
   useQueryClient,
-  useSuspenseQuery,
 } from "@tanstack/react-query"
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
@@ -23,8 +23,10 @@ import {
   type ApiError,
   type ApplicationPublic,
   ApplicationReviewsService,
+  type ApplicationStatus,
   ApplicationsService,
   ApprovalStrategiesService,
+  DashboardService,
   FormFieldsService,
   type ReviewDecision,
 } from "@/client"
@@ -52,6 +54,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { LoadingButton } from "@/components/ui/loading-button"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
@@ -71,11 +80,23 @@ interface ApplicationSchema {
   >
 }
 
+const APPLICATION_STATUS_OPTIONS: {
+  value: ApplicationStatus
+  label: string
+}[] = [
+  { value: "draft", label: "Draft" },
+  { value: "in review", label: "In Review" },
+  { value: "accepted", label: "Accepted" },
+  { value: "rejected", label: "Rejected" },
+  { value: "withdrawn", label: "Withdrawn" },
+]
+
 function getApplicationsQueryOptions(
   popupId: string | null,
   page: number,
   pageSize: number,
   search?: string,
+  statusFilter?: ApplicationStatus,
 ) {
   return {
     queryFn: () =>
@@ -84,14 +105,111 @@ function getApplicationsQueryOptions(
         limit: pageSize,
         popupId: popupId || undefined,
         search: search || undefined,
+        statusFilter: statusFilter || undefined,
       }),
-    queryKey: ["applications", popupId, { page, pageSize, search }],
+    queryKey: [
+      "applications",
+      popupId,
+      { page, pageSize, search, statusFilter },
+    ],
   }
 }
 
+function useStatusCounts(popupId: string | null) {
+  const { data: stats, isLoading } = useQuery({
+    queryKey: ["dashboard", "stats", popupId],
+    queryFn: () => DashboardService.getDashboardStats({ popupId: popupId! }),
+    enabled: !!popupId,
+  })
+
+  const counts: Partial<Record<ApplicationStatus, number>> = {}
+  if (stats?.applications) {
+    const a = stats.applications
+    counts.draft = a.draft ?? 0
+    counts["in review"] = a.in_review ?? 0
+    counts.accepted = a.accepted ?? 0
+    counts.rejected = a.rejected ?? 0
+    counts.withdrawn = a.withdrawn ?? 0
+  }
+  const total = stats?.applications?.total ?? 0
+
+  return { counts, total, isLoading }
+}
+
+function StatusDropdownFilter({
+  popupId,
+  selected,
+  onSelect,
+}: {
+  popupId: string | null
+  selected: ApplicationStatus | undefined
+  onSelect: (value: ApplicationStatus | undefined) => void
+}) {
+  const { counts, total } = useStatusCounts(popupId)
+
+  const options = [
+    { value: "all" as const, label: "All", count: total },
+    ...APPLICATION_STATUS_OPTIONS.map((opt) => ({
+      value: opt.value,
+      label: opt.label,
+      count: counts[opt.value] ?? 0,
+    })),
+  ]
+
+  const currentLabel = selected
+    ? (APPLICATION_STATUS_OPTIONS.find((o) => o.value === selected)?.label ??
+      "All")
+    : "All"
+  const currentCount = selected ? (counts[selected] ?? 0) : total
+
+  return (
+    <Select
+      value={selected ?? "all"}
+      onValueChange={(v) =>
+        onSelect(v === "all" ? undefined : (v as ApplicationStatus))
+      }
+    >
+      <SelectTrigger className="h-9 w-[180px]">
+        <SelectValue>
+          {currentLabel} ({currentCount})
+        </SelectValue>
+      </SelectTrigger>
+      <SelectContent>
+        {options.map((opt) => (
+          <SelectItem
+            key={opt.value === "all" ? "all" : opt.value}
+            value={opt.value === "all" ? "all" : opt.value}
+          >
+            <span className="flex w-full items-center justify-between gap-4">
+              <span>{opt.label}</span>
+              <span className="text-muted-foreground tabular-nums">
+                {opt.count}
+              </span>
+            </span>
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
+}
+
+const VALID_STATUSES: Set<string> = new Set([
+  "draft",
+  "in review",
+  "accepted",
+  "rejected",
+  "withdrawn",
+])
+
 export const Route = createFileRoute("/_layout/applications/")({
   component: Applications,
-  validateSearch: validateTableSearch,
+  validateSearch: (raw: Record<string, unknown>) => ({
+    ...validateTableSearch(raw),
+    status:
+      typeof raw.status === "string" && VALID_STATUSES.has(raw.status)
+        ? (raw.status as ApplicationStatus)
+        : undefined,
+  }),
   head: () => ({
     meta: [{ title: "Applications - EdgeOS" }],
   }),
@@ -161,8 +279,12 @@ function SubmitReviewDialog({
       })
       createErrorHandler(showErrorToast)(err as ApiError)
     },
-    onSettled: () =>
-      queryClient.invalidateQueries({ queryKey: ["applications"] }),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["applications"] })
+      queryClient.invalidateQueries({
+        queryKey: ["dashboard", "stats", application.popup_id],
+      })
+    },
   })
 
   const actionVerb =
@@ -286,6 +408,7 @@ const getColumns = (
   {
     accessorKey: "human.first_name",
     header: ({ column }) => <SortableHeader label="Name" column={column} />,
+    meta: { label: "Name", toggleable: false },
     cell: ({ row }) => (
       <Link
         to="/applications/$id"
@@ -299,6 +422,7 @@ const getColumns = (
   {
     accessorKey: "human.email",
     header: ({ column }) => <SortableHeader label="Email" column={column} />,
+    meta: { label: "Email", toggleable: true },
     cell: ({ row }) => (
       <span className="text-muted-foreground">{row.original.human?.email}</span>
     ),
@@ -306,6 +430,7 @@ const getColumns = (
   {
     accessorKey: "human.organization",
     header: "Organization",
+    meta: { label: "Organization", toggleable: true },
     cell: ({ row }) => (
       <span className="text-muted-foreground">
         {row.original.human?.organization || "N/A"}
@@ -315,16 +440,23 @@ const getColumns = (
   {
     accessorKey: "status",
     header: ({ column }) => <SortableHeader label="Status" column={column} />,
+    meta: { label: "Status", toggleable: true },
     cell: ({ row }) => <StatusBadge status={row.original.status} />,
   },
   {
     accessorKey: "attendees",
-    header: "Attendees",
-    cell: ({ row }) => <span>{row.original.attendees?.length ?? 0}</span>,
+    header: "Companions",
+    meta: { label: "Companions", toggleable: true },
+    cell: ({ row }) => {
+      const companions =
+        row.original.attendees?.filter((a) => a.category !== "main") ?? []
+      return <span>{companions.length}</span>
+    },
   },
   {
     accessorKey: "red_flag",
     header: "Flagged",
+    meta: { label: "Flagged", toggleable: true },
     cell: ({ row }) =>
       row.original.red_flag ? (
         <Badge variant="destructive">
@@ -334,8 +466,37 @@ const getColumns = (
       ) : null,
   },
   {
+    accessorKey: "submitted_at",
+    header: "Submitted",
+    meta: { label: "Submitted", toggleable: true, defaultHidden: true },
+    cell: ({ row }) => {
+      const value = row.original.submitted_at
+      if (!value) return <span className="text-muted-foreground">—</span>
+      return (
+        <span className="text-muted-foreground">
+          {new Date(value).toLocaleDateString(undefined, {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+          })}
+        </span>
+      )
+    },
+  },
+  {
+    accessorKey: "referral",
+    header: "Referral",
+    meta: { label: "Referral", toggleable: true, defaultHidden: true },
+    cell: ({ row }) => (
+      <span className="text-muted-foreground">
+        {row.original.referral || "—"}
+      </span>
+    ),
+  },
+  {
     id: "actions",
     header: () => <span className="sr-only">Actions</span>,
+    meta: { toggleable: false },
     cell: ({ row }) => (
       <div className="flex justify-end">
         <ApplicationActionsMenu
@@ -352,20 +513,36 @@ function ApplicationsTableContent() {
   const { isAdmin } = useAuth()
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
+  const navigate = useNavigate()
   const searchParams = Route.useSearch()
   const { search, pagination, setSearch, setPagination } = useTableSearchParams(
     searchParams,
     "/applications",
   )
+  const statusFilter = searchParams.status
 
-  const { data: applications } = useSuspenseQuery(
-    getApplicationsQueryOptions(
+  const setStatusFilter = (value: ApplicationStatus | undefined) => {
+    navigate({
+      to: "/applications",
+      search: (prev: Record<string, unknown>) => ({
+        ...prev,
+        status: value,
+        page: 0,
+      }),
+      replace: true,
+    })
+  }
+
+  const { data: applications } = useQuery({
+    ...getApplicationsQueryOptions(
       selectedPopupId,
       pagination.pageIndex,
       pagination.pageSize,
       search,
+      statusFilter,
     ),
-  )
+    placeholderData: keepPreviousData,
+  })
 
   const { data: approvalStrategy } = useQuery({
     queryKey: ["approval-strategy", selectedPopupId],
@@ -435,22 +612,47 @@ function ApplicationsTableContent() {
       })
       createErrorHandler(showErrorToast)(err as ApiError)
     },
-    onSettled: () =>
-      queryClient.invalidateQueries({ queryKey: ["applications"] }),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["applications"] })
+      if (selectedPopupId) {
+        queryClient.invalidateQueries({
+          queryKey: ["dashboard", "stats", selectedPopupId],
+        })
+      }
+    },
   })
 
   const isWeightedVoting = approvalStrategy?.strategy_type === "weighted"
   const columns = getColumns(isWeightedVoting)
   const canBulkReview = isAdmin && !isWeightedVoting
 
+  if (!applications) return <Skeleton className="h-64 w-full" />
+
   return (
     <DataTable
       columns={columns}
       data={applications.results}
+      tableId="applications"
       searchPlaceholder="Search by name, email, or organization..."
-      hiddenOnMobile={["human.organization", "attendees", "red_flag"]}
+      hiddenOnMobile={[
+        "human.organization",
+        "attendees",
+        "red_flag",
+        "submitted_at",
+        "referral",
+      ]}
       searchValue={search}
       onSearchChange={setSearch}
+      filterBar={
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusDropdownFilter
+            popupId={selectedPopupId}
+            selected={statusFilter}
+            onSelect={setStatusFilter}
+          />
+          {/* Add more filter dropdowns here (e.g. organization, date range) */}
+        </div>
+      }
       serverPagination={{
         total: applications.paging.total,
         pagination: pagination,

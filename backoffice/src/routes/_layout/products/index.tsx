@@ -1,7 +1,8 @@
 import {
+  keepPreviousData,
   useMutation,
+  useQuery,
   useQueryClient,
-  useSuspenseQuery,
 } from "@tanstack/react-query"
 import { createFileRoute, Link } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
@@ -233,8 +234,8 @@ function ProductsTableContent() {
     setSorting,
   } = useTableSearchParams(searchParams, "/products")
 
-  const { data: products } = useSuspenseQuery(
-    getProductsQueryOptions(
+  const { data: products } = useQuery({
+    ...getProductsQueryOptions(
       selectedPopupId,
       pagination.pageIndex,
       pagination.pageSize,
@@ -242,7 +243,10 @@ function ProductsTableContent() {
       sortBy,
       sortOrder,
     ),
-  )
+    placeholderData: keepPreviousData,
+  })
+
+  if (!products) return <Skeleton className="h-64 w-full" />
 
   return (
     <DataTable

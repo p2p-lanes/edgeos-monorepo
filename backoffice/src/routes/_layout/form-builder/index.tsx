@@ -16,9 +16,10 @@ import {
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import {
+  keepPreviousData,
   useMutation,
+  useQuery,
   useQueryClient,
-  useSuspenseQuery,
 } from "@tanstack/react-query"
 import { createFileRoute, Link } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
@@ -428,14 +429,17 @@ function FormFieldsTableContent({ reorderMode }: { reorderMode: boolean }) {
     "/form-builder",
   )
 
-  const { data: formFields } = useSuspenseQuery(
-    getFormFieldsQueryOptions(
+  const { data: formFields } = useQuery({
+    ...getFormFieldsQueryOptions(
       selectedPopupId,
       pagination.pageIndex,
       pagination.pageSize,
       search,
     ),
-  )
+    placeholderData: keepPreviousData,
+  })
+
+  if (!formFields) return <Skeleton className="h-64 w-full" />
 
   if (reorderMode && !search && formFields.results.length > 0) {
     return <SortableFieldList fields={formFields.results} />

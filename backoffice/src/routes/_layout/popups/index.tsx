@@ -1,7 +1,8 @@
 import {
+  keepPreviousData,
   useMutation,
+  useQuery,
   useQueryClient,
-  useSuspenseQuery,
 } from "@tanstack/react-query"
 import { createFileRoute, Link } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
@@ -238,9 +239,12 @@ function PopupsTableContent() {
     "/popups",
   )
 
-  const { data: popups } = useSuspenseQuery(
-    getPopupsQueryOptions(pagination.pageIndex, pagination.pageSize, search),
-  )
+  const { data: popups } = useQuery({
+    ...getPopupsQueryOptions(pagination.pageIndex, pagination.pageSize, search),
+    placeholderData: keepPreviousData,
+  })
+
+  if (!popups) return <Skeleton className="h-64 w-full" />
 
   return (
     <DataTable

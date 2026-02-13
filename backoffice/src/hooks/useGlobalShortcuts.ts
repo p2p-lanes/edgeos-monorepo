@@ -1,9 +1,8 @@
 import { useNavigate, useRouterState } from "@tanstack/react-router"
 import { useEffect } from "react"
 import { toast } from "sonner"
-
-import { useTheme } from "@/components/theme-provider"
 import type { Theme } from "@/components/theme-provider"
+import { useTheme } from "@/components/theme-provider"
 import useAuth from "@/hooks/useAuth"
 import { CREATE_ROUTES } from "@/lib/shortcuts"
 

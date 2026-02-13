@@ -1,22 +1,20 @@
-import {
-  useMutation,
-  useQueryClient,
-  useSuspenseQuery,
-} from "@tanstack/react-query"
+import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
 import {
-  Check,
   Copy,
   CreditCard,
   Download,
   EllipsisVertical,
   ExternalLink,
   Eye,
+  Fingerprint,
+  Hash,
+  Tag,
 } from "lucide-react"
 import { Suspense, useState } from "react"
 
-import { type ApiError, type PaymentPublic, PaymentsService } from "@/client"
+import { type PaymentPublic, PaymentsService } from "@/client"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
@@ -29,7 +27,6 @@ import {
   DialogClose,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
@@ -37,13 +34,12 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { LoadingButton } from "@/components/ui/loading-button"
+import { InlineRow, InlineSection } from "@/components/ui/inline-form"
+import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
-import useAuth from "@/hooks/useAuth"
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard"
 import useCustomToast from "@/hooks/useCustomToast"
 import {
@@ -51,7 +47,6 @@ import {
   validateTableSearch,
 } from "@/hooks/useTableSearchParams"
 import { exportToCsv, fetchAllPages } from "@/lib/export"
-import { createErrorHandler } from "@/utils"
 
 function getPaymentsQueryOptions(
   popupId: string | null,
@@ -96,250 +91,164 @@ function ViewPayment({ payment }: { payment: PaymentPublic }) {
         <Eye className="mr-2 h-4 w-4" />
         View Details
       </DropdownMenuItem>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
+      <DialogContent className="max-w-md gap-0 p-0">
+        <DialogHeader className="sr-only">
           <DialogTitle>Payment Details</DialogTitle>
           <DialogDescription>
-            Payment ID: {payment.id.slice(0, 8)}...
+            Payment #{payment.id.slice(0, 8)}
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">
-                Amount
-              </p>
-              <p className="text-lg font-bold font-mono">
-                ${payment.amount} {payment.currency}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">
-                Status
-              </p>
-              <StatusBadge status={payment.status ?? ""} />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">
-                Source
-              </p>
-              <p>{payment.source || "N/A"}</p>
-            </div>
-            {payment.rate && (
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">
-                  Rate
-                </p>
-                <p>{payment.rate}</p>
-              </div>
-            )}
-          </div>
 
+        {/* Hero */}
+        <div className="space-y-1 px-6 pt-6 pb-4">
+          <p className="font-mono text-3xl font-semibold">
+            ${payment.amount}{" "}
+            <span className="text-lg text-muted-foreground">
+              {payment.currency}
+            </span>
+          </p>
+          <StatusBadge status={payment.status ?? ""} />
+        </div>
+
+        <Separator />
+
+        {/* Details */}
+        <InlineSection title="Details" className="px-6 py-4">
+          {payment.source && (
+            <InlineRow
+              icon={<CreditCard className="h-4 w-4 text-muted-foreground" />}
+              label="Source"
+            >
+              <span className="text-sm">{payment.source}</span>
+            </InlineRow>
+          )}
+          {payment.rate && (
+            <InlineRow
+              icon={<Hash className="h-4 w-4 text-muted-foreground" />}
+              label="Rate"
+            >
+              <span className="font-mono text-sm">{payment.rate}</span>
+            </InlineRow>
+          )}
           {payment.coupon_code && (
-            <div className="rounded-lg border p-3">
-              <p className="text-sm font-medium text-muted-foreground">
-                Coupon Applied
-              </p>
-              <div className="flex items-center justify-between">
-                <Badge variant="outline" className="mt-1">
-                  {payment.coupon_code}
-                </Badge>
+            <InlineRow
+              icon={<Tag className="h-4 w-4 text-muted-foreground" />}
+              label="Coupon"
+            >
+              <div className="flex items-center gap-2">
+                <Badge variant="outline">{payment.coupon_code}</Badge>
                 {payment.discount_value && (
                   <span className="text-sm text-green-600">
                     -{payment.discount_value}%
                   </span>
                 )}
               </div>
-            </div>
+            </InlineRow>
           )}
+        </InlineSection>
 
-          <div className="rounded-lg border p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">
-                  Payment ID
-                </p>
-                <p className="font-mono text-sm">{payment.id}</p>
-              </div>
+        <Separator />
+
+        {/* Identifiers */}
+        <InlineSection title="Identifiers" className="px-6 py-4">
+          <InlineRow
+            icon={<Fingerprint className="h-4 w-4 text-muted-foreground" />}
+            label="Payment ID"
+          >
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-xs text-muted-foreground">
+                {payment.id.slice(0, 8)}...
+              </span>
               <Button
-                variant="outline"
+                variant="ghost"
                 size="icon"
+                className="h-7 w-7"
                 aria-label="Copy Payment ID"
                 onClick={() => copyToClipboard(payment.id, "Payment ID")}
               >
-                <Copy className="h-4 w-4" />
+                <Copy className="h-3.5 w-3.5" />
               </Button>
             </div>
-          </div>
-
+          </InlineRow>
           {payment.external_id && (
-            <div className="rounded-lg border p-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    External ID
-                  </p>
-                  <p className="font-mono text-sm">{payment.external_id}</p>
-                </div>
+            <InlineRow
+              icon={<ExternalLink className="h-4 w-4 text-muted-foreground" />}
+              label="External ID"
+            >
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-xs text-muted-foreground">
+                  {payment.external_id.slice(0, 12)}...
+                </span>
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="icon"
+                  className="h-7 w-7"
                   aria-label="Copy External ID"
                   onClick={() =>
                     copyToClipboard(payment.external_id!, "External ID")
                   }
                 >
-                  <Copy className="h-4 w-4" />
+                  <Copy className="h-3.5 w-3.5" />
                 </Button>
               </div>
-            </div>
+            </InlineRow>
           )}
-
           {payment.checkout_url && (
-            <div>
-              <p className="text-sm font-medium text-muted-foreground mb-1">
-                Checkout URL
-              </p>
+            <InlineRow
+              icon={<ExternalLink className="h-4 w-4 text-muted-foreground" />}
+              label="Checkout"
+            >
               <a
                 href={payment.checkout_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-primary hover:underline text-sm break-all"
+                className="text-sm text-primary hover:underline"
               >
-                {payment.checkout_url.slice(0, 50)}...
-                <ExternalLink className="h-3 w-3" />
+                Open link
               </a>
-            </div>
+            </InlineRow>
           )}
+        </InlineSection>
 
-          {payment.products_snapshot &&
-            payment.products_snapshot.length > 0 && (
-              <div>
-                <p className="text-sm font-medium text-muted-foreground mb-2">
-                  Products
-                </p>
-                <div className="space-y-2">
-                  {payment.products_snapshot.map((product) => (
-                    <div
-                      key={`${product.product_id}-${product.attendee_id}`}
-                      className="flex items-center justify-between rounded border p-2"
-                    >
-                      <span className="text-sm">{product.product_name}</span>
-                      <span className="font-mono text-sm">
-                        {product.quantity}x ${product.product_price}
-                      </span>
-                    </div>
-                  ))}
+        {/* Products */}
+        {payment.products_snapshot && payment.products_snapshot.length > 0 && (
+          <>
+            <Separator />
+            <InlineSection title="Products" className="px-6 py-4">
+              {payment.products_snapshot.map((product) => (
+                <div
+                  key={`${product.product_id}-${product.attendee_id}`}
+                  className="flex items-center justify-between py-2.5"
+                >
+                  <span className="text-sm">{product.product_name}</span>
+                  <span className="font-mono text-sm text-muted-foreground">
+                    {product.quantity}x ${product.product_price}
+                  </span>
                 </div>
-              </div>
-            )}
+              ))}
+            </InlineSection>
+          </>
+        )}
 
-          <div className="grid grid-cols-2 gap-4 text-sm text-muted-foreground">
+        {/* Footer */}
+        <Separator />
+        <div className="flex items-center justify-between px-6 py-4">
+          <div className="flex gap-4 text-xs text-muted-foreground">
             {payment.created_at && (
-              <div>
-                Created: {new Date(payment.created_at).toLocaleString()}
-              </div>
+              <span>{new Date(payment.created_at).toLocaleDateString()}</span>
             )}
             {payment.updated_at && (
-              <div>
-                Updated: {new Date(payment.updated_at).toLocaleString()}
-              </div>
+              <span>
+                Updated {new Date(payment.updated_at).toLocaleDateString()}
+              </span>
             )}
           </div>
+          <DialogClose asChild>
+            <Button variant="outline" size="sm">
+              Close
+            </Button>
+          </DialogClose>
         </div>
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="outline">Close</Button>
-          </DialogClose>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-function ApprovePayment({
-  payment,
-  onSuccess,
-}: {
-  payment: PaymentPublic
-  onSuccess: () => void
-}) {
-  const [isOpen, setIsOpen] = useState(false)
-  const queryClient = useQueryClient()
-  const { showSuccessToast, showErrorToast } = useCustomToast()
-
-  const mutation = useMutation({
-    mutationFn: () => PaymentsService.approvePayment({ paymentId: payment.id }),
-    onMutate: async () => {
-      await queryClient.cancelQueries({ queryKey: ["payments"] })
-      const previousData = queryClient.getQueriesData({
-        queryKey: ["payments"],
-      })
-      queryClient.setQueriesData(
-        { queryKey: ["payments"] },
-        (
-          old:
-            | {
-                results: PaymentPublic[]
-                paging: { limit: number; offset: number; total: number }
-              }
-            | undefined,
-        ) => {
-          if (!old?.results) return old
-          return {
-            ...old,
-            results: old.results.map((p) =>
-              p.id === payment.id ? { ...p, status: "approved" } : p,
-            ),
-          }
-        },
-      )
-      return { previousData }
-    },
-    onSuccess: () => {
-      showSuccessToast("Payment approved successfully")
-      setIsOpen(false)
-      onSuccess()
-    },
-    onError: (err, _, context) => {
-      context?.previousData?.forEach(([key, data]) => {
-        queryClient.setQueryData(key, data)
-      })
-      createErrorHandler(showErrorToast)(err as ApiError)
-    },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ["payments"] }),
-  })
-
-  return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DropdownMenuItem
-        onSelect={(e) => e.preventDefault()}
-        onClick={() => setIsOpen(true)}
-        disabled={payment.status === "approved"}
-      >
-        <Check className="mr-2 h-4 w-4" />
-        Approve Payment
-      </DropdownMenuItem>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Approve Payment</DialogTitle>
-          <DialogDescription>
-            Are you sure you want to manually approve this payment of $
-            {payment.amount} {payment.currency}? This will assign the purchased
-            products to the attendees.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="outline">Cancel</Button>
-          </DialogClose>
-          <LoadingButton
-            loading={mutation.isPending}
-            onClick={() => mutation.mutate()}
-          >
-            Approve
-          </LoadingButton>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   )
@@ -347,7 +256,6 @@ function ApprovePayment({
 
 function PaymentActionsMenu({ payment }: { payment: PaymentPublic }) {
   const [open, setOpen] = useState(false)
-  const { isAdmin } = useAuth()
   const [, copy] = useCopyToClipboard()
   const { showSuccessToast } = useCustomToast()
 
@@ -370,16 +278,6 @@ function PaymentActionsMenu({ payment }: { payment: PaymentPublic }) {
           <Copy className="mr-2 h-4 w-4" />
           Copy Payment ID
         </DropdownMenuItem>
-
-        {isAdmin && payment.status === "pending" && (
-          <>
-            <DropdownMenuSeparator />
-            <ApprovePayment
-              payment={payment}
-              onSuccess={() => setOpen(false)}
-            />
-          </>
-        )}
       </DropdownMenuContent>
     </DropdownMenu>
   )
@@ -448,67 +346,22 @@ const columns: ColumnDef<PaymentPublic>[] = [
 
 function PaymentsTableContent() {
   const { selectedPopupId } = useWorkspace()
-  const { isAdmin } = useAuth()
-  const queryClient = useQueryClient()
-  const { showSuccessToast, showErrorToast } = useCustomToast()
   const searchParams = Route.useSearch()
   const { search, pagination, setSearch, setPagination } = useTableSearchParams(
     searchParams,
     "/payments",
   )
 
-  const { data: payments } = useSuspenseQuery(
-    getPaymentsQueryOptions(
+  const { data: payments } = useQuery({
+    ...getPaymentsQueryOptions(
       selectedPopupId,
       pagination.pageIndex,
       pagination.pageSize,
     ),
-  )
-
-  const bulkApproveMutation = useMutation({
-    mutationFn: async (ids: string[]) => {
-      await Promise.all(
-        ids.map((id) => PaymentsService.approvePayment({ paymentId: id })),
-      )
-    },
-    onMutate: async (ids) => {
-      await queryClient.cancelQueries({ queryKey: ["payments"] })
-      const previousData = queryClient.getQueriesData({
-        queryKey: ["payments"],
-      })
-      const idSet = new Set(ids)
-      queryClient.setQueriesData(
-        { queryKey: ["payments"] },
-        (
-          old:
-            | {
-                results: PaymentPublic[]
-                paging: { limit: number; offset: number; total: number }
-              }
-            | undefined,
-        ) => {
-          if (!old?.results) return old
-          return {
-            ...old,
-            results: old.results.map((p) =>
-              idSet.has(p.id) ? { ...p, status: "approved" } : p,
-            ),
-          }
-        },
-      )
-      return { previousData }
-    },
-    onSuccess: (_, ids) => {
-      showSuccessToast(`${ids.length} payment(s) approved`)
-    },
-    onError: (err, _, context) => {
-      context?.previousData?.forEach(([key, data]) => {
-        queryClient.setQueryData(key, data)
-      })
-      createErrorHandler(showErrorToast)(err as ApiError)
-    },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ["payments"] }),
+    placeholderData: keepPreviousData,
   })
+
+  if (!payments) return <Skeleton className="h-64 w-full" />
 
   const filtered = search
     ? payments.results.filter((p) => {
@@ -546,30 +399,6 @@ function PaymentsTableContent() {
           />
         ) : undefined
       }
-      selectable={isAdmin}
-      bulkActions={
-        isAdmin
-          ? (selectedRows) => {
-              const approvable = (selectedRows as PaymentPublic[]).filter(
-                (p) => p.status === "pending",
-              )
-              return (
-                <Button
-                  size="sm"
-                  disabled={
-                    approvable.length === 0 || bulkApproveMutation.isPending
-                  }
-                  onClick={() =>
-                    bulkApproveMutation.mutate(approvable.map((p) => p.id))
-                  }
-                >
-                  <Check className="mr-1.5 h-3.5 w-3.5" />
-                  Approve ({approvable.length})
-                </Button>
-              )
-            }
-          : undefined
-      }
     />
   )
 }
@@ -589,18 +418,14 @@ function Payments() {
           popupId: selectedPopupId,
         }),
       )
-      exportToCsv(
-        "payments",
-        results as unknown as Record<string, unknown>[],
-        [
-          { key: "amount", label: "Amount" },
-          { key: "currency", label: "Currency" },
-          { key: "status", label: "Status" },
-          { key: "source", label: "Source" },
-          { key: "coupon_code", label: "Coupon" },
-          { key: "created_at", label: "Date" },
-        ],
-      )
+      exportToCsv("payments", results as unknown as Record<string, unknown>[], [
+        { key: "amount", label: "Amount" },
+        { key: "currency", label: "Currency" },
+        { key: "status", label: "Status" },
+        { key: "source", label: "Source" },
+        { key: "coupon_code", label: "Coupon" },
+        { key: "created_at", label: "Date" },
+      ])
     } finally {
       setIsExporting(false)
     }

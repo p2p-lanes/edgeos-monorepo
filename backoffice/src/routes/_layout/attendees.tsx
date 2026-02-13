@@ -1,12 +1,13 @@
-import { useSuspenseQuery } from "@tanstack/react-query"
+import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
 import {
-  Copy,
   Download,
   EllipsisVertical,
   Eye,
+  Mail,
   QrCode,
+  User,
   Users,
 } from "lucide-react"
 import { Suspense, useState } from "react"
@@ -23,7 +24,6 @@ import {
   DialogClose,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
@@ -33,10 +33,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { InlineRow, InlineSection } from "@/components/ui/inline-form"
+import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
-import { useCopyToClipboard } from "@/hooks/useCopyToClipboard"
-import useCustomToast from "@/hooks/useCustomToast"
 import {
   useTableSearchParams,
   validateTableSearch,
@@ -69,13 +69,6 @@ export const Route = createFileRoute("/_layout/attendees")({
 
 function ViewAttendee({ attendee }: { attendee: AttendeePublic }) {
   const [isOpen, setIsOpen] = useState(false)
-  const [, copy] = useCopyToClipboard()
-  const { showSuccessToast } = useCustomToast()
-
-  const copyToClipboard = (text: string, label: string) => {
-    copy(text)
-    showSuccessToast(`${label} copied to clipboard`)
-  }
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -86,107 +79,99 @@ function ViewAttendee({ attendee }: { attendee: AttendeePublic }) {
         <Eye className="mr-2 h-4 w-4" />
         View Details
       </DropdownMenuItem>
-      <DialogContent>
-        <DialogHeader>
+      <DialogContent className="max-w-md gap-0 p-0">
+        <DialogHeader className="sr-only">
           <DialogTitle>Attendee Details</DialogTitle>
           <DialogDescription>{attendee.name}</DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Name</p>
-              <p className="font-medium">{attendee.name}</p>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Email</p>
-              <p>{attendee.email || "N/A"}</p>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">
-                Category
-              </p>
-              <Badge variant="outline">{attendee.category}</Badge>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">
-                Gender
-              </p>
-              <p>{attendee.gender || "N/A"}</p>
-            </div>
-          </div>
 
-          <div className="rounded-lg border p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">
-                  Check-in Code
-                </p>
-                <p className="font-mono text-lg font-bold">
-                  {attendee.check_in_code}
-                </p>
-              </div>
-              <Button
-                variant="outline"
-                size="icon"
-                aria-label="Copy check-in code"
-                onClick={() =>
-                  copyToClipboard(attendee.check_in_code, "Check-in code")
-                }
-              >
-                <Copy className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
+        {/* Hero */}
+        <div className="space-y-1 px-6 pt-6 pb-4">
+          <p className="text-2xl font-semibold">{attendee.name}</p>
+          <Badge variant="secondary" className="capitalize">
+            {attendee.category}
+          </Badge>
+        </div>
 
-          {attendee.poap_url && (
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">
-                POAP URL
-              </p>
-              <a
-                href={attendee.poap_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline break-all"
-              >
-                {attendee.poap_url}
-              </a>
-            </div>
+        <Separator />
+
+        {/* Contact */}
+        <InlineSection title="Contact" className="px-6 py-4">
+          <InlineRow
+            icon={<Mail className="h-4 w-4 text-muted-foreground" />}
+            label="Email"
+          >
+            <span className="text-sm text-muted-foreground">
+              {attendee.email || "N/A"}
+            </span>
+          </InlineRow>
+          {attendee.gender && (
+            <InlineRow
+              icon={<User className="h-4 w-4 text-muted-foreground" />}
+              label="Gender"
+            >
+              <span className="text-sm text-muted-foreground">
+                {attendee.gender}
+              </span>
+            </InlineRow>
           )}
+        </InlineSection>
 
-          {attendee.products && attendee.products.length > 0 && (
-            <div>
-              <p className="text-sm font-medium text-muted-foreground mb-2">
+        <Separator />
+
+        {/* Check-in */}
+        <InlineSection title="Check-in" className="px-6 py-4">
+          <InlineRow
+            icon={<QrCode className="h-4 w-4 text-muted-foreground" />}
+            label="Code"
+          >
+            <span className="font-mono text-sm font-medium">
+              {attendee.check_in_code}
+            </span>
+          </InlineRow>
+        </InlineSection>
+
+        {/* Products */}
+        {attendee.products && attendee.products.length > 0 && (
+          <>
+            <Separator />
+            <div className="px-6 py-4">
+              <p className="mb-2 px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 Products
               </p>
-              <div className="flex flex-wrap gap-2">
-                {attendee.products.map((product) => (
-                  <Badge key={String(product)} variant="secondary">
-                    {String(product)}
-                  </Badge>
-                ))}
+              <div className="flex flex-wrap gap-1.5">
+                {attendee.products.map((product) => {
+                  const p = product as { id?: string; name?: string }
+                  return (
+                    <Badge key={p.id ?? String(product)} variant="secondary">
+                      {p.name ?? "Unknown"}
+                    </Badge>
+                  )
+                })}
               </div>
             </div>
-          )}
+          </>
+        )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-muted-foreground">
+        {/* Footer */}
+        <Separator />
+        <div className="flex items-center justify-between px-6 py-4">
+          <div className="flex gap-4 text-xs text-muted-foreground">
             {attendee.created_at && (
-              <div>
-                Created: {new Date(attendee.created_at).toLocaleString()}
-              </div>
+              <span>{new Date(attendee.created_at).toLocaleDateString()}</span>
             )}
             {attendee.updated_at && (
-              <div>
-                Updated: {new Date(attendee.updated_at).toLocaleString()}
-              </div>
+              <span>
+                Updated {new Date(attendee.updated_at).toLocaleDateString()}
+              </span>
             )}
           </div>
-        </div>
-        <DialogFooter>
           <DialogClose asChild>
-            <Button variant="outline">Close</Button>
+            <Button variant="outline" size="sm">
+              Close
+            </Button>
           </DialogClose>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   )
@@ -194,14 +179,6 @@ function ViewAttendee({ attendee }: { attendee: AttendeePublic }) {
 
 function AttendeeActionsMenu({ attendee }: { attendee: AttendeePublic }) {
   const [open, setOpen] = useState(false)
-  const [, copy] = useCopyToClipboard()
-  const { showSuccessToast } = useCustomToast()
-
-  const copyCheckInCode = () => {
-    copy(attendee.check_in_code)
-    showSuccessToast("Check-in code copied")
-    setOpen(false)
-  }
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
@@ -212,10 +189,6 @@ function AttendeeActionsMenu({ attendee }: { attendee: AttendeePublic }) {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <ViewAttendee attendee={attendee} />
-        <DropdownMenuItem onClick={copyCheckInCode}>
-          <QrCode className="mr-2 h-4 w-4" />
-          Copy Check-in Code
-        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   )
@@ -276,13 +249,16 @@ function AttendeesTableContent() {
     "/attendees",
   )
 
-  const { data: attendees } = useSuspenseQuery(
-    getAttendeesQueryOptions(
+  const { data: attendees } = useQuery({
+    ...getAttendeesQueryOptions(
       selectedPopupId,
       pagination.pageIndex,
       pagination.pageSize,
     ),
-  )
+    placeholderData: keepPreviousData,
+  })
+
+  if (!attendees) return <Skeleton className="h-64 w-full" />
 
   const filtered = search
     ? attendees.results.filter((a) => {

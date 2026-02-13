@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
+import { useLocation, useNavigate } from "@tanstack/react-router"
 import { Calendar } from "lucide-react"
 import { useEffect } from "react"
 
@@ -21,6 +22,15 @@ export function PopupSelector() {
     effectiveTenantId,
     needsTenantSelection,
   } = useWorkspace()
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  const handlePopupChange = (value: string) => {
+    setSelectedPopupId(value)
+    if (/\/(new|edit)/.test(location.pathname)) {
+      navigate({ to: "/" })
+    }
+  }
 
   // Only fetch popups when we have a tenant context
   const canFetchPopups = !needsTenantSelection && !!effectiveTenantId
@@ -85,7 +95,7 @@ export function PopupSelector() {
         <Calendar className="h-3 w-3" />
         Popup
       </Label>
-      <Select value={selectedPopupId ?? ""} onValueChange={setSelectedPopupId}>
+      <Select value={selectedPopupId ?? ""} onValueChange={handlePopupChange}>
         <SelectTrigger className="w-full">
           <SelectValue placeholder="Select popup" />
         </SelectTrigger>
