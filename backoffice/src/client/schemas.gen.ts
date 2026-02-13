@@ -1939,7 +1939,7 @@ export const EmailTemplatePublicSchema = {
 
 export const EmailTemplateTypeSchema = {
     type: 'string',
-    enum: ['login_code_user', 'login_code_human', 'application_received', 'application_accepted', 'application_rejected', 'payment_confirmed', 'payment_pending', 'edit_passes_confirmed'],
+    enum: ['login_code_user', 'login_code_human', 'application_received', 'application_accepted', 'application_rejected', 'payment_confirmed', 'abandoned_cart', 'edit_passes_confirmed'],
     title: 'EmailTemplateType'
 } as const;
 

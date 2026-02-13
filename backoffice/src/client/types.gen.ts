@@ -392,7 +392,7 @@ export type EmailTemplatePublic = {
     updated_at?: (string | null);
 };
 
-export type EmailTemplateType = 'login_code_user' | 'login_code_human' | 'application_received' | 'application_accepted' | 'application_rejected' | 'payment_confirmed' | 'payment_pending' | 'edit_passes_confirmed';
+export type EmailTemplateType = 'login_code_user' | 'login_code_human' | 'application_received' | 'application_accepted' | 'application_rejected' | 'payment_confirmed' | 'abandoned_cart' | 'edit_passes_confirmed';
 
 export type EmailTemplateUpdate = {
     subject?: (string | null);
