@@ -19,7 +19,7 @@ function NewApplication() {
   // Only superadmins can create applications via backoffice (for testing)
   useEffect(() => {
     if (!isUserLoading && !isSuperadmin) {
-      navigate({ to: "/applications" })
+      navigate({ to: "/applications", search: {} })
     }
   }, [isSuperadmin, isUserLoading, navigate])
 
@@ -33,7 +33,7 @@ function NewApplication() {
       description="Create a test application with custom fields (Superadmin only)"
       backTo="/applications"
     >
-      <ApplicationForm onSuccess={() => navigate({ to: "/applications" })} />
+      <ApplicationForm onSuccess={() => navigate({ to: "/applications", search: {} })} />
     </FormPageLayout>
   )
 }

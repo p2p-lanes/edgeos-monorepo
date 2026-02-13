@@ -66,6 +66,7 @@ import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
 import {
+  type TableSearchParams,
   useTableSearchParams,
   validateTableSearch,
 } from "@/hooks/useTableSearchParams"
@@ -203,12 +204,13 @@ const VALID_STATUSES: Set<string> = new Set([
 
 export const Route = createFileRoute("/_layout/applications/")({
   component: Applications,
-  validateSearch: (raw: Record<string, unknown>) => ({
+  validateSearch: (
+    raw: Record<string, unknown>,
+  ): TableSearchParams & { status?: ApplicationStatus } => ({
     ...validateTableSearch(raw),
-    status:
-      typeof raw.status === "string" && VALID_STATUSES.has(raw.status)
-        ? (raw.status as ApplicationStatus)
-        : undefined,
+    ...(typeof raw.status === "string" && VALID_STATUSES.has(raw.status)
+      ? { status: raw.status as ApplicationStatus }
+      : {}),
   }),
   head: () => ({
     meta: [{ title: "Applications - EdgeOS" }],

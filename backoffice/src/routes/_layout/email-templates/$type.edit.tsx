@@ -3,7 +3,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import { ArrowLeft } from "lucide-react"
 import { Suspense } from "react"
 
-import { EmailTemplatesService } from "@/client"
+import { type EmailTemplateType, EmailTemplatesService } from "@/client"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { EmailTemplateEditor } from "@/components/EmailTemplateEditor"
@@ -61,7 +61,7 @@ function EditorContent({ templateType }: { templateType: string }) {
       </div>
 
       <EmailTemplateEditor
-        templateType={templateType}
+        templateType={templateType as EmailTemplateType}
         popupId={selectedPopupId!}
         existingTemplate={existingTemplate}
         typeInfo={typeInfo}

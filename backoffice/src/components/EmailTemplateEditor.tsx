@@ -15,6 +15,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react"
 import type {
   EmailTemplatePublic,
+  EmailTemplateType,
   PopupPublic,
   TemplateTypeInfo,
   TemplateVariable,
@@ -57,7 +58,7 @@ import useCustomToast from "@/hooks/useCustomToast"
 import { createErrorHandler } from "@/utils"
 
 interface EmailTemplateEditorProps {
-  templateType: string
+  templateType: EmailTemplateType
   popupId: string
   existingTemplate?: EmailTemplatePublic
   typeInfo: TemplateTypeInfo
@@ -491,7 +492,7 @@ export function EmailTemplateEditor({
       {/* Editor + Preview */}
       <div className="min-h-0 flex-1 rounded-md border">
         {showPreview ? (
-          <ResizablePanelGroup direction="horizontal">
+          <ResizablePanelGroup orientation="horizontal">
             <ResizablePanel defaultSize={50} minSize={30}>
               <Editor
                 height="100%"

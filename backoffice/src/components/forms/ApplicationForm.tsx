@@ -910,7 +910,7 @@ export function ApplicationForm({ onSuccess }: ApplicationFormProps) {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => navigate({ to: "/applications" })}
+                onClick={() => navigate({ to: "/applications", search: {} })}
               >
                 Cancel
               </Button>
