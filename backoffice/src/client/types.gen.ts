@@ -372,6 +372,34 @@ export type DashboardStats = {
     payments: PaymentStats;
 };
 
+export type EmailTemplateCreate = {
+    popup_id: string;
+    template_type: string;
+    subject?: (string | null);
+    html_content: string;
+    is_active?: boolean;
+};
+
+export type EmailTemplatePublic = {
+    id: string;
+    tenant_id: string;
+    popup_id: string;
+    template_type: string;
+    subject?: (string | null);
+    html_content: string;
+    is_active?: boolean;
+    created_at?: (string | null);
+    updated_at?: (string | null);
+};
+
+export type EmailTemplateType = 'login_code_user' | 'login_code_human' | 'application_received' | 'application_accepted' | 'application_rejected' | 'payment_confirmed' | 'payment_pending' | 'edit_passes_confirmed';
+
+export type EmailTemplateUpdate = {
+    subject?: (string | null);
+    html_content?: (string | null);
+    is_active?: (boolean | null);
+};
+
 export type FormFieldCreate = {
     popup_id: string;
     name: string;
@@ -673,6 +701,11 @@ export type ListModel_CouponPublic_ = {
     paging: Paging;
 };
 
+export type ListModel_EmailTemplatePublic_ = {
+    results: Array<EmailTemplatePublic>;
+    paging: Paging;
+};
+
 export type ListModel_FormFieldPublic_ = {
     results: Array<FormFieldPublic>;
     paging: Paging;
@@ -960,6 +993,20 @@ export type PresignedUrlResponse = {
     public_url: string;
 };
 
+export type PreviewRequest = {
+    html_content: string;
+    template_type: string;
+    subject?: (string | null);
+    preview_variables?: ({
+    [key: string]: unknown;
+} | null);
+};
+
+export type PreviewResponse = {
+    rendered_html: string;
+    rendered_subject?: (string | null);
+};
+
 /**
  * Schema for batch product creation.
  */
@@ -1096,6 +1143,16 @@ export type ReviewSummary = {
     reviews: Array<ApplicationReviewPublic>;
 };
 
+export type SendTestRequest = {
+    html_content: string;
+    template_type: string;
+    subject?: (string | null);
+    to_email: string;
+    custom_variables?: ({
+    [key: string]: unknown;
+} | null);
+};
+
 /**
  * Card payment info from SimpleFI.
  */
@@ -1171,6 +1228,24 @@ export type SimpleFIWebhookPayload = {
     entity_type: string;
     entity_id: string;
     data: SimpleFIData;
+};
+
+export type TemplateTypeInfo = {
+    type: string;
+    label: string;
+    description: string;
+    category: string;
+    default_subject: string;
+    variables: Array<TemplateVariable>;
+};
+
+export type TemplateVariable = {
+    name: string;
+    label?: (string | null);
+    type: string;
+    description: string;
+    required?: boolean;
+    group?: (string | null);
 };
 
 export type TenantCreate = {
@@ -1622,6 +1697,74 @@ export type DashboardGetDashboardStatsData = {
 };
 
 export type DashboardGetDashboardStatsResponse = (DashboardStats);
+
+export type EmailTemplatesListTemplateTypesResponse = (Array<TemplateTypeInfo>);
+
+export type EmailTemplatesGetDefaultTemplateData = {
+    templateType: EmailTemplateType;
+};
+
+export type EmailTemplatesGetDefaultTemplateResponse = ({
+    [key: string]: (string);
+});
+
+export type EmailTemplatesPreviewTemplateData = {
+    requestBody: PreviewRequest;
+};
+
+export type EmailTemplatesPreviewTemplateResponse = (PreviewResponse);
+
+export type EmailTemplatesSendTestEmailData = {
+    requestBody: SendTestRequest;
+};
+
+export type EmailTemplatesSendTestEmailResponse = ({
+    [key: string]: (string);
+});
+
+export type EmailTemplatesListEmailTemplatesData = {
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    popupId?: (string | null);
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+    xTenantId?: (string | null);
+};
+
+export type EmailTemplatesListEmailTemplatesResponse = (ListModel_EmailTemplatePublic_);
+
+export type EmailTemplatesCreateEmailTemplateData = {
+    requestBody: EmailTemplateCreate;
+    xTenantId?: (string | null);
+};
+
+export type EmailTemplatesCreateEmailTemplateResponse = (EmailTemplatePublic);
+
+export type EmailTemplatesGetEmailTemplateData = {
+    templateId: string;
+    xTenantId?: (string | null);
+};
+
+export type EmailTemplatesGetEmailTemplateResponse = (EmailTemplatePublic);
+
+export type EmailTemplatesUpdateEmailTemplateData = {
+    requestBody: EmailTemplateUpdate;
+    templateId: string;
+    xTenantId?: (string | null);
+};
+
+export type EmailTemplatesUpdateEmailTemplateResponse = (EmailTemplatePublic);
+
+export type EmailTemplatesDeleteEmailTemplateData = {
+    templateId: string;
+    xTenantId?: (string | null);
+};
+
+export type EmailTemplatesDeleteEmailTemplateResponse = (void);
 
 export type FormFieldsListFormFieldsData = {
     /**

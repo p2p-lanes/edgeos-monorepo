@@ -1829,6 +1829,160 @@ export const DashboardStatsSchema = {
     description: 'Complete dashboard statistics.'
 } as const;
 
+export const EmailTemplateCreateSchema = {
+    properties: {
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        template_type: {
+            type: 'string',
+            title: 'Template Type'
+        },
+        subject: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Subject'
+        },
+        html_content: {
+            type: 'string',
+            title: 'Html Content'
+        },
+        is_active: {
+            type: 'boolean',
+            title: 'Is Active',
+            default: true
+        }
+    },
+    type: 'object',
+    required: ['popup_id', 'template_type', 'html_content'],
+    title: 'EmailTemplateCreate'
+} as const;
+
+export const EmailTemplatePublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        template_type: {
+            type: 'string',
+            title: 'Template Type'
+        },
+        subject: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Subject'
+        },
+        html_content: {
+            type: 'string',
+            title: 'Html Content'
+        },
+        is_active: {
+            type: 'boolean',
+            title: 'Is Active',
+            default: true
+        },
+        created_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created At'
+        },
+        updated_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Updated At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'tenant_id', 'popup_id', 'template_type', 'html_content'],
+    title: 'EmailTemplatePublic'
+} as const;
+
+export const EmailTemplateTypeSchema = {
+    type: 'string',
+    enum: ['login_code_user', 'login_code_human', 'application_received', 'application_accepted', 'application_rejected', 'payment_confirmed', 'payment_pending', 'edit_passes_confirmed'],
+    title: 'EmailTemplateType'
+} as const;
+
+export const EmailTemplateUpdateSchema = {
+    properties: {
+        subject: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Subject'
+        },
+        html_content: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Html Content'
+        },
+        is_active: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Is Active'
+        }
+    },
+    type: 'object',
+    title: 'EmailTemplateUpdate'
+} as const;
+
 export const FormFieldCreateSchema = {
     properties: {
         popup_id: {
@@ -3556,6 +3710,24 @@ export const ListModel_CouponPublic_Schema = {
     title: 'ListModel[CouponPublic]'
 } as const;
 
+export const ListModel_EmailTemplatePublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/EmailTemplatePublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[EmailTemplatePublic]'
+} as const;
+
 export const ListModel_FormFieldPublic_Schema = {
     properties: {
         results: {
@@ -4967,6 +5139,68 @@ export const PresignedUrlResponseSchema = {
     description: 'Response with presigned URL for upload.'
 } as const;
 
+export const PreviewRequestSchema = {
+    properties: {
+        html_content: {
+            type: 'string',
+            title: 'Html Content'
+        },
+        template_type: {
+            type: 'string',
+            title: 'Template Type'
+        },
+        subject: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Subject'
+        },
+        preview_variables: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Preview Variables'
+        }
+    },
+    type: 'object',
+    required: ['html_content', 'template_type'],
+    title: 'PreviewRequest'
+} as const;
+
+export const PreviewResponseSchema = {
+    properties: {
+        rendered_html: {
+            type: 'string',
+            title: 'Rendered Html'
+        },
+        rendered_subject: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Rendered Subject'
+        }
+    },
+    type: 'object',
+    required: ['rendered_html'],
+    title: 'PreviewResponse'
+} as const;
+
 export const ProductBatchSchema = {
     properties: {
         popup_id: {
@@ -5757,6 +5991,50 @@ export const ReviewSummarySchema = {
     description: 'Summary of reviews for an application.'
 } as const;
 
+export const SendTestRequestSchema = {
+    properties: {
+        html_content: {
+            type: 'string',
+            title: 'Html Content'
+        },
+        template_type: {
+            type: 'string',
+            title: 'Template Type'
+        },
+        subject: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Subject'
+        },
+        to_email: {
+            type: 'string',
+            format: 'email',
+            title: 'To Email'
+        },
+        custom_variables: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Custom Variables'
+        }
+    },
+    type: 'object',
+    required: ['html_content', 'template_type', 'to_email'],
+    title: 'SendTestRequest'
+} as const;
+
 export const SimpleFICardPaymentSchema = {
     properties: {
         provider: {
@@ -5972,6 +6250,88 @@ export const SimpleFIWebhookPayloadSchema = {
     required: ['id', 'event_type', 'entity_type', 'entity_id', 'data'],
     title: 'SimpleFIWebhookPayload',
     description: 'SimpleFI webhook payload schema.'
+} as const;
+
+export const TemplateTypeInfoSchema = {
+    properties: {
+        type: {
+            type: 'string',
+            title: 'Type'
+        },
+        label: {
+            type: 'string',
+            title: 'Label'
+        },
+        description: {
+            type: 'string',
+            title: 'Description'
+        },
+        category: {
+            type: 'string',
+            title: 'Category'
+        },
+        default_subject: {
+            type: 'string',
+            title: 'Default Subject'
+        },
+        variables: {
+            items: {
+                '$ref': '#/components/schemas/TemplateVariable'
+            },
+            type: 'array',
+            title: 'Variables'
+        }
+    },
+    type: 'object',
+    required: ['type', 'label', 'description', 'category', 'default_subject', 'variables'],
+    title: 'TemplateTypeInfo'
+} as const;
+
+export const TemplateVariableSchema = {
+    properties: {
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        label: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Label'
+        },
+        type: {
+            type: 'string',
+            title: 'Type'
+        },
+        description: {
+            type: 'string',
+            title: 'Description'
+        },
+        required: {
+            type: 'boolean',
+            title: 'Required',
+            default: true
+        },
+        group: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Group'
+        }
+    },
+    type: 'object',
+    required: ['name', 'type', 'description'],
+    title: 'TemplateVariable'
 } as const;
 
 export const TenantCreateSchema = {
