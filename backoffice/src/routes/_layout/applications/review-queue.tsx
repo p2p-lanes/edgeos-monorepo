@@ -78,7 +78,9 @@ function ReviewQueuePage() {
             </p>
           </div>
           <Button variant="outline" asChild>
-            <Link to="/applications" search={{}}>Back to Applications</Link>
+            <Link to="/applications" search={{}}>
+              Back to Applications
+            </Link>
           </Button>
         </div>
         <EmptyState
@@ -87,7 +89,9 @@ function ReviewQueuePage() {
           description="There are no applications pending your review."
           action={
             <Button variant="outline" asChild>
-              <Link to="/applications" search={{}}>View All Applications</Link>
+              <Link to="/applications" search={{}}>
+                View All Applications
+              </Link>
             </Button>
           }
         />
@@ -111,7 +115,9 @@ function ReviewQueuePage() {
           </p>
         </div>
         <Button variant="outline" asChild>
-          <Link to="/applications" search={{}}>Back to List</Link>
+          <Link to="/applications" search={{}}>
+            Back to List
+          </Link>
         </Button>
       </div>
 

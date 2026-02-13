@@ -33,7 +33,9 @@ function NewApplication() {
       description="Create a test application with custom fields (Superadmin only)"
       backTo="/applications"
     >
-      <ApplicationForm onSuccess={() => navigate({ to: "/applications", search: {} })} />
+      <ApplicationForm
+        onSuccess={() => navigate({ to: "/applications", search: {} })}
+      />
     </FormPageLayout>
   )
 }

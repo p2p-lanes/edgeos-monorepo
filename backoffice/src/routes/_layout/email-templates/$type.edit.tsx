@@ -3,7 +3,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import { ArrowLeft } from "lucide-react"
 import { Suspense } from "react"
 
-import { type EmailTemplateType, EmailTemplatesService } from "@/client"
+import { EmailTemplatesService, type EmailTemplateType } from "@/client"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { EmailTemplateEditor } from "@/components/EmailTemplateEditor"
