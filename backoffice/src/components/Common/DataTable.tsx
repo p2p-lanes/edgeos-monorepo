@@ -17,12 +17,27 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  Columns3,
   Search,
 } from "lucide-react"
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react"
-
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import {
   Select,
@@ -39,7 +54,21 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { useIsMobile } from "@/hooks/useMobile"
+
+declare module "@tanstack/react-table" {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  interface ColumnMeta<TData, TValue> {
+    label?: string
+    toggleable?: boolean
+    defaultHidden?: boolean
+  }
+}
 
 interface PaginationState {
   pageIndex: number
@@ -65,10 +94,25 @@ interface DataTableProps<TData, TValue> {
   onSearchChange?: (value: string) => void
   serverPagination?: ServerPaginationProps
   serverSorting?: ServerSortingProps
+  filterBar?: ReactNode
   emptyState?: ReactNode
   selectable?: boolean
   bulkActions?: (selectedRows: TData[]) => ReactNode
   hiddenOnMobile?: string[]
+  tableId?: string
+}
+
+function loadColumnVisibility(tableId: string): VisibilityState {
+  try {
+    const raw = localStorage.getItem(`table-columns-${tableId}`)
+    return raw ? JSON.parse(raw) : {}
+  } catch {
+    return {}
+  }
+}
+
+function saveColumnVisibility(tableId: string, state: VisibilityState) {
+  localStorage.setItem(`table-columns-${tableId}`, JSON.stringify(state))
 }
 
 function SortableHeader({
@@ -109,12 +153,14 @@ export function DataTable<TData, TValue>({
   searchPlaceholder,
   searchValue,
   onSearchChange,
+  filterBar,
   serverPagination,
   serverSorting,
   emptyState,
   selectable,
   bulkActions,
   hiddenOnMobile,
+  tableId,
 }: DataTableProps<TData, TValue>) {
   const [localSorting, setLocalSorting] = useState<SortingState>([])
   const sorting = serverSorting ? serverSorting.sorting : localSorting
@@ -146,10 +192,43 @@ export function DataTable<TData, TValue>({
     }, 300)
   }
 
+  // User column visibility preferences (persisted in localStorage)
+  const [userVisibility, setUserVisibility] = useState<VisibilityState>(() =>
+    tableId ? loadColumnVisibility(tableId) : {},
+  )
+
+  const handleColumnVisibilityChange = useCallback(
+    (
+      updater: VisibilityState | ((prev: VisibilityState) => VisibilityState),
+    ) => {
+      setUserVisibility((prev) => {
+        const next = typeof updater === "function" ? updater(prev) : updater
+        if (tableId) saveColumnVisibility(tableId, next)
+        return next
+      })
+    },
+    [tableId],
+  )
+
+  // Merge: defaultHidden from meta → user preferences → mobile overrides (highest priority)
   const columnVisibility = useMemo<VisibilityState>(() => {
-    if (!isMobile || !hiddenOnMobile) return {}
-    return Object.fromEntries(hiddenOnMobile.map((id) => [id, false]))
-  }, [isMobile, hiddenOnMobile])
+    const defaultHidden: VisibilityState = {}
+    for (const col of columns) {
+      const id = "accessorKey" in col ? String(col.accessorKey) : col.id
+      if (id && col.meta?.defaultHidden) {
+        defaultHidden[id] = false
+      }
+    }
+
+    const mobileOverrides: VisibilityState = {}
+    if (isMobile && hiddenOnMobile) {
+      for (const id of hiddenOnMobile) {
+        mobileOverrides[id] = false
+      }
+    }
+
+    return { ...defaultHidden, ...userVisibility, ...mobileOverrides }
+  }, [columns, isMobile, hiddenOnMobile, userVisibility])
 
   const allColumns = useMemo(() => {
     if (!selectable) return columns
@@ -189,6 +268,7 @@ export function DataTable<TData, TValue>({
     ...(serverSorting && { manualSorting: true }),
     ...(!serverSorting && { getSortedRowModel: getSortedRowModel() }),
     onSortingChange: handleSortingChange,
+    ...(tableId && { onColumnVisibilityChange: handleColumnVisibilityChange }),
     ...(selectable && {
       onRowSelectionChange: setRowSelection,
     }),
@@ -236,19 +316,71 @@ export function DataTable<TData, TValue>({
     }
   }
 
+  const hasToolbar = onSearchChange || tableId || filterBar
+
   return (
     <div className="flex flex-col gap-4">
-      {onSearchChange && (
-        <div className="flex items-center gap-3">
-          <div className="relative max-w-sm flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder={searchPlaceholder ?? "Search..."}
-              value={localSearch}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              className="pl-9"
-            />
+      {hasToolbar && (
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            {onSearchChange && (
+              <div className="relative w-full min-w-0 sm:max-w-xs">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder={searchPlaceholder ?? "Search..."}
+                  value={localSearch}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+            )}
+            {filterBar && (
+              <div className="flex min-w-0 flex-1 items-center">
+                {filterBar}
+              </div>
+            )}
           </div>
+          {tableId && (
+            <DropdownMenu>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-9 w-9 shrink-0"
+                      aria-label="Toggle columns"
+                    >
+                      <Columns3 className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  <p>Toggle columns</p>
+                </TooltipContent>
+              </Tooltip>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {table
+                  .getAllColumns()
+                  .filter(
+                    (col) =>
+                      col.columnDef.meta?.toggleable !== false &&
+                      col.columnDef.meta?.label,
+                  )
+                  .map((col) => (
+                    <DropdownMenuCheckboxItem
+                      key={col.id}
+                      checked={col.getIsVisible()}
+                      onCheckedChange={(value) => col.toggleVisibility(!!value)}
+                    >
+                      {col.columnDef.meta?.label}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       )}
 
