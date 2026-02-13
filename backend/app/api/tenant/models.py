@@ -1,6 +1,7 @@
 import uuid
 from typing import TYPE_CHECKING
 
+from sqlalchemy import Index, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlmodel import Column, Field, Relationship
 
@@ -10,6 +11,7 @@ if TYPE_CHECKING:
     from app.api.application.models import Applications
     from app.api.attendee.models import Attendees
     from app.api.coupon.models import Coupons
+    from app.api.email_template.models import EmailTemplates
     from app.api.form_field.models import FormFields
     from app.api.group.models import Groups
     from app.api.human.models import Humans
@@ -21,6 +23,10 @@ if TYPE_CHECKING:
 
 
 class Tenants(TenantBase, table=True):
+    __table_args__ = (
+        Index("ix_tenants_active", "slug", postgresql_where=text("deleted = false")),
+    )
+
     id: uuid.UUID = Field(
         default_factory=uuid.uuid4,
         sa_column=Column(
@@ -46,6 +52,9 @@ class Tenants(TenantBase, table=True):
     )
     groups: list["Groups"] = Relationship(back_populates="tenant", cascade_delete=True)
     form_fields: list["FormFields"] = Relationship(
+        back_populates="tenant", cascade_delete=True
+    )
+    email_templates: list["EmailTemplates"] = Relationship(
         back_populates="tenant", cascade_delete=True
     )
 

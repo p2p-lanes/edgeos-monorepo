@@ -23,13 +23,22 @@ from app.api.approval_strategy.schemas import (
 )
 from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.attendee.schemas import AttendeeCreate, AttendeePublic, AttendeeUpdate
-from app.api.check_in.models import CheckIns
-from app.api.check_in.schemas import CheckInCreate, CheckInPublic, CheckInUpdate
 
 # Auth
 from app.api.auth.pending_human_models import PendingHumans
+from app.api.check_in.models import CheckIns
+from app.api.check_in.schemas import CheckInCreate, CheckInPublic, CheckInUpdate
 from app.api.coupon.models import Coupons
 from app.api.coupon.schemas import CouponCreate, CouponPublic, CouponUpdate
+
+# Email templates
+from app.api.email_template.models import EmailTemplates
+from app.api.email_template.schemas import (
+    EmailTemplateCreate,
+    EmailTemplatePublic,
+    EmailTemplateType,
+    EmailTemplateUpdate,
+)
 
 # Form fields
 from app.api.form_field.models import FormFields
@@ -99,6 +108,12 @@ __all__ = [
     "CouponCreate",
     "CouponPublic",
     "CouponUpdate",
+    # Email templates
+    "EmailTemplates",
+    "EmailTemplateCreate",
+    "EmailTemplatePublic",
+    "EmailTemplateType",
+    "EmailTemplateUpdate",
     # Form fields
     "FormFields",
     "FormFieldCreate",

@@ -397,6 +397,8 @@ async def create_my_application(
             ),
             from_address=application.popup.tenant.sender_email,
             from_name=application.popup.tenant.sender_name,
+            popup_id=application.popup_id,
+            db_session=db,
         )
 
     return _build_application_public(application)

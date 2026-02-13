@@ -1,4 +1,5 @@
 import datetime
+import uuid
 from collections.abc import Mapping
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -7,11 +8,15 @@ from typing import Any
 
 import aiosmtplib
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound
+from jinja2.sandbox import SandboxedEnvironment
 from loguru import logger
 from premailer import transform
+from sqlmodel import Session
 
+from app.api.email_template.schemas import EmailTemplateType
 from app.core.config import settings
 from app.services.email.templates import (
+    TEMPLATE_TYPE_TO_FILE,
     ApplicationAcceptedContext,
     ApplicationReceivedContext,
     ApplicationRejectedContext,
@@ -22,6 +27,37 @@ from app.services.email.templates import (
     PaymentConfirmedContext,
     PaymentPendingContext,
 )
+
+
+def _enrich_with_popup_data(
+    context: dict[str, Any], popup_id: uuid.UUID, db_session: Session
+) -> dict[str, Any]:
+    """Add popup fields to context with popup_ prefix (skip if already present)."""
+    from app.api.popup.crud import popups_crud
+
+    popup = popups_crud.get(db_session, popup_id)
+    if not popup:
+        return context
+
+    enriched = dict(context)
+    popup_fields = {
+        "popup_name": popup.name,
+        "popup_icon_url": popup.icon_url,
+        "popup_web_url": popup.web_url,
+        "popup_blog_url": popup.blog_url,
+        "popup_twitter_url": popup.twitter_url,
+        "popup_start_date": popup.start_date.strftime("%B %d, %Y")
+        if popup.start_date
+        else None,
+        "popup_end_date": popup.end_date.strftime("%B %d, %Y")
+        if popup.end_date
+        else None,
+    }
+    for key, value in popup_fields.items():
+        if key not in enriched:
+            enriched[key] = value
+
+    return enriched
 
 
 class EmailService:
@@ -38,6 +74,89 @@ class EmailService:
                 "current_year": datetime.datetime.now().year,
             }
         )
+
+    def render_custom_template(
+        self, html_content: str, context: Mapping[str, Any]
+    ) -> str:
+        """Render user-provided HTML template with sandboxed Jinja2.
+
+        Uses SandboxedEnvironment to prevent SSTI attacks.
+        """
+        try:
+            env = SandboxedEnvironment()
+            env.globals.update(
+                {
+                    "project_name": settings.PROJECT_NAME,
+                    "current_year": datetime.datetime.now().year,
+                }
+            )
+            template = env.from_string(html_content)
+            html = template.render(**context)
+            return transform(html)
+        except Exception as e:
+            logger.error(f"Error rendering custom template: {e}")
+            raise
+
+    def render_preview_template(
+        self, html_content: str, context: Mapping[str, Any]
+    ) -> str:
+        """Render user-provided HTML for live preview.
+
+        Uses _PreservingUndefined so that variables without a value render
+        as ``{{ variable_name }}`` instead of raising an error.
+        """
+        from app.services.email.templates import PreservingUndefined
+
+        try:
+            env = SandboxedEnvironment(undefined=PreservingUndefined)
+            env.globals.update(
+                {
+                    "project_name": settings.PROJECT_NAME,
+                    "current_year": datetime.datetime.now().year,
+                }
+            )
+            template = env.from_string(html_content)
+            html = template.render(**context)
+            return transform(html)
+        except Exception as e:
+            logger.error(f"Error rendering preview template: {e}")
+            raise
+
+    def render_with_fallback(
+        self,
+        template_type: EmailTemplateType,
+        context: Mapping[str, Any],
+        popup_id: uuid.UUID | None = None,
+        db_session: Session | None = None,
+    ) -> tuple[str, str | None]:
+        """Render email using DB-stored custom template or file-based fallback.
+
+        Returns:
+            Tuple of (rendered_html, custom_subject_or_none)
+        """
+        if popup_id and db_session:
+            from app.api.email_template.crud import email_template_crud
+
+            custom = email_template_crud.get_active_template(
+                db_session, popup_id, template_type.value
+            )
+            if custom:
+                rendered_html = self.render_custom_template(
+                    custom.html_content, context
+                )
+                rendered_subject = None
+                if custom.subject:
+                    env = SandboxedEnvironment()
+                    rendered_subject = env.from_string(custom.subject).render(**context)
+                return rendered_html, rendered_subject
+
+        # Fallback to file-based template
+        file_path = TEMPLATE_TYPE_TO_FILE.get(template_type)
+        if not file_path:
+            raise ValueError(f"No file mapping for template type: {template_type}")
+
+        rendered_html = self.render_template(file_path, context)
+        return rendered_html, None
 
     def render_template(self, template_name: str, context: Mapping[str, Any]) -> str:
         """
@@ -235,15 +354,20 @@ class EmailService:
         context: ApplicationReceivedContext,
         from_address: str | None = None,
         from_name: str | None = None,
+        popup_id: uuid.UUID | None = None,
+        db_session: Session | None = None,
     ) -> bool:
         """Send application received confirmation email."""
-        return await self.send_template_email(
+        return await self._send_with_fallback(
             to=to,
             subject=subject,
+            template_type=EmailTemplateType.APPLICATION_RECEIVED,
             template_name=EmailTemplates.APPLICATION_RECEIVED,
             context=context.model_dump(exclude_none=True),
             from_address=from_address,
             from_name=from_name,
+            popup_id=popup_id,
+            db_session=db_session,
         )
 
     async def send_application_accepted(
@@ -253,15 +377,20 @@ class EmailService:
         context: ApplicationAcceptedContext,
         from_address: str | None = None,
         from_name: str | None = None,
+        popup_id: uuid.UUID | None = None,
+        db_session: Session | None = None,
     ) -> bool:
         """Send application accepted email."""
-        return await self.send_template_email(
+        return await self._send_with_fallback(
             to=to,
             subject=subject,
+            template_type=EmailTemplateType.APPLICATION_ACCEPTED,
             template_name=EmailTemplates.APPLICATION_ACCEPTED,
             context=context.model_dump(exclude_none=True),
             from_address=from_address,
             from_name=from_name,
+            popup_id=popup_id,
+            db_session=db_session,
         )
 
     async def send_application_rejected(
@@ -271,15 +400,20 @@ class EmailService:
         context: ApplicationRejectedContext,
         from_address: str | None = None,
         from_name: str | None = None,
+        popup_id: uuid.UUID | None = None,
+        db_session: Session | None = None,
     ) -> bool:
         """Send application rejected email."""
-        return await self.send_template_email(
+        return await self._send_with_fallback(
             to=to,
             subject=subject,
+            template_type=EmailTemplateType.APPLICATION_REJECTED,
             template_name=EmailTemplates.APPLICATION_REJECTED,
             context=context.model_dump(exclude_none=True),
             from_address=from_address,
             from_name=from_name,
+            popup_id=popup_id,
+            db_session=db_session,
         )
 
     async def send_payment_confirmed(
@@ -289,15 +423,20 @@ class EmailService:
         context: PaymentConfirmedContext,
         from_address: str | None = None,
         from_name: str | None = None,
+        popup_id: uuid.UUID | None = None,
+        db_session: Session | None = None,
     ) -> bool:
         """Send payment confirmed email."""
-        return await self.send_template_email(
+        return await self._send_with_fallback(
             to=to,
             subject=subject,
+            template_type=EmailTemplateType.PAYMENT_CONFIRMED,
             template_name=EmailTemplates.PAYMENT_CONFIRMED,
             context=context.model_dump(exclude_none=True),
             from_address=from_address,
             from_name=from_name,
+            popup_id=popup_id,
+            db_session=db_session,
         )
 
     async def send_payment_pending(
@@ -307,15 +446,20 @@ class EmailService:
         context: PaymentPendingContext,
         from_address: str | None = None,
         from_name: str | None = None,
+        popup_id: uuid.UUID | None = None,
+        db_session: Session | None = None,
     ) -> bool:
         """Send payment pending email."""
-        return await self.send_template_email(
+        return await self._send_with_fallback(
             to=to,
             subject=subject,
+            template_type=EmailTemplateType.PAYMENT_PENDING,
             template_name=EmailTemplates.PAYMENT_PENDING,
             context=context.model_dump(exclude_none=True),
             from_address=from_address,
             from_name=from_name,
+            popup_id=popup_id,
+            db_session=db_session,
         )
 
     async def send_edit_passes_confirmed(
@@ -325,16 +469,64 @@ class EmailService:
         context: EditPassesConfirmedContext,
         from_address: str | None = None,
         from_name: str | None = None,
+        popup_id: uuid.UUID | None = None,
+        db_session: Session | None = None,
     ) -> bool:
         """Send pass modification confirmed email."""
-        return await self.send_template_email(
+        return await self._send_with_fallback(
             to=to,
             subject=subject,
+            template_type=EmailTemplateType.EDIT_PASSES_CONFIRMED,
             template_name=EmailTemplates.EDIT_PASSES_CONFIRMED,
             context=context.model_dump(exclude_none=True),
             from_address=from_address,
             from_name=from_name,
+            popup_id=popup_id,
+            db_session=db_session,
         )
+
+    async def _send_with_fallback(
+        self,
+        to: str,
+        subject: str,
+        template_type: EmailTemplateType,
+        template_name: str,
+        context: Mapping[str, Any],
+        from_address: str | None = None,
+        from_name: str | None = None,
+        popup_id: uuid.UUID | None = None,
+        db_session: Session | None = None,
+    ) -> bool:
+        """Send email using DB custom template if available, else file-based fallback."""
+        try:
+            enriched_context: Mapping[str, Any] = context
+            if popup_id and db_session:
+                enriched_context = _enrich_with_popup_data(
+                    dict(context), popup_id, db_session
+                )
+                rendered_html, custom_subject = self.render_with_fallback(
+                    template_type, enriched_context, popup_id, db_session
+                )
+                final_subject = custom_subject or subject
+                return await self.send_email(
+                    to=to,
+                    subject=final_subject,
+                    html_content=rendered_html,
+                    from_address=from_address,
+                    from_name=from_name,
+                )
+
+            return await self.send_template_email(
+                to=to,
+                subject=subject,
+                template_name=template_name,
+                context=enriched_context,
+                from_address=from_address,
+                from_name=from_name,
+            )
+        except Exception as e:
+            logger.error(f"Error sending email with fallback to {to}: {e}")
+            return False
 
 
 # Singleton instance

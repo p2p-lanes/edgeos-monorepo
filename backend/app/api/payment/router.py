@@ -31,7 +31,7 @@ from app.services.email import (
 router = APIRouter(prefix="/payments", tags=["payments"])
 
 
-async def _send_payment_confirmed_email(payment) -> None:
+async def _send_payment_confirmed_email(payment, db_session=None) -> None:
     """Send payment confirmation email."""
     from loguru import logger
 
@@ -90,6 +90,8 @@ async def _send_payment_confirmed_email(payment) -> None:
         ),
         from_address=tenant.sender_email,
         from_name=tenant.sender_name,
+        popup_id=popup.id,
+        db_session=db_session,
     )
     logger.info(
         f"Payment confirmed email sent to {human.email} for payment {payment.id}"
@@ -179,7 +181,7 @@ async def update_payment(
         payment_in.status == PaymentStatus.APPROVED
         and old_status != PaymentStatus.APPROVED.value
     ):
-        await _send_payment_confirmed_email(payment)
+        await _send_payment_confirmed_email(payment, db_session=db)
 
     return PaymentPublic.model_validate(payment)
 
@@ -195,7 +197,7 @@ async def approve_payment(
     payment = payments_crud.approve_payment(db, payment_id)
 
     # Send payment confirmed email
-    await _send_payment_confirmed_email(payment)
+    await _send_payment_confirmed_email(payment, db_session=db)
 
     return PaymentPublic.model_validate(payment)
 
@@ -398,7 +400,7 @@ async def simplefi_webhook(
             rate=rate,
         )
         # Send confirmation email
-        await _send_payment_confirmed_email(payment)
+        await _send_payment_confirmed_email(payment, db_session=db)
         logger.info("Payment %s approved via SimpleFI webhook", payment.id)
     else:
         # Mark as expired for other statuses

@@ -8,6 +8,7 @@ from app.api import (
     auth,
     coupon,
     dashboard,
+    email_template,
     form_field,
     group,
     human,
@@ -34,6 +35,7 @@ api_router.include_router(product.router)
 api_router.include_router(coupon.router)
 api_router.include_router(group.router)
 api_router.include_router(form_field.router)
+api_router.include_router(email_template.router)
 
 # Approval system resources (registered before application so static paths
 # like /applications/pending-review are matched before /{application_id})
