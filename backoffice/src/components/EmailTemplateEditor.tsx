@@ -1,6 +1,5 @@
 import Editor, { type OnMount } from "@monaco-editor/react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { useBlocker } from "@tanstack/react-router"
 import {
   Braces,
   ChevronRight,
@@ -53,8 +52,11 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable"
 import { Switch } from "@/components/ui/switch"
-import { Textarea } from "@/components/ui/textarea"
 import useCustomToast from "@/hooks/useCustomToast"
+import {
+  UnsavedChangesDialog,
+  useDirtyBlocker,
+} from "@/hooks/useUnsavedChanges"
 import { createErrorHandler } from "@/utils"
 
 interface EmailTemplateEditorProps {
@@ -91,14 +93,9 @@ export function EmailTemplateEditor({
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [loadDefaultConfirmOpen, setLoadDefaultConfirmOpen] = useState(false)
   const [testEmail, setTestEmail] = useState("")
-  const [testVariablesJson, setTestVariablesJson] = useState("")
   const [showPreview, setShowPreview] = useState(true)
 
   const isEdit = !!existingTemplate
-
-  // =========================================================================
-  // Queries
-  // =========================================================================
 
   const { data: defaultTemplate } = useQuery({
     queryKey: ["email-template-default", templateType],
@@ -112,10 +109,6 @@ export function EmailTemplateEditor({
     queryKey: ["popup", popupId],
     queryFn: () => PopupsService.getPopup({ popupId }),
   })
-
-  // =========================================================================
-  // Dirty state tracking
-  // =========================================================================
 
   const initialHtmlRef = useRef(existingTemplate?.html_content ?? "")
   const initialSubjectRef = useRef(existingTemplate?.subject ?? "")
@@ -136,34 +129,19 @@ export function EmailTemplateEditor({
     }
   }, [defaultTemplate, existingTemplate])
 
-  const blocker = useBlocker({
-    shouldBlockFn: () =>
+  const blocker = useDirtyBlocker(
+    isDirty,
+    () =>
       htmlContent !== initialHtmlRef.current ||
       subject !== initialSubjectRef.current ||
       isActive !== initialIsActiveRef.current,
-    enableBeforeUnload: () => isDirty,
-    disabled: !isDirty,
-    withResolver: true,
-  })
-
-  useEffect(() => {
-    if (!isDirty) return
-    const handler = (e: BeforeUnloadEvent) => {
-      e.preventDefault()
-    }
-    window.addEventListener("beforeunload", handler)
-    return () => window.removeEventListener("beforeunload", handler)
-  }, [isDirty])
+  )
 
   const resetDirtyState = () => {
     initialHtmlRef.current = htmlContent
     initialSubjectRef.current = subject
     initialIsActiveRef.current = isActive
   }
-
-  // =========================================================================
-  // Effects
-  // =========================================================================
 
   const fetchPreview = useCallback(
     (content: string, subjectValue: string) => {
@@ -205,10 +183,6 @@ export function EmailTemplateEditor({
       setHtmlContent(defaultTemplate.html_content)
     }
   }, [defaultTemplate, existingTemplate, htmlContent])
-
-  // =========================================================================
-  // Editor actions
-  // =========================================================================
 
   const handleEditorMount: OnMount = (editor) => {
     editorRef.current = editor
@@ -266,27 +240,9 @@ export function EmailTemplateEditor({
     setLoadDefaultConfirmOpen(false)
   }
 
-  // =========================================================================
-  // Send Test helpers
-  // =========================================================================
-
   const openSendTest = () => {
-    const popupVars = getPopupPreviewVariables(popupData)
-    const placeholders: Record<string, string> = {}
-    for (const v of typeInfo.variables) {
-      if (!(v.name in popupVars)) {
-        placeholders[v.name] = `{{${v.name}}}`
-      }
-    }
-    setTestVariablesJson(
-      JSON.stringify({ ...placeholders, ...popupVars }, null, 2),
-    )
     setSendTestOpen(true)
   }
-
-  // =========================================================================
-  // Mutations
-  // =========================================================================
 
   const createMutation = useMutation({
     mutationFn: (data: {
@@ -347,20 +303,14 @@ export function EmailTemplateEditor({
   })
 
   const sendTestMutation = useMutation({
-    mutationFn: ({
-      email,
-      customVariables,
-    }: {
-      email: string
-      customVariables?: Record<string, unknown>
-    }) =>
+    mutationFn: (email: string) =>
       EmailTemplatesService.sendTestEmail({
         requestBody: {
           html_content: htmlContent,
           template_type: templateType,
           subject: subject || undefined,
           to_email: email,
-          custom_variables: customVariables,
+          custom_variables: getPopupPreviewVariables(popupData),
         },
       }),
     onSuccess: () => {
@@ -388,12 +338,7 @@ export function EmailTemplateEditor({
   }
 
   const handleSendTest = () => {
-    try {
-      const variables = JSON.parse(testVariablesJson) as Record<string, unknown>
-      sendTestMutation.mutate({ email: testEmail, customVariables: variables })
-    } catch {
-      showErrorToast("Invalid JSON in test variables")
-    }
+    sendTestMutation.mutate(testEmail)
   }
 
   const isSaving = createMutation.isPending || updateMutation.isPending
@@ -556,31 +501,20 @@ export function EmailTemplateEditor({
           <DialogHeader>
             <DialogTitle>Send Test Email</DialogTitle>
             <DialogDescription>
-              Send a test email to verify the template. Edit the variables below
-              to customize the test data.
+              Send a test email to verify layout and styling. Popup variables
+              will be filled with real data; other variables will show as
+              placeholders.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex flex-col gap-4">
-            <div>
-              <Label htmlFor="test-email">Email Address</Label>
-              <Input
-                id="test-email"
-                type="email"
-                placeholder="you@example.com"
-                value={testEmail}
-                onChange={(e) => setTestEmail(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="test-variables">Test Variables (JSON)</Label>
-              <Textarea
-                id="test-variables"
-                className="mt-1.5 min-h-48 font-mono text-xs"
-                value={testVariablesJson}
-                onChange={(e) => setTestVariablesJson(e.target.value)}
-                spellCheck={false}
-              />
-            </div>
+          <div>
+            <Label htmlFor="test-email">Email Address</Label>
+            <Input
+              id="test-email"
+              type="email"
+              placeholder="you@example.com"
+              value={testEmail}
+              onChange={(e) => setTestEmail(e.target.value)}
+            />
           </div>
           <DialogFooter>
             <DialogClose asChild>
@@ -653,38 +587,15 @@ export function EmailTemplateEditor({
       </Dialog>
 
       {/* Unsaved Changes Navigation Dialog */}
-      {blocker.status === "blocked" && (
-        <Dialog open onOpenChange={(open) => !open && blocker.reset()}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Unsaved changes</DialogTitle>
-              <DialogDescription>
-                You have unsaved changes that will be lost if you leave this
-                page. Are you sure you want to continue?
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button variant="outline" onClick={blocker.reset}>
-                Stay on page
-              </Button>
-              <Button variant="destructive" onClick={blocker.proceed}>
-                Discard changes
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
+      <UnsavedChangesDialog blocker={blocker} />
     </div>
   )
 }
 
-// =============================================================================
-// Variable groups popover content
-// =============================================================================
-
 /** Map popup variable names to their corresponding PopupPublic field. */
 const POPUP_FIELD_MAP: Record<string, keyof PopupPublic> = {
   popup_name: "name",
+  popup_image_url: "image_url",
   popup_icon_url: "icon_url",
   popup_web_url: "web_url",
   popup_blog_url: "blog_url",
