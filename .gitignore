@@ -15,6 +15,7 @@ Thumbs.db
 .agents
 .cursor
 .crush
+.claude/*
 AGENTS.md
 CLAUDE.md
 tasks/*
