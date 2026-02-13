@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import aiosmtplib
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound
@@ -17,6 +17,7 @@ from app.api.email_template.schemas import EmailTemplateType
 from app.core.config import settings
 from app.services.email.templates import (
     TEMPLATE_TYPE_TO_FILE,
+    AbandonedCartContext,
     ApplicationAcceptedContext,
     ApplicationReceivedContext,
     ApplicationRejectedContext,
@@ -25,8 +26,26 @@ from app.services.email.templates import (
     LoginCodeHumanContext,
     LoginCodeUserContext,
     PaymentConfirmedContext,
-    PaymentPendingContext,
 )
+
+if TYPE_CHECKING:
+    from app.api.payment.models import Payments
+
+
+def compute_order_summary(payment: "Payments") -> str:
+    """Pre-render payment products into an HTML summary for custom templates.
+
+    Returns a ``<br>``-joined HTML string with each product line showing
+    the product name, attendee name, and price.
+    """
+    lines: list[str] = []
+    for ps in payment.products_snapshot:
+        attendee_name = ps.attendee.name if ps.attendee else "N/A"
+        lines.append(
+            f"<strong>{ps.product_name}</strong> ({attendee_name})"
+            f" — ${float(ps.product_price):.2f}"
+        )
+    return "<br>".join(lines)
 
 
 def _enrich_with_popup_data(
@@ -42,6 +61,7 @@ def _enrich_with_popup_data(
     enriched = dict(context)
     popup_fields = {
         "popup_name": popup.name,
+        "popup_image_url": popup.image_url,
         "popup_icon_url": popup.icon_url,
         "popup_web_url": popup.web_url,
         "popup_blog_url": popup.blog_url,
@@ -439,22 +459,22 @@ class EmailService:
             db_session=db_session,
         )
 
-    async def send_payment_pending(
+    async def send_abandoned_cart(
         self,
         to: str,
         subject: str,
-        context: PaymentPendingContext,
+        context: AbandonedCartContext,
         from_address: str | None = None,
         from_name: str | None = None,
         popup_id: uuid.UUID | None = None,
         db_session: Session | None = None,
     ) -> bool:
-        """Send payment pending email."""
+        """Send abandoned cart email."""
         return await self._send_with_fallback(
             to=to,
             subject=subject,
-            template_type=EmailTemplateType.PAYMENT_PENDING,
-            template_name=EmailTemplates.PAYMENT_PENDING,
+            template_type=EmailTemplateType.ABANDONED_CART,
+            template_name=EmailTemplates.ABANDONED_CART,
             context=context.model_dump(exclude_none=True),
             from_address=from_address,
             from_name=from_name,

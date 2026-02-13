@@ -14,7 +14,7 @@ class EmailTemplateType(StrEnum):
     APPLICATION_ACCEPTED = "application_accepted"
     APPLICATION_REJECTED = "application_rejected"
     PAYMENT_CONFIRMED = "payment_confirmed"
-    PAYMENT_PENDING = "payment_pending"
+    ABANDONED_CART = "abandoned_cart"
     EDIT_PASSES_CONFIRMED = "edit_passes_confirmed"
 
 

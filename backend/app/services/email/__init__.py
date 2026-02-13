@@ -1,5 +1,10 @@
-from app.services.email.service import EmailService, get_email_service
+from app.services.email.service import (
+    EmailService,
+    compute_order_summary,
+    get_email_service,
+)
 from app.services.email.templates import (
+    AbandonedCartContext,
     ApplicationAcceptedContext,
     ApplicationReceivedContext,
     ApplicationRejectedContext,
@@ -9,7 +14,6 @@ from app.services.email.templates import (
     LoginCodeUserContext,
     PaymentAttendeeItem,
     PaymentConfirmedContext,
-    PaymentPendingContext,
     PaymentProductItem,
 )
 
@@ -27,8 +31,10 @@ __all__ = [
     "ApplicationRejectedContext",
     # Payment contexts
     "PaymentConfirmedContext",
-    "PaymentPendingContext",
+    "AbandonedCartContext",
     "EditPassesConfirmedContext",
     "PaymentProductItem",
     "PaymentAttendeeItem",
+    # Helpers
+    "compute_order_summary",
 ]

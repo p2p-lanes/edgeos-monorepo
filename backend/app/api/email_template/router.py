@@ -99,7 +99,14 @@ async def preview_template(
     from app.services.email.service import get_email_service
 
     service = get_email_service()
-    rendered_html = service.render_preview_template(body.html_content, variables)
+
+    try:
+        rendered_html = service.render_preview_template(body.html_content, variables)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Template rendering error: {e}",
+        )
 
     rendered_subject = None
     if body.subject:
@@ -133,13 +140,22 @@ async def send_test_email(
     from app.services.email.service import get_email_service
 
     service = get_email_service()
-    rendered_html = service.render_custom_template(body.html_content, variables)
+
+    try:
+        rendered_html = service.render_preview_template(body.html_content, variables)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Template rendering error: {e}",
+        )
 
     rendered_subject = body.subject or "Test Email"
     if body.subject:
         from jinja2.sandbox import SandboxedEnvironment
 
-        env = SandboxedEnvironment()
+        from app.services.email.templates import PreservingUndefined
+
+        env = SandboxedEnvironment(undefined=PreservingUndefined)
         rendered_subject = env.from_string(body.subject).render(**variables)
 
     success = await service.send_email(

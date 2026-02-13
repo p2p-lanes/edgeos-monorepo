@@ -121,13 +121,14 @@ class PaymentConfirmedContext(BaseModel):
     discount_value: int | None = None
     original_amount: float | None = None
     attendees: list[PaymentAttendeeItem] | None = None
+    order_summary: str | None = None
     portal_url: str | None = None
 
 
-class PaymentPendingContext(BaseModel):
-    """Context for payment/pending.html template.
+class AbandonedCartContext(BaseModel):
+    """Context for payment/abandoned_cart.html template.
 
-    Sent when a payment is created but not yet completed.
+    Sent when a payment is created but not completed (abandoned cart).
     """
 
     first_name: str
@@ -138,6 +139,7 @@ class PaymentPendingContext(BaseModel):
     discount_value: int | None = None
     original_amount: float | None = None
     checkout_url: str | None = None
+    order_summary: str | None = None
 
 
 class EditPassesConfirmedContext(BaseModel):
@@ -155,6 +157,7 @@ class EditPassesConfirmedContext(BaseModel):
     credit_applied: float | None = None
     remaining_credit: float | None = None
     attendees: list[PaymentAttendeeItem] | None = None
+    order_summary: str | None = None
     portal_url: str | None = None
 
 
@@ -180,7 +183,7 @@ class EmailTemplates:
 
     # Payment
     PAYMENT_CONFIRMED = "payment/confirmed.html"
-    PAYMENT_PENDING = "payment/pending.html"
+    ABANDONED_CART = "payment/abandoned_cart.html"
     EDIT_PASSES_CONFIRMED = "payment/edit_passes_confirmed.html"
 
 
@@ -195,7 +198,7 @@ TEMPLATE_TYPE_TO_FILE: dict[EmailTemplateType, str] = {
     EmailTemplateType.APPLICATION_ACCEPTED: "application/accepted.html",
     EmailTemplateType.APPLICATION_REJECTED: "application/rejected.html",
     EmailTemplateType.PAYMENT_CONFIRMED: "payment/confirmed.html",
-    EmailTemplateType.PAYMENT_PENDING: "payment/pending.html",
+    EmailTemplateType.ABANDONED_CART: "payment/abandoned_cart.html",
     EmailTemplateType.EDIT_PASSES_CONFIRMED: "payment/edit_passes_confirmed.html",
 }
 
@@ -211,6 +214,14 @@ _POPUP_EVENT_VARIABLES: list[dict[str, Any]] = [
         "type": "string",
         "description": "Name of the event/popup",
         "required": True,
+        "group": "Event",
+    },
+    {
+        "name": "popup_image_url",
+        "label": "Cover Image URL",
+        "type": "string",
+        "description": "Event cover image URL",
+        "required": False,
         "group": "Event",
     },
     {
@@ -464,6 +475,14 @@ TEMPLATE_TYPE_METADATA: list[dict[str, Any]] = [
                 "group": "Payment",
             },
             {
+                "name": "order_summary",
+                "label": "Order Summary",
+                "type": "string",
+                "description": "Pre-rendered HTML summary of products and attendees",
+                "required": False,
+                "group": "Payment",
+            },
+            {
                 "name": "portal_url",
                 "label": "Portal URL",
                 "type": "string",
@@ -475,11 +494,11 @@ TEMPLATE_TYPE_METADATA: list[dict[str, Any]] = [
         ],
     },
     {
-        "type": EmailTemplateType.PAYMENT_PENDING,
-        "label": "Payment Pending",
-        "description": "Sent when a payment is created but not yet completed.",
+        "type": EmailTemplateType.ABANDONED_CART,
+        "label": "Abandoned Cart",
+        "description": "Sent when a payment is created but not completed (abandoned cart).",
         "category": "Payment",
-        "default_subject": "Complete Your Payment - {{ popup_name }}",
+        "default_subject": "Complete Your Purchase - {{ popup_name }}",
         "variables": [
             {
                 "name": "first_name",
@@ -526,6 +545,14 @@ TEMPLATE_TYPE_METADATA: list[dict[str, Any]] = [
                 "label": "Original Amount",
                 "type": "number",
                 "description": "Amount before discount",
+                "required": False,
+                "group": "Payment",
+            },
+            {
+                "name": "order_summary",
+                "label": "Order Summary",
+                "type": "string",
+                "description": "Pre-rendered HTML summary of products and attendees",
                 "required": False,
                 "group": "Payment",
             },
@@ -608,6 +635,14 @@ TEMPLATE_TYPE_METADATA: list[dict[str, Any]] = [
                 "label": "Attendees",
                 "type": "array",
                 "description": "Updated attendee list",
+                "required": False,
+                "group": "Payment",
+            },
+            {
+                "name": "order_summary",
+                "label": "Order Summary",
+                "type": "string",
+                "description": "Pre-rendered HTML summary of products and attendees",
                 "required": False,
                 "group": "Payment",
             },
