@@ -228,11 +228,7 @@ export function EmailTemplateEditor({
   }
 
   const handleLoadDefault = () => {
-    if (isDirty) {
-      setLoadDefaultConfirmOpen(true)
-    } else {
-      loadDefault()
-    }
+    setLoadDefaultConfirmOpen(true)
   }
 
   const confirmLoadDefault = () => {
@@ -541,8 +537,8 @@ export function EmailTemplateEditor({
           <DialogHeader>
             <DialogTitle>Load Default Template</DialogTitle>
             <DialogDescription>
-              You have unsaved changes. Loading the default template will
-              discard your current changes. Are you sure?
+              This will replace the current content with the default template.
+              Are you sure?
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
