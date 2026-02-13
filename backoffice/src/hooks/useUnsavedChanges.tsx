@@ -1,6 +1,6 @@
 import { useStore } from "@tanstack/react-form"
 import { useBlocker } from "@tanstack/react-router"
-import { useEffect } from "react"
+import { useEffect, useRef } from "react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -12,13 +12,22 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function useUnsavedChanges(form: { store: any }) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const isDirty = useStore(form.store, (s: any) => s.isDirty as boolean)
+
+export const unsavedChangesRef = { current: false }
+
+function useUnsavedChangesBlocker(
+  isDirty: boolean,
+  shouldBlockFn: () => boolean,
+) {
+  useEffect(() => {
+    unsavedChangesRef.current = isDirty
+    return () => {
+      unsavedChangesRef.current = false
+    }
+  }, [isDirty])
 
   const blocker = useBlocker({
-    shouldBlockFn: () => form.store.state.isDirty as boolean,
+    shouldBlockFn,
     enableBeforeUnload: () => isDirty,
     disabled: !isDirty,
     withResolver: true,
@@ -38,10 +47,33 @@ export function useUnsavedChanges(form: { store: any }) {
   return blocker
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function useUnsavedChanges(form: { store: any }) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const isDirty = useStore(form.store, (s: any) => s.isDirty as boolean)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return useUnsavedChangesBlocker(
+    isDirty,
+    () => form.store.state.isDirty as boolean,
+  )
+}
+
+export function useDirtyBlocker(
+  isDirty: boolean,
+  shouldBlockFn?: () => boolean,
+) {
+  const dirtyRef = useRef(isDirty)
+  dirtyRef.current = isDirty
+  return useUnsavedChangesBlocker(
+    isDirty,
+    shouldBlockFn ?? (() => dirtyRef.current),
+  )
+}
+
 export function UnsavedChangesDialog({
   blocker,
 }: {
-  blocker: ReturnType<typeof useUnsavedChanges>
+  blocker: ReturnType<typeof useBlocker>
 }) {
   if (blocker.status !== "blocked") return null
 

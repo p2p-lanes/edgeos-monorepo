@@ -1,8 +1,18 @@
 import { useQuery } from "@tanstack/react-query"
 import { useLocation, useNavigate } from "@tanstack/react-router"
 import { Building2 } from "lucide-react"
+import { useState } from "react"
 
 import { TenantsService } from "@/client"
+import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -13,17 +23,43 @@ import {
 } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
+import { unsavedChangesRef } from "@/hooks/useUnsavedChanges"
 
 export function TenantSelector() {
   const { selectedTenantId, setSelectedTenantId } = useWorkspace()
   const location = useLocation()
   const navigate = useNavigate()
 
+  const [pendingTenantId, setPendingTenantId] = useState<string | null>(null)
+
+  /** Derive the list path from the current URL, e.g. /products/123/edit -> /products */
+  const getListPath = () =>
+    location.pathname.replace(/\/[^/]+(\/edit)?$/, "") || "/"
+
   const handleTenantChange = (value: string) => {
-    setSelectedTenantId(value)
-    if (/\/(new|edit)/.test(location.pathname)) {
-      navigate({ to: "/" })
+    const isOnEditPage = /\/(new|edit)/.test(location.pathname)
+
+    if (isOnEditPage && unsavedChangesRef.current) {
+      setPendingTenantId(value)
+      return
     }
+
+    setSelectedTenantId(value)
+    if (isOnEditPage) {
+      navigate({ to: getListPath() })
+    }
+  }
+
+  const confirmTenantChange = () => {
+    if (pendingTenantId) {
+      setSelectedTenantId(pendingTenantId)
+      setPendingTenantId(null)
+      navigate({ to: getListPath() })
+    }
+  }
+
+  const cancelTenantChange = () => {
+    setPendingTenantId(null)
   }
 
   const {
@@ -70,6 +106,29 @@ export function TenantSelector() {
           ))}
         </SelectContent>
       </Select>
+
+      <Dialog
+        open={!!pendingTenantId}
+        onOpenChange={(open) => !open && cancelTenantChange()}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Unsaved changes</DialogTitle>
+            <DialogDescription>
+              You have unsaved changes that will be lost if you switch tenants.
+              Are you sure you want to continue?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={cancelTenantChange}>
+              Stay on page
+            </Button>
+            <Button variant="destructive" onClick={confirmTenantChange}>
+              Discard changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -1,9 +1,18 @@
 import { useQuery } from "@tanstack/react-query"
 import { useLocation, useNavigate } from "@tanstack/react-router"
 import { Calendar } from "lucide-react"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 
 import { PopupsService } from "@/client"
+import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -14,6 +23,7 @@ import {
 } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
+import { unsavedChangesRef } from "@/hooks/useUnsavedChanges"
 
 export function PopupSelector() {
   const {
@@ -25,11 +35,36 @@ export function PopupSelector() {
   const location = useLocation()
   const navigate = useNavigate()
 
+  const [pendingPopupId, setPendingPopupId] = useState<string | null>(null)
+
+  /** Derive the list path from the current URL, e.g. /products/123/edit -> /products */
+  const getListPath = () =>
+    location.pathname.replace(/\/[^/]+(\/edit)?$/, "") || "/"
+
   const handlePopupChange = (value: string) => {
-    setSelectedPopupId(value)
-    if (/\/(new|edit)/.test(location.pathname)) {
-      navigate({ to: "/" })
+    const isOnEditPage = /\/(new|edit)/.test(location.pathname)
+
+    if (isOnEditPage && unsavedChangesRef.current) {
+      setPendingPopupId(value)
+      return
     }
+
+    setSelectedPopupId(value)
+    if (isOnEditPage) {
+      navigate({ to: getListPath() })
+    }
+  }
+
+  const confirmPopupChange = () => {
+    if (pendingPopupId) {
+      setSelectedPopupId(pendingPopupId)
+      setPendingPopupId(null)
+      navigate({ to: getListPath() })
+    }
+  }
+
+  const cancelPopupChange = () => {
+    setPendingPopupId(null)
   }
 
   // Only fetch popups when we have a tenant context
@@ -107,6 +142,29 @@ export function PopupSelector() {
           ))}
         </SelectContent>
       </Select>
+
+      <Dialog
+        open={!!pendingPopupId}
+        onOpenChange={(open) => !open && cancelPopupChange()}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Unsaved changes</DialogTitle>
+            <DialogDescription>
+              You have unsaved changes that will be lost if you switch popups.
+              Are you sure you want to continue?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={cancelPopupChange}>
+              Stay on page
+            </Button>
+            <Button variant="destructive" onClick={confirmPopupChange}>
+              Discard changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
