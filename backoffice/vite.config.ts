@@ -22,4 +22,15 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ["react", "react-dom"],
+          router: ["@tanstack/react-router", "@tanstack/react-query"],
+          editor: ["@monaco-editor/react"],
+        },
+      },
+    },
+  },
 })
