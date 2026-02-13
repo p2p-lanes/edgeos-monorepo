@@ -12,7 +12,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 
-
 export const unsavedChangesRef = { current: false }
 
 function useUnsavedChangesBlocker(

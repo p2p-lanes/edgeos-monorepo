@@ -59,6 +59,61 @@ import {
 } from "@/hooks/useUnsavedChanges"
 import { createErrorHandler } from "@/utils"
 
+const HTML_SHELL_BEFORE_STYLE = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="x-apple-disable-message-reformatting">
+    <title>{{ subject }}</title>
+    `
+
+const HTML_SHELL_AFTER_STYLE = `
+</head>
+<body>
+    `
+
+const HTML_SHELL_CLOSING = `
+</body>
+</html>`
+
+/**
+ * Extract the editable parts (style block + body innerHTML) from a
+ * complete HTML document, stripping the DOCTYPE/html/head/meta shell.
+ */
+function extractEditableContent(fullHtml: string): string {
+  // If it doesn't look like a full document, return as-is (already extracted)
+  if (!/<html[\s>]/i.test(fullHtml)) return fullHtml
+
+  const styleMatch = fullHtml.match(/<style>([\s\S]*?)<\/style>/i)
+  const bodyMatch = fullHtml.match(/<body[^>]*>([\s\S]*)<\/body>/i)
+
+  const styleBlock = styleMatch ? `<style>${styleMatch[1]}</style>` : ""
+  const bodyContent = bodyMatch?.[1]?.trim() ?? ""
+
+  if (styleBlock && bodyContent) return `${styleBlock}\n\n${bodyContent}`
+  if (bodyContent) return bodyContent
+  return fullHtml
+}
+
+/**
+ * Wrap the editable content (style + body) back into a full HTML document
+ * so the backend can render it as-is.
+ */
+function reconstructFullHtml(editableContent: string): string {
+  const styleMatch = editableContent.match(/<style>([\s\S]*?)<\/style>/i)
+  const styleBlock = styleMatch
+    ? `<style>${styleMatch[1]}</style>`
+    : "<style></style>"
+
+  const bodyContent = editableContent
+    .replace(/<style>[\s\S]*?<\/style>/i, "")
+    .trim()
+
+  return `${HTML_SHELL_BEFORE_STYLE}${styleBlock}${HTML_SHELL_AFTER_STYLE}${bodyContent}${HTML_SHELL_CLOSING}`
+}
+
 interface EmailTemplateEditorProps {
   templateType: EmailTemplateType
   popupId: string
@@ -84,7 +139,9 @@ export function EmailTemplateEditor({
   const lastFocusedRef = useRef<"editor" | "subject">("editor")
 
   const [htmlContent, setHtmlContent] = useState(
-    existingTemplate?.html_content ?? "",
+    existingTemplate?.html_content
+      ? extractEditableContent(existingTemplate.html_content)
+      : "",
   )
   const [subject, setSubject] = useState(existingTemplate?.subject ?? "")
   const [isActive, setIsActive] = useState(existingTemplate?.is_active ?? true)
@@ -110,7 +167,11 @@ export function EmailTemplateEditor({
     queryFn: () => PopupsService.getPopup({ popupId }),
   })
 
-  const initialHtmlRef = useRef(existingTemplate?.html_content ?? "")
+  const initialHtmlRef = useRef(
+    existingTemplate?.html_content
+      ? extractEditableContent(existingTemplate.html_content)
+      : "",
+  )
   const initialSubjectRef = useRef(existingTemplate?.subject ?? "")
   const initialIsActiveRef = useRef(existingTemplate?.is_active ?? true)
 
@@ -125,7 +186,9 @@ export function EmailTemplateEditor({
       defaultTemplate?.html_content &&
       !initialHtmlRef.current
     ) {
-      initialHtmlRef.current = defaultTemplate.html_content
+      initialHtmlRef.current = extractEditableContent(
+        defaultTemplate.html_content,
+      )
     }
   }, [defaultTemplate, existingTemplate])
 
@@ -154,7 +217,7 @@ export function EmailTemplateEditor({
         try {
           const result = await EmailTemplatesService.previewTemplate({
             requestBody: {
-              html_content: content,
+              html_content: reconstructFullHtml(content),
               template_type: templateType,
               subject: subjectValue || undefined,
               preview_variables: getPopupPreviewVariables(popupData),
@@ -180,7 +243,7 @@ export function EmailTemplateEditor({
 
   useEffect(() => {
     if (!existingTemplate && defaultTemplate?.html_content && !htmlContent) {
-      setHtmlContent(defaultTemplate.html_content)
+      setHtmlContent(extractEditableContent(defaultTemplate.html_content))
     }
   }, [defaultTemplate, existingTemplate, htmlContent])
 
@@ -220,7 +283,7 @@ export function EmailTemplateEditor({
 
   const loadDefault = () => {
     if (defaultTemplate?.html_content) {
-      setHtmlContent(defaultTemplate.html_content)
+      setHtmlContent(extractEditableContent(defaultTemplate.html_content))
       setTimeout(() => {
         editorRef.current?.getAction("editor.action.formatDocument")?.run()
       }, 100)
@@ -302,7 +365,7 @@ export function EmailTemplateEditor({
     mutationFn: (email: string) =>
       EmailTemplatesService.sendTestEmail({
         requestBody: {
-          html_content: htmlContent,
+          html_content: reconstructFullHtml(htmlContent),
           template_type: templateType,
           subject: subject || undefined,
           to_email: email,
@@ -318,15 +381,16 @@ export function EmailTemplateEditor({
   })
 
   const handleSave = () => {
+    const fullHtml = reconstructFullHtml(htmlContent)
     if (isEdit) {
       updateMutation.mutate({
-        html_content: htmlContent,
+        html_content: fullHtml,
         subject: subject || undefined,
         is_active: isActive,
       })
     } else {
       createMutation.mutate({
-        html_content: htmlContent,
+        html_content: fullHtml,
         subject: subject || undefined,
         is_active: isActive,
       })
