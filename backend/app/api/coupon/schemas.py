@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, field_validator
-from sqlmodel import Field, SQLModel
+from sqlmodel import DateTime, Field, SQLModel
 
 
 class CouponBase(SQLModel):
@@ -14,8 +14,12 @@ class CouponBase(SQLModel):
     discount_value: int = Field(default=0)  # Percentage: 0, 10, 20, ..., 100
     max_uses: int | None = Field(default=None, nullable=True)
     current_uses: int = Field(default=0)
-    start_date: datetime | None = Field(default=None, nullable=True)
-    end_date: datetime | None = Field(default=None, nullable=True)
+    start_date: datetime | None = Field(
+        default=None, nullable=True, sa_type=DateTime(timezone=True)
+    )
+    end_date: datetime | None = Field(
+        default=None, nullable=True, sa_type=DateTime(timezone=True)
+    )
     is_active: bool = Field(default=True)
 
 

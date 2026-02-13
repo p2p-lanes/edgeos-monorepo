@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
-from sqlmodel import Column, Field, Relationship
+from sqlmodel import Column, DateTime, Field, Relationship, func
 
 from app.api.popup_reviewer.schemas import PopupReviewerBase
 
@@ -34,6 +34,9 @@ class PopupReviewers(PopupReviewerBase, table=True):
 
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
+        sa_column=Column(
+            DateTime(timezone=True), server_default=func.now(), nullable=False
+        ),
     )
 
     # Relationships

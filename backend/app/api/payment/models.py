@@ -2,6 +2,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Optional
 
+from sqlalchemy import Index, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlmodel import Column, DateTime, Field, Relationship, func
 
@@ -23,7 +24,9 @@ class PaymentProducts(PaymentProductBase, table=True):
 
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
-        sa_column=Column(DateTime(timezone=True), server_default=func.now()),
+        sa_column=Column(
+            DateTime(timezone=True), server_default=func.now(), nullable=False
+        ),
     )
 
     # Relationships
@@ -35,6 +38,15 @@ class PaymentProducts(PaymentProductBase, table=True):
 class Payments(PaymentBase, table=True):
     """Payment model for tracking purchases."""
 
+    __table_args__ = (
+        Index("ix_payments_application_status", "application_id", "status"),
+        Index(
+            "ix_payments_pending_queue",
+            "created_at",
+            postgresql_where=text("status = 'pending'"),
+        ),
+    )
+
     id: uuid.UUID = Field(
         default_factory=uuid.uuid4,
         sa_column=Column(
@@ -45,12 +57,17 @@ class Payments(PaymentBase, table=True):
 
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
-        sa_column=Column(DateTime(timezone=True), server_default=func.now()),
+        sa_column=Column(
+            DateTime(timezone=True), server_default=func.now(), nullable=False
+        ),
     )
     updated_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
         sa_column=Column(
-            DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+            DateTime(timezone=True),
+            server_default=func.now(),
+            onupdate=func.now(),
+            nullable=False,
         ),
     )
 

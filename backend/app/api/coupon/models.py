@@ -1,7 +1,7 @@
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import UniqueConstraint
+from sqlalchemy import Index, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlmodel import Column, Field, Relationship
 
@@ -18,6 +18,13 @@ class Coupons(CouponBase, table=True):
 
     __table_args__ = (
         UniqueConstraint("code", "popup_id", name="uq_coupon_code_popup_id"),
+        Index("ix_coupons_popup_active", "popup_id", "is_active"),
+        Index(
+            "ix_coupons_active_lookup",
+            "popup_id",
+            "code",
+            postgresql_where=text("is_active = true"),
+        ),
     )
 
     id: uuid.UUID = Field(

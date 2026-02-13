@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
-from sqlmodel import Field, SQLModel
+from sqlmodel import DateTime, Field, SQLModel
 
 
 class CheckInBase(SQLModel):
@@ -10,10 +10,16 @@ class CheckInBase(SQLModel):
 
     tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
     attendee_id: uuid.UUID = Field(foreign_key="attendees.id", unique=True, index=True)
-    arrival_date: datetime | None = Field(default=None, nullable=True)
-    departure_date: datetime | None = Field(default=None, nullable=True)
+    arrival_date: datetime | None = Field(
+        default=None, nullable=True, sa_type=DateTime(timezone=True)
+    )
+    departure_date: datetime | None = Field(
+        default=None, nullable=True, sa_type=DateTime(timezone=True)
+    )
     qr_check_in: bool = Field(default=False)
-    qr_scan_timestamp: datetime | None = Field(default=None, nullable=True)
+    qr_scan_timestamp: datetime | None = Field(
+        default=None, nullable=True, sa_type=DateTime(timezone=True)
+    )
 
 
 class CheckInCreate(BaseModel):

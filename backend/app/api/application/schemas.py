@@ -5,7 +5,7 @@ from enum import Enum
 from pydantic import BaseModel, ConfigDict, field_validator
 from sqlalchemy import String
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
-from sqlmodel import Column, Field, SQLModel
+from sqlmodel import Column, DateTime, Field, SQLModel
 
 from app.api.attendee.schemas import AttendeePublic, CompanionCreate
 from app.api.human.schemas import HumanPublic
@@ -39,7 +39,7 @@ class ApplicationBase(SQLModel):
     popup_id: uuid.UUID = Field(foreign_key="popups.id", index=True)
     human_id: uuid.UUID = Field(foreign_key="humans.id", index=True)
     group_id: uuid.UUID | None = Field(
-        default=None, foreign_key="groups.id", nullable=True
+        default=None, foreign_key="groups.id", nullable=True, index=True
     )
 
     # Popup-specific fields
@@ -64,8 +64,12 @@ class ApplicationBase(SQLModel):
     )
 
     # Timestamps
-    submitted_at: datetime | None = Field(default=None, nullable=True)
-    accepted_at: datetime | None = Field(default=None, nullable=True)
+    submitted_at: datetime | None = Field(
+        default=None, nullable=True, sa_type=DateTime(timezone=True)
+    )
+    accepted_at: datetime | None = Field(
+        default=None, nullable=True, sa_type=DateTime(timezone=True)
+    )
 
 
 class ApplicationPublic(BaseModel):

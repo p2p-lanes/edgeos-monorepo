@@ -1,7 +1,7 @@
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import UniqueConstraint
+from sqlalchemy import Index, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlmodel import Column, Field, Relationship
 
@@ -19,6 +19,13 @@ class Products(ProductBase, table=True):
 
     __table_args__ = (
         UniqueConstraint("slug", "popup_id", name="uq_product_slug_popup_id"),
+        Index("ix_products_popup_active", "popup_id", "is_active"),
+        Index(
+            "ix_products_active_lookup",
+            "popup_id",
+            "category",
+            postgresql_where=text("is_active = true"),
+        ),
     )
 
     id: uuid.UUID = Field(

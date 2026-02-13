@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import UniqueConstraint
+from sqlalchemy import Index, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlmodel import Column, DateTime, Field, Relationship, SQLModel, func
 
@@ -60,7 +60,9 @@ class GroupWhitelistedEmails(SQLModel, table=True):
     email: str = Field(index=True)
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
-        sa_column=Column(DateTime(timezone=True), server_default=func.now()),
+        sa_column=Column(
+            DateTime(timezone=True), server_default=func.now(), nullable=False
+        ),
     )
 
     # Relationship
@@ -70,7 +72,10 @@ class GroupWhitelistedEmails(SQLModel, table=True):
 class Groups(GroupBase, table=True):
     """Group model for organizing applications and providing discounts."""
 
-    __table_args__ = (UniqueConstraint("slug", "popup_id", name="uq_group_slug_popup"),)
+    __table_args__ = (
+        UniqueConstraint("slug", "popup_id", name="uq_group_slug_popup"),
+        Index("ix_groups_popup_ambassador", "popup_id", "is_ambassador_group"),
+    )
 
     id: uuid.UUID = Field(
         default_factory=uuid.uuid4,
@@ -82,12 +87,17 @@ class Groups(GroupBase, table=True):
 
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
-        sa_column=Column(DateTime(timezone=True), server_default=func.now()),
+        sa_column=Column(
+            DateTime(timezone=True), server_default=func.now(), nullable=False
+        ),
     )
     updated_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
         sa_column=Column(
-            DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+            DateTime(timezone=True),
+            server_default=func.now(),
+            onupdate=func.now(),
+            nullable=False,
         ),
     )
 

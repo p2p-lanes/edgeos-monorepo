@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
-from sqlmodel import Column, Field, Relationship
+from sqlmodel import Column, DateTime, Field, Relationship, func
 
 from app.api.approval_strategy.schemas import ApprovalStrategyBase
 
@@ -31,9 +31,18 @@ class ApprovalStrategies(ApprovalStrategyBase, table=True):
 
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
+        sa_column=Column(
+            DateTime(timezone=True), server_default=func.now(), nullable=False
+        ),
     )
     updated_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
+        sa_column=Column(
+            DateTime(timezone=True),
+            server_default=func.now(),
+            onupdate=func.now(),
+            nullable=False,
+        ),
     )
 
     # Relationships

@@ -27,7 +27,9 @@ class CheckIns(CheckInBase, table=True):
 
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
-        sa_column=Column(DateTime(timezone=True), server_default=func.now()),
+        sa_column=Column(
+            DateTime(timezone=True), server_default=func.now(), nullable=False
+        ),
     )
 
     # Relationships

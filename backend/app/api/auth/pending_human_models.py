@@ -3,7 +3,7 @@ from datetime import datetime
 
 from sqlalchemy import UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
-from sqlmodel import Column, Field, SQLModel
+from sqlmodel import Column, DateTime, Field, SQLModel
 
 
 class PendingHumans(SQLModel, table=True):
@@ -25,7 +25,7 @@ class PendingHumans(SQLModel, table=True):
     tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
     email: str = Field(index=True, max_length=255)
     auth_code: str = Field(max_length=6)
-    code_expiration: datetime = Field(index=True)
+    code_expiration: datetime = Field(index=True, sa_type=DateTime(timezone=True))
     attempts: int = Field(default=0)
 
     picture_url: str | None = Field(default=None, max_length=500)

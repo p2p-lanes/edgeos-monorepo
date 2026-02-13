@@ -4,8 +4,8 @@ from decimal import Decimal
 from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, model_validator
-from sqlalchemy import Numeric
-from sqlmodel import Column, Field, SQLModel
+from sqlalchemy import Numeric, Text
+from sqlmodel import Column, DateTime, Field, SQLModel
 
 
 class ProductCategory(str, Enum):
@@ -46,14 +46,18 @@ class ProductBase(SQLModel):
     compare_price: Decimal | None = Field(
         default=None, sa_column=Column(Numeric(10, 2), nullable=True)
     )
-    description: str | None = Field(default=None, nullable=True)
+    description: str | None = Field(default=None, nullable=True, sa_type=Text())
     category: ProductCategory = Field(default=ProductCategory.TICKET, index=True)
     attendee_category: TicketAttendeeCategory | None = Field(
         default=None, nullable=True
     )
     duration_type: TicketDuration | None = Field(default=None, nullable=True)
-    start_date: datetime | None = Field(default=None, nullable=True)
-    end_date: datetime | None = Field(default=None, nullable=True)
+    start_date: datetime | None = Field(
+        default=None, nullable=True, sa_type=DateTime(timezone=True)
+    )
+    end_date: datetime | None = Field(
+        default=None, nullable=True, sa_type=DateTime(timezone=True)
+    )
     is_active: bool = Field(default=True)
     exclusive: bool = Field(default=False)
     max_quantity: int | None = Field(default=None, nullable=True)

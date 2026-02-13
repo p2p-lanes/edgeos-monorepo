@@ -2,6 +2,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
+from sqlalchemy import Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlmodel import Column, DateTime, Field, Relationship, func
 
@@ -28,6 +29,10 @@ class AttendeeProducts(AttendeeProductsBase, table=True):
 class Attendees(AttendeeBase, table=True):
     """Attendee model - people attending an event via an application."""
 
+    __table_args__ = (
+        Index("ix_attendees_application_category", "application_id", "category"),
+    )
+
     id: uuid.UUID = Field(
         default_factory=uuid.uuid4,
         sa_column=Column(
@@ -38,12 +43,17 @@ class Attendees(AttendeeBase, table=True):
 
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
-        sa_column=Column(DateTime(timezone=True), server_default=func.now()),
+        sa_column=Column(
+            DateTime(timezone=True), server_default=func.now(), nullable=False
+        ),
     )
     updated_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
         sa_column=Column(
-            DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+            DateTime(timezone=True),
+            server_default=func.now(),
+            onupdate=func.now(),
+            nullable=False,
         ),
     )
 

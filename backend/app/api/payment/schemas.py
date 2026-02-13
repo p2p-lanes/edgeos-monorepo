@@ -4,7 +4,7 @@ from decimal import Decimal
 from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, field_validator
-from sqlalchemy import Numeric
+from sqlalchemy import Numeric, Text
 from sqlmodel import Column, Field, SQLModel
 
 
@@ -30,13 +30,17 @@ class PaymentProductBase(SQLModel):
 
     tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
     payment_id: uuid.UUID = Field(foreign_key="payments.id", primary_key=True)
-    product_id: uuid.UUID = Field(foreign_key="products.id", primary_key=True)
-    attendee_id: uuid.UUID = Field(foreign_key="attendees.id", primary_key=True)
+    product_id: uuid.UUID = Field(
+        foreign_key="products.id", primary_key=True, index=True
+    )
+    attendee_id: uuid.UUID = Field(
+        foreign_key="attendees.id", primary_key=True, index=True
+    )
     quantity: int = Field(default=1)
 
     # Snapshot of product at time of purchase
     product_name: str
-    product_description: str | None = None
+    product_description: str | None = Field(default=None, sa_type=Text())
     product_price: Decimal = Field(sa_column=Column(Numeric(10, 2), nullable=False))
     product_category: str
 
@@ -60,7 +64,7 @@ class PaymentBase(SQLModel):
 
     # Discount tracking
     coupon_id: uuid.UUID | None = Field(
-        default=None, foreign_key="coupons.id", nullable=True
+        default=None, foreign_key="coupons.id", nullable=True, index=True
     )
     coupon_code: str | None = Field(default=None, nullable=True)
     discount_value: Decimal | None = Field(
@@ -72,7 +76,7 @@ class PaymentBase(SQLModel):
 
     # Group discount tracking
     group_id: uuid.UUID | None = Field(
-        default=None, foreign_key="groups.id", nullable=True
+        default=None, foreign_key="groups.id", nullable=True, index=True
     )
 
 

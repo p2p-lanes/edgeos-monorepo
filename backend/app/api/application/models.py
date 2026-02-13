@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import UniqueConstraint
+from sqlalchemy import Index, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlmodel import Column, DateTime, Field, Relationship, func
 
@@ -43,7 +43,9 @@ class ApplicationSnapshots(ApplicationSnapshotBase, table=True):
 
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
-        sa_column=Column(DateTime(timezone=True), server_default=func.now()),
+        sa_column=Column(
+            DateTime(timezone=True), server_default=func.now(), nullable=False
+        ),
     )
 
     # Relationships
@@ -59,6 +61,18 @@ class Applications(ApplicationBase, table=True):
 
     __table_args__ = (
         UniqueConstraint("human_id", "popup_id", name="uq_application_human_popup"),
+        Index("ix_applications_popup_status", "popup_id", "status"),
+        Index(
+            "ix_applications_active_status",
+            "popup_id",
+            "submitted_at",
+            postgresql_where=text("status IN ('in review', 'accepted')"),
+        ),
+        Index(
+            "ix_applications_custom_fields",
+            "custom_fields",
+            postgresql_using="gin",
+        ),
     )
 
     id: uuid.UUID = Field(
@@ -71,12 +85,17 @@ class Applications(ApplicationBase, table=True):
 
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
-        sa_column=Column(DateTime(timezone=True), server_default=func.now()),
+        sa_column=Column(
+            DateTime(timezone=True), server_default=func.now(), nullable=False
+        ),
     )
     updated_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
         sa_column=Column(
-            DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+            DateTime(timezone=True),
+            server_default=func.now(),
+            onupdate=func.now(),
+            nullable=False,
         ),
     )
 

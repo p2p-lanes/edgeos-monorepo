@@ -3,6 +3,7 @@ from datetime import datetime
 from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict
+from sqlalchemy import Text
 from sqlmodel import Field, SQLModel
 
 
@@ -26,7 +27,7 @@ class ApplicationReviewBase(SQLModel):
     tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
 
     decision: ReviewDecision
-    notes: str | None = Field(default=None, max_length=2000)
+    notes: str | None = Field(default=None, max_length=2000, sa_type=Text())
 
 
 class ApplicationReviewCreate(BaseModel):

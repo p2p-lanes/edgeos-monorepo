@@ -131,7 +131,9 @@ class AttendeeProductsBase(SQLModel):
 
     tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
     attendee_id: uuid.UUID = Field(foreign_key="attendees.id", primary_key=True)
-    product_id: uuid.UUID = Field(foreign_key="products.id", primary_key=True)
+    product_id: uuid.UUID = Field(
+        foreign_key="products.id", primary_key=True, index=True
+    )
     quantity: int = Field(default=1)
 
 

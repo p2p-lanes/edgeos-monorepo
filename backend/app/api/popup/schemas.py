@@ -19,7 +19,7 @@ class PopupStatus(StrEnum):
 class PopupBase(SQLModel):
     name: str = Field(index=True)
     slug: str = Field(unique=True, index=True)
-    tenant_id: uuid.UUID = Field(foreign_key="tenants.id")
+    tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
     start_date: datetime | None = None
     end_date: datetime | None = None
     status: PopupStatus = PopupStatus.draft

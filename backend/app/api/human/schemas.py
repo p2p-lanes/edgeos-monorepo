@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, field_validator
-from sqlmodel import Field, SQLModel
+from sqlmodel import DateTime, Field, SQLModel
 
 
 class HumanBase(SQLModel):
@@ -31,7 +31,9 @@ class HumanBase(SQLModel):
 
     # Auth fields
     auth_code: str | None = Field(default=None, max_length=6)
-    code_expiration: datetime | None = Field(default=None)
+    code_expiration: datetime | None = Field(
+        default=None, sa_type=DateTime(timezone=True)
+    )
     auth_attempts: int = Field(default=0)
 
 
