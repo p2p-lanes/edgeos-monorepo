@@ -129,7 +129,7 @@ export function registerStatusCommand(program: Command): void {
     .action(async (_, cmd) => {
       const jsonOutput = cmd.optsWithGlobals().json;
       try {
-        const apiUrl = getConfig("api_url") || "http://localhost:8000";
+        const apiUrl = getConfig("api_url") || "https://api-dev.simplefi.tech";
         const token = getConfig("token");
         const tenantId = getConfig("tenant_id");
         const popupId = getConfig("popup_id");

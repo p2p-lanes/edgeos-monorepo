@@ -40,7 +40,7 @@ export async function apiClient(
   options?: ApiRequestOptions
 ): Promise<any> {
   const baseUrl =
-    globalOptions.apiUrl || getConfig("api_url") || "http://localhost:8000";
+    globalOptions.apiUrl || getConfig("api_url") || "https://api-dev.simplefi.tech";
   const token = globalOptions.token || getConfig("token");
   const tenantId = globalOptions.tenantId || getConfig("tenant_id");
 
