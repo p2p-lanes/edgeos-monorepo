@@ -13,7 +13,7 @@ class GroupBase(SQLModel):
     tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
     popup_id: uuid.UUID = Field(foreign_key="popups.id", index=True)
     name: str = Field(index=True)
-    slug: str = Field(unique=True, index=True)
+    slug: str = Field(index=True)
     description: str | None = Field(default=None, nullable=True, sa_type=Text())
     discount_percentage: Decimal = Field(
         default=Decimal("0"), sa_column=Column(Numeric(5, 2), nullable=False)
@@ -92,11 +92,6 @@ class GroupWhitelistedEmailPublic(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
-
-
-# ========================
-# Group Member Schemas
-# ========================
 
 
 class GroupMemberCreate(BaseModel):
@@ -190,11 +185,6 @@ class GroupWithMembers(GroupPublic):
     members: list[GroupMemberPublic] = []
 
 
-# ========================
-# Group Leader Schemas
-# ========================
-
-
 class GroupLeaderBase(SQLModel):
     """Base schema for group leaders link table."""
 
@@ -216,4 +206,6 @@ class GroupProductsBase(SQLModel):
 
     tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
     group_id: uuid.UUID = Field(foreign_key="groups.id", primary_key=True)
-    product_id: uuid.UUID = Field(foreign_key="products.id", primary_key=True, index=True)
+    product_id: uuid.UUID = Field(
+        foreign_key="products.id", primary_key=True, index=True
+    )
