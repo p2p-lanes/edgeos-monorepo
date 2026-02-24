@@ -2,7 +2,8 @@
   "name": "EdgeOS",
   "private": true,
   "workspaces": [
-    "backoffice"
+    "backoffice",
+    "cli"
   ],
   "scripts": {
     "dev": "bun run --filter backoffice dev",
