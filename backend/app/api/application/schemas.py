@@ -225,11 +225,6 @@ class ApplicationFilter(BaseModel):
     email: str | None = None
 
 
-# =============================================================================
-# Application Snapshot
-# =============================================================================
-
-
 class ApplicationSnapshotBase(SQLModel):
     """Base schema for application snapshots.
 
@@ -293,11 +288,6 @@ class ApplicationSnapshotPublic(BaseModel):
     status: str
 
     model_config = ConfigDict(from_attributes=True)
-
-
-# =============================================================================
-# Directory schemas (for attendee listing)
-# =============================================================================
 
 
 class AttendeeDirectoryEntry(BaseModel):

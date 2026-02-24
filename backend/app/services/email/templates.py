@@ -1,10 +1,3 @@
-"""
-Type-safe email template context definitions.
-
-Each Pydantic model defines the expected variables for a specific email template.
-Use these types when calling EmailService.send_template_email() for IDE autocomplete.
-"""
-
 import datetime
 from pathlib import Path
 from typing import Any
@@ -13,10 +6,6 @@ from jinja2 import Environment, FileSystemLoader, Undefined
 from pydantic import BaseModel
 
 from app.api.email_template.schemas import EmailTemplateType
-
-# =============================================================================
-# Auth Templates
-# =============================================================================
 
 
 class LoginCodeUserContext(BaseModel):
@@ -39,11 +28,6 @@ class LoginCodeHumanContext(BaseModel):
     first_name: str | None = None
     auth_code: str
     expiration_minutes: int = 15
-
-
-# =============================================================================
-# Application Templates
-# =============================================================================
 
 
 class ApplicationReceivedContext(BaseModel):
@@ -83,11 +67,6 @@ class ApplicationRejectedContext(BaseModel):
     first_name: str
     last_name: str
     popup_name: str
-
-
-# =============================================================================
-# Payment Templates
-# =============================================================================
 
 
 class PaymentProductItem(BaseModel):
@@ -161,17 +140,7 @@ class EditPassesConfirmedContext(BaseModel):
     portal_url: str | None = None
 
 
-# =============================================================================
-# Template Name Constants
-# =============================================================================
-
-
 class EmailTemplates:
-    """Constants for email template names.
-
-    Use these constants instead of hardcoding template paths.
-    """
-
     # Auth
     LOGIN_CODE_USER = "auth/login_code_user.html"
     LOGIN_CODE_HUMAN = "auth/login_code_human.html"
@@ -187,10 +156,6 @@ class EmailTemplates:
     EDIT_PASSES_CONFIRMED = "payment/edit_passes_confirmed.html"
 
 
-# =============================================================================
-# Template Type → File Path Mapping
-# =============================================================================
-
 TEMPLATE_TYPE_TO_FILE: dict[EmailTemplateType, str] = {
     EmailTemplateType.LOGIN_CODE_USER: "auth/login_code_user.html",
     EmailTemplateType.LOGIN_CODE_HUMAN: "auth/login_code_human.html",
@@ -202,10 +167,6 @@ TEMPLATE_TYPE_TO_FILE: dict[EmailTemplateType, str] = {
     EmailTemplateType.EDIT_PASSES_CONFIRMED: "payment/edit_passes_confirmed.html",
 }
 
-
-# =============================================================================
-# Template Type Metadata (for API /types endpoint)
-# =============================================================================
 
 _POPUP_EVENT_VARIABLES: list[dict[str, Any]] = [
     {
@@ -658,11 +619,6 @@ TEMPLATE_TYPE_METADATA: list[dict[str, Any]] = [
         ],
     },
 ]
-
-
-# =============================================================================
-# Template Flattening Utility
-# =============================================================================
 
 
 class PreservingUndefined(Undefined):

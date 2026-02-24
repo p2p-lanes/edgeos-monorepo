@@ -74,11 +74,6 @@ def _build_application_public(application) -> ApplicationPublic:
     return app_public
 
 
-# ========================
-# BO (Backoffice) Routes
-# ========================
-
-
 @router.get("", response_model=ListModel[ApplicationPublic])
 async def list_applications(
     db: TenantSession,
@@ -254,11 +249,6 @@ async def delete_application(
         )
 
     crud.applications_crud.delete(db, application)
-
-
-# ========================
-# Portal (Human) Routes
-# ========================
 
 
 @router.get("/my/applications", response_model=ListModel[ApplicationPublic])
@@ -450,11 +440,6 @@ async def update_my_application(
     db.refresh(application)
 
     return _build_application_public(application)
-
-
-# ========================
-# Attendee Management (Portal)
-# ========================
 
 
 @router.post(
