@@ -141,15 +141,10 @@ async def create_group(
     else:
         tenant_id = current_user.tenant_id
 
-    # Create group
-    group_data = group_in.model_dump()
-    group_data["tenant_id"] = tenant_id
-    group_data["slug"] = slug
-    group = Groups(**group_data)
+    # Set resolved slug before delegating to CRUD
+    group_in.slug = slug
 
-    db.add(group)
-    db.commit()
-    db.refresh(group)
+    group = crud.groups_crud.create(db, group_in, tenant_id=tenant_id)
 
     return GroupPublic.model_validate(group)
 
