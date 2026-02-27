@@ -472,7 +472,6 @@ function InlineStrategyFields({
   handleFieldBlur,
   isSaving,
 }: {
-  // biome-ignore lint/suspicious/noExplicitAny: private component, form type is inferred from parent
   form: any
   strategyType: StrategyType
   selectedStrategy: (typeof STRATEGY_TYPES)[number] | undefined
