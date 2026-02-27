@@ -873,6 +873,8 @@ export type PaymentUpdate = {
 export type PopupCreate = {
     tenant_id?: (string | null);
     name: string;
+    tagline?: (string | null);
+    location?: (string | null);
     slug?: string;
     start_date?: (string | null);
     end_date?: (string | null);
@@ -891,6 +893,8 @@ export type PopupCreate = {
 
 export type PopupPublic = {
     name: string;
+    tagline?: (string | null);
+    location?: (string | null);
     slug: string;
     tenant_id: string;
     start_date?: (string | null);
@@ -945,6 +949,8 @@ export type PopupStatus = 'draft' | 'active' | 'archived' | 'ended';
 
 export type PopupUpdate = {
     name?: (string | null);
+    tagline?: (string | null);
+    location?: (string | null);
     slug?: (string | null);
     status?: (PopupStatus | null);
     start_date?: (string | null);
@@ -1255,6 +1261,7 @@ export type TenantCreate = {
     sender_name?: (string | null);
     image_url?: (string | null);
     icon_url?: (string | null);
+    logo_url?: (string | null);
 };
 
 export type TenantCredentialResponse = {
@@ -1272,6 +1279,7 @@ export type TenantPublic = {
     sender_name?: (string | null);
     image_url?: (string | null);
     icon_url?: (string | null);
+    logo_url?: (string | null);
     id: string;
 };
 
@@ -1282,6 +1290,7 @@ export type TenantUpdate = {
     sender_name?: (string | null);
     image_url?: (string | null);
     icon_url?: (string | null);
+    logo_url?: (string | null);
 };
 
 /**
