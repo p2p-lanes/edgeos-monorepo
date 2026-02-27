@@ -1,0 +1,5 @@
+packages:
+  - backoffice
+
+onlyBuiltDependencies:
+  - '@swc/core'

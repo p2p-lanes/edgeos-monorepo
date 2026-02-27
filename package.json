@@ -1,11 +1,12 @@
 {
-  "name": "EdgeOS",
+  "name": "edgeos",
   "private": true,
-  "workspaces": [
-    "backoffice"
-  ],
   "scripts": {
-    "dev": "bun run --filter backoffice dev",
-    "lint": "bun run --filter backoffice lint"
+    "dev": "pnpm --filter backoffice dev",
+    "lint": "pnpm --filter backoffice lint",
+    "build": "pnpm --filter backoffice build"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["@swc/core", "esbuild"]
   }
 }

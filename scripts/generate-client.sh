@@ -8,5 +8,5 @@ uv run python -c "import app.main; import json; print(json.dumps(app.main.applic
 cd ..
 mv openapi.json backoffice/
 cd backoffice
-bun run generate-client
-bun run lint
+pnpm run generate-client
+pnpm run lint

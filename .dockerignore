@@ -1,0 +1,48 @@
+# Dependencies - installed fresh inside Docker
+**/node_modules
+
+# Python virtual environments
+**/.venv
+**/__pycache__
+
+# Git
+.git
+.gitignore
+
+# IDE & Editors
+.vscode
+.idea
+*.swp
+*.swo
+
+# AI Agents & Tools
+.agents
+.cursor
+.crush
+.claude
+AGENTS.md
+CLAUDE.md
+tasks
+
+# Environment files
+.env*
+!.env.example
+
+# Build outputs
+**/dist
+**/build
+**/coverage
+
+# Testing artifacts
+test-results
+playwright-report
+blob-report
+playwright/.cache
+playwright/.auth
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

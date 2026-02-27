@@ -1,21 +1,21 @@
-# Stage 0, "build-stage", based on Bun, to build and compile the backoffice
+# Stage 0, "build-stage", based on Node + pnpm, to build and compile the backoffice
 FROM public.ecr.aws/docker/library/node:20-alpine AS build-stage
-RUN npm install -g bun
+RUN corepack enable && corepack prepare pnpm@10.30.3 --activate
 
 WORKDIR /app
 
-COPY package.json bun.lock /app/
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc /app/
 
 COPY backoffice/package.json /app/backoffice/
 
-WORKDIR /app/backoffice
-
-RUN bun install --frozen-lockfile
+ENV NODE_ENV=development
+RUN pnpm install --frozen-lockfile
 
 COPY ./backoffice /app/backoffice
 ARG VITE_API_URL
+ENV NODE_ENV=production
 
-RUN bun run build
+RUN pnpm --filter backoffice run build
 
 
 # Stage 1, based on Nginx, to have only the compiled app, ready for production with Nginx

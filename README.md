@@ -169,7 +169,7 @@ If you prefer running services locally without Docker:
 #### Prerequisites
 
 - [uv](https://docs.astral.sh/uv/) (for Python backend)
-- [Bun](https://bun.sh/) (for React frontend)
+- [pnpm](https://pnpm.io/) (for React frontend)
 - PostgreSQL 15+ (running locally or remotely)
 
 #### Backend Development
@@ -199,16 +199,16 @@ bash scripts/format.sh
 cd backoffice
 
 # Install dependencies
-bun install
+pnpm install
 
 # Run development server
-bun run dev
+pnpm run dev
 
 # Regenerate API client (after backend changes)
-bun run generate-client
+pnpm run generate-client
 
 # Lint
-bun run lint
+pnpm run lint
 ```
 
 ### Database Migrations

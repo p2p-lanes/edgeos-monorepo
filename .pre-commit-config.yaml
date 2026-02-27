@@ -21,7 +21,7 @@ repos:
     hooks:
       - id: local-biome-check
         name: biome check
-        entry: bun run lint
+        entry: pnpm run lint
         language: system
         types: [text]
         files: ^backoffice/

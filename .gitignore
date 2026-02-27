@@ -39,7 +39,7 @@ htmlcov/
 dist/
 build/
 
-# Node/Bun
+# Node
 node_modules/
 *.local
 logs/

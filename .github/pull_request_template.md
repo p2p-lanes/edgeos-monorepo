@@ -24,8 +24,8 @@ Fixes #(issue number)
 
 - [ ] Backend tests pass (`bash scripts/test.sh`)
 - [ ] Backend linting passes (`bash scripts/lint.sh`)
-- [ ] Backoffice builds successfully (`bun run build`)
-- [ ] Backoffice linting passes (`bun run lint`)
+- [ ] Backoffice builds successfully (`pnpm run build`)
+- [ ] Backoffice linting passes (`pnpm run lint`)
 - [ ] Manual testing performed
 
 ## Checklist
@@ -34,5 +34,5 @@ Fixes #(issue number)
 - [ ] I have updated documentation if needed
 - [ ] I have added tests for new functionality
 - [ ] All new and existing tests pass
-- [ ] I have regenerated the OpenAPI client if backend API changed (`bun run generate-client`)
+- [ ] I have regenerated the OpenAPI client if backend API changed (`pnpm run generate-client`)
 - [ ] Database migrations are included if schema changed
