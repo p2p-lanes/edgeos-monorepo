@@ -39,7 +39,7 @@ function getAdminItems(tenantId: string | null | undefined): Item[] {
   if (tenantId) {
     items.push({
       icon: Building2,
-      title: "Tenant",
+      title: "Organization",
       path: `/tenants/${tenantId}/edit`,
     })
   }
@@ -50,7 +50,7 @@ function getAdminItems(tenantId: string | null | undefined): Item[] {
 const coreItems: Item[] = [{ icon: Home, title: "Dashboard", path: "/" }]
 
 const popupItems: Item[] = [
-  { icon: Calendar, title: "Popups", path: "/popups" },
+  { icon: Calendar, title: "Events", path: "/popups" },
   { icon: Package, title: "Products", path: "/products" },
   { icon: Tag, title: "Coupons", path: "/coupons" },
   { icon: UsersRound, title: "Groups", path: "/groups" },
@@ -63,7 +63,7 @@ const adminItems: Item[] = [{ icon: Users, title: "Users", path: "/admin" }]
 
 // Superadmin only items - Tenants list view
 const superadminItems: Item[] = [
-  { icon: Building2, title: "Tenants", path: "/tenants" },
+  { icon: Building2, title: "Organizations", path: "/tenants" },
 ]
 
 export function AppSidebar() {
@@ -139,7 +139,7 @@ export function AppSidebar() {
 
         {/* Popup management section */}
         <SidebarGroup>
-          <SidebarGroupLabel>Popup Management</SidebarGroupLabel>
+          <SidebarGroupLabel>Event Management</SidebarGroupLabel>
           <Main items={popupItems} />
         </SidebarGroup>
 

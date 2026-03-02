@@ -237,10 +237,6 @@ export function UserForm({ defaultValues, onSuccess }: UserFormProps) {
               <span className="text-xs uppercase tracking-wider">Email</span>
               <p className="font-mono">{defaultValues.email}</p>
             </div>
-            <div>
-              <span className="text-xs uppercase tracking-wider">ID</span>
-              <p className="font-mono text-xs">{defaultValues.id}</p>
-            </div>
           </div>
         )}
 

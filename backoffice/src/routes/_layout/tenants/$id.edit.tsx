@@ -12,7 +12,7 @@ import useAuth from "@/hooks/useAuth"
 export const Route = createFileRoute("/_layout/tenants/$id/edit")({
   component: EditTenantPage,
   head: () => ({
-    meta: [{ title: "Edit Tenant - EdgeOS" }],
+    meta: [{ title: "Edit Organization - EdgeOS" }],
   }),
 })
 
@@ -45,8 +45,8 @@ function EditTenantPage() {
 
   return (
     <FormPageLayout
-      title="Edit Tenant"
-      description="Update tenant settings and configuration"
+      title="Edit Organization"
+      description="Update organization settings and configuration"
       backTo={isSuperadmin ? "/tenants" : "/"}
     >
       <QueryErrorBoundary>

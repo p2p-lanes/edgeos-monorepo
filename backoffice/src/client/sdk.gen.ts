@@ -610,6 +610,7 @@ export class AttendeesService {
                 application_id: data.applicationId,
                 popup_id: data.popupId,
                 email: data.email,
+                search: data.search,
                 skip: data.skip,
                 limit: data.limit
             },

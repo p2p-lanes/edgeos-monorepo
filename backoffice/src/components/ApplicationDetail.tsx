@@ -37,7 +37,6 @@ import { LoadingButton } from "@/components/ui/loading-button"
 import { Separator } from "@/components/ui/separator"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
-import { cn } from "@/lib/utils"
 import { createErrorHandler } from "@/utils"
 
 // ========================
@@ -112,9 +111,8 @@ function WeightedVoting({
         </p>
         <div className="flex flex-col gap-1">
           <Button
-            variant="ghost"
             size="sm"
-            className="w-full justify-start text-green-600 hover:bg-green-50 hover:text-green-700"
+            className="w-full justify-start bg-green-700 hover:bg-green-800 text-white"
             onClick={() => handleVote("strong_yes")}
           >
             <ChevronUp className="h-3.5 w-3.5" />
@@ -122,27 +120,24 @@ function WeightedVoting({
             Strong Yes
           </Button>
           <Button
-            variant="ghost"
             size="sm"
-            className="w-full justify-start text-green-600 hover:bg-green-50 hover:text-green-700"
+            className="w-full justify-start bg-green-500 hover:bg-green-600 text-white"
             onClick={() => handleVote("yes")}
           >
             <ThumbsUp className="h-3.5 w-3.5" />
             Yes
           </Button>
           <Button
-            variant="ghost"
             size="sm"
-            className="w-full justify-start text-red-600 hover:bg-red-50 hover:text-red-700"
+            className="w-full justify-start bg-red-400 hover:bg-red-500 text-white"
             onClick={() => handleVote("no")}
           >
             <ThumbsDown className="h-3.5 w-3.5" />
             No
           </Button>
           <Button
-            variant="ghost"
             size="sm"
-            className="w-full justify-start text-red-600 hover:bg-red-50 hover:text-red-700"
+            className="w-full justify-start bg-red-700 hover:bg-red-800 text-white"
             onClick={() => handleVote("strong_no")}
           >
             <ChevronDown className="h-3.5 w-3.5" />
@@ -234,16 +229,15 @@ function SimpleVoting({
         <div className="flex flex-col gap-1">
           <Button
             size="sm"
-            className="w-full justify-start"
+            className="w-full justify-start bg-green-600 hover:bg-green-700 text-white border-0"
             onClick={() => handleClick("yes")}
           >
             <ThumbsUp className="h-3.5 w-3.5" />
             Approve
           </Button>
           <Button
-            variant="destructive"
             size="sm"
-            className="w-full justify-start"
+            className="w-full justify-start bg-red-600 hover:bg-red-700 text-white border-0"
             onClick={() => handleClick("no")}
           >
             <ThumbsDown className="h-3.5 w-3.5" />
@@ -457,19 +451,7 @@ export function ApplicationDetail({
     reviewSummary.total_reviews > 0
 
   return (
-    <div
-      className={cn(
-        "mx-auto",
-        canReview ? "flex max-w-5xl gap-8" : "max-w-2xl",
-      )}
-    >
-      {/* Main content */}
-      <div
-        className={cn(
-          "min-w-0 space-y-6",
-          canReview ? "max-w-2xl flex-1" : "w-full",
-        )}
-      >
+    <div className="relative mx-auto w-[32rem] max-w-full space-y-6">
         {/* Hero */}
         <div className="space-y-1">
           <div className="flex items-start justify-between gap-4">
@@ -502,7 +484,7 @@ export function ApplicationDetail({
           </div>
         )}
 
-        <Separator className={cn(canReview && "hidden lg:block")} />
+        <Separator />
 
         {/* Review summary (when not reviewer but reviews exist) */}
         {!canReview && hasReviews && (
@@ -626,11 +608,10 @@ export function ApplicationDetail({
             </InlineSection>
           </>
         )}
-      </div>
 
       {/* Desktop action panel */}
       {canReview && (
-        <aside className="hidden w-56 shrink-0 lg:block">
+        <aside className="absolute top-0 left-[calc(100%+2rem)] hidden w-56 lg:block">
           <div className="sticky top-24 space-y-6">
             {votingPanel}
             {hasReviews && <ReviewSummary summary={reviewSummary} />}

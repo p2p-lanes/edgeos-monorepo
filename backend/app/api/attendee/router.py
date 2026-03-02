@@ -26,6 +26,7 @@ async def list_attendees(
     application_id: uuid.UUID | None = None,
     popup_id: uuid.UUID | None = None,
     email: str | None = None,
+    search: str | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[AttendeePublic]:
@@ -36,14 +37,20 @@ async def list_attendees(
         attendees = attendees[skip : skip + limit]
     elif popup_id:
         attendees, total = crud.attendees_crud.find_by_popup(
-            db, popup_id=popup_id, skip=skip, limit=limit
+            db, popup_id=popup_id, skip=skip, limit=limit, search=search
         )
     elif email:
         attendees, total = crud.attendees_crud.find_by_email(
             db, email=email, skip=skip, limit=limit
         )
     else:
-        attendees, total = crud.attendees_crud.find(db, skip=skip, limit=limit)
+        attendees, total = crud.attendees_crud.find(
+            db,
+            skip=skip,
+            limit=limit,
+            search=search,
+            search_fields=["name", "email"],
+        )
 
     results = []
     for a in attendees:

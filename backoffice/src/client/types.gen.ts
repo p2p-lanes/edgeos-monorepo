@@ -1576,6 +1576,7 @@ export type AttendeesListAttendeesData = {
      */
     limit?: number;
     popupId?: (string | null);
+    search?: (string | null);
     /**
      * Number of items to skip
      */

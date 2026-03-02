@@ -428,17 +428,39 @@ async def update_my_application(
             detail="Cannot update application in current status",
         )
 
-    # Handle status change to IN_REVIEW
+    # Separate profile fields from application fields
+    from app.api.human.crud import humans_crud
+    from app.api.human.schemas import HumanUpdate
+
     update_data = app_in.model_dump(exclude_unset=True)
-    if "status" in update_data:
-        if hasattr(update_data["status"], "value"):
-            update_data["status"] = update_data["status"].value
 
-        if update_data["status"] == ApplicationStatus.IN_REVIEW.value:
+    profile_fields = {
+        "first_name",
+        "last_name",
+        "telegram",
+        "organization",
+        "role",
+        "gender",
+        "age",
+        "residence",
+    }
+    profile_update = {k: v for k, v in update_data.items() if k in profile_fields}
+    app_update = {k: v for k, v in update_data.items() if k not in profile_fields}
+
+    # Update human profile if needed
+    if profile_update:
+        humans_crud.update(db, application.human, HumanUpdate(**profile_update))
+
+    # Handle status change to IN_REVIEW
+    if "status" in app_update:
+        if hasattr(app_update["status"], "value"):
+            app_update["status"] = app_update["status"].value
+
+        if app_update["status"] == ApplicationStatus.IN_REVIEW.value:
             if not application.submitted_at:
-                update_data["submitted_at"] = datetime.now(UTC)
+                app_update["submitted_at"] = datetime.now(UTC)
 
-    for field, value in update_data.items():
+    for field, value in app_update.items():
         setattr(application, field, value)
 
     db.add(application)

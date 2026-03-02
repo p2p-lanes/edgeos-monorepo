@@ -29,7 +29,7 @@ interface UserInfoProps {
 
 function UserInfo({ fullName, email }: UserInfoProps) {
   return (
-    <div className="flex items-center gap-2.5 w-full min-w-0">
+    <div className="flex items-center gap-2.5 w-full min-w-0 group-data-[collapsible=icon]:justify-center">
       <UserIcon className="size-4 shrink-0" />
       <div className="flex flex-col items-start min-w-0 group-data-[collapsible=icon]:hidden">
         <p className="text-sm font-medium truncate w-full">{fullName}</p>

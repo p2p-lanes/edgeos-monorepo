@@ -6,7 +6,7 @@ import { TenantForm } from "@/components/forms/TenantForm"
 export const Route = createFileRoute("/_layout/tenants/new")({
   component: NewTenant,
   head: () => ({
-    meta: [{ title: "New Tenant - EdgeOS" }],
+    meta: [{ title: "New Organization - EdgeOS" }],
   }),
 })
 
@@ -15,8 +15,8 @@ function NewTenant() {
 
   return (
     <FormPageLayout
-      title="Create Tenant"
-      description="Add a new tenant organization to the platform"
+      title="Create Organization"
+      description="Add a new organization to the platform"
       backTo="/tenants"
     >
       <TenantForm onSuccess={() => navigate({ to: "/tenants" })} />

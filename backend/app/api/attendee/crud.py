@@ -61,6 +61,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         popup_id: uuid.UUID,
         skip: int = 0,
         limit: int = 100,
+        search: str | None = None,
     ) -> tuple[list[Attendees], int]:
         """Find attendees by popup_id via their applications with eager loading."""
         from app.api.application.models import Applications
@@ -70,6 +71,12 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
             .join(Applications, Attendees.application_id == Applications.id)  # type: ignore[arg-type]
             .where(Applications.popup_id == popup_id)
         )
+
+        if search:
+            search_term = f"%{search}%"
+            base_statement = base_statement.where(
+                Attendees.name.ilike(search_term) | Attendees.email.ilike(search_term)  # type: ignore[union-attr]
+            )
 
         # Use proper count query instead of fetching all rows
         count_statement = select(func.count()).select_from(base_statement.subquery())

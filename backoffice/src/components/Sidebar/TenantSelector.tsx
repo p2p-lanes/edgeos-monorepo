@@ -74,7 +74,7 @@ export function TenantSelector() {
   if (isLoading) {
     return (
       <div className="space-y-2">
-        <Label className="text-xs text-muted-foreground">Tenant</Label>
+        <Label className="text-xs text-muted-foreground">Organization</Label>
         <Skeleton className="h-9 w-full" />
       </div>
     )
@@ -83,7 +83,7 @@ export function TenantSelector() {
   if (!tenants?.results?.length) {
     return (
       <div className="py-2 text-sm text-muted-foreground">
-        {isError ? "Failed to load tenants" : "No tenants available"}
+        {isError ? "Failed to load organizations" : "No organizations available"}
       </div>
     )
   }
@@ -92,11 +92,11 @@ export function TenantSelector() {
     <div className="space-y-2">
       <Label className="text-xs text-muted-foreground flex items-center gap-1">
         <Building2 className="h-3 w-3" />
-        Tenant
+        Organization
       </Label>
       <Select value={selectedTenantId ?? ""} onValueChange={handleTenantChange}>
         <SelectTrigger className="w-full">
-          <SelectValue placeholder="Select tenant" />
+          <SelectValue placeholder="Select organization" />
         </SelectTrigger>
         <SelectContent>
           {tenants.results.map((tenant) => (
@@ -115,8 +115,8 @@ export function TenantSelector() {
           <DialogHeader>
             <DialogTitle>Unsaved changes</DialogTitle>
             <DialogDescription>
-              You have unsaved changes that will be lost if you switch tenants.
-              Are you sure you want to continue?
+              You have unsaved changes that will be lost if you switch
+              organizations. Are you sure you want to continue?
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

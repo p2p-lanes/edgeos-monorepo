@@ -75,7 +75,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
     mutationFn: (data: PopupCreate) =>
       PopupsService.createPopup({ requestBody: data }),
     onSuccess: (data) => {
-      showSuccessToast("Popup created successfully", {
+      showSuccessToast("Event created successfully", {
         label: "View",
         onClick: () =>
           navigate({ to: "/popups/$id/edit", params: { id: data.id } }),
@@ -94,7 +94,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         requestBody: data,
       }),
     onSuccess: () => {
-      showSuccessToast("Popup updated successfully")
+      showSuccessToast("Event updated successfully")
       queryClient.invalidateQueries({ queryKey: ["popups"] })
       form.reset()
       onSuccess()
@@ -105,7 +105,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
   const deleteMutation = useMutation({
     mutationFn: () => PopupsService.deletePopup({ popupId: defaultValues!.id }),
     onSuccess: () => {
-      showSuccessToast("Popup deleted successfully")
+      showSuccessToast("Event deleted successfully")
       queryClient.invalidateQueries({ queryKey: ["popups"] })
       navigate({ to: "/popups" })
     },
@@ -189,7 +189,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         <FormErrorSummary
           form={form}
           fieldLabels={{
-            name: "Popup Name",
+            name: "Event Name",
             tagline: "Tagline",
             location: "Location",
             slug: "Slug",
@@ -210,7 +210,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
             {(field) => (
               <div>
                 <HeroInput
-                  placeholder="Popup Name"
+                  placeholder="Event Name"
                   value={field.state.value}
                   onBlur={field.handleBlur}
                   onChange={(e) => field.handleChange(e.target.value)}
@@ -297,10 +297,6 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
             <div>
               <span className="text-xs uppercase tracking-wider">Slug</span>
               <p className="font-mono">{defaultValues.slug}</p>
-            </div>
-            <div>
-              <span className="text-xs uppercase tracking-wider">ID</span>
-              <p className="font-mono text-xs">{defaultValues.id}</p>
             </div>
           </div>
         )}
@@ -462,7 +458,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
               <InlineRow
                 icon={<Ticket className="h-4 w-4 text-muted-foreground" />}
                 label="Discount Coupons"
-                description="Enable discount coupons for this popup"
+                description="Enable discount coupons for this event"
               >
                 <Switch
                   id="allows_coupons"
@@ -638,7 +634,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
           </Button>
           {!readOnly && (
             <LoadingButton type="submit" loading={isPending}>
-              {isEdit ? "Save Changes" : "Create Popup"}
+              {isEdit ? "Save Changes" : "Create Event"}
             </LoadingButton>
           )}
         </div>
@@ -647,10 +643,10 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
       {isEdit && !readOnly && (
         <div className="mx-auto max-w-2xl">
           <DangerZone
-            description="Once you delete this popup, all associated products, groups, coupons, and attendee data will be permanently removed. This action cannot be undone."
+            description="Once you delete this event, all associated products, groups, coupons, and attendee data will be permanently removed. This action cannot be undone."
             onDelete={() => deleteMutation.mutate()}
             isDeleting={deleteMutation.isPending}
-            confirmText="Delete Popup"
+            confirmText="Delete Event"
             resourceName={defaultValues.name}
             variant="inline"
           />
