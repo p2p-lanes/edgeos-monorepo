@@ -3,13 +3,17 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "main": "./src/client/index.ts",
-  "types": "./src/client/index.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/client/index.ts"
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
   },
   "scripts": {
-    "generate": "openapi-ts"
+    "build": "tsc -p tsconfig.build.json",
+    "generate": "openapi-ts && tsc -p tsconfig.build.json"
   },
   "dependencies": {
     "axios": "1.13.2"
