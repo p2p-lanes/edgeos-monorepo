@@ -1,4 +1,4 @@
-import type { GroupWithMembers } from "@edgeos/api-client"
+import type { GroupWithMembers } from "@/client"
 import { Check, Copy, Import, Plus, Users } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"

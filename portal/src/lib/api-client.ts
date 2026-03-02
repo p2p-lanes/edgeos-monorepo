@@ -1,4 +1,4 @@
-import { OpenAPI } from "@edgeos/api-client"
+import { OpenAPI } from "@/client"
 
 OpenAPI.BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
 

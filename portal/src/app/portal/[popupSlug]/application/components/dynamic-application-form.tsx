@@ -1,7 +1,7 @@
 "use client"
 
-import type { ApplicationPublic, PopupPublic } from "@edgeos/api-client"
-import { ApplicationsService } from "@edgeos/api-client"
+import type { ApplicationPublic, PopupPublic } from "@/client"
+import { ApplicationsService } from "@/client"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { AnimatePresence, motion } from "framer-motion"
 import { useRouter } from "next/navigation"

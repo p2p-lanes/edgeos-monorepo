@@ -1,4 +1,4 @@
-import { ProductsService } from "@edgeos/api-client"
+import { ProductsService } from "@/client"
 import { useQuery } from "@tanstack/react-query"
 import { queryKeys } from "@/lib/query-keys"
 import type { ProductsPass } from "@/types/Products"

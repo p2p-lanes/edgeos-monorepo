@@ -1,4 +1,4 @@
-import type { HumanPublic } from "@edgeos/api-client"
+import type { HumanPublic } from "@/client"
 import { Calendar1, MapPinned, Speech } from "lucide-react"
 import { Card } from "../ui/card"
 

@@ -1,4 +1,4 @@
-import { GroupsService } from "@edgeos/api-client"
+import { GroupsService } from "@/client"
 import { AlertCircle, Check, FileUp, HelpCircle, Upload, X } from "lucide-react"
 import { useParams } from "next/navigation"
 import { useRef, useState } from "react"

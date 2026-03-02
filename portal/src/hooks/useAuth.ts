@@ -1,6 +1,6 @@
 "use client"
 
-import { HumansService } from "@edgeos/api-client"
+import { HumansService } from "@/client"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useParams, useRouter } from "next/navigation"
 import { useCallback } from "react"

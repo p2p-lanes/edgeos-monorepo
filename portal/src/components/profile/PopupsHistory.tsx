@@ -1,4 +1,4 @@
-import type { PopupPublic } from "@edgeos/api-client"
+import type { PopupPublic } from "@/client"
 import { Calendar, Clock, MapPin } from "lucide-react"
 import Image from "next/image"
 import { useApplication } from "@/providers/applicationProvider"

@@ -3,7 +3,7 @@ import type {
   ApplicationUpdate,
   CompanionCreate,
   UserSettableStatus,
-} from "@edgeos/api-client"
+} from "@/client"
 import type { ApplicationFormSchema } from "@/types/form-schema"
 
 /** Build a target map from the schema: field name → "human" | "application" */

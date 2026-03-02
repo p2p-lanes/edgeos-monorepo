@@ -1,4 +1,4 @@
-import type { HumanPublic } from "@edgeos/api-client"
+import type { HumanPublic } from "@/client"
 import {
   Building,
   ChevronDown,

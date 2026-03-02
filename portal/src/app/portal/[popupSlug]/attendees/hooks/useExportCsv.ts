@@ -1,6 +1,6 @@
 "use client"
 
-import { OpenAPI } from "@edgeos/api-client"
+import { OpenAPI } from "@/client"
 import { useCallback, useState } from "react"
 import { toast } from "sonner"
 import { useCityProvider } from "@/providers/cityProvider"

@@ -1,4 +1,4 @@
-import { FormFieldsService } from "@edgeos/api-client"
+import { FormFieldsService } from "@/client"
 import { useQuery } from "@tanstack/react-query"
 import { queryKeys } from "@/lib/query-keys"
 import type { ApplicationFormSchema } from "@/types/form-schema"

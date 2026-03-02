@@ -1,6 +1,6 @@
 "use client"
 
-import type { ApplicationPublic } from "@edgeos/api-client"
+import type { ApplicationPublic } from "@/client"
 import { useQueryClient } from "@tanstack/react-query"
 import { createContext, type ReactNode, useCallback, useContext } from "react"
 import { useApplicationsQuery } from "@/hooks/useGetApplications"

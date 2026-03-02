@@ -1,4 +1,4 @@
-import { GroupsService, type GroupWithMembers } from "@edgeos/api-client"
+import { GroupsService, type GroupWithMembers } from "@/client"
 import { useQuery } from "@tanstack/react-query"
 import { queryKeys } from "@/lib/query-keys"
 

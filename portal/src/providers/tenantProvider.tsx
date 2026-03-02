@@ -1,7 +1,7 @@
 "use client"
 
-import type { TenantPublic } from "@edgeos/api-client"
-import { ApiError, TenantsService } from "@edgeos/api-client"
+import type { TenantPublic } from "@/client"
+import { ApiError, TenantsService } from "@/client"
 import {
   createContext,
   type ReactNode,

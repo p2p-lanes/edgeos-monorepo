@@ -1,6 +1,6 @@
 "use client"
 
-import type { PopupPublic } from "@edgeos/api-client"
+import type { PopupPublic } from "@/client"
 import { useParams } from "next/navigation"
 import {
   createContext,

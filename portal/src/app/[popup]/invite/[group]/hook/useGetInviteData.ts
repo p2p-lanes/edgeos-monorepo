@@ -1,6 +1,6 @@
 "use client"
 
-import { GroupsService } from "@edgeos/api-client"
+import { GroupsService } from "@/client"
 import { useQuery } from "@tanstack/react-query"
 import { useParams } from "next/navigation"
 import { useEffect } from "react"

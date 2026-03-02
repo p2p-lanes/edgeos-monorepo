@@ -1,6 +1,6 @@
 "use client"
 
-import { ApiError, AuthService } from "@edgeos/api-client"
+import { ApiError, AuthService } from "@/client"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { motion } from "framer-motion"
 import { useRouter, useSearchParams } from "next/navigation"

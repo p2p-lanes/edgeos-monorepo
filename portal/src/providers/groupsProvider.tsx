@@ -1,6 +1,6 @@
 "use client"
 
-import type { GroupPublic } from "@edgeos/api-client"
+import type { GroupPublic } from "@/client"
 import { createContext, type ReactNode, useContext, useState } from "react"
 
 interface GroupsContextType {

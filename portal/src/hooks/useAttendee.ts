@@ -1,4 +1,4 @@
-import { ApplicationsService } from "@edgeos/api-client"
+import { ApplicationsService } from "@/client"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { useApplication } from "@/providers/applicationProvider"

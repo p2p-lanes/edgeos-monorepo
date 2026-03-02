@@ -1,6 +1,6 @@
 "use client"
 
-import { ApiError } from "@edgeos/api-client"
+import { ApiError } from "@/client"
 import {
   MutationCache,
   QueryCache,

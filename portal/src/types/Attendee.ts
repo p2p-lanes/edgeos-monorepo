@@ -1,4 +1,4 @@
-import type { AttendeePublic } from "@edgeos/api-client"
+import type { AttendeePublic } from "@/client"
 import type { ProductsPass } from "./Products"
 
 export type AttendeeCategory = "main" | "spouse" | "kid" | "baby" | "teen"

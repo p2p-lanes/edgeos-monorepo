@@ -1,6 +1,6 @@
 "use client"
 
-import type { CompanionCreate } from "@edgeos/api-client"
+import type { CompanionCreate } from "@/client"
 import { AnimatePresence, motion } from "framer-motion"
 import { Plus, X } from "lucide-react"
 import { useState } from "react"

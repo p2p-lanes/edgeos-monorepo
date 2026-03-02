@@ -1,4 +1,4 @@
-import type { ProductPublic } from "@edgeos/api-client"
+import type { ProductPublic } from "@/client"
 
 /**
  * Portal-specific extension of ProductPublic.

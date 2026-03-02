@@ -1,4 +1,4 @@
-import { ApplicationsService } from "@edgeos/api-client"
+import { ApplicationsService } from "@/client"
 import { useQuery } from "@tanstack/react-query"
 import { useMemo, useState } from "react"
 import { queryKeys } from "@/lib/query-keys"

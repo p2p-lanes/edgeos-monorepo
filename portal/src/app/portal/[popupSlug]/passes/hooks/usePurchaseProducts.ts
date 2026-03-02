@@ -1,4 +1,4 @@
-import { PaymentsService } from "@edgeos/api-client"
+import { PaymentsService } from "@/client"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { queryKeys } from "@/lib/query-keys"

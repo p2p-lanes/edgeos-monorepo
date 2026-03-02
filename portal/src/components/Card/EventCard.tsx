@@ -1,6 +1,6 @@
 "use client"
 
-import type { PopupPublic } from "@edgeos/api-client"
+import type { PopupPublic } from "@/client"
 import { CalendarDays, MapPin } from "lucide-react"
 import { createContext, useContext } from "react"
 import { ButtonAnimated } from "@/components/ui/button"

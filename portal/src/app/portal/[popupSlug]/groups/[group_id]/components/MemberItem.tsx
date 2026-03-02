@@ -1,4 +1,4 @@
-import type { GroupMemberPublic } from "@edgeos/api-client"
+import type { GroupMemberPublic } from "@/client"
 import { AnimatePresence, motion } from "framer-motion"
 import { ChevronDown, Pencil, Trash2, User } from "lucide-react"
 import { useState } from "react"

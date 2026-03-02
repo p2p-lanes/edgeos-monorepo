@@ -1,4 +1,4 @@
-import type { GroupPublic, PopupPublic } from "@edgeos/api-client"
+import type { GroupPublic, PopupPublic } from "@/client"
 import { Check, Copy } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState } from "react"

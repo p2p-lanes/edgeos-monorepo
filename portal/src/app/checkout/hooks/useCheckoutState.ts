@@ -4,7 +4,7 @@ import {
   ApiError,
   ApplicationsService,
   GroupsService,
-} from "@edgeos/api-client"
+} from "@/client"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useParams, useSearchParams } from "next/navigation"
 import { useState } from "react"

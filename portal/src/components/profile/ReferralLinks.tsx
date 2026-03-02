@@ -1,6 +1,6 @@
 "use client"
 
-import type { GroupPublic, PopupPublic } from "@edgeos/api-client"
+import type { GroupPublic, PopupPublic } from "@/client"
 import { Check, Copy } from "lucide-react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"

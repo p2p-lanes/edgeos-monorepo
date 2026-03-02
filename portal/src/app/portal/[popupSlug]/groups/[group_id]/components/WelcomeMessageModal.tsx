@@ -1,5 +1,5 @@
-import type { GroupWithMembers } from "@edgeos/api-client"
-import { GroupsService } from "@edgeos/api-client"
+import type { GroupWithMembers } from "@/client"
+import { GroupsService } from "@/client"
 import { useParams } from "next/navigation"
 import { useState } from "react"
 import { toast } from "sonner"

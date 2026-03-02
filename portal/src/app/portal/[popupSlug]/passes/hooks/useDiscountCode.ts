@@ -1,4 +1,4 @@
-import { ApiError, CouponsService } from "@edgeos/api-client"
+import { ApiError, CouponsService } from "@/client"
 import { useMutation } from "@tanstack/react-query"
 import { useState } from "react"
 import useCompareDiscount from "@/hooks/useCompareDiscount"

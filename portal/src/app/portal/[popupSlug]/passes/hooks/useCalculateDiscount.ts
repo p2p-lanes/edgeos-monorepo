@@ -31,7 +31,7 @@ const useCalculateDiscount = (isPatreon: boolean, products: ProductsPass[]) => {
 
     if (application.group_id && groups.length > 0) {
       const group = groups.find(
-        (g: import("@edgeos/api-client").GroupPublic) =>
+        (g: import("@/client").GroupPublic) =>
           g.id === application.group_id,
       )
       if (
