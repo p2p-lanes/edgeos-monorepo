@@ -53,8 +53,17 @@ class Settings(BaseSettings):
     @property
     def all_cors_origins(self) -> list[str]:
         return [str(origin).rstrip("/") for origin in self.BACKEND_CORS_ORIGINS] + [
-            self.BACKOFFICE_URL
+            self.BACKOFFICE_URL,
+            self.PORTAL_URL,
         ]
+
+    @computed_field
+    @property
+    def cors_allow_origin_regex(self) -> str | None:
+        """Allow any subdomain of localhost in dev for multi-tenant portal."""
+        if self.ENVIRONMENT == Environment.DEV:
+            return r"^https?://[\w-]+\.localhost(:\d+)?$"
+        return None
 
     PROJECT_NAME: str = Field(...)
     SENTRY_DSN: HttpUrl | None = None

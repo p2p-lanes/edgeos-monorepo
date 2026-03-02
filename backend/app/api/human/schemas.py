@@ -83,6 +83,27 @@ class HumanCreate(BaseModel):
         return v.lower().strip()
 
 
+class HumanProfileUpdate(BaseModel):
+    """Schema for humans updating their own profile."""
+
+    first_name: str | None = None
+    last_name: str | None = None
+    telegram: str | None = None
+    organization: str | None = None
+    role: str | None = None
+    gender: str | None = None
+    age: str | None = None
+    residence: str | None = None
+    picture_url: str | None = None
+
+    @field_validator("telegram", mode="before")
+    @classmethod
+    def strip_strings(cls, v: str | None) -> str | None:
+        if v is not None:
+            return v.strip() or None
+        return v
+
+
 class HumanUpdate(BaseModel):
     """Human schema for profile updates."""
 

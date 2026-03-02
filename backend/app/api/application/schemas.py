@@ -310,3 +310,55 @@ class AttendeeDirectoryFilter(BaseModel):
 
     q: str | None = None
     email: str | None = None
+
+
+class DirectoryProduct(BaseModel):
+    """Minimal product info for directory participation display."""
+
+    id: uuid.UUID
+    name: str
+    slug: str
+    category: str | None = None
+    duration_type: str | None = None
+    start_date: datetime | None = None
+    end_date: datetime | None = None
+
+
+class AssociatedAttendee(BaseModel):
+    """Non-main attendee summary for directory."""
+
+    name: str
+    category: str
+    gender: str | None = None
+    email: str | None = None
+
+
+class AttendeesDirectoryEntry(BaseModel):
+    """Single entry in the attendees directory."""
+
+    id: uuid.UUID  # application id
+
+    # Human profile (from application.human)
+    first_name: str | None = None
+    last_name: str | None = None
+    email: str | None = None
+    telegram: str | None = None
+    role: str | None = None
+    organization: str | None = None
+    residence: str | None = None
+    age: str | None = None
+    gender: str | None = None
+    picture_url: str | None = None
+
+    # Computed from attendees
+    brings_kids: bool | str = False  # str "*" when hidden
+
+    # Participation
+    participation: list[DirectoryProduct] = []
+    check_in: datetime | None = None
+    check_out: datetime | None = None
+
+    # Associated attendees (spouse/kids)
+    associated_attendees: list[AssociatedAttendee] = []
+
+    model_config = ConfigDict(from_attributes=True)

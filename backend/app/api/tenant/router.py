@@ -14,6 +14,22 @@ from app.core.tenant_db import get_tenant_credential, revoke_tenant_credentials
 router = APIRouter(prefix="/tenants", tags=["tenants"])
 
 
+@router.get("/public/{slug}", response_model=TenantPublic)
+async def get_tenant_by_slug(
+    slug: str,
+    db: SessionDep,
+) -> TenantPublic:
+    tenant = crud.get_by_slug(db, slug)
+
+    if tenant is None or tenant.deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tenant not found",
+        )
+
+    return TenantPublic.model_validate(tenant)
+
+
 @router.get("", response_model=ListModel[TenantPublic])
 async def list_tenants(
     db: SessionDep,

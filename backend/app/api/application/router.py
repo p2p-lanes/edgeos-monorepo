@@ -1,7 +1,10 @@
+import csv
+import io
 import uuid
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, status
+from fastapi.responses import Response
 
 from app.api.application import crud
 from app.api.application.schemas import (
@@ -11,6 +14,9 @@ from app.api.application.schemas import (
     ApplicationPublic,
     ApplicationStatus,
     ApplicationUpdate,
+    AssociatedAttendee,
+    AttendeesDirectoryEntry,
+    DirectoryProduct,
 )
 from app.api.attendee.schemas import (
     AttendeeCreate,
@@ -440,6 +446,179 @@ async def update_my_application(
     db.refresh(application)
 
     return _build_application_public(application)
+
+
+def _build_directory_entry(application) -> AttendeesDirectoryEntry:
+    """Build a single directory entry from an application."""
+    human = application.human
+    info_hidden = set(application.info_not_shared or [])
+
+    def mask(field: str, value: str | None) -> str | None:
+        return "*" if field in info_hidden else value
+
+    # Find main attendee and their products
+    main_attendee = application.get_main_attendee()
+    products: list[DirectoryProduct] = []
+    check_in = None
+    check_out = None
+
+    if main_attendee:
+        for ap in main_attendee.attendee_products:
+            p = ap.product
+            products.append(
+                DirectoryProduct(
+                    id=p.id,
+                    name=p.name,
+                    slug=p.slug,
+                    category=p.category,
+                    duration_type=p.duration_type,
+                    start_date=p.start_date,
+                    end_date=p.end_date,
+                )
+            )
+            if p.start_date:
+                if check_in is None or p.start_date < check_in:
+                    check_in = p.start_date
+            if p.end_date:
+                if check_out is None or p.end_date > check_out:
+                    check_out = p.end_date
+
+    has_kids = any(a.category == "kid" for a in application.attendees)
+    brings_kids: bool | str = "*" if "brings_kids" in info_hidden else has_kids
+
+    associated = [
+        AssociatedAttendee(
+            name=a.name,
+            category=a.category,
+            gender=a.gender,
+            email=a.email,
+        )
+        for a in application.attendees
+        if a.category != "main"
+    ]
+
+    return AttendeesDirectoryEntry(
+        id=application.id,
+        first_name=mask("first_name", human.first_name if human else None),
+        last_name=mask("last_name", human.last_name if human else None),
+        email=mask("email", human.email if human else None),
+        telegram=mask("telegram", human.telegram if human else None),
+        role=mask("role", human.role if human else None),
+        organization=mask("organization", human.organization if human else None),
+        residence=mask("residence", human.residence if human else None),
+        age=mask("age", human.age if human else None),
+        gender=mask("gender", human.gender if human else None),
+        picture_url=human.picture_url if human else None,
+        brings_kids=brings_kids,
+        participation=products,
+        check_in=check_in,
+        check_out=check_out,
+        associated_attendees=associated,
+    )
+
+
+@router.get(
+    "/my/directory/{popup_id}", response_model=ListModel[AttendeesDirectoryEntry]
+)
+async def list_attendees_directory(
+    popup_id: uuid.UUID,
+    db: HumanTenantSession,
+    _: CurrentHuman,
+    skip: PaginationSkip = 0,
+    limit: PaginationLimit = 100,
+    q: str | None = None,
+    brings_kids: bool | None = None,
+    participation: str | None = None,
+) -> ListModel[AttendeesDirectoryEntry]:
+    """List attendees directory for a popup (Portal).
+
+    Returns accepted/in-review applications with at least one product.
+    Respects info_not_shared masking.
+    """
+    applications, total = crud.applications_crud.find_directory(
+        db,
+        popup_id=popup_id,
+        skip=skip,
+        limit=limit,
+        q=q,
+        brings_kids=brings_kids,
+        participation=participation,
+    )
+
+    results = [_build_directory_entry(a) for a in applications]
+
+    return ListModel[AttendeesDirectoryEntry](
+        results=results,
+        paging=Paging(offset=skip, limit=limit, total=total),
+    )
+
+
+@router.get("/my/directory/{popup_id}/csv")
+async def export_attendees_directory_csv(
+    popup_id: uuid.UUID,
+    db: HumanTenantSession,
+    _: CurrentHuman,
+    q: str | None = None,
+    brings_kids: bool | None = None,
+    participation: str | None = None,
+) -> Response:
+    """Export attendees directory as CSV (Portal).
+
+    No pagination — fetches all matching entries.
+    """
+    applications, _ = crud.applications_crud.find_directory(
+        db,
+        popup_id=popup_id,
+        skip=0,
+        limit=10000,
+        q=q,
+        brings_kids=brings_kids,
+        participation=participation,
+    )
+
+    entries = [_build_directory_entry(a) for a in applications]
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(
+        [
+            "First Name",
+            "Last Name",
+            "Email",
+            "Telegram",
+            "Role",
+            "Organization",
+            "Residence",
+            "Age",
+            "Gender",
+            "Brings Kids",
+            "Check In",
+            "Check Out",
+        ]
+    )
+    for e in entries:
+        writer.writerow(
+            [
+                e.first_name or "",
+                e.last_name or "",
+                e.email or "",
+                e.telegram or "",
+                e.role or "",
+                e.organization or "",
+                e.residence or "",
+                e.age or "",
+                e.gender or "",
+                str(e.brings_kids),
+                e.check_in.isoformat() if e.check_in else "",
+                e.check_out.isoformat() if e.check_out else "",
+            ]
+        )
+
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=attendees.csv"},
+    )
 
 
 @router.post(

@@ -3,8 +3,11 @@
   "private": true,
   "scripts": {
     "dev": "pnpm --filter backoffice dev",
-    "lint": "pnpm --filter backoffice lint",
-    "build": "pnpm --filter backoffice build"
+    "dev:portal": "pnpm --filter portal dev",
+    "dev:all": "pnpm --parallel --filter backoffice --filter portal dev",
+    "lint": "pnpm --filter backoffice --filter portal lint",
+    "lint:portal": "pnpm --filter portal lint",
+    "build": "pnpm --filter backoffice --filter portal build"
   },
   "pnpm": {
     "onlyBuiltDependencies": ["@swc/core", "esbuild"]

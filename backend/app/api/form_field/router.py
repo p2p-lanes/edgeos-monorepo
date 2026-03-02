@@ -7,7 +7,13 @@ from app.api.form_field import crud
 from app.api.form_field.schemas import FormFieldCreate, FormFieldPublic, FormFieldUpdate
 from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
-from app.core.dependencies.users import CurrentUser, CurrentWriter, TenantSession
+from app.core.dependencies.users import (
+    CurrentHuman,
+    CurrentUser,
+    CurrentWriter,
+    HumanTenantSession,
+    TenantSession,
+)
 
 router = APIRouter(prefix="/form-fields", tags=["form-fields"])
 
@@ -147,6 +153,25 @@ async def get_application_schema(
     Returns a schema combining base application fields with
     custom form fields defined for the popup.
     """
+    from app.api.popup.crud import popups_crud
+
+    popup = popups_crud.get(db, popup_id)
+    if not popup:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Popup not found",
+        )
+
+    return crud.form_fields_crud.build_schema_for_popup(db, popup_id)
+
+
+@router.get("/portal/schema/{popup_id}", response_model=dict[str, Any])
+async def get_portal_application_schema(
+    popup_id: uuid.UUID,
+    db: HumanTenantSession,
+    _: CurrentHuman,
+) -> dict[str, Any]:
+    """Get the application form schema for a popup (Portal)."""
     from app.api.popup.crud import popups_crud
 
     popup = popups_crud.get(db, popup_id)

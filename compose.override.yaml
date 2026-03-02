@@ -87,6 +87,17 @@ services:
         - VITE_API_URL=http://localhost:8000
         - NODE_ENV=development
 
+  portal:
+    pull_policy: build
+    restart: "no"
+    ports:
+      - "3000:3000"
+    build:
+      context: .
+      dockerfile: portal/Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=http://localhost:8000
+
   # MinIO for local S3-compatible storage
   minio:
     image: minio/minio:RELEASE.2025-04-22T22-12-26Z

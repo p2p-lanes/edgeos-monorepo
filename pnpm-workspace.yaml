@@ -1,5 +1,7 @@
 packages:
   - backoffice
+  - portal
+  - packages/*
 
 onlyBuiltDependencies:
   - '@swc/core'

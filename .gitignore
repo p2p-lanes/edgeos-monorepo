@@ -61,3 +61,4 @@ coverage/
 # Build outputs
 dist/
 dist-ssr/
+.next/

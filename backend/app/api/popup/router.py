@@ -9,10 +9,16 @@ from app.api.approval_strategy.schemas import (
     ApprovalStrategyType,
 )
 from app.api.popup import crud
-from app.api.popup.schemas import PopupCreate, PopupPublic, PopupUpdate
+from app.api.popup.schemas import PopupCreate, PopupPublic, PopupStatus, PopupUpdate
 from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
-from app.core.dependencies.users import CurrentUser, CurrentWriter, TenantSession
+from app.core.dependencies.users import (
+    CurrentHuman,
+    CurrentUser,
+    CurrentWriter,
+    HumanTenantSession,
+    TenantSession,
+)
 
 router = APIRouter(prefix="/popups", tags=["popups"])
 
@@ -138,3 +144,31 @@ async def delete_popup(
         )
 
     crud.delete(db, popup)
+
+
+@router.get("/portal/list", response_model=list[PopupPublic])
+async def list_portal_popups(
+    db: HumanTenantSession,
+    _: CurrentHuman,
+) -> list[PopupPublic]:
+    """List active popups for the current human's tenant (Portal)."""
+    popups, _ = crud.find(db, status=PopupStatus.active, limit=100)
+    return [PopupPublic.model_validate(p) for p in popups]
+
+
+@router.get("/portal/{slug}", response_model=PopupPublic)
+async def get_portal_popup(
+    slug: str,
+    db: HumanTenantSession,
+    _: CurrentHuman,
+) -> PopupPublic:
+    """Get a popup by slug (Portal)."""
+    popup = crud.get_by_slug(db, slug)
+
+    if not popup or popup.status != PopupStatus.active:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Event not found",
+        )
+
+    return PopupPublic.model_validate(popup)

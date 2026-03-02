@@ -6,6 +6,7 @@ from fastapi import APIRouter, Header, HTTPException, status
 from app.api.human import crud
 from app.api.human.schemas import (
     HumanCreate,
+    HumanProfileUpdate,
     HumanPublic,
     HumanUpdate,
 )
@@ -15,6 +16,7 @@ from app.core.dependencies.users import (
     CurrentHuman,
     CurrentUser,
     CurrentWriter,
+    HumanTenantSession,
     TenantSession,
 )
 
@@ -99,6 +101,25 @@ async def get_current_human_info(
     current_user: CurrentHuman,
 ) -> HumanPublic:
     return HumanPublic.model_validate(current_user)
+
+
+@router.patch("/me", response_model=HumanPublic)
+async def update_current_human(
+    human_in: HumanProfileUpdate,
+    current_human: CurrentHuman,
+    db: HumanTenantSession,
+) -> HumanPublic:
+    """Update the current authenticated human's profile."""
+    human = crud.get(db, current_human.id)
+
+    if not human:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Human not found",
+        )
+
+    updated = crud.update(db, human, human_in)
+    return HumanPublic.model_validate(updated)
 
 
 @router.get("/{human_id}", response_model=HumanPublic)

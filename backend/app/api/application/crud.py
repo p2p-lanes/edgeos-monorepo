@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from fastapi import HTTPException, status
-from sqlalchemy import desc, or_
+from sqlalchemy import desc, exists, or_
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, col, func, select
 
@@ -18,6 +18,7 @@ from app.api.attendee.crud import attendees_crud, generate_check_in_code
 from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.human.models import Humans
 from app.api.human.schemas import HumanCreate, HumanUpdate
+from app.api.product.models import Products
 from app.api.shared.crud import BaseCRUD
 
 if TYPE_CHECKING:
@@ -145,6 +146,114 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         count_statement = select(func.count()).select_from(base_statement.subquery())
         total = session.exec(count_statement).one()
 
+        statement = (
+            base_statement.options(
+                selectinload(Applications.attendees)  # type: ignore[arg-type]
+                .selectinload(Attendees.attendee_products)  # type: ignore[arg-type]
+                .selectinload(AttendeeProducts.product),  # type: ignore[arg-type]
+                selectinload(Applications.human),  # type: ignore[arg-type]
+            )
+            .order_by(desc(Applications.created_at))  # type: ignore[arg-type]
+            .offset(skip)
+            .limit(limit)
+        )
+        results = list(session.exec(statement).all())
+
+        return results, total
+
+    def find_directory(
+        self,
+        session: Session,
+        popup_id: uuid.UUID,
+        skip: int = 0,
+        limit: int = 100,
+        q: str | None = None,
+        brings_kids: bool | None = None,
+        participation: str | None = None,
+    ) -> tuple[list[Applications], int]:
+        """Find applications for the attendees directory.
+
+        Returns accepted/in-review applications whose main attendee has at
+        least one product assigned. Supports text search, brings_kids filter,
+        and participation (week) filter.
+        """
+        base_statement = (
+            select(Applications)
+            .where(Applications.popup_id == popup_id)
+            .where(
+                Applications.status.in_(  # type: ignore[union-attr]
+                    [
+                        ApplicationStatus.ACCEPTED.value,
+                        ApplicationStatus.IN_REVIEW.value,
+                    ]
+                )
+            )
+        )
+
+        # Main attendee must have at least one product
+        has_products = (
+            exists()
+            .where(Attendees.application_id == Applications.id)
+            .where(Attendees.category == "main")
+            .where(AttendeeProducts.attendee_id == Attendees.id)
+        )
+        base_statement = base_statement.where(has_products)
+
+        # Text search across human fields
+        if q:
+            search_term = f"%{q}%"
+            base_statement = base_statement.join(
+                Humans,
+                Applications.human_id == Humans.id,  # type: ignore[arg-type]
+            ).where(
+                or_(
+                    col(Humans.first_name).ilike(search_term),
+                    col(Humans.last_name).ilike(search_term),
+                    col(Humans.email).ilike(search_term),
+                    col(Humans.telegram).ilike(search_term),
+                    col(Humans.role).ilike(search_term),
+                    col(Humans.organization).ilike(search_term),
+                )
+            )
+
+        # Filter by brings_kids
+        if brings_kids is True:
+            has_kids = (
+                exists()
+                .where(Attendees.application_id == Applications.id)
+                .where(Attendees.category == "kid")
+            )
+            base_statement = base_statement.where(has_kids)
+        elif brings_kids is False:
+            has_kids = (
+                exists()
+                .where(Attendees.application_id == Applications.id)
+                .where(Attendees.category == "kid")
+            )
+            base_statement = base_statement.where(~has_kids)
+
+        # Filter by participation weeks
+        if participation:
+            week_numbers = [w.strip() for w in participation.split(",") if w.strip()]
+            week_conditions = []
+            for w in week_numbers:
+                week_conditions.append(col(Products.slug).ilike(f"week{w}%"))
+            if week_conditions:
+                participation_exists = (
+                    exists()
+                    .where(Attendees.application_id == Applications.id)
+                    .where(Attendees.category == "main")
+                    .where(AttendeeProducts.attendee_id == Attendees.id)
+                    .where(AttendeeProducts.product_id == Products.id)
+                    .where(or_(*week_conditions))
+                )
+                base_statement = base_statement.where(participation_exists)
+
+        # Count
+        count_statement = select(func.count()).select_from(base_statement.subquery())
+        total = session.exec(count_statement).one()
+
+        # Eager load
         statement = (
             base_statement.options(
                 selectinload(Applications.attendees)  # type: ignore[arg-type]

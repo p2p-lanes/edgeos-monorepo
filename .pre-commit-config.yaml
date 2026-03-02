@@ -13,18 +13,30 @@ repos:
         exclude: |
             (?x)^(
                 backoffice/src/client/.*|
+                portal/src/client/.*|
                 backend/app/templates/.*
             )$
       - id: trailing-whitespace
-        exclude: ^backoffice/src/client/.*
+        exclude: |
+            (?x)^(
+                backoffice/src/client/.*|
+                portal/src/client/.*
+            )$
   - repo: local
     hooks:
-      - id: local-biome-check
-        name: biome check
-        entry: pnpm run lint
+      - id: biome-check-backoffice
+        name: biome check (backoffice)
+        entry: pnpm --filter backoffice lint
         language: system
         types: [text]
         files: ^backoffice/
+
+      - id: biome-check-portal
+        name: biome check (portal)
+        entry: pnpm --filter portal lint
+        language: system
+        types: [text]
+        files: ^portal/
 
       - id: local-ruff-check
         name: ruff check
@@ -40,8 +52,8 @@ repos:
         language: python
         types: [python]
 
-      - id: generate-backoffice-sdk
-        name: Generate Backoffice SDK
+      - id: generate-sdk
+        name: Generate SDK
         entry: bash ./scripts/generate-client.sh
         pass_filenames: false
         language: system
