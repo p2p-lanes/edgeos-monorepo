@@ -1,6 +1,5 @@
 "use client"
 
-import { ApiError } from "@/client"
 import {
   MutationCache,
   QueryCache,
@@ -8,6 +7,7 @@ import {
   QueryClientProvider,
 } from "@tanstack/react-query"
 import { type ReactNode, useState } from "react"
+import { ApiError } from "@/client"
 
 function handleApiError(error: Error) {
   if (error instanceof ApiError && error.status === 401) {

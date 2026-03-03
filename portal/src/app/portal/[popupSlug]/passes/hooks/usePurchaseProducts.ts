@@ -1,6 +1,6 @@
-import { PaymentsService } from "@/client"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
+import { PaymentsService } from "@/client"
 import { queryKeys } from "@/lib/query-keys"
 import { useApplication } from "@/providers/applicationProvider"
 import { useDiscount } from "@/providers/discountProvider"

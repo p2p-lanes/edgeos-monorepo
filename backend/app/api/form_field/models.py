@@ -1,5 +1,5 @@
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
@@ -8,6 +8,7 @@ from sqlmodel import Column, Field, Relationship
 from app.api.form_field.schemas import FormFieldBase
 
 if TYPE_CHECKING:
+    from app.api.form_section.models import FormSections
     from app.api.popup.models import Popups
     from app.api.tenant.models import Tenants
 
@@ -27,3 +28,4 @@ class FormFields(FormFieldBase, table=True):
 
     tenant: "Tenants" = Relationship(back_populates="form_fields")
     popup: "Popups" = Relationship(back_populates="form_fields")
+    section: Optional["FormSections"] = Relationship(back_populates="form_fields")

@@ -1,5 +1,5 @@
 import { useForm } from "@tanstack/react-form"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import {
   AlignLeft,
@@ -17,6 +17,7 @@ import {
   type FormFieldPublic,
   FormFieldsService,
   type FormFieldUpdate,
+  FormSectionsService,
 } from "@/client"
 import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
@@ -64,6 +65,8 @@ const FIELD_TYPES = [
   { value: "url", label: "URL", icon: Link },
 ]
 
+const NO_SECTION = "__none__"
+
 interface FormFieldFormProps {
   defaultValues?: FormFieldPublic
   onSuccess: () => void
@@ -80,6 +83,19 @@ export function FormFieldForm({
   const { isAdmin } = useAuth()
   const isEdit = !!defaultValues
   const readOnly = !isAdmin
+
+  const popupId = isEdit ? defaultValues.popup_id : selectedPopupId
+
+  const { data: sectionsData } = useQuery({
+    queryKey: ["form-sections", popupId],
+    queryFn: () =>
+      FormSectionsService.listFormSections({
+        popupId: popupId || undefined,
+      }),
+    enabled: !!popupId,
+  })
+
+  const sections = sectionsData?.results ?? []
 
   const createMutation = useMutation({
     mutationFn: (data: FormFieldCreate) =>
@@ -125,10 +141,9 @@ export function FormFieldForm({
 
   const form = useForm({
     defaultValues: {
-      name: defaultValues?.name ?? "",
       label: defaultValues?.label ?? "",
       field_type: defaultValues?.field_type ?? "text",
-      section: defaultValues?.section ?? "",
+      section_id: defaultValues?.section_id ?? "",
       position: defaultValues?.position?.toString() ?? "0",
       required: defaultValues?.required ?? false,
       options: defaultValues?.options?.join("\n") ?? "",
@@ -143,12 +158,16 @@ export function FormFieldForm({
         .map((o) => o.trim())
         .filter((o) => o.length > 0)
 
+      const sectionId =
+        value.section_id && value.section_id !== NO_SECTION
+          ? value.section_id
+          : undefined
+
       if (isEdit) {
         updateMutation.mutate({
-          name: value.name,
           label: value.label,
           field_type: value.field_type,
-          section: value.section || undefined,
+          section_id: sectionId || null,
           position: Number.parseInt(value.position, 10) || 0,
           required: value.required,
           options: optionsArray.length > 0 ? optionsArray : undefined,
@@ -162,10 +181,9 @@ export function FormFieldForm({
         }
         createMutation.mutate({
           popup_id: selectedPopupId,
-          name: value.name,
           label: value.label,
           field_type: value.field_type,
-          section: value.section || undefined,
+          section_id: sectionId || null,
           position: Number.parseInt(value.position, 10) || 0,
           required: value.required,
           options: optionsArray.length > 0 ? optionsArray : undefined,
@@ -200,10 +218,9 @@ export function FormFieldForm({
         <FormErrorSummary
           form={form}
           fieldLabels={{
-            name: "Field Name",
             label: "Label",
             field_type: "Field Type",
-            section: "Section",
+            section_id: "Section",
           }}
         />
         <div>
@@ -227,69 +244,36 @@ export function FormFieldForm({
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <form.Field
-                    name="name"
-                    validators={{
-                      onBlur: ({ value }) =>
-                        !readOnly && !value ? "Name is required" : undefined,
-                    }}
-                  >
-                    {(field) => (
-                      <div className="space-y-2">
-                        <Label htmlFor="name">
-                          Field Name{" "}
-                          {!readOnly && (
-                            <span className="text-destructive">*</span>
-                          )}
-                        </Label>
-                        <Input
-                          id="name"
-                          placeholder="dietary_restrictions"
-                          value={field.state.value}
-                          onBlur={field.handleBlur}
-                          onChange={(e) => field.handleChange(e.target.value)}
-                          disabled={readOnly}
-                        />
-                        <p className="text-sm text-muted-foreground">
-                          Internal identifier (no spaces)
-                        </p>
-                        <FieldError errors={field.state.meta.errors} />
-                      </div>
-                    )}
-                  </form.Field>
-
-                  <form.Field
-                    name="label"
-                    validators={{
-                      onBlur: ({ value }) =>
-                        !readOnly && !value ? "Label is required" : undefined,
-                    }}
-                  >
-                    {(field) => (
-                      <div className="space-y-2">
-                        <Label htmlFor="label">
-                          Display Label{" "}
-                          {!readOnly && (
-                            <span className="text-destructive">*</span>
-                          )}
-                        </Label>
-                        <Input
-                          id="label"
-                          placeholder="Dietary Restrictions"
-                          value={field.state.value}
-                          onBlur={field.handleBlur}
-                          onChange={(e) => field.handleChange(e.target.value)}
-                          disabled={readOnly}
-                        />
-                        <p className="text-sm text-muted-foreground">
-                          Label shown to users
-                        </p>
-                        <FieldError errors={field.state.meta.errors} />
-                      </div>
-                    )}
-                  </form.Field>
-                </div>
+                <form.Field
+                  name="label"
+                  validators={{
+                    onBlur: ({ value }) =>
+                      !readOnly && !value ? "Label is required" : undefined,
+                  }}
+                >
+                  {(field) => (
+                    <div className="space-y-2">
+                      <Label htmlFor="label">
+                        Display Label{" "}
+                        {!readOnly && (
+                          <span className="text-destructive">*</span>
+                        )}
+                      </Label>
+                      <Input
+                        id="label"
+                        placeholder="Dietary Restrictions"
+                        value={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                        disabled={readOnly}
+                      />
+                      <p className="text-sm text-muted-foreground">
+                        Label shown to users
+                      </p>
+                      <FieldError errors={field.state.meta.errors} />
+                    </div>
+                  )}
+                </form.Field>
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <form.Field name="field_type">
@@ -316,20 +300,33 @@ export function FormFieldForm({
                     )}
                   </form.Field>
 
-                  <form.Field name="section">
+                  <form.Field name="section_id">
                     {(field) => (
                       <div className="space-y-2">
-                        <Label htmlFor="section">Section</Label>
-                        <Input
-                          id="section"
-                          placeholder="preferences"
-                          value={field.state.value}
-                          onBlur={field.handleBlur}
-                          onChange={(e) => field.handleChange(e.target.value)}
+                        <Label htmlFor="section_id">Section</Label>
+                        <Select
+                          value={field.state.value || NO_SECTION}
+                          onValueChange={(val) =>
+                            field.handleChange(val === NO_SECTION ? "" : val)
+                          }
                           disabled={readOnly}
-                        />
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select section" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={NO_SECTION}>
+                              No section
+                            </SelectItem>
+                            {sections.map((s) => (
+                              <SelectItem key={s.id} value={s.id}>
+                                {s.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <p className="text-sm text-muted-foreground">
-                          Group fields by section
+                          Group this field into a section
                         </p>
                       </div>
                     )}
@@ -351,7 +348,7 @@ export function FormFieldForm({
                           disabled={readOnly}
                         />
                         <p className="text-sm text-muted-foreground">
-                          Display order (lower = first)
+                          Display order within section (lower = first)
                         </p>
                       </div>
                     )}

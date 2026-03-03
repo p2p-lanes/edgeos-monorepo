@@ -222,6 +222,16 @@ export type ApprovalStrategyUpdate = {
 };
 
 /**
+ * Non-main attendee summary for directory.
+ */
+export type AssociatedAttendee = {
+    name: string;
+    category: string;
+    gender?: (string | null);
+    email?: (string | null);
+};
+
+/**
  * Attendee schema for creation (by user).
  */
 export type AttendeeCreate = {
@@ -248,6 +258,28 @@ export type AttendeePublic = {
     created_at?: (string | null);
     updated_at?: (string | null);
     products?: Array<unknown>;
+};
+
+/**
+ * Single entry in the attendees directory.
+ */
+export type AttendeesDirectoryEntry = {
+    id: string;
+    first_name?: (string | null);
+    last_name?: (string | null);
+    email?: (string | null);
+    telegram?: (string | null);
+    role?: (string | null);
+    organization?: (string | null);
+    residence?: (string | null);
+    age?: (string | null);
+    gender?: (string | null);
+    picture_url?: (string | null);
+    brings_kids?: (boolean | string);
+    participation?: Array<DirectoryProduct>;
+    check_in?: (string | null);
+    check_out?: (string | null);
+    associated_attendees?: Array<AssociatedAttendee>;
 };
 
 /**
@@ -372,6 +404,19 @@ export type DashboardStats = {
     payments: PaymentStats;
 };
 
+/**
+ * Minimal product info for directory participation display.
+ */
+export type DirectoryProduct = {
+    id: string;
+    name: string;
+    slug: string;
+    category?: (string | null);
+    duration_type?: (string | null);
+    start_date?: (string | null);
+    end_date?: (string | null);
+};
+
 export type EmailTemplateCreate = {
     popup_id: string;
     template_type: string;
@@ -402,10 +447,9 @@ export type EmailTemplateUpdate = {
 
 export type FormFieldCreate = {
     popup_id: string;
-    name: string;
     label: string;
     field_type?: string;
-    section?: (string | null);
+    section_id?: (string | null);
     position?: number;
     required?: boolean;
     options?: (Array<(string)> | null);
@@ -420,7 +464,8 @@ export type FormFieldPublic = {
     name: string;
     label: string;
     field_type: string;
-    section?: (string | null);
+    section_id?: (string | null);
+    section_label?: (string | null);
     position?: number;
     required?: boolean;
     options?: (Array<(string)> | null);
@@ -429,15 +474,36 @@ export type FormFieldPublic = {
 };
 
 export type FormFieldUpdate = {
-    name?: (string | null);
     label?: (string | null);
     field_type?: (string | null);
-    section?: (string | null);
+    section_id?: (string | null);
     position?: (number | null);
     required?: (boolean | null);
     options?: (Array<(string)> | null);
     placeholder?: (string | null);
     help_text?: (string | null);
+};
+
+export type FormSectionCreate = {
+    popup_id: string;
+    label: string;
+    description?: (string | null);
+    order?: number;
+};
+
+export type FormSectionPublic = {
+    id: string;
+    tenant_id: string;
+    popup_id: string;
+    label: string;
+    description?: (string | null);
+    order?: number;
+};
+
+export type FormSectionUpdate = {
+    label?: (string | null);
+    description?: (string | null);
+    order?: (number | null);
 };
 
 /**
@@ -633,6 +699,21 @@ export type HumanCreate = {
 };
 
 /**
+ * Schema for humans updating their own profile.
+ */
+export type HumanProfileUpdate = {
+    first_name?: (string | null);
+    last_name?: (string | null);
+    telegram?: (string | null);
+    organization?: (string | null);
+    role?: (string | null);
+    gender?: (string | null);
+    age?: (string | null);
+    residence?: (string | null);
+    picture_url?: (string | null);
+};
+
+/**
  * Human schema for API responses.
  */
 export type HumanPublic = {
@@ -696,6 +777,11 @@ export type ListModel_AttendeePublic_ = {
     paging: Paging;
 };
 
+export type ListModel_AttendeesDirectoryEntry_ = {
+    results: Array<AttendeesDirectoryEntry>;
+    paging: Paging;
+};
+
 export type ListModel_CouponPublic_ = {
     results: Array<CouponPublic>;
     paging: Paging;
@@ -708,6 +794,11 @@ export type ListModel_EmailTemplatePublic_ = {
 
 export type ListModel_FormFieldPublic_ = {
     results: Array<FormFieldPublic>;
+    paging: Paging;
+};
+
+export type ListModel_FormSectionPublic_ = {
+    results: Array<FormSectionPublic>;
     paging: Paging;
 };
 
@@ -1516,6 +1607,32 @@ export type ApplicationsCreateMyApplicationData = {
 
 export type ApplicationsCreateMyApplicationResponse = (ApplicationPublic);
 
+export type ApplicationsListAttendeesDirectoryData = {
+    bringsKids?: (boolean | null);
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    participation?: (string | null);
+    popupId: string;
+    q?: (string | null);
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+};
+
+export type ApplicationsListAttendeesDirectoryResponse = (ListModel_AttendeesDirectoryEntry_);
+
+export type ApplicationsExportAttendeesDirectoryCsvData = {
+    bringsKids?: (boolean | null);
+    participation?: (string | null);
+    popupId: string;
+    q?: (string | null);
+};
+
+export type ApplicationsExportAttendeesDirectoryCsvResponse = (unknown);
+
 export type ApplicationsAddMyAttendeeData = {
     popupId: string;
     requestBody: AttendeeCreate;
@@ -1830,6 +1947,58 @@ export type FormFieldsGetApplicationSchemaResponse = ({
     [key: string]: unknown;
 });
 
+export type FormFieldsGetPortalApplicationSchemaData = {
+    popupId: string;
+};
+
+export type FormFieldsGetPortalApplicationSchemaResponse = ({
+    [key: string]: unknown;
+});
+
+export type FormSectionsListFormSectionsData = {
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    popupId?: (string | null);
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+    xTenantId?: (string | null);
+};
+
+export type FormSectionsListFormSectionsResponse = (ListModel_FormSectionPublic_);
+
+export type FormSectionsCreateFormSectionData = {
+    requestBody: FormSectionCreate;
+    xTenantId?: (string | null);
+};
+
+export type FormSectionsCreateFormSectionResponse = (FormSectionPublic);
+
+export type FormSectionsGetFormSectionData = {
+    sectionId: string;
+    xTenantId?: (string | null);
+};
+
+export type FormSectionsGetFormSectionResponse = (FormSectionPublic);
+
+export type FormSectionsUpdateFormSectionData = {
+    requestBody: FormSectionUpdate;
+    sectionId: string;
+    xTenantId?: (string | null);
+};
+
+export type FormSectionsUpdateFormSectionResponse = (FormSectionPublic);
+
+export type FormSectionsDeleteFormSectionData = {
+    sectionId: string;
+    xTenantId?: (string | null);
+};
+
+export type FormSectionsDeleteFormSectionResponse = (void);
+
 export type GroupsListGroupsData = {
     /**
      * Maximum number of items to return
@@ -1959,6 +2128,12 @@ export type HumansCreateHumanData = {
 export type HumansCreateHumanResponse = (HumanPublic);
 
 export type HumansGetCurrentHumanInfoResponse = (HumanPublic);
+
+export type HumansUpdateCurrentHumanData = {
+    requestBody: HumanProfileUpdate;
+};
+
+export type HumansUpdateCurrentHumanResponse = (HumanPublic);
 
 export type HumansGetHumanData = {
     humanId: string;
@@ -2133,6 +2308,14 @@ export type PopupsDeletePopupData = {
 
 export type PopupsDeletePopupResponse = (void);
 
+export type PopupsListPortalPopupsResponse = (Array<PopupPublic>);
+
+export type PopupsGetPortalPopupData = {
+    slug: string;
+};
+
+export type PopupsGetPortalPopupResponse = (PopupPublic);
+
 export type ProductsListProductsData = {
     category?: (ProductCategory | null);
     isActive?: (boolean | null);
@@ -2188,6 +2371,28 @@ export type ProductsDeleteProductData = {
 };
 
 export type ProductsDeleteProductResponse = (void);
+
+export type ProductsListPortalProductsData = {
+    category?: (ProductCategory | null);
+    isActive?: (boolean | null);
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    popupId?: (string | null);
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+};
+
+export type ProductsListPortalProductsResponse = (ListModel_ProductPublic_);
+
+export type TenantsGetTenantBySlugData = {
+    slug: string;
+};
+
+export type TenantsGetTenantBySlugResponse = (TenantPublic);
 
 export type TenantsListTenantsData = {
     /**

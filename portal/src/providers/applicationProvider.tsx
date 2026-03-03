@@ -1,8 +1,8 @@
 "use client"
 
-import type { ApplicationPublic } from "@/client"
 import { useQueryClient } from "@tanstack/react-query"
 import { createContext, type ReactNode, useCallback, useContext } from "react"
+import type { ApplicationPublic } from "@/client"
 import { useApplicationsQuery } from "@/hooks/useGetApplications"
 import { queryKeys } from "@/lib/query-keys"
 import type { AttendeePassState } from "@/types/Attendee"

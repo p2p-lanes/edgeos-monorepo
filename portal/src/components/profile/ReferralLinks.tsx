@@ -1,8 +1,8 @@
 "use client"
 
-import type { GroupPublic, PopupPublic } from "@/client"
 import { Check, Copy } from "lucide-react"
 import { useState } from "react"
+import type { GroupPublic, PopupPublic } from "@/client"
 import { Button } from "@/components/ui/button"
 import { useCityProvider } from "@/providers/cityProvider"
 import { getBaseUrl } from "@/utils/environment"

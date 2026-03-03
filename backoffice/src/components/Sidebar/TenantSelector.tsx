@@ -83,7 +83,9 @@ export function TenantSelector() {
   if (!tenants?.results?.length) {
     return (
       <div className="py-2 text-sm text-muted-foreground">
-        {isError ? "Failed to load organizations" : "No organizations available"}
+        {isError
+          ? "Failed to load organizations"
+          : "No organizations available"}
       </div>
     )
   }

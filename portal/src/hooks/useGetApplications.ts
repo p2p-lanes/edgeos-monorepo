@@ -1,5 +1,5 @@
-import { ApplicationsService } from "@/client"
 import { useQuery } from "@tanstack/react-query"
+import { ApplicationsService } from "@/client"
 import { queryKeys } from "@/lib/query-keys"
 
 export function useApplicationsQuery() {

@@ -1,7 +1,7 @@
 "use client"
 
-import type { GroupPublic } from "@/client"
 import { createContext, type ReactNode, useContext, useState } from "react"
+import type { GroupPublic } from "@/client"
 
 interface GroupsContextType {
   groups: GroupPublic[]

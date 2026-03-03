@@ -2273,10 +2273,6 @@ export const FormFieldCreateSchema = {
             format: 'uuid',
             title: 'Popup Id'
         },
-        name: {
-            type: 'string',
-            title: 'Name'
-        },
         label: {
             type: 'string',
             title: 'Label'
@@ -2286,16 +2282,17 @@ export const FormFieldCreateSchema = {
             title: 'Field Type',
             default: 'text'
         },
-        section: {
+        section_id: {
             anyOf: [
                 {
-                    type: 'string'
+                    type: 'string',
+                    format: 'uuid'
                 },
                 {
                     type: 'null'
                 }
             ],
-            title: 'Section'
+            title: 'Section Id'
         },
         position: {
             type: 'integer',
@@ -2345,7 +2342,7 @@ export const FormFieldCreateSchema = {
         }
     },
     type: 'object',
-    required: ['popup_id', 'name', 'label'],
+    required: ['popup_id', 'label'],
     title: 'FormFieldCreate'
 } as const;
 
@@ -2378,7 +2375,19 @@ export const FormFieldPublicSchema = {
             type: 'string',
             title: 'Field Type'
         },
-        section: {
+        section_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Section Id'
+        },
+        section_label: {
             anyOf: [
                 {
                     type: 'string'
@@ -2387,7 +2396,7 @@ export const FormFieldPublicSchema = {
                     type: 'null'
                 }
             ],
-            title: 'Section'
+            title: 'Section Label'
         },
         position: {
             type: 'integer',
@@ -2443,17 +2452,6 @@ export const FormFieldPublicSchema = {
 
 export const FormFieldUpdateSchema = {
     properties: {
-        name: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Name'
-        },
         label: {
             anyOf: [
                 {
@@ -2476,16 +2474,17 @@ export const FormFieldUpdateSchema = {
             ],
             title: 'Field Type'
         },
-        section: {
+        section_id: {
             anyOf: [
                 {
-                    type: 'string'
+                    type: 'string',
+                    format: 'uuid'
                 },
                 {
                     type: 'null'
                 }
             ],
-            title: 'Section'
+            title: 'Section Id'
         },
         position: {
             anyOf: [
@@ -2548,6 +2547,122 @@ export const FormFieldUpdateSchema = {
     },
     type: 'object',
     title: 'FormFieldUpdate'
+} as const;
+
+export const FormSectionCreateSchema = {
+    properties: {
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        label: {
+            type: 'string',
+            title: 'Label'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        order: {
+            type: 'integer',
+            title: 'Order',
+            default: 0
+        }
+    },
+    type: 'object',
+    required: ['popup_id', 'label'],
+    title: 'FormSectionCreate'
+} as const;
+
+export const FormSectionPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        label: {
+            type: 'string',
+            title: 'Label'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        order: {
+            type: 'integer',
+            title: 'Order',
+            default: 0
+        }
+    },
+    type: 'object',
+    required: ['id', 'tenant_id', 'popup_id', 'label'],
+    title: 'FormSectionPublic'
+} as const;
+
+export const FormSectionUpdateSchema = {
+    properties: {
+        label: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Label'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        order: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Order'
+        }
+    },
+    type: 'object',
+    title: 'FormSectionUpdate'
 } as const;
 
 export const GroupAdminUpdateSchema = {
@@ -3739,7 +3854,7 @@ export const HumanProfileUpdateSchema = {
     },
     type: 'object',
     title: 'HumanProfileUpdate',
-    description: 'Schema for humans updating their own profile'
+    description: 'Schema for humans updating their own profile.'
 } as const;
 
 export const HumanPublicSchema = {
@@ -4152,6 +4267,24 @@ export const ListModel_FormFieldPublic_Schema = {
     type: 'object',
     required: ['results', 'paging'],
     title: 'ListModel[FormFieldPublic]'
+} as const;
+
+export const ListModel_FormSectionPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/FormSectionPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[FormSectionPublic]'
 } as const;
 
 export const ListModel_GroupPublic_Schema = {

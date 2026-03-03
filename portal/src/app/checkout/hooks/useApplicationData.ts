@@ -1,6 +1,6 @@
-import { ApplicationsService } from "@/client"
 import { useQuery } from "@tanstack/react-query"
 import { jwtDecode } from "jwt-decode"
+import { ApplicationsService } from "@/client"
 import { queryKeys } from "@/lib/query-keys"
 import type { FormDataProps } from "../types"
 

@@ -25,7 +25,9 @@ class FormFieldBase(SQLModel):
     name: str = Field(index=True)
     label: str
     field_type: str = Field(default=FormFieldType.TEXT.value)
-    section: str | None = Field(default=None, nullable=True)
+    section_id: uuid.UUID | None = Field(
+        default=None, nullable=True, foreign_key="formsections.id"
+    )
     position: int = Field(default=0)
     required: bool = Field(default=False)
     options: list[str] | None = Field(
@@ -42,7 +44,8 @@ class FormFieldPublic(BaseModel):
     name: str
     label: str
     field_type: str
-    section: str | None = None
+    section_id: uuid.UUID | None = None
+    section_label: str | None = None
     position: int = 0
     required: bool = False
     options: list[str] | None = None
@@ -54,10 +57,9 @@ class FormFieldPublic(BaseModel):
 
 class FormFieldCreate(BaseModel):
     popup_id: uuid.UUID
-    name: str
     label: str
     field_type: str = FormFieldType.TEXT.value
-    section: str | None = None
+    section_id: uuid.UUID | None = None
     position: int = 0
     required: bool = False
     options: list[str] | None = None
@@ -68,10 +70,9 @@ class FormFieldCreate(BaseModel):
 
 
 class FormFieldUpdate(BaseModel):
-    name: str | None = None
     label: str | None = None
     field_type: str | None = None
-    section: str | None = None
+    section_id: uuid.UUID | None = None
     position: int | None = None
     required: bool | None = None
     options: list[str] | None = None

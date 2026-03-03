@@ -1,8 +1,8 @@
 "use client"
 
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import type { HumanProfileUpdate } from "@/client"
 import { type HumanPublic, HumansService } from "@/client"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { queryKeys } from "@/lib/query-keys"
 
 export type UpdateProfilePayload = Partial<

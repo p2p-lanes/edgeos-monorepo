@@ -28,6 +28,7 @@ import {
   Eye,
   FileText,
   GripVertical,
+  Layers,
   Pencil,
   Plus,
   Trash2,
@@ -38,6 +39,8 @@ import {
   type ApiError,
   type FormFieldPublic,
   FormFieldsService,
+  type FormSectionPublic,
+  FormSectionsService,
 } from "@/client"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
@@ -62,6 +65,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { LoadingButton } from "@/components/ui/loading-button"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
@@ -90,7 +94,7 @@ function getFormFieldsQueryOptions(
 }
 
 export const Route = createFileRoute("/_layout/form-builder/")({
-  component: FormFields,
+  component: FormBuilder,
   validateSearch: validateTableSearch,
   head: () => ({
     meta: [{ title: "Form Builder - EdgeOS" }],
@@ -107,6 +111,19 @@ function AddFormFieldButton() {
     </Button>
   )
 }
+
+function AddSectionButton() {
+  return (
+    <Button asChild>
+      <Link to="/form-builder/sections/new">
+        <Plus className="mr-2 h-4 w-4" />
+        Add Section
+      </Link>
+    </Button>
+  )
+}
+
+// ─── Fields Tab Components ───────────────────────────────────────────────────
 
 function DeleteFormField({
   field,
@@ -210,15 +227,6 @@ const columns: ColumnDef<FormFieldPublic>[] = [
     ),
   },
   {
-    accessorKey: "name",
-    header: "Name",
-    cell: ({ row }) => (
-      <span className="font-mono text-sm text-muted-foreground">
-        {row.original.name}
-      </span>
-    ),
-  },
-  {
     accessorKey: "field_type",
     header: "Type",
     cell: ({ row }) => (
@@ -226,11 +234,11 @@ const columns: ColumnDef<FormFieldPublic>[] = [
     ),
   },
   {
-    accessorKey: "section",
+    accessorKey: "section_label",
     header: "Section",
     cell: ({ row }) => (
       <span className="text-muted-foreground">
-        {row.original.section || "—"}
+        {row.original.section_label || "—"}
       </span>
     ),
   },
@@ -301,9 +309,6 @@ function SortableFieldItem({ field }: { field: FormFieldPublic }) {
             </Badge>
           )}
         </div>
-        <p className="text-xs text-muted-foreground font-mono mt-0.5">
-          {field.name}
-        </p>
       </div>
       <FormFieldActionsMenu field={field} />
     </div>
@@ -372,7 +377,7 @@ function SortableFieldList({ fields }: { fields: FormFieldPublic[] }) {
   const sectionOrder: string[] = []
   const grouped: Record<string, FormFieldPublic[]> = {}
   for (const field of sorted) {
-    const section = field.section || "Unsectioned"
+    const section = field.section_label || "Unsectioned"
     if (!grouped[section]) {
       grouped[section] = []
       sectionOrder.push(section)
@@ -450,7 +455,7 @@ function FormFieldsTableContent({ reorderMode }: { reorderMode: boolean }) {
       columns={columns}
       data={formFields.results}
       searchPlaceholder="Search by label, name, or type..."
-      hiddenOnMobile={["name", "section", "required", "position"]}
+      hiddenOnMobile={["section_label", "required", "position"]}
       searchValue={search}
       onSearchChange={setSearch}
       serverPagination={{
@@ -479,10 +484,253 @@ function FormFieldsTableContent({ reorderMode }: { reorderMode: boolean }) {
   )
 }
 
-function FormFields() {
+// ─── Sections Tab Components ─────────────────────────────────────────────────
+
+function DeleteFormSection({
+  section,
+  onSuccess,
+}: {
+  section: FormSectionPublic
+  onSuccess: () => void
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+  const queryClient = useQueryClient()
+  const { showSuccessToast, showErrorToast } = useCustomToast()
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      FormSectionsService.deleteFormSection({ sectionId: section.id }),
+    onSuccess: () => {
+      showSuccessToast("Section deleted successfully")
+      setIsOpen(false)
+      onSuccess()
+    },
+    onError: createErrorHandler(showErrorToast),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["form-sections"] })
+      queryClient.invalidateQueries({ queryKey: ["form-fields"] })
+    },
+  })
+
+  return (
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DropdownMenuItem
+        variant="destructive"
+        onSelect={(e) => e.preventDefault()}
+        onClick={() => setIsOpen(true)}
+      >
+        <Trash2 className="mr-2 h-4 w-4" />
+        Delete
+      </DropdownMenuItem>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Delete Section</DialogTitle>
+          <DialogDescription>
+            Are you sure you want to delete "{section.label}"? Fields in this
+            section will become unsectioned. This action cannot be undone.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="outline">Cancel</Button>
+          </DialogClose>
+          <LoadingButton
+            variant="destructive"
+            loading={mutation.isPending}
+            onClick={() => mutation.mutate()}
+          >
+            Delete
+          </LoadingButton>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function SectionActionsMenu({ section }: { section: FormSectionPublic }) {
+  const [open, setOpen] = useState(false)
+  const { isAdmin } = useAuth()
+
+  return (
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" aria-label="Section actions">
+          <EllipsisVertical className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem asChild>
+          <Link
+            to="/form-builder/sections/$id/edit"
+            params={{ id: section.id }}
+          >
+            {isAdmin ? (
+              <>
+                <Pencil className="mr-2 h-4 w-4" />
+                Edit
+              </>
+            ) : (
+              <>
+                <Eye className="mr-2 h-4 w-4" />
+                View
+              </>
+            )}
+          </Link>
+        </DropdownMenuItem>
+        {isAdmin && (
+          <DeleteFormSection
+            section={section}
+            onSuccess={() => setOpen(false)}
+          />
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+function SortableSectionItem({ section }: { section: FormSectionPublic }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: section.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center gap-3 rounded-lg border bg-background p-3 ${isDragging ? "opacity-50 shadow-lg" : ""}`}
+    >
+      <button
+        type="button"
+        className="cursor-grab touch-none text-muted-foreground hover:text-foreground"
+        {...attributes}
+        {...listeners}
+      >
+        <GripVertical className="h-4 w-4" />
+      </button>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="font-medium text-sm truncate">{section.label}</span>
+          <Badge variant="outline" className="shrink-0 text-xs">
+            #{section.order}
+          </Badge>
+        </div>
+        {section.description && (
+          <p className="text-xs text-muted-foreground mt-0.5 truncate">
+            {section.description}
+          </p>
+        )}
+      </div>
+      <SectionActionsMenu section={section} />
+    </div>
+  )
+}
+
+function SectionsListContent() {
+  const { selectedPopupId } = useWorkspace()
+  const queryClient = useQueryClient()
+  const { showErrorToast } = useCustomToast()
+  const [isSaving, setIsSaving] = useState(false)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  )
+
+  const { data: sectionsData } = useQuery({
+    queryKey: ["form-sections", selectedPopupId],
+    queryFn: () =>
+      FormSectionsService.listFormSections({
+        popupId: selectedPopupId || undefined,
+      }),
+    enabled: !!selectedPopupId,
+  })
+
+  const sections = sectionsData?.results ?? []
+  const sorted = [...sections].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const oldIndex = sorted.findIndex((s) => s.id === active.id)
+    const newIndex = sorted.findIndex((s) => s.id === over.id)
+    const reordered = arrayMove(sorted, oldIndex, newIndex)
+
+    setIsSaving(true)
+    try {
+      await Promise.all(
+        reordered.map((section, idx) =>
+          FormSectionsService.updateFormSection({
+            sectionId: section.id,
+            requestBody: { order: idx },
+          }),
+        ),
+      )
+      queryClient.invalidateQueries({ queryKey: ["form-sections"] })
+    } catch (err) {
+      createErrorHandler(showErrorToast)(err as ApiError)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  if (sorted.length === 0) {
+    return (
+      <EmptyState
+        icon={Layers}
+        title="No sections yet"
+        description="Create sections to organize your form fields into groups."
+        action={<AddSectionButton />}
+      />
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      {isSaving && (
+        <p className="text-xs text-muted-foreground animate-pulse">
+          Saving order...
+        </p>
+      )}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext
+          items={sorted.map((s) => s.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          <div className="space-y-1.5">
+            {sorted.map((section) => (
+              <SortableSectionItem key={section.id} section={section} />
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
+    </div>
+  )
+}
+
+// ─── Main Component ──────────────────────────────────────────────────────────
+
+function FormBuilder() {
   const { isAdmin } = useAuth()
   const { isContextReady } = useWorkspace()
   const [reorderMode, setReorderMode] = useState(false)
+  const [activeTab, setActiveTab] = useState("sections")
 
   return (
     <div className="flex flex-col gap-6">
@@ -495,25 +743,45 @@ function FormFields() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {isAdmin && isContextReady && (
-            <Button
-              variant={reorderMode ? "default" : "outline"}
-              size="sm"
-              onClick={() => setReorderMode(!reorderMode)}
-            >
-              <GripVertical className="mr-1.5 h-3.5 w-3.5" />
-              {reorderMode ? "Done Reordering" : "Reorder"}
-            </Button>
+          {activeTab === "fields" && isAdmin && isContextReady && (
+            <>
+              <Button
+                variant={reorderMode ? "default" : "outline"}
+                size="sm"
+                onClick={() => setReorderMode(!reorderMode)}
+              >
+                <GripVertical className="mr-1.5 h-3.5 w-3.5" />
+                {reorderMode ? "Done Reordering" : "Reorder"}
+              </Button>
+              <AddFormFieldButton />
+            </>
           )}
-          {isAdmin && isContextReady && <AddFormFieldButton />}
+          {activeTab === "sections" && isAdmin && isContextReady && (
+            <AddSectionButton />
+          )}
         </div>
       </div>
       {isContextReady && (
-        <QueryErrorBoundary>
-          <Suspense fallback={<Skeleton className="h-64 w-full" />}>
-            <FormFieldsTableContent reorderMode={reorderMode} />
-          </Suspense>
-        </QueryErrorBoundary>
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList>
+            <TabsTrigger value="sections">Sections</TabsTrigger>
+            <TabsTrigger value="fields">Fields</TabsTrigger>
+          </TabsList>
+          <TabsContent value="sections">
+            <QueryErrorBoundary>
+              <Suspense fallback={<Skeleton className="h-64 w-full" />}>
+                <SectionsListContent />
+              </Suspense>
+            </QueryErrorBoundary>
+          </TabsContent>
+          <TabsContent value="fields">
+            <QueryErrorBoundary>
+              <Suspense fallback={<Skeleton className="h-64 w-full" />}>
+                <FormFieldsTableContent reorderMode={reorderMode} />
+              </Suspense>
+            </QueryErrorBoundary>
+          </TabsContent>
+        </Tabs>
       )}
     </div>
   )

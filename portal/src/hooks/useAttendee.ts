@@ -1,6 +1,6 @@
-import { ApplicationsService } from "@/client"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
+import { ApplicationsService } from "@/client"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import type { CreateAttendee } from "@/types/Attendee"

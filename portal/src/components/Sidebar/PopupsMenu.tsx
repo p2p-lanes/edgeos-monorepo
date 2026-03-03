@@ -1,6 +1,5 @@
 "use client"
 
-import type { PopupPublic } from "@/client"
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -10,6 +9,7 @@ import { ChevronsUpDown } from "lucide-react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useCallback } from "react"
+import type { PopupPublic } from "@/client"
 import { useCityProvider } from "@/providers/cityProvider"
 import { DropdownMenuContent, DropdownMenuItem } from "./DropdownMenu"
 import {

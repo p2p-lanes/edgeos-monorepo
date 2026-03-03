@@ -1,8 +1,8 @@
-import type { GroupMemberPublic } from "@/client"
-import { GroupsService } from "@/client"
 import { useParams } from "next/navigation"
 import { useState } from "react"
 import { toast } from "sonner"
+import type { GroupMemberPublic } from "@/client"
+import { GroupsService } from "@/client"
 import { Button } from "@/components/ui/button"
 import Modal from "@/components/ui/modal"
 

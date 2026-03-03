@@ -1,6 +1,6 @@
-import { ApplicationsService } from "@/client"
 import { useQuery } from "@tanstack/react-query"
 import { useMemo, useState } from "react"
+import { ApplicationsService } from "@/client"
 import { queryKeys } from "@/lib/query-keys"
 import { useCityProvider } from "@/providers/cityProvider"
 import type { AttendeeDirectory } from "@/types/Attendee"

@@ -1,7 +1,7 @@
-import { PopupsService } from "@/client"
 import { useQuery } from "@tanstack/react-query"
 import { useParams, usePathname, useRouter } from "next/navigation"
 import { useEffect } from "react"
+import { PopupsService } from "@/client"
 import { queryKeys } from "@/lib/query-keys"
 
 export function usePopupsQuery() {

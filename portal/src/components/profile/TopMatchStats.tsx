@@ -1,7 +1,7 @@
-import type { HumanPublic } from "@/client"
 import { Users } from "lucide-react"
 import Image from "next/image"
 import { useCallback, useEffect, useState } from "react"
+import type { HumanPublic } from "@/client"
 import type { EventParticipant } from "@/types/StatsSocialLayer"
 import { Avatar } from "../ui/avatar"
 import { Card } from "../ui/card"

@@ -1,8 +1,8 @@
 "use client"
 
-import type { PopupPublic } from "@/client"
 import { CalendarDays, MapPin } from "lucide-react"
 import { createContext, useContext } from "react"
+import type { PopupPublic } from "@/client"
 import { ButtonAnimated } from "@/components/ui/button"
 import { CardAnimation, CardContent } from "@/components/ui/card"
 import { EventProgressBar, type EventStatus } from "./EventProgressBar"

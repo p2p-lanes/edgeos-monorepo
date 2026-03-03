@@ -1,5 +1,5 @@
-import { ProductsService } from "@/client"
 import { useQuery } from "@tanstack/react-query"
+import { ProductsService } from "@/client"
 import { queryKeys } from "@/lib/query-keys"
 import type { ProductsPass } from "@/types/Products"
 

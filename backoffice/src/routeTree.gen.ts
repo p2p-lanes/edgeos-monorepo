@@ -41,10 +41,12 @@ import { Route as LayoutProductsIdEditRouteImport } from './routes/_layout/produ
 import { Route as LayoutPopupsIdEditRouteImport } from './routes/_layout/popups/$id.edit'
 import { Route as LayoutHumansIdEditRouteImport } from './routes/_layout/humans/$id.edit'
 import { Route as LayoutGroupsIdEditRouteImport } from './routes/_layout/groups/$id.edit'
+import { Route as LayoutFormBuilderSectionsNewRouteImport } from './routes/_layout/form-builder/sections/new'
 import { Route as LayoutFormBuilderIdEditRouteImport } from './routes/_layout/form-builder/$id.edit'
 import { Route as LayoutEmailTemplatesTypeEditRouteImport } from './routes/_layout/email-templates/$type.edit'
 import { Route as LayoutCouponsIdEditRouteImport } from './routes/_layout/coupons/$id.edit'
 import { Route as LayoutAdminIdEditRouteImport } from './routes/_layout/admin/$id.edit'
+import { Route as LayoutFormBuilderSectionsIdEditRouteImport } from './routes/_layout/form-builder/sections/$id.edit'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -207,6 +209,12 @@ const LayoutGroupsIdEditRoute = LayoutGroupsIdEditRouteImport.update({
   path: '/groups/$id/edit',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutFormBuilderSectionsNewRoute =
+  LayoutFormBuilderSectionsNewRouteImport.update({
+    id: '/form-builder/sections/new',
+    path: '/form-builder/sections/new',
+    getParentRoute: () => LayoutRoute,
+  } as any)
 const LayoutFormBuilderIdEditRoute = LayoutFormBuilderIdEditRouteImport.update({
   id: '/form-builder/$id/edit',
   path: '/form-builder/$id/edit',
@@ -228,6 +236,12 @@ const LayoutAdminIdEditRoute = LayoutAdminIdEditRouteImport.update({
   path: '/admin/$id/edit',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutFormBuilderSectionsIdEditRoute =
+  LayoutFormBuilderSectionsIdEditRouteImport.update({
+    id: '/form-builder/sections/$id/edit',
+    path: '/form-builder/sections/$id/edit',
+    getParentRoute: () => LayoutRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof LayoutIndexRoute
@@ -260,11 +274,13 @@ export interface FileRoutesByFullPath {
   '/coupons/$id/edit': typeof LayoutCouponsIdEditRoute
   '/email-templates/$type/edit': typeof LayoutEmailTemplatesTypeEditRoute
   '/form-builder/$id/edit': typeof LayoutFormBuilderIdEditRoute
+  '/form-builder/sections/new': typeof LayoutFormBuilderSectionsNewRoute
   '/groups/$id/edit': typeof LayoutGroupsIdEditRoute
   '/humans/$id/edit': typeof LayoutHumansIdEditRoute
   '/popups/$id/edit': typeof LayoutPopupsIdEditRoute
   '/products/$id/edit': typeof LayoutProductsIdEditRoute
   '/tenants/$id/edit': typeof LayoutTenantsIdEditRoute
+  '/form-builder/sections/$id/edit': typeof LayoutFormBuilderSectionsIdEditRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
@@ -297,11 +313,13 @@ export interface FileRoutesByTo {
   '/coupons/$id/edit': typeof LayoutCouponsIdEditRoute
   '/email-templates/$type/edit': typeof LayoutEmailTemplatesTypeEditRoute
   '/form-builder/$id/edit': typeof LayoutFormBuilderIdEditRoute
+  '/form-builder/sections/new': typeof LayoutFormBuilderSectionsNewRoute
   '/groups/$id/edit': typeof LayoutGroupsIdEditRoute
   '/humans/$id/edit': typeof LayoutHumansIdEditRoute
   '/popups/$id/edit': typeof LayoutPopupsIdEditRoute
   '/products/$id/edit': typeof LayoutProductsIdEditRoute
   '/tenants/$id/edit': typeof LayoutTenantsIdEditRoute
+  '/form-builder/sections/$id/edit': typeof LayoutFormBuilderSectionsIdEditRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -336,11 +354,13 @@ export interface FileRoutesById {
   '/_layout/coupons/$id/edit': typeof LayoutCouponsIdEditRoute
   '/_layout/email-templates/$type/edit': typeof LayoutEmailTemplatesTypeEditRoute
   '/_layout/form-builder/$id/edit': typeof LayoutFormBuilderIdEditRoute
+  '/_layout/form-builder/sections/new': typeof LayoutFormBuilderSectionsNewRoute
   '/_layout/groups/$id/edit': typeof LayoutGroupsIdEditRoute
   '/_layout/humans/$id/edit': typeof LayoutHumansIdEditRoute
   '/_layout/popups/$id/edit': typeof LayoutPopupsIdEditRoute
   '/_layout/products/$id/edit': typeof LayoutProductsIdEditRoute
   '/_layout/tenants/$id/edit': typeof LayoutTenantsIdEditRoute
+  '/_layout/form-builder/sections/$id/edit': typeof LayoutFormBuilderSectionsIdEditRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -375,11 +395,13 @@ export interface FileRouteTypes {
     | '/coupons/$id/edit'
     | '/email-templates/$type/edit'
     | '/form-builder/$id/edit'
+    | '/form-builder/sections/new'
     | '/groups/$id/edit'
     | '/humans/$id/edit'
     | '/popups/$id/edit'
     | '/products/$id/edit'
     | '/tenants/$id/edit'
+    | '/form-builder/sections/$id/edit'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
@@ -412,11 +434,13 @@ export interface FileRouteTypes {
     | '/coupons/$id/edit'
     | '/email-templates/$type/edit'
     | '/form-builder/$id/edit'
+    | '/form-builder/sections/new'
     | '/groups/$id/edit'
     | '/humans/$id/edit'
     | '/popups/$id/edit'
     | '/products/$id/edit'
     | '/tenants/$id/edit'
+    | '/form-builder/sections/$id/edit'
   id:
     | '__root__'
     | '/_layout'
@@ -450,11 +474,13 @@ export interface FileRouteTypes {
     | '/_layout/coupons/$id/edit'
     | '/_layout/email-templates/$type/edit'
     | '/_layout/form-builder/$id/edit'
+    | '/_layout/form-builder/sections/new'
     | '/_layout/groups/$id/edit'
     | '/_layout/humans/$id/edit'
     | '/_layout/popups/$id/edit'
     | '/_layout/products/$id/edit'
     | '/_layout/tenants/$id/edit'
+    | '/_layout/form-builder/sections/$id/edit'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -688,6 +714,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutGroupsIdEditRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/form-builder/sections/new': {
+      id: '/_layout/form-builder/sections/new'
+      path: '/form-builder/sections/new'
+      fullPath: '/form-builder/sections/new'
+      preLoaderRoute: typeof LayoutFormBuilderSectionsNewRouteImport
+      parentRoute: typeof LayoutRoute
+    }
     '/_layout/form-builder/$id/edit': {
       id: '/_layout/form-builder/$id/edit'
       path: '/form-builder/$id/edit'
@@ -714,6 +747,13 @@ declare module '@tanstack/react-router' {
       path: '/admin/$id/edit'
       fullPath: '/admin/$id/edit'
       preLoaderRoute: typeof LayoutAdminIdEditRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/form-builder/sections/$id/edit': {
+      id: '/_layout/form-builder/sections/$id/edit'
+      path: '/form-builder/sections/$id/edit'
+      fullPath: '/form-builder/sections/$id/edit'
+      preLoaderRoute: typeof LayoutFormBuilderSectionsIdEditRouteImport
       parentRoute: typeof LayoutRoute
     }
   }
@@ -749,11 +789,13 @@ interface LayoutRouteChildren {
   LayoutCouponsIdEditRoute: typeof LayoutCouponsIdEditRoute
   LayoutEmailTemplatesTypeEditRoute: typeof LayoutEmailTemplatesTypeEditRoute
   LayoutFormBuilderIdEditRoute: typeof LayoutFormBuilderIdEditRoute
+  LayoutFormBuilderSectionsNewRoute: typeof LayoutFormBuilderSectionsNewRoute
   LayoutGroupsIdEditRoute: typeof LayoutGroupsIdEditRoute
   LayoutHumansIdEditRoute: typeof LayoutHumansIdEditRoute
   LayoutPopupsIdEditRoute: typeof LayoutPopupsIdEditRoute
   LayoutProductsIdEditRoute: typeof LayoutProductsIdEditRoute
   LayoutTenantsIdEditRoute: typeof LayoutTenantsIdEditRoute
+  LayoutFormBuilderSectionsIdEditRoute: typeof LayoutFormBuilderSectionsIdEditRoute
 }
 
 const LayoutRouteChildren: LayoutRouteChildren = {
@@ -786,11 +828,13 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutCouponsIdEditRoute: LayoutCouponsIdEditRoute,
   LayoutEmailTemplatesTypeEditRoute: LayoutEmailTemplatesTypeEditRoute,
   LayoutFormBuilderIdEditRoute: LayoutFormBuilderIdEditRoute,
+  LayoutFormBuilderSectionsNewRoute: LayoutFormBuilderSectionsNewRoute,
   LayoutGroupsIdEditRoute: LayoutGroupsIdEditRoute,
   LayoutHumansIdEditRoute: LayoutHumansIdEditRoute,
   LayoutPopupsIdEditRoute: LayoutPopupsIdEditRoute,
   LayoutProductsIdEditRoute: LayoutProductsIdEditRoute,
   LayoutTenantsIdEditRoute: LayoutTenantsIdEditRoute,
+  LayoutFormBuilderSectionsIdEditRoute: LayoutFormBuilderSectionsIdEditRoute,
 }
 
 const LayoutRouteWithChildren =
