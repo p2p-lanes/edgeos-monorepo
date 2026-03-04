@@ -491,6 +491,8 @@ export type FormFieldPublic = {
     options?: (Array<(string)> | null);
     placeholder?: (string | null);
     help_text?: (string | null);
+    protected?: boolean;
+    target?: (string | null);
 };
 
 export type FormFieldUpdate = {
@@ -518,6 +520,7 @@ export type FormSectionPublic = {
     label: string;
     description?: (string | null);
     order?: number;
+    protected?: boolean;
 };
 
 export type FormSectionUpdate = {

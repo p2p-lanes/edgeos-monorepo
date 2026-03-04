@@ -10,6 +10,7 @@ class FormSectionBase(SQLModel):
     label: str
     description: str | None = Field(default=None, nullable=True)
     order: int = Field(default=0)
+    protected: bool = Field(default=False)
 
 
 class FormSectionPublic(BaseModel):
@@ -19,6 +20,7 @@ class FormSectionPublic(BaseModel):
     label: str
     description: str | None = None
     order: int = 0
+    protected: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 

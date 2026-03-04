@@ -51,6 +51,8 @@ class FormFieldPublic(BaseModel):
     options: list[str] | None = None
     placeholder: str | None = None
     help_text: str | None = None
+    protected: bool = False
+    target: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

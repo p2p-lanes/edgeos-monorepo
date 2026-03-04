@@ -110,6 +110,7 @@ async def create_popup(
             popup_id=popup.id,
             label=section_def["label"],
             order=section_def["order"],
+            protected=True,
         )
         db.add(section)
         db.commit()

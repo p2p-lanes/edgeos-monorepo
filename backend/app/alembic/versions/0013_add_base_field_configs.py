@@ -72,6 +72,12 @@ DEFAULT_SECTIONS = {
 
 
 def upgrade():
+    # 0. Add protected column to formsections
+    op.add_column(
+        "formsections",
+        sa.Column("protected", sa.Boolean(), nullable=False, server_default="false"),
+    )
+
     # 1. Create basefieldconfigs table
     op.create_table(
         "basefieldconfigs",
@@ -129,12 +135,19 @@ def upgrade():
 
             if existing:
                 section_ids[section_key] = existing[0]
+                # Mark existing section as protected
+                conn.execute(
+                    sa.text(
+                        "UPDATE formsections SET protected = true WHERE id = :id"
+                    ),
+                    {"id": existing[0]},
+                )
             else:
                 result = conn.execute(
                     sa.text(
                         """
-                        INSERT INTO formsections (id, tenant_id, popup_id, label, "order")
-                        VALUES (gen_random_uuid(), :tenant_id, :popup_id, :label, :order)
+                        INSERT INTO formsections (id, tenant_id, popup_id, label, "order", protected)
+                        VALUES (gen_random_uuid(), :tenant_id, :popup_id, :label, :order, true)
                         RETURNING id
                         """
                     ),
@@ -175,3 +188,4 @@ def upgrade():
 def downgrade():
     remove_tenant_table_permissions("basefieldconfigs")
     op.drop_table("basefieldconfigs")
+    op.drop_column("formsections", "protected")

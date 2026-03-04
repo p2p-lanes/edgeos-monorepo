@@ -218,7 +218,6 @@ def init_db(session: Session) -> None:
                 name=field_data["name"],
                 label=field_data["label"],
                 field_type=field_data.get("field_type", "text"),
-                section=field_data.get("section"),
                 position=field_data.get("position", 0),
                 required=field_data.get("required", False),
                 options=field_data.get("options"),
