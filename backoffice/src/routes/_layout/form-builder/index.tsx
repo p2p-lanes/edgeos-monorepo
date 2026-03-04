@@ -362,17 +362,7 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
         const sourceIds = [...(prev[activeSection] ?? [])]
         const targetIds = [...(prev[targetKey] ?? [])]
 
-        if (activeSection === targetKey) {
-          const overIdStr = String(over.id)
-          const oldIndex = sourceIds.indexOf(activeIdStr)
-          const newIndex = sourceIds.indexOf(overIdStr)
-          if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex)
-            return prev
-          return {
-            ...prev,
-            [activeSection]: arrayMove(sourceIds, oldIndex, newIndex),
-          }
-        }
+        if (activeSection === targetKey) return prev
 
         const newSourceIds = sourceIds.filter((id) => id !== activeIdStr)
         const newTargetIds = targetIds.filter((id) => id !== activeIdStr)
@@ -427,8 +417,47 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
       return
     }
 
-    if (liveOrderMap) {
-      for (const [sectionKey, orderedIds] of Object.entries(liveOrderMap)) {
+    let finalOrderMap = liveOrderMap ? { ...liveOrderMap } : null
+
+    // Apply same-section arrayMove — was intentionally skipped in handleDragOver
+    if (finalOrderMap && over) {
+      const overIdStr = String(over.id)
+
+      let activeSection: string | null = null
+      for (const [section, ids] of Object.entries(finalOrderMap)) {
+        if (ids.includes(activeIdStr)) {
+          activeSection = section
+          break
+        }
+      }
+
+      let targetKey: string | null = null
+      if (over.data.current?.type === "canvas-field") {
+        targetKey = over.data.current.sectionKey || UNSECTIONED
+      } else if (over.data.current?.type === "section") {
+        targetKey = over.data.current.sectionKey
+      }
+
+      if (
+        activeSection &&
+        targetKey &&
+        activeSection === targetKey &&
+        over.data.current?.type === "canvas-field"
+      ) {
+        const sourceIds = [...finalOrderMap[activeSection]]
+        const oldIndex = sourceIds.indexOf(activeIdStr)
+        const newIndex = sourceIds.indexOf(overIdStr)
+        if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
+          finalOrderMap = {
+            ...finalOrderMap,
+            [activeSection]: arrayMove(sourceIds, oldIndex, newIndex),
+          }
+        }
+      }
+    }
+
+    if (finalOrderMap) {
+      for (const [sectionKey, orderedIds] of Object.entries(finalOrderMap)) {
         const serverOrder = fields
           .filter((f) => (f.section_id || UNSECTIONED) === sectionKey)
           .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))

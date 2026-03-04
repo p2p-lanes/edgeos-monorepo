@@ -1,6 +1,6 @@
 import { useDroppable } from "@dnd-kit/core"
 import {
-  rectSortingStrategy,
+  verticalListSortingStrategy,
   SortableContext,
 } from "@dnd-kit/sortable"
 import { Check, Pencil, Trash2, X } from "lucide-react"
@@ -252,7 +252,7 @@ export function SectionDropZone({
         {/* Right: fields grid */}
         <SortableContext
           items={fields.map((f) => f.id)}
-          strategy={rectSortingStrategy}
+          strategy={verticalListSortingStrategy}
         >
           <div
             className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5 min-h-[48px]"
