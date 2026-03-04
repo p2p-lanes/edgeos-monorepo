@@ -128,7 +128,7 @@ export function FormFieldForm({
       name: defaultValues?.name ?? "",
       label: defaultValues?.label ?? "",
       field_type: defaultValues?.field_type ?? "text",
-      section: defaultValues?.section ?? "",
+      section_id: defaultValues?.section_id ?? "",
       position: defaultValues?.position?.toString() ?? "0",
       required: defaultValues?.required ?? false,
       options: defaultValues?.options?.join("\n") ?? "",
@@ -145,10 +145,9 @@ export function FormFieldForm({
 
       if (isEdit) {
         updateMutation.mutate({
-          name: value.name,
           label: value.label,
           field_type: value.field_type,
-          section: value.section || undefined,
+          section_id: value.section_id || undefined,
           position: Number.parseInt(value.position, 10) || 0,
           required: value.required,
           options: optionsArray.length > 0 ? optionsArray : undefined,
@@ -162,10 +161,9 @@ export function FormFieldForm({
         }
         createMutation.mutate({
           popup_id: selectedPopupId,
-          name: value.name,
           label: value.label,
           field_type: value.field_type,
-          section: value.section || undefined,
+          section_id: value.section_id || undefined,
           position: Number.parseInt(value.position, 10) || 0,
           required: value.required,
           options: optionsArray.length > 0 ? optionsArray : undefined,
@@ -203,7 +201,7 @@ export function FormFieldForm({
             name: "Field Name",
             label: "Label",
             field_type: "Field Type",
-            section: "Section",
+            section_id: "Section",
           }}
         />
         <div>
@@ -316,20 +314,20 @@ export function FormFieldForm({
                     )}
                   </form.Field>
 
-                  <form.Field name="section">
+                  <form.Field name="section_id">
                     {(field) => (
                       <div className="space-y-2">
-                        <Label htmlFor="section">Section</Label>
+                        <Label htmlFor="section_id">Section ID</Label>
                         <Input
-                          id="section"
-                          placeholder="preferences"
+                          id="section_id"
+                          placeholder="section UUID"
                           value={field.state.value}
                           onBlur={field.handleBlur}
                           onChange={(e) => field.handleChange(e.target.value)}
                           disabled={readOnly}
                         />
                         <p className="text-sm text-muted-foreground">
-                          Group fields by section
+                          Link to a form section by ID
                         </p>
                       </div>
                     )}
