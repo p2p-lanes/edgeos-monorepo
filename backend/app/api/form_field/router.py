@@ -1,9 +1,12 @@
 import uuid
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, HTTPException, status
 
 from app.api.form_field import crud
+
+if TYPE_CHECKING:
+    from sqlmodel import Session
 from app.api.form_field.models import FormFields
 from app.api.form_field.schemas import FormFieldCreate, FormFieldPublic, FormFieldUpdate
 from app.api.shared.enums import UserRole
@@ -26,6 +29,45 @@ def _to_public(field: FormFields) -> FormFieldPublic:
     return data
 
 
+def _get_base_fields_as_public(
+    db: "Session", popup_id: uuid.UUID
+) -> list[FormFieldPublic]:
+    """Build FormFieldPublic entries for base fields from BaseFieldConfigs."""
+    from app.api.base_field_config.constants import BASE_FIELD_DEFINITIONS
+    from app.api.base_field_config.crud import base_field_configs_crud
+
+    configs = base_field_configs_crud.find_by_popup(db, popup_id)
+    config_map = {c.field_name: c for c in configs}
+
+    results: list[FormFieldPublic] = []
+    for field_name, definition in BASE_FIELD_DEFINITIONS.items():
+        config = config_map.get(field_name)
+        section_label = None
+        if config and config.section:
+            section_label = config.section.label
+
+        results.append(
+            FormFieldPublic(
+                id=config.id if config else uuid.uuid4(),
+                tenant_id=config.tenant_id if config else uuid.UUID(int=0),
+                popup_id=popup_id,
+                name=field_name,
+                label=definition["label"],
+                field_type=definition["type"],
+                section_id=config.section_id if config else None,
+                section_label=section_label,
+                position=config.position if config else definition.get("default_position", 0),
+                required=definition["required"],
+                options=config.options if config and config.options else definition.get("default_options"),
+                placeholder=config.placeholder if config else definition.get("default_placeholder"),
+                help_text=config.help_text if config else definition.get("default_help_text"),
+                protected=True,
+                target=definition["target"],
+            )
+        )
+    return results
+
+
 @router.get("", response_model=ListModel[FormFieldPublic])
 async def list_form_fields(
     db: TenantSession,
@@ -36,16 +78,22 @@ async def list_form_fields(
     limit: PaginationLimit = 100,
 ) -> ListModel[FormFieldPublic]:
     if popup_id:
-        fields, total = crud.form_fields_crud.find_by_popup(
+        base_fields = _get_base_fields_as_public(db, popup_id)
+        custom_fields, custom_total = crud.form_fields_crud.find_by_popup(
             db, popup_id=popup_id, skip=skip, limit=limit, search=search
         )
+        all_fields = base_fields + [_to_public(f) for f in custom_fields]
+        # Sort by position
+        all_fields.sort(key=lambda f: (f.position or 0))
+        total = len(base_fields) + custom_total
     else:
-        fields, total = crud.form_fields_crud.find(
+        custom_fields, total = crud.form_fields_crud.find(
             db, skip=skip, limit=limit, search=search, search_fields=["label", "name"]
         )
+        all_fields = [_to_public(f) for f in custom_fields]
 
     return ListModel[FormFieldPublic](
-        results=[_to_public(f) for f in fields],
+        results=all_fields,
         paging=Paging(offset=skip, limit=limit, total=total),
     )
 

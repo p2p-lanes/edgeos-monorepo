@@ -2589,6 +2589,22 @@ export const FormFieldPublicSchema = {
                 }
             ],
             title: 'Help Text'
+        },
+        protected: {
+            type: 'boolean',
+            title: 'Protected',
+            default: false
+        },
+        target: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Target'
         }
     },
     type: 'object',
@@ -2764,6 +2780,11 @@ export const FormSectionPublicSchema = {
             type: 'integer',
             title: 'Order',
             default: 0
+        },
+        protected: {
+            type: 'boolean',
+            title: 'Protected',
+            default: false
         }
     },
     type: 'object',

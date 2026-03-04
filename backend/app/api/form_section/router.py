@@ -118,4 +118,10 @@ async def delete_form_section(
             detail="Form section not found",
         )
 
+    if section.protected:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete a protected section",
+        )
+
     crud.form_sections_crud.delete(db, section)
