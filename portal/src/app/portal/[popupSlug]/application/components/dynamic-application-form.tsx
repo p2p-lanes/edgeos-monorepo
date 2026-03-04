@@ -1,12 +1,12 @@
 "use client"
 
-import type { ApplicationPublic, PopupPublic } from "@edgeos/api-client"
-import { ApplicationsService } from "@edgeos/api-client"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { AnimatePresence, motion } from "framer-motion"
 import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
+import type { ApplicationPublic, PopupPublic } from "@/client"
+import { ApplicationsService } from "@/client"
 import { ButtonAnimated } from "@/components/ui/button"
 import InputForm, { AddonInputForm } from "@/components/ui/Form/Input"
 import SelectForm from "@/components/ui/Form/Select"
@@ -202,34 +202,49 @@ export function DynamicApplicationForm({
     return bySection
   }, [schema.base_fields])
 
-  // Group custom fields by section
+  // Group custom fields by section_id
   const sectionedFields = useMemo(() => {
-    const bySection: Record<string, [string, FormFieldSchema][]> = {}
+    const bySectionId: Record<string, [string, FormFieldSchema][]> = {}
 
     for (const [name, field] of Object.entries(schema.custom_fields)) {
-      const section = field.section || "Additional Information"
-      if (!bySection[section]) bySection[section] = []
-      bySection[section].push([`custom_${name}`, field])
+      const sectionId = field.section_id || "_unsectioned"
+      if (!bySectionId[sectionId]) bySectionId[sectionId] = []
+      bySectionId[sectionId].push([`custom_${name}`, field])
     }
 
-    // Use schema.sections order if available
+    // Build ordered sections using schema.sections (now objects with id/label/description)
     const orderedSections: {
       title: string
+      subtitle?: string
       fields: [string, FormFieldSchema][]
     }[] = []
 
     if (schema.sections?.length) {
       for (const section of schema.sections) {
-        if (bySection[section]) {
-          orderedSections.push({ title: section, fields: bySection[section] })
-          delete bySection[section]
+        const fields = bySectionId[section.id]
+        if (fields) {
+          orderedSections.push({
+            title: section.label,
+            subtitle: section.description ?? undefined,
+            fields,
+          })
+          delete bySectionId[section.id]
         }
       }
     }
 
-    // Any remaining sections not in schema.sections
-    for (const [section, fields] of Object.entries(bySection)) {
-      orderedSections.push({ title: section, fields })
+    // Unsectioned fields
+    if (bySectionId._unsectioned) {
+      orderedSections.push({
+        title: "Additional Information",
+        fields: bySectionId._unsectioned,
+      })
+      delete bySectionId._unsectioned
+    }
+
+    // Any remaining sections not matched
+    for (const [, fields] of Object.entries(bySectionId)) {
+      orderedSections.push({ title: "Other", fields })
     }
 
     return orderedSections
@@ -327,10 +342,11 @@ export function DynamicApplicationForm({
         ))}
 
         {/* Dynamic sections from custom fields */}
-        {sectionedFields.map(({ title, fields }) => (
+        {sectionedFields.map(({ title, subtitle, fields }) => (
           <FormSection
             key={title}
             title={title}
+            subtitle={subtitle}
             fields={fields}
             values={values}
             errors={errors}

@@ -1,5 +1,5 @@
-import { GroupsService } from "@edgeos/api-client"
 import { useQuery } from "@tanstack/react-query"
+import { GroupsService } from "@/client"
 import { queryKeys } from "@/lib/query-keys"
 
 export function useGroupsQuery() {

@@ -1,6 +1,5 @@
 "use client"
 
-import type { PopupPublic } from "@edgeos/api-client"
 import { useParams } from "next/navigation"
 import {
   createContext,
@@ -9,6 +8,7 @@ import {
   useContext,
   useState,
 } from "react"
+import type { PopupPublic } from "@/client"
 import { usePopupsQuery } from "@/hooks/useGetPopups"
 
 interface CityContext_interface {

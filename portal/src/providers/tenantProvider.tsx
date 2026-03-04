@@ -1,7 +1,5 @@
 "use client"
 
-import type { TenantPublic } from "@edgeos/api-client"
-import { ApiError, TenantsService } from "@edgeos/api-client"
 import {
   createContext,
   type ReactNode,
@@ -9,6 +7,8 @@ import {
   useEffect,
   useState,
 } from "react"
+import type { TenantPublic } from "@/client"
+import { ApiError, TenantsService } from "@/client"
 import "@/lib/api-client"
 
 const TENANT_STORAGE_KEY = "portal_tenant_id"

@@ -1,5 +1,5 @@
-import { PaymentsService } from "@edgeos/api-client"
 import { useQuery } from "@tanstack/react-query"
+import { PaymentsService } from "@/client"
 import { queryKeys } from "@/lib/query-keys"
 import { useApplication } from "@/providers/applicationProvider"
 import type { PaymentsProps } from "@/types/passes"

@@ -1,5 +1,5 @@
-import type { ApplicationPublic, PopupPublic } from "@edgeos/api-client"
 import { useState } from "react"
+import type { ApplicationPublic, PopupPublic } from "@/client"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,

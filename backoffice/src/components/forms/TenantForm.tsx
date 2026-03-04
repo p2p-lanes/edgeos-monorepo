@@ -42,7 +42,7 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
     mutationFn: (data: TenantCreate) =>
       TenantsService.createTenant({ requestBody: data }),
     onSuccess: () => {
-      showSuccessToast("Tenant created successfully")
+      showSuccessToast("Organization created successfully")
       queryClient.invalidateQueries({ queryKey: ["tenants"] })
       form.reset()
       onSuccess()
@@ -57,7 +57,7 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
         requestBody: data,
       }),
     onSuccess: () => {
-      showSuccessToast("Tenant updated successfully")
+      showSuccessToast("Organization updated successfully")
       queryClient.invalidateQueries({
         queryKey: ["tenants", defaultValues!.id],
       })
@@ -71,7 +71,7 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
     mutationFn: () =>
       TenantsService.deleteTenant({ tenantId: defaultValues!.id }),
     onSuccess: () => {
-      showSuccessToast("Tenant deleted successfully")
+      showSuccessToast("Organization deleted successfully")
       queryClient.invalidateQueries({ queryKey: ["tenants"] })
       navigate({ to: "/tenants" })
     },
@@ -134,7 +134,7 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
             {(field) => (
               <div>
                 <HeroInput
-                  placeholder="Tenant Name"
+                  placeholder="Organization Name"
                   value={field.state.value}
                   onBlur={field.handleBlur}
                   onChange={(e) => field.handleChange(e.target.value)}
@@ -144,16 +144,6 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
             )}
           </form.Field>
         </div>
-
-        {/* Tenant metadata (edit only) */}
-        {isEdit && (
-          <div className="flex gap-6 text-sm text-muted-foreground">
-            <div>
-              <span className="text-xs uppercase tracking-wider">ID</span>
-              <p className="font-mono text-xs">{defaultValues.id}</p>
-            </div>
-          </div>
-        )}
 
         <Separator />
 
@@ -293,7 +283,7 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
             Cancel
           </Button>
           <LoadingButton type="submit" loading={isPending}>
-            {isEdit ? "Save Changes" : "Create Tenant"}
+            {isEdit ? "Save Changes" : "Create Organization"}
           </LoadingButton>
         </div>
       </form>
@@ -301,10 +291,10 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
       {isEdit && (
         <div className="mx-auto max-w-2xl">
           <DangerZone
-            description="Once you delete this tenant, all associated data will be permanently removed. This action cannot be undone."
+            description="Once you delete this organization, all associated data will be permanently removed. This action cannot be undone."
             onDelete={() => deleteMutation.mutate()}
             isDeleting={deleteMutation.isPending}
-            confirmText="Delete Tenant"
+            confirmText="Delete Organization"
             resourceName={defaultValues.name}
             variant="inline"
           />

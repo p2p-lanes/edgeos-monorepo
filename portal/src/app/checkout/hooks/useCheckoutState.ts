@@ -1,13 +1,9 @@
 "use client"
 
-import {
-  ApiError,
-  ApplicationsService,
-  GroupsService,
-} from "@edgeos/api-client"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useParams, useSearchParams } from "next/navigation"
 import { useState } from "react"
+import { ApiError, ApplicationsService, GroupsService } from "@/client"
 import { queryKeys } from "@/lib/query-keys"
 import type { CheckoutState, FormDataProps } from "../types"
 import useCookies from "./useCookies"

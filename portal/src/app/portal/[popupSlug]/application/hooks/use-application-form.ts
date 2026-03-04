@@ -1,5 +1,5 @@
-import type { ApplicationPublic } from "@edgeos/api-client"
 import { useCallback, useMemo, useReducer } from "react"
+import type { ApplicationPublic } from "@/client"
 import { buildFormZodSchema } from "@/lib/form-schema-builder"
 import type {
   ApplicationFormSchema,

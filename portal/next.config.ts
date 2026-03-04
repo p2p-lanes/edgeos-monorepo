@@ -1,8 +1,9 @@
+import path from "node:path"
 import type { NextConfig } from "next"
 
 const nextConfig: NextConfig = {
   output: "standalone",
-  transpilePackages: ["@edgeos/utils", "@edgeos/api-client"],
+  outputFileTracingRoot: path.resolve(__dirname, ".."),
   env: {
     NEXT_PUBLIC_API_URL:
       process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000",

@@ -1,5 +1,5 @@
-import { ApiError, AuthService } from "@edgeos/api-client"
 import { useCallback, useEffect, useRef, useState } from "react"
+import { ApiError, AuthService } from "@/client"
 import { configureApiClient } from "@/lib/api-client"
 import { useTenant } from "@/providers/tenantProvider"
 

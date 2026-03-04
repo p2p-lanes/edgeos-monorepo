@@ -11,7 +11,8 @@ export interface FormFieldSchema {
     | "url"
   label: string
   required: boolean
-  section: string
+  section?: string
+  section_id?: string | null
   position?: number
   options?: string[]
   placeholder?: string
@@ -19,8 +20,15 @@ export interface FormFieldSchema {
   target?: "human" | "application"
 }
 
+export interface FormSectionSchema {
+  id: string
+  label: string
+  description: string | null
+  order: number
+}
+
 export interface ApplicationFormSchema {
   base_fields: Record<string, FormFieldSchema>
   custom_fields: Record<string, FormFieldSchema>
-  sections: string[]
+  sections: FormSectionSchema[]
 }

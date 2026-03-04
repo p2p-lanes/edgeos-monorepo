@@ -1,5 +1,6 @@
-import type { HumanPublic } from "@edgeos/api-client"
 import { Calendar1, MapPinned, Speech } from "lucide-react"
+import type { HumanPublic } from "@/client"
+import { useTenant } from "@/providers/tenantProvider"
 import { Card } from "../ui/card"
 
 // LEGACY: popups, total_days, referral_count removed from API – review for deletion
@@ -8,6 +9,7 @@ const StatsCards = ({
 }: {
   userData: HumanPublic | null
 }) => {
+  const { tenant } = useTenant()
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
       <Card className="p-6">
@@ -25,7 +27,9 @@ const StatsCards = ({
       <Card className="p-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-gray-600 mb-1">Days at Edge</p>
+            <p className="text-sm text-gray-600 mb-1">
+              Days at {tenant?.name ?? "Edge"}
+            </p>
             <p className="text-3xl font-bold text-gray-900">—</p>
           </div>
           <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">

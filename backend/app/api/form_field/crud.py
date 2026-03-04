@@ -1,3 +1,5 @@
+import re
+import unicodedata
 import uuid
 from typing import Any
 
@@ -6,8 +8,17 @@ from sqlmodel import Session, col, func, select
 
 from app.api.form_field.models import FormFields
 from app.api.form_field.schemas import FormFieldCreate, FormFieldType, FormFieldUpdate
+from app.api.form_section.models import FormSections
 from app.api.popup.models import Popups
 from app.api.shared.crud import BaseCRUD
+
+
+def _slugify(text: str) -> str:
+    """Convert text to a slug suitable for use as a field name."""
+    text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
+    text = re.sub(r"[^\w\s]", "", text.lower())
+    text = re.sub(r"[\s]+", "_", text).strip("_")
+    return text[:80] or "field"
 
 
 class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
@@ -22,6 +33,18 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
         )
         return session.exec(statement).first()
 
+    def generate_field_name(
+        self, session: Session, label: str, popup_id: uuid.UUID
+    ) -> str:
+        """Generate a unique field name from a label."""
+        base = _slugify(label)
+        name = base
+        counter = 1
+        while self.get_by_name(session, name, popup_id):
+            name = f"{base}_{counter}"
+            counter += 1
+        return name
+
     def find_by_popup(
         self,
         session: Session,
@@ -32,8 +55,9 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
     ) -> tuple[list[FormFields], int]:
         statement = (
             select(FormFields)
+            .outerjoin(FormSections, FormFields.section_id == FormSections.id)
             .where(FormFields.popup_id == popup_id)
-            .order_by(FormFields.section, FormFields.position)  # type: ignore[arg-type]
+            .order_by(FormSections.order, FormFields.position)  # type: ignore[arg-type]
         )
 
         # Apply text search if provided
@@ -153,6 +177,13 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
         popup = session.get(Popups, popup_id)
         popup_name = popup.name if popup else "the event"
 
+        # Load sections for this popup
+        from app.api.form_section.crud import form_sections_crud
+
+        db_sections, _ = form_sections_crud.find_by_popup(
+            session, popup_id, skip=0, limit=100
+        )
+
         base_fields: dict[str, Any] = {
             # Human profile fields (target: "human")
             "first_name": {
@@ -258,24 +289,31 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
         # Build custom fields schema
         custom_fields = {}
         for field in fields:
-            custom_fields[field.name] = {
+            entry: dict[str, Any] = {
                 "type": field.field_type,
                 "label": field.label,
                 "required": field.required,
-                "section": field.section or None,
+                "section_id": str(field.section_id) if field.section_id else None,
                 "position": field.position,
             }
             if field.options:
-                custom_fields[field.name]["options"] = field.options
+                entry["options"] = field.options
             if field.placeholder:
-                custom_fields[field.name]["placeholder"] = field.placeholder
+                entry["placeholder"] = field.placeholder
             if field.help_text:
-                custom_fields[field.name]["help_text"] = field.help_text
+                entry["help_text"] = field.help_text
+            custom_fields[field.name] = entry
 
-        sections = ["profile"]
-        for f in custom_fields.values():
-            if f["section"] and f["section"] not in sections:
-                sections.append(f["section"])
+        # Build sections list from DB
+        sections = [
+            {
+                "id": str(s.id),
+                "label": s.label,
+                "description": s.description,
+                "order": s.order,
+            }
+            for s in db_sections
+        ]
 
         return {
             "base_fields": base_fields,

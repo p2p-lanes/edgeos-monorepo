@@ -1205,6 +1205,45 @@ export const ApprovalStrategyUpdateSchema = {
     description: 'Schema for updating an approval strategy.'
 } as const;
 
+export const AssociatedAttendeeSchema = {
+    properties: {
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        category: {
+            type: 'string',
+            title: 'Category'
+        },
+        gender: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Gender'
+        },
+        email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Email'
+        }
+    },
+    type: 'object',
+    required: ['name', 'category'],
+    title: 'AssociatedAttendee',
+    description: 'Non-main attendee summary for directory.'
+} as const;
+
 export const AttendeeCreateSchema = {
     properties: {
         name: {
@@ -1486,6 +1525,182 @@ export const AttendeeWithTicketsSchema = {
     required: ['id', 'name', 'email', 'category', 'check_in_code', 'popup_id', 'popup_name', 'products'],
     title: 'AttendeeWithTickets',
     description: 'Attendee with ticket/product information.'
+} as const;
+
+export const AttendeesDirectoryEntrySchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        first_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'First Name'
+        },
+        last_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Name'
+        },
+        email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Email'
+        },
+        telegram: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Telegram'
+        },
+        role: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Role'
+        },
+        organization: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Organization'
+        },
+        residence: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Residence'
+        },
+        age: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Age'
+        },
+        gender: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Gender'
+        },
+        picture_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Picture Url'
+        },
+        brings_kids: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'string'
+                }
+            ],
+            title: 'Brings Kids',
+            default: false
+        },
+        participation: {
+            items: {
+                '$ref': '#/components/schemas/DirectoryProduct'
+            },
+            type: 'array',
+            title: 'Participation',
+            default: []
+        },
+        check_in: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Check In'
+        },
+        check_out: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Check Out'
+        },
+        associated_attendees: {
+            items: {
+                '$ref': '#/components/schemas/AssociatedAttendee'
+            },
+            type: 'array',
+            title: 'Associated Attendees',
+            default: []
+        }
+    },
+    type: 'object',
+    required: ['id'],
+    title: 'AttendeesDirectoryEntry',
+    description: 'Single entry in the attendees directory.'
 } as const;
 
 export const AuthCodeSentResponseSchema = {
@@ -1829,6 +2044,74 @@ export const DashboardStatsSchema = {
     description: 'Complete dashboard statistics.'
 } as const;
 
+export const DirectoryProductSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        slug: {
+            type: 'string',
+            title: 'Slug'
+        },
+        category: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Category'
+        },
+        duration_type: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Duration Type'
+        },
+        start_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Start Date'
+        },
+        end_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'End Date'
+        }
+    },
+    type: 'object',
+    required: ['id', 'name', 'slug'],
+    title: 'DirectoryProduct',
+    description: 'Minimal product info for directory participation display.'
+} as const;
+
 export const EmailTemplateCreateSchema = {
     properties: {
         popup_id: {
@@ -1990,10 +2273,6 @@ export const FormFieldCreateSchema = {
             format: 'uuid',
             title: 'Popup Id'
         },
-        name: {
-            type: 'string',
-            title: 'Name'
-        },
         label: {
             type: 'string',
             title: 'Label'
@@ -2003,16 +2282,17 @@ export const FormFieldCreateSchema = {
             title: 'Field Type',
             default: 'text'
         },
-        section: {
+        section_id: {
             anyOf: [
                 {
-                    type: 'string'
+                    type: 'string',
+                    format: 'uuid'
                 },
                 {
                     type: 'null'
                 }
             ],
-            title: 'Section'
+            title: 'Section Id'
         },
         position: {
             type: 'integer',
@@ -2062,7 +2342,7 @@ export const FormFieldCreateSchema = {
         }
     },
     type: 'object',
-    required: ['popup_id', 'name', 'label'],
+    required: ['popup_id', 'label'],
     title: 'FormFieldCreate'
 } as const;
 
@@ -2095,7 +2375,19 @@ export const FormFieldPublicSchema = {
             type: 'string',
             title: 'Field Type'
         },
-        section: {
+        section_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Section Id'
+        },
+        section_label: {
             anyOf: [
                 {
                     type: 'string'
@@ -2104,7 +2396,7 @@ export const FormFieldPublicSchema = {
                     type: 'null'
                 }
             ],
-            title: 'Section'
+            title: 'Section Label'
         },
         position: {
             type: 'integer',
@@ -2160,17 +2452,6 @@ export const FormFieldPublicSchema = {
 
 export const FormFieldUpdateSchema = {
     properties: {
-        name: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Name'
-        },
         label: {
             anyOf: [
                 {
@@ -2193,16 +2474,17 @@ export const FormFieldUpdateSchema = {
             ],
             title: 'Field Type'
         },
-        section: {
+        section_id: {
             anyOf: [
                 {
-                    type: 'string'
+                    type: 'string',
+                    format: 'uuid'
                 },
                 {
                     type: 'null'
                 }
             ],
-            title: 'Section'
+            title: 'Section Id'
         },
         position: {
             anyOf: [
@@ -2265,6 +2547,122 @@ export const FormFieldUpdateSchema = {
     },
     type: 'object',
     title: 'FormFieldUpdate'
+} as const;
+
+export const FormSectionCreateSchema = {
+    properties: {
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        label: {
+            type: 'string',
+            title: 'Label'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        order: {
+            type: 'integer',
+            title: 'Order',
+            default: 0
+        }
+    },
+    type: 'object',
+    required: ['popup_id', 'label'],
+    title: 'FormSectionCreate'
+} as const;
+
+export const FormSectionPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        label: {
+            type: 'string',
+            title: 'Label'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        order: {
+            type: 'integer',
+            title: 'Order',
+            default: 0
+        }
+    },
+    type: 'object',
+    required: ['id', 'tenant_id', 'popup_id', 'label'],
+    title: 'FormSectionPublic'
+} as const;
+
+export const FormSectionUpdateSchema = {
+    properties: {
+        label: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Label'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        order: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Order'
+        }
+    },
+    type: 'object',
+    title: 'FormSectionUpdate'
 } as const;
 
 export const GroupAdminUpdateSchema = {
@@ -3352,6 +3750,113 @@ export const HumanCreateSchema = {
     description: 'Human schema for creation.'
 } as const;
 
+export const HumanProfileUpdateSchema = {
+    properties: {
+        first_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'First Name'
+        },
+        last_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Name'
+        },
+        telegram: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Telegram'
+        },
+        organization: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Organization'
+        },
+        role: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Role'
+        },
+        gender: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Gender'
+        },
+        age: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Age'
+        },
+        residence: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Residence'
+        },
+        picture_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Picture Url'
+        }
+    },
+    type: 'object',
+    title: 'HumanProfileUpdate',
+    description: 'Schema for humans updating their own profile.'
+} as const;
+
 export const HumanPublicSchema = {
     properties: {
         id: {
@@ -3692,6 +4197,24 @@ export const ListModel_AttendeePublic_Schema = {
     title: 'ListModel[AttendeePublic]'
 } as const;
 
+export const ListModel_AttendeesDirectoryEntry_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/AttendeesDirectoryEntry'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[AttendeesDirectoryEntry]'
+} as const;
+
 export const ListModel_CouponPublic_Schema = {
     properties: {
         results: {
@@ -3744,6 +4267,24 @@ export const ListModel_FormFieldPublic_Schema = {
     type: 'object',
     required: ['results', 'paging'],
     title: 'ListModel[FormFieldPublic]'
+} as const;
+
+export const ListModel_FormSectionPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/FormSectionPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[FormSectionPublic]'
 } as const;
 
 export const ListModel_GroupPublic_Schema = {

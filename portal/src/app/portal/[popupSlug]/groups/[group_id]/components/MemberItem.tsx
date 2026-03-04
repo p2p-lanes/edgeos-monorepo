@@ -1,7 +1,7 @@
-import type { GroupMemberPublic } from "@edgeos/api-client"
 import { AnimatePresence, motion } from "framer-motion"
 import { ChevronDown, Pencil, Trash2, User } from "lucide-react"
 import { useState } from "react"
+import type { GroupMemberPublic } from "@/client"
 import ParticipationTickets from "@/components/common/ParticipationTickets"
 import { Button } from "@/components/ui/button"
 import {

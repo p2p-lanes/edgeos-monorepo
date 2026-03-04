@@ -77,16 +77,13 @@ def handle_integrity_error(_: Request, exc: IntegrityError) -> JSONResponse:
     )
 
 
-# Set all CORS enabled origins
-if settings.all_cors_origins or settings.cors_allow_origin_regex:
-    application.add_middleware(
-        CORSMiddleware,  # type: ignore[arg-type]
-        allow_origins=settings.all_cors_origins,
-        allow_origin_regex=settings.cors_allow_origin_regex,
-        allow_credentials=True,
-        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type", "X-Tenant-Id"],
-    )
+application.add_middleware(
+    CORSMiddleware,  # type: ignore[arg-type]
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Tenant-Id"],
+)
 
 
 @application.get("/health-check", tags=["utils"], include_in_schema=False)

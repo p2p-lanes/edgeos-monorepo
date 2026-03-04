@@ -1,4 +1,4 @@
-import type { GroupMemberPublic } from "@edgeos/api-client"
+import type { GroupMemberPublic } from "@/client"
 import MemberItem from "./MemberItem"
 
 interface MembersListProps {

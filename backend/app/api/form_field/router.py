@@ -4,6 +4,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, status
 
 from app.api.form_field import crud
+from app.api.form_field.models import FormFields
 from app.api.form_field.schemas import FormFieldCreate, FormFieldPublic, FormFieldUpdate
 from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
@@ -16,6 +17,13 @@ from app.core.dependencies.users import (
 )
 
 router = APIRouter(prefix="/form-fields", tags=["form-fields"])
+
+
+def _to_public(field: FormFields) -> FormFieldPublic:
+    """Convert a FormFields model to a FormFieldPublic with section_label."""
+    data = FormFieldPublic.model_validate(field)
+    data.section_label = field.section.label if field.section else None
+    return data
 
 
 @router.get("", response_model=ListModel[FormFieldPublic])
@@ -37,7 +45,7 @@ async def list_form_fields(
         )
 
     return ListModel[FormFieldPublic](
-        results=[FormFieldPublic.model_validate(f) for f in fields],
+        results=[_to_public(f) for f in fields],
         paging=Paging(offset=skip, limit=limit, total=total),
     )
 
@@ -56,7 +64,7 @@ async def get_form_field(
             detail="Form field not found",
         )
 
-    return FormFieldPublic.model_validate(field)
+    return _to_public(field)
 
 
 @router.post("", response_model=FormFieldPublic, status_code=status.HTTP_201_CREATED)
@@ -65,13 +73,6 @@ async def create_form_field(
     db: TenantSession,
     current_user: CurrentWriter,
 ) -> FormFieldPublic:
-    existing = crud.form_fields_crud.get_by_name(db, field_in.name, field_in.popup_id)
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="A form field with this name already exists in this popup",
-        )
-
     if current_user.role == UserRole.SUPERADMIN:
         from app.api.popup.crud import popups_crud
 
@@ -85,17 +86,21 @@ async def create_form_field(
     else:
         tenant_id = current_user.tenant_id
 
-    from app.api.form_field.models import FormFields
+    # Auto-generate the internal field name from label
+    name = crud.form_fields_crud.generate_field_name(
+        db, field_in.label, field_in.popup_id
+    )
 
     field_data = field_in.model_dump()
     field_data["tenant_id"] = tenant_id
+    field_data["name"] = name
     field = FormFields(**field_data)
 
     db.add(field)
     db.commit()
     db.refresh(field)
 
-    return FormFieldPublic.model_validate(field)
+    return _to_public(field)
 
 
 @router.patch("/{field_id}", response_model=FormFieldPublic)
@@ -113,16 +118,8 @@ async def update_form_field(
             detail="Form field not found",
         )
 
-    if field_in.name and field_in.name != field.name:
-        existing = crud.form_fields_crud.get_by_name(db, field_in.name, field.popup_id)
-        if existing:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="A form field with this name already exists in this popup",
-            )
-
     updated = crud.form_fields_crud.update(db, field, field_in)
-    return FormFieldPublic.model_validate(updated)
+    return _to_public(updated)
 
 
 @router.delete("/{field_id}", status_code=status.HTTP_204_NO_CONTENT)

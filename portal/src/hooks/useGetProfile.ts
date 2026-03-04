@@ -1,8 +1,8 @@
 "use client"
 
-import type { HumanProfileUpdate } from "@edgeos/api-client"
-import { type HumanPublic, HumansService } from "@edgeos/api-client"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import type { HumanProfileUpdate } from "@/client"
+import { type HumanPublic, HumansService } from "@/client"
 import { queryKeys } from "@/lib/query-keys"
 
 export type UpdateProfilePayload = Partial<

@@ -4,7 +4,7 @@ RUN corepack enable && corepack prepare pnpm@10.30.3 --activate
 
 WORKDIR /app
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc /app/
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml /app/
 
 COPY backoffice/package.json /app/backoffice/
 

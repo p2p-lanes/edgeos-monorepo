@@ -170,10 +170,6 @@ export function CouponForm({ defaultValues, onSuccess }: CouponFormProps) {
         {/* Coupon metadata (edit only) */}
         {isEdit && (
           <div className="flex gap-6 text-sm text-muted-foreground">
-            <div>
-              <span className="text-xs uppercase tracking-wider">ID</span>
-              <p className="font-mono text-xs">{defaultValues.id}</p>
-            </div>
             {defaultValues.current_uses != null && (
               <div>
                 <span className="text-xs uppercase tracking-wider">

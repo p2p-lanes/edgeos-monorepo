@@ -1,9 +1,9 @@
 "use client"
 
-import type { ApplicationPublic } from "@edgeos/api-client"
 import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
+import type { ApplicationPublic } from "@/client"
 import { Loader } from "@/components/ui/Loader"
 import { useApplicationSchema } from "@/hooks/useApplicationSchema"
 import { useApplication } from "@/providers/applicationProvider"

@@ -447,10 +447,9 @@ export type EmailTemplateUpdate = {
 
 export type FormFieldCreate = {
     popup_id: string;
-    name: string;
     label: string;
     field_type?: string;
-    section?: (string | null);
+    section_id?: (string | null);
     position?: number;
     required?: boolean;
     options?: (Array<(string)> | null);
@@ -465,7 +464,8 @@ export type FormFieldPublic = {
     name: string;
     label: string;
     field_type: string;
-    section?: (string | null);
+    section_id?: (string | null);
+    section_label?: (string | null);
     position?: number;
     required?: boolean;
     options?: (Array<(string)> | null);
@@ -474,15 +474,36 @@ export type FormFieldPublic = {
 };
 
 export type FormFieldUpdate = {
-    name?: (string | null);
     label?: (string | null);
     field_type?: (string | null);
-    section?: (string | null);
+    section_id?: (string | null);
     position?: (number | null);
     required?: (boolean | null);
     options?: (Array<(string)> | null);
     placeholder?: (string | null);
     help_text?: (string | null);
+};
+
+export type FormSectionCreate = {
+    popup_id: string;
+    label: string;
+    description?: (string | null);
+    order?: number;
+};
+
+export type FormSectionPublic = {
+    id: string;
+    tenant_id: string;
+    popup_id: string;
+    label: string;
+    description?: (string | null);
+    order?: number;
+};
+
+export type FormSectionUpdate = {
+    label?: (string | null);
+    description?: (string | null);
+    order?: (number | null);
 };
 
 /**
@@ -678,7 +699,7 @@ export type HumanCreate = {
 };
 
 /**
- * Schema for humans updating their own profile
+ * Schema for humans updating their own profile.
  */
 export type HumanProfileUpdate = {
     first_name?: (string | null);
@@ -773,6 +794,11 @@ export type ListModel_EmailTemplatePublic_ = {
 
 export type ListModel_FormFieldPublic_ = {
     results: Array<FormFieldPublic>;
+    paging: Paging;
+};
+
+export type ListModel_FormSectionPublic_ = {
+    results: Array<FormSectionPublic>;
     paging: Paging;
 };
 
@@ -1667,6 +1693,7 @@ export type AttendeesListAttendeesData = {
      */
     limit?: number;
     popupId?: (string | null);
+    search?: (string | null);
     /**
      * Number of items to skip
      */
@@ -1927,6 +1954,50 @@ export type FormFieldsGetPortalApplicationSchemaData = {
 export type FormFieldsGetPortalApplicationSchemaResponse = ({
     [key: string]: unknown;
 });
+
+export type FormSectionsListFormSectionsData = {
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    popupId?: (string | null);
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+    xTenantId?: (string | null);
+};
+
+export type FormSectionsListFormSectionsResponse = (ListModel_FormSectionPublic_);
+
+export type FormSectionsCreateFormSectionData = {
+    requestBody: FormSectionCreate;
+    xTenantId?: (string | null);
+};
+
+export type FormSectionsCreateFormSectionResponse = (FormSectionPublic);
+
+export type FormSectionsGetFormSectionData = {
+    sectionId: string;
+    xTenantId?: (string | null);
+};
+
+export type FormSectionsGetFormSectionResponse = (FormSectionPublic);
+
+export type FormSectionsUpdateFormSectionData = {
+    requestBody: FormSectionUpdate;
+    sectionId: string;
+    xTenantId?: (string | null);
+};
+
+export type FormSectionsUpdateFormSectionResponse = (FormSectionPublic);
+
+export type FormSectionsDeleteFormSectionData = {
+    sectionId: string;
+    xTenantId?: (string | null);
+};
+
+export type FormSectionsDeleteFormSectionResponse = (void);
 
 export type GroupsListGroupsData = {
     /**

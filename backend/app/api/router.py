@@ -10,6 +10,7 @@ from app.api import (
     dashboard,
     email_template,
     form_field,
+    form_section,
     group,
     human,
     payment,
@@ -34,6 +35,7 @@ api_router.include_router(popup.router)
 api_router.include_router(product.router)
 api_router.include_router(coupon.router)
 api_router.include_router(group.router)
+api_router.include_router(form_section.router)
 api_router.include_router(form_field.router)
 api_router.include_router(email_template.router)
 

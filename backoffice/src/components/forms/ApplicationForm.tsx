@@ -49,7 +49,8 @@ interface FormFieldSchema {
   type: string
   label: string
   required: boolean
-  section: string
+  section?: string
+  section_id?: string | null
   position?: number
   options?: string[]
   placeholder?: string
@@ -57,10 +58,17 @@ interface FormFieldSchema {
   target?: "human" | "application"
 }
 
+interface FormSectionSchema {
+  id: string
+  label: string
+  description: string | null
+  order: number
+}
+
 interface ApplicationSchema {
   base_fields: Record<string, FormFieldSchema>
   custom_fields: Record<string, FormFieldSchema>
-  sections: string[]
+  sections: FormSectionSchema[]
 }
 
 // Type for companion with client-side ID for React key
@@ -252,22 +260,30 @@ export function ApplicationForm({ onSuccess }: ApplicationFormProps) {
       )
     : []
 
-  // Split custom fields: no section -> inline with base fields, with section -> separate cards
+  // Split custom fields: no section_id -> inline with base fields, with section_id -> separate cards
   const unsectionedFields = sortedCustomFields.filter(
-    ([, field]) => !field.section,
+    ([, field]) => !field.section_id,
   )
   const sectionedFields = sortedCustomFields.filter(
-    ([, field]) => !!field.section,
+    ([, field]) => !!field.section_id,
   )
 
-  // Group sectioned fields by section name
-  const fieldsBySection: Record<string, [string, FormFieldSchema][]> = {}
+  // Group sectioned fields by section_id, use schema.sections for labels
+  const sectionMap = new Map((schema?.sections ?? []).map((s) => [s.id, s]))
+  const fieldsBySection: Record<
+    string,
+    { label: string; fields: [string, FormFieldSchema][] }
+  > = {}
   for (const [name, field] of sectionedFields) {
-    const section = field.section!
-    if (!fieldsBySection[section]) {
-      fieldsBySection[section] = []
+    const sectionId = field.section_id!
+    if (!fieldsBySection[sectionId]) {
+      const sectionInfo = sectionMap.get(sectionId)
+      fieldsBySection[sectionId] = {
+        label: sectionInfo?.label ?? "Other",
+        fields: [],
+      }
     }
-    fieldsBySection[section].push([name, field])
+    fieldsBySection[sectionId].fields.push([name, field])
   }
 
   const getRequiredValidator = (fieldSchema: FormFieldSchema) => {
@@ -774,18 +790,20 @@ export function ApplicationForm({ onSuccess }: ApplicationFormProps) {
               </CardContent>
             </Card>
 
-            {Object.entries(fieldsBySection).map(([section, fields]) => (
-              <Card key={section}>
-                <CardHeader>
-                  <CardTitle className="capitalize">{section}</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {fields.map(([name, field]) =>
-                    renderCustomField(name, field),
-                  )}
-                </CardContent>
-              </Card>
-            ))}
+            {Object.entries(fieldsBySection).map(
+              ([sectionId, { label, fields }]) => (
+                <Card key={sectionId}>
+                  <CardHeader>
+                    <CardTitle className="capitalize">{label}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {fields.map(([name, field]) =>
+                      renderCustomField(name, field),
+                    )}
+                  </CardContent>
+                </Card>
+              ),
+            )}
 
             {/* Form Actions */}
             <div className="flex gap-4">
@@ -966,18 +984,30 @@ export function ApplicationForm({ onSuccess }: ApplicationFormProps) {
                         const previewUnsectioned = Object.entries(
                           customVals,
                         ).filter(
-                          ([key]) => !schema?.custom_fields?.[key]?.section,
+                          ([key]) => !schema?.custom_fields?.[key]?.section_id,
                         )
                         const previewSectioned: Record<
                           string,
-                          [string, unknown][]
+                          { label: string; fields: [string, unknown][] }
                         > = {}
+                        const previewSectionMap = new Map(
+                          (schema?.sections ?? []).map((s) => [s.id, s]),
+                        )
                         for (const [key, value] of Object.entries(customVals)) {
-                          const section = schema?.custom_fields?.[key]?.section
-                          if (section) {
-                            if (!previewSectioned[section])
-                              previewSectioned[section] = []
-                            previewSectioned[section].push([key, value])
+                          const sectionId =
+                            schema?.custom_fields?.[key]?.section_id
+                          if (sectionId) {
+                            if (!previewSectioned[sectionId]) {
+                              const info = previewSectionMap.get(sectionId)
+                              previewSectioned[sectionId] = {
+                                label: info?.label ?? "Other",
+                                fields: [],
+                              }
+                            }
+                            previewSectioned[sectionId].fields.push([
+                              key,
+                              value,
+                            ])
                           }
                         }
 
@@ -996,7 +1026,10 @@ export function ApplicationForm({ onSuccess }: ApplicationFormProps) {
                               </div>
                             )}
                             {Object.entries(previewSectioned).map(
-                              ([section, fields]) => {
+                              ([
+                                sectionId,
+                                { label: sectionLabel, fields },
+                              ]) => {
                                 const hasValues = fields.some(
                                   ([, v]) =>
                                     v !== "" &&
@@ -1005,11 +1038,11 @@ export function ApplicationForm({ onSuccess }: ApplicationFormProps) {
                                 )
                                 if (!hasValues) return null
                                 return (
-                                  <div key={section}>
+                                  <div key={sectionId}>
                                     <Separator />
                                     <div className="space-y-2 pt-4">
                                       <p className="text-sm font-medium text-muted-foreground capitalize">
-                                        {section}
+                                        {sectionLabel}
                                       </p>
                                       {fields.map(([key, value]) =>
                                         renderPreviewField(key, value),

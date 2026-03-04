@@ -47,6 +47,7 @@ function getAttendeesQueryOptions(
   popupId: string | null,
   page: number,
   pageSize: number,
+  search?: string,
 ) {
   return {
     queryFn: () =>
@@ -54,8 +55,9 @@ function getAttendeesQueryOptions(
         skip: page * pageSize,
         limit: pageSize,
         popupId: popupId || undefined,
+        search: search || undefined,
       }),
-    queryKey: ["attendees", popupId, { page, pageSize }],
+    queryKey: ["attendees", popupId, { page, pageSize, search }],
   }
 }
 
@@ -215,13 +217,6 @@ const columns: ColumnDef<AttendeePublic>[] = [
     cell: ({ row }) => <Badge variant="outline">{row.original.category}</Badge>,
   },
   {
-    accessorKey: "check_in_code",
-    header: "Check-in Code",
-    cell: ({ row }) => (
-      <span className="font-mono text-sm">{row.original.check_in_code}</span>
-    ),
-  },
-  {
     accessorKey: "gender",
     header: "Gender",
     cell: ({ row }) => (
@@ -254,36 +249,24 @@ function AttendeesTableContent() {
       selectedPopupId,
       pagination.pageIndex,
       pagination.pageSize,
+      search,
     ),
     placeholderData: keepPreviousData,
   })
 
   if (!attendees) return <Skeleton className="h-64 w-full" />
 
-  const filtered = search
-    ? attendees.results.filter((a) => {
-        const term = search.toLowerCase()
-        return (
-          (a.name ?? "").toLowerCase().includes(term) ||
-          (a.email ?? "").toLowerCase().includes(term) ||
-          (a.check_in_code ?? "").toLowerCase().includes(term)
-        )
-      })
-    : attendees.results
-
   return (
     <DataTable
       columns={columns}
-      data={filtered}
-      searchPlaceholder="Search by name, email, or check-in code..."
-      hiddenOnMobile={["check_in_code", "gender", "category"]}
+      data={attendees.results}
+      searchPlaceholder="Search by name or email..."
+      hiddenOnMobile={["gender", "category"]}
       searchValue={search}
       onSearchChange={setSearch}
       serverPagination={{
-        total: search ? filtered.length : attendees.paging.total,
-        pagination: search
-          ? { pageIndex: 0, pageSize: attendees.paging.total }
-          : pagination,
+        total: attendees.paging.total,
+        pagination,
         onPaginationChange: setPagination,
       }}
       emptyState={

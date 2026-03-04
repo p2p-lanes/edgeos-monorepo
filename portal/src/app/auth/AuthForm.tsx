@@ -1,11 +1,11 @@
 "use client"
 
-import { ApiError, AuthService } from "@edgeos/api-client"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { motion } from "framer-motion"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useRef, useState } from "react"
 import { z } from "zod/v4"
+import { ApiError, AuthService } from "@/client"
 import { ButtonAnimated } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { queryKeys } from "@/lib/query-keys"

@@ -1,9 +1,9 @@
 "use client"
 
-import { GroupsService } from "@edgeos/api-client"
 import { useQuery } from "@tanstack/react-query"
 import { useSearchParams } from "next/navigation"
 import { useEffect } from "react"
+import { GroupsService } from "@/client"
 import { queryKeys } from "@/lib/query-keys"
 import { useCityProvider } from "@/providers/cityProvider"
 import { useDiscount } from "@/providers/discountProvider"
