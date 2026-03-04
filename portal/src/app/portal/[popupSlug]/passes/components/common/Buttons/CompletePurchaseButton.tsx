@@ -2,11 +2,7 @@ import { ButtonAnimated } from "@/components/ui/button"
 import { usePassesProvider } from "@/providers/passesProvider"
 import usePurchaseProducts from "../../../hooks/usePurchaseProducts"
 
-const CompletePurchaseButton = ({
-  edit,
-}: {
-  edit?: boolean
-}) => {
+const CompletePurchaseButton = ({ edit }: { edit?: boolean }) => {
   const { purchaseProducts, loading } = usePurchaseProducts()
   const { attendeePasses: attendees } = usePassesProvider()
   const someSelected = attendees.some((attendee) =>

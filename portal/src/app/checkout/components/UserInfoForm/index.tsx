@@ -2,6 +2,7 @@
 
 import { useSearchParams } from "next/navigation"
 import { useEffect, useState } from "react"
+import type { GroupPublic } from "@/client"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -14,7 +15,6 @@ import {
 import { useApplicationData } from "../../hooks/useApplicationData"
 import { useEmailVerification } from "../../hooks/useEmailVerification"
 import { useUserForm } from "../../hooks/useUserForm"
-import type { GroupPublic } from "@/client"
 import type { FormDataProps } from "../../types"
 import EmailVerification from "./EmailVerification"
 import PersonalInfoForm from "./PersonalInfoForm"

@@ -7,6 +7,7 @@ from app.api import (
     attendee,
     auth,
     base_field_config,
+    cart,
     coupon,
     dashboard,
     email_template,
@@ -51,6 +52,7 @@ api_router.include_router(application_review.router)
 api_router.include_router(application.router)
 api_router.include_router(attendee.router)
 api_router.include_router(payment.router)
+api_router.include_router(cart.router)
 
 # Utility resources
 api_router.include_router(upload.router)

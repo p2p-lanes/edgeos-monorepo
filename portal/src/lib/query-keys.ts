@@ -12,6 +12,9 @@ export const queryKeys = {
     directory: (popupId: string) =>
       ["attendees", "directory", popupId] as const,
   },
+  cart: {
+    byPopup: (popupId: string) => ["cart", popupId] as const,
+  },
   payments: {
     all: ["payments"] as const,
     byApp: (applicationId: string) => ["payments", applicationId] as const,

@@ -10,7 +10,6 @@ export interface FormDataProps {
   local_resident: string
 }
 
-
 export type CheckoutState = "form" | "processing" | "success" | "passes"
 
 export interface GenderOption {

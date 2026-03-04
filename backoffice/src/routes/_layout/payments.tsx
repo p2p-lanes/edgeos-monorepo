@@ -69,6 +69,19 @@ const columns: ColumnDef<PaymentPublic>[] = [
     ),
   },
   {
+    accessorKey: "insurance_amount",
+    header: "Insurance",
+    cell: ({ row }) => {
+      const val = row.original.insurance_amount
+      const num = Number(val)
+      return num > 0 ? (
+        <span className="font-mono">${val}</span>
+      ) : (
+        <span className="text-muted-foreground">—</span>
+      )
+    },
+  },
+  {
     accessorKey: "coupon_code",
     header: "Coupon",
     cell: ({ row }) =>
@@ -152,7 +165,7 @@ function PaymentsTableContent() {
       columns={columns}
       data={filtered}
       searchPlaceholder="Search by status, source, coupon, or amount..."
-      hiddenOnMobile={["source", "coupon_code", "created_at", "products"]}
+      hiddenOnMobile={["source", "insurance_amount", "coupon_code", "created_at", "products"]}
       searchValue={search}
       onSearchChange={setSearch}
       serverPagination={{
@@ -195,6 +208,7 @@ function Payments() {
         { key: "currency", label: "Currency" },
         { key: "status", label: "Status" },
         { key: "source", label: "Source" },
+        { key: "insurance_amount", label: "Insurance" },
         { key: "coupon_code", label: "Coupon" },
         { key: "created_at", label: "Date" },
       ])

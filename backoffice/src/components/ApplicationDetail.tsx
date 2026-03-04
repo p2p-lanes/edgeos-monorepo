@@ -4,6 +4,7 @@ import {
   Building,
   ChevronDown,
   ChevronUp,
+  DollarSign,
   MapPin,
   MessageCircle,
   ThumbsDown,
@@ -565,6 +566,19 @@ export function ApplicationDetail({
             <span className="text-sm">{application.referral}</span>
           </InlineRow>
         )}
+        {(() => {
+          const credit = Number(application.credit)
+          return credit > 0 ? (
+            <InlineRow
+              icon={
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              }
+              label="Account Credit"
+            >
+              <span className="font-mono text-sm">${credit.toFixed(2)}</span>
+            </InlineRow>
+          ) : null
+        })()}
       </InlineSection>
 
       {/* Unsectioned custom fields */}

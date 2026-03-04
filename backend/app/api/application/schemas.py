@@ -1,9 +1,10 @@
 import uuid
 from datetime import datetime
+from decimal import Decimal
 from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, field_validator
-from sqlalchemy import String
+from sqlalchemy import Numeric, String
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlmodel import Column, DateTime, Field, SQLModel
 
@@ -63,6 +64,12 @@ class ApplicationBase(SQLModel):
         sa_column=Column(JSONB, nullable=True),
     )
 
+    # Credit balance (remaining credit from edit-passes overpayment)
+    credit: Decimal = Field(
+        default=Decimal("0"),
+        sa_column=Column(Numeric(10, 2), nullable=False, server_default="0"),
+    )
+
     # Timestamps
     submitted_at: datetime | None = Field(
         default=None, nullable=True, sa_type=DateTime(timezone=True)
@@ -87,6 +94,9 @@ class ApplicationPublic(BaseModel):
     status: str
     custom_fields: dict = {}
     custom_fields_schema: dict | None = None
+
+    # Credit balance
+    credit: Decimal = Decimal("0")
 
     # Timestamps
     submitted_at: datetime | None = None

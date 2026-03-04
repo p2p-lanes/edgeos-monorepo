@@ -19,8 +19,7 @@ export default function PatronSection({ onSkip }: PatronSectionProps) {
   const { patronProducts, cart, setPatronAmount, clearPatron } = useCheckout()
 
   const patronProduct = patronProducts[0]
-  const isVariablePrice =
-    (patronProduct as { min_price?: number | null })?.min_price != null
+  const isVariablePrice = patronProduct?.category === "patreon"
   const isPatronEnabled = cart.patron !== null
 
   const currentAmount = cart.patron?.amount || 0

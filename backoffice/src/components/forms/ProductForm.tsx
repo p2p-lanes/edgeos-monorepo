@@ -4,6 +4,7 @@ import { useNavigate } from "@tanstack/react-router"
 import {
   Calendar,
   Clock,
+  CloudRain,
   DollarSign,
   Hash,
   Power,
@@ -95,6 +96,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
   const isEdit = !!defaultValues
   const readOnly = !isAdmin
 
+
   const createMutation = useMutation({
     mutationFn: (data: ProductCreate) =>
       ProductsService.createProduct({ requestBody: data }),
@@ -151,6 +153,8 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
       max_quantity: defaultValues?.max_quantity?.toString() ?? "",
       start_date: toDateInputValue(defaultValues?.start_date),
       end_date: toDateInputValue(defaultValues?.end_date),
+      insurance_percentage:
+        defaultValues?.insurance_percentage?.toString() ?? "",
     },
     onSubmit: ({ value }) => {
       if (readOnly) return
@@ -174,6 +178,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
           is_active: value.is_active,
           exclusive: value.exclusive,
           max_quantity: maxQty,
+          insurance_percentage: value.insurance_percentage || null,
         })
       } else {
         if (!selectedPopupId) {
@@ -194,6 +199,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
           is_active: value.is_active,
           exclusive: value.exclusive,
           max_quantity: maxQty ?? undefined,
+          insurance_percentage: value.insurance_percentage || undefined,
         })
       }
     },
@@ -369,6 +375,29 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
                 </InlineRow>
                 <FieldError errors={field.state.meta.errors} />
               </div>
+            )}
+          </form.Field>
+
+          <form.Field name="insurance_percentage">
+            {(field) => (
+              <InlineRow
+                icon={
+                  <CloudRain className="h-4 w-4 text-muted-foreground" />
+                }
+                label="Insurance %"
+                description="Leave empty to disable insurance for this product"
+              >
+                <Input
+                  placeholder="—"
+                  type="text"
+                  inputMode="decimal"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  disabled={readOnly}
+                  className="max-w-24 text-sm"
+                />
+              </InlineRow>
             )}
           </form.Field>
 
