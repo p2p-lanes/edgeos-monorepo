@@ -6,6 +6,7 @@ from app.api import (
     approval_strategy,
     attendee,
     auth,
+    base_field_config,
     coupon,
     dashboard,
     email_template,
@@ -38,6 +39,7 @@ api_router.include_router(group.router)
 api_router.include_router(form_section.router)
 api_router.include_router(form_field.router)
 api_router.include_router(email_template.router)
+api_router.include_router(base_field_config.router)
 
 # Approval system resources (registered before application so static paths
 # like /applications/pending-review are matched before /{application_id})

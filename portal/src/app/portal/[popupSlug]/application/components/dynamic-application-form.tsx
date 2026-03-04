@@ -184,23 +184,62 @@ export function DynamicApplicationForm({
     return g ?? ""
   }, [values.gender, schema.base_fields])
 
-  // Group base_fields by section, sorted by position
+  // Group base_fields by section_id, sorted by position
   const baseFieldSections = useMemo(() => {
-    const bySection: Record<string, [string, FormFieldSchema][]> = {}
+    const bySectionId: Record<string, [string, FormFieldSchema][]> = {}
 
     for (const [name, field] of Object.entries(schema.base_fields)) {
-      const section = field.section || "profile"
-      if (!bySection[section]) bySection[section] = []
-      bySection[section].push([name, field])
+      const sectionId = field.section_id || "_unsectioned"
+      if (!bySectionId[sectionId]) bySectionId[sectionId] = []
+      bySectionId[sectionId].push([name, field])
     }
 
     // Sort fields within each section by position
-    for (const fields of Object.values(bySection)) {
+    for (const fields of Object.values(bySectionId)) {
       fields.sort(([, a], [, b]) => (a.position ?? 0) - (b.position ?? 0))
     }
 
-    return bySection
-  }, [schema.base_fields])
+    // Build ordered sections using schema.sections
+    const orderedSections: {
+      id: string
+      title: string
+      subtitle?: string
+      fields: [string, FormFieldSchema][]
+    }[] = []
+
+    if (schema.sections?.length) {
+      for (const section of schema.sections) {
+        const fields = bySectionId[section.id]
+        if (fields) {
+          orderedSections.push({
+            id: section.id,
+            title: section.label,
+            subtitle: section.description ?? undefined,
+            fields,
+          })
+          delete bySectionId[section.id]
+        }
+      }
+    }
+
+    // Unsectioned base fields
+    if (bySectionId._unsectioned) {
+      orderedSections.push({
+        id: "_unsectioned",
+        title: "Personal Information",
+        subtitle: "Your basic information helps us identify and contact you.",
+        fields: bySectionId._unsectioned,
+      })
+      delete bySectionId._unsectioned
+    }
+
+    // Any remaining
+    for (const [id, fields] of Object.entries(bySectionId)) {
+      orderedSections.push({ id, title: "Other", fields })
+    }
+
+    return orderedSections
+  }, [schema.base_fields, schema.sections])
 
   // Group custom fields by section_id
   const sectionedFields = useMemo(() => {
@@ -323,16 +362,9 @@ export function DynamicApplicationForm({
     <>
       <form onSubmit={handleSubmit} className="space-y-8 px-8 md:px-12">
         {/* Base fields grouped by section */}
-        {Object.entries(baseFieldSections).map(([section, fields]) => (
-          <div key={section}>
-            <SectionWrapper
-              title={section === "profile" ? "Personal Information" : section}
-              subtitle={
-                section === "profile"
-                  ? "Your basic information helps us identify and contact you."
-                  : undefined
-              }
-            >
+        {baseFieldSections.map(({ id, title, subtitle, fields }) => (
+          <div key={id}>
+            <SectionWrapper title={title} subtitle={subtitle}>
               <div className="grid gap-4 sm:grid-cols-2">
                 {fields.map(([name, field]) => renderBaseField(name, field))}
               </div>
