@@ -15,7 +15,6 @@ import Special from "../components/common/Products/Special"
 import TitleTabs from "../components/common/TitleTabs"
 import TotalFloatingBar from "../components/common/TotalFloatingBar"
 import TotalPurchase from "../components/common/TotalPurchase"
-import WaiverCheckbox from "../components/common/WaiverCheckbox"
 import ToolbarTop from "../components/ToolbarTop"
 
 // Función temporal para convertir markdown básico a HTML
@@ -59,7 +58,6 @@ const BuyPasses = ({
     isEditing,
   } = usePassesProvider()
   const [openCart, setOpenCart] = useState<boolean>(false)
-  const [waiverAccepted, setWaiverAccepted] = useState<boolean>(false)
   const searchParams = useSearchParams()
   const isDayCheckout = searchParams.has("day-passes")
   const mainAttendee = attendees.find((a) => a.category === "main")
@@ -70,7 +68,7 @@ const BuyPasses = ({
     a.products.some(
       (p) =>
         p.selected &&
-        (p.category.includes("day")
+        (p.duration_type === "day"
           ? (p.quantity ?? 0) > (p.original_quantity ?? 0)
           : true),
     ),
@@ -152,16 +150,8 @@ const BuyPasses = ({
             isOpen={openCart}
             setIsOpen={setOpenCart}
           />
-          <WaiverCheckbox
-            checked={waiverAccepted}
-            onCheckedChange={setWaiverAccepted}
-            className="px-3"
-          />
           <div className="flex w-full justify-center">
-            <CompletePurchaseButton
-              edit={total <= 0}
-              waiverAccepted={waiverAccepted}
-            />
+            <CompletePurchaseButton edit={total <= 0} />
           </div>
         </div>
       )}
@@ -174,16 +164,7 @@ const BuyPasses = ({
               isFloating ? (
                 <div className="flex justify-center lg:ml-[255px]">
                   <div className="bg-white p-4 shadow-lg border border-neutral-200 rounded-lg min-w-[600px] pointer-events-auto">
-                    <div className="space-y-3">
-                      <WaiverCheckbox
-                        checked={waiverAccepted}
-                        onCheckedChange={setWaiverAccepted}
-                      />
-                      <TotalFloatingBar
-                        setOpenCart={setOpenCart}
-                        waiverAccepted={waiverAccepted}
-                      />
-                    </div>
+                    <TotalFloatingBar setOpenCart={setOpenCart} />
                   </div>
                 </div>
               ) : (
@@ -194,16 +175,8 @@ const BuyPasses = ({
                     isOpen={openCart}
                     setIsOpen={setOpenCart}
                   />
-                  <WaiverCheckbox
-                    checked={waiverAccepted}
-                    onCheckedChange={setWaiverAccepted}
-                    className="px-3"
-                  />
                   <div className="flex w-full justify-center">
-                    <CompletePurchaseButton
-                      edit={total <= 0}
-                      waiverAccepted={waiverAccepted}
-                    />
+                    <CompletePurchaseButton edit={total <= 0} />
                   </div>
                 </div>
               )
@@ -226,16 +199,8 @@ const BuyPasses = ({
                   isOpen={openCart}
                   setIsOpen={setOpenCart}
                 />
-                <WaiverCheckbox
-                  checked={waiverAccepted}
-                  onCheckedChange={setWaiverAccepted}
-                  className="px-3 mt-4"
-                />
                 <div className="flex w-full justify-center mt-4">
-                  <CompletePurchaseButton
-                    edit={total <= 0}
-                    waiverAccepted={waiverAccepted}
-                  />
+                  <CompletePurchaseButton edit={total <= 0} />
                 </div>
               </div>
             )}

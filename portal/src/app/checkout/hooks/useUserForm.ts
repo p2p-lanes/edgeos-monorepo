@@ -30,18 +30,33 @@ export const useUserForm = ({
 
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  // Cargar datos del token si existe
+  // Cargar datos del token si existe y no está expirado
   useEffect(() => {
     const token = window?.localStorage?.getItem("token")
     if (token) {
-      configureApiClient(token)
-      const decodedToken = jwtDecode(token) as { email: string }
+      try {
+        const decodedToken = jwtDecode(token) as {
+          email: string
+          exp?: number
+        }
+        const isExpired = decodedToken.exp
+          ? decodedToken.exp * 1000 < Date.now()
+          : false
 
-      setFormData((prev) => ({
-        ...prev,
-        email: decodedToken.email,
-        email_verified: true,
-      }))
+        if (isExpired) {
+          localStorage.removeItem("token")
+          return
+        }
+
+        configureApiClient(token)
+        setFormData((prev) => ({
+          ...prev,
+          email: decodedToken.email,
+          email_verified: true,
+        }))
+      } catch {
+        localStorage.removeItem("token")
+      }
     }
   }, [])
 

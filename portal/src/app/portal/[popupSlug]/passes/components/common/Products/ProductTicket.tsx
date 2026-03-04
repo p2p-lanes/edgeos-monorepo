@@ -47,11 +47,9 @@ const Product = ({
 
   // Check if this is a week product with month purchased/selected from same attendee
   const isWeekWithMonth =
-    (product.category === "week" || product.category === "local week") &&
-    hasMonthPurchased &&
-    !product.purchased
+    product.duration_type === "week" && hasMonthPurchased && !product.purchased
 
-  if (product.category.includes("day")) {
+  if (product.duration_type === "day") {
     return (
       <ProductDay
         product={product}

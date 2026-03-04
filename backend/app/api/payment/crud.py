@@ -391,7 +391,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         already_patreon: bool,
     ) -> PaymentPreview:
         """Calculate all discounts and return payment preview."""
-        discount_assigned = Decimal(str(application.discount_assigned or 0))  # type: ignore[attr-defined]
+        discount_assigned = Decimal("0")
 
         response = PaymentPreview(
             application_id=application.id,

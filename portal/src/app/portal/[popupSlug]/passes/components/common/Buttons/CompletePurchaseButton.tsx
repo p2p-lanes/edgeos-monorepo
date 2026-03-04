@@ -4,10 +4,8 @@ import usePurchaseProducts from "../../../hooks/usePurchaseProducts"
 
 const CompletePurchaseButton = ({
   edit,
-  waiverAccepted = true,
 }: {
   edit?: boolean
-  waiverAccepted?: boolean
 }) => {
   const { purchaseProducts, loading } = usePurchaseProducts()
   const { attendeePasses: attendees } = usePassesProvider()
@@ -15,13 +13,13 @@ const CompletePurchaseButton = ({
     attendee.products.some(
       (product) =>
         product.selected &&
-        (product.purchased ? product.category === "day" : true),
+        (product.purchased ? product.duration_type === "day" : true),
     ),
   )
 
   return (
     <ButtonAnimated
-      disabled={loading || !someSelected || !waiverAccepted}
+      disabled={loading || !someSelected}
       loading={loading}
       className="w-full md:w-fit md:min-w-[120px] text-white bg-slate-800"
       onClick={() => purchaseProducts(attendees)}

@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query"
 import { useParams, usePathname, useRouter } from "next/navigation"
 import { useEffect } from "react"
 import { PopupsService } from "@/client"
+import { isLoggedIn } from "@/hooks/useAuth"
 import { queryKeys } from "@/lib/query-keys"
 
 export function usePopupsQuery() {
@@ -11,6 +12,7 @@ export function usePopupsQuery() {
       const result = await PopupsService.listPortalPopups()
       return result.filter((p) => p.status === "active").reverse()
     },
+    enabled: isLoggedIn(),
   })
 }
 

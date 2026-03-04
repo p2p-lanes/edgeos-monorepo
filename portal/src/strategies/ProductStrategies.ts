@@ -33,7 +33,7 @@ class ExclusiveProductStrategy implements ProductStrategy {
           selected:
             p.id === product.id
               ? !p.selected
-              : p.exclusive && willBeSelected && product?.exclusive
+              : willBeSelected && !p.purchased
                 ? false
                 : p.selected,
         })),
@@ -98,7 +98,7 @@ class MonthProductStrategy implements ProductStrategy {
           selected:
             p.id === product.id
               ? !p.selected
-              : p.category === "week" && !p.purchased
+              : p.duration_type === "week" && !p.purchased
                 ? willSelectMonth
                 : p.selected,
         })),
@@ -110,109 +110,12 @@ class MonthProductStrategy implements ProductStrategy {
 class WeekProductStrategy implements ProductStrategy {
   protected countActiveWeeks(products: ProductsPass[]): number {
     return products.filter(
-      (p) => p.category === "week" && (p.purchased || p.selected),
+      (p) => p.duration_type === "week" && (p.purchased || p.selected),
     ).length
   }
 
   protected hasEditedWeeks(products: ProductsPass[]): boolean {
-    return products.some((p) => p.category === "week" && p.edit)
-  }
-
-  protected shouldSelectMonth(
-    activeWeeks: number,
-    hasEditedWeeks: boolean,
-    monthPurchased: boolean,
-  ): boolean {
-    if (monthPurchased) {
-      return false
-    }
-    return activeWeeks >= 4 && !hasEditedWeeks
-  }
-
-  handleSelection(
-    attendees: AttendeePassState[],
-    attendeeId: string,
-    product: ProductsPass,
-  ): AttendeePassState[] {
-    return attendees.map((attendee) => {
-      if (attendee.id !== attendeeId) return attendee
-
-      const willBeSelected = !product.selected
-      const monthProduct = attendee.products.find((p) => p.category === "month")
-
-      const updatedProducts = attendee.products.map((p) => ({
-        ...p,
-        selected: p.id === product.id ? willBeSelected : p.selected,
-        edit:
-          p.id === product.id ? product.purchased && willBeSelected : p.edit,
-      }))
-
-      const activeWeeks = this.countActiveWeeks(updatedProducts)
-      const hasEdited = this.hasEditedWeeks(updatedProducts)
-      const shouldSelectMonth = this.shouldSelectMonth(
-        activeWeeks,
-        hasEdited,
-        monthProduct?.purchased || false,
-      )
-
-      return {
-        ...attendee,
-        products: updatedProducts.map((p) => ({
-          ...p,
-          quantity:
-            p.category.includes("day") && shouldSelectMonth && !p.purchased
-              ? 0
-              : p.quantity,
-          selected:
-            p.category === "month"
-              ? shouldSelectMonth
-              : p.category.includes("day") && shouldSelectMonth
-                ? false
-                : p.selected,
-          edit: p.category === "month" ? hasEdited : p.edit,
-        })),
-      }
-    })
-  }
-}
-
-class LocalMonthProductStrategy implements ProductStrategy {
-  handleSelection(
-    attendees: AttendeePassState[],
-    attendeeId: string,
-    product: ProductsPass,
-  ): AttendeePassState[] {
-    const isMonthSelected = product?.selected
-    const willSelectMonth = !isMonthSelected
-
-    return attendees.map((attendee) => {
-      if (attendee.id !== attendeeId) return attendee
-
-      return {
-        ...attendee,
-        products: attendee.products.map((p) => ({
-          ...p,
-          selected:
-            p.id === product.id
-              ? !p.selected
-              : p.category === "local week" && !p.purchased
-                ? willSelectMonth
-                : p.selected,
-        })),
-      }
-    })
-  }
-}
-
-class LocalWeekProductStrategy implements ProductStrategy {
-  protected countActiveWeeks(products: ProductsPass[]): number {
-    return products.filter(
-      (p) => p.category === "local week" && (p.purchased || p.selected),
-    ).length
-  }
-
-  protected hasEditedWeeks(products: ProductsPass[]): boolean {
-    return products.some((p) => p.category === "local week" && p.edit)
+    return products.some((p) => p.duration_type === "week" && p.edit)
   }
 
   protected shouldSelectMonth(
@@ -236,7 +139,7 @@ class LocalWeekProductStrategy implements ProductStrategy {
 
       const willBeSelected = !product.selected
       const monthProduct = attendee.products.find(
-        (p) => p.category === "local month",
+        (p) => p.duration_type === "month",
       )
 
       const updatedProducts = attendee.products.map((p) => ({
@@ -259,16 +162,36 @@ class LocalWeekProductStrategy implements ProductStrategy {
         products: updatedProducts.map((p) => ({
           ...p,
           quantity:
-            p.category.includes("day") && shouldSelectMonth && !p.purchased
+            p.duration_type === "day" && shouldSelectMonth && !p.purchased
               ? 0
               : p.quantity,
           selected:
-            p.category === "local month"
+            p.duration_type === "month"
               ? shouldSelectMonth
-              : p.category.includes("day") && shouldSelectMonth
+              : p.duration_type === "day" && shouldSelectMonth
                 ? false
                 : p.selected,
-          edit: p.category === "local month" ? hasEdited : p.edit,
+          edit: p.duration_type === "month" ? hasEdited : p.edit,
+        })),
+      }
+    })
+  }
+}
+
+class FullProductStrategy implements ProductStrategy {
+  handleSelection(
+    attendees: AttendeePassState[],
+    attendeeId: string,
+    product: ProductsPass,
+  ): AttendeePassState[] {
+    return attendees.map((attendee) => {
+      if (attendee.id !== attendeeId) return attendee
+
+      return {
+        ...attendee,
+        products: attendee.products.map((p) => ({
+          ...p,
+          selected: p.id === product.id ? !p.selected : p.selected,
         })),
       }
     })
@@ -302,31 +225,64 @@ class DayProductStrategy implements ProductStrategy {
   }
 }
 
+/**
+ * Wraps any strategy to deselect exclusive products when a non-exclusive
+ * product is selected, ensuring mutual exclusivity works both ways.
+ */
+class ExclusivityGuard implements ProductStrategy {
+  constructor(private inner: ProductStrategy) {}
+
+  handleSelection(
+    attendees: AttendeePassState[],
+    attendeeId: string,
+    product: ProductsPass,
+    discount?: DiscountProps,
+  ): AttendeePassState[] {
+    const result = this.inner.handleSelection(
+      attendees,
+      attendeeId,
+      product,
+      discount,
+    )
+
+    const willBeSelected = !product.selected
+    if (!willBeSelected) return result
+
+    return result.map((attendee) => {
+      if (attendee.id !== attendeeId) return attendee
+      return {
+        ...attendee,
+        products: attendee.products.map((p) => ({
+          ...p,
+          selected: p.exclusive && !p.purchased ? false : p.selected,
+        })),
+      }
+    })
+  }
+}
+
 export const getProductStrategy = (
   product: ProductsPass,
   _isEditing: boolean,
 ): ProductStrategy => {
-  if (product.exclusive && product.category !== "month")
-    return new ExclusiveProductStrategy()
+  if (product.exclusive) return new ExclusiveProductStrategy()
 
-  switch (product.category) {
-    case "patreon":
-      return new PatreonProductStrategy()
-    case "month":
-      return new MonthProductStrategy()
-    case "local month":
-      return new LocalMonthProductStrategy()
-    case "week":
-      return new WeekProductStrategy()
-    case "local week":
-      return new LocalWeekProductStrategy()
-    case "exclusive":
-      return new ExclusiveProductStrategy()
-    case "day":
-      return new DayProductStrategy()
-    case "local day":
-      return new DayProductStrategy()
-    default:
-      return new WeekProductStrategy()
-  }
+  if (product.category === "patreon") return new PatreonProductStrategy()
+
+  const baseStrategy = (() => {
+    switch (product.duration_type) {
+      case "month":
+        return new MonthProductStrategy()
+      case "week":
+        return new WeekProductStrategy()
+      case "day":
+        return new DayProductStrategy()
+      case "full":
+        return new FullProductStrategy()
+      default:
+        return new WeekProductStrategy()
+    }
+  })()
+
+  return new ExclusivityGuard(baseStrategy)
 }

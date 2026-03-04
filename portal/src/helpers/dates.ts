@@ -1,5 +1,14 @@
+/**
+ * Parse a date string as a local date (ignoring timezone).
+ * "2026-05-10T00:00:00Z" → May 10 in any timezone, not May 9 in UTC-3.
+ */
+const parseLocalDate = (date: string): Date => {
+  const d = new Date(date)
+  return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
+}
+
 export const toDate = (date: string) => {
-  return new Date(date).toLocaleDateString("en-US", {
+  return parseLocalDate(date).toLocaleDateString("en-US", {
     month: "long",
     day: "numeric",
   })
@@ -18,5 +27,5 @@ export const formatDate = (
   },
 ) => {
   if (!date) return ""
-  return new Date(date).toLocaleDateString("en-EN", formatString)
+  return parseLocalDate(date).toLocaleDateString("en-EN", formatString)
 }

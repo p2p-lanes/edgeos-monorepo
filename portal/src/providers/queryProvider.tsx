@@ -13,7 +13,12 @@ function handleApiError(error: Error) {
   if (error instanceof ApiError && error.status === 401) {
     if (typeof window !== "undefined") {
       localStorage.removeItem("token")
-      window.location.href = "/auth"
+      const isPublicRoute =
+        window.location.pathname.startsWith("/checkout") ||
+        window.location.pathname.includes("/invite/")
+      if (!isPublicRoute) {
+        window.location.href = "/auth"
+      }
     }
   }
 }

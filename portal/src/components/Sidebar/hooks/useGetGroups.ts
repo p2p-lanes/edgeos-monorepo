@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { GroupsService } from "@/client"
+import { isLoggedIn } from "@/hooks/useAuth"
 import { queryKeys } from "@/lib/query-keys"
 
 export function useGroupsQuery() {
@@ -9,6 +10,7 @@ export function useGroupsQuery() {
       const result = await GroupsService.listMyGroups()
       return result.results
     },
+    enabled: isLoggedIn(),
   })
 }
 
