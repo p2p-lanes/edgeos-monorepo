@@ -10,7 +10,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
+import { Badge } from "@/components/ui/badge"
 import { CanvasField } from "./CanvasField"
+import { isSpecialField, isSpecialSection } from "./constants"
 
 interface SectionDropZoneProps {
   sectionKey: string
@@ -45,6 +47,7 @@ export function SectionDropZone({
   const sectionLabel = section?.label ?? "Unsectioned"
   const sectionDescription = section?.description ?? null
   const isApiSection = section !== null
+  const isSpecial = isApiSection && isSpecialSection(section)
 
   const { setNodeRef, isOver } = useDroppable({
     id: `section-${sectionKey}`,
@@ -120,11 +123,11 @@ export function SectionDropZone({
           isOver
             ? "bg-primary/5 ring-2 ring-primary/40 ring-offset-2 ring-offset-background"
             : ""
-        }`}
+        } ${isSpecial ? "opacity-90 bg-muted/20" : ""}`}
       >
         {/* Left: section header */}
         <div className="space-y-1 group/section">
-          {isEditingLabel ? (
+          {!isSpecial && isEditingLabel ? (
             <div className="space-y-1.5">
               <Input
                 ref={labelInputRef}
@@ -161,18 +164,25 @@ export function SectionDropZone({
                 <h2 className="text-xl font-semibold tracking-tight flex-1">
                   {sectionLabel}
                 </h2>
+                {isSpecial && (
+                  <Badge variant="secondary" className="text-xs shrink-0">
+                    Protected
+                  </Badge>
+                )}
                 {isApiSection && (
                   <div className="flex gap-0.5 opacity-0 group-hover/section:opacity-100 transition-opacity">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                      onClick={handleStartEditLabel}
-                      aria-label={`Rename section ${sectionLabel}`}
-                    >
-                      <Pencil className="h-3 w-3" />
-                    </Button>
-                    {fields.length === 0 && (
+                    {!isSpecial && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                        onClick={handleStartEditLabel}
+                        aria-label={`Rename section ${sectionLabel}`}
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                    )}
+                    {!isSpecial && fields.length === 0 && (
                       <Button
                         variant="ghost"
                         size="icon"
@@ -187,7 +197,7 @@ export function SectionDropZone({
                 )}
               </div>
 
-              {/* Description */}
+              {/* Description — editable for all sections (special sections: description only, not label) */}
               {isApiSection && (
                 isEditingDescription ? (
                   <div className="space-y-1.5">
@@ -274,6 +284,7 @@ export function SectionDropZone({
                 field={field}
                 sectionKey={sectionKey}
                 isSelected={selectedFieldId === field.id}
+                isSpecial={isSpecialField(field)}
                 onSelect={onSelectField}
                 onDelete={onDeleteField}
               />

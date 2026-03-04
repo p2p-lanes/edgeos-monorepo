@@ -3,7 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion"
 import useCheckoutState from "../hooks/useCheckoutState"
 import type { FormDataProps } from "../types"
-import PassesCheckout from "./PassesCheckout"
+import CheckoutFlow from "./CheckoutFlow"
 import TransitionScreen from "./TransitionScreen"
 import UserInfoForm from "./UserInfoForm"
 
@@ -81,7 +81,7 @@ export const CheckoutContent = ({
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5 }}
           >
-            <PassesCheckout onBack={() => setCheckoutState("form")} />
+            <CheckoutFlow onBack={() => setCheckoutState("form")} />
           </motion.div>
         )
 

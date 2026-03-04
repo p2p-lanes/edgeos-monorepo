@@ -15,7 +15,7 @@ const useCalculateDiscount = (isPatreon: boolean, products: ProductsPass[]) => {
   const productCompare = useMemo(
     () =>
       products.find(
-        (p) => p.category === "week" && p.price !== p.compare_price,
+        (p) => p.duration_type === "week" && p.price !== p.compare_price,
       ) ?? { price: 100, compare_price: 100 },
     [products],
   )

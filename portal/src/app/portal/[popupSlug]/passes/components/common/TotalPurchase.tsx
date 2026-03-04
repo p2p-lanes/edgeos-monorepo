@@ -34,10 +34,7 @@ const TotalPurchase = ({
 
   // Detectar si hay productos month seleccionados
   const hasMonthSelected = attendees.some((attendee) =>
-    attendee.products.some(
-      (p) =>
-        p.selected && (p.category === "month" || p.category === "local month"),
-    ),
+    attendee.products.some((p) => p.selected && p.duration_type === "month"),
   )
 
   const productsCart = attendees
@@ -46,9 +43,7 @@ const TotalPurchase = ({
 
       // Si hay un month seleccionado, solo mostrar los productos month
       if (hasMonthSelected) {
-        return selectedProducts.filter(
-          (p) => p.category === "month" || p.category === "local month",
-        )
+        return selectedProducts.filter((p) => p.duration_type === "month")
       }
 
       // L├│gica original si no hay month seleccionado
@@ -195,11 +190,7 @@ const _DiscountMonth = ({
       return (
         total +
         attendee.products
-          .filter(
-            (p) =>
-              p.selected &&
-              (p.category === "week" || p.category === "local week"),
-          )
+          .filter((p) => p.selected && p.duration_type === "week")
           .reduce((sum, product) => sum + (product.price ?? 0), 0)
       )
     }, 0)
@@ -208,10 +199,7 @@ const _DiscountMonth = ({
   }
   // const hasPatreon = attendees.some(attendee => attendee.products.some(p => p.category === 'patreon' && (p.selected || p.purchased)))
   const hasMonthSelected = attendees.some((attendee) =>
-    attendee.products.some(
-      (p) =>
-        p.selected && (p.category === "month" || p.category === "local month"),
-    ),
+    attendee.products.some((p) => p.selected && p.duration_type === "month"),
   )
 
   if (!hasMonthSelected) return null
@@ -247,17 +235,14 @@ const DiscountWeekPurchased = ({
     return attendees.reduce((totalDiscount, attendee) => {
       // Verificar si este attendee tiene un month seleccionado
       const hasMonthSelectedForAttendee = attendee.products.some(
-        (p) =>
-          p.selected &&
-          (p.category === "month" || p.category === "local month"),
+        (p) => p.selected && p.duration_type === "month",
       )
 
       if (!hasMonthSelectedForAttendee) return totalDiscount
 
       // Buscar productos week comprados para este attendee
       const weekPurchasedProducts = attendee.products.filter(
-        (p) =>
-          p.purchased && (p.category === "week" || p.category === "local week"),
+        (p) => p.purchased && p.duration_type === "week",
       )
 
       // Sumar el original_price de los productos week comprados

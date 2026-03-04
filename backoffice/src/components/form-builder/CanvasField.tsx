@@ -9,6 +9,7 @@ interface CanvasFieldProps {
   field: FormFieldPublic
   sectionKey: string
   isSelected: boolean
+  isSpecial?: boolean
   onSelect: (fieldId: string) => void
   onDelete: (fieldId: string) => void
 }
@@ -67,6 +68,7 @@ export function CanvasField({
   field,
   sectionKey,
   isSelected,
+  isSpecial = false,
   onSelect,
   onDelete,
 }: CanvasFieldProps) {
@@ -137,7 +139,7 @@ export function CanvasField({
           isSelected
             ? "bg-primary/5 ring-1 ring-primary/30"
             : "hover:bg-muted/50"
-        }`}
+        } ${isSpecial ? "opacity-90 bg-muted/30" : ""}`}
       >
         {/* Left drag handle — always visible */}
         <div
@@ -160,6 +162,11 @@ export function CanvasField({
                 {field.required && (
                   <span className="text-destructive ml-0.5">*</span>
                 )}
+                {isSpecial && (
+                  <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5 py-0">
+                    Protected
+                  </Badge>
+                )}
               </label>
               {field.help_text && (
                 <p className="text-xs text-muted-foreground leading-snug">
@@ -167,14 +174,16 @@ export function CanvasField({
                 </p>
               )}
             </div>
-            <button
-              type="button"
-              className="ml-2 mt-0.5 h-6 w-6 shrink-0 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-              onClick={handleDelete}
-              aria-label={`Delete ${field.label}`}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
+            {!isSpecial && (
+              <button
+                type="button"
+                className="ml-2 mt-0.5 h-6 w-6 shrink-0 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                onClick={handleDelete}
+                aria-label={`Delete ${field.label}`}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
 
           {/* Input preview */}

@@ -8,6 +8,9 @@ from app.api.approval_strategy.schemas import (
     ApprovalStrategyCreate,
     ApprovalStrategyType,
 )
+from app.api.base_field_config.constants import DEFAULT_SECTIONS
+from app.api.base_field_config.crud import base_field_configs_crud
+from app.api.form_section.models import FormSections
 from app.api.popup import crud
 from app.api.popup.schemas import PopupCreate, PopupPublic, PopupStatus, PopupUpdate
 from app.api.shared.enums import UserRole
@@ -97,6 +100,27 @@ async def create_popup(
         strategy_in=ApprovalStrategyCreate(
             strategy_type=ApprovalStrategyType.AUTO_ACCEPT
         ),
+    )
+
+    # Create default form sections and base field configs
+    section_map: dict[str, uuid.UUID] = {}
+    for key, section_def in DEFAULT_SECTIONS.items():
+        section = FormSections(
+            tenant_id=popup.tenant_id,
+            popup_id=popup.id,
+            label=section_def["label"],
+            order=section_def["order"],
+        )
+        db.add(section)
+        db.commit()
+        db.refresh(section)
+        section_map[key] = section.id
+
+    base_field_configs_crud.create_defaults_for_popup(
+        db,
+        popup_id=popup.id,
+        tenant_id=popup.tenant_id,
+        section_map=section_map,
     )
 
     return PopupPublic.model_validate(popup)

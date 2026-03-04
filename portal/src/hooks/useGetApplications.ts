@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { ApplicationsService } from "@/client"
+import { isLoggedIn } from "@/hooks/useAuth"
 import { queryKeys } from "@/lib/query-keys"
 
 export function useApplicationsQuery() {
@@ -9,6 +10,7 @@ export function useApplicationsQuery() {
       const result = await ApplicationsService.listMyApplications()
       return result.results
     },
+    enabled: isLoggedIn(),
   })
 }
 

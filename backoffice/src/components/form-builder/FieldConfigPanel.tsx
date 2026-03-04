@@ -20,7 +20,7 @@ import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import useCustomToast from "@/hooks/useCustomToast"
 import { createErrorHandler } from "@/utils"
-import { FIELD_TYPES } from "./constants"
+import { FIELD_TYPES, isSpecialField } from "./constants"
 
 interface FieldConfigPanelProps {
   field: FormFieldPublic
@@ -72,6 +72,16 @@ export function FieldConfigPanel({
   }
 
   const handleSave = () => {
+    if (isSpecialField(field)) {
+      updateMutation.mutate({
+        fieldId: field.id,
+        requestBody: {
+          placeholder: localValues.placeholder || undefined,
+          help_text: localValues.help_text || undefined,
+        },
+      })
+      return
+    }
     const optionsArray = localValues.options
       .split("\n")
       .map((o) => o.trim())
@@ -94,8 +104,15 @@ export function FieldConfigPanel({
     localValues.field_type === "select" ||
     localValues.field_type === "multiselect"
 
+  const isProtected = isSpecialField(field)
+
   return (
     <div className="space-y-5 px-4 pb-6">
+      {isProtected && (
+        <p className="text-sm text-muted-foreground rounded-md bg-muted/30 px-3 py-2">
+          Protected field – only placeholder and help text can be edited.
+        </p>
+      )}
       <div className="space-y-2">
         <Label htmlFor="config-label">Display Label</Label>
         <Input
@@ -103,6 +120,7 @@ export function FieldConfigPanel({
           value={localValues.label}
           onChange={(e) => handleChange("label", e.target.value)}
           placeholder="Field label"
+          disabled={isProtected}
         />
       </div>
 
@@ -112,7 +130,7 @@ export function FieldConfigPanel({
           value={localValues.field_type}
           onValueChange={(val) => handleChange("field_type", val)}
         >
-          <SelectTrigger>
+          <SelectTrigger disabled={isProtected}>
             <SelectValue placeholder="Select type" />
           </SelectTrigger>
           <SelectContent>
@@ -155,6 +173,7 @@ export function FieldConfigPanel({
             onChange={(e) => handleChange("options", e.target.value)}
             placeholder={"Option 1\nOption 2\nOption 3"}
             rows={4}
+            disabled={isProtected}
           />
           <p className="text-xs text-muted-foreground">One option per line</p>
         </div>
@@ -173,6 +192,7 @@ export function FieldConfigPanel({
           id="config-required"
           checked={localValues.required}
           onCheckedChange={(val) => handleChange("required", val)}
+          disabled={isProtected}
         />
       </div>
 

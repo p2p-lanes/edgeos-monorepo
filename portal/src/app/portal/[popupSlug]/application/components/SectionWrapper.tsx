@@ -28,13 +28,13 @@ const SectionWrapper = ({
         duration: 0.6,
         ease: "backOut",
       }}
-      className={`grid gap-10 lg:grid-cols-[220px,1fr] pb-12 ${className}`}
+      className={`flex flex-col sm:flex-row sm:gap-10 gap-6 pb-8 ${className}`}
     >
-      <div className="space-y-1">
+      <div className="space-y-1 sm:w-[220px] sm:shrink-0 sm:pr-8">
         <h2 className="text-2xl font-semibold tracking-tight">{title}</h2>
         <p className="text-muted-foreground">{subtitle}</p>
       </div>
-      <div className="space-y-6">{children}</div>
+      <div className="min-w-0 flex-1 space-y-6">{children}</div>
     </motion.div>
   )
 }

@@ -52,6 +52,7 @@ import {
   useUnsavedChanges,
 } from "@/hooks/useUnsavedChanges"
 import { createErrorHandler } from "@/utils"
+import { isSpecialField } from "@/components/form-builder/constants"
 
 const FIELD_TYPES = [
   { value: "text", label: "Text", icon: Type },
@@ -83,6 +84,8 @@ export function FormFieldForm({
   const { isAdmin } = useAuth()
   const isEdit = !!defaultValues
   const readOnly = !isAdmin
+  const isProtectedField =
+    isEdit && defaultValues ? isSpecialField(defaultValues) : false
 
   const popupId = isEdit ? defaultValues.popup_id : selectedPopupId
 
@@ -164,6 +167,13 @@ export function FormFieldForm({
           : undefined
 
       if (isEdit) {
+        if (isProtectedField) {
+          updateMutation.mutate({
+            placeholder: value.placeholder || undefined,
+            help_text: value.help_text || undefined,
+          })
+          return
+        }
         updateMutation.mutate({
           label: value.label,
           field_type: value.field_type,
@@ -236,11 +246,13 @@ export function FormFieldForm({
                       : "Form Field Details"}
                 </CardTitle>
                 <CardDescription>
-                  {readOnly
-                    ? "View form field configuration (read-only)"
-                    : isEdit
-                      ? "Update the form field configuration"
-                      : "Configure a custom field for applications"}
+                  {isProtectedField
+                    ? "Protected field – only placeholder and help text can be edited."
+                    : readOnly
+                      ? "View form field configuration (read-only)"
+                      : isEdit
+                        ? "Update the form field configuration"
+                        : "Configure a custom field for applications"}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -265,7 +277,7 @@ export function FormFieldForm({
                         value={field.state.value}
                         onBlur={field.handleBlur}
                         onChange={(e) => field.handleChange(e.target.value)}
-                        disabled={readOnly}
+                        disabled={readOnly || isProtectedField}
                       />
                       <p className="text-sm text-muted-foreground">
                         Label shown to users
@@ -283,9 +295,8 @@ export function FormFieldForm({
                         <Select
                           value={field.state.value}
                           onValueChange={(val) => field.handleChange(val)}
-                          disabled={readOnly}
                         >
-                          <SelectTrigger>
+                          <SelectTrigger disabled={readOnly || isProtectedField}>
                             <SelectValue placeholder="Select type" />
                           </SelectTrigger>
                           <SelectContent>
@@ -309,9 +320,8 @@ export function FormFieldForm({
                           onValueChange={(val) =>
                             field.handleChange(val === NO_SECTION ? "" : val)
                           }
-                          disabled={readOnly}
                         >
-                          <SelectTrigger>
+                          <SelectTrigger disabled={readOnly || isProtectedField}>
                             <SelectValue placeholder="Select section" />
                           </SelectTrigger>
                           <SelectContent>
@@ -345,7 +355,7 @@ export function FormFieldForm({
                           value={field.state.value}
                           onBlur={field.handleBlur}
                           onChange={(e) => field.handleChange(e.target.value)}
-                          disabled={readOnly}
+                          disabled={readOnly || isProtectedField}
                         />
                         <p className="text-sm text-muted-foreground">
                           Display order within section (lower = first)
@@ -387,7 +397,7 @@ export function FormFieldForm({
                               onChange={(e) =>
                                 field.handleChange(e.target.value)
                               }
-                              disabled={readOnly}
+                              disabled={readOnly || isProtectedField}
                             />
                             <p className="text-sm text-muted-foreground">
                               One option per line
@@ -430,7 +440,7 @@ export function FormFieldForm({
                         id="required"
                         checked={field.state.value}
                         onCheckedChange={(val) => field.handleChange(val)}
-                        disabled={readOnly}
+                        disabled={readOnly || isProtectedField}
                       />
                     </div>
                   )}
@@ -457,7 +467,7 @@ export function FormFieldForm({
         </div>
       </form>
 
-      {isEdit && !readOnly && (
+      {isEdit && !readOnly && !isProtectedField && (
         <DangerZone
           description="Once you delete this form field, applications may lose their stored data for this field. This action cannot be undone."
           onDelete={() => deleteMutation.mutate()}

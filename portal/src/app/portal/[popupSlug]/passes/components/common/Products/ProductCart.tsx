@@ -4,9 +4,10 @@ import { badgeName } from "../../../constants/multiuse"
 const ProductCart = ({ product }: { product: ProductsPass }) => {
   const price = product.original_price ? product.original_price : product.price
 
-  const quantity = product.category.includes("day")
-    ? (product.quantity ?? 0) - (product.original_quantity ?? 0)
-    : 1
+  const quantity =
+    product.duration_type === "day"
+      ? (product.quantity ?? 0) - (product.original_quantity ?? 0)
+      : 1
 
   const totalPrice = (price * quantity).toFixed(0)
 

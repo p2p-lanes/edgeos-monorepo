@@ -7,6 +7,7 @@ from sqlmodel import Column, Field, Relationship
 from app.api.form_section.schemas import FormSectionBase
 
 if TYPE_CHECKING:
+    from app.api.base_field_config.models import BaseFieldConfigs
     from app.api.form_field.models import FormFields
     from app.api.popup.models import Popups
     from app.api.tenant.models import Tenants
@@ -24,3 +25,6 @@ class FormSections(FormSectionBase, table=True):
     tenant: "Tenants" = Relationship(back_populates="form_sections")
     popup: "Popups" = Relationship(back_populates="form_sections")
     form_fields: list["FormFields"] = Relationship(back_populates="section")
+    base_field_configs: list["BaseFieldConfigs"] = Relationship(
+        back_populates="section"
+    )

@@ -6,10 +6,8 @@ import usePurchaseProducts from "../../hooks/usePurchaseProducts"
 
 const TotalFloatingBar = ({
   setOpenCart,
-  waiverAccepted,
 }: {
   setOpenCart: (prev: boolean) => void
-  waiverAccepted: boolean
 }) => {
   const { originalTotal, total } = useCalculateTotal()
   const { purchaseProducts, loading } = usePurchaseProducts()
@@ -19,7 +17,7 @@ const TotalFloatingBar = ({
       (product) =>
         product.selected &&
         (product.purchased
-          ? product.category === "day" &&
+          ? product.duration_type === "day" &&
             (product.quantity || 1) > (product.original_quantity || 1)
           : true),
     ),
@@ -57,7 +55,7 @@ const TotalFloatingBar = ({
         <Button
           variant="default"
           className="p-5 whitespace-nowrap"
-          disabled={loading || !someSelected || !waiverAccepted}
+          disabled={loading || !someSelected}
           onClick={() => purchaseProducts(attendees)}
         >
           {loading && <Loader2 className="size-4 animate-spin" />}

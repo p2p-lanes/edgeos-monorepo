@@ -20,29 +20,17 @@ import OptionsMenu from "./Buttons/OptionsMenu"
 import Product from "./Products/ProductTicket"
 import QRcode from "./QRcode"
 
-const getCategoryPriority = (category: string): number => {
-  const normalized = category.toLowerCase()
-  if (normalized === "day") return 999
-
-  const isLocal = normalized.includes("local")
-  const isWeek = normalized.includes("week")
-  const isMonth = normalized.includes("month")
-
-  if (!isLocal && isMonth) return 0
-  if (!isLocal && isWeek) return 1
-  if (isLocal && isMonth) return 2
-  if (isLocal && isWeek) return 3
+const getDurationPriority = (p: ProductsPass): number => {
+  const dt = p.duration_type
+  if (dt === "month") return 0
+  if (dt === "full") return 1
+  if (dt === "week") return 2
+  if (dt === "day") return 999
   return 4
 }
 
 const sortProductsByPriority = (a: ProductsPass, b: ProductsPass): number => {
-  if (a.category === "day" && b.category !== "day") return 1
-  if (a.category !== "day" && b.category === "day") return -1
-
-  const priorityA = getCategoryPriority(a.category)
-  const priorityB = getCategoryPriority(b.category)
-  if (priorityA !== priorityB) return priorityA - priorityB
-  return 0
+  return getDurationPriority(a) - getDurationPriority(b)
 }
 
 const AttendeeTicket = ({
@@ -60,7 +48,7 @@ const AttendeeTicket = ({
     .filter(
       (product) =>
         product.category !== "patreon" &&
-        (isDayCheckout ? product.category === "day" : true),
+        (isDayCheckout ? product.duration_type === "day" : true),
     )
     .sort(sortProductsByPriority)
   const { getCity } = useCityProvider()
@@ -72,20 +60,15 @@ const AttendeeTicket = ({
 
   const hasMonthPurchased = attendee.products.some(
     (product) =>
-      (product.category === "month" || product.category === "local month") &&
+      (product.duration_type === "month" || product.duration_type === "full") &&
       (product.purchased || product.selected),
   )
   // LEGACY: application.local_resident was removed from API
   const isLocalResident = false
 
-  // Split products into Local and Common groups while preserving the original order
-  const localProducts = standardProducts.filter((p) =>
-    p.category.includes("local"),
-  )
-  const commonProducts = standardProducts.filter(
-    (p) =>
-      p.category === "week" || p.category === "month" || p.category === "day",
-  )
+  // All ticket products go into commonProducts (local categories no longer exist)
+  const localProducts: ProductsPass[] = []
+  const commonProducts = standardProducts.filter((p) => p.category === "ticket")
 
   // Collapsible open states
   const defaultLocalOpen = isLocalResident ? localProducts.length > 0 : false
@@ -222,11 +205,11 @@ const AttendeeTicket = ({
                     <CollapsibleContent className="transition-all duration-100 ease-in-out data-[state=closed]:animate-slideUp data-[state=open]:animate-slideDown">
                       <div className="flex flex-col gap-2">
                         {localProducts.map((product, index) => {
-                          const hasDayInCommon = localProducts.some((p) =>
-                            p.category.includes("day"),
+                          const hasDayInCommon = localProducts.some(
+                            (p) => p.duration_type === "day",
                           )
                           const firstDayIndexCommon = localProducts.findIndex(
-                            (p) => p.category.includes("day"),
+                            (p) => p.duration_type === "day",
                           )
 
                           return (
@@ -249,8 +232,7 @@ const AttendeeTicket = ({
                                     : () => {}
                                 }
                               />
-                              {(product.category === "month" ||
-                                product.category === "local month") && (
+                              {product.duration_type === "month" && (
                                 <Separator className="my-1" />
                               )}
                             </React.Fragment>
@@ -289,11 +271,11 @@ const AttendeeTicket = ({
                     <CollapsibleContent className="transition-all duration-100 ease-in-out data-[state=closed]:animate-slideUp data-[state=open]:animate-slideDown">
                       <div className="flex flex-col gap-2">
                         {(() => {
-                          const hasDayInCommon = commonProducts.some((p) =>
-                            p.category.includes("day"),
+                          const hasDayInCommon = commonProducts.some(
+                            (p) => p.duration_type === "day",
                           )
                           const firstDayIndexCommon = commonProducts.findIndex(
-                            (p) => p.category.includes("day"),
+                            (p) => p.duration_type === "day",
                           )
                           return commonProducts.map((product, index) => (
                             <React.Fragment
@@ -315,8 +297,7 @@ const AttendeeTicket = ({
                                     : () => {}
                                 }
                               />
-                              {(product.category === "month" ||
-                                product.category === "local month") && (
+                              {product.duration_type === "month" && (
                                 <Separator className="my-1" />
                               )}
                             </React.Fragment>

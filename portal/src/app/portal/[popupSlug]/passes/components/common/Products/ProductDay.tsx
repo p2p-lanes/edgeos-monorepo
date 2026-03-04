@@ -76,13 +76,12 @@ const Product = ({
   }, [])
 
   const calculateMaxQuantity = () => {
-    if (!product.start_date || !product.end_date) return 1
+    if (product.max_quantity) return product.max_quantity
+    if (!product.start_date || !product.end_date) return 30
     const startDate = new Date(product.start_date)
     const endDate = new Date(product.end_date)
     const diffTime = Math.abs(endDate.getTime() - startDate.getTime())
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-
-    // A├▒adir 1 para incluir ambos d├¡as (start y end)
     return diffDays + 1
   }
 

@@ -1,7 +1,15 @@
 import { useForm } from "@tanstack/react-form"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
-import { Clock, DollarSign, Hash, Power, Users } from "lucide-react"
+import {
+  Calendar,
+  Clock,
+  DollarSign,
+  Hash,
+  Power,
+  Shield,
+  Users,
+} from "lucide-react"
 import {
   type ProductCategory,
   type ProductCreate,
@@ -72,6 +80,12 @@ const ATTENDEE_CATEGORIES: { value: TicketAttendeeCategory; label: string }[] =
     { value: "kid", label: "Kid" },
   ]
 
+/** Extract YYYY-MM-DD from an ISO date string like "2026-05-10T00:00:00Z" */
+const toDateInputValue = (iso?: string | null): string => {
+  if (!iso) return ""
+  return iso.slice(0, 10)
+}
+
 export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -133,7 +147,10 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
         "main") as TicketAttendeeCategory,
       duration_type: (defaultValues?.duration_type ?? "full") as TicketDuration,
       is_active: defaultValues?.is_active ?? true,
+      exclusive: defaultValues?.exclusive ?? false,
       max_quantity: defaultValues?.max_quantity?.toString() ?? "",
+      start_date: toDateInputValue(defaultValues?.start_date),
+      end_date: toDateInputValue(defaultValues?.end_date),
     },
     onSubmit: ({ value }) => {
       if (readOnly) return
@@ -152,7 +169,10 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
           category: value.category,
           attendee_category: isTicket ? value.attendee_category : null,
           duration_type: isTicket ? value.duration_type : null,
+          start_date: isTicket && value.start_date ? value.start_date : null,
+          end_date: isTicket && value.end_date ? value.end_date : null,
           is_active: value.is_active,
+          exclusive: value.exclusive,
           max_quantity: maxQty,
         })
       } else {
@@ -168,7 +188,11 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
           category: value.category,
           attendee_category: isTicket ? value.attendee_category : undefined,
           duration_type: isTicket ? value.duration_type : undefined,
+          start_date:
+            isTicket && value.start_date ? value.start_date : undefined,
+          end_date: isTicket && value.end_date ? value.end_date : undefined,
           is_active: value.is_active,
+          exclusive: value.exclusive,
           max_quantity: maxQty ?? undefined,
         })
       }
@@ -363,6 +387,22 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
               </InlineRow>
             )}
           </form.Field>
+
+          <form.Field name="exclusive">
+            {(field) => (
+              <InlineRow
+                icon={<Shield className="h-4 w-4 text-muted-foreground" />}
+                label="Exclusive"
+                description="Only one exclusive product can be selected at a time"
+              >
+                <Switch
+                  checked={field.state.value}
+                  onCheckedChange={(checked) => field.handleChange(checked)}
+                  disabled={readOnly}
+                />
+              </InlineRow>
+            )}
+          </form.Field>
         </InlineSection>
 
         {/* Ticket Options (conditional) */}
@@ -430,6 +470,46 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
                             ))}
                           </SelectContent>
                         </Select>
+                      </InlineRow>
+                    )}
+                  </form.Field>
+
+                  <form.Field name="start_date">
+                    {(field) => (
+                      <InlineRow
+                        icon={
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                        }
+                        label="Start Date"
+                        description="When the ticket validity begins"
+                      >
+                        <Input
+                          type="date"
+                          value={field.state.value}
+                          onChange={(e) => field.handleChange(e.target.value)}
+                          disabled={readOnly}
+                          className="max-w-44 text-sm"
+                        />
+                      </InlineRow>
+                    )}
+                  </form.Field>
+
+                  <form.Field name="end_date">
+                    {(field) => (
+                      <InlineRow
+                        icon={
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                        }
+                        label="End Date"
+                        description="When the ticket validity ends"
+                      >
+                        <Input
+                          type="date"
+                          value={field.state.value}
+                          onChange={(e) => field.handleChange(e.target.value)}
+                          disabled={readOnly}
+                          className="max-w-44 text-sm"
+                        />
                       </InlineRow>
                     )}
                   </form.Field>

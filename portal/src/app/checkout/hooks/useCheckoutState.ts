@@ -3,7 +3,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useParams, useSearchParams } from "next/navigation"
 import { useState } from "react"
-import { ApiError, ApplicationsService, GroupsService } from "@/client"
+import { ApiError, ApplicationsService } from "@/client"
 import { queryKeys } from "@/lib/query-keys"
 import type { CheckoutState, FormDataProps } from "../types"
 import useCookies from "./useCookies"
@@ -25,8 +25,9 @@ const useCheckoutState = () => {
       formData: FormDataProps
       groupData: any
     }) => {
-      const groupId = (groupParam || group) as string
-      if (!groupId) throw new Error("Invalid group ID")
+      const groupSlug = (groupParam || group) as string
+      if (!groupSlug) throw new Error("Invalid group")
+      if (!groupData?.id) throw new Error("Group data not loaded")
 
       setCookie(
         JSON.stringify({
@@ -37,21 +38,21 @@ const useCheckoutState = () => {
         }),
       )
 
-      await GroupsService.addGroupMember({
-        groupId,
+      const application = await ApplicationsService.createMyApplication({
         requestBody: {
-          ...formData,
-          local_resident: formData.local_resident === "yes",
+          popup_id: groupData.popup_id,
+          group_id: groupData.id,
+          first_name: formData.first_name,
+          last_name: formData.last_name,
+          email: formData.email,
+          telegram: formData.telegram,
+          organization: formData.organization || undefined,
+          role: formData.role || undefined,
+          gender: formData.gender || undefined,
         },
       })
 
-      const apps = await ApplicationsService.listMyApplications()
-      const matchingApp = apps.results.find(
-        (app) =>
-          app.popup_id === groupData.popup_id || app.group_id === groupId,
-      )
-
-      return { matchingApp, groupId, groupData }
+      return { matchingApp: application, groupData }
     },
     onMutate: () => {
       setCheckoutState("processing")
@@ -66,12 +67,12 @@ const useCheckoutState = () => {
     },
     onError: async (error: any, variables) => {
       const { groupData } = variables
-      const groupId = (groupParam || group) as string
 
       if (
         error instanceof ApiError &&
-        (error.status === 409 ||
-          (error.body as any)?.detail?.includes("already has an application"))
+        (error.status === 400 ||
+          error.status === 409 ||
+          (error.body as any)?.detail?.includes("already have an application"))
       ) {
         try {
           const token = window?.localStorage?.getItem("token")
@@ -79,7 +80,8 @@ const useCheckoutState = () => {
             const result = await ApplicationsService.listMyApplications()
             const existingApp = result.results.find(
               (app) =>
-                app.group_id === groupId || app.popup_id === groupData.popup_id,
+                app.group_id === groupData.id ||
+                app.popup_id === groupData.popup_id,
             )
 
             if (existingApp) {

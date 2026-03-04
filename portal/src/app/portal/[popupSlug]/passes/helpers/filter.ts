@@ -17,7 +17,7 @@ export const defaultProducts = (
   return products
     .filter((p) => p.is_active !== false)
     .map((p) => {
-      if (p.category !== "patreon" && p.category !== "supporter") {
+      if (p.category !== "patreon") {
         return {
           ...p,
           price: isPatreon
@@ -25,7 +25,7 @@ export const defaultProducts = (
             : hasDiscount
               ? p.price * (1 - discount / 100)
               : p.price,
-          original_price: hasDiscount ? p.price : p.compare_price, // Precio original para mostrar tachado
+          original_price: hasDiscount ? p.price : p.compare_price,
         }
       }
       return { ...p, original_price: p.price }
@@ -47,16 +47,14 @@ export const filterProductsToPurchase = (
   editableMode: boolean,
 ) => {
   const reducedProducts = products.reduce((acc: ProductsPass[], product) => {
-    const isDayProduct = product.category.includes("day")
-    const isWeekProduct =
-      product.category === "week" || product.category === "local week"
-    const isMonthProduct =
-      product.category === "month" || product.category === "local month"
+    const isDayProduct = product.duration_type === "day"
+    const isWeekProduct = product.duration_type === "week"
+    const isMonthProduct = product.duration_type === "month"
     const isPatreonProduct = product.category === "patreon"
 
     const hasMonth = products.some(
       (p) =>
-        (p.category === "month" || p.category === "local month") &&
+        p.duration_type === "month" &&
         (p.selected || p.purchased) &&
         !p.edit &&
         p.attendee_category === product.attendee_category,
@@ -105,8 +103,6 @@ export const filterProductsToPurchase = (
 
     return acc
   }, [])
-
-  // console.log('reducedProducts', reducedProducts, {editableMode})
 
   return reducedProducts.map((p) => ({
     product_id: p.id,

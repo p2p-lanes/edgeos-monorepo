@@ -34,7 +34,14 @@ import { DragOverlayContent } from "@/components/form-builder/DragOverlayContent
 import { FieldConfigPanel } from "@/components/form-builder/FieldConfigPanel"
 import { FieldPalette } from "@/components/form-builder/FieldPalette"
 import { FormCanvas } from "@/components/form-builder/FormCanvas"
-import { FIELD_TYPES, PALETTE_ITEM_PREFIX } from "@/components/form-builder/constants"
+import {
+  FIELD_TYPES,
+  getSortableSectionId,
+  isSpecialField,
+  PALETTE_ITEM_PREFIX,
+  parseSortableSectionId,
+  SORTABLE_SECTION_PREFIX,
+} from "@/components/form-builder/constants"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -125,6 +132,7 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<FormFieldPublic | null>(null)
   const [liveOrderMap, setLiveOrderMap] = useState<Record<string, string[]> | null>(null)
+  const [liveSectionOrder, setLiveSectionOrder] = useState<string[] | null>(null)
 
   const { data: formFieldsData, isLoading: isLoadingFields } = useQuery({
     ...getAllFormFieldsQueryOptions(popupId),
@@ -309,6 +317,15 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
     return keys
   }, [sections, fieldsBySection])
 
+  const orderedSectionKeys = useMemo(() => {
+    if (liveSectionOrder === null) return sectionKeys
+    const hasUnsectioned = fieldsBySection[UNSECTIONED]?.length
+    const apiOrder = liveSectionOrder.filter((id) =>
+      sections.some((s) => s.id === id),
+    )
+    return hasUnsectioned ? [UNSECTIONED, ...apiOrder] : apiOrder
+  }, [liveSectionOrder, sectionKeys, sections, fieldsBySection])
+
   const buildInitialLiveMap = useCallback((): Record<string, string[]> => {
     const map: Record<string, string[]> = {}
     for (const key of sectionKeys) {
@@ -325,6 +342,10 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id)
     const activeIdStr = String(event.active.id)
+    if (activeIdStr.startsWith(SORTABLE_SECTION_PREFIX)) {
+      setLiveSectionOrder(sections.map((s) => s.id))
+      return
+    }
     if (!activeIdStr.startsWith(PALETTE_ITEM_PREFIX)) {
       setLiveOrderMap(buildInitialLiveMap())
     }
@@ -336,6 +357,21 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
       if (!over || !active) return
 
       const activeIdStr = String(active.id)
+      if (activeIdStr.startsWith(SORTABLE_SECTION_PREFIX)) {
+        if (over.data.current?.type === "section-sortable" && liveSectionOrder) {
+          const overSectionId = over.data.current.sectionId as string
+          const activeSectionId = parseSortableSectionId(activeIdStr)
+          if (!activeSectionId || activeSectionId === overSectionId) return
+          setLiveSectionOrder((prev) => {
+            if (!prev) return prev
+            const oldIndex = prev.indexOf(activeSectionId)
+            const newIndex = prev.indexOf(overSectionId)
+            if (oldIndex === -1 || newIndex === -1) return prev
+            return arrayMove(prev, oldIndex, newIndex)
+          })
+        }
+        return
+      }
       if (activeIdStr.startsWith(PALETTE_ITEM_PREFIX)) return
 
       let targetKey: string
@@ -380,18 +416,43 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
         }
       })
     },
-    [],
+    [liveSectionOrder],
   )
 
   const handleDragCancel = useCallback((_event: DragCancelEvent) => {
     setActiveId(null)
     setLiveOrderMap(null)
+    setLiveSectionOrder(null)
   }, [])
+
+  const persistSectionOrder = useCallback(
+    (sectionIds: string[]) => {
+      const previousOrder = sections
+        .slice()
+        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+        .map((s) => s.id)
+      sectionIds.forEach((sectionId, index) => {
+        if (previousOrder[index] !== sectionId) {
+          updateSectionMutation.mutate({
+            sectionId,
+            requestBody: { order: index },
+          })
+        }
+      })
+    },
+    [sections, updateSectionMutation],
+  )
 
   const handleDragEnd = (event: DragEndEvent) => {
     setActiveId(null)
     const { active, over } = event
     const activeIdStr = String(active.id)
+
+    if (activeIdStr.startsWith(SORTABLE_SECTION_PREFIX)) {
+      if (liveSectionOrder) persistSectionOrder(liveSectionOrder)
+      setLiveSectionOrder(null)
+      return
+    }
 
     if (activeIdStr.startsWith(PALETTE_ITEM_PREFIX)) {
       setLiveOrderMap(null)
@@ -486,9 +547,14 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
   const handleDeleteField = useCallback(
     (fieldId: string) => {
       const field = fields.find((f) => f.id === fieldId)
-      if (field) setDeleteTarget(field)
+      if (!field) return
+      if (isSpecialField(field)) {
+        showErrorToast("This field cannot be deleted.")
+        return
+      }
+      setDeleteTarget(field)
     },
-    [fields],
+    [fields, showErrorToast],
   )
 
   const handleUpdateSection = useCallback(
@@ -566,6 +632,7 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
             <FormCanvas
               fieldsBySection={fieldsBySection}
               sections={sections}
+              orderedSectionKeys={orderedSectionKeys}
               selectedFieldId={selectedFieldId}
               onSelectField={handleSelectField}
               onDeleteField={handleDeleteField}
@@ -583,6 +650,7 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
           <DragOverlayContent
             activeId={activeId ? String(activeId) : null}
             fields={fields}
+            sections={sections}
           />
         </DragOverlay>
       </DndContext>

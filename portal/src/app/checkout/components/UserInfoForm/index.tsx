@@ -14,13 +14,14 @@ import {
 import { useApplicationData } from "../../hooks/useApplicationData"
 import { useEmailVerification } from "../../hooks/useEmailVerification"
 import { useUserForm } from "../../hooks/useUserForm"
-import type { FormDataProps, GroupData } from "../../types"
+import type { GroupPublic } from "@/client"
+import type { FormDataProps } from "../../types"
 import EmailVerification from "./EmailVerification"
 import PersonalInfoForm from "./PersonalInfoForm"
 import RedFlagScreen from "./RedFlagScreen"
 
 interface UserInfoFormProps {
-  group: GroupData | null
+  group: GroupPublic | null
   isLoading: boolean
   error: string | null
   onSubmit: (data: FormDataProps) => Promise<void>
@@ -41,13 +42,13 @@ const UserInfoForm = ({
   const searchParams = useSearchParams()
   const isDayCheckout = searchParams.has("day-passes")
 
-  // Get application data based on group's popup_city_id
+  // Get application data based on group's popup_id
   const {
     applicationData,
     isLoading: isLoadingApplication,
     refreshApplicationData,
   } = useApplicationData({
-    groupPopupCityId: group?.popup_city_id,
+    groupPopupCityId: group?.popup_id,
   })
 
   const {
@@ -208,9 +209,9 @@ const UserInfoForm = ({
   if (showRedFlagScreen) {
     const userName =
       applicationData?.first_name || formData.first_name || "User"
-    const popupName = group?.popup_name || "this location"
+    const popupName = group?.name || "this location"
 
-    const popupSlug = group?.popup_slug || "unknown"
+    const popupSlug = group?.slug || "unknown"
 
     return (
       <RedFlagScreen

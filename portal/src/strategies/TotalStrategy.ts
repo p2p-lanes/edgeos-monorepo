@@ -19,13 +19,11 @@ abstract class BasePriceStrategy implements PriceCalculationStrategy {
         const price = product.original_price ?? 0
 
         if (product.purchased) {
-          // Para productos comprados, solo contamos la diferencia adicional
           const diff =
             (product.quantity || 1) - (product.original_quantity || 1)
           return diff > 0 ? sum + price * diff : sum
         }
 
-        // Para productos no comprados, contamos el precio total
         return sum + price * (product.quantity || 1)
       }, 0)
   }
@@ -39,19 +37,15 @@ abstract class BasePriceStrategy implements PriceCalculationStrategy {
 class MonthlyPriceStrategy extends BasePriceStrategy {
   calculate(products: ProductsPass[], discount: DiscountProps): TotalResult {
     const hasPatreon = products.some(
-      (p) =>
-        (p.category === "patreon" || p.category === "supporter") && p.selected,
+      (p) => p.category === "patreon" && p.selected,
     )
     const monthProduct = products.find(
-      (p) =>
-        (p.category === "month" || p.category === "local month") &&
-        p.selected &&
-        !p.purchased,
+      (p) => p.duration_type === "month" && p.selected && !p.purchased,
     )
     const monthPrice =
       (monthProduct?.price ?? 0) * (monthProduct?.quantity ?? 1)
     const totalProductsPurchased = products
-      .filter((p) => p.category !== "patreon" && p.category !== "supporter")
+      .filter((p) => p.category !== "patreon")
       .reduce(
         (sum, product) =>
           sum +
@@ -63,13 +57,6 @@ class MonthlyPriceStrategy extends BasePriceStrategy {
     const discountAmount = discount.discount_value
       ? originalTotal * (discount.discount_value / 100)
       : 0
-
-    console.log("month", {
-      monthPrice,
-      originalTotal,
-      discountAmount,
-      totalProductsPurchased,
-    })
 
     return {
       total:
@@ -84,11 +71,8 @@ class MonthlyPriceStrategy extends BasePriceStrategy {
 
   protected calculateOriginalTotal(products: ProductsPass[]): number {
     return (
-      products.find(
-        (p) =>
-          p.selected &&
-          (p.category === "month" || p.category === "local month"),
-      )?.original_price ?? 0
+      products.find((p) => p.selected && p.duration_type === "month")
+        ?.original_price ?? 0
     )
   }
 }
@@ -97,18 +81,18 @@ class WeeklyPriceStrategy extends BasePriceStrategy {
   calculate(products: ProductsPass[], discount: DiscountProps): TotalResult {
     const weekSelectedProducts = products.filter(
       (p) =>
-        (p.category === "week" ||
-          p.category === "local week" ||
-          p.category.includes("day")) &&
+        (p.duration_type === "week" ||
+          p.duration_type === "full" ||
+          p.duration_type === "day") &&
         p.selected,
     )
 
     const totalSelected = weekSelectedProducts.reduce((sum, product) => {
-      if (product.purchased && !product.category.includes("day")) {
+      if (product.purchased && product.duration_type !== "day") {
         return sum - (product.price ?? 0) * (product.quantity || 1)
       }
 
-      if (product.category.includes("day")) {
+      if (product.duration_type === "day") {
         if (product.purchased) {
           const diff =
             (product.quantity || 1) - (product.original_quantity || 1)
@@ -136,15 +120,10 @@ class WeeklyPriceStrategy extends BasePriceStrategy {
 class PatreonPriceStrategy extends BasePriceStrategy {
   calculate(products: ProductsPass[], _discount: DiscountProps): TotalResult {
     const patreonProduct = products.find(
-      (p) =>
-        (p.category === "patreon" || p.category === "supporter") && p.selected,
+      (p) => p.category === "patreon" && p.selected,
     )
     const productsSelected = products.filter(
-      (p) =>
-        p.selected &&
-        !p.purchased &&
-        p.category !== "patreon" &&
-        p.category !== "supporter",
+      (p) => p.selected && !p.purchased && p.category !== "patreon",
     )
     const patreonPrice =
       (patreonProduct?.price ?? 0) * (patreonProduct?.quantity ?? 1)
@@ -166,8 +145,7 @@ class PatreonPriceStrategy extends BasePriceStrategy {
 class MonthlyPurchasedPriceStrategy extends BasePriceStrategy {
   calculate(products: ProductsPass[], _discount: DiscountProps): TotalResult {
     const someSelectedWeek = products.some(
-      (p) =>
-        p.selected && (p.category === "week" || p.category === "local week"),
+      (p) => p.selected && p.duration_type === "week",
     )
 
     if (!someSelectedWeek) {
@@ -179,14 +157,10 @@ class MonthlyPurchasedPriceStrategy extends BasePriceStrategy {
     }
 
     const monthProductPurchased = products.find(
-      (p) =>
-        (p.category === "month" || p.category === "local month") && p.purchased,
+      (p) => p.duration_type === "month" && p.purchased,
     )
     const weekProductsPurchased = products.filter(
-      (p) =>
-        (p.category === "week" || p.category === "local week") &&
-        p.purchased &&
-        !p.selected,
+      (p) => p.duration_type === "week" && p.purchased && !p.selected,
     )
 
     const totalWeekPurchased = weekProductsPurchased.reduce(
@@ -203,32 +177,6 @@ class MonthlyPurchasedPriceStrategy extends BasePriceStrategy {
           (monthProductPurchased?.quantity ?? 1),
       originalTotal: originalTotal,
       discountAmount: 0,
-    }
-  }
-}
-
-class DayPriceStrategy extends BasePriceStrategy {
-  calculate(products: ProductsPass[], discount: DiscountProps): TotalResult {
-    const daySelectedProducts = products.filter(
-      (p) => p.category.includes("day") && p.selected,
-    )
-
-    const totalSelected = daySelectedProducts.reduce((sum, product) => {
-      if (product.purchased) {
-        return sum - (product.price ?? 0) * (product.quantity ?? 1)
-      }
-      return sum + (product.price ?? 0) * (product.quantity ?? 1)
-    }, 0)
-
-    const originalTotal = this.calculateOriginalTotal(products)
-    const discountAmount = discount.discount_value
-      ? originalTotal * (discount.discount_value / 100)
-      : 0
-
-    return {
-      total: totalSelected,
-      originalTotal: originalTotal,
-      discountAmount: discountAmount,
     }
   }
 }
@@ -254,13 +202,11 @@ export class TotalCalculator {
       { total: 0, originalTotal: 0, discountAmount: 0 },
     )
 
-    // Compare individual discount vs group discount and apply only the greater one
     if (groupDiscountPercentage && groupDiscountPercentage > 0) {
       const groupDiscountAmount =
         baseResult.originalTotal * (groupDiscountPercentage / 100)
       const individualDiscountAmount = baseResult.discountAmount
 
-      // Use the greater discount
       if (groupDiscountAmount > individualDiscountAmount) {
         return {
           total: baseResult.originalTotal - groupDiscountAmount,
@@ -275,16 +221,13 @@ export class TotalCalculator {
 
   private getStrategy(products: ProductsPass[]): PriceCalculationStrategy {
     const hasPatreon = products.some(
-      (p) =>
-        (p.category === "patreon" || p.category === "supporter") && p.selected,
+      (p) => p.category === "patreon" && p.selected,
     )
     const hasMonthly = products.some(
-      (p) =>
-        (p.category === "month" || p.category === "local month") && p.selected,
+      (p) => p.duration_type === "month" && p.selected,
     )
     const hasMonthPurchased = products.some(
-      (p) =>
-        (p.category === "month" || p.category === "local month") && p.purchased,
+      (p) => p.duration_type === "month" && p.purchased,
     )
 
     if (hasPatreon) return new PatreonPriceStrategy()

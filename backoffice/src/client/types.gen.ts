@@ -325,6 +325,26 @@ export type AuthCodeSentResponse = {
     expires_in_minutes?: number;
 };
 
+export type BaseFieldConfigPublic = {
+    id: string;
+    tenant_id: string;
+    popup_id: string;
+    field_name: string;
+    section_id?: (string | null);
+    position?: number;
+    placeholder?: (string | null);
+    help_text?: (string | null);
+    options?: (Array<(string)> | null);
+};
+
+export type BaseFieldConfigUpdate = {
+    section_id?: (string | null);
+    position?: (number | null);
+    placeholder?: (string | null);
+    help_text?: (string | null);
+    options?: (Array<(string)> | null);
+};
+
 /**
  * Schema for creating companion attendees (spouse/kids) during application.
  *
@@ -1762,6 +1782,24 @@ export type AuthHumanAuthenticateData = {
 };
 
 export type AuthHumanAuthenticateResponse = (Token);
+
+export type BaseFieldConfigsListBaseFieldConfigsData = {
+    /**
+     * Filter by popup ID
+     */
+    popupId: string;
+    xTenantId?: (string | null);
+};
+
+export type BaseFieldConfigsListBaseFieldConfigsResponse = (Array<BaseFieldConfigPublic>);
+
+export type BaseFieldConfigsUpdateBaseFieldConfigData = {
+    configId: string;
+    requestBody: BaseFieldConfigUpdate;
+    xTenantId?: (string | null);
+};
+
+export type BaseFieldConfigsUpdateBaseFieldConfigResponse = (BaseFieldConfigPublic);
 
 export type CouponsListCouponsData = {
     isActive?: (boolean | null);

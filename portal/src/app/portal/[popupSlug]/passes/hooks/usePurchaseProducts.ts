@@ -21,9 +21,9 @@ const usePurchaseProducts = () => {
 
       const monthSelectedWithWeekOrDay = attendeePasses.some(
         (p) =>
-          p.products.some((p) => p.category === "month" && p.selected) &&
-          (p.products.some((p) => p.category === "week" && p.purchased) ||
-            p.products.some((p) => p.category.includes("day") && p.purchased)),
+          p.products.some((p) => p.duration_type === "month" && p.selected) &&
+          (p.products.some((p) => p.duration_type === "week" && p.purchased) ||
+            p.products.some((p) => p.duration_type === "day" && p.purchased)),
       )
 
       // LEGACY: application.credit removed from API
@@ -42,8 +42,8 @@ const usePurchaseProducts = () => {
       const result = await PaymentsService.createMyPayment({
         requestBody: {
           application_id: String(application.id),
-          products: filteredProducts.map((p: any) => ({
-            product_id: String(p.id),
+          products: filteredProducts.map((p) => ({
+            product_id: String(p.product_id),
             attendee_id: String(p.attendee_id),
             quantity: p.quantity ?? 1,
           })),

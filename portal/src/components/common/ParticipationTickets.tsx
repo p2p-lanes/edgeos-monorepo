@@ -22,12 +22,11 @@ const ParticipationTickets = ({
     (product) => product.category === "patreon",
   )
   const hasMonthPass = participation.some(
-    (product) =>
-      product.category === "month" || product.category === "local month",
+    (product) => product.duration_type === "month",
   )
   const products = passes.filter(
     (product) =>
-      product.category === "week" && product.attendee_category === "main",
+      product.duration_type === "week" && product.attendee_category === "main",
   )
 
   const weeks: (ProductsPass | null)[] = [null, null, null, null]

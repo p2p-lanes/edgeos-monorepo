@@ -374,6 +374,10 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         data["tenant_id"] = tenant_id
         data["human_id"] = human_id
 
+        # Auto-accept applications that come through a group (checkout/referral)
+        if data.get("group_id"):
+            data["status"] = ApplicationStatus.ACCEPTED.value
+
         # Set submitted_at if status is IN_REVIEW or ACCEPTED
         if app_data.status in [
             ApplicationStatus.IN_REVIEW.value,

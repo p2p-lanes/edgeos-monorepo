@@ -82,11 +82,12 @@ const PassesProvider = ({ children }: { children: ReactNode }) => {
             // )
           )
           .map((product: ProductsPass) => {
-            const originalQuantity = product.category.includes("day")
-              ? (attendees
-                  .find((a) => a.id === attendee.id)
-                  ?.products.find((p) => p.id === product.id)?.quantity ?? 0)
-              : 1
+            const originalQuantity =
+              product.duration_type === "day"
+                ? (attendees
+                    .find((a) => a.id === attendee.id)
+                    ?.products.find((p) => p.id === product.id)?.quantity ?? 0)
+                : 1
             return {
               ...product,
               original_quantity: originalQuantity,

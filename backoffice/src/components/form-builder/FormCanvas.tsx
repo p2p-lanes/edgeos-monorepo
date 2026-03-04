@@ -1,15 +1,22 @@
+import {
+  verticalListSortingStrategy,
+  SortableContext,
+} from "@dnd-kit/sortable"
 import { FolderPlus, LayoutTemplate } from "lucide-react"
 import { useRef, useState } from "react"
 import type { FormFieldPublic, FormSectionPublic, FormSectionUpdate } from "@/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { getSortableSectionId } from "./constants"
 import { SectionDropZone } from "./SectionDropZone"
+import { SortableSectionWrapper } from "./SortableSectionWrapper"
 
 const UNSECTIONED = "__unsectioned__"
 
 interface FormCanvasProps {
   fieldsBySection: Record<string, FormFieldPublic[]>
   sections: FormSectionPublic[]
+  orderedSectionKeys: string[]
   selectedFieldId: string | null
   onSelectField: (fieldId: string) => void
   onDeleteField: (fieldId: string) => void
@@ -21,6 +28,7 @@ interface FormCanvasProps {
 export function FormCanvas({
   fieldsBySection,
   sections,
+  orderedSectionKeys,
   selectedFieldId,
   onSelectField,
   onDeleteField,
@@ -37,22 +45,34 @@ export function FormCanvas({
     0,
   )
 
-  const orderedSectionKeys: string[] = []
-  if (fieldsBySection[UNSECTIONED]?.length) {
-    orderedSectionKeys.push(UNSECTIONED)
-  }
-  for (const section of sections) {
-    if (fieldsBySection[section.id] !== undefined) {
-      orderedSectionKeys.push(section.id)
-    }
-  }
-  for (const key of Object.keys(fieldsBySection)) {
-    if (!orderedSectionKeys.includes(key)) {
-      orderedSectionKeys.push(key)
-    }
-  }
-
+  const sectionSortableItems = orderedSectionKeys
+    .filter((k) => k !== UNSECTIONED)
+    .map((k) => getSortableSectionId(k))
   const sectionMap = new Map(sections.map((s) => [s.id, s]))
+
+  const renderSection = (key: string, idx: number, isLast: boolean) => {
+    const section = sectionMap.get(key) ?? null
+    const dropZone = (
+      <SectionDropZone
+        key={key}
+        sectionKey={key}
+        section={section}
+        fields={fieldsBySection[key] || []}
+        selectedFieldId={selectedFieldId}
+        isLast={isLast}
+        onSelectField={onSelectField}
+        onDeleteField={onDeleteField}
+        onUpdateSection={onUpdateSection}
+        onDeleteSection={onDeleteSection}
+      />
+    )
+    if (key === UNSECTIONED) return dropZone
+    return (
+      <SortableSectionWrapper key={key} sectionId={key}>
+        {dropZone}
+      </SortableSectionWrapper>
+    )
+  }
 
   const handleAddSection = () => {
     setIsAddingSection(true)
@@ -91,23 +111,14 @@ export function FormCanvas({
           your application form.
         </p>
         <div className="w-full max-w-2xl">
-          {orderedSectionKeys.map((key, idx) => {
-            const section = sectionMap.get(key) ?? null
-            return (
-              <SectionDropZone
-                key={key}
-                sectionKey={key}
-                section={section}
-                fields={fieldsBySection[key] || []}
-                selectedFieldId={selectedFieldId}
-                isLast={idx === orderedSectionKeys.length - 1}
-                onSelectField={onSelectField}
-                onDeleteField={onDeleteField}
-                onUpdateSection={onUpdateSection}
-                onDeleteSection={onDeleteSection}
-              />
-            )
-          })}
+          <SortableContext
+            items={sectionSortableItems}
+            strategy={verticalListSortingStrategy}
+          >
+            {orderedSectionKeys.map((key, idx) =>
+              renderSection(key, idx, idx === orderedSectionKeys.length - 1),
+            )}
+          </SortableContext>
         </div>
         <Button
           variant="outline"
@@ -123,23 +134,18 @@ export function FormCanvas({
 
   return (
     <div className="flex-1 overflow-y-auto px-8 py-8 md:px-12">
-      {orderedSectionKeys.map((key, idx) => {
-        const section = sectionMap.get(key) ?? null
-        return (
-          <SectionDropZone
-            key={key}
-            sectionKey={key}
-            section={section}
-            fields={fieldsBySection[key] || []}
-            selectedFieldId={selectedFieldId}
-            isLast={idx === orderedSectionKeys.length - 1 && !isAddingSection}
-            onSelectField={onSelectField}
-            onDeleteField={onDeleteField}
-            onUpdateSection={onUpdateSection}
-            onDeleteSection={onDeleteSection}
-          />
-        )
-      })}
+      <SortableContext
+        items={sectionSortableItems}
+        strategy={verticalListSortingStrategy}
+      >
+        {orderedSectionKeys.map((key, idx) =>
+          renderSection(
+            key,
+            idx,
+            idx === orderedSectionKeys.length - 1 && !isAddingSection,
+          ),
+        )}
+      </SortableContext>
 
       {isAddingSection ? (
         <div className="flex items-center gap-2 p-4 rounded-lg border border-dashed border-primary bg-primary/5 mt-4">

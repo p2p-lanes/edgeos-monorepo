@@ -31,6 +31,7 @@ import {
   useUnsavedChanges,
 } from "@/hooks/useUnsavedChanges"
 import { createErrorHandler } from "@/utils"
+import { isSpecialSection } from "@/components/form-builder/constants"
 
 interface FormSectionFormProps {
   defaultValues?: FormSectionPublic
@@ -48,6 +49,7 @@ export function FormSectionForm({
   const { isAdmin } = useAuth()
   const isEdit = !!defaultValues
   const readOnly = !isAdmin
+  const isProtectedSection = isEdit && defaultValues ? isSpecialSection(defaultValues) : false
 
   const createMutation = useMutation({
     mutationFn: (data: FormSectionCreate) =>
@@ -108,8 +110,9 @@ export function FormSectionForm({
 
       if (isEdit) {
         updateMutation.mutate({
-          label: value.label,
-          description: value.description || undefined,
+          ...(isProtectedSection
+            ? { description: value.description || undefined }
+            : { label: value.label, description: value.description || undefined }),
           order: Number.parseInt(value.order, 10) || 0,
         })
       } else {
@@ -167,11 +170,13 @@ export function FormSectionForm({
                       : "New Section"}
                 </CardTitle>
                 <CardDescription>
-                  {readOnly
-                    ? "View section configuration (read-only)"
-                    : isEdit
-                      ? "Update the section configuration"
-                      : "Create a new section to group form fields"}
+                  {isProtectedSection
+                    ? "This is a protected section; only description and order can be edited."
+                    : readOnly
+                      ? "View section configuration (read-only)"
+                      : isEdit
+                        ? "Update the section configuration"
+                        : "Create a new section to group form fields"}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -197,7 +202,7 @@ export function FormSectionForm({
                           value={field.state.value}
                           onBlur={field.handleBlur}
                           onChange={(e) => field.handleChange(e.target.value)}
-                          disabled={readOnly}
+                          disabled={readOnly || isProtectedSection}
                         />
                         <p className="text-sm text-muted-foreground">
                           Section title shown to applicants
@@ -267,7 +272,7 @@ export function FormSectionForm({
         </div>
       </form>
 
-      {isEdit && !readOnly && (
+      {isEdit && !readOnly && !isProtectedSection && (
         <DangerZone
           description="Once you delete this section, all fields assigned to it will become unsectioned. This action cannot be undone."
           onDelete={() => deleteMutation.mutate()}

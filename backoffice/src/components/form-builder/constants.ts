@@ -10,6 +10,7 @@ import {
   Type,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
+import type { FormFieldPublic, FormSectionPublic } from "@/client"
 
 export interface FieldTypeDefinition {
   value: string
@@ -34,6 +35,18 @@ export const FULL_WIDTH_TYPES = new Set(["textarea", "multiselect"])
 export const PALETTE_ITEM_PREFIX = "palette-"
 export const CANVAS_ITEM_PREFIX = "canvas-"
 
+/** Prefix for sortable section DnD ids (section reorder). */
+export const SORTABLE_SECTION_PREFIX = "sortable-section-"
+
+export const getSortableSectionId = (sectionId: string): string =>
+  SORTABLE_SECTION_PREFIX + sectionId
+
+export const parseSortableSectionId = (id: string): string | null => {
+  if (typeof id !== "string" || !id.startsWith(SORTABLE_SECTION_PREFIX))
+    return null
+  return id.slice(SORTABLE_SECTION_PREFIX.length) || null
+}
+
 export const slugify = (...parts: string[]): string =>
   parts
     .join("_")
@@ -41,3 +54,18 @@ export const slugify = (...parts: string[]): string =>
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_|_$/g, "")
     .replace(/_{2,}/g, "_")
+
+/** Section labels that are protected: cannot be deleted, only label and order editable. */
+export const SPECIAL_SECTION_LABELS: string[] = ["profile", "info not shared"]
+
+/** Field labels that are protected: cannot be deleted, only label and position editable. */
+export const SPECIAL_FIELD_LABELS: string[] = ['first name']
+
+export const isSpecialSection = (
+  section: FormSectionPublic | null,
+): boolean =>
+  !!section &&
+  SPECIAL_SECTION_LABELS.includes((section.label ?? "").trim().toLowerCase())
+
+export const isSpecialField = (field: FormFieldPublic): boolean =>
+  SPECIAL_FIELD_LABELS.includes((field.label ?? "").trim().toLowerCase())
