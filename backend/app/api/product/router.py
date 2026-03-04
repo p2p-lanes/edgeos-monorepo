@@ -1,7 +1,7 @@
 import uuid
-from typing import Literal
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Header, HTTPException, status
 from loguru import logger
 
 from app.api.product import crud
@@ -15,6 +15,12 @@ from app.api.product.schemas import (
 )
 from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
+from app.api.translation.service import (
+    TRANSLATABLE_FIELDS,
+    apply_translation_overlay,
+    delete_translations_for_entity,
+    get_translations_bulk,
+)
 from app.core.dependencies.users import (
     CurrentHuman,
     CurrentSuperadmin,
@@ -249,6 +255,7 @@ async def delete_product(
             detail="Product not found",
         )
 
+    delete_translations_for_entity(db, "product", product.id)
     crud.products_crud.delete(db, product)
 
 
@@ -261,6 +268,7 @@ async def list_portal_products(
     category: ProductCategory | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
+    accept_language: Annotated[str | None, Header(alias="Accept-Language")] = None,
 ) -> ListModel[ProductPublic]:
     """List products visible to the current human (Portal)."""
     if popup_id:
@@ -279,7 +287,24 @@ async def list_portal_products(
             limit=limit,
         )
 
+    lang = None
+    if accept_language and accept_language != "en":
+        lang = accept_language.split(",")[0].split("-")[0].strip()
+
+    if lang:
+        product_ids = [p.id for p in products]
+        translations_map = get_translations_bulk(db, "product", product_ids, lang)
+        results = []
+        for p in products:
+            data = ProductPublic.model_validate(p).model_dump()
+            data = apply_translation_overlay(
+                data, translations_map.get(p.id), TRANSLATABLE_FIELDS["product"]
+            )
+            results.append(ProductPublic.model_validate(data))
+    else:
+        results = [ProductPublic.model_validate(p) for p in products]
+
     return ListModel[ProductPublic](
-        results=[ProductPublic.model_validate(p) for p in products],
+        results=results,
         paging=Paging(offset=skip, limit=limit, total=total),
     )

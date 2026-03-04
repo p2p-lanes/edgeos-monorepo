@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { LabelRequired } from "@/components/ui/label"
@@ -32,12 +33,14 @@ const EmailVerification = ({
   isDisabled,
   emailError,
 }: EmailVerificationProps) => {
+  const { t } = useTranslation()
+
   return (
     <div className="space-y-4">
       <div className="w-full flex items-center justify-between">
         <div className="w-full flex flex-col gap-2">
           <div className="flex flex-col gap-2">
-            <LabelRequired isRequired={true}>Email</LabelRequired>
+            <LabelRequired isRequired={true}>{t("common.email")}</LabelRequired>
           </div>
           <Input
             id="email"
@@ -46,7 +49,7 @@ const EmailVerification = ({
             onChange={(e) => handleEmailChange(e.target.value)}
             error={emailError}
             required
-            placeholder="example@email.com"
+            placeholder={t("form.email_placeholder")}
             disabled={showVerificationInput}
             className="w-full"
           />
@@ -60,7 +63,7 @@ const EmailVerification = ({
             className="mt-[21px]"
             onClick={handleChangeEmail}
           >
-            Change email
+            {t("form.change_email")}
           </Button>
         )}
       </div>
@@ -69,8 +72,7 @@ const EmailVerification = ({
         <div className="space-y-2">
           <div className="flex flex-col items-center space-y-3">
             <p className="text-sm text-center">
-              We've sent a 6-digit verification code to{" "}
-              <span className="font-medium">{email}</span>
+              {t("checkout.email_verification_sent", { email })}
             </p>
             <OtpInput
               value={verificationCode}
@@ -87,7 +89,9 @@ const EmailVerification = ({
                 disabled={countdown > 0}
                 className="text-xs ml-auto"
               >
-                {countdown > 0 ? `Resend Code (${countdown}s)` : "Resend Code"}
+                {countdown > 0
+                  ? t("checkout.resend_code_countdown", { countdown })
+                  : t("checkout.resend_code")}
               </Button>
             </div>
 
@@ -97,8 +101,7 @@ const EmailVerification = ({
               </p>
             )}
             <p className="text-xs text-muted-foreground text-center mt-1">
-              Didn&apos;t receive the code? Check your spam folder or click
-              &quot;Resend Code&quot; after the timer expires.
+              {t("checkout.resend_hint")}
             </p>
           </div>
         </div>

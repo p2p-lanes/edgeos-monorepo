@@ -1,4 +1,5 @@
 import { useSearchParams } from "next/navigation"
+import { useTranslation } from "react-i18next"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useCityProvider } from "@/providers/cityProvider"
@@ -13,6 +14,7 @@ interface YourPassesProps {
 }
 
 const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
+  const { t } = useTranslation()
   const { attendeePasses: attendees } = usePassesProvider()
   const mainAttendee = attendees.find((a) => a.category === "main")
   const specialProduct = mainAttendee?.products.find(
@@ -26,8 +28,8 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
   return (
     <div className="space-y-6">
       <TitleTabs
-        title="Your Passes"
-        subtitle="View and manage your passes here. Need to make changes? You can switch your week closer to the event to match your plans!"
+        title={t("passes.your_passes")}
+        subtitle={t("passes.your_passes_description")}
       />
 
       <div className="my-4 flex justify-start">

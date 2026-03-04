@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useTranslation } from "react-i18next"
 import HeaderProfile from "@/components/profile/HeaderProfile"
 import HumanForm from "@/components/profile/HumanForm"
 import PopupsHistory from "@/components/profile/PopupsHistory"
@@ -11,6 +12,7 @@ import { Loader } from "@/components/ui/Loader"
 import useGetProfile from "@/hooks/useGetProfile"
 
 export default function ProfileContent() {
+  const { t } = useTranslation()
   const {
     profile,
     isLoading,
@@ -93,11 +95,9 @@ export default function ProfileContent() {
     return (
       <div className="flex-1 flex flex-col items-center justify-center h-full">
         <Card className="p-6 bg-white gap-2">
+          <p className="text-gray-600 text-center">{t("portal.no_profile")}</p>
           <p className="text-gray-600 text-center">
-            No profile data available.
-          </p>
-          <p className="text-gray-600 text-center">
-            Please contact support if you believe this is an error.
+            {t("portal.no_profile_contact")}
           </p>
           <p className="text-red-600 text-center">{error}</p>
         </Card>

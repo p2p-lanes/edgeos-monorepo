@@ -1,5 +1,6 @@
 import { CheckCircle, Loader2, XCircle } from "lucide-react"
 import { useState } from "react"
+import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import useDiscountCode from "../../hooks/useDiscountCode"
@@ -11,6 +12,7 @@ const DiscountCode = ({
   defaultOpen?: boolean
   label?: boolean
 }) => {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(defaultOpen)
   const [discountCode, setDiscountCode] = useState("")
   const {
@@ -37,7 +39,7 @@ const DiscountCode = ({
           className="text-sm font-medium underline whitespace-nowrap cursor-pointer my-2"
           onClick={() => setOpen(!open)}
         >
-          Have a coupon?
+          {t("passes.have_coupon")}
         </p>
       )}
       {open ? (
@@ -50,7 +52,7 @@ const DiscountCode = ({
                   ? discountMsg
                   : ""
               }
-              placeholder="Enter coupon code"
+              placeholder={t("passes.coupon_placeholder")}
               className="bg-white text-black"
               data-discount-code={discountCode}
               value={discountCode.toUpperCase()}
@@ -69,7 +71,7 @@ const DiscountCode = ({
               disabled={discountCode.length === 0 || loading || validDiscount}
             >
               {loading && <Loader2 className="size-4 animate-spin" />}
-              Apply
+              {t("common.apply")}
             </Button>
           </div>
           {!loading &&
@@ -83,9 +85,7 @@ const DiscountCode = ({
                 ) : (
                   <XCircle className="w-4 h-4 text-red-500" />
                 )}
-                {validDiscount
-                  ? "Coupon code applied successfully."
-                  : discountMsg}
+                {validDiscount ? t("passes.coupon_applied") : discountMsg}
               </p>
             )}
         </div>

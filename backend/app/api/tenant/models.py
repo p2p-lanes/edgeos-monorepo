@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from app.api.email_template.models import EmailTemplates
     from app.api.form_field.models import FormFields
     from app.api.form_section.models import FormSections
+    from app.api.translation.models import Translations
     from app.api.group.models import Groups
     from app.api.human.models import Humans
     from app.api.payment.models import Payments
@@ -70,5 +71,10 @@ class Tenants(TenantBase, table=True):
         back_populates="tenant", cascade_delete=True
     )
     payments: list["Payments"] = Relationship(
+        back_populates="tenant", cascade_delete=True
+    )
+
+    # Translations
+    translations: list["Translations"] = Relationship(
         back_populates="tenant", cascade_delete=True
     )

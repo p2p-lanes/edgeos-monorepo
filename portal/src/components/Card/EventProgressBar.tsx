@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next"
 import { useIsMobile } from "@/hooks/useIsMobile"
 
 export type EventStatus =
@@ -21,6 +22,7 @@ const statusColor = (status: string) => {
 }
 
 export function EventProgressBar({ status }: EventProgressBarProps) {
+  const { t } = useTranslation()
   const stages = [
     "not_started",
     "draft",
@@ -43,15 +45,15 @@ export function EventProgressBar({ status }: EventProgressBarProps) {
 
   const stageLabels = {
     not_started: "",
-    draft: "Draft",
-    "in review": "Application submitted",
-    accepted: "Application accepted",
-    rejected: status === "rejected" ? "Application rejected" : null,
-    withdrawn: status === "withdrawn" ? "Application withdrawn" : null,
+    draft: t("status.draft"),
+    "in review": t("status.in_review"),
+    accepted: t("status.accepted"),
+    rejected: status === "rejected" ? t("status.rejected") : null,
+    withdrawn: status === "withdrawn" ? t("status.withdrawn") : null,
   }
 
   const statusLabel =
-    status === "not_started" ? "Not started" : stageLabels[status]
+    status === "not_started" ? t("status.not_started") : stageLabels[status]
 
   if (isMobile)
     return (

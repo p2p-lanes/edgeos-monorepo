@@ -3,6 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion"
 import { Plus, X } from "lucide-react"
 import { useState } from "react"
+import { useTranslation } from "react-i18next"
 import type { CompanionCreate } from "@/client"
 import { Button } from "@/components/ui/button"
 import {
@@ -23,11 +24,14 @@ export interface CompanionWithId extends CompanionCreate {
   _id: string
 }
 
-const GENDER_OPTIONS = [
-  { value: "Male", label: "Male" },
-  { value: "Female", label: "Female" },
-  { value: "Prefer not to say", label: "Prefer not to say" },
-]
+function useGenderOptions() {
+  const { t } = useTranslation()
+  return [
+    { value: "Male", label: t("form.gender_male") },
+    { value: "Female", label: t("form.gender_female") },
+    { value: "Prefer not to say", label: t("form.gender_prefer_not") },
+  ]
+}
 
 const animationProps = {
   initial: { opacity: 0, height: 0 },
@@ -49,6 +53,8 @@ export function CompanionsSection({
   companions,
   onCompanionsChange,
 }: CompanionsSectionProps) {
+  const { t } = useTranslation()
+  const genderOptions = useGenderOptions()
   const [hasSpouse, setHasSpouse] = useState(
     companions.some((c) => c.category === "spouse"),
   )
@@ -117,12 +123,12 @@ export function CompanionsSection({
 
   return (
     <>
-      <SectionWrapper title="Children and +1s">
+      <SectionWrapper title={t("companions.title")}>
         <div className="flex flex-col gap-4">
           {allowsSpouse && (
             <div>
               <CheckboxForm
-                label="I am bringing a spouse/partner"
+                label={t("companions.bringing_spouse")}
                 id="brings_spouse"
                 checked={hasSpouse}
                 onCheckedChange={handleToggleSpouse}
@@ -132,17 +138,17 @@ export function CompanionsSection({
                   <motion.div {...animationProps}>
                     <div className="flex flex-col gap-6 mt-6">
                       <InputForm
-                        label="Name of spouse/partner"
+                        label={t("companions.spouse_name")}
                         id="spouse_name"
                         value={spouse.name}
                         onChange={(v) =>
                           updateCompanion(spouse._id, { name: v })
                         }
                         isRequired
-                        subtitle="We will approve your spouse/partner if we approve you."
+                        subtitle={t("companions.spouse_approval")}
                       />
                       <InputForm
-                        label="Spouse/partner email"
+                        label={t("companions.spouse_email")}
                         id="spouse_email"
                         type="email"
                         value={spouse.email ?? ""}
@@ -150,7 +156,7 @@ export function CompanionsSection({
                           updateCompanion(spouse._id, { email: v })
                         }
                         isRequired
-                        subtitle="Please provide your spouse/partner's email so we can remind them to apply."
+                        subtitle={t("companions.spouse_email_help")}
                       />
                     </div>
                   </motion.div>
@@ -162,7 +168,7 @@ export function CompanionsSection({
           {allowsChildren && (
             <div>
               <CheckboxForm
-                label="I'm bringing kids"
+                label={t("companions.bringing_kids")}
                 id="brings_kids"
                 checked={hasKids}
                 onCheckedChange={handleToggleKids}
@@ -172,9 +178,7 @@ export function CompanionsSection({
                   <motion.div {...animationProps}>
                     <div className="mt-4">
                       <LabelMuted className="text-sm text-muted-foreground mb-4 block">
-                        We will approve your kids if we approve you. Your kids
-                        do not need to fill out their own version of this form
-                        however.
+                        {t("companions.kids_approval")}
                       </LabelMuted>
 
                       {kids.length > 0 && (
@@ -207,7 +211,7 @@ export function CompanionsSection({
                         className="flex items-center gap-2"
                       >
                         <Plus size={16} />
-                        Add Kid
+                        {t("companions.add_kid")}
                       </Button>
 
                       <Dialog
@@ -216,24 +220,28 @@ export function CompanionsSection({
                       >
                         <DialogContent className="sm:max-w-[425px] bg-white">
                           <DialogHeader>
-                            <DialogTitle>Add Child</DialogTitle>
+                            <DialogTitle>
+                              {t("companions.add_child")}
+                            </DialogTitle>
                           </DialogHeader>
                           <div className="space-y-4 py-4">
                             <InputForm
-                              label="Child's Name"
+                              label={t("companions.child_name")}
                               id="kid_name"
                               value={kidName}
                               onChange={setKidName}
                               isRequired
-                              placeholder="Enter child's name"
+                              placeholder={t(
+                                "companions.child_name_placeholder",
+                              )}
                             />
                             <SelectForm
-                              label="Gender"
+                              label={t("companions.child_gender")}
                               id="kid_gender"
                               value={kidGender}
                               onChange={setKidGender}
-                              options={GENDER_OPTIONS}
-                              placeholder="Select gender"
+                              options={genderOptions}
+                              placeholder={t("companions.child_gender_select")}
                             />
                           </div>
                           <DialogFooter className="flex flex-col gap-4 md:flex-row">
@@ -246,14 +254,14 @@ export function CompanionsSection({
                                 setShowKidModal(false)
                               }}
                             >
-                              Cancel
+                              {t("common.cancel")}
                             </Button>
                             <Button
                               type="button"
                               onClick={addKid}
                               disabled={!kidName.trim()}
                             >
-                              Add Child
+                              {t("companions.add_child")}
                             </Button>
                           </DialogFooter>
                         </DialogContent>

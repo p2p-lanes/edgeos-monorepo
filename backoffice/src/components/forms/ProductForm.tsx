@@ -1,8 +1,9 @@
 import { useForm } from "@tanstack/react-form"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import { Clock, DollarSign, Hash, Power, Users } from "lucide-react"
 import {
+  PopupsService,
   type ProductCategory,
   type ProductCreate,
   type ProductPublic,
@@ -14,6 +15,7 @@ import {
 import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
+import { TranslationManager } from "@/components/translations/TranslationManager"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -80,6 +82,15 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
   const { isAdmin } = useAuth()
   const isEdit = !!defaultValues
   const readOnly = !isAdmin
+
+  const { data: popupData } = useQuery({
+    queryKey: ["popups", defaultValues?.popup_id ?? selectedPopupId],
+    queryFn: () =>
+      PopupsService.getPopup({
+        popupId: defaultValues?.popup_id ?? selectedPopupId!,
+      }),
+    enabled: isEdit && !!(defaultValues?.popup_id ?? selectedPopupId),
+  })
 
   const createMutation = useMutation({
     mutationFn: (data: ProductCreate) =>
@@ -438,6 +449,23 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
             )
           }
         </form.Subscribe>
+
+        {isEdit && (popupData?.supported_languages?.length ?? 0) > 1 && (
+          <>
+            <Separator />
+            <TranslationManager
+              entityType="product"
+              entityId={defaultValues!.id}
+              translatableFields={["name", "description"]}
+              sourceData={{
+                name: defaultValues!.name,
+                description: defaultValues!.description,
+              }}
+              supportedLanguages={popupData!.supported_languages!}
+              defaultLanguage={popupData!.default_language!}
+            />
+          </>
+        )}
 
         <Separator />
 

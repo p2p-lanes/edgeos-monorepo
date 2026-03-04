@@ -2,6 +2,7 @@
 
 import { useSearchParams } from "next/navigation"
 import { useEffect, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -36,6 +37,7 @@ const UserInfoForm = ({
   error,
   isInvite = false,
 }: UserInfoFormProps) => {
+  const { t } = useTranslation()
   const [_isAutoFilled, setIsAutoFilled] = useState(false)
   const [showRedFlagScreen, setShowRedFlagScreen] = useState(false)
   const searchParams = useSearchParams()
@@ -166,8 +168,7 @@ const UserInfoForm = ({
         } else {
           setErrors((prev) => ({
             ...prev,
-            general:
-              "An error occurred while submitting the form. Please try again.",
+            general: t("checkout.submit_error"),
           }))
         }
       }
@@ -179,7 +180,9 @@ const UserInfoForm = ({
     return (
       <Card className="max-w-lg mx-auto backdrop-blur bg-white/90">
         <CardHeader>
-          <CardTitle className="text-2xl font-bold mb-2">Checkout</CardTitle>
+          <CardTitle className="text-2xl font-bold mb-2">
+            {t("checkout.title")}
+          </CardTitle>
           <div className="mt-6 p-3 bg-red-100 border border-red-300 text-red-800 rounded-md">
             {errors.general || error}
           </div>
@@ -194,7 +197,7 @@ const UserInfoForm = ({
       <Card className="max-w-lg mx-auto backdrop-blur bg-white/90">
         <CardHeader>
           <CardTitle className="text-2xl font-bold mb-2">
-            Loading your information
+            {t("checkout.loading_info")}
           </CardTitle>
         </CardHeader>
         <CardContent className="flex justify-center py-6">
@@ -224,7 +227,9 @@ const UserInfoForm = ({
   return (
     <Card className="max-w-lg mx-auto backdrop-blur bg-white/90">
       <CardHeader>
-        <CardTitle className="text-2xl font-bold">Express Checkout</CardTitle>
+        <CardTitle className="text-2xl font-bold">
+          {t("checkout.express_title")}
+        </CardTitle>
         {group?.welcome_message && (
           <CardDescription className="bg-green-100 text-green-800 p-2 rounded-md radius-lg">
             {group.welcome_message}
@@ -282,12 +287,12 @@ const UserInfoForm = ({
             }
           >
             {isSubmitting
-              ? "Processing..."
+              ? t("common.processing")
               : formData.email_verified
-                ? "Continue"
+                ? t("common.continue")
                 : showVerificationInput
-                  ? "Verify Code"
-                  : "Send Code"}
+                  ? t("checkout.verify_code")
+                  : t("checkout.send_code")}
           </Button>
         </CardFooter>
       </form>

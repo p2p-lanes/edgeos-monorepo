@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion"
 import { useEffect, useState } from "react"
+import { useTranslation } from "react-i18next"
 
 interface TransitionScreenProps {
   message: string
@@ -14,6 +15,7 @@ const TransitionScreen = ({
   isPending,
   isSuccess,
 }: TransitionScreenProps) => {
+  const { t } = useTranslation()
   const [dots, setDots] = useState(".")
 
   // Efecto para animar los puntos suspensivos
@@ -43,7 +45,7 @@ const TransitionScreen = ({
             {dots}
           </p>
           <p className="mt-2 text-sm text-muted-foreground">
-            This might take a few moments
+            {t("checkout.processing_subtitle")}
           </p>
         </>
       )}
@@ -71,9 +73,9 @@ const TransitionScreen = ({
               />
             </svg>
           </div>
-          <p className="text-lg font-medium">Registration successful!</p>
+          <p className="text-lg font-medium">{t("checkout.success")}</p>
           <p className="mt-2 text-sm text-muted-foreground">
-            Loading your passes...
+            {t("checkout.loading_passes")}
           </p>
         </motion.div>
       )}

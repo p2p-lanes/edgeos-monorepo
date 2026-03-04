@@ -9,6 +9,7 @@ from app.api.form_section.schemas import (
     FormSectionUpdate,
 )
 from app.api.shared.enums import UserRole
+from app.api.translation.service import delete_translations_for_entity
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import CurrentUser, CurrentWriter, TenantSession
 
@@ -118,4 +119,5 @@ async def delete_form_section(
             detail="Form section not found",
         )
 
+    delete_translations_for_entity(db, "form_section", section.id)
     crud.form_sections_crud.delete(db, section)

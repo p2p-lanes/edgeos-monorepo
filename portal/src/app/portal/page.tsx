@@ -3,6 +3,7 @@
 import { Calendar } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useEffect } from "react"
+import { useTranslation } from "react-i18next"
 import {
   Card,
   CardContent,
@@ -13,6 +14,7 @@ import { Loader } from "@/components/ui/Loader"
 import { useCityProvider } from "@/providers/cityProvider"
 
 const Page = () => {
+  const { t } = useTranslation()
   const { getCity, getPopups, popupsLoaded } = useCityProvider()
   const router = useRouter()
   const params = useSearchParams()
@@ -42,10 +44,9 @@ const Page = () => {
               <Calendar className="w-8 h-8 text-muted-foreground" />
             </div>
             <div className="space-y-2">
-              <CardTitle>No Active Popups</CardTitle>
+              <CardTitle>{t("portal.no_active_popups")}</CardTitle>
               <CardDescription>
-                There are no active popups available at the moment. Please check
-                back later.
+                {t("portal.no_active_popups_description")}
               </CardDescription>
             </div>
           </CardContent>

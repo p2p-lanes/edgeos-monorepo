@@ -1,16 +1,18 @@
 import { useForm } from "@tanstack/react-form"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import {
   type FormSectionCreate,
   type FormSectionPublic,
   FormSectionsService,
   type FormSectionUpdate,
+  PopupsService,
 } from "@/client"
 import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
 import { FormErrorSummary } from "@/components/Common/FormErrorSummary"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
+import { TranslationManager } from "@/components/translations/TranslationManager"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -22,6 +24,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { LoadingButton } from "@/components/ui/loading-button"
+import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
@@ -48,6 +51,15 @@ export function FormSectionForm({
   const { isAdmin } = useAuth()
   const isEdit = !!defaultValues
   const readOnly = !isAdmin
+
+  const { data: popupData } = useQuery({
+    queryKey: ["popups", defaultValues?.popup_id ?? selectedPopupId],
+    queryFn: () =>
+      PopupsService.getPopup({
+        popupId: defaultValues?.popup_id ?? selectedPopupId!,
+      }),
+    enabled: isEdit && !!(defaultValues?.popup_id ?? selectedPopupId),
+  })
 
   const createMutation = useMutation({
     mutationFn: (data: FormSectionCreate) =>
@@ -248,6 +260,23 @@ export function FormSectionForm({
                 </form.Field>
               </CardContent>
             </Card>
+
+            {isEdit && (popupData?.supported_languages?.length ?? 0) > 1 && (
+              <>
+                <Separator />
+                <TranslationManager
+                  entityType="form_section"
+                  entityId={defaultValues!.id}
+                  translatableFields={["label", "description"]}
+                  sourceData={{
+                    label: defaultValues!.label,
+                    description: defaultValues!.description,
+                  }}
+                  supportedLanguages={popupData!.supported_languages!}
+                  defaultLanguage={popupData!.default_language!}
+                />
+              </>
+            )}
 
             <div className="flex gap-4">
               <Button

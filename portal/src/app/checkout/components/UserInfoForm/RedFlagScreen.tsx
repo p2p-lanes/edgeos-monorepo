@@ -1,6 +1,7 @@
 "use client"
 
 import { useRouter } from "next/navigation"
+import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
@@ -15,6 +16,7 @@ const RedFlagScreen = ({
   popupName,
   popupSlug,
 }: RedFlagScreenProps) => {
+  const { t } = useTranslation()
   const router = useRouter()
 
   const handlePortalRedirect = () => {
@@ -25,24 +27,21 @@ const RedFlagScreen = ({
     <Card className="max-w-lg mx-auto backdrop-blur bg-white/90">
       <CardHeader>
         <CardTitle className="text-2xl font-bold text-center">
-          Application Required
+          {t("checkout.application_required")}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="text-center space-y-4">
           <p className="text-lg">
-            Hi <span className="font-semibold">{userName}</span>, before you can
-            purchase a pass, we'd love to get to know you better!
+            {t("checkout.application_required_message", { userName })}
           </p>
           <p className="text-gray-600">
-            Please visit the Edge Portal and apply to{" "}
-            <span className="font-semibold">{popupName}</span>, so we can review
-            your information.
+            {t("checkout.application_required_prompt", { popupName })}
           </p>
         </div>
 
         <Button onClick={handlePortalRedirect} className="w-full" size="lg">
-          Go to Portal
+          {t("checkout.go_to_portal")}
         </Button>
       </CardContent>
     </Card>

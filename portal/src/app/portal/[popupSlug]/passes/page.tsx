@@ -1,6 +1,7 @@
 "use client"
 import { ShoppingCart, Ticket } from "lucide-react"
 import { useState } from "react"
+import { useTranslation } from "react-i18next"
 import { Loader } from "@/components/ui/Loader"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { usePassesProvider } from "@/providers/passesProvider"
@@ -11,6 +12,7 @@ import YourPasses from "./Tabs/YourPasses"
 export default function HomePasses() {
   usePermission()
 
+  const { t } = useTranslation()
   const { attendeePasses: attendees, products } = usePassesProvider()
   const [activeTab, setActiveTab] = useState<string | null>(null)
 
@@ -38,11 +40,11 @@ export default function HomePasses() {
       <TabsList className="grid w-full grid-cols-2 mb-4">
         <TabsTrigger value="your-passes">
           {" "}
-          <Ticket className="w-4 h-4 mr-2" /> Your Passes
+          <Ticket className="w-4 h-4 mr-2" /> {t("passes.your_passes")}
         </TabsTrigger>
         <TabsTrigger value="buy-passes">
           {" "}
-          <ShoppingCart className="w-4 h-4 mr-2" /> Buy Passes
+          <ShoppingCart className="w-4 h-4 mr-2" /> {t("passes.buy_passes")}
         </TabsTrigger>
       </TabsList>
 

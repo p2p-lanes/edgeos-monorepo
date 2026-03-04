@@ -14,6 +14,10 @@ OpenAPI.interceptors.request.use((config) => {
   if (tenantId) {
     config.headers = { ...config.headers, "X-Tenant-Id": tenantId }
   }
+  const language = localStorage.getItem("portal_language")
+  if (language && language !== "en") {
+    config.headers = { ...config.headers, "Accept-Language": language }
+  }
   return config
 })
 

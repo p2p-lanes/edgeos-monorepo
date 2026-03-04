@@ -71,6 +71,8 @@ from app.api.popup_reviewer.schemas import (
 )
 from app.api.product.models import Products
 from app.api.product.schemas import ProductCreate, ProductPublic, ProductUpdate
+from app.api.translation.models import Translations
+from app.api.translation.schemas import TranslationCreate, TranslationPublic
 from app.api.tenant.credential_models import TenantCredentials
 from app.api.tenant.models import Tenants
 from app.api.tenant.schemas import TenantCreate, TenantPublic, TenantUpdate
@@ -165,4 +167,8 @@ __all__ = [
     "ApplicationReviewCreate",
     "ApplicationReviewPublic",
     "ReviewDecision",
+    # Translations
+    "Translations",
+    "TranslationCreate",
+    "TranslationPublic",
 ]

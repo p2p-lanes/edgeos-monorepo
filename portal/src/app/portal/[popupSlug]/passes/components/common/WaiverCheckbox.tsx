@@ -1,4 +1,5 @@
 import { Info } from "lucide-react"
+import { useTranslation } from "react-i18next"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import {
@@ -19,6 +20,8 @@ const WaiverCheckbox = ({
   onCheckedChange,
   className,
 }: WaiverCheckboxProps) => {
+  const { t } = useTranslation()
+
   return (
     <TooltipProvider>
       <div className={`flex items-start space-x-2 ${className || ""}`}>
@@ -33,14 +36,14 @@ const WaiverCheckbox = ({
             htmlFor="waiver-agreement"
             className="text-xs text-muted-foreground mt-1 cursor-pointer"
           >
-            I acknowledge the risks involved and{" "}
+            {t("passes.waiver_acknowledge")}{" "}
             <a
               href="https://waiver.smartwaiver.com/w/bgnpvra597aqdukktfwyss/web/"
               target="_blank"
               rel="noopener noreferrer"
               className="text-blue-600 hover:underline font-medium"
             >
-              agree to the Waiver and Release of Liability.
+              {t("passes.waiver_info")}
             </a>
           </Label>
           <Tooltip>
@@ -55,12 +58,7 @@ const WaiverCheckbox = ({
               side="top"
               className="max-w-xs p-3 text-xs leading-relaxed"
             >
-              I understand that participating in this event involves inherent
-              risks, including the possibility of injury or loss. By checking
-              this box, I confirm that I have read and agree to the Waiver and
-              Release of Liability, and I voluntarily accept these risks and
-              release the organizers from any claims related to my
-              participation.
+              {t("passes.waiver_detail")}
             </TooltipContent>
           </Tooltip>
         </div>

@@ -2,6 +2,7 @@
 
 import { FileDown, ListFilter, Loader2 } from "lucide-react"
 import { useEffect, useState } from "react"
+import { useTranslation } from "react-i18next"
 import Permissions from "@/components/Permissions"
 import { Button } from "@/components/ui/button"
 import {
@@ -24,6 +25,7 @@ import useExportCsv from "./hooks/useExportCsv"
 import useGetData from "./hooks/useGetData"
 
 const Page = () => {
+  const { t } = useTranslation()
   const {
     attendees,
     loading,
@@ -68,21 +70,17 @@ const Page = () => {
         <div className="flex flex-col h-full max-w-5xl mx-auto p-6">
           <div className="flex-none">
             <h1 className="text-2xl font-semibold tracking-tight">
-              Attendee Directory
+              {t("attendees.title")}
             </h1>
             <p className="text-sm text-muted-foreground mt-4">
-              Reach out to your friends to plan dates, find shared housing, or
-              organize activities together.
-              <br />
-              *This directory includes only the information of those who have
-              voluntarily opted in to share their details.
+              {t("attendees.description")}
             </p>
           </div>
 
           <div className="mt-6 flex items-center gap-3">
             <Input
               aria-label="Search in directory"
-              placeholder="Search by name, email, organization..."
+              placeholder={t("attendees.search_placeholder")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={handleSearchKeyDown}
@@ -97,7 +95,7 @@ const Page = () => {
                 onClick={clearFilters}
                 className="bg-red-500 text-white hover:bg-red-500 hover:shadow-md hover:text-white"
               >
-                Clear filters
+                {t("attendees.clear_filters")}
               </Button>
             )}
             <Dialog open={filtersOpen} onOpenChange={setFiltersOpen}>
@@ -113,19 +111,21 @@ const Page = () => {
                   </DialogTrigger>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>Open search filters</p>
+                  <p>{t("attendees.open_filters")}</p>
                 </TooltipContent>
               </Tooltip>
               <DialogContent className="bg-white">
                 <DialogHeader>
-                  <DialogTitle>Filters</DialogTitle>
+                  <DialogTitle>{t("attendees.filters")}</DialogTitle>
                 </DialogHeader>
                 <div className="flex flex-col gap-6">
                   <div className="flex items-center justify-between">
                     <div className="flex flex-col">
-                      <span className="text-sm font-medium">Brings kids</span>
+                      <span className="text-sm font-medium">
+                        {t("attendees.brings_kids")}
+                      </span>
                       <span className="text-xs text-muted-foreground">
-                        Toggle to filter by bringing kids
+                        {t("attendees.toggle_kids")}
                       </span>
                     </div>
                     <Switch
@@ -136,7 +136,9 @@ const Page = () => {
                   </div>
 
                   <div className="flex flex-col gap-2">
-                    <span className="text-sm font-medium">Weeks Coming</span>
+                    <span className="text-sm font-medium">
+                      {t("attendees.weeks_coming")}
+                    </span>
                     <div className="flex flex-wrap gap-2">
                       {[1, 2, 3, 4].map((week) => {
                         const isActive = selectedWeeks.includes(week)
@@ -152,7 +154,7 @@ const Page = () => {
                             aria-pressed={isActive}
                             onClick={() => handleToggleWeek(week)}
                           >
-                            Week {week}
+                            {t("attendees.week", { week })}
                           </Button>
                         )
                       })}
@@ -167,7 +169,7 @@ const Page = () => {
                         setFiltersOpen(false)
                       }}
                     >
-                      Clear
+                      {t("attendees.clear_filters")}
                     </Button>
                     <Button
                       onClick={() => {
@@ -175,7 +177,7 @@ const Page = () => {
                         setFiltersOpen(false)
                       }}
                     >
-                      Apply filters
+                      {t("attendees.apply_filters")}
                     </Button>
                   </div>
                 </div>
@@ -198,7 +200,7 @@ const Page = () => {
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <p>Export attendees as CSV</p>
+                <p>{t("attendees.export_csv")}</p>
               </TooltipContent>
             </Tooltip>
           </div>

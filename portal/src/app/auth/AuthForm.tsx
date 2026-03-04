@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { motion } from "framer-motion"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useRef, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { z } from "zod/v4"
 import { ApiError, AuthService } from "@/client"
 import { ButtonAnimated } from "@/components/ui/button"
@@ -11,18 +12,19 @@ import { Input } from "@/components/ui/input"
 import { queryKeys } from "@/lib/query-keys"
 import { useTenant } from "@/providers/tenantProvider"
 
-const emailSchema = z.email("Please enter a valid email address")
-const codeSchema = z
-  .string()
-  .length(6, "Code must be 6 digits")
-  .regex(/^\d{6}$/)
-
 export default function AuthForm() {
+  const { t } = useTranslation()
   const { tenantId, tenant } = useTenant()
   const router = useRouter()
   const queryClient = useQueryClient()
   const params = useSearchParams()
   const popupSlug = params.get("popup")
+
+  const emailSchema = z.email(t("auth.invalid_email"))
+  const codeSchema = z
+    .string()
+    .length(6, t("auth.code_must_be_6_digits"))
+    .regex(/^\d{6}$/)
 
   const [email, setEmail] = useState("")
   const [code, setCode] = useState("")
@@ -61,9 +63,9 @@ export default function AuthForm() {
     },
     onError: (err) => {
       if (err instanceof ApiError) {
-        setError(err.message || "Failed to send verification code")
+        setError(err.message || t("auth.failed_to_send_code"))
       } else {
-        setError("Something went wrong. Please try again.")
+        setError(t("auth.something_went_wrong"))
       }
     },
   })
@@ -89,14 +91,14 @@ export default function AuthForm() {
     onError: (err) => {
       if (err instanceof ApiError) {
         if (err.status === 401) {
-          setError("Invalid verification code. Please try again.")
+          setError(t("auth.invalid_code"))
         } else if (err.status === 404) {
-          setError("Code expired. Please request a new one.")
+          setError(t("auth.code_expired"))
         } else {
-          setError("Failed to verify code. Please try again.")
+          setError(t("auth.failed_to_verify"))
         }
       } else {
-        setError("Network error. Please check your connection.")
+        setError(t("auth.network_error"))
       }
     },
   })
@@ -208,16 +210,16 @@ export default function AuthForm() {
               style={{ textWrap: "balance" }}
             >
               {step === "email"
-                ? "Sign Up or Log In"
-                : "Enter verification code"}
+                ? t("auth.sign_up_or_log_in")
+                : t("auth.enter_verification_code")}
             </h2>
             <p
               className="mt-2 text-sm text-gray-600"
               style={{ textWrap: "balance" }}
             >
               {step === "email"
-                ? "Welcome! Enter your email to receive a verification code."
-                : `We sent a 6-digit code to ${email}`}
+                ? t("auth.welcome_message")
+                : t("auth.code_sent_to", { email })}
             </p>
           </div>
 
@@ -233,7 +235,7 @@ export default function AuthForm() {
                   type="email"
                   autoComplete="email"
                   required
-                  placeholder="Email address"
+                  placeholder={t("auth.email_placeholder")}
                   value={email}
                   onChange={(e) => {
                     setEmail(e.target.value)
@@ -270,7 +272,7 @@ export default function AuthForm() {
                     />
                   </svg>
                 ) : (
-                  "Continue"
+                  t("common.continue")
                 )}
               </ButtonAnimated>
             </form>
@@ -326,12 +328,12 @@ export default function AuthForm() {
                     />
                   </svg>
                 ) : (
-                  "Verify"
+                  t("common.verify")
                 )}
               </ButtonAnimated>
               <div className="flex flex-col items-center gap-2 text-sm text-gray-600">
                 {countdown > 0 ? (
-                  <p>Resend code in {countdown}s</p>
+                  <p>{t("auth.resend_code_countdown", { countdown })}</p>
                 ) : (
                   <button
                     type="button"
@@ -339,7 +341,7 @@ export default function AuthForm() {
                     disabled={isLoading}
                     className="text-black underline hover:text-gray-700 disabled:opacity-50"
                   >
-                    Resend code
+                    {t("auth.resend_code")}
                   </button>
                 )}
                 <button
@@ -348,7 +350,7 @@ export default function AuthForm() {
                   disabled={isLoading}
                   className="text-gray-500 hover:text-gray-700 disabled:opacity-50"
                 >
-                  Use a different email
+                  {t("auth.use_different_email")}
                 </button>
               </div>
             </form>

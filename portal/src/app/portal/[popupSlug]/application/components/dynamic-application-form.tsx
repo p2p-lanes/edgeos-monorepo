@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { AnimatePresence, motion } from "framer-motion"
 import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import type { ApplicationPublic, PopupPublic } from "@/client"
 import { ApplicationsService } from "@/client"
@@ -49,6 +50,7 @@ export function DynamicApplicationForm({
   existingApplication,
   popup,
 }: DynamicApplicationFormProps) {
+  const { t } = useTranslation()
   const router = useRouter()
   const queryClient = useQueryClient()
   const { getRelevantApplication, updateApplication } = useApplication()
@@ -127,8 +129,8 @@ export function DynamicApplicationForm({
     const { isValid, errors: validationErrors } = validate(false)
     if (!isValid) {
       const fields = Object.keys(validationErrors).join(", ")
-      toast.error("Error", {
-        description: `Please fill in the following required fields: ${fields}`,
+      toast.error(t("errors.error"), {
+        description: t("application.required_fields_error", { fields }),
       })
       setStatusBtn({ loadingDraft: false, loadingSubmit: false })
       return
@@ -136,14 +138,13 @@ export function DynamicApplicationForm({
 
     try {
       await submitMutation.mutateAsync("in review")
-      toast.success("Application Submitted", {
-        description: "Your application has been successfully submitted.",
+      toast.success(t("application.submitted_title"), {
+        description: t("application.submitted_description"),
       })
       router.push(`/portal/${popup.slug}`)
     } catch {
-      toast.error("Error Submitting Application", {
-        description:
-          "There was an error submitting your application. Please try again.",
+      toast.error(t("application.submit_error_title"), {
+        description: t("application.submit_error_description"),
       })
     }
     setStatusBtn({ loadingDraft: false, loadingSubmit: false })
@@ -153,12 +154,12 @@ export function DynamicApplicationForm({
     setStatusBtn({ loadingDraft: true, loadingSubmit: false })
     try {
       await submitMutation.mutateAsync("draft")
-      toast.success("Draft Saved", {
-        description: "Your draft has been successfully saved.",
+      toast.success(t("application.draft_saved_title"), {
+        description: t("application.draft_saved_description"),
       })
     } catch {
-      toast.error("Error Saving Draft", {
-        description: "There was an error saving your draft. Please try again.",
+      toast.error(t("application.draft_error_title"), {
+        description: t("application.draft_error_description"),
       })
     }
     setStatusBtn({ loadingDraft: false, loadingSubmit: false })
@@ -236,7 +237,7 @@ export function DynamicApplicationForm({
     // Unsectioned fields
     if (bySectionId._unsectioned) {
       orderedSections.push({
-        title: "Additional Information",
+        title: t("form.additional_info"),
         fields: bySectionId._unsectioned,
       })
       delete bySectionId._unsectioned
@@ -244,11 +245,11 @@ export function DynamicApplicationForm({
 
     // Any remaining sections not matched
     for (const [, fields] of Object.entries(bySectionId)) {
-      orderedSections.push({ title: "Other", fields })
+      orderedSections.push({ title: t("form.other"), fields })
     }
 
     return orderedSections
-  }, [schema])
+  }, [schema, t])
 
   /** Render a single base field — special cases inline, rest via DynamicField */
   const renderBaseField = (name: string, field: FormFieldSchema) => {
@@ -289,7 +290,7 @@ export function DynamicApplicationForm({
               <motion.div {...animationProps}>
                 <InputForm
                   isRequired
-                  label="Specify your gender"
+                  label={t("form.gender_specify")}
                   id="gender_specify"
                   value={(values.gender_specify as string) ?? ""}
                   onChange={(v) => handleChange("gender_specify", v)}
@@ -326,10 +327,10 @@ export function DynamicApplicationForm({
         {Object.entries(baseFieldSections).map(([section, fields]) => (
           <div key={section}>
             <SectionWrapper
-              title={section === "profile" ? "Personal Information" : section}
+              title={section === "profile" ? t("form.personal_info") : section}
               subtitle={
                 section === "profile"
-                  ? "Your basic information helps us identify and contact you."
+                  ? t("form.personal_info_description")
                   : undefined
               }
             >
@@ -372,7 +373,7 @@ export function DynamicApplicationForm({
             onClick={handleDraft}
             className="w-full md:w-auto"
           >
-            Save as draft
+            {t("form.save_draft")}
           </ButtonAnimated>
           <ButtonAnimated
             loading={statusBtn.loadingSubmit}
@@ -380,7 +381,7 @@ export function DynamicApplicationForm({
             type="submit"
             className="w-full md:w-auto"
           >
-            Submit
+            {t("common.submit")}
           </ButtonAnimated>
         </div>
       </form>

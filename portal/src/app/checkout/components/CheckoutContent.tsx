@@ -1,6 +1,7 @@
 "use client"
 
 import { AnimatePresence, motion } from "framer-motion"
+import { useTranslation } from "react-i18next"
 import useCheckoutState from "../hooks/useCheckoutState"
 import type { FormDataProps } from "../types"
 import PassesCheckout from "./PassesCheckout"
@@ -24,6 +25,7 @@ export const CheckoutContent = ({
   error: any
   isInvite?: boolean
 }) => {
+  const { t } = useTranslation()
   const {
     checkoutState,
     isSubmitting,
@@ -67,7 +69,7 @@ export const CheckoutContent = ({
       case "processing":
         return (
           <TransitionScreen
-            message="Processing your registration"
+            message={t("checkout.processing")}
             isPending={true}
             isSuccess={false}
           />

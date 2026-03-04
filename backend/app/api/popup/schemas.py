@@ -4,7 +4,9 @@ from enum import StrEnum
 from typing import Self
 
 from pydantic import model_validator
-from sqlmodel import Field, SQLModel
+from sqlalchemy import Column
+from sqlalchemy.dialects.postgresql import ARRAY
+from sqlmodel import Field, SQLModel, String
 
 from app.utils.utils import slugify
 
@@ -35,6 +37,11 @@ class PopupBase(SQLModel):
     blog_url: str | None = None
     twitter_url: str | None = None
     simplefi_api_key: str | None = None
+    default_language: str = Field(default="en")
+    supported_languages: list[str] = Field(
+        default=["en"],
+        sa_column=Column(ARRAY(String), nullable=False, server_default="{en}"),
+    )
 
 
 class PopupCreate(SQLModel):
@@ -56,6 +63,8 @@ class PopupCreate(SQLModel):
     blog_url: str | None = None
     twitter_url: str | None = None
     simplefi_api_key: str | None = None
+    default_language: str = "en"
+    supported_languages: list[str] = ["en"]
 
     @model_validator(mode="after")
     def generate_slug(self) -> Self:
@@ -81,6 +90,8 @@ class PopupUpdate(SQLModel):
     blog_url: str | None = None
     twitter_url: str | None = None
     simplefi_api_key: str | None = None
+    default_language: str | None = None
+    supported_languages: list[str] | None = None
 
 
 class PopupPublic(PopupBase):
