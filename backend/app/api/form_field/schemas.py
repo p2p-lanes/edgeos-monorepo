@@ -13,6 +13,7 @@ class FormFieldType(str, Enum):
     NUMBER = "number"
     BOOLEAN = "boolean"
     SELECT = "select"
+    SELECT_CARDS = "select_cards"
     MULTISELECT = "multiselect"
     DATE = "date"
     EMAIL = "email"

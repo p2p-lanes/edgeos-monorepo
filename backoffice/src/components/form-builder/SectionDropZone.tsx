@@ -127,7 +127,7 @@ export function SectionDropZone({
       >
         {/* Left: section header */}
         <div className="space-y-1 group/section">
-          {!isSpecial && isEditingLabel ? (
+          {isEditingLabel ? (
             <div className="space-y-1.5">
               <Input
                 ref={labelInputRef}
@@ -171,17 +171,15 @@ export function SectionDropZone({
                 )}
                 {isApiSection && (
                   <div className="flex gap-0.5 opacity-0 group-hover/section:opacity-100 transition-opacity">
-                    {!isSpecial && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                        onClick={handleStartEditLabel}
-                        aria-label={`Rename section ${sectionLabel}`}
-                      >
-                        <Pencil className="h-3 w-3" />
-                      </Button>
-                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                      onClick={handleStartEditLabel}
+                      aria-label={`Rename section ${sectionLabel}`}
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </Button>
                     {!isSpecial && fields.length === 0 && (
                       <Button
                         variant="ghost"
@@ -197,7 +195,7 @@ export function SectionDropZone({
                 )}
               </div>
 
-              {/* Description — editable for all sections (special sections: description only, not label) */}
+              {/* Description — editable for all sections */}
               {isApiSection && (
                 isEditingDescription ? (
                   <div className="space-y-1.5">

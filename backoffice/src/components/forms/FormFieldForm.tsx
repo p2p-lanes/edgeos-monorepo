@@ -6,6 +6,7 @@ import {
   Calendar,
   CheckSquare,
   Hash,
+  LayoutGrid,
   Link,
   List,
   ListChecks,
@@ -60,6 +61,7 @@ const FIELD_TYPES = [
   { value: "number", label: "Number", icon: Hash },
   { value: "boolean", label: "Boolean (Yes/No)", icon: CheckSquare },
   { value: "select", label: "Select (Single)", icon: List },
+  { value: "select_cards", label: "Single select (visible options)", icon: LayoutGrid },
   { value: "multiselect", label: "Multi-Select", icon: ListChecks },
   { value: "date", label: "Date", icon: Calendar },
   { value: "email", label: "Email", icon: Mail },
@@ -181,7 +183,9 @@ export function FormFieldForm({
           position: Number.parseInt(value.position, 10) || 0,
           required: value.required,
           options: optionsArray.length > 0 ? optionsArray : undefined,
-          placeholder: value.placeholder || undefined,
+          ...(value.field_type !== "select_cards" && {
+            placeholder: value.placeholder || undefined,
+          }),
           help_text: value.help_text || undefined,
         })
       } else {
@@ -197,7 +201,9 @@ export function FormFieldForm({
           position: Number.parseInt(value.position, 10) || 0,
           required: value.required,
           options: optionsArray.length > 0 ? optionsArray : undefined,
-          placeholder: value.placeholder || undefined,
+          ...(value.field_type !== "select_cards" && {
+            placeholder: value.placeholder || undefined,
+          }),
           help_text: value.help_text || undefined,
         })
       }
@@ -364,26 +370,34 @@ export function FormFieldForm({
                     )}
                   </form.Field>
 
-                  <form.Field name="placeholder">
-                    {(field) => (
-                      <div className="space-y-2">
-                        <Label htmlFor="placeholder">Placeholder</Label>
-                        <Input
-                          id="placeholder"
-                          placeholder="Enter your answer..."
-                          value={field.state.value}
-                          onBlur={field.handleBlur}
-                          onChange={(e) => field.handleChange(e.target.value)}
-                          disabled={readOnly}
-                        />
-                      </div>
-                    )}
-                  </form.Field>
+                  <form.Subscribe selector={(state) => state.values.field_type}>
+                    {(fieldType) =>
+                      fieldType !== "select_cards" && (
+                        <form.Field name="placeholder">
+                          {(field) => (
+                            <div className="space-y-2">
+                              <Label htmlFor="placeholder">Placeholder</Label>
+                              <Input
+                                id="placeholder"
+                                placeholder="Enter your answer..."
+                                value={field.state.value}
+                                onBlur={field.handleBlur}
+                                onChange={(e) =>
+                                  field.handleChange(e.target.value)
+                                }
+                                disabled={readOnly}
+                              />
+                            </div>
+                          )}
+                        </form.Field>
+                      )
+                    }
+                  </form.Subscribe>
                 </div>
 
                 <form.Subscribe selector={(state) => state.values.field_type}>
                   {(fieldType) =>
-                    (fieldType === "select" || fieldType === "multiselect") && (
+                    (fieldType === "select" || fieldType === "select_cards" || fieldType === "multiselect") && (
                       <form.Field name="options">
                         {(field) => (
                           <div className="space-y-2">

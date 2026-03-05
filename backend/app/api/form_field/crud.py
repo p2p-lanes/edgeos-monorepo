@@ -137,6 +137,12 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
                         f"Field '{field.label}' must be one of: {', '.join(field.options)}"
                     )
 
+            elif field_type == FormFieldType.SELECT_CARDS.value:
+                if field.options and value not in field.options:
+                    errors.append(
+                        f"Field '{field.label}' must be one of: {', '.join(field.options)}"
+                    )
+
             elif field_type == FormFieldType.MULTISELECT.value:
                 if not isinstance(value, list):
                     errors.append(f"Field '{field.label}' must be a list")

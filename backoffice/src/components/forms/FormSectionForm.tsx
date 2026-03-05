@@ -110,9 +110,8 @@ export function FormSectionForm({
 
       if (isEdit) {
         updateMutation.mutate({
-          ...(isProtectedSection
-            ? { description: value.description || undefined }
-            : { label: value.label, description: value.description || undefined }),
+          label: value.label,
+          description: value.description || undefined,
           order: Number.parseInt(value.order, 10) || 0,
         })
       } else {
@@ -171,7 +170,7 @@ export function FormSectionForm({
                 </CardTitle>
                 <CardDescription>
                   {isProtectedSection
-                    ? "This is a protected section; only description and order can be edited."
+                    ? "This is a protected section; you can edit title, description and order. It cannot be deleted."
                     : readOnly
                       ? "View section configuration (read-only)"
                       : isEdit
@@ -202,7 +201,7 @@ export function FormSectionForm({
                           value={field.state.value}
                           onBlur={field.handleBlur}
                           onChange={(e) => field.handleChange(e.target.value)}
-                          disabled={readOnly || isProtectedSection}
+                          disabled={readOnly}
                         />
                         <p className="text-sm text-muted-foreground">
                           Section title shown to applicants

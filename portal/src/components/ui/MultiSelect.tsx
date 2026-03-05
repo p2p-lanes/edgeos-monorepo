@@ -47,7 +47,7 @@ export function MultiSelect({
               type="button"
               key={option.value}
               onClick={() => toggleOption(option.value)}
-              className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+              className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium cursor-pointer transition-colors ${
                 isSelected
                   ? "bg-gray-700 text-white hover:bg-gray-800 border"
                   : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-300"

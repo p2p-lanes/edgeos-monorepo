@@ -20,7 +20,6 @@ import type {
 import { useApplicationForm } from "../hooks/use-application-form"
 import { CompanionsSection, type CompanionWithId } from "./companions-section"
 import { DynamicField } from "./fields/dynamic-field"
-import { FormSection } from "./form-section"
 import { ProgressBar } from "./progress-bar"
 import SectionWrapper from "./SectionWrapper"
 import { SectionSeparator } from "./section-separator"
@@ -32,7 +31,7 @@ const animationProps = {
   transition: { duration: 0.3, ease: "easeInOut" },
 }
 
-const FULL_WIDTH_TYPES = new Set(["textarea", "multiselect"])
+const FULL_WIDTH_TYPES = new Set(["textarea", "multiselect", "url", "select_cards"])
 
 function mapOptions(options?: string[]) {
   return (options ?? []).map((opt) => ({ value: opt, label: opt }))
@@ -184,110 +183,107 @@ export function DynamicApplicationForm({
     return g ?? ""
   }, [values.gender, schema.base_fields])
 
-  // Group base_fields by section_id, sorted by position
-  const baseFieldSections = useMemo(() => {
-    const bySectionId: Record<string, [string, FormFieldSchema][]> = {}
+  // Single ordered list of sections: each block has base + custom fields, order follows schema.sections
+  type SectionBlock = {
+    id: string
+    title: string
+    subtitle?: string
+    baseFields: [string, FormFieldSchema][]
+    customFields: [string, FormFieldSchema][]
+  }
+
+  const mergedSections = useMemo(() => {
+    const bySectionIdBase: Record<string, [string, FormFieldSchema][]> = {}
+    const bySectionIdCustom: Record<string, [string, FormFieldSchema][]> = {}
 
     for (const [name, field] of Object.entries(schema.base_fields)) {
       const sectionId = field.section_id || "_unsectioned"
-      if (!bySectionId[sectionId]) bySectionId[sectionId] = []
-      bySectionId[sectionId].push([name, field])
+      if (!bySectionIdBase[sectionId]) bySectionIdBase[sectionId] = []
+      bySectionIdBase[sectionId].push([name, field])
     }
-
-    // Sort fields within each section by position
-    for (const fields of Object.values(bySectionId)) {
-      fields.sort(([, a], [, b]) => (a.position ?? 0) - (b.position ?? 0))
-    }
-
-    // Build ordered sections using schema.sections
-    const orderedSections: {
-      id: string
-      title: string
-      subtitle?: string
-      fields: [string, FormFieldSchema][]
-    }[] = []
-
-    if (schema.sections?.length) {
-      for (const section of schema.sections) {
-        const fields = bySectionId[section.id]
-        if (fields) {
-          orderedSections.push({
-            id: section.id,
-            title: section.label,
-            subtitle: section.description ?? undefined,
-            fields,
-          })
-          delete bySectionId[section.id]
-        }
-      }
-    }
-
-    // Unsectioned base fields
-    if (bySectionId._unsectioned) {
-      orderedSections.push({
-        id: "_unsectioned",
-        title: "Personal Information",
-        subtitle: "Your basic information helps us identify and contact you.",
-        fields: bySectionId._unsectioned,
-      })
-      delete bySectionId._unsectioned
-    }
-
-    // Any remaining
-    for (const [id, fields] of Object.entries(bySectionId)) {
-      orderedSections.push({ id, title: "Other", fields })
-    }
-
-    return orderedSections
-  }, [schema.base_fields, schema.sections])
-
-  // Group custom fields by section_id
-  const sectionedFields = useMemo(() => {
-    const bySectionId: Record<string, [string, FormFieldSchema][]> = {}
-
     for (const [name, field] of Object.entries(schema.custom_fields)) {
       const sectionId = field.section_id || "_unsectioned"
-      if (!bySectionId[sectionId]) bySectionId[sectionId] = []
-      bySectionId[sectionId].push([`custom_${name}`, field])
+      if (!bySectionIdCustom[sectionId]) bySectionIdCustom[sectionId] = []
+      bySectionIdCustom[sectionId].push([`custom_${name}`, field])
     }
 
-    // Build ordered sections using schema.sections (now objects with id/label/description)
-    const orderedSections: {
-      title: string
-      subtitle?: string
-      fields: [string, FormFieldSchema][]
-    }[] = []
+    const sortByPosition = (fields: [string, FormFieldSchema][]) =>
+      fields.sort(([, a], [, b]) => (a.position ?? 0) - (b.position ?? 0))
+    for (const fields of Object.values(bySectionIdBase)) sortByPosition(fields)
+    for (const fields of Object.values(bySectionIdCustom)) sortByPosition(fields)
 
-    if (schema.sections?.length) {
-      for (const section of schema.sections) {
-        const fields = bySectionId[section.id]
-        if (fields) {
-          orderedSections.push({
-            title: section.label,
-            subtitle: section.description ?? undefined,
-            fields,
-          })
-          delete bySectionId[section.id]
-        }
-      }
-    }
+    const result: SectionBlock[] = []
+    const sortedSections = [...(schema.sections ?? [])].sort(
+      (a, b) => (a.order ?? 0) - (b.order ?? 0),
+    )
 
-    // Unsectioned fields
-    if (bySectionId._unsectioned) {
-      orderedSections.push({
-        title: "Additional Information",
-        fields: bySectionId._unsectioned,
+    // 1. Unsectioned base first
+    if (bySectionIdBase._unsectioned?.length) {
+      result.push({
+        id: "_unsectioned_base",
+        title: "Personal Information",
+        subtitle:
+          "Your basic information helps us identify and contact you.",
+        baseFields: bySectionIdBase._unsectioned,
+        customFields: [],
       })
-      delete bySectionId._unsectioned
+      delete bySectionIdBase._unsectioned
     }
 
-    // Any remaining sections not matched
-    for (const [, fields] of Object.entries(bySectionId)) {
-      orderedSections.push({ title: "Other", fields })
+    // 2. Schema sections in order (only include if has base or custom fields)
+    for (const section of sortedSections) {
+      const baseFields = bySectionIdBase[section.id] ?? []
+      const customFields = bySectionIdCustom[section.id] ?? []
+      if (baseFields.length === 0 && customFields.length === 0) continue
+      result.push({
+        id: section.id,
+        title: section.label,
+        subtitle: section.description ?? undefined,
+        baseFields,
+        customFields,
+      })
+      delete bySectionIdBase[section.id]
+      delete bySectionIdCustom[section.id]
     }
 
-    return orderedSections
+    // 3. Unsectioned custom
+    if (bySectionIdCustom._unsectioned?.length) {
+      result.push({
+        id: "_unsectioned_custom",
+        title: "Additional Information",
+        baseFields: [],
+        customFields: bySectionIdCustom._unsectioned,
+      })
+      delete bySectionIdCustom._unsectioned
+    }
+
+    // 4. Remaining (section_id not in schema.sections)
+    const remainingIds = new Set([
+      ...Object.keys(bySectionIdBase),
+      ...Object.keys(bySectionIdCustom),
+    ])
+    for (const id of remainingIds) {
+      const baseFields = bySectionIdBase[id] ?? []
+      const customFields = bySectionIdCustom[id] ?? []
+      if (baseFields.length === 0 && customFields.length === 0) continue
+      result.push({
+        id,
+        title: "Other",
+        baseFields,
+        customFields,
+      })
+    }
+
+    return result
   }, [schema])
+
+  const hasChildrenSection = useMemo(
+    () =>
+      mergedSections.some((block) =>
+        block.title.toLowerCase().includes("children"),
+      ),
+    [mergedSections],
+  )
 
   /** Render a single base field — special cases inline, rest via DynamicField */
   const renderBaseField = (name: string, field: FormFieldSchema) => {
@@ -353,6 +349,7 @@ export function DynamicApplicationForm({
           value={values[name]}
           error={errors[name]}
           onChange={handleChange}
+          hideLabelAndSubtitle={name === "info_not_shared"}
         />
       </div>
     )
@@ -361,38 +358,58 @@ export function DynamicApplicationForm({
   return (
     <>
       <form onSubmit={handleSubmit} className="space-y-8 px-8 md:px-12">
-        {/* Base fields grouped by section */}
-        {baseFieldSections.map(({ id, title, subtitle, fields }) => (
-          <div key={id}>
-            <SectionWrapper title={title} subtitle={subtitle}>
-              <div className="grid gap-4 sm:grid-cols-2">
-                {fields.map(([name, field]) => renderBaseField(name, field))}
+        {/* Sections in schema order (base + custom fields per section) */}
+        {mergedSections.map(({ id, title, subtitle, baseFields, customFields }) => {
+          const isChildrenSection = title.toLowerCase().includes("children")
+          if (isChildrenSection) {
+            return (
+              <div key={id}>
+                <CompanionsSection
+                  allowsSpouse={popup.allows_spouse ?? false}
+                  allowsChildren={popup.allows_children ?? false}
+                  companions={companions}
+                  onCompanionsChange={setCompanions}
+                />
               </div>
-            </SectionWrapper>
-            <SectionSeparator />
-          </div>
-        ))}
+            )
+          }
+          return (
+            <div key={id}>
+              <SectionWrapper title={title} subtitle={subtitle}>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {baseFields.map(([name, field]) => renderBaseField(name, field))}
+                  {customFields.map(([name, field]) => (
+                    <div
+                      key={name}
+                      className={
+                        FULL_WIDTH_TYPES.has(field.type) ? "md:col-span-2" : ""
+                      }
+                    >
+                      <DynamicField
+                        name={name}
+                        field={field}
+                        value={values[name]}
+                        error={errors[name]}
+                        onChange={handleChange}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </SectionWrapper>
+              <SectionSeparator />
+            </div>
+          )
+        })}
 
-        {/* Dynamic sections from custom fields */}
-        {sectionedFields.map(({ title, subtitle, fields }) => (
-          <FormSection
-            key={title}
-            title={title}
-            subtitle={subtitle}
-            fields={fields}
-            values={values}
-            errors={errors}
-            onChange={handleChange}
+        {/* Companions section (only when no "Children" section from API) */}
+        {/* {!hasChildrenSection && (
+          <CompanionsSection
+            allowsSpouse={popup.allows_spouse ?? false}
+            allowsChildren={popup.allows_children ?? false}
+            companions={companions}
+            onCompanionsChange={setCompanions}
           />
-        ))}
-
-        {/* Companions section */}
-        <CompanionsSection
-          allowsSpouse={popup.allows_spouse ?? false}
-          allowsChildren={popup.allows_children ?? false}
-          companions={companions}
-          onCompanionsChange={setCompanions}
-        />
+        )} */}
 
         {/* Submit buttons */}
         <div className="flex flex-col w-full gap-6 md:flex-row justify-between items-center pt-6">

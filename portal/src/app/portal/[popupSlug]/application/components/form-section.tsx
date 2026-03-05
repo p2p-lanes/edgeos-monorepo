@@ -3,7 +3,7 @@ import { DynamicField } from "./fields/dynamic-field"
 import SectionWrapper from "./SectionWrapper"
 import { SectionSeparator } from "./section-separator"
 
-const FULL_WIDTH_TYPES = new Set(["textarea", "multiselect"])
+const FULL_WIDTH_TYPES = new Set(["textarea", "multiselect", "url", "select_cards"])
 
 interface FormSectionProps {
   title: string
@@ -45,6 +45,7 @@ export function FormSection({
                 value={values[name]}
                 error={errors[name]}
                 onChange={onChange}
+                hideLabelAndSubtitle={name === "info_not_shared"}
               />
             </div>
           ))}

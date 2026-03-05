@@ -87,22 +87,25 @@ export function FieldConfigPanel({
       .map((o) => o.trim())
       .filter((o) => o.length > 0)
 
-    updateMutation.mutate({
-      fieldId: field.id,
-      requestBody: {
-        label: localValues.label || undefined,
-        field_type: localValues.field_type || undefined,
-        placeholder: localValues.placeholder || undefined,
-        help_text: localValues.help_text || undefined,
-        required: localValues.required,
-        options: optionsArray.length > 0 ? optionsArray : undefined,
-      },
-    })
+    const requestBody: FormFieldUpdate = {
+      label: localValues.label || undefined,
+      field_type: localValues.field_type || undefined,
+      help_text: localValues.help_text || undefined,
+      required: localValues.required,
+      options: optionsArray.length > 0 ? optionsArray : undefined,
+    }
+    if (localValues.field_type !== "select_cards") {
+      requestBody.placeholder = localValues.placeholder || undefined
+    }
+    updateMutation.mutate({ fieldId: field.id, requestBody })
   }
 
   const showOptions =
     localValues.field_type === "select" ||
+    localValues.field_type === "select_cards" ||
     localValues.field_type === "multiselect"
+
+  const showPlaceholder = localValues.field_type !== "select_cards"
 
   const isProtected = isSpecialField(field)
 
@@ -143,15 +146,17 @@ export function FieldConfigPanel({
         </Select>
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="config-placeholder">Placeholder</Label>
-        <Input
-          id="config-placeholder"
-          value={localValues.placeholder}
-          onChange={(e) => handleChange("placeholder", e.target.value)}
-          placeholder="Enter placeholder text..."
-        />
-      </div>
+      {showPlaceholder && (
+        <div className="space-y-2">
+          <Label htmlFor="config-placeholder">Placeholder</Label>
+          <Input
+            id="config-placeholder"
+            value={localValues.placeholder}
+            onChange={(e) => handleChange("placeholder", e.target.value)}
+            placeholder="Enter placeholder text..."
+          />
+        </div>
+      )}
 
       <div className="space-y-2">
         <Label htmlFor="config-help">Help Text</Label>

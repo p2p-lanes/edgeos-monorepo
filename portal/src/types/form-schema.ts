@@ -5,6 +5,7 @@ export interface FormFieldSchema {
     | "number"
     | "boolean"
     | "select"
+    | "select_cards"
     | "multiselect"
     | "date"
     | "email"

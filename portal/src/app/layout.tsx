@@ -1,21 +1,12 @@
 import type { Metadata, Viewport } from "next"
-import { Geist, Geist_Mono } from "next/font/google"
+import { GeistSans } from "geist/font/sans"
+import { GeistMono } from "geist/font/mono"
 import "./globals.css"
 import { Toaster } from "sonner"
 import GoogleAnalytics from "@/components/utils/GoogleAnalytics"
 import { config } from "@/constants/config"
 import QueryProvider from "@/providers/queryProvider"
 import { TenantProvider } from "@/providers/tenantProvider"
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-})
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-})
 
 export const metadata: Metadata = {
   title: config.metadata.title,
@@ -50,7 +41,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${GeistSans.variable} ${GeistSans.className} ${GeistMono.variable} antialiased`}
         suppressHydrationWarning
       >
         <GoogleAnalytics />
