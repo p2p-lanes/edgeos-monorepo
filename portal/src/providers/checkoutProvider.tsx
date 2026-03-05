@@ -1,5 +1,6 @@
 "use client"
 
+import { useQueryClient } from "@tanstack/react-query"
 import {
   createContext,
   type ReactNode,
@@ -21,6 +22,7 @@ import {
 } from "@/hooks/useCartApi"
 import useGetPassesData from "@/hooks/useGetPassesData"
 import { markPurchasePending } from "@/hooks/usePaymentRedirect"
+import { queryKeys } from "@/lib/query-keys"
 import type { AttendeePassState } from "@/types/Attendee"
 import type {
   CheckoutCartState,
@@ -88,9 +90,10 @@ export function CheckoutProvider({
   children,
   initialStep = "passes",
 }: CheckoutProviderProps) {
+  const queryClient = useQueryClient()
   const { attendeePasses, toggleProduct, isEditing, toggleEditing } =
     usePassesProvider()
-  const { discountApplied, setDiscount } = useDiscount()
+  const { discountApplied, setDiscount, resetDiscount } = useDiscount()
   const { getRelevantApplication } = useApplication()
   const { getCity } = useCityProvider()
   const { products } = useGetPassesData()
@@ -106,6 +109,7 @@ export function CheckoutProvider({
 
   const hasRestoredCheckoutRef = useRef(false)
   const previousCityIdRef = useRef(cityId)
+  const paymentCompleteRef = useRef(false)
 
   // Step management
   const [currentStep, setCurrentStep] = useState<CheckoutStep>(initialStep)
@@ -422,7 +426,12 @@ export function CheckoutProvider({
 
   // Persist checkout cart to DB (debounced)
   useEffect(() => {
-    if (!cityId || !hasRestoredCheckoutRef.current) return
+    if (
+      !cityId ||
+      !hasRestoredCheckoutRef.current ||
+      paymentCompleteRef.current
+    )
+      return
 
     const cartState: CartState = {
       passes: selectedPasses.map((p) => ({
@@ -708,7 +717,8 @@ export function CheckoutProvider({
     setPromoCode("")
     setPromoCodeValid(false)
     setPromoCodeDiscount(0)
-  }, [])
+    resetDiscount()
+  }, [resetDiscount])
 
   // Insurance
   const toggleInsurance = useCallback(() => {
@@ -801,7 +811,8 @@ export function CheckoutProvider({
       const hasPatreonSelected = attendeePasses.some((a) =>
         a.products.some((p) => p.category === "patreon" && p.selected),
       )
-      const isMonthUpgrade = fullOrMonthSelectedWithWeekOrDay && !hasPatreonSelected
+      const isMonthUpgrade =
+        fullOrMonthSelectedWithWeekOrDay && !hasPatreonSelected
 
       if (isEditing) {
         for (const attendee of attendeePasses) {
@@ -907,7 +918,6 @@ export function CheckoutProvider({
         },
       })
 
-      // Handle PaymentPreview (has checkout_url) or PaymentPublic
       const data = result as {
         status?: string
         checkout_url?: string | null
@@ -931,7 +941,14 @@ export function CheckoutProvider({
         if (isEditing) {
           toggleEditing(false)
         }
+        paymentCompleteRef.current = true
         clearCart()
+        await queryClient.invalidateQueries({
+          queryKey: queryKeys.applications.mine(),
+        })
+        await queryClient.invalidateQueries({
+          queryKey: queryKeys.payments.all,
+        })
         setCurrentStep("success")
         setIsSubmitting(false)
         return { success: true }
@@ -961,6 +978,7 @@ export function CheckoutProvider({
     isEditing,
     attendeePasses,
     toggleEditing,
+    queryClient,
   ])
 
   const value: CheckoutContextValue = {

@@ -134,7 +134,10 @@ export function CanvasField({
                   <span className="text-destructive ml-0.5">*</span>
                 )}
                 {isSpecial && (
-                  <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5 py-0">
+                  <Badge
+                    variant="secondary"
+                    className="ml-1.5 text-[10px] px-1.5 py-0"
+                  >
                     Protected
                   </Badge>
                 )}
@@ -175,12 +178,13 @@ export function CanvasFieldOverlay({ field }: { field: FormFieldPublic }) {
         <GripVertical className="h-4 w-4 text-muted-foreground" />
         <span className="text-sm font-semibold truncate">
           {field.label}
-          {field.required && (
-            <span className="text-destructive ml-0.5">*</span>
-          )}
+          {field.required && <span className="text-destructive ml-0.5">*</span>}
         </span>
         {TypeIcon && (
-          <Badge variant="outline" className="shrink-0 text-xs gap-1 py-0 ml-auto">
+          <Badge
+            variant="outline"
+            className="shrink-0 text-xs gap-1 py-0 ml-auto"
+          >
             <TypeIcon className="h-3 w-3" />
             {fieldTypeDef?.label}
           </Badge>

@@ -1,4 +1,5 @@
 import type { FormFieldSchema } from "@edgeos/shared-form-ui"
+import type { LucideIcon } from "lucide-react"
 import {
   AlignLeft,
   Calendar,
@@ -11,7 +12,6 @@ import {
   Mail,
   Type,
 } from "lucide-react"
-import type { LucideIcon } from "lucide-react"
 import type { FormFieldPublic, FormSectionPublic } from "@/client"
 
 /** Map API form field to shared FormFieldSchema for SchemaField / portal-style components. */
@@ -67,7 +67,12 @@ export const FIELD_TYPES: FieldTypeDefinition[] = [
   { value: "url", label: "URL", icon: Link },
 ]
 
-export const FULL_WIDTH_TYPES = new Set(["textarea", "multiselect", "url", "select_cards"])
+export const FULL_WIDTH_TYPES = new Set([
+  "textarea",
+  "multiselect",
+  "url",
+  "select_cards",
+])
 
 export const PALETTE_ITEM_PREFIX = "palette-"
 export const CANVAS_ITEM_PREFIX = "canvas-"
@@ -93,9 +98,8 @@ export const slugify = (...parts: string[]): string =>
     .replace(/_{2,}/g, "_")
 
 /** Section is protected when API returns protected: true (cannot delete, limited edit). */
-export const isSpecialSection = (
-  section: FormSectionPublic | null,
-): boolean => !!section && section.protected === true
+export const isSpecialSection = (section: FormSectionPublic | null): boolean =>
+  !!section && section.protected === true
 
 /** Field is protected when API returns protected: true (cannot delete, only placeholder/help text editable). */
 export const isSpecialField = (field: FormFieldPublic): boolean =>

@@ -22,11 +22,12 @@ export function DragOverlayContent({
 }: DragOverlayContentProps) {
   if (!activeId) return null
 
-  if (typeof activeId === "string" && activeId.startsWith(SORTABLE_SECTION_PREFIX)) {
+  if (
+    typeof activeId === "string" &&
+    activeId.startsWith(SORTABLE_SECTION_PREFIX)
+  ) {
     const sectionId = parseSortableSectionId(activeId)
-    const section = sectionId
-      ? sections.find((s) => s.id === sectionId)
-      : null
+    const section = sectionId ? sections.find((s) => s.id === sectionId) : null
     if (section) {
       return (
         <div className="flex items-center gap-3 rounded-lg border-2 border-primary bg-background p-3 shadow-xl w-56">
@@ -39,7 +40,10 @@ export function DragOverlayContent({
     return null
   }
 
-  if (typeof activeId === "string" && activeId.startsWith(PALETTE_ITEM_PREFIX)) {
+  if (
+    typeof activeId === "string" &&
+    activeId.startsWith(PALETTE_ITEM_PREFIX)
+  ) {
     const typeValue = activeId.replace(PALETTE_ITEM_PREFIX, "")
     const fieldType = FIELD_TYPES.find((t) => t.value === typeValue)
     if (!fieldType) return null

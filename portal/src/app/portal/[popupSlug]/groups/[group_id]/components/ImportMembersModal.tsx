@@ -275,8 +275,7 @@ const ImportMembersModal = ({
     const headers = ["first_name", "last_name", "email", "telegram", "gender"]
 
     // Create CSV content
-    const csvContent =
-      headers.join(",") + "\n" + "John,Doe,john.doe@example.com,@johndoe,Male"
+    const csvContent = `${headers.join(",")}\nJohn,Doe,john.doe@example.com,@johndoe,Male`
 
     // Create blob and download link
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })

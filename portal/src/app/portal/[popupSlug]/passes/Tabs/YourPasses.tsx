@@ -1,12 +1,6 @@
+import { ArrowRight, FileText, Plus, Sparkles, Ticket } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 import { useState } from "react"
-import {
-  ArrowRight,
-  FileText,
-  Plus,
-  Sparkles,
-  Ticket,
-} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -17,11 +11,11 @@ import { useCityProvider } from "@/providers/cityProvider"
 import { usePassesProvider } from "@/providers/passesProvider"
 import type { AttendeePassState } from "@/types/Attendee"
 import { formatCurrency } from "@/types/checkout"
-import useModal from "../hooks/useModal"
 import { AttendeeModal } from "../components/AttendeeModal"
-import InvoiceModal from "../components/common/InvoiceModal"
 import AttendeeTicket from "../components/common/AttendeeTicket"
+import InvoiceModal from "../components/common/InvoiceModal"
 import Special from "../components/common/Products/Special"
+import useModal from "../hooks/useModal"
 
 interface YourPassesProps {
   onSwitchToBuy: () => void
@@ -48,10 +42,11 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
     a.products.some((p) => p.purchased),
   )
 
-  const mainTickets = products.filter((p) => p.category === "ticket" && p.attendee_category === "main")
-  const minPrice = mainTickets.length > 0
-    ? Math.min(...mainTickets.map((p) => p.price))
-    : null
+  const mainTickets = products.filter(
+    (p) => p.category === "ticket" && p.attendee_category === "main",
+  )
+  const minPrice =
+    mainTickets.length > 0 ? Math.min(...mainTickets.map((p) => p.price)) : null
 
   const handleSubmit = async (data: AttendeePassState) => {
     if (modal.category) {

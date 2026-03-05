@@ -1,6 +1,7 @@
 import uuid
 
-from sqlmodel import Session, select
+from sqlalchemy.orm import selectinload
+from sqlmodel import Session, func, select
 
 from app.api.cart.models import Carts
 from app.api.cart.schemas import CartState
@@ -8,6 +9,31 @@ from app.api.cart.schemas import CartState
 
 class CartsCRUD:
     """CRUD operations for Carts."""
+
+    def find_all(
+        self,
+        session: Session,
+        popup_id: uuid.UUID | None = None,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> tuple[list[Carts], int]:
+        """List all carts (abandoned) with eager loaded relationships."""
+        statement = select(Carts).options(
+            selectinload(Carts.human),  # type: ignore[arg-type]
+            selectinload(Carts.popup),  # type: ignore[arg-type]
+        )
+
+        if popup_id:
+            statement = statement.where(Carts.popup_id == popup_id)
+
+        count_statement = select(func.count()).select_from(statement.subquery())
+        total = session.exec(count_statement).one()
+
+        statement = statement.order_by(Carts.updated_at.desc())  # type: ignore[union-attr]
+        statement = statement.offset(skip).limit(limit)
+        results = list(session.exec(statement).all())
+
+        return results, total
 
     def get_or_create(
         self,

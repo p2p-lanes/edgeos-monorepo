@@ -1,17 +1,16 @@
 "use client"
 
 import { useParams, useRouter, useSearchParams } from "next/navigation"
-import { useState } from "react"
 import CheckoutFlow from "@/app/checkout/components/CheckoutFlow"
 import { Loader } from "@/components/ui/Loader"
 import useAttendee from "@/hooks/useAttendee"
-import { usePassesProvider } from "@/providers/passesProvider"
 import { CheckoutProvider } from "@/providers/checkoutProvider"
+import { usePassesProvider } from "@/providers/passesProvider"
 import type { AttendeeCategory, AttendeePassState } from "@/types/Attendee"
 import type { CheckoutStep } from "@/types/checkout"
-import usePermission from "../hooks/usePermission"
-import useModal from "../hooks/useModal"
 import { AttendeeModal } from "../components/AttendeeModal"
+import useModal from "../hooks/useModal"
+import usePermission from "../hooks/usePermission"
 
 export default function BuyPassesPage() {
   usePermission()

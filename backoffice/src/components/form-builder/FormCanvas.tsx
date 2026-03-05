@@ -1,10 +1,11 @@
-import {
-  verticalListSortingStrategy,
-  SortableContext,
-} from "@dnd-kit/sortable"
+import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { FolderPlus, LayoutTemplate } from "lucide-react"
 import { useRef, useState } from "react"
-import type { FormFieldPublic, FormSectionPublic, FormSectionUpdate } from "@/client"
+import type {
+  FormFieldPublic,
+  FormSectionPublic,
+  FormSectionUpdate,
+} from "@/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getSortableSectionId } from "./constants"
@@ -107,8 +108,8 @@ export function FormCanvas({
           Start building your form
         </h3>
         <p className="text-sm text-muted-foreground max-w-md mb-6">
-          Drag field types from the right panel and drop them here to build
-          your application form.
+          Drag field types from the right panel and drop them here to build your
+          application form.
         </p>
         <div className="w-full max-w-2xl">
           <SortableContext
@@ -161,11 +162,7 @@ export function FormCanvas({
           <Button size="sm" onClick={handleConfirmAddSection}>
             Add
           </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleCancelAddSection}
-          >
+          <Button size="sm" variant="outline" onClick={handleCancelAddSection}>
             Cancel
           </Button>
         </div>

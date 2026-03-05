@@ -539,12 +539,12 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         self,
         session: Session,
         obj: PaymentCreate,
-    ) -> tuple[Payments | None, PaymentPreview]:
+    ) -> tuple[Payments, PaymentPreview]:
         """
         Create a payment with all validations and discount calculations.
 
-        For zero-amount payments, returns (None, preview) with status approved.
-        For paid payments, returns (payment, preview) with checkout info from SimpleFI.
+        For zero-amount payments, auto-approves and adds products directly.
+        For paid payments, returns payment with checkout info from SimpleFI.
         """
         preview = self.preview_payment(session, obj)
 
@@ -565,8 +565,64 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             else:
                 application.credit = 0.0
 
+            # Clear existing products if editing passes
+            if obj.edit_passes:
+                # Build a temporary payment-like object to reuse _clear_application_products
+                attendee_ids = {p.attendee_id for p in obj.products}
+                statement = select(AttendeeProducts).where(
+                    AttendeeProducts.attendee_id.in_(attendee_ids)  # type: ignore[attr-defined]
+                )
+                existing_products = list(session.exec(statement).all())
+                for ap in existing_products:
+                    session.delete(ap)
+                session.flush()
+
             # Auto-approve and add products directly
             self._add_products_to_attendees(session, obj.products)
+
+            # Get product details for snapshot
+            product_ids = [p.product_id for p in obj.products]
+            prod_statement = select(Products).where(Products.id.in_(product_ids))  # type: ignore[attr-defined]
+            products_map = {p.id: p for p in session.exec(prod_statement).all()}
+
+            # Create payment record for audit trail
+            payment = Payments(
+                tenant_id=application.tenant_id,
+                application_id=obj.application_id,
+                status=PaymentStatus.APPROVED.value,
+                amount=preview.amount,
+                insurance_amount=preview.insurance_amount,
+                currency=preview.currency,
+                coupon_id=preview.coupon_id,
+                coupon_code=preview.coupon_code,
+                discount_value=preview.discount_value,
+                edit_passes=obj.edit_passes,
+                group_id=preview.group_id,
+                source=None,
+            )
+            session.add(payment)
+            session.flush()
+
+            # Create product snapshots
+            for req_prod in obj.products:
+                product = products_map.get(req_prod.product_id)
+                if product:
+                    payment_product = PaymentProducts(
+                        tenant_id=application.tenant_id,
+                        payment_id=payment.id,
+                        product_id=req_prod.product_id,
+                        attendee_id=req_prod.attendee_id,
+                        quantity=req_prod.quantity,
+                        product_name=product.name,
+                        product_description=product.description,
+                        product_price=product.price,
+                        product_category=product.category or "",
+                    )
+                    session.add(payment_product)
+
+            # Increment coupon usage if used
+            if preview.coupon_id:
+                coupons_crud.use_coupon(session, preview.coupon_id)
 
             # Clear cart after successful purchase
             from app.api.cart.crud import carts_crud
@@ -577,11 +633,11 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
             session.add(application)
             session.commit()
-            session.refresh(application)
+            session.refresh(payment)
 
-            # Return preview with approved status
+            # Return payment with approved status
             preview.status = PaymentStatus.APPROVED.value
-            return None, preview
+            return payment, preview
 
         # Validate popup has SimpleFI API key configured
         if not application.popup or not application.popup.simplefi_api_key:

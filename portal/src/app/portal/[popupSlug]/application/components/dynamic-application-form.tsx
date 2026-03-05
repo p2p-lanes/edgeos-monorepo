@@ -31,7 +31,12 @@ const animationProps = {
   transition: { duration: 0.3, ease: "easeInOut" },
 }
 
-const FULL_WIDTH_TYPES = new Set(["textarea", "multiselect", "url", "select_cards"])
+const FULL_WIDTH_TYPES = new Set([
+  "textarea",
+  "multiselect",
+  "url",
+  "select_cards",
+])
 
 function mapOptions(options?: string[]) {
   return (options ?? []).map((opt) => ({ value: opt, label: opt }))
@@ -293,7 +298,8 @@ export function DynamicApplicationForm({
     const sortByPosition = (fields: [string, FormFieldSchema][]) =>
       fields.sort(([, a], [, b]) => (a.position ?? 0) - (b.position ?? 0))
     for (const fields of Object.values(bySectionIdBase)) sortByPosition(fields)
-    for (const fields of Object.values(bySectionIdCustom)) sortByPosition(fields)
+    for (const fields of Object.values(bySectionIdCustom))
+      sortByPosition(fields)
 
     const result: SectionBlock[] = []
     const sortedSections = [...(schema.sections ?? [])].sort(
@@ -305,8 +311,7 @@ export function DynamicApplicationForm({
       result.push({
         id: "_unsectioned_base",
         title: "Personal Information",
-        subtitle:
-          "Your basic information helps us identify and contact you.",
+        subtitle: "Your basic information helps us identify and contact you.",
         baseFields: bySectionIdBase._unsectioned,
         customFields: [],
       })
@@ -360,7 +365,7 @@ export function DynamicApplicationForm({
     return result
   }, [schema])
 
-  const hasChildrenSection = useMemo(
+  const _hasChildrenSection = useMemo(
     () =>
       mergedSections.some((block) =>
         block.title.toLowerCase().includes("children"),

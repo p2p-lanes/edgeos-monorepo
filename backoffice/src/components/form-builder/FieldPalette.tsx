@@ -1,7 +1,7 @@
 import { useDraggable } from "@dnd-kit/core"
 import { GripVertical } from "lucide-react"
-import { FIELD_TYPES, PALETTE_ITEM_PREFIX } from "./constants"
 import type { FieldTypeDefinition } from "./constants"
+import { FIELD_TYPES, PALETTE_ITEM_PREFIX } from "./constants"
 
 function PaletteItem({ fieldType }: { fieldType: FieldTypeDefinition }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({

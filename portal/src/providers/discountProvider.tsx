@@ -16,6 +16,7 @@ import { useCityProvider } from "./cityProvider"
 interface DiscountContextType {
   discountApplied: DiscountProps
   setDiscount: (discount: DiscountProps) => void
+  resetDiscount: () => void
 }
 
 const DiscountContext = createContext<DiscountContextType | null>(null)
@@ -64,8 +65,18 @@ const DiscountProvider = ({ children }: { children: ReactNode }) => {
     [discountApplied.discount_value],
   )
 
+  const resetDiscount = useCallback(() => {
+    setDiscountApplied({
+      discount_value: 0,
+      discount_type: "percentage",
+      discount_code: null,
+    })
+  }, [])
+
   return (
-    <DiscountContext.Provider value={{ discountApplied, setDiscount }}>
+    <DiscountContext.Provider
+      value={{ discountApplied, setDiscount, resetDiscount }}
+    >
       {children}
     </DiscountContext.Provider>
   )
