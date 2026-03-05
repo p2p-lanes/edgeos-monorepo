@@ -377,60 +377,66 @@ export function DynamicApplicationForm({
     <>
       <form onSubmit={handleSubmit} className="space-y-8 px-8 md:px-12">
         {/* Sections in schema order (base + custom fields per section) */}
-        {mergedSections.map(({ id, title, subtitle, baseFields, customFields }) => {
-          const isChildrenSection = title.toLowerCase().includes("children")
-          if (isChildrenSection) {
+        {mergedSections.map(
+          ({ id, title, subtitle, baseFields, customFields }) => {
+            const isChildrenSection = title.toLowerCase().includes("children")
+            if (isChildrenSection) {
+              return (
+                <div key={id}>
+                  <CompanionsSection
+                    allowsSpouse={popup.allows_spouse ?? false}
+                    allowsChildren={popup.allows_children ?? false}
+                    companions={companions}
+                    onCompanionsChange={setCompanions}
+                  />
+                </div>
+              )
+            }
             return (
               <div key={id}>
-                <CompanionsSection
-                  allowsSpouse={popup.allows_spouse ?? false}
-                  allowsChildren={popup.allows_children ?? false}
-                  companions={companions}
-                  onCompanionsChange={setCompanions}
-                />
-              </div>
-            )
-          }
-          return (
-            <div key={id}>
-              <SectionWrapper title={title} subtitle={subtitle}>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {baseFields.map(([name, field]) => (
-                    <BaseField
-                      key={name}
-                      name={name}
-                      field={field}
-                      value={values[name]}
-                      error={errors[name]}
-                      onChange={handleChange}
-                      displayGender={displayGender}
-                      handleGenderChange={handleGenderChange}
-                      genderSpecifyValue={(values.gender_specify as string) ?? ""}
-                      genderSpecifyError={errors.gender_specify}
-                    />
-                  ))}
-                  {customFields.map(([name, field]) => (
-                    <div
-                      key={name}
-                      className={
-                        FULL_WIDTH_TYPES.has(field.type) ? "md:col-span-2" : ""
-                      }
-                    >
-                      <DynamicField
+                <SectionWrapper title={title} subtitle={subtitle}>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {baseFields.map(([name, field]) => (
+                      <BaseField
+                        key={name}
                         name={name}
                         field={field}
                         value={values[name]}
                         error={errors[name]}
                         onChange={handleChange}
+                        displayGender={displayGender}
+                        handleGenderChange={handleGenderChange}
+                        genderSpecifyValue={
+                          (values.gender_specify as string) ?? ""
+                        }
+                        genderSpecifyError={errors.gender_specify}
                       />
-                    </div>
-                  ))}
-                </div>
-              </SectionWrapper>
-              <SectionSeparator />
-            </div>
-          )
-        })}
+                    ))}
+                    {customFields.map(([name, field]) => (
+                      <div
+                        key={name}
+                        className={
+                          FULL_WIDTH_TYPES.has(field.type)
+                            ? "md:col-span-2"
+                            : ""
+                        }
+                      >
+                        <DynamicField
+                          name={name}
+                          field={field}
+                          value={values[name]}
+                          error={errors[name]}
+                          onChange={handleChange}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </SectionWrapper>
+                <SectionSeparator />
+              </div>
+            )
+          },
+        )}
 
         {/* Companions section (only when no "Children" section from API) */}
         {/* {!hasChildrenSection && (

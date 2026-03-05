@@ -1,6 +1,7 @@
 "use client"
 
 import { CalendarDays, MapPin } from "lucide-react"
+import NextImage from "next/image"
 import { createContext, useContext } from "react"
 import type { PopupPublic } from "@/client"
 import { ButtonAnimated } from "@/components/ui/button"
@@ -63,9 +64,10 @@ function Image() {
   return (
     <div className="relative sm:h-auto sm:hidden lg:inline-block lg:w-1/3">
       {popup.image_url ? (
-        <img
+        <NextImage
           src={popup.image_url}
           alt={popup.name}
+          fill
           className="object-cover w-full h-full"
         />
       ) : (

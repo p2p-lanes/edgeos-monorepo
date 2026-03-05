@@ -85,6 +85,7 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
         <div className="text-center max-w-lg">
           <div className="mx-auto mb-8 flex h-24 w-24 items-center justify-center rounded-full bg-gray-200">
             <svg
+              aria-hidden="true"
               className="h-12 w-12 text-gray-400"
               fill="none"
               viewBox="0 0 24 24"

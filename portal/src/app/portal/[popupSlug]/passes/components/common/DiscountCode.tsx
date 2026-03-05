@@ -33,12 +33,13 @@ const DiscountCode = ({
   return (
     <div className="flex px-0 gap-4">
       {label && (
-        <p
+        <button
+          type="button"
           className="text-sm font-medium underline whitespace-nowrap cursor-pointer my-2"
           onClick={() => setOpen(!open)}
         >
           Have a coupon?
-        </p>
+        </button>
       )}
       {open ? (
         <div className="flex flex-col items-end gap-2">

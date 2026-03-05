@@ -1,6 +1,7 @@
 "use client"
 
 import { CalendarDays, MapPin } from "lucide-react"
+import Image from "next/image"
 import { useCityProvider } from "@/providers/cityProvider"
 
 export function FormHeader() {
@@ -26,13 +27,13 @@ export function FormHeader() {
 
   return (
     <div className="flex flex-col md:flex-row gap-6">
-      <div className="flex items-center">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={city.image_url ?? undefined}
+      <div className="relative flex items-center w-full md:min-h-[190px] md:w-[20vw] md:max-w-[240px]">
+        <Image
+          src={city.image_url ?? ""}
           alt={city.name}
-          style={{ height: "auto" }}
-          className="w-full md:min-h-[190px] md:w-[20vw] md:max-w-[240px] object-cover dark:invert rounded-2xl"
+          className="object-cover dark:invert rounded-2xl"
+          fill
+          sizes="(max-width: 768px) 100vw, 20vw"
         />
       </div>
       <div className="space-y-2">

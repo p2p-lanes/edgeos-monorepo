@@ -32,9 +32,9 @@ const UserInfoForm = ({
   group,
   onSubmit,
   isSubmitting,
-  isLoading,
+  isLoading: _isLoading,
   error,
-  isInvite = false,
+  isInvite: _isInvite = false,
 }: UserInfoFormProps) => {
   const [_isAutoFilled, setIsAutoFilled] = useState(false)
   const [showRedFlagScreen, setShowRedFlagScreen] = useState(false)
@@ -226,6 +226,7 @@ const UserInfoForm = ({
         {group?.description && (
           <CardDescription
             className="prose prose-sm max-w-none"
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: Rich text content from admin CMS
             dangerouslySetInnerHTML={{ __html: group.description }}
           />
         )}

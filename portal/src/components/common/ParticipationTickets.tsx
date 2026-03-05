@@ -9,7 +9,6 @@ import type { ProductsPass } from "@/types/Products"
 
 const ParticipationTickets = ({
   participation,
-  className,
   passes,
 }: {
   participation: ProductsPass[] | string

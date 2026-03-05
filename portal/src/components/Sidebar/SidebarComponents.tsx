@@ -83,6 +83,7 @@ const SidebarProvider = React.forwardRef<
         }
 
         // This sets the cookie to keep the sidebar state.
+        // biome-ignore lint/suspicious/noDocumentCookie: Cookie Store API not universally supported, direct assignment is intentional
         document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
       },
       [setOpenProp, open],
@@ -263,7 +264,7 @@ const SidebarTrigger = React.forwardRef<
   React.ElementRef<typeof Button>,
   React.ComponentProps<typeof Button>
 >(({ className, onClick, ...props }, ref) => {
-  const { toggleSidebar, openMobile } = useSidebar()
+  const { toggleSidebar } = useSidebar()
 
   return (
     <Button

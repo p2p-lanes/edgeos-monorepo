@@ -232,8 +232,9 @@ export function SectionDropZone({
                     </div>
                   </div>
                 ) : (
-                  <p
-                    className="text-sm text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
+                  <button
+                    type="button"
+                    className="text-sm text-muted-foreground cursor-pointer hover:text-foreground transition-colors block bg-transparent border-0 p-0 text-left"
                     onClick={handleStartEditDescription}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ")
@@ -242,7 +243,7 @@ export function SectionDropZone({
                     aria-label="Edit section description"
                   >
                     {sectionDescription || "Click to add description..."}
-                  </p>
+                  </button>
                 ))}
 
               {!isApiSection && (

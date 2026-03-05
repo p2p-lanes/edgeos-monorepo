@@ -306,16 +306,13 @@ const ImportMembersModal = ({
           members at once.
           <Tooltip>
             <TooltipTrigger asChild>
-              <a
-                href="#"
-                onClick={(e) => {
-                  e.preventDefault()
-                  handleDownloadTemplate()
-                }}
+              <button
+                type="button"
+                onClick={handleDownloadTemplate}
                 className="text-primary hover:underline inline-flex items-center text-sm font-medium cursor-pointer ml-1"
               >
                 Download template file.
-              </a>
+              </button>
             </TooltipTrigger>
             <TooltipContent className="max-w-xs">
               <p>
@@ -329,8 +326,9 @@ const ImportMembersModal = ({
     >
       <div className="space-y-6">
         {/* File upload area */}
-        <div
-          className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+        <button
+          type="button"
+          className={`w-full border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
             isDragging ? "border-primary bg-primary/5" : "border-gray-300"
           }`}
           onDragEnter={handleDragEnter}
@@ -382,7 +380,7 @@ const ImportMembersModal = ({
               </div>
             </div>
           )}
-        </div>
+        </button>
 
         {/* Validation error message */}
         {validationError && (

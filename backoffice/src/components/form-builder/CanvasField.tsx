@@ -5,9 +5,9 @@ import { GripVertical, Trash2 } from "lucide-react"
 import type { FormFieldPublic } from "@/client"
 import { Badge } from "@/components/ui/badge"
 import {
-  formFieldPublicToFormFieldSchema,
   FIELD_TYPES,
   FULL_WIDTH_TYPES,
+  formFieldPublicToFormFieldSchema,
   getPreviewValueForFieldType,
 } from "./constants"
 
@@ -100,35 +100,37 @@ export function CanvasField({
       style={style}
       className={`${isFullWidth ? "md:col-span-2" : ""}`}
     >
-      <div
+      <button
+        type="button"
         onClick={handleClick}
         onKeyDown={handleKeyDown}
         tabIndex={0}
-        role="button"
         aria-label={`Configure ${field.label} field`}
-        className={`group relative flex items-stretch rounded-md transition-all cursor-pointer ${
+        className={`group relative flex items-stretch rounded-md transition-all cursor-pointer text-left w-full ${
           isSelected
             ? "bg-primary/5 ring-1 ring-primary/30"
             : "hover:bg-muted/50"
         } ${isSpecial ? "opacity-90 bg-muted/30" : ""}`}
       >
         {/* Left drag handle — always visible */}
-        <div
-          className="flex items-center justify-center w-6 shrink-0 rounded-l-md cursor-grab active:cursor-grabbing text-muted-foreground/30 hover:text-muted-foreground transition-colors touch-none"
+        <button
+          type="button"
+          className="flex items-center justify-center w-6 shrink-0 rounded-l-md cursor-grab active:cursor-grabbing text-muted-foreground/30 hover:text-muted-foreground transition-colors touch-none border-0 bg-transparent p-0"
           {...attributes}
           {...listeners}
           aria-label="Drag to reorder"
           onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
         >
           <GripVertical className="h-4 w-4" />
-        </div>
+        </button>
 
         {/* Field content */}
         <div className="flex-1 py-2 pr-2">
           {/* Delete button — shows on group hover */}
           <div className="flex items-start justify-between mb-1.5">
             <div className="space-y-1">
-              <label className="text-sm font-semibold text-foreground">
+              <span className="text-sm font-semibold text-foreground">
                 {field.label}
                 {field.required && (
                   <span className="text-destructive ml-0.5">*</span>
@@ -141,7 +143,7 @@ export function CanvasField({
                     Protected
                   </Badge>
                 )}
-              </label>
+              </span>
               {field.help_text && (
                 <p className="text-xs text-muted-foreground leading-snug">
                   {field.help_text}
@@ -163,7 +165,7 @@ export function CanvasField({
           {/* Input preview */}
           <FieldPreview field={field} />
         </div>
-      </div>
+      </button>
     </div>
   )
 }

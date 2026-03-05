@@ -62,6 +62,7 @@ const Product = ({
 
   return (
     <button
+      type="button"
       onClick={
         disabled || (purchased && !isEditing)
           ? undefined

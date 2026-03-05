@@ -7,10 +7,12 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml /app/
 
 COPY backoffice/package.json /app/backoffice/
+COPY packages/shared-form-ui/package.json /app/packages/shared-form-ui/
 
 ENV NODE_ENV=development
 RUN pnpm install --frozen-lockfile
 
+COPY ./packages/shared-form-ui /app/packages/shared-form-ui
 COPY ./backoffice /app/backoffice
 ARG VITE_API_URL
 ENV NODE_ENV=production

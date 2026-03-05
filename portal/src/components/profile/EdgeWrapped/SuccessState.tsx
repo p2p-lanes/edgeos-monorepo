@@ -26,6 +26,7 @@ export const SuccessState = ({ imageUrl }: SuccessStateProps) => {
     <motion.div key="success" className="flex flex-col w-full gap-3 sm:gap-6">
       <div className="relative p-1 rounded-sm bg-white">
         <div className="relative w-full bg-gray-100 border border-gray-200">
+          {/* biome-ignore lint/performance/noImgElement: motion.img required for blur animation, Next Image incompatible */}
           <motion.img
             initial={{ filter: "blur(12px)", scale: 1.06 }}
             animate={{ filter: "blur(0px)", scale: 1 }}

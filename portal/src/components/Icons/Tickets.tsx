@@ -3,6 +3,7 @@ const height = 18
 
 export const TicketPatron = () => (
   <svg
+    aria-hidden="true"
     width={width}
     height={height}
     viewBox="0 0 16 16"
@@ -63,6 +64,7 @@ export const TicketPatron = () => (
 
 export const TicketWeek = ({ week }: { week: boolean }) => (
   <svg
+    aria-hidden="true"
     width={width}
     height={height}
     viewBox="0 0 16 16"

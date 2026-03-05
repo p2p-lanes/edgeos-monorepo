@@ -139,7 +139,7 @@ const DiscountCouponTotal = ({
   discountAmount,
   discountApplied,
   patreonSelected,
-  products,
+  products: _products,
 }: {
   discountAmount: number
   discountApplied: DiscountProps

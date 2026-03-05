@@ -15,19 +15,19 @@ function PaletteItem({ fieldType }: { fieldType: FieldTypeDefinition }) {
   const Icon = fieldType.icon
 
   return (
-    <div
+    <button
+      type="button"
       ref={setNodeRef}
       {...attributes}
       {...listeners}
       className={`flex items-center gap-3 rounded-lg border bg-background p-3 cursor-grab active:cursor-grabbing select-none transition-colors hover:bg-accent hover:border-accent-foreground/20 ${isDragging ? "opacity-40" : ""}`}
-      role="button"
       tabIndex={0}
       aria-label={`Drag ${fieldType.label} field`}
     >
       <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground" />
       <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
       <span className="text-sm font-medium truncate">{fieldType.label}</span>
-    </div>
+    </button>
   )
 }
 

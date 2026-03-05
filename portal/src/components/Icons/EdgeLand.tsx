@@ -1,6 +1,7 @@
 export const EdgeLand = () => {
   return (
     <svg
+      aria-hidden="true"
       width="30"
       height="37"
       viewBox="0 0 30 37"

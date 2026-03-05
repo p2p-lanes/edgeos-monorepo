@@ -3,7 +3,7 @@
 import { motion } from "framer-motion"
 import { ArrowRight } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useCityProvider } from "@/providers/cityProvider"
@@ -14,13 +14,13 @@ export default function SuccessStep() {
   const city = getCity()
   const [countdown, setCountdown] = useState(30)
 
-  const handleGoToPasses = () => {
+  const handleGoToPasses = useCallback(() => {
     if (city?.slug) {
       router.push(`/portal/${city.slug}/passes`)
     } else {
       router.push("/portal")
     }
-  }
+  }, [city?.slug, router])
 
   useEffect(() => {
     const timer = setInterval(() => {

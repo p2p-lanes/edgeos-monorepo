@@ -26,10 +26,10 @@ const EmailVerification = ({
   verificationError,
   countdown,
   handleEmailChange,
-  handleSendCode,
+  handleSendCode: _handleSendCode,
   handleResendCode,
   handleChangeEmail,
-  isDisabled,
+  isDisabled: _isDisabled,
   emailError,
 }: EmailVerificationProps) => {
   return (

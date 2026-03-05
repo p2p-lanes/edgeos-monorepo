@@ -2,7 +2,7 @@ import { useCalculateTotal } from "@/hooks/useCalculateTotal"
 import { usePassesProvider } from "@/providers/passesProvider"
 
 const BalancePasses = () => {
-  const { total, balance } = useCalculateTotal()
+  const { balance } = useCalculateTotal()
   const { isEditing } = usePassesProvider()
 
   if (!isEditing) return null

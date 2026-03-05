@@ -196,12 +196,13 @@ const AttendeeTicket = ({
               /* View mode - no purchased passes */
               <p className="text-gray-500 max-w-xs lg:max-w-sm leading-relaxed">
                 You do not yet have any passes for {city?.name}, please go to{" "}
-                <span
+                <button
+                  type="button"
                   onClick={onSwitchToBuy}
                   className="font-bold text-gray-900 hover:underline cursor-pointer"
                 >
                   Buy Passes
-                </span>{" "}
+                </button>{" "}
                 to purchase
               </p>
             ) : !toggleProduct && hasPurchased ? (

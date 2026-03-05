@@ -30,11 +30,14 @@ const OtpInput = React.forwardRef<HTMLDivElement, OtpInputProps>(
 
     const getOTPValue = () => (value ? value.toString().split("") : [])
 
-    const focusInput = (inputIndex: number) => {
-      const selectedIndex = Math.max(Math.min(length - 1, inputIndex), 0)
-      inputRefs.current[selectedIndex]?.focus()
-      setActiveInput(selectedIndex)
-    }
+    const focusInput = React.useCallback(
+      (inputIndex: number) => {
+        const selectedIndex = Math.max(Math.min(length - 1, inputIndex), 0)
+        inputRefs.current[selectedIndex]?.focus()
+        setActiveInput(selectedIndex)
+      },
+      [length],
+    )
 
     const handleOnChange = (
       e: React.ChangeEvent<HTMLInputElement>,

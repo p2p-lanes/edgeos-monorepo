@@ -60,8 +60,16 @@ export const FIELD_TYPES: FieldTypeDefinition[] = [
   { value: "number", label: "Number", icon: Hash },
   { value: "boolean", label: "Boolean (Yes/No)", icon: CheckSquare },
   { value: "select", label: "Select (Single)", icon: List },
-  { value: "select_cards", label: "Single select (visible options)", icon: LayoutGrid },
-  { value: "multiselect", label: "Pills (multiple selections)", icon: ListChecks },
+  {
+    value: "select_cards",
+    label: "Single select (visible options)",
+    icon: LayoutGrid,
+  },
+  {
+    value: "multiselect",
+    label: "Pills (multiple selections)",
+    icon: ListChecks,
+  },
   { value: "date", label: "Date", icon: Calendar },
   { value: "email", label: "Email", icon: Mail },
   { value: "url", label: "URL", icon: Link },

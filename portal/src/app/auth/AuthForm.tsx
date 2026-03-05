@@ -2,6 +2,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { motion } from "framer-motion"
+import Image from "next/image"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useRef, useState } from "react"
 import { z } from "zod/v4"
@@ -173,14 +174,17 @@ export default function AuthForm() {
           className="relative aspect-square w-[180px] mx-auto mb-8"
         >
           {tenant?.icon_url ? (
-            <img
+            <Image
               src={tenant.icon_url}
               alt={tenant.name ?? "Icon"}
               className="size-full rounded-lg object-cover"
+              fill
+              sizes="180px"
             />
           ) : (
             <div className="size-full rounded-lg bg-gray-200 flex items-center justify-center">
               <svg
+                aria-hidden="true"
                 className="size-16 text-gray-400"
                 fill="none"
                 viewBox="0 0 24 24"
@@ -250,6 +254,7 @@ export default function AuthForm() {
               >
                 {isLoading ? (
                   <svg
+                    aria-hidden="true"
                     className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
                     xmlns="http://www.w3.org/2000/svg"
                     fill="none"
@@ -306,6 +311,7 @@ export default function AuthForm() {
               >
                 {isLoading ? (
                   <svg
+                    aria-hidden="true"
                     className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
                     xmlns="http://www.w3.org/2000/svg"
                     fill="none"

@@ -62,7 +62,7 @@ export default function MultiSelectDropdown({
 
   return (
     <div className="w-full">
-      <label className="text-sm font-medium">{title}</label>
+      <span className="text-sm font-medium">{title}</span>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
@@ -82,10 +82,9 @@ export default function MultiSelectDropdown({
                     className="mr-1 mb-1"
                   >
                     {option.label}
-                    <span
+                    <button
+                      type="button"
                       className="ml-1 ring-offset-background rounded-full outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 cursor-pointer"
-                      role="button"
-                      tabIndex={0}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault()
@@ -103,7 +102,7 @@ export default function MultiSelectDropdown({
                       }}
                     >
                       <X className="h-3 w-3 text-muted-foreground hover:text-foreground" />
-                    </span>
+                    </button>
                   </Badge>
                 ))
               )}

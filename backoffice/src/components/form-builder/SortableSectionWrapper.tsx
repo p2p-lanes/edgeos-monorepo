@@ -46,14 +46,15 @@ export function SortableSectionWrapper({
 
   return (
     <div ref={setNodeRef} style={style} className="flex gap-2 items-stretch">
-      <div
-        className="flex items-center justify-center w-8 shrink-0 rounded-l-md cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground transition-colors touch-none"
+      <button
+        type="button"
+        className="flex items-center justify-center w-8 shrink-0 rounded-l-md cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground transition-colors touch-none border-0 bg-transparent p-0"
         {...attributes}
         {...listeners}
         aria-label="Drag to reorder section"
       >
         <GripVertical className="h-4 w-4" />
-      </div>
+      </button>
       <div className="flex-1 min-w-0">{children}</div>
     </div>
   )

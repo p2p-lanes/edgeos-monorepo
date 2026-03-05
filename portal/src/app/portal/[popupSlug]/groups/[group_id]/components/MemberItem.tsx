@@ -69,11 +69,11 @@ const MemberItem = ({
 
   return (
     <div className="border rounded-md overflow-hidden bg-white">
-      <div
-        className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50"
+      <button
+        type="button"
+        className="w-full p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50"
         onClick={() => setIsExpanded(!isExpanded)}
         aria-label={`Toggle details for ${member.first_name} ${member.last_name}`}
-        onKeyDown={(e) => e.key === "Enter" && setIsExpanded(!isExpanded)}
       >
         <div className="flex items-center gap-3">
           <User size={20} />
@@ -86,7 +86,7 @@ const MemberItem = ({
             </span>
           )}
         </div>
-        <motion.button
+        <motion.span
           className="text-gray-400 hover:text-gray-600 transition-all duration-300"
           aria-label={isExpanded ? "Collapse" : "Expand"}
           initial={false}
@@ -94,8 +94,8 @@ const MemberItem = ({
           transition={{ duration: 0.3, ease: "easeInOut" }}
         >
           <ChevronDown size={16} />
-        </motion.button>
-      </div>
+        </motion.span>
+      </button>
 
       <AnimatePresence>
         {isExpanded && (

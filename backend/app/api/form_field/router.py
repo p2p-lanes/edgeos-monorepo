@@ -212,8 +212,7 @@ async def update_form_field(
         # Only forward fields that were actually sent and are configurable
         configurable = {"section_id", "position", "placeholder", "help_text", "options"}
         update_data = {
-            k: getattr(field_in, k)
-            for k in field_in.model_fields_set & configurable
+            k: getattr(field_in, k) for k in field_in.model_fields_set & configurable
         }
         config_update = BaseFieldConfigUpdate(**update_data)
         updated_config = base_field_configs_crud.update(db, base_config, config_update)

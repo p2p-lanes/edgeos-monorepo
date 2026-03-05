@@ -168,8 +168,7 @@ export function useApplicationForm(schema: ApplicationFormSchema) {
   const progress = useMemo(() => {
     const allFields = { ...schema.base_fields, ...schema.custom_fields }
     const requiredFields = Object.entries(allFields).filter(
-      ([name, f]) =>
-        f.required && !fieldsReplacedByChildrenSection.has(name),
+      ([name, f]) => f.required && !fieldsReplacedByChildrenSection.has(name),
     )
     if (requiredFields.length === 0) return 100
 

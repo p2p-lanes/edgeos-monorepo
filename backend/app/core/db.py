@@ -35,8 +35,8 @@ def _generate_check_in_code() -> str:
 
 
 def init_db(session: Session) -> None:
-    from app.core.tenant_db import ensure_tenant_credentials
     from app.api.approval_strategy.schemas import ApprovalStrategyType
+    from app.core.tenant_db import ensure_tenant_credentials
     from app.models import (
         Applications,
         ApprovalStrategies,
@@ -179,9 +179,7 @@ def init_db(session: Session) -> None:
                 session.commit()
                 session.refresh(section)
                 default_section_map[section_key] = section.id
-                logger.info(
-                    f"Default section created: {section.label} for {popup_key}"
-                )
+                logger.info(f"Default section created: {section.label} for {popup_key}")
 
         # Create base field configs
         base_field_configs_crud.create_defaults_for_popup(
@@ -192,9 +190,7 @@ def init_db(session: Session) -> None:
     # Create default approval strategy (auto_accept) for each popup
     for popup_key, popup in popup_map.items():
         existing_strategy = session.exec(
-            select(ApprovalStrategies).where(
-                ApprovalStrategies.popup_id == popup.id
-            )
+            select(ApprovalStrategies).where(ApprovalStrategies.popup_id == popup.id)
         ).first()
         if not existing_strategy:
             strategy = ApprovalStrategies(
@@ -204,9 +200,7 @@ def init_db(session: Session) -> None:
             )
             session.add(strategy)
             session.commit()
-            logger.info(
-                f"Approval strategy created: auto_accept for {popup_key}"
-            )
+            logger.info(f"Approval strategy created: auto_accept for {popup_key}")
 
     product_map: dict[str, Products] = {}  # Key: "{popup_key}:{product_slug}"
     for product_data in seed_data.get("products", []):

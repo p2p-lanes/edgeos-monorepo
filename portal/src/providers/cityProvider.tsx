@@ -6,6 +6,7 @@ import {
   type ReactNode,
   useCallback,
   useContext,
+  useEffect,
   useState,
 } from "react"
 import type { PopupPublic } from "@/client"
@@ -23,6 +24,7 @@ export const CityContext = createContext<CityContext_interface | null>(null)
 const CityProvider = ({ children }: { children: ReactNode }) => {
   const { data: popups = [], isFetched } = usePopupsQuery()
   const [cityPreselected, setCityPreselected] = useState<string | null>(null)
+  const [lastValidCity, setLastValidCity] = useState<PopupPublic | null>(null)
   const params = useParams()
 
   const popupsLoaded = isFetched
@@ -31,16 +33,24 @@ const CityProvider = ({ children }: { children: ReactNode }) => {
     return popups.find((popup) => popup.slug === params.popupSlug) ?? null
   }, [popups, params.popupSlug])
 
+  const cityFromUrl = getValidCity()
+
+  useEffect(() => {
+    if (cityFromUrl) {
+      setLastValidCity(cityFromUrl)
+    }
+  }, [cityFromUrl])
+
   const getCity = useCallback((): PopupPublic | null => {
     const city = getValidCity()
     if (cityPreselected) {
       const selectedCity = popups.find((popup) => popup.id === cityPreselected)
       if (selectedCity) return selectedCity
     } else if (!city) {
-      return popups[0] ?? null
+      return lastValidCity ?? popups[0] ?? null
     }
     return city ?? null
-  }, [getValidCity, cityPreselected, popups])
+  }, [getValidCity, cityPreselected, popups, lastValidCity])
 
   const getPopups = useCallback((): PopupPublic[] => {
     return popups

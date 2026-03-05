@@ -16,8 +16,8 @@ export default function ProfileContent() {
     isLoading,
     error,
     updateProfile,
-    isUpdating,
-    updateError,
+    isUpdating: _isUpdating,
+    updateError: _updateError,
     refresh,
   } = useGetProfile()
   const [userData, setUserData] = useState(profile)

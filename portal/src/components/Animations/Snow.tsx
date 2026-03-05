@@ -25,7 +25,7 @@ const Snow = () => {
     )
   }
 
-  return <></>
+  return null
 }
 
 export default Snow

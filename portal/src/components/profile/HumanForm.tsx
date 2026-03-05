@@ -9,6 +9,7 @@ import {
   User,
   X,
 } from "lucide-react"
+import Image from "next/image"
 import { useRef, useState } from "react"
 import { RiTelegram2Line } from "react-icons/ri"
 import type { HumanPublic } from "@/client"
@@ -93,17 +94,19 @@ const HumanForm = ({
     <Card className="p-4 md:p-6 bg-white mb-8 flex flex-col md:flex-row md:flex-wrap md:items-center md:justify-between">
       <div className="flex items-center gap-4 order-1 md:order-1 mb-6 md:mb-0">
         <div className="relative">
-          <div
-            className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center cursor-pointer transition-all duration-200 hover:bg-blue-200 group"
+          <button
+            type="button"
+            className="relative w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center cursor-pointer transition-all duration-200 hover:bg-blue-200 group"
             onMouseEnter={() => setIsHovering(true)}
             onMouseLeave={() => setIsHovering(false)}
             onClick={handleAvatarClick}
           >
             {userData?.picture_url || editForm?.picture_url ? (
-              <img
+              <Image
                 src={editForm?.picture_url || userData?.picture_url}
                 alt="Profile"
-                className="w-full h-full rounded-full object-cover"
+                fill
+                className="rounded-full object-cover"
               />
             ) : (
               <User className="w-8 h-8 text-blue-600" />
@@ -118,7 +121,7 @@ const HumanForm = ({
                 )}
               </div>
             )}
-          </div>
+          </button>
 
           <input
             ref={fileInputRef}
@@ -183,6 +186,7 @@ const HumanForm = ({
                   {filteredLinkedEmails.length > 0 && (
                     <div className="mt-1">
                       <button
+                        type="button"
                         onClick={() => setShowLinkedEmails(!showLinkedEmails)}
                         className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition-colors"
                       >

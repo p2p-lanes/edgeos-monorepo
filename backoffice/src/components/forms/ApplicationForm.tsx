@@ -1,3 +1,8 @@
+import {
+  SchemaField,
+  type FormFieldSchema as SharedFormFieldSchema,
+  type FormSectionSchema as SharedFormSectionSchema,
+} from "@edgeos/shared-form-ui"
 import { useForm } from "@tanstack/react-form"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
@@ -15,11 +20,6 @@ import { FormErrorSummary } from "@/components/Common/FormErrorSummary"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  SchemaField,
-  type FormFieldSchema as SharedFormFieldSchema,
-  type FormSectionSchema as SharedFormSectionSchema,
-} from "@edgeos/shared-form-ui"
 import {
   Card,
   CardContent,

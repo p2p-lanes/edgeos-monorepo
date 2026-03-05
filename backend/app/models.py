@@ -39,12 +39,16 @@ from app.api.email_template.schemas import (
     EmailTemplateType,
     EmailTemplateUpdate,
 )
+from app.api.form_field.models import FormFields
+from app.api.form_field.schemas import FormFieldCreate, FormFieldPublic, FormFieldUpdate
 
 # Form sections & fields
 from app.api.form_section.models import FormSections
-from app.api.form_section.schemas import FormSectionCreate, FormSectionPublic, FormSectionUpdate
-from app.api.form_field.models import FormFields
-from app.api.form_field.schemas import FormFieldCreate, FormFieldPublic, FormFieldUpdate
+from app.api.form_section.schemas import (
+    FormSectionCreate,
+    FormSectionPublic,
+    FormSectionUpdate,
+)
 
 # Group models
 from app.api.group.models import (

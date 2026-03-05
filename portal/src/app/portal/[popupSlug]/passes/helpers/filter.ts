@@ -85,20 +85,33 @@ export const filterProductsToPurchase = (
             ? (product.quantity ?? 0)
             : (product.quantity ?? 0) - (product.original_quantity ?? 0),
         }
-        return [...acc, newProduct]
+        acc.push(newProduct)
+        return acc
       }
-      return [...acc, product]
+      acc.push(product)
+      return acc
     }
 
     if (editableMode) {
-      if (isMonthProduct && product.purchased && !product.edit)
-        return [...acc, product]
+      if (isMonthProduct && product.purchased && !product.edit) {
+        acc.push(product)
+        return acc
+      }
 
-      if (isPatreonProduct && product.purchased) return [...acc, product]
+      if (isPatreonProduct && product.purchased) {
+        acc.push(product)
+        return acc
+      }
 
-      if (isWeekProduct && !hasMonth) return [...acc, product]
+      if (isWeekProduct && !hasMonth) {
+        acc.push(product)
+        return acc
+      }
 
-      if (isDayProduct && !hasMonth) return [...acc, product]
+      if (isDayProduct && !hasMonth) {
+        acc.push(product)
+        return acc
+      }
     }
 
     return acc

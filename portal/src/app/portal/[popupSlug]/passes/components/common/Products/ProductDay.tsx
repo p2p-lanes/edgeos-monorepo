@@ -125,10 +125,11 @@ const Product = ({
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <div
+        <button
+          type="button"
           onClick={handleMainClick}
           className={cn(
-            "flex items-center gap-2 border border-neutral-200 rounded-md p-2 relative cursor-pointer",
+            "flex items-center gap-2 border border-neutral-200 rounded-md p-2 relative cursor-pointer w-full text-left",
             variants[
               purchased
                 ? "purchased"
@@ -140,9 +141,9 @@ const Product = ({
             ],
             disabled && "cursor-not-allowed",
           )}
-          role="button"
           tabIndex={disabled ? -1 : 0}
           aria-disabled={disabled}
+          disabled={disabled}
         >
           <div className="flex justify-between w-full flex-wrap">
             <div className="flex md:items-center md:gap-2 flex-col md:flex-row">
@@ -223,7 +224,7 @@ const Product = ({
               </div>
             </div>
           </div>
-        </div>
+        </button>
       </TooltipTrigger>
       {hasMonthPurchased && (
         <TooltipContent className="bg-white text-black shadow-md border border-gray-200 max-w-sm">
@@ -251,15 +252,18 @@ const QuantityControls = ({
 }) => {
   const showQuantityControls = product.quantity && product.quantity > 0
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: stopPropagation container for quantity buttons
     <div
       className="flex items-center relative h-6 overflow-hidden"
       onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => e.stopPropagation()}
     >
       {showQuantityControls ? (
         <div className="flex items-center animate-fade-in-right">
           {!disabled && (
             <button
-              onClick={(_e) => {
+              type="button"
+              onClick={() => {
                 handleSubtractQuantity()
               }}
               className={cn(
@@ -279,7 +283,8 @@ const QuantityControls = ({
 
           {!disabled && (
             <button
-              onClick={(_e) => {
+              type="button"
+              onClick={() => {
                 handleSumQuantity()
               }}
               className={cn(
@@ -297,7 +302,8 @@ const QuantityControls = ({
       ) : (
         !disabled && (
           <button
-            onClick={(_e) => {
+            type="button"
+            onClick={() => {
               handleSumQuantity()
             }}
             className="hidden transition-all duration-300 ease-in-out transform hover:scale-110 md:flex items-center justify-center w-6 h-6 rounded"

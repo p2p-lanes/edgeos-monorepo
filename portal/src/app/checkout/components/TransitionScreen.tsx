@@ -57,6 +57,7 @@ const TransitionScreen = ({
         >
           <div className="w-16 h-16 bg-green-100 text-green-800 rounded-full flex items-center justify-center mb-4">
             <svg
+              aria-hidden="true"
               xmlns="http://www.w3.org/2000/svg"
               className="h-8 w-8"
               fill="none"

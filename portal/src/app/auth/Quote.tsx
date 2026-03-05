@@ -32,6 +32,7 @@ export default function Quote() {
         ) : (
           <div className="w-[100px] h-[40px] rounded bg-gray-300/50 flex items-center justify-center">
             <svg
+              aria-hidden="true"
               className="size-6 text-gray-400"
               fill="none"
               viewBox="0 0 24 24"
@@ -49,6 +50,7 @@ export default function Quote() {
       </div>
       {!tenant?.image_url && (
         <svg
+          aria-hidden="true"
           className="size-24 text-gray-400"
           fill="none"
           viewBox="0 0 24 24"

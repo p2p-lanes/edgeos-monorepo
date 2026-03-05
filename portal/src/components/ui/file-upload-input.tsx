@@ -98,6 +98,7 @@ export function FileUploadInput({
       <LabelMuted>
         {subtitle} {isRequired && <span className="text-red-500">*</span>}
       </LabelMuted>
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: Drop zone requires drag event handlers on a container div */}
       <div
         className={`p-4 border-2 border-dashed rounded-lg ${
           dragActive ? "border-primary" : "border-gray-300"

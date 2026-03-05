@@ -114,10 +114,14 @@ export default function HousingStep({ onSkip }: HousingStepProps) {
         </div>
         <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
           <div className="flex-1 min-w-0">
-            <label className="block text-xs text-gray-500 mb-1 sm:hidden">
+            <label
+              htmlFor="checkin-date"
+              className="block text-xs text-gray-500 mb-1 sm:hidden"
+            >
               Check-in
             </label>
             <input
+              id="checkin-date"
               type="date"
               value={formatDateInput(checkIn)}
               min={formatDateInput(popupStart)}
@@ -128,10 +132,14 @@ export default function HousingStep({ onSkip }: HousingStepProps) {
           </div>
           <span className="hidden sm:block self-center text-gray-400">to</span>
           <div className="flex-1 min-w-0">
-            <label className="block text-xs text-gray-500 mb-1 sm:hidden">
+            <label
+              htmlFor="checkout-date"
+              className="block text-xs text-gray-500 mb-1 sm:hidden"
+            >
               Check-out
             </label>
             <input
+              id="checkout-date"
               type="date"
               value={formatDateInput(checkOut)}
               min={formatDateInput(checkIn)}

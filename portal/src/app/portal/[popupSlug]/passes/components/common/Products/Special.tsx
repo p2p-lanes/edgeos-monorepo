@@ -122,6 +122,7 @@ function SpecialBase({
   const hasOnClick = !isDisabled && onClick && !purchased
   return (
     <button
+      type="button"
       data-category="patreon"
       onClick={hasOnClick ? onClick : undefined}
       data-selected={selected}

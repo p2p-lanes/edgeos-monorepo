@@ -22,7 +22,7 @@ const PaginationControls = ({
   totalItems,
   pageSize,
   onPageChange,
-  onPageSizeChange,
+  onPageSizeChange: _onPageSizeChange,
 }: PaginationControlsProps) => {
   const totalPages = Math.ceil(totalItems / pageSize)
 
