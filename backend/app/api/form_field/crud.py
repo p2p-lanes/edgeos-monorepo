@@ -197,9 +197,20 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
         db_configs = base_field_configs_crud.find_by_popup(session, popup_id)
         config_map = {c.field_name: c for c in db_configs}
 
+        # Determine which companion fields to include based on popup settings
+        spouse_fields = {"partner", "partner_email"}
+        children_fields = {"kids"}
+        skip_fields: set[str] = set()
+        if popup and not popup.allows_spouse:
+            skip_fields |= spouse_fields
+        if popup and not popup.allows_children:
+            skip_fields |= children_fields
+
         # Build base fields by merging hardcoded definitions with DB configs
         base_fields: dict[str, Any] = {}
         for field_name, definition in BASE_FIELD_DEFINITIONS.items():
+            if field_name in skip_fields:
+                continue
             entry: dict[str, Any] = {
                 "type": definition["type"],
                 "label": definition["label"],

@@ -33,8 +33,8 @@ export default function ConfirmStep() {
     monthUpgradeCredit,
   } = useCheckout()
   const { getRelevantApplication } = useApplication()
-  const _application = getRelevantApplication()
-  const accountCredit = 0 // ApplicationPublic doesn't have credit field yet
+  const application = getRelevantApplication()
+  const accountCredit = application?.credit ? Number(application.credit) : 0
 
   const [promoInput, setPromoInput] = useState(cart.promoCode)
   const [promoError, setPromoError] = useState("")

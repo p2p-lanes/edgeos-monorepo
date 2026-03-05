@@ -7,11 +7,12 @@ defaults here but can be overridden per popup via BaseFieldConfigs records.
 
 from typing import Any
 
-# Default sections created for every popup.
+# Default sections created for every popup.Z
 # Keys are used as identifiers during creation; values define the section.
 DEFAULT_SECTIONS: dict[str, dict[str, Any]] = {
-    "profile": {"label": "Profile", "order": 0},
+    "profile": {"label": "Personal Information", "order": 0},
     "info_not_shared": {"label": "Info not shared", "order": 1},
+    "companions": {"label": "Children and +1s", "order": 2},
 }
 
 # Each entry defines:
@@ -78,29 +79,13 @@ BASE_FIELD_DEFINITIONS: dict[str, dict[str, Any]] = {
         "default_position": 5,
         "default_options": ["18-24", "25-34", "35-44", "45-54", "55+"],
     },
-    "organization": {
-        "type": "text",
-        "label": "Organization",
-        "required": False,
-        "target": "human",
-        "default_section_key": "profile",
-        "default_position": 6,
-    },
-    "role": {
-        "type": "text",
-        "label": "Role",
-        "required": False,
-        "target": "human",
-        "default_section_key": "profile",
-        "default_position": 7,
-    },
     "referral": {
         "type": "text",
         "label": "Did anyone refer you?",
         "required": False,
         "target": "application",
         "default_section_key": "profile",
-        "default_position": 8,
+        "default_position": 6,
         "default_help_text": "List everyone who encouraged you to apply.",
     },
     "info_not_shared": {
@@ -122,5 +107,34 @@ BASE_FIELD_DEFINITIONS: dict[str, dict[str, Any]] = {
             "Age",
             "Residence",
         ],
+    },
+    "partner": {
+        "type": "text",
+        "label": "Name of spouse/partner + duration of their stay",
+        "required": True,
+        "target": "application",
+        "default_section_key": "companions",
+        "default_position": 0,
+        "default_placeholder": "Name",
+        "default_help_text": "We will approve your spouse/partner if we approve you. However please have them fill out this form as well so we have their information in our system.",
+    },
+    "partner_email": {
+        "type": "email",
+        "label": "Spouse/partner email",
+        "required": True,
+        "target": "application",
+        "default_section_key": "companions",
+        "default_position": 1,
+        "default_placeholder": "Email",
+        "default_help_text": "Please provide your spouse/partner's email so we can remind them to apply.",
+    },
+    "kids": {
+        "type": "kids",
+        "label": "I’m bringing kids",
+        "required": False,
+        "target": "application",
+        "default_section_key": "companions",
+        "default_position": 2,
+        "default_help_text": "We will approve your kids if we approve you. Your kids do not need to fill out their own version of this form however.",
     },
 }

@@ -438,8 +438,6 @@ async def update_my_application(
         "first_name",
         "last_name",
         "telegram",
-        "organization",
-        "role",
         "gender",
         "age",
         "residence",
@@ -519,14 +517,17 @@ def _build_directory_entry(application) -> AttendeesDirectoryEntry:
         if a.category != "main"
     ]
 
+    # Read organization/role from application custom_fields
+    custom = application.custom_fields or {}
+
     return AttendeesDirectoryEntry(
         id=application.id,
         first_name=mask("first_name", human.first_name if human else None),
         last_name=mask("last_name", human.last_name if human else None),
         email=mask("email", human.email if human else None),
         telegram=mask("telegram", human.telegram if human else None),
-        role=mask("role", human.role if human else None),
-        organization=mask("organization", human.organization if human else None),
+        role=mask("role", custom.get("role")),
+        organization=mask("organization", custom.get("organization")),
         residence=mask("residence", human.residence if human else None),
         age=mask("age", human.age if human else None),
         gender=mask("gender", human.gender if human else None),

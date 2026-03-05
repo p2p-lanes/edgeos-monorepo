@@ -54,7 +54,7 @@ def _get_credit(application: Applications, discount_value: Decimal) -> Decimal:
         if not patreon:
             total += subtotal
 
-    credit = Decimal(str(application.credit)) if application.credit else Decimal("0")  # type: ignore[attr-defined]
+    credit = Decimal(str(application.credit)) if application.credit else Decimal("0")
     return _get_discounted_price(total, discount_value) + credit
 
 
@@ -383,6 +383,27 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         return already_patreon
 
+    def _calculate_insurance(
+        self,
+        session: Session,
+        requested_products: list[PaymentProductRequest],
+    ) -> Decimal:
+        """Calculate insurance amount based on product insurance percentages."""
+        product_ids = list({rp.product_id for rp in requested_products})
+        statement = select(Products).where(Products.id.in_(product_ids))  # type: ignore[attr-defined]
+        product_models = {p.id: p for p in session.exec(statement).all()}
+
+        total = Decimal("0")
+        for req_prod in requested_products:
+            product = product_models.get(req_prod.product_id)
+            if not product or not product.insurance_percentage:
+                continue
+            total += (
+                product.price * req_prod.quantity * product.insurance_percentage / 100
+            ).quantize(MONEY_PRECISION, rounding=ROUND_HALF_UP)
+
+        return total
+
     def _apply_discounts(
         self,
         session: Session,
@@ -456,6 +477,12 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 response.coupon_id = coupon.id
                 response.coupon_code = coupon.code
                 response.discount_value = coupon_discount
+
+        # Calculate insurance if requested
+        if obj.insurance:
+            insurance_amount = self._calculate_insurance(session, obj.products)
+            response.insurance_amount = insurance_amount
+            response.amount += insurance_amount
 
         return response
 
@@ -541,6 +568,13 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             # Auto-approve and add products directly
             self._add_products_to_attendees(session, obj.products)
 
+            # Clear cart after successful purchase
+            from app.api.cart.crud import carts_crud
+
+            carts_crud.delete_by_human_popup(
+                session, human_id=application.human_id, popup_id=application.popup_id
+            )
+
             session.add(application)
             session.commit()
             session.refresh(application)
@@ -605,6 +639,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             application_id=obj.application_id,
             status=simplefi_response.status,
             amount=preview.amount,
+            insurance_amount=preview.insurance_amount,
             currency=preview.currency,
             coupon_id=preview.coupon_id,
             coupon_code=preview.coupon_code,
@@ -708,6 +743,16 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
             # Create ambassador group if patreon product was purchased
             self._create_ambassador_group(session, payment)
+
+            # Clear cart after successful payment
+            from app.api.cart.crud import carts_crud
+
+            if payment.application:
+                carts_crud.delete_by_human_popup(
+                    session,
+                    human_id=payment.application.human_id,
+                    popup_id=payment.application.popup_id,
+                )
 
             # Single atomic commit for the entire operation
             session.commit()

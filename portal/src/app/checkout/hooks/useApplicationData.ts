@@ -45,8 +45,6 @@ export const useApplicationData = ({
           last_name: matchingApp.human?.last_name || "",
           email: decodedToken.email,
           telegram: matchingApp.human?.telegram || "",
-          organization: matchingApp.human?.organization || "",
-          role: matchingApp.human?.role || "",
           gender: matchingApp.human?.gender?.toLowerCase() || "",
           email_verified: true,
           local_resident: "",

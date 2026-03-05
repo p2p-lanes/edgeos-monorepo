@@ -430,16 +430,6 @@ const getColumns = (
     ),
   },
   {
-    accessorKey: "human.organization",
-    header: "Organization",
-    meta: { label: "Organization", toggleable: true },
-    cell: ({ row }) => (
-      <span className="text-muted-foreground">
-        {row.original.human?.organization || "N/A"}
-      </span>
-    ),
-  },
-  {
     accessorKey: "status",
     header: ({ column }) => <SortableHeader label="Status" column={column} />,
     meta: { label: "Status", toggleable: true },
@@ -635,14 +625,8 @@ function ApplicationsTableContent() {
       columns={columns}
       data={applications.results}
       tableId="applications"
-      searchPlaceholder="Search by name, email, or organization..."
-      hiddenOnMobile={[
-        "human.organization",
-        "attendees",
-        "red_flag",
-        "submitted_at",
-        "referral",
-      ]}
+      searchPlaceholder="Search by name or email..."
+      hiddenOnMobile={["attendees", "red_flag", "submitted_at", "referral"]}
       searchValue={search}
       onSearchChange={setSearch}
       filterBar={
@@ -764,8 +748,6 @@ function Applications() {
         { key: "status", label: "Status" },
         { key: "referral", label: "Referral" },
         { key: "human.telegram", label: "Telegram" },
-        { key: "human.organization", label: "Organization" },
-        { key: "human.role", label: "Role" },
         { key: "human.gender", label: "Gender" },
         { key: "human.age", label: "Age Range" },
         { key: "human.residence", label: "Residence" },

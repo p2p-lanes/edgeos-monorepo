@@ -109,15 +109,6 @@ const columns: ColumnDef<HumanPublic>[] = [
     ),
   },
   {
-    accessorKey: "organization",
-    header: "Organization",
-    cell: ({ row }) => (
-      <span className="text-muted-foreground">
-        {row.original.organization || "—"}
-      </span>
-    ),
-  },
-  {
     accessorKey: "red_flag",
     header: "Status",
     cell: ({ row }) => (
@@ -153,8 +144,8 @@ function HumansTableContent() {
     <DataTable
       columns={columns}
       data={humans.results}
-      searchPlaceholder="Search by name, email, or organization..."
-      hiddenOnMobile={["organization", "red_flag"]}
+      searchPlaceholder="Search by name or email..."
+      hiddenOnMobile={["red_flag"]}
       searchValue={search}
       onSearchChange={setSearch}
       serverPagination={{

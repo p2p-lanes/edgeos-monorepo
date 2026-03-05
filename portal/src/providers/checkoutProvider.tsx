@@ -1,6 +1,5 @@
 "use client"
 
-import { jwtDecode } from "jwt-decode"
 import {
   createContext,
   type ReactNode,
@@ -15,13 +14,13 @@ import { toast } from "sonner"
 import type { PaymentProductRequest } from "@/client"
 import { CouponsService, PaymentsService } from "@/client"
 import {
-  clearCartStorage,
-  loadCheckoutCart,
-  markPurchasePending,
-  type PersistedCheckoutCart,
-  saveCheckoutCart,
-} from "@/hooks/useCartStorage"
+  type CartState,
+  useCart,
+  useClearCart,
+  useSaveCart,
+} from "@/hooks/useCartApi"
 import useGetPassesData from "@/hooks/useGetPassesData"
+import { markPurchasePending } from "@/hooks/usePaymentRedirect"
 import type { AttendeePassState } from "@/types/Attendee"
 import type {
   CheckoutCartState,
@@ -96,22 +95,14 @@ export function CheckoutProvider({
   const { getCity } = useCityProvider()
   const { products } = useGetPassesData()
   const application = getRelevantApplication()
+  const appCredit = application?.credit
   const city = getCity()
-  const cityId = city?.id
+  const cityId = city?.id ? String(city.id) : null
 
-  const citizenId = useMemo(() => {
-    try {
-      const token =
-        typeof window !== "undefined"
-          ? window.localStorage.getItem("token")
-          : null
-      if (!token) return null
-      const decoded = jwtDecode<{ citizen_id?: string }>(token)
-      return decoded.citizen_id ?? null
-    } catch {
-      return null
-    }
-  }, [])
+  // Cart API hooks
+  const { data: savedCart, isSuccess: cartLoaded } = useCart(cityId)
+  const { save: debouncedSaveCart } = useSaveCart(cityId)
+  const clearCartMutation = useClearCart(cityId)
 
   const hasRestoredCheckoutRef = useRef(false)
 
@@ -127,28 +118,26 @@ export function CheckoutProvider({
   const [promoCodeDiscount, setPromoCodeDiscount] = useState(0)
   const [insurance, setInsurance] = useState(false)
 
-  // Restore checkout cart from localStorage
+  // Restore checkout cart from DB
   useEffect(() => {
-    if (hasRestoredCheckoutRef.current || !cityId || !citizenId) return
+    if (hasRestoredCheckoutRef.current || !cartLoaded || !savedCart) return
+    if (!products.length) return
 
     hasRestoredCheckoutRef.current = true
 
     if (initialStep === "success") {
-      clearCartStorage(citizenId, cityId)
+      clearCartMutation.mutate()
       return
     }
-
-    const savedCart = loadCheckoutCart(citizenId, cityId)
-    if (!savedCart) return
 
     // Restore housing
     if (savedCart.housing) {
       const product = products.find(
-        (p) => p.id === savedCart.housing?.productId,
+        (p) => p.id === savedCart.housing?.product_id,
       )
       if (product) {
-        const start = new Date(savedCart.housing.checkIn)
-        const end = new Date(savedCart.housing.checkOut)
+        const start = new Date(savedCart.housing.check_in)
+        const end = new Date(savedCart.housing.check_out)
         const nights = Math.max(
           1,
           Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)),
@@ -156,8 +145,8 @@ export function CheckoutProvider({
         setHousing({
           productId: product.id,
           product,
-          checkIn: savedCart.housing.checkIn,
-          checkOut: savedCart.housing.checkOut,
+          checkIn: savedCart.housing.check_in,
+          checkOut: savedCart.housing.check_out,
           nights,
           pricePerNight: product.price,
           totalPrice: product.price * nights,
@@ -169,7 +158,7 @@ export function CheckoutProvider({
     if (savedCart.merch?.length) {
       const restoredMerch = savedCart.merch.reduce<SelectedMerchItem[]>(
         (acc, saved) => {
-          const product = products.find((p) => p.id === saved.productId)
+          const product = products.find((p) => p.id === saved.product_id)
           if (!product || saved.quantity <= 0) return acc
           acc.push({
             productId: product.id,
@@ -184,7 +173,32 @@ export function CheckoutProvider({
       )
       if (restoredMerch.length > 0) setMerch(restoredMerch)
     }
-  }, [cityId, citizenId, products, initialStep])
+
+    // Restore patron
+    if (savedCart.patron) {
+      const product = products.find(
+        (p) => p.id === savedCart.patron?.product_id,
+      )
+      if (product) {
+        setPatron({
+          productId: product.id,
+          product,
+          amount: savedCart.patron.amount,
+          isCustomAmount: savedCart.patron.is_custom_amount,
+        })
+      }
+    }
+
+    // Restore promo code
+    if (savedCart.promo_code) {
+      setPromoCode(savedCart.promo_code)
+    }
+
+    // Restore insurance
+    if (savedCart.insurance) {
+      setInsurance(true)
+    }
+  }, [cartLoaded, savedCart, products, initialStep, clearCartMutation])
 
   // Loading states
   const [isLoading, setIsLoading] = useState(false)
@@ -325,26 +339,21 @@ export function CheckoutProvider({
 
       for (const pass of passes) {
         const pct =
-          (pass.product as ProductsPass & { insurance_percentage?: number })
-            .insurance_percentage ?? DEFAULT_INSURANCE_PCT
+          Number(pass.product.insurance_percentage) || DEFAULT_INSURANCE_PCT
         const basePrice = pass.originalPrice ?? pass.price
         total += (basePrice * pct) / 100
       }
 
       if (housingItem) {
         const pct =
-          (
-            housingItem.product as ProductsPass & {
-              insurance_percentage?: number
-            }
-          ).insurance_percentage ?? DEFAULT_INSURANCE_PCT
+          Number(housingItem.product.insurance_percentage) ||
+          DEFAULT_INSURANCE_PCT
         total += (housingItem.totalPrice * pct) / 100
       }
 
       for (const item of merchItems) {
         const pct =
-          (item.product as ProductsPass & { insurance_percentage?: number })
-            .insurance_percentage ?? DEFAULT_INSURANCE_PCT
+          Number(item.product.insurance_percentage) || DEFAULT_INSURANCE_PCT
         total += (item.totalPrice * pct) / 100
       }
 
@@ -391,25 +400,49 @@ export function CheckoutProvider({
     ],
   )
 
-  // Persist checkout cart to localStorage
+  // Persist checkout cart to DB (debounced)
   useEffect(() => {
-    if (!cityId || !citizenId || !hasRestoredCheckoutRef.current) return
-    const persistedCart: PersistedCheckoutCart = {
+    if (!cityId || !hasRestoredCheckoutRef.current) return
+
+    const cartState: CartState = {
+      passes: selectedPasses.map((p) => ({
+        attendee_id: p.attendeeId,
+        product_id: p.productId,
+        quantity: p.quantity,
+      })),
       housing: housing
         ? {
-            productId: housing.productId,
-            checkIn: housing.checkIn,
-            checkOut: housing.checkOut,
+            product_id: housing.productId,
+            check_in: housing.checkIn,
+            check_out: housing.checkOut,
           }
         : null,
       merch: merch.map((m) => ({
-        productId: m.productId,
+        product_id: m.productId,
         quantity: m.quantity,
       })),
-      patron: null,
+      patron: patron
+        ? {
+            product_id: patron.productId,
+            amount: patron.amount,
+            is_custom_amount: patron.isCustomAmount,
+          }
+        : null,
+      promo_code: promoCodeValid ? promoCode : null,
+      insurance,
     }
-    saveCheckoutCart(citizenId, cityId, persistedCart)
-  }, [housing, merch, cityId, citizenId])
+    debouncedSaveCart(cartState)
+  }, [
+    housing,
+    merch,
+    patron,
+    selectedPasses,
+    promoCode,
+    promoCodeValid,
+    insurance,
+    cityId,
+    debouncedSaveCart,
+  ])
 
   // Calculate summary
   const summary = useMemo<CheckoutCartSummary>(() => {
@@ -436,7 +469,7 @@ export function CheckoutProvider({
       patronSubtotal +
       insuranceSubtotal
     const discount = originalSubtotal - subtotal
-    const accountCredit = 0 // ApplicationPublic does not have credit field yet
+    const accountCredit = appCredit ? Number(appCredit) : 0
     const credit = isEditing
       ? editCredit + accountCredit
       : accountCredit + monthUpgradeCredit
@@ -469,6 +502,7 @@ export function CheckoutProvider({
     isEditing,
     editCredit,
     monthUpgradeCredit,
+    appCredit,
   ])
 
   // Navigation
@@ -670,10 +704,8 @@ export function CheckoutProvider({
     setPromoCodeValid(false)
     setPromoCodeDiscount(0)
     setInsurance(false)
-    if (cityId && citizenId) {
-      clearCartStorage(citizenId, cityId)
-    }
-  }, [cityId, citizenId])
+    clearCartMutation.mutate()
+  }, [clearCartMutation])
 
   // Validation helpers
   const canProceedToStepFn = useCallback(
@@ -773,7 +805,7 @@ export function CheckoutProvider({
           }
         }
       } else {
-        const hasAccountCredit = false // ApplicationPublic doesn't have credit yet
+        const hasAccountCredit = appCredit ? Number(appCredit) > 0 : false
 
         if (hasAccountCredit || isMonthUpgrade) {
           for (const attendee of attendeePasses) {
@@ -846,6 +878,7 @@ export function CheckoutProvider({
           products: productsToSend,
           coupon_code: promoCodeValid ? promoCode : undefined,
           edit_passes: isEditing || isMonthUpgrade ? true : undefined,
+          insurance: insurance || undefined,
         },
       })
 
@@ -891,12 +924,14 @@ export function CheckoutProvider({
     }
   }, [
     application?.id,
+    appCredit,
     selectedPasses,
     merch,
     housing,
     patron,
     promoCodeValid,
     promoCode,
+    insurance,
     clearCart,
     isEditing,
     attendeePasses,

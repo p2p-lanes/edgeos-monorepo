@@ -98,9 +98,13 @@ class MonthProductStrategy implements ProductStrategy {
           selected:
             p.id === product.id
               ? !p.selected
-              : p.duration_type === "week" && !p.purchased
-                ? willSelectMonth
+              : p.duration_type === "week" && !p.purchased && willSelectMonth
+                ? false
                 : p.selected,
+          quantity:
+            p.duration_type === "day" && !p.purchased && willSelectMonth
+              ? 0
+              : p.quantity,
         })),
       }
     })
@@ -261,10 +265,39 @@ class ExclusivityGuard implements ProductStrategy {
   }
 }
 
+class EditProductStrategy implements ProductStrategy {
+  handleSelection(
+    attendees: AttendeePassState[],
+    attendeeId: string,
+    product: ProductsPass,
+  ): AttendeePassState[] {
+    return attendees.map((attendee) => {
+      if (attendee.id !== attendeeId) return attendee
+
+      return {
+        ...attendee,
+        products: attendee.products.map((p) => {
+          if (p.id !== product.id) return p
+
+          if (p.purchased) {
+            // Toggle edit flag: give up for credit
+            return { ...p, edit: !p.edit, selected: !p.edit }
+          }
+
+          // Non-purchased: toggle selection
+          return { ...p, selected: !p.selected }
+        }),
+      }
+    })
+  }
+}
+
 export const getProductStrategy = (
   product: ProductsPass,
-  _isEditing: boolean,
+  isEditing: boolean,
 ): ProductStrategy => {
+  if (isEditing) return new EditProductStrategy()
+
   if (product.exclusive) return new ExclusiveProductStrategy()
 
   if (product.category === "patreon") return new PatreonProductStrategy()

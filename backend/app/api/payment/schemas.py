@@ -55,6 +55,10 @@ class PaymentBase(SQLModel):
     amount: Decimal = Field(
         default=Decimal("0"), sa_column=Column(Numeric(10, 2), nullable=False)
     )
+    insurance_amount: Decimal = Field(
+        default=Decimal("0"),
+        sa_column=Column(Numeric(10, 2), nullable=False, server_default="0"),
+    )
     currency: str = Field(default="USD")
     rate: Decimal | None = Field(
         default=None, sa_column=Column(Numeric(18, 8), nullable=True)
@@ -110,6 +114,7 @@ class PaymentCreate(BaseModel):
     products: list[PaymentProductRequest]
     coupon_code: str | None = None
     edit_passes: bool = False
+    insurance: bool = False
 
     @field_validator("products", mode="before")
     @classmethod
@@ -129,6 +134,7 @@ class PaymentPreview(BaseModel):
     products: list[PaymentProductRequest]
     original_amount: Decimal
     amount: Decimal
+    insurance_amount: Decimal = Decimal("0")
     currency: str = "USD"
     edit_passes: bool = False
 

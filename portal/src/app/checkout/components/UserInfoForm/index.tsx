@@ -1,7 +1,7 @@
 "use client"
 
-import { useSearchParams } from "next/navigation"
 import { useEffect, useState } from "react"
+import type { GroupPublic } from "@/client"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -14,7 +14,6 @@ import {
 import { useApplicationData } from "../../hooks/useApplicationData"
 import { useEmailVerification } from "../../hooks/useEmailVerification"
 import { useUserForm } from "../../hooks/useUserForm"
-import type { GroupPublic } from "@/client"
 import type { FormDataProps } from "../../types"
 import EmailVerification from "./EmailVerification"
 import PersonalInfoForm from "./PersonalInfoForm"
@@ -39,8 +38,6 @@ const UserInfoForm = ({
 }: UserInfoFormProps) => {
   const [_isAutoFilled, setIsAutoFilled] = useState(false)
   const [showRedFlagScreen, setShowRedFlagScreen] = useState(false)
-  const searchParams = useSearchParams()
-  const isDayCheckout = searchParams.has("day-passes")
 
   // Get application data based on group's popup_id
   const {
@@ -69,7 +66,6 @@ const UserInfoForm = ({
       applicationData &&
       (applicationData.first_name ||
         applicationData.last_name ||
-        applicationData.organization ||
         applicationData.telegram)
     ) {
       setIsAutoFilled(true)
@@ -151,10 +147,6 @@ const UserInfoForm = ({
       }
 
       try {
-        if (isDayCheckout) {
-          formData.organization = null
-          formData.role = null
-        }
         await onSubmit(formData)
       } catch (error: any) {
         console.error("Error submitting form:", error)

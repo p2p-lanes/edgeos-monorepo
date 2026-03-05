@@ -13,8 +13,6 @@ export type ApplicationAdminCreate = {
     last_name?: (string | null);
     email: string;
     telegram?: (string | null);
-    organization?: (string | null);
-    role?: (string | null);
     gender?: (string | null);
     age?: (string | null);
     residence?: (string | null);
@@ -35,8 +33,6 @@ export type ApplicationAdminUpdate = {
     first_name?: (string | null);
     last_name?: (string | null);
     telegram?: (string | null);
-    organization?: (string | null);
-    role?: (string | null);
     gender?: (string | null);
     age?: (string | null);
     residence?: (string | null);
@@ -60,8 +56,6 @@ export type ApplicationCreate = {
     last_name: string;
     email?: (string | null);
     telegram?: (string | null);
-    organization?: (string | null);
-    role?: (string | null);
     gender?: (string | null);
     age?: (string | null);
     residence?: (string | null);
@@ -94,6 +88,7 @@ export type ApplicationPublic = {
     custom_fields_schema?: ({
     [key: string]: unknown;
 } | null);
+    credit?: string;
     submitted_at?: (string | null);
     accepted_at?: (string | null);
     created_at?: (string | null);
@@ -156,8 +151,6 @@ export type ApplicationUpdate = {
     first_name?: (string | null);
     last_name?: (string | null);
     telegram?: (string | null);
-    organization?: (string | null);
-    role?: (string | null);
     gender?: (string | null);
     age?: (string | null);
     residence?: (string | null);
@@ -343,6 +336,72 @@ export type BaseFieldConfigUpdate = {
     placeholder?: (string | null);
     help_text?: (string | null);
     options?: (Array<(string)> | null);
+};
+
+/**
+ * Housing selection in cart.
+ */
+export type CartItemHousing = {
+    product_id: string;
+    check_in: string;
+    check_out: string;
+};
+
+/**
+ * Merch selection in cart.
+ */
+export type CartItemMerch = {
+    product_id: string;
+    quantity?: number;
+};
+
+/**
+ * Pass selection in cart.
+ */
+export type CartItemPass = {
+    attendee_id: string;
+    product_id: string;
+    quantity?: number;
+};
+
+/**
+ * Patron selection in cart.
+ */
+export type CartItemPatron = {
+    product_id: string;
+    amount: number;
+    is_custom_amount?: boolean;
+};
+
+/**
+ * Cart schema for API responses.
+ */
+export type CartPublic = {
+    id: string;
+    human_id: string;
+    popup_id: string;
+    items: CartState;
+    created_at?: (string | null);
+    updated_at?: (string | null);
+};
+
+/**
+ * Full cart state stored as JSONB.
+ */
+export type CartState = {
+    passes?: Array<CartItemPass>;
+    housing?: (CartItemHousing | null);
+    merch?: Array<CartItemMerch>;
+    patron?: (CartItemPatron | null);
+    promo_code?: (string | null);
+    insurance?: boolean;
+};
+
+/**
+ * Schema for updating cart items.
+ */
+export type CartUpdate = {
+    items: CartState;
 };
 
 /**
@@ -594,8 +653,6 @@ export type GroupMemberCreate = {
     last_name: string;
     email: string;
     telegram?: (string | null);
-    organization?: (string | null);
-    role?: (string | null);
     gender?: (string | null);
     local_resident?: (boolean | null);
 };
@@ -624,8 +681,6 @@ export type GroupMemberUpdate = {
     last_name?: (string | null);
     email?: (string | null);
     telegram?: (string | null);
-    organization?: (string | null);
-    role?: (string | null);
     gender?: (string | null);
     local_resident?: (boolean | null);
 };
@@ -713,8 +768,6 @@ export type HumanCreate = {
     first_name?: (string | null);
     last_name?: (string | null);
     telegram?: (string | null);
-    organization?: (string | null);
-    role?: (string | null);
     gender?: (string | null);
     age?: (string | null);
     residence?: (string | null);
@@ -728,8 +781,6 @@ export type HumanProfileUpdate = {
     first_name?: (string | null);
     last_name?: (string | null);
     telegram?: (string | null);
-    organization?: (string | null);
-    role?: (string | null);
     gender?: (string | null);
     age?: (string | null);
     residence?: (string | null);
@@ -746,8 +797,6 @@ export type HumanPublic = {
     first_name?: (string | null);
     last_name?: (string | null);
     telegram?: (string | null);
-    organization?: (string | null);
-    role?: (string | null);
     gender?: (string | null);
     age?: (string | null);
     residence?: (string | null);
@@ -762,8 +811,6 @@ export type HumanUpdate = {
     first_name?: (string | null);
     last_name?: (string | null);
     telegram?: (string | null);
-    organization?: (string | null);
-    role?: (string | null);
     gender?: (string | null);
     age?: (string | null);
     residence?: (string | null);
@@ -879,6 +926,7 @@ export type PaymentCreate = {
     products: Array<PaymentProductRequest>;
     coupon_code?: (string | null);
     edit_passes?: boolean;
+    insurance?: boolean;
 };
 
 /**
@@ -889,6 +937,7 @@ export type PaymentPreview = {
     products: Array<PaymentProductRequest>;
     original_amount: string;
     amount: string;
+    insurance_amount?: string;
     currency?: string;
     edit_passes?: boolean;
     coupon_id?: (string | null);
@@ -932,6 +981,7 @@ export type PaymentPublic = {
     external_id?: (string | null);
     status?: string;
     amount?: string;
+    insurance_amount?: string;
     currency?: string;
     rate?: (string | null);
     source?: (string | null);
@@ -1152,6 +1202,7 @@ export type ProductBatchItem = {
     is_active?: boolean;
     exclusive?: boolean;
     max_quantity?: (number | null);
+    insurance_percentage?: (number | string | null);
 };
 
 /**
@@ -1173,6 +1224,7 @@ export type ProductBatchResult = {
     is_active?: boolean;
     exclusive?: boolean;
     max_quantity?: (number | null);
+    insurance_percentage?: (string | null);
     id: string;
     success: boolean;
     err_msg?: (string | null);
@@ -1202,6 +1254,7 @@ export type ProductCreate = {
     is_active?: boolean;
     exclusive?: boolean;
     max_quantity?: (number | null);
+    insurance_percentage?: (number | string | null);
 };
 
 /**
@@ -1223,6 +1276,7 @@ export type ProductPublic = {
     is_active?: boolean;
     exclusive?: boolean;
     max_quantity?: (number | null);
+    insurance_percentage?: (string | null);
     id: string;
 };
 
@@ -1243,6 +1297,7 @@ export type ProductUpdate = {
     is_active?: (boolean | null);
     exclusive?: (boolean | null);
     max_quantity?: (number | null);
+    insurance_percentage?: (number | string | null);
 };
 
 /**
@@ -1803,6 +1858,25 @@ export type BaseFieldConfigsUpdateBaseFieldConfigData = {
 };
 
 export type BaseFieldConfigsUpdateBaseFieldConfigResponse = (BaseFieldConfigPublic);
+
+export type CartsGetMyCartData = {
+    popupId: string;
+};
+
+export type CartsGetMyCartResponse = (CartPublic);
+
+export type CartsUpdateMyCartData = {
+    popupId: string;
+    requestBody: CartUpdate;
+};
+
+export type CartsUpdateMyCartResponse = (CartPublic);
+
+export type CartsDeleteMyCartData = {
+    popupId: string;
+};
+
+export type CartsDeleteMyCartResponse = (void);
 
 export type CouponsListCouponsData = {
     isActive?: (boolean | null);

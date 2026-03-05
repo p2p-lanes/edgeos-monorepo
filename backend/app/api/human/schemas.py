@@ -19,8 +19,6 @@ class HumanBase(SQLModel):
     first_name: str | None = Field(default=None, max_length=255)
     last_name: str | None = Field(default=None, max_length=255)
     telegram: str | None = Field(default=None, max_length=255)
-    organization: str | None = Field(default=None, max_length=255)
-    role: str | None = Field(default=None, max_length=255)
     gender: str | None = Field(default=None, max_length=50)
     age: str | None = Field(default=None, max_length=50)
     residence: str | None = Field(default=None, max_length=255)
@@ -48,8 +46,6 @@ class HumanPublic(BaseModel):
     first_name: str | None = None
     last_name: str | None = None
     telegram: str | None = None
-    organization: str | None = None
-    role: str | None = None
     gender: str | None = None
     age: str | None = None
     residence: str | None = None
@@ -69,8 +65,6 @@ class HumanCreate(BaseModel):
     first_name: str | None = None
     last_name: str | None = None
     telegram: str | None = None
-    organization: str | None = None
-    role: str | None = None
     gender: str | None = None
     age: str | None = None
     residence: str | None = None
@@ -89,8 +83,6 @@ class HumanProfileUpdate(BaseModel):
     first_name: str | None = None
     last_name: str | None = None
     telegram: str | None = None
-    organization: str | None = None
-    role: str | None = None
     gender: str | None = None
     age: str | None = None
     residence: str | None = None
@@ -110,8 +102,6 @@ class HumanUpdate(BaseModel):
     first_name: str | None = None
     last_name: str | None = None
     telegram: str | None = None
-    organization: str | None = None
-    role: str | None = None
     gender: str | None = None
     age: str | None = None
     residence: str | None = None

@@ -44,28 +44,6 @@ export const ApplicationAdminCreateSchema = {
             ],
             title: 'Telegram'
         },
-        organization: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Organization'
-        },
-        role: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Role'
-        },
         gender: {
             anyOf: [
                 {
@@ -212,28 +190,6 @@ export const ApplicationAdminUpdateSchema = {
             ],
             title: 'Telegram'
         },
-        organization: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Organization'
-        },
-        role: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Role'
-        },
         gender: {
             anyOf: [
                 {
@@ -356,28 +312,6 @@ export const ApplicationCreateSchema = {
                 }
             ],
             title: 'Telegram'
-        },
-        organization: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Organization'
-        },
-        role: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Role'
         },
         gender: {
             anyOf: [
@@ -581,6 +515,12 @@ export const ApplicationPublicSchema = {
                 }
             ],
             title: 'Custom Fields Schema'
+        },
+        credit: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Credit',
+            default: '0'
         },
         submitted_at: {
             anyOf: [
@@ -866,28 +806,6 @@ export const ApplicationUpdateSchema = {
                 }
             ],
             title: 'Telegram'
-        },
-        organization: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Organization'
-        },
-        role: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Role'
         },
         gender: {
             anyOf: [
@@ -1869,6 +1787,212 @@ export const BaseFieldConfigUpdateSchema = {
     },
     type: 'object',
     title: 'BaseFieldConfigUpdate'
+} as const;
+
+export const CartItemHousingSchema = {
+    properties: {
+        product_id: {
+            type: 'string',
+            title: 'Product Id'
+        },
+        check_in: {
+            type: 'string',
+            title: 'Check In'
+        },
+        check_out: {
+            type: 'string',
+            title: 'Check Out'
+        }
+    },
+    type: 'object',
+    required: ['product_id', 'check_in', 'check_out'],
+    title: 'CartItemHousing',
+    description: 'Housing selection in cart.'
+} as const;
+
+export const CartItemMerchSchema = {
+    properties: {
+        product_id: {
+            type: 'string',
+            title: 'Product Id'
+        },
+        quantity: {
+            type: 'integer',
+            title: 'Quantity',
+            default: 1
+        }
+    },
+    type: 'object',
+    required: ['product_id'],
+    title: 'CartItemMerch',
+    description: 'Merch selection in cart.'
+} as const;
+
+export const CartItemPassSchema = {
+    properties: {
+        attendee_id: {
+            type: 'string',
+            title: 'Attendee Id'
+        },
+        product_id: {
+            type: 'string',
+            title: 'Product Id'
+        },
+        quantity: {
+            type: 'integer',
+            title: 'Quantity',
+            default: 1
+        }
+    },
+    type: 'object',
+    required: ['attendee_id', 'product_id'],
+    title: 'CartItemPass',
+    description: 'Pass selection in cart.'
+} as const;
+
+export const CartItemPatronSchema = {
+    properties: {
+        product_id: {
+            type: 'string',
+            title: 'Product Id'
+        },
+        amount: {
+            type: 'number',
+            title: 'Amount'
+        },
+        is_custom_amount: {
+            type: 'boolean',
+            title: 'Is Custom Amount',
+            default: false
+        }
+    },
+    type: 'object',
+    required: ['product_id', 'amount'],
+    title: 'CartItemPatron',
+    description: 'Patron selection in cart.'
+} as const;
+
+export const CartPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        human_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Human Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        items: {
+            '$ref': '#/components/schemas/CartState'
+        },
+        created_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created At'
+        },
+        updated_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Updated At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'human_id', 'popup_id', 'items'],
+    title: 'CartPublic',
+    description: 'Cart schema for API responses.'
+} as const;
+
+export const CartStateSchema = {
+    properties: {
+        passes: {
+            items: {
+                '$ref': '#/components/schemas/CartItemPass'
+            },
+            type: 'array',
+            title: 'Passes',
+            default: []
+        },
+        housing: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/CartItemHousing'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        merch: {
+            items: {
+                '$ref': '#/components/schemas/CartItemMerch'
+            },
+            type: 'array',
+            title: 'Merch',
+            default: []
+        },
+        patron: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/CartItemPatron'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        promo_code: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Promo Code'
+        },
+        insurance: {
+            type: 'boolean',
+            title: 'Insurance',
+            default: false
+        }
+    },
+    type: 'object',
+    title: 'CartState',
+    description: 'Full cart state stored as JSONB.'
+} as const;
+
+export const CartUpdateSchema = {
+    properties: {
+        items: {
+            '$ref': '#/components/schemas/CartState'
+        }
+    },
+    type: 'object',
+    required: ['items'],
+    title: 'CartUpdate',
+    description: 'Schema for updating cart items.'
 } as const;
 
 export const CompanionCreateSchema = {
@@ -3201,28 +3325,6 @@ export const GroupMemberCreateSchema = {
             ],
             title: 'Telegram'
         },
-        organization: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Organization'
-        },
-        role: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Role'
-        },
         gender: {
             anyOf: [
                 {
@@ -3384,28 +3486,6 @@ export const GroupMemberUpdateSchema = {
                 }
             ],
             title: 'Telegram'
-        },
-        organization: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Organization'
-        },
-        role: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Role'
         },
         gender: {
             anyOf: [
@@ -3844,28 +3924,6 @@ export const HumanCreateSchema = {
             ],
             title: 'Telegram'
         },
-        organization: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Organization'
-        },
-        role: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Role'
-        },
         gender: {
             anyOf: [
                 {
@@ -3951,28 +4009,6 @@ export const HumanProfileUpdateSchema = {
                 }
             ],
             title: 'Telegram'
-        },
-        organization: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Organization'
-        },
-        role: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Role'
         },
         gender: {
             anyOf: [
@@ -4073,28 +4109,6 @@ export const HumanPublicSchema = {
             ],
             title: 'Telegram'
         },
-        organization: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Organization'
-        },
-        role: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Role'
-        },
         gender: {
             anyOf: [
                 {
@@ -4185,28 +4199,6 @@ export const HumanUpdateSchema = {
                 }
             ],
             title: 'Telegram'
-        },
-        organization: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Organization'
-        },
-        role: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Role'
         },
         gender: {
             anyOf: [
@@ -4647,6 +4639,11 @@ export const PaymentCreateSchema = {
             type: 'boolean',
             title: 'Edit Passes',
             default: false
+        },
+        insurance: {
+            type: 'boolean',
+            title: 'Insurance',
+            default: false
         }
     },
     type: 'object',
@@ -4678,6 +4675,12 @@ export const PaymentPreviewSchema = {
             type: 'string',
             pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
             title: 'Amount'
+        },
+        insurance_amount: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Insurance Amount',
+            default: '0'
         },
         currency: {
             type: 'string',
@@ -4884,6 +4887,12 @@ export const PaymentPublicSchema = {
             type: 'string',
             pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
             title: 'Amount',
+            default: '0'
+        },
+        insurance_amount: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Insurance Amount',
             default: '0'
         },
         currency: {
@@ -6121,6 +6130,21 @@ export const ProductBatchItemSchema = {
                 }
             ],
             title: 'Max Quantity'
+        },
+        insurance_percentage: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Insurance Percentage'
         }
     },
     type: 'object',
@@ -6245,6 +6269,18 @@ export const ProductBatchResultSchema = {
                 }
             ],
             title: 'Max Quantity'
+        },
+        insurance_percentage: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Insurance Percentage'
         },
         id: {
             type: 'string',
@@ -6414,6 +6450,21 @@ export const ProductCreateSchema = {
                 }
             ],
             title: 'Max Quantity'
+        },
+        insurance_percentage: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Insurance Percentage'
         }
     },
     type: 'object',
@@ -6538,6 +6589,18 @@ export const ProductPublicSchema = {
                 }
             ],
             title: 'Max Quantity'
+        },
+        insurance_percentage: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Insurance Percentage'
         },
         id: {
             type: 'string',
@@ -6704,6 +6767,21 @@ export const ProductUpdateSchema = {
                 }
             ],
             title: 'Max Quantity'
+        },
+        insurance_percentage: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Insurance Percentage'
         }
     },
     type: 'object',
