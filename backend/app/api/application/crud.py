@@ -104,7 +104,6 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                     col(Humans.first_name).ilike(search_term),
                     col(Humans.last_name).ilike(search_term),
                     col(Humans.email).ilike(search_term),
-                    col(Humans.organization).ilike(search_term),
                 )
             )
 
@@ -211,8 +210,6 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                     col(Humans.last_name).ilike(search_term),
                     col(Humans.email).ilike(search_term),
                     col(Humans.telegram).ilike(search_term),
-                    col(Humans.role).ilike(search_term),
-                    col(Humans.organization).ilike(search_term),
                 )
             )
 
@@ -342,8 +339,6 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             "first_name",
             "last_name",
             "telegram",
-            "organization",
-            "role",
             "gender",
             "age",
             "residence",
@@ -519,8 +514,6 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                     first_name=app_data.first_name,
                     last_name=app_data.last_name,
                     telegram=app_data.telegram,
-                    organization=app_data.organization,
-                    role=app_data.role,
                     gender=app_data.gender,
                     age=app_data.age,
                     residence=app_data.residence,
@@ -533,8 +526,6 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 "first_name",
                 "last_name",
                 "telegram",
-                "organization",
-                "role",
                 "gender",
                 "age",
                 "residence",
@@ -700,8 +691,6 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             "first_name",
             "last_name",
             "telegram",
-            "organization",
-            "role",
             "gender",
             "age",
             "residence",

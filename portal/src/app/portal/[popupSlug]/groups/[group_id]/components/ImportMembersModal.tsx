@@ -25,8 +25,6 @@ interface MemberData {
   last_name: string
   email: string
   telegram?: string
-  organization?: string
-  role?: string
   gender?: string
 }
 
@@ -149,8 +147,6 @@ const ImportMembersModal = ({
           last_name: row.last_name,
           email: row.email,
           telegram: row.telegram || undefined,
-          organization: row.organization || undefined,
-          role: row.role || undefined,
           gender: row.gender || undefined,
         })
       }
@@ -276,21 +272,11 @@ const ImportMembersModal = ({
 
   const handleDownloadTemplate = () => {
     // Define required and optional columns
-    const headers = [
-      "first_name",
-      "last_name",
-      "email",
-      "telegram",
-      "organization",
-      "role",
-      "gender",
-    ]
+    const headers = ["first_name", "last_name", "email", "telegram", "gender"]
 
     // Create CSV content
     const csvContent =
-      headers.join(",") +
-      "\n" +
-      "John,Doe,john.doe@example.com,@johndoe,Company Name,Member,Male"
+      headers.join(",") + "\n" + "John,Doe,john.doe@example.com,@johndoe,Male"
 
     // Create blob and download link
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })

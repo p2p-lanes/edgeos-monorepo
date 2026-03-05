@@ -13,8 +13,6 @@ export type ApplicationAdminCreate = {
     last_name?: (string | null);
     email: string;
     telegram?: (string | null);
-    organization?: (string | null);
-    role?: (string | null);
     gender?: (string | null);
     age?: (string | null);
     residence?: (string | null);
@@ -35,8 +33,6 @@ export type ApplicationAdminUpdate = {
     first_name?: (string | null);
     last_name?: (string | null);
     telegram?: (string | null);
-    organization?: (string | null);
-    role?: (string | null);
     gender?: (string | null);
     age?: (string | null);
     residence?: (string | null);
@@ -60,8 +56,6 @@ export type ApplicationCreate = {
     last_name: string;
     email?: (string | null);
     telegram?: (string | null);
-    organization?: (string | null);
-    role?: (string | null);
     gender?: (string | null);
     age?: (string | null);
     residence?: (string | null);
@@ -157,8 +151,6 @@ export type ApplicationUpdate = {
     first_name?: (string | null);
     last_name?: (string | null);
     telegram?: (string | null);
-    organization?: (string | null);
-    role?: (string | null);
     gender?: (string | null);
     age?: (string | null);
     residence?: (string | null);
@@ -661,8 +653,6 @@ export type GroupMemberCreate = {
     last_name: string;
     email: string;
     telegram?: (string | null);
-    organization?: (string | null);
-    role?: (string | null);
     gender?: (string | null);
     local_resident?: (boolean | null);
 };
@@ -691,8 +681,6 @@ export type GroupMemberUpdate = {
     last_name?: (string | null);
     email?: (string | null);
     telegram?: (string | null);
-    organization?: (string | null);
-    role?: (string | null);
     gender?: (string | null);
     local_resident?: (boolean | null);
 };
@@ -780,8 +768,6 @@ export type HumanCreate = {
     first_name?: (string | null);
     last_name?: (string | null);
     telegram?: (string | null);
-    organization?: (string | null);
-    role?: (string | null);
     gender?: (string | null);
     age?: (string | null);
     residence?: (string | null);
@@ -795,8 +781,6 @@ export type HumanProfileUpdate = {
     first_name?: (string | null);
     last_name?: (string | null);
     telegram?: (string | null);
-    organization?: (string | null);
-    role?: (string | null);
     gender?: (string | null);
     age?: (string | null);
     residence?: (string | null);
@@ -813,8 +797,6 @@ export type HumanPublic = {
     first_name?: (string | null);
     last_name?: (string | null);
     telegram?: (string | null);
-    organization?: (string | null);
-    role?: (string | null);
     gender?: (string | null);
     age?: (string | null);
     residence?: (string | null);
@@ -829,8 +811,6 @@ export type HumanUpdate = {
     first_name?: (string | null);
     last_name?: (string | null);
     telegram?: (string | null);
-    organization?: (string | null);
-    role?: (string | null);
     gender?: (string | null);
     age?: (string | null);
     residence?: (string | null);

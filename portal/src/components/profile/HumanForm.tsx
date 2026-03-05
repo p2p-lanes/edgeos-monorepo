@@ -1,5 +1,4 @@
 import {
-  Building,
   ChevronDown,
   ChevronUp,
   Edit2,
@@ -133,7 +132,9 @@ const HumanForm = ({
           <h2 className="text-xl md:text-2xl font-bold text-gray-900">
             {userData?.first_name} {userData?.last_name}
           </h2>
-          <p className="text-sm md:text-base text-gray-600">{userData?.role}</p>
+          <p className="text-sm md:text-base text-gray-600">
+            {userData?.email}
+          </p>
         </div>
       </div>
       <div className="flex items-center gap-2 justify-end md:justify-start w-full md:w-auto order-3 md:order-2 md:ml-auto">
@@ -226,17 +227,6 @@ const HumanForm = ({
               </div>
             </div>
           )} */}
-            {userData?.organization && (
-              <div className="flex items-center gap-3">
-                <Building className="w-5 h-5 text-gray-400" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm text-gray-600">Organization</p>
-                  <p className="text-gray-900 break-words">
-                    {userData?.organization}
-                  </p>
-                </div>
-              </div>
-            )}
             {/* LEGACY: x_user removed from API – review for deletion */}
             {userData?.telegram && (
               <div className="flex items-center gap-3">
@@ -285,23 +275,6 @@ const HumanForm = ({
                   className="mt-1"
                 />
               </div>
-              <div>
-                <Label
-                  htmlFor="secondary_email"
-                  className="text-sm font-medium text-gray-700"
-                >
-                  Organization
-                </Label>
-                <Input
-                  id="organization"
-                  type="email"
-                  value={editForm.organization ?? ""}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, organization: e.target.value })
-                  }
-                  className="mt-1"
-                />
-              </div>
             </div>
             <div className="space-y-4">
               {/* LEGACY: x_user removed from API – review for deletion */}
@@ -317,22 +290,6 @@ const HumanForm = ({
                   value={editForm.telegram ?? ""}
                   onChange={(e) =>
                     setEditForm({ ...editForm, telegram: e.target.value })
-                  }
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label
-                  htmlFor="role"
-                  className="text-sm font-medium text-gray-700"
-                >
-                  Role
-                </Label>
-                <Input
-                  id="role"
-                  value={editForm.role ?? ""}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, role: e.target.value })
                   }
                   className="mt-1"
                 />

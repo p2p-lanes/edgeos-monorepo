@@ -29,8 +29,6 @@ interface FormData {
   last_name: string
   email: string
   telegram: string | null
-  organization: string | null
-  role: string | null
   gender: string | null
 }
 
@@ -48,8 +46,6 @@ const MemberFormModal = ({
     last_name: "",
     email: "",
     telegram: null,
-    organization: null,
-    role: null,
     gender: null,
   })
 
@@ -64,8 +60,6 @@ const MemberFormModal = ({
         last_name: member.last_name || "",
         email: member.email || "",
         telegram: member.telegram || "",
-        organization: member.organization || "",
-        role: member.role || "",
         gender: member.gender || "",
       })
     }
@@ -145,8 +139,6 @@ const MemberFormModal = ({
             last_name: processedData.last_name ?? "",
             email: processedData.email ?? "",
             telegram: processedData.telegram,
-            organization: processedData.organization,
-            role: processedData.role,
             gender: processedData.gender,
           },
         })
@@ -160,8 +152,6 @@ const MemberFormModal = ({
           last_name: "",
           email: "",
           telegram: null,
-          organization: null,
-          role: null,
           gender: null,
         })
       }
@@ -259,30 +249,6 @@ const MemberFormModal = ({
             id="telegram"
             value={formData.telegram || ""}
             onChange={(e) => handleInputChange("telegram", e.target.value)}
-          />
-        </FormInputWrapper>
-
-        {/* Organization */}
-        <FormInputWrapper>
-          <LabelRequired htmlFor="organization" isRequired={false}>
-            Organization
-          </LabelRequired>
-          <Input
-            id="organization"
-            value={formData.organization || ""}
-            onChange={(e) => handleInputChange("organization", e.target.value)}
-          />
-        </FormInputWrapper>
-
-        {/* Role */}
-        <FormInputWrapper>
-          <LabelRequired htmlFor="role" isRequired={false}>
-            Role
-          </LabelRequired>
-          <Input
-            id="role"
-            value={formData.role || ""}
-            onChange={(e) => handleInputChange("role", e.target.value)}
           />
         </FormInputWrapper>
 

@@ -103,8 +103,6 @@ export function HumanForm({ defaultValues, onSuccess }: HumanFormProps) {
       first_name: defaultValues?.first_name ?? "",
       last_name: defaultValues?.last_name ?? "",
       telegram: defaultValues?.telegram ?? "",
-      organization: defaultValues?.organization ?? "",
-      role: defaultValues?.role ?? "",
       gender: defaultValues?.gender ?? "",
       age: defaultValues?.age ?? "",
       residence: defaultValues?.residence ?? "",
@@ -117,8 +115,6 @@ export function HumanForm({ defaultValues, onSuccess }: HumanFormProps) {
           first_name: value.first_name || null,
           last_name: value.last_name || null,
           telegram: value.telegram || null,
-          organization: value.organization || null,
-          role: value.role || null,
           gender: value.gender || null,
           age: value.age || null,
           residence: value.residence || null,
@@ -131,8 +127,6 @@ export function HumanForm({ defaultValues, onSuccess }: HumanFormProps) {
           first_name: value.first_name || null,
           last_name: value.last_name || null,
           telegram: value.telegram || null,
-          organization: value.organization || null,
-          role: value.role || null,
           gender: value.gender || null,
           age: value.age || null,
           residence: value.residence || null,
@@ -310,45 +304,13 @@ export function HumanForm({ defaultValues, onSuccess }: HumanFormProps) {
               </CardContent>
             </Card>
 
-            {/* Professional Information */}
+            {/* Contact & Media */}
             <Card>
               <CardHeader>
-                <CardTitle>Professional Information</CardTitle>
-                <CardDescription>Work and contact details</CardDescription>
+                <CardTitle>Contact & Media</CardTitle>
+                <CardDescription>Contact and profile details</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <form.Field name="organization">
-                    {(field) => (
-                      <div className="space-y-2">
-                        <Label htmlFor={field.name}>Organization</Label>
-                        <Input
-                          id={field.name}
-                          placeholder="Company name"
-                          value={field.state.value}
-                          onChange={(e) => field.handleChange(e.target.value)}
-                          disabled={readOnly}
-                        />
-                      </div>
-                    )}
-                  </form.Field>
-
-                  <form.Field name="role">
-                    {(field) => (
-                      <div className="space-y-2">
-                        <Label htmlFor={field.name}>Role</Label>
-                        <Input
-                          id={field.name}
-                          placeholder="Developer, Designer, etc."
-                          value={field.state.value}
-                          onChange={(e) => field.handleChange(e.target.value)}
-                          disabled={readOnly}
-                        />
-                      </div>
-                    )}
-                  </form.Field>
-                </div>
-
                 <div className="grid gap-4 sm:grid-cols-2">
                   <form.Field name="telegram">
                     {(field) => (
@@ -439,8 +401,6 @@ export function HumanForm({ defaultValues, onSuccess }: HumanFormProps) {
                 email: state.values.email,
                 first_name: state.values.first_name,
                 last_name: state.values.last_name,
-                organization: state.values.organization,
-                role: state.values.role,
                 residence: state.values.residence,
                 picture_url: state.values.picture_url,
                 red_flag: state.values.red_flag,
@@ -477,8 +437,7 @@ export function HumanForm({ defaultValues, onSuccess }: HumanFormProps) {
                           )}
                         </div>
                         <p className="text-sm text-muted-foreground">
-                          {values.role || "Role"}{" "}
-                          {values.organization && `at ${values.organization}`}
+                          {values.email || "Email"}
                         </p>
                       </div>
                     </div>

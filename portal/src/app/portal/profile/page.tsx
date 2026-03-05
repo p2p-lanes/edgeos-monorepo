@@ -25,10 +25,8 @@ export default function ProfileContent() {
   const [editForm, setEditForm] = useState({
     first_name: userData?.first_name,
     last_name: userData?.last_name,
-    organization: userData?.organization,
     telegram: userData?.telegram,
     gender: userData?.gender,
-    role: userData?.role,
     picture_url: userData?.picture_url,
   })
 
@@ -38,10 +36,8 @@ export default function ProfileContent() {
     setEditForm({
       first_name: profile.first_name,
       last_name: profile.last_name,
-      organization: profile.organization,
       telegram: profile.telegram,
       gender: profile.gender,
-      role: profile.role,
       picture_url: profile.picture_url,
     })
   }, [profile])
@@ -63,10 +59,8 @@ export default function ProfileContent() {
     const updated = await updateProfile({
       first_name: editForm.first_name ?? undefined,
       last_name: editForm.last_name ?? undefined,
-      organization: editForm.organization ?? undefined,
       telegram: editForm.telegram ?? undefined,
       gender: editForm.gender ?? undefined,
-      role: editForm.role ?? undefined,
       picture_url: editForm.picture_url ?? undefined,
     })
     if (updated) {
@@ -80,10 +74,8 @@ export default function ProfileContent() {
     setEditForm({
       first_name: userData.first_name,
       last_name: userData.last_name,
-      organization: userData.organization,
       telegram: userData.telegram,
       gender: userData.gender,
-      role: userData.role,
       picture_url: userData.picture_url,
     })
     setIsEditing(false)

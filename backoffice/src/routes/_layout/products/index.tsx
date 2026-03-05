@@ -265,7 +265,11 @@ function ProductsTableContent() {
       columns={columns}
       data={products.results}
       searchPlaceholder="Search by name..."
-      hiddenOnMobile={["attendee_category", "insurance_percentage", "is_active"]}
+      hiddenOnMobile={[
+        "attendee_category",
+        "insurance_percentage",
+        "is_active",
+      ]}
       searchValue={search}
       onSearchChange={setSearch}
       serverPagination={{

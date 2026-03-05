@@ -35,12 +35,25 @@ def _get_base_fields_as_public(
     """Build FormFieldPublic entries for base fields from BaseFieldConfigs."""
     from app.api.base_field_config.constants import BASE_FIELD_DEFINITIONS
     from app.api.base_field_config.crud import base_field_configs_crud
+    from app.api.popup.models import Popups
 
     configs = base_field_configs_crud.find_by_popup(db, popup_id)
     config_map = {c.field_name: c for c in configs}
 
+    # Determine which companion fields to skip based on popup settings
+    popup = db.get(Popups, popup_id)
+    spouse_fields = {"partner", "partner_email"}
+    children_fields = {"kids"}
+    skip_fields: set[str] = set()
+    if popup and not popup.allows_spouse:
+        skip_fields |= spouse_fields
+    if popup and not popup.allows_children:
+        skip_fields |= children_fields
+
     results: list[FormFieldPublic] = []
     for field_name, definition in BASE_FIELD_DEFINITIONS.items():
+        if field_name in skip_fields:
+            continue
         config = config_map.get(field_name)
         section_label = None
         if config and config.section:
@@ -56,11 +69,19 @@ def _get_base_fields_as_public(
                 field_type=definition["type"],
                 section_id=config.section_id if config else None,
                 section_label=section_label,
-                position=config.position if config else definition.get("default_position", 0),
+                position=config.position
+                if config
+                else definition.get("default_position", 0),
                 required=definition["required"],
-                options=config.options if config and config.options else definition.get("default_options"),
-                placeholder=config.placeholder if config else definition.get("default_placeholder"),
-                help_text=config.help_text if config else definition.get("default_help_text"),
+                options=config.options
+                if config and config.options
+                else definition.get("default_options"),
+                placeholder=config.placeholder
+                if config
+                else definition.get("default_placeholder"),
+                help_text=config.help_text
+                if config
+                else definition.get("default_help_text"),
                 protected=True,
                 target=definition["target"],
             )

@@ -165,7 +165,13 @@ function PaymentsTableContent() {
       columns={columns}
       data={filtered}
       searchPlaceholder="Search by status, source, coupon, or amount..."
-      hiddenOnMobile={["source", "insurance_amount", "coupon_code", "created_at", "products"]}
+      hiddenOnMobile={[
+        "source",
+        "insurance_amount",
+        "coupon_code",
+        "created_at",
+        "products",
+      ]}
       searchValue={search}
       onSearchChange={setSearch}
       serverPagination={{

@@ -1,7 +1,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query"
 import {
   AlertTriangle,
-  Building,
   ChevronDown,
   ChevronUp,
   DollarSign,
@@ -9,7 +8,6 @@ import {
   MessageCircle,
   ThumbsDown,
   ThumbsUp,
-  User,
 } from "lucide-react"
 import { type ReactNode, useState } from "react"
 
@@ -517,22 +515,6 @@ export function ApplicationDetail({
 
       {/* Applicant */}
       <InlineSection title="Applicant">
-        {application.human?.organization && (
-          <InlineRow
-            icon={<Building className="h-4 w-4 text-muted-foreground" />}
-            label="Organization"
-          >
-            <span className="text-sm">{application.human.organization}</span>
-          </InlineRow>
-        )}
-        {application.human?.role && (
-          <InlineRow
-            icon={<User className="h-4 w-4 text-muted-foreground" />}
-            label="Role"
-          >
-            <span className="text-sm">{application.human.role}</span>
-          </InlineRow>
-        )}
         {application.human?.residence && (
           <InlineRow
             icon={<MapPin className="h-4 w-4 text-muted-foreground" />}
@@ -570,9 +552,7 @@ export function ApplicationDetail({
           const credit = Number(application.credit)
           return credit > 0 ? (
             <InlineRow
-              icon={
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
-              }
+              icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
               label="Account Credit"
             >
               <span className="font-mono text-sm">${credit.toFixed(2)}</span>

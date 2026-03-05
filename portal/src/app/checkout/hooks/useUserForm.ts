@@ -1,5 +1,4 @@
 import { jwtDecode } from "jwt-decode"
-import { useSearchParams } from "next/navigation"
 import { useEffect, useState } from "react"
 import { configureApiClient } from "@/lib/api-client"
 import type { FormDataProps } from "../types"
@@ -13,15 +12,11 @@ export const useUserForm = ({
   initialData = {},
   applicationData,
 }: UseUserFormProps = {}) => {
-  const searchParams = useSearchParams()
-  const isDayCheckout = searchParams.has("day-passes")
   const [formData, setFormData] = useState<FormDataProps>({
     first_name: "",
     last_name: "",
     email: "",
     telegram: "",
-    organization: !isDayCheckout ? "" : null,
-    role: !isDayCheckout ? "" : null,
     gender: "",
     email_verified: false,
     local_resident: "",
@@ -110,9 +105,6 @@ export const useUserForm = ({
         "Email verification is required. Please verify your email before continuing."
     }
     if (!formData.telegram) newErrors.telegram = "Telegram is required"
-    if (!formData.organization && !isDayCheckout)
-      newErrors.organization = "Organization is required"
-    if (!formData.role && !isDayCheckout) newErrors.role = "Role is required"
     if (!formData.gender) newErrors.gender = "Gender is required"
     if (formData.gender === "Specify")
       newErrors.gender_specify = "Please specify your gender"
@@ -135,8 +127,6 @@ export const useUserForm = ({
       last_name: "",
       email: "",
       telegram: "",
-      organization: isDayCheckout ? "" : null,
-      role: isDayCheckout ? "" : null,
       gender: "",
       email_verified: false,
       local_resident: "",

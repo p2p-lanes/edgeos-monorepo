@@ -101,8 +101,6 @@ class GroupMemberCreate(BaseModel):
     last_name: str
     email: str
     telegram: str | None = None
-    organization: str | None = None
-    role: str | None = None
     gender: str | None = None
     local_resident: bool | None = None
 
@@ -128,8 +126,6 @@ class GroupMemberUpdate(BaseModel):
     last_name: str | None = None
     email: str | None = None
     telegram: str | None = None
-    organization: str | None = None
-    role: str | None = None
     gender: str | None = None
     local_resident: bool | None = None
 

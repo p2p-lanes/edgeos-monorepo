@@ -805,9 +805,7 @@ export function CheckoutProvider({
           }
         }
       } else {
-        const hasAccountCredit = appCredit
-          ? Number(appCredit) > 0
-          : false
+        const hasAccountCredit = appCredit ? Number(appCredit) > 0 : false
 
         if (hasAccountCredit || isMonthUpgrade) {
           for (const attendee of attendeePasses) {

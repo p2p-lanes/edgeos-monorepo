@@ -44,28 +44,6 @@ export const ApplicationAdminCreateSchema = {
             ],
             title: 'Telegram'
         },
-        organization: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Organization'
-        },
-        role: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Role'
-        },
         gender: {
             anyOf: [
                 {
@@ -212,28 +190,6 @@ export const ApplicationAdminUpdateSchema = {
             ],
             title: 'Telegram'
         },
-        organization: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Organization'
-        },
-        role: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Role'
-        },
         gender: {
             anyOf: [
                 {
@@ -356,28 +312,6 @@ export const ApplicationCreateSchema = {
                 }
             ],
             title: 'Telegram'
-        },
-        organization: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Organization'
-        },
-        role: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Role'
         },
         gender: {
             anyOf: [
@@ -872,28 +806,6 @@ export const ApplicationUpdateSchema = {
                 }
             ],
             title: 'Telegram'
-        },
-        organization: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Organization'
-        },
-        role: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Role'
         },
         gender: {
             anyOf: [
@@ -3413,28 +3325,6 @@ export const GroupMemberCreateSchema = {
             ],
             title: 'Telegram'
         },
-        organization: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Organization'
-        },
-        role: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Role'
-        },
         gender: {
             anyOf: [
                 {
@@ -3596,28 +3486,6 @@ export const GroupMemberUpdateSchema = {
                 }
             ],
             title: 'Telegram'
-        },
-        organization: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Organization'
-        },
-        role: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Role'
         },
         gender: {
             anyOf: [
@@ -4056,28 +3924,6 @@ export const HumanCreateSchema = {
             ],
             title: 'Telegram'
         },
-        organization: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Organization'
-        },
-        role: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Role'
-        },
         gender: {
             anyOf: [
                 {
@@ -4163,28 +4009,6 @@ export const HumanProfileUpdateSchema = {
                 }
             ],
             title: 'Telegram'
-        },
-        organization: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Organization'
-        },
-        role: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Role'
         },
         gender: {
             anyOf: [
@@ -4285,28 +4109,6 @@ export const HumanPublicSchema = {
             ],
             title: 'Telegram'
         },
-        organization: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Organization'
-        },
-        role: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Role'
-        },
         gender: {
             anyOf: [
                 {
@@ -4397,28 +4199,6 @@ export const HumanUpdateSchema = {
                 }
             ],
             title: 'Telegram'
-        },
-        organization: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Organization'
-        },
-        role: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Role'
         },
         gender: {
             anyOf: [

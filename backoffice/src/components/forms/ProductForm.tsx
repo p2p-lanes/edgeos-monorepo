@@ -96,7 +96,6 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
   const isEdit = !!defaultValues
   const readOnly = !isAdmin
 
-
   const createMutation = useMutation({
     mutationFn: (data: ProductCreate) =>
       ProductsService.createProduct({ requestBody: data }),
@@ -381,9 +380,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
           <form.Field name="insurance_percentage">
             {(field) => (
               <InlineRow
-                icon={
-                  <CloudRain className="h-4 w-4 text-muted-foreground" />
-                }
+                icon={<CloudRain className="h-4 w-4 text-muted-foreground" />}
                 label="Insurance %"
                 description="Leave empty to disable insurance for this product"
               >

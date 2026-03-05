@@ -47,15 +47,25 @@ SOURCE_DB_URL = os.environ.get("SOURCE_DB_URL", "")
 # ---------------------------------------------------------------------------
 # Reviewer mapping (all known reviewers across popups)
 # ---------------------------------------------------------------------------
+
+# Edge
+# REVIEWER_MAP = {
+#     "steph_review": {"email": "steph@edgecity.live", "full_name": "Steph"},
+#     "timour_review": {"email": "timour@edgecity.live", "full_name": "Timour"},
+#     "janine_review": {"email": "janine@edgecity.live", "full_name": "Janine"},
+#     "tela_review": {"email": "telamon@edgecity.live", "full_name": "Telamon"},
+#     "devon_review": {"email": "devon@esmeralda.org", "full_name": "Devon"},
+#     "lina_review": {"email": "lina@edgecity.live", "full_name": "Lina"},
+#     "katherine_review": {"email": "katherine@edgecity.live", "full_name": "Katherine"},
+#     "remy_review": {"email": "remy@edgecity.live", "full_name": "Remy"},
+# }
+
+# The Mu
+
 REVIEWER_MAP = {
-    "steph_review": {"email": "steph@edgecity.live", "full_name": "Steph"},
-    "timour_review": {"email": "timour@edgecity.live", "full_name": "Timour"},
-    "janine_review": {"email": "janine@edgecity.live", "full_name": "Janine"},
-    "tela_review": {"email": "telamon@edgecity.live", "full_name": "Telamon"},
-    "devon_review": {"email": "devon@esmeralda.org", "full_name": "Devon"},
-    "lina_review": {"email": "lina@edgecity.live", "full_name": "Lina"},
-    "katherine_review": {"email": "katherine@edgecity.live", "full_name": "Katherine"},
-    "remy_review": {"email": "remy@edgecity.live", "full_name": "Remy"},
+    "sun_review": {"email": "sun@the-mu.xyz", "full_name": "Sun"},
+    "xiaoyu_review": {"email": "xiaoyu@the-mu.xyz", "full_name": "Xiaoyu"},
+    "frank_review": {"email": "frank@the-mu.xyz", "full_name": "Frank"},
 }
 
 REVIEW_VALUE_MAP = {
@@ -72,8 +82,6 @@ CORE_APPLICATION_COLUMNS = {
     "last_name",
     "email",
     "telegram",
-    "organization",
-    "role",
     "gender",
     "age",
     "residence",
@@ -739,8 +747,6 @@ def run_import(
                     first_name=parse_optional_str(row.get("first_name")),
                     last_name=parse_optional_str(row.get("last_name")),
                     telegram=parse_optional_str(row.get("telegram")),
-                    organization=parse_optional_str(row.get("organization")),
-                    role=parse_optional_str(row.get("role")),
                     gender=parse_optional_str(row.get("gender")),
                     age=parse_optional_str(row.get("age")),
                     residence=parse_optional_str(row.get("residence")),
@@ -958,7 +964,7 @@ def run_import(
                 name=fdef["name"],
                 label=fdef["label"],
                 field_type=fdef["field_type"],
-                section="general",
+                section_id=None,
                 position=fdef.get("position", 0),
                 required=False,
             )

@@ -47,7 +47,7 @@ async def list_humans(
         skip=skip,
         limit=limit,
         search=search,
-        search_fields=["first_name", "last_name", "email", "organization"],
+        search_fields=["first_name", "last_name", "email"],
     )
 
     return ListModel[HumanPublic](

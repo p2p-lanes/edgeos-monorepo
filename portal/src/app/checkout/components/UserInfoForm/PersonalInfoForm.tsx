@@ -1,4 +1,3 @@
-import { useSearchParams } from "next/navigation"
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import InputForm, { AddonInputForm } from "@/components/ui/Form/Input"
@@ -13,8 +12,6 @@ interface PersonalInfoFormProps {
     first_name: string
     last_name: string
     telegram: string
-    organization: string | null
-    role: string | null
     gender: string
     email: string
     local_resident: string
@@ -30,8 +27,6 @@ const PersonalInfoForm = ({
   handleChangeEmail,
   errors,
 }: PersonalInfoFormProps) => {
-  const searchParams = useSearchParams()
-  const isDayCheckout = searchParams.has("day-passes")
   const { getCity } = useCityProvider()
   const _city = getCity()
   // Estado para almacenar el valor de género normalizado
@@ -117,30 +112,6 @@ const PersonalInfoForm = ({
         isRequired
         placeholder="username"
       />
-
-      {!isDayCheckout && (
-        <>
-          <InputForm
-            label="Organization"
-            id="organization"
-            value={formData.organization || ""}
-            onChange={(value) => handleInputChange("organization", value)}
-            error={errors.organization}
-            isRequired
-            placeholder="Your organization name"
-          />
-
-          <InputForm
-            label="Role"
-            id="role"
-            value={formData.role || ""}
-            onChange={(value) => handleInputChange("role", value)}
-            error={errors.role}
-            isRequired
-            placeholder="Your role in the organization"
-          />
-        </>
-      )}
 
       {/* <SelectForm
         label={form?.personal_information?.local_resident_title || "Are you a LATAM citizen / San Martin resident?"}

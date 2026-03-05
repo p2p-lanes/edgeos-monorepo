@@ -85,8 +85,6 @@ const HUMAN_FIELD_KEYS = new Set([
   "first_name",
   "last_name",
   "telegram",
-  "organization",
-  "role",
   "gender",
   "age",
   "residence",
@@ -892,7 +890,7 @@ export function ApplicationForm({ onSuccess }: ApplicationFormProps) {
                             {fullName || "Applicant Name"}
                           </p>
                           <p className="text-sm text-muted-foreground">
-                            {(vals.organization as string) || "Organization"}
+                            {(vals.email as string) || "Email"}
                           </p>
                         </div>
                       </div>

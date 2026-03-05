@@ -46,8 +46,6 @@ const useCheckoutState = () => {
           last_name: formData.last_name,
           email: formData.email,
           telegram: formData.telegram,
-          organization: formData.organization || undefined,
-          role: formData.role || undefined,
           gender: formData.gender || undefined,
         },
       })

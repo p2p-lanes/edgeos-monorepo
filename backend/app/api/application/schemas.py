@@ -131,8 +131,6 @@ class ApplicationCreate(BaseModel):
     last_name: str
     email: str | None = None
     telegram: str | None = None
-    organization: str | None = None
-    role: str | None = None
     gender: str | None = None
     age: str | None = None
     residence: str | None = None
@@ -168,8 +166,6 @@ class ApplicationUpdate(BaseModel):
     first_name: str | None = None
     last_name: str | None = None
     telegram: str | None = None
-    organization: str | None = None
-    role: str | None = None
     gender: str | None = None
     age: str | None = None
     residence: str | None = None
@@ -202,8 +198,6 @@ class ApplicationAdminCreate(BaseModel):
     last_name: str | None = None
     email: str  # Required for admin creation
     telegram: str | None = None
-    organization: str | None = None
-    role: str | None = None
     gender: str | None = None
     age: str | None = None
     residence: str | None = None
@@ -253,8 +247,6 @@ class ApplicationSnapshotBase(SQLModel):
     last_name: str | None = None
     email: str
     telegram: str | None = None
-    organization: str | None = None
-    role: str | None = None
     gender: str | None = None
     age: str | None = None
     residence: str | None = None
@@ -285,8 +277,6 @@ class ApplicationSnapshotPublic(BaseModel):
     last_name: str | None = None
     email: str
     telegram: str | None = None
-    organization: str | None = None
-    role: str | None = None
     gender: str | None = None
     age: str | None = None
     residence: str | None = None
