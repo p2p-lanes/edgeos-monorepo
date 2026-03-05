@@ -50,7 +50,7 @@ export function FormCanvas({
     .map((k) => getSortableSectionId(k))
   const sectionMap = new Map(sections.map((s) => [s.id, s]))
 
-  const renderSection = (key: string, idx: number, isLast: boolean) => {
+  const renderSection = (key: string, _idx: number, isLast: boolean) => {
     const section = sectionMap.get(key) ?? null
     const dropZone = (
       <SectionDropZone

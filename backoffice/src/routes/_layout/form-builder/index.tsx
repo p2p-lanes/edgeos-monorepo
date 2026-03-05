@@ -36,7 +36,6 @@ import { FieldPalette } from "@/components/form-builder/FieldPalette"
 import { FormCanvas } from "@/components/form-builder/FormCanvas"
 import {
   FIELD_TYPES,
-  getSortableSectionId,
   isSpecialField,
   PALETTE_ITEM_PREFIX,
   parseSortableSectionId,
