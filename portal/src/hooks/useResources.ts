@@ -1,4 +1,4 @@
-import { FileText, Users } from "lucide-react"
+import { FileText, Ticket, Users } from "lucide-react"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import type { Resource } from "@/types/resources"
@@ -25,6 +25,12 @@ const useResources = () => {
           value: application?.status ?? "not started",
         },
       ],
+    },
+    {
+      name: "Passes",
+      icon: Ticket,
+      status: canSeeAttendees ? "active" : "hidden",
+      path: `/portal/${city?.slug}/passes`,
     },
     {
       name: "Attendee Directory",

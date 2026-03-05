@@ -105,6 +105,7 @@ export function CheckoutProvider({
   const clearCartMutation = useClearCart(cityId)
 
   const hasRestoredCheckoutRef = useRef(false)
+  const previousCityIdRef = useRef(cityId)
 
   // Step management
   const [currentStep, setCurrentStep] = useState<CheckoutStep>(initialStep)
@@ -117,6 +118,22 @@ export function CheckoutProvider({
   const [promoCodeValid, setPromoCodeValid] = useState(false)
   const [promoCodeDiscount, setPromoCodeDiscount] = useState(0)
   const [insurance, setInsurance] = useState(false)
+
+  // Reset state when city changes so we re-restore from new city's cart
+  useEffect(() => {
+    if (previousCityIdRef.current === cityId) return
+    previousCityIdRef.current = cityId
+
+    hasRestoredCheckoutRef.current = false
+    setHousing(null)
+    setMerch([])
+    setPatron(null)
+    setPromoCode("")
+    setPromoCodeValid(false)
+    setPromoCodeDiscount(0)
+    setInsurance(false)
+    setCurrentStep("passes")
+  }, [cityId])
 
   // Restore checkout cart from DB
   useEffect(() => {
@@ -306,10 +323,13 @@ export function CheckoutProvider({
     if (hasPatreonSelected) return 0
 
     return attendeePasses.reduce((total, attendee) => {
-      const hasMonthSelected = attendee.products.some(
-        (p) => p.duration_type === "month" && p.selected && !p.purchased,
+      const hasFullOrMonthSelected = attendee.products.some(
+        (p) =>
+          (p.duration_type === "full" || p.duration_type === "month") &&
+          p.selected &&
+          !p.purchased,
       )
-      if (!hasMonthSelected) return total
+      if (!hasFullOrMonthSelected) return total
 
       const hasPurchasedWeekOrDay = attendee.products.some(
         (p) =>
@@ -767,10 +787,13 @@ export function CheckoutProvider({
     try {
       const productsToSend: PaymentProductRequest[] = []
 
-      const monthSelectedWithWeekOrDay = attendeePasses.some(
+      const fullOrMonthSelectedWithWeekOrDay = attendeePasses.some(
         (a) =>
           a.products.some(
-            (p) => p.duration_type === "month" && p.selected && !p.purchased,
+            (p) =>
+              (p.duration_type === "full" || p.duration_type === "month") &&
+              p.selected &&
+              !p.purchased,
           ) &&
           (a.products.some((p) => p.duration_type === "week" && p.purchased) ||
             a.products.some((p) => p.duration_type === "day" && p.purchased)),
@@ -778,7 +801,7 @@ export function CheckoutProvider({
       const hasPatreonSelected = attendeePasses.some((a) =>
         a.products.some((p) => p.category === "patreon" && p.selected),
       )
-      const isMonthUpgrade = monthSelectedWithWeekOrDay && !hasPatreonSelected
+      const isMonthUpgrade = fullOrMonthSelectedWithWeekOrDay && !hasPatreonSelected
 
       if (isEditing) {
         for (const attendee of attendeePasses) {
@@ -809,14 +832,16 @@ export function CheckoutProvider({
 
         if (hasAccountCredit || isMonthUpgrade) {
           for (const attendee of attendeePasses) {
-            const hasMonth = attendee.products.some(
-              (p) => p.duration_type === "month" && (p.purchased || p.selected),
+            const hasFullOrMonth = attendee.products.some(
+              (p) =>
+                (p.duration_type === "full" || p.duration_type === "month") &&
+                (p.purchased || p.selected),
             )
 
             for (const product of attendee.products) {
               if (!product.purchased) continue
               if (
-                hasMonth &&
+                hasFullOrMonth &&
                 (product.duration_type === "week" ||
                   product.duration_type === "day")
               )

@@ -1194,6 +1194,7 @@ export type ProductBatchItem = {
     price: (number | string);
     compare_price?: (number | string | null);
     description?: (string | null);
+    image_url?: (string | null);
     category?: ProductCategory;
     attendee_category?: (TicketAttendeeCategory | null);
     duration_type?: (TicketDuration | null);
@@ -1216,6 +1217,7 @@ export type ProductBatchResult = {
     price: string;
     compare_price?: (string | null);
     description?: (string | null);
+    image_url?: (string | null);
     category?: ProductCategory;
     attendee_category?: (TicketAttendeeCategory | null);
     duration_type?: (TicketDuration | null);
@@ -1246,6 +1248,7 @@ export type ProductCreate = {
     price: (number | string);
     compare_price?: (number | string | null);
     description?: (string | null);
+    image_url?: (string | null);
     category?: ProductCategory;
     attendee_category?: (TicketAttendeeCategory | null);
     duration_type?: (TicketDuration | null);
@@ -1268,6 +1271,7 @@ export type ProductPublic = {
     price: string;
     compare_price?: (string | null);
     description?: (string | null);
+    image_url?: (string | null);
     category?: ProductCategory;
     attendee_category?: (TicketAttendeeCategory | null);
     duration_type?: (TicketDuration | null);
@@ -1289,6 +1293,7 @@ export type ProductUpdate = {
     price?: (number | string | null);
     compare_price?: (number | string | null);
     description?: (string | null);
+    image_url?: (string | null);
     category?: (ProductCategory | null);
     attendee_category?: (TicketAttendeeCategory | null);
     duration_type?: (TicketDuration | null);

@@ -1,6 +1,7 @@
 "use client"
 
 import { Info, Minus, Plus, ShoppingBag, X } from "lucide-react"
+import Image from "next/image"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -94,8 +95,12 @@ function MerchItem({ product, quantity, onQuantityChange }: MerchItemProps) {
           onIncrement={() => onQuantityChange(quantity + 1)}
           onDecrement={() => onQuantityChange(Math.max(0, quantity - 1))}
         />
-        <div className="w-14 h-14 shrink-0 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center">
-          <ShoppingBag className="w-6 h-6 text-gray-300" />
+        <div className="relative w-14 h-14 shrink-0 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center">
+          {product.image_url ? (
+            <Image src={product.image_url} alt={product.name} fill className="object-cover" />
+          ) : (
+            <ShoppingBag className="w-6 h-6 text-gray-300" />
+          )}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1">
@@ -129,8 +134,12 @@ function MerchItem({ product, quantity, onQuantityChange }: MerchItemProps) {
       {/* Mobile layout */}
       <div className="md:hidden">
         <div className="flex gap-3 mb-3">
-          <div className="w-16 h-16 shrink-0 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center">
-            <ShoppingBag className="w-7 h-7 text-gray-300" />
+          <div className="relative w-16 h-16 shrink-0 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center">
+            {product.image_url ? (
+              <Image src={product.image_url} alt={product.name} fill className="object-cover" />
+            ) : (
+              <ShoppingBag className="w-7 h-7 text-gray-300" />
+            )}
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1 mb-0.5">

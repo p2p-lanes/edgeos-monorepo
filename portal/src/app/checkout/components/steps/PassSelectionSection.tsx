@@ -22,10 +22,11 @@ const getCategoryLabel = (category: AttendeeCategory): string => {
 const sortProductsByPriority = (a: ProductsPass, b: ProductsPass): number => {
   const getPriority = (p: ProductsPass) => {
     const dt = p.duration_type
-    if (dt === "month") return 0
-    if (dt === "week") return 1
-    if (dt === "day") return 2
-    return 3
+    if (dt === "full") return 0
+    if (dt === "month") return 1
+    if (dt === "week") return 2
+    if (dt === "day") return 3
+    return 4
   }
   return getPriority(a) - getPriority(b)
 }
@@ -144,6 +145,9 @@ function AttendeePassCard({
     .filter((product) => product.category !== "patreon")
     .sort(sortProductsByPriority)
 
+  const fullProducts = standardProducts.filter(
+    (p) => p.duration_type === "full",
+  )
   const monthProducts = standardProducts.filter(
     (p) => p.duration_type === "month",
   )
@@ -152,8 +156,10 @@ function AttendeePassCard({
   )
   const dayProducts = standardProducts.filter((p) => p.duration_type === "day")
 
-  const hasMonthSelected = attendee.products.some(
-    (p) => p.duration_type === "month" && (p.purchased || p.selected),
+  const hasFullOrMonthSelected = attendee.products.some(
+    (p) =>
+      (p.duration_type === "full" || p.duration_type === "month") &&
+      (p.purchased || p.selected),
   )
 
   const primaryHasPass = (passId: string): boolean => {
@@ -161,11 +167,15 @@ function AttendeePassCard({
     if (!primary) return true
     const primaryProduct = primary.products.find((p) => p.id === passId)
     if (!primaryProduct) return true
-    const primaryHasMonth = primary.products.some(
-      (p) => p.duration_type === "month" && (p.purchased || p.selected),
+    const primaryHasFullOrMonth = primary.products.some(
+      (p) =>
+        (p.duration_type === "full" || p.duration_type === "month") &&
+        (p.purchased || p.selected),
     )
     return (
-      primaryProduct.purchased || primaryProduct.selected || primaryHasMonth
+      primaryProduct.purchased ||
+      primaryProduct.selected ||
+      primaryHasFullOrMonth
     )
   }
 
@@ -185,6 +195,46 @@ function AttendeePassCard({
           </div>
         </div>
       </div>
+
+      {/* Full Pass Section */}
+      {fullProducts.length > 0 && !isChild && (
+        <>
+          <div className="relative px-5 py-2 bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100 overflow-hidden">
+            <div
+              className="absolute inset-0 opacity-100"
+              style={stripedPatternStyle}
+            />
+            <div className="relative flex items-center gap-2">
+              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                Full Passes
+              </h4>
+              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+            </div>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {fullProducts.map((product) => {
+              const isSpouse = attendee.category === "spouse"
+              const disabledForSpouse = isSpouse && !primaryHasPass(product.id)
+              const isDisabled = product.disabled || disabledForSpouse
+
+              return (
+                <PassOption
+                  key={product.id}
+                  product={product}
+                  onClick={() => toggleProduct(attendee.id, product)}
+                  disabled={isDisabled}
+                  disabledReason={
+                    disabledForSpouse
+                      ? "Requires primary pass holder"
+                      : undefined
+                  }
+                  isEditing={isEditing}
+                />
+              )
+            })}
+          </div>
+        </>
+      )}
 
       {/* Month Pass Section */}
       {monthProducts.length > 0 && !isChild && (
@@ -243,7 +293,7 @@ function AttendeePassCard({
               const isSpouse = attendee.category === "spouse"
               const disabledForSpouse = isSpouse && !primaryHasPass(product.id)
               const isDisabled =
-                product.disabled || hasMonthSelected || disabledForSpouse
+                product.disabled || hasFullOrMonthSelected || disabledForSpouse
 
               return (
                 <PassOption
@@ -281,7 +331,7 @@ function AttendeePassCard({
               const isSpouse = attendee.category === "spouse"
               const disabledForSpouse = isSpouse && !primaryHasPass(product.id)
               const isDisabled =
-                product.disabled || hasMonthSelected || disabledForSpouse
+                product.disabled || hasFullOrMonthSelected || disabledForSpouse
 
               return (
                 <DayPassOption

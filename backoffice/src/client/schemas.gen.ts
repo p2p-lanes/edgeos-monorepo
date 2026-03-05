@@ -6062,6 +6062,17 @@ export const ProductBatchItemSchema = {
             ],
             title: 'Description'
         },
+        image_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Image Url'
+        },
         category: {
             '$ref': '#/components/schemas/ProductCategory',
             default: 'ticket'
@@ -6200,6 +6211,17 @@ export const ProductBatchResultSchema = {
                 }
             ],
             title: 'Description'
+        },
+        image_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Image Url'
         },
         category: {
             '$ref': '#/components/schemas/ProductCategory',
@@ -6382,6 +6404,17 @@ export const ProductCreateSchema = {
             ],
             title: 'Description'
         },
+        image_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Image Url'
+        },
         category: {
             '$ref': '#/components/schemas/ProductCategory',
             default: 'ticket'
@@ -6520,6 +6553,17 @@ export const ProductPublicSchema = {
                 }
             ],
             title: 'Description'
+        },
+        image_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Image Url'
         },
         category: {
             '$ref': '#/components/schemas/ProductCategory',
@@ -6680,6 +6724,17 @@ export const ProductUpdateSchema = {
                 }
             ],
             title: 'Description'
+        },
+        image_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Image Url'
         },
         category: {
             anyOf: [

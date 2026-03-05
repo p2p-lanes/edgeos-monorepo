@@ -1,10 +1,12 @@
 "use client"
 
 import { Calendar, Check, Home } from "lucide-react"
+import Image from "next/image"
 import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
+import { useCityProvider } from "@/providers/cityProvider"
 import {
   calculateNights,
   formatCheckoutDate,
@@ -21,25 +23,30 @@ function formatDateInput(date: Date): string {
 }
 
 function parseDate(dateStr: string): Date {
-  return new Date(`${dateStr}T00:00:00`)
+  const ymd = dateStr.split("T")[0]
+  return new Date(`${ymd}T00:00:00`)
 }
 
 export default function HousingStep({ onSkip }: HousingStepProps) {
   const { housingProducts, cart, selectHousing, clearHousing } = useCheckout()
+  const { getCity } = useCityProvider()
+  const city = getCity()
 
-  const defaultStart = useMemo(() => {
+  const popupStart = useMemo(() => {
+    if (city?.start_date) return parseDate(city.start_date)
     return new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-  }, [])
+  }, [city?.start_date])
 
-  const defaultEnd = useMemo(() => {
+  const popupEnd = useMemo(() => {
+    if (city?.end_date) return parseDate(city.end_date)
     return new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
-  }, [])
+  }, [city?.end_date])
 
   const [checkIn, setCheckIn] = useState<Date>(
-    cart.housing?.checkIn ? new Date(cart.housing.checkIn) : defaultStart,
+    cart.housing?.checkIn ? new Date(cart.housing.checkIn) : popupStart,
   )
   const [checkOut, setCheckOut] = useState<Date>(
-    cart.housing?.checkOut ? new Date(cart.housing.checkOut) : defaultEnd,
+    cart.housing?.checkOut ? new Date(cart.housing.checkOut) : popupEnd,
   )
   const [selectedProductId, setSelectedProductId] = useState<string | null>(
     cart.housing?.productId || null,
@@ -113,6 +120,7 @@ export default function HousingStep({ onSkip }: HousingStepProps) {
             <input
               type="date"
               value={formatDateInput(checkIn)}
+              min={formatDateInput(popupStart)}
               max={formatDateInput(checkOut)}
               onChange={(e) => setCheckIn(parseDate(e.target.value))}
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -127,6 +135,7 @@ export default function HousingStep({ onSkip }: HousingStepProps) {
               type="date"
               value={formatDateInput(checkOut)}
               min={formatDateInput(checkIn)}
+              max={formatDateInput(popupEnd)}
               onChange={(e) => setCheckOut(parseDate(e.target.value))}
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
@@ -181,9 +190,18 @@ function PropertyCard({
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
       <div className="relative h-32 sm:h-40 bg-gradient-to-br from-gray-100 to-gray-200">
-        <div className="absolute inset-0 flex items-center justify-center">
-          <Home className="w-12 h-12 text-gray-300" />
-        </div>
+        {product.image_url ? (
+          <Image
+            src={product.image_url}
+            alt={product.name}
+            fill
+            className="object-cover"
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Home className="w-12 h-12 text-gray-300" />
+          </div>
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
         <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4 text-white">
           <h3 className="font-bold text-base sm:text-lg">{product.name}</h3>

@@ -36,12 +36,15 @@ def _generate_check_in_code() -> str:
 
 def init_db(session: Session) -> None:
     from app.core.tenant_db import ensure_tenant_credentials
+    from app.api.approval_strategy.schemas import ApprovalStrategyType
     from app.models import (
         Applications,
+        ApprovalStrategies,
         AttendeeProducts,
         Attendees,
         Coupons,
         FormFields,
+        FormSections,
         GroupLeaders,
         GroupMembers,
         Groups,
@@ -120,7 +123,6 @@ def init_db(session: Session) -> None:
                 name=popup_data["name"],
                 slug=popup_data["slug"],
                 status=popup_data.get("status", "draft"),
-                requires_approval=popup_data.get("requires_approval", False),
                 allows_spouse=popup_data.get("allows_spouse", False),
                 allows_children=popup_data.get("allows_children", False),
                 allows_coupons=popup_data.get("allows_coupons", False),
@@ -140,6 +142,71 @@ def init_db(session: Session) -> None:
             session.refresh(popup)
             popup_map[popup_key] = popup
             logger.info(f"Popup created: {popup.name} ({popup_key})")
+
+    # Create default sections and base field configs for each popup
+    from app.api.base_field_config.constants import DEFAULT_SECTIONS
+    from app.api.base_field_config.crud import base_field_configs_crud
+    from app.api.base_field_config.models import BaseFieldConfigs
+
+    for popup_key, popup in popup_map.items():
+        # Check if base field configs already exist for this popup
+        existing_configs = session.exec(
+            select(BaseFieldConfigs).where(BaseFieldConfigs.popup_id == popup.id)
+        ).first()
+        if existing_configs:
+            continue
+
+        # Create default sections
+        default_section_map = {}
+        for section_key, section_def in DEFAULT_SECTIONS.items():
+            existing_section = session.exec(
+                select(FormSections).where(
+                    FormSections.label == section_def["label"],
+                    FormSections.popup_id == popup.id,
+                )
+            ).first()
+            if existing_section:
+                default_section_map[section_key] = existing_section.id
+            else:
+                section = FormSections(
+                    tenant_id=demo_tenant.id,
+                    popup_id=popup.id,
+                    label=section_def["label"],
+                    order=section_def["order"],
+                    protected=True,
+                )
+                session.add(section)
+                session.commit()
+                session.refresh(section)
+                default_section_map[section_key] = section.id
+                logger.info(
+                    f"Default section created: {section.label} for {popup_key}"
+                )
+
+        # Create base field configs
+        base_field_configs_crud.create_defaults_for_popup(
+            session, popup.id, demo_tenant.id, default_section_map
+        )
+        logger.info(f"Base field configs created for {popup_key}")
+
+    # Create default approval strategy (auto_accept) for each popup
+    for popup_key, popup in popup_map.items():
+        existing_strategy = session.exec(
+            select(ApprovalStrategies).where(
+                ApprovalStrategies.popup_id == popup.id
+            )
+        ).first()
+        if not existing_strategy:
+            strategy = ApprovalStrategies(
+                tenant_id=demo_tenant.id,
+                popup_id=popup.id,
+                strategy_type=ApprovalStrategyType.AUTO_ACCEPT,
+            )
+            session.add(strategy)
+            session.commit()
+            logger.info(
+                f"Approval strategy created: auto_accept for {popup_key}"
+            )
 
     product_map: dict[str, Products] = {}  # Key: "{popup_key}:{product_slug}"
     for product_data in seed_data.get("products", []):
@@ -197,6 +264,40 @@ def init_db(session: Session) -> None:
             product_map[map_key] = product
             logger.info(f"Product created: {product.name} for {popup_key}")
 
+    section_map: dict[str, FormSections] = {}
+    for section_data in seed_data.get("form_sections", []):
+        section_key = section_data["key"]
+        popup_key = section_data["popup_key"]
+        popup = popup_map.get(popup_key)
+        if not popup:
+            logger.warning(
+                f"Popup {popup_key} not found for form section {section_data['label']}"
+            )
+            continue
+
+        existing_section = session.exec(
+            select(FormSections).where(
+                FormSections.label == section_data["label"],
+                FormSections.popup_id == popup.id,
+            )
+        ).first()
+        if existing_section:
+            section_map[section_key] = existing_section
+        else:
+            section = FormSections(
+                tenant_id=demo_tenant.id,
+                popup_id=popup.id,
+                label=section_data["label"],
+                description=section_data.get("description"),
+                order=section_data.get("order", 0),
+                protected=section_data.get("protected", False),
+            )
+            session.add(section)
+            session.commit()
+            session.refresh(section)
+            section_map[section_key] = section
+            logger.info(f"Form section created: {section.label} for {popup_key}")
+
     for field_data in seed_data.get("form_fields", []):
         popup_key = field_data["popup_key"]
         popup = popup_map.get(popup_key)
@@ -205,6 +306,13 @@ def init_db(session: Session) -> None:
                 f"Popup {popup_key} not found for form field {field_data['name']}"
             )
             continue
+
+        # Resolve section_id from section_key
+        section_id = None
+        if field_data.get("section_key"):
+            section = section_map.get(field_data["section_key"])
+            if section:
+                section_id = section.id
 
         existing_field = session.exec(
             select(FormFields).where(
@@ -218,6 +326,7 @@ def init_db(session: Session) -> None:
                 name=field_data["name"],
                 label=field_data["label"],
                 field_type=field_data.get("field_type", "text"),
+                section_id=section_id,
                 position=field_data.get("position", 0),
                 required=field_data.get("required", False),
                 options=field_data.get("options"),
@@ -290,8 +399,6 @@ def init_db(session: Session) -> None:
                 first_name=human_data.get("first_name"),
                 last_name=human_data.get("last_name"),
                 telegram=human_data.get("telegram"),
-                organization=human_data.get("organization"),
-                role=human_data.get("role"),
                 gender=human_data.get("gender"),
                 age=human_data.get("age"),
                 residence=human_data.get("residence"),

@@ -25,6 +25,7 @@ import { FieldError } from "@/components/Common/FieldError"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { ImageUpload } from "@/components/ui/image-upload"
 import {
   HeroInput,
   InlineRow,
@@ -143,6 +144,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
       name: defaultValues?.name ?? "",
       price: defaultValues?.price?.toString() ?? "",
       description: defaultValues?.description ?? "",
+      image_url: defaultValues?.image_url ?? "",
       category: (defaultValues?.category ?? "ticket") as ProductCategory,
       attendee_category: (defaultValues?.attendee_category ??
         "main") as TicketAttendeeCategory,
@@ -169,6 +171,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
           name: value.name,
           price: value.price,
           description: value.description || null,
+          image_url: value.image_url || null,
           category: value.category,
           attendee_category: isTicket ? value.attendee_category : null,
           duration_type: isTicket ? value.duration_type : null,
@@ -189,6 +192,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
           name: value.name,
           price: value.price,
           description: value.description || undefined,
+          image_url: value.image_url || undefined,
           category: value.category,
           attendee_category: isTicket ? value.attendee_category : undefined,
           duration_type: isTicket ? value.duration_type : undefined,
@@ -300,6 +304,22 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
                 value={field.state.value}
                 onBlur={field.handleBlur}
                 onChange={(e) => field.handleChange(e.target.value)}
+                disabled={readOnly}
+              />
+            </div>
+          )}
+        </form.Field>
+
+        {/* Image */}
+        <form.Field name="image_url">
+          {(field) => (
+            <div className="space-y-2">
+              <p className="px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Image
+              </p>
+              <ImageUpload
+                value={field.state.value || null}
+                onChange={(url) => field.handleChange(url ?? "")}
                 disabled={readOnly}
               />
             </div>

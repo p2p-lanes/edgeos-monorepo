@@ -3,6 +3,10 @@ from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, HTTPException, status
 
+from app.api.base_field_config.constants import BASE_FIELD_DEFINITIONS
+from app.api.base_field_config.crud import base_field_configs_crud
+from app.api.base_field_config.models import BaseFieldConfigs
+from app.api.base_field_config.schemas import BaseFieldConfigUpdate
 from app.api.form_field import crud
 
 if TYPE_CHECKING:
@@ -29,12 +33,33 @@ def _to_public(field: FormFields) -> FormFieldPublic:
     return data
 
 
+def _base_config_to_public(config: BaseFieldConfigs) -> FormFieldPublic:
+    """Convert a BaseFieldConfigs model to a FormFieldPublic."""
+    definition = BASE_FIELD_DEFINITIONS[config.field_name]
+    section_label = config.section.label if config.section else None
+    return FormFieldPublic(
+        id=config.id,
+        tenant_id=config.tenant_id,
+        popup_id=config.popup_id,
+        name=config.field_name,
+        label=definition["label"],
+        field_type=definition["type"],
+        section_id=config.section_id,
+        section_label=section_label,
+        position=config.position,
+        required=definition["required"],
+        options=config.options or definition.get("default_options"),
+        placeholder=config.placeholder or definition.get("default_placeholder"),
+        help_text=config.help_text or definition.get("default_help_text"),
+        protected=True,
+        target=definition["target"],
+    )
+
+
 def _get_base_fields_as_public(
     db: "Session", popup_id: uuid.UUID
 ) -> list[FormFieldPublic]:
     """Build FormFieldPublic entries for base fields from BaseFieldConfigs."""
-    from app.api.base_field_config.constants import BASE_FIELD_DEFINITIONS
-    from app.api.base_field_config.crud import base_field_configs_crud
     from app.api.popup.models import Popups
 
     configs = base_field_configs_crud.find_by_popup(db, popup_id)
@@ -55,37 +80,28 @@ def _get_base_fields_as_public(
         if field_name in skip_fields:
             continue
         config = config_map.get(field_name)
-        section_label = None
-        if config and config.section:
-            section_label = config.section.label
-
-        results.append(
-            FormFieldPublic(
-                id=config.id if config else uuid.uuid4(),
-                tenant_id=config.tenant_id if config else uuid.UUID(int=0),
-                popup_id=popup_id,
-                name=field_name,
-                label=definition["label"],
-                field_type=definition["type"],
-                section_id=config.section_id if config else None,
-                section_label=section_label,
-                position=config.position
-                if config
-                else definition.get("default_position", 0),
-                required=definition["required"],
-                options=config.options
-                if config and config.options
-                else definition.get("default_options"),
-                placeholder=config.placeholder
-                if config
-                else definition.get("default_placeholder"),
-                help_text=config.help_text
-                if config
-                else definition.get("default_help_text"),
-                protected=True,
-                target=definition["target"],
+        if config:
+            results.append(_base_config_to_public(config))
+        else:
+            results.append(
+                FormFieldPublic(
+                    id=uuid.uuid4(),
+                    tenant_id=uuid.UUID(int=0),
+                    popup_id=popup_id,
+                    name=field_name,
+                    label=definition["label"],
+                    field_type=definition["type"],
+                    section_id=None,
+                    section_label=None,
+                    position=definition.get("default_position", 0),
+                    required=definition["required"],
+                    options=definition.get("default_options"),
+                    placeholder=definition.get("default_placeholder"),
+                    help_text=definition.get("default_help_text"),
+                    protected=True,
+                    target=definition["target"],
+                )
             )
-        )
     return results
 
 
@@ -127,13 +143,18 @@ async def get_form_field(
 ) -> FormFieldPublic:
     field = crud.form_fields_crud.get(db, field_id)
 
-    if not field:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Form field not found",
-        )
+    if field:
+        return _to_public(field)
 
-    return _to_public(field)
+    # Check if it's a base field config
+    base_config = base_field_configs_crud.get(db, field_id)
+    if base_config:
+        return _base_config_to_public(base_config)
+
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="Form field not found",
+    )
 
 
 @router.post("", response_model=FormFieldPublic, status_code=status.HTTP_201_CREATED)
@@ -181,14 +202,27 @@ async def update_form_field(
 ) -> FormFieldPublic:
     field = crud.form_fields_crud.get(db, field_id)
 
-    if not field:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Form field not found",
-        )
+    if field:
+        updated = crud.form_fields_crud.update(db, field, field_in)
+        return _to_public(updated)
 
-    updated = crud.form_fields_crud.update(db, field, field_in)
-    return _to_public(updated)
+    # Check if it's a base field config
+    base_config = base_field_configs_crud.get(db, field_id)
+    if base_config:
+        # Only forward fields that were actually sent and are configurable
+        configurable = {"section_id", "position", "placeholder", "help_text", "options"}
+        update_data = {
+            k: getattr(field_in, k)
+            for k in field_in.model_fields_set & configurable
+        }
+        config_update = BaseFieldConfigUpdate(**update_data)
+        updated_config = base_field_configs_crud.update(db, base_config, config_update)
+        return _base_config_to_public(updated_config)
+
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="Form field not found",
+    )
 
 
 @router.delete("/{field_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -40,7 +40,9 @@ from app.api.email_template.schemas import (
     EmailTemplateUpdate,
 )
 
-# Form fields
+# Form sections & fields
+from app.api.form_section.models import FormSections
+from app.api.form_section.schemas import FormSectionCreate, FormSectionPublic, FormSectionUpdate
 from app.api.form_field.models import FormFields
 from app.api.form_field.schemas import FormFieldCreate, FormFieldPublic, FormFieldUpdate
 
@@ -114,7 +116,11 @@ __all__ = [
     "EmailTemplatePublic",
     "EmailTemplateType",
     "EmailTemplateUpdate",
-    # Form fields
+    # Form sections & fields
+    "FormSections",
+    "FormSectionCreate",
+    "FormSectionPublic",
+    "FormSectionUpdate",
     "FormFields",
     "FormFieldCreate",
     "FormFieldPublic",

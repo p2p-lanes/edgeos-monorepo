@@ -42,9 +42,19 @@ const PassesProvider = ({ children }: { children: ReactNode }) => {
   const [isEditing, setIsEditing] = useState(false)
   const { products } = useGetPassesData()
   const { getCity } = useCityProvider()
-  const _city = getCity()
-  // LEGACY: local_resident removed from ApplicationPublic
+  const city = getCity()
+  const cityId = city?.id ? String(city.id) : null
+  const previousCityIdRef = useRef(cityId)
   const attendeePassesRef = useRef<AttendeePassState[]>([])
+
+  // Reset attendeePasses when city changes so stale data doesn't persist
+  useEffect(() => {
+    if (previousCityIdRef.current === cityId) return
+    previousCityIdRef.current = cityId
+    setAttendeePasses([])
+    attendeePassesRef.current = []
+    setIsEditing(false)
+  }, [cityId])
 
   const toggleProduct = useCallback(
     (attendeeId: string, product: ProductsPass) => {
