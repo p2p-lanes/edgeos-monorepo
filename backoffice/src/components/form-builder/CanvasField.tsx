@@ -29,7 +29,7 @@ function FieldPreview({ field }: { field: FormFieldPublic }) {
       field={schemaField}
       value={previewValue}
       onChange={() => {}}
-      readOnly
+      // readOnly
       hideLabelAndSubtitle
     />
   )
