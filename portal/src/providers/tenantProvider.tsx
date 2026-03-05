@@ -81,12 +81,30 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-neutral-100">
-        <div className="text-center max-w-md p-8">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            Tenant not found
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 px-4">
+        <div className="text-center max-w-lg">
+          <div className="mx-auto mb-8 flex h-24 w-24 items-center justify-center rounded-full bg-gray-200">
+            <svg
+              className="h-12 w-12 text-gray-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"
+              />
+            </svg>
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900">
+            Site not available
           </h1>
-          <p className="text-gray-600">{error}</p>
+          <p className="mt-3 text-lg text-gray-500">
+            The address you entered doesn't match any registered site. Please
+            check the URL and try again.
+          </p>
         </div>
       </div>
     )

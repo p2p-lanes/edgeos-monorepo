@@ -10,6 +10,7 @@ import {
   Loader2,
   Shield,
   ShoppingBag,
+  Tag,
   Ticket,
   X,
 } from "lucide-react"
@@ -37,6 +38,7 @@ export default function CartFooter({ onPay, onBack }: CartFooterProps) {
     clearHousing,
     updateMerchQuantity,
     clearPatron,
+    clearPromoCode,
     canProceedToStep,
     isSubmitting,
     isEditing,
@@ -278,6 +280,35 @@ export default function CartFooter({ onPay, onBack }: CartFooterProps) {
                 <span className="text-sm font-medium text-gray-900">
                   {formatCurrency(summary.insuranceSubtotal)}
                 </span>
+              </div>
+            </div>
+          )}
+
+          {/* Promo Code */}
+          {cart.promoCodeValid && cart.promoCode && (
+            <div className="mb-4">
+              <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                Promo Code
+              </h4>
+              <div className="flex items-center justify-between py-2">
+                <div className="flex items-center gap-3">
+                  <Tag className="w-4 h-4 text-green-500 shrink-0" />
+                  <span className="text-sm font-medium text-green-700">
+                    {cart.promoCode}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-green-600">
+                    -{cart.promoCodeDiscount}%
+                  </span>
+                  <button
+                    type="button"
+                    onClick={clearPromoCode}
+                    className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             </div>
           )}

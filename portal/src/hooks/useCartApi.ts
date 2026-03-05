@@ -73,7 +73,8 @@ export function useCart(popupId: string | null) {
 export function useSaveCart(popupId: string | null) {
   const queryClient = useQueryClient()
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const mutationRef = useRef<ReturnType<typeof useMutation<CartPublic, Error, CartState>>>(null)
+  const mutationRef =
+    useRef<ReturnType<typeof useMutation<CartPublic, Error, CartState>>>(null)
 
   const mutation = useMutation({
     mutationFn: async (items: CartState) => {
@@ -85,10 +86,7 @@ export function useSaveCart(popupId: string | null) {
       })
     },
     onSuccess: (_data, variables) => {
-      queryClient.setQueryData(
-        queryKeys.cart.byPopup(popupId ?? ""),
-        variables,
-      )
+      queryClient.setQueryData(queryKeys.cart.byPopup(popupId ?? ""), variables)
     },
   })
   mutationRef.current = mutation

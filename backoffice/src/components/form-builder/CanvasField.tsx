@@ -88,7 +88,8 @@ function FieldPreview({ field }: { field: FormFieldPublic }) {
   if (type === "select" || type === "multiselect") {
     return (
       <div className="flex h-10 w-full items-center rounded-md border border-input bg-background px-3 text-sm text-muted-foreground">
-        {field.placeholder || `Select${type === "multiselect" ? " multiple" : ""}...`}
+        {field.placeholder ||
+          `Select${type === "multiselect" ? " multiple" : ""}...`}
         <svg
           className="ml-auto h-4 w-4 opacity-50"
           fill="none"
@@ -96,7 +97,12 @@ function FieldPreview({ field }: { field: FormFieldPublic }) {
           viewBox="0 0 24 24"
           aria-hidden="true"
         >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M19 9l-7 7-7-7"
+          />
         </svg>
       </div>
     )
@@ -220,7 +226,10 @@ export function CanvasField({
                   <span className="text-destructive ml-0.5">*</span>
                 )}
                 {isSpecial && (
-                  <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5 py-0">
+                  <Badge
+                    variant="secondary"
+                    className="ml-1.5 text-[10px] px-1.5 py-0"
+                  >
                     Protected
                   </Badge>
                 )}
@@ -261,12 +270,13 @@ export function CanvasFieldOverlay({ field }: { field: FormFieldPublic }) {
         <GripVertical className="h-4 w-4 text-muted-foreground" />
         <span className="text-sm font-semibold truncate">
           {field.label}
-          {field.required && (
-            <span className="text-destructive ml-0.5">*</span>
-          )}
+          {field.required && <span className="text-destructive ml-0.5">*</span>}
         </span>
         {TypeIcon && (
-          <Badge variant="outline" className="shrink-0 text-xs gap-1 py-0 ml-auto">
+          <Badge
+            variant="outline"
+            className="shrink-0 text-xs gap-1 py-0 ml-auto"
+          >
             <TypeIcon className="h-3 w-3" />
             {fieldTypeDef?.label}
           </Badge>

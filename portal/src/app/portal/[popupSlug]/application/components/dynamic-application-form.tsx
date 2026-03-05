@@ -31,7 +31,12 @@ const animationProps = {
   transition: { duration: 0.3, ease: "easeInOut" },
 }
 
-const FULL_WIDTH_TYPES = new Set(["textarea", "multiselect", "url", "select_cards"])
+const FULL_WIDTH_TYPES = new Set([
+  "textarea",
+  "multiselect",
+  "url",
+  "select_cards",
+])
 
 function mapOptions(options?: string[]) {
   return (options ?? []).map((opt) => ({ value: opt, label: opt }))
@@ -210,7 +215,8 @@ export function DynamicApplicationForm({
     const sortByPosition = (fields: [string, FormFieldSchema][]) =>
       fields.sort(([, a], [, b]) => (a.position ?? 0) - (b.position ?? 0))
     for (const fields of Object.values(bySectionIdBase)) sortByPosition(fields)
-    for (const fields of Object.values(bySectionIdCustom)) sortByPosition(fields)
+    for (const fields of Object.values(bySectionIdCustom))
+      sortByPosition(fields)
 
     const result: SectionBlock[] = []
     const sortedSections = [...(schema.sections ?? [])].sort(
@@ -222,8 +228,7 @@ export function DynamicApplicationForm({
       result.push({
         id: "_unsectioned_base",
         title: "Personal Information",
-        subtitle:
-          "Your basic information helps us identify and contact you.",
+        subtitle: "Your basic information helps us identify and contact you.",
         baseFields: bySectionIdBase._unsectioned,
         customFields: [],
       })
@@ -277,7 +282,7 @@ export function DynamicApplicationForm({
     return result
   }, [schema])
 
-  const hasChildrenSection = useMemo(
+  const _hasChildrenSection = useMemo(
     () =>
       mergedSections.some((block) =>
         block.title.toLowerCase().includes("children"),
@@ -359,47 +364,53 @@ export function DynamicApplicationForm({
     <>
       <form onSubmit={handleSubmit} className="space-y-8 px-8 md:px-12">
         {/* Sections in schema order (base + custom fields per section) */}
-        {mergedSections.map(({ id, title, subtitle, baseFields, customFields }) => {
-          const isChildrenSection = title.toLowerCase().includes("children")
-          if (isChildrenSection) {
+        {mergedSections.map(
+          ({ id, title, subtitle, baseFields, customFields }) => {
+            const isChildrenSection = title.toLowerCase().includes("children")
+            if (isChildrenSection) {
+              return (
+                <div key={id}>
+                  <CompanionsSection
+                    allowsSpouse={popup.allows_spouse ?? false}
+                    allowsChildren={popup.allows_children ?? false}
+                    companions={companions}
+                    onCompanionsChange={setCompanions}
+                  />
+                </div>
+              )
+            }
             return (
               <div key={id}>
-                <CompanionsSection
-                  allowsSpouse={popup.allows_spouse ?? false}
-                  allowsChildren={popup.allows_children ?? false}
-                  companions={companions}
-                  onCompanionsChange={setCompanions}
-                />
+                <SectionWrapper title={title} subtitle={subtitle}>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {baseFields.map(([name, field]) =>
+                      renderBaseField(name, field),
+                    )}
+                    {customFields.map(([name, field]) => (
+                      <div
+                        key={name}
+                        className={
+                          FULL_WIDTH_TYPES.has(field.type)
+                            ? "md:col-span-2"
+                            : ""
+                        }
+                      >
+                        <DynamicField
+                          name={name}
+                          field={field}
+                          value={values[name]}
+                          error={errors[name]}
+                          onChange={handleChange}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </SectionWrapper>
+                <SectionSeparator />
               </div>
             )
-          }
-          return (
-            <div key={id}>
-              <SectionWrapper title={title} subtitle={subtitle}>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {baseFields.map(([name, field]) => renderBaseField(name, field))}
-                  {customFields.map(([name, field]) => (
-                    <div
-                      key={name}
-                      className={
-                        FULL_WIDTH_TYPES.has(field.type) ? "md:col-span-2" : ""
-                      }
-                    >
-                      <DynamicField
-                        name={name}
-                        field={field}
-                        value={values[name]}
-                        error={errors[name]}
-                        onChange={handleChange}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </SectionWrapper>
-              <SectionSeparator />
-            </div>
-          )
-        })}
+          },
+        )}
 
         {/* Companions section (only when no "Children" section from API) */}
         {/* {!hasChildrenSection && (

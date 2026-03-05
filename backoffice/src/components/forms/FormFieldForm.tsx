@@ -24,6 +24,7 @@ import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
 import { FormErrorSummary } from "@/components/Common/FormErrorSummary"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
+import { isSpecialField } from "@/components/form-builder/constants"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -53,7 +54,6 @@ import {
   useUnsavedChanges,
 } from "@/hooks/useUnsavedChanges"
 import { createErrorHandler } from "@/utils"
-import { isSpecialField } from "@/components/form-builder/constants"
 
 const FIELD_TYPES = [
   { value: "text", label: "Text", icon: Type },
@@ -61,7 +61,11 @@ const FIELD_TYPES = [
   { value: "number", label: "Number", icon: Hash },
   { value: "boolean", label: "Boolean (Yes/No)", icon: CheckSquare },
   { value: "select", label: "Select (Single)", icon: List },
-  { value: "select_cards", label: "Single select (visible options)", icon: LayoutGrid },
+  {
+    value: "select_cards",
+    label: "Single select (visible options)",
+    icon: LayoutGrid,
+  },
   { value: "multiselect", label: "Multi-Select", icon: ListChecks },
   { value: "date", label: "Date", icon: Calendar },
   { value: "email", label: "Email", icon: Mail },
@@ -302,7 +306,9 @@ export function FormFieldForm({
                           value={field.state.value}
                           onValueChange={(val) => field.handleChange(val)}
                         >
-                          <SelectTrigger disabled={readOnly || isProtectedField}>
+                          <SelectTrigger
+                            disabled={readOnly || isProtectedField}
+                          >
                             <SelectValue placeholder="Select type" />
                           </SelectTrigger>
                           <SelectContent>
@@ -327,7 +333,9 @@ export function FormFieldForm({
                             field.handleChange(val === NO_SECTION ? "" : val)
                           }
                         >
-                          <SelectTrigger disabled={readOnly || isProtectedField}>
+                          <SelectTrigger
+                            disabled={readOnly || isProtectedField}
+                          >
                             <SelectValue placeholder="Select section" />
                           </SelectTrigger>
                           <SelectContent>
@@ -397,7 +405,9 @@ export function FormFieldForm({
 
                 <form.Subscribe selector={(state) => state.values.field_type}>
                   {(fieldType) =>
-                    (fieldType === "select" || fieldType === "select_cards" || fieldType === "multiselect") && (
+                    (fieldType === "select" ||
+                      fieldType === "select_cards" ||
+                      fieldType === "multiselect") && (
                       <form.Field name="options">
                         {(field) => (
                           <div className="space-y-2">

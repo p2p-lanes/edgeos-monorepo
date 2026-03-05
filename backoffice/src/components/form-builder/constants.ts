@@ -1,3 +1,4 @@
+import type { LucideIcon } from "lucide-react"
 import {
   AlignLeft,
   Calendar,
@@ -10,7 +11,6 @@ import {
   Mail,
   Type,
 } from "lucide-react"
-import type { LucideIcon } from "lucide-react"
 import type { FormFieldPublic, FormSectionPublic } from "@/client"
 
 export interface FieldTypeDefinition {
@@ -25,14 +25,23 @@ export const FIELD_TYPES: FieldTypeDefinition[] = [
   { value: "number", label: "Number", icon: Hash },
   { value: "boolean", label: "Boolean (Yes/No)", icon: CheckSquare },
   { value: "select", label: "Select (Single)", icon: List },
-  { value: "select_cards", label: "Single select (visible options)", icon: LayoutGrid },
+  {
+    value: "select_cards",
+    label: "Single select (visible options)",
+    icon: LayoutGrid,
+  },
   { value: "multiselect", label: "Multi-Select", icon: ListChecks },
   { value: "date", label: "Date", icon: Calendar },
   { value: "email", label: "Email", icon: Mail },
   { value: "url", label: "URL", icon: Link },
 ]
 
-export const FULL_WIDTH_TYPES = new Set(["textarea", "multiselect", "url", "select_cards"])
+export const FULL_WIDTH_TYPES = new Set([
+  "textarea",
+  "multiselect",
+  "url",
+  "select_cards",
+])
 
 export const PALETTE_ITEM_PREFIX = "palette-"
 export const CANVAS_ITEM_PREFIX = "canvas-"
@@ -58,9 +67,8 @@ export const slugify = (...parts: string[]): string =>
     .replace(/_{2,}/g, "_")
 
 /** Section is protected when API returns protected: true (cannot delete, limited edit). */
-export const isSpecialSection = (
-  section: FormSectionPublic | null,
-): boolean => !!section && section.protected === true
+export const isSpecialSection = (section: FormSectionPublic | null): boolean =>
+  !!section && section.protected === true
 
 /** Field is protected when API returns protected: true (cannot delete, only placeholder/help text editable). */
 export const isSpecialField = (field: FormFieldPublic): boolean =>

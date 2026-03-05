@@ -77,3 +77,44 @@ class CartPublic(BaseModel):
     updated_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class CartHumanInfo(BaseModel):
+    """Embedded human info for abandoned cart listing."""
+
+    id: uuid.UUID
+    email: str
+    first_name: str | None = None
+    last_name: str | None = None
+
+
+class CartPopupInfo(BaseModel):
+    """Embedded popup info for abandoned cart listing."""
+
+    id: uuid.UUID
+    name: str
+    slug: str
+
+
+class CartPaymentInfo(BaseModel):
+    """Embedded payment info for abandoned cart listing."""
+
+    id: uuid.UUID
+    status: str
+    amount: float
+    currency: str
+    created_at: datetime | None = None
+
+
+class AbandonedCartPublic(BaseModel):
+    """Abandoned cart with enriched info for backoffice."""
+
+    id: uuid.UUID
+    items: CartState
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+    human: CartHumanInfo
+    popup: CartPopupInfo
+    payments: list[CartPaymentInfo] = []
+
+    model_config = ConfigDict(from_attributes=True)

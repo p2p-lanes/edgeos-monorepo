@@ -22,6 +22,9 @@ export default function MerchSection({ onSkip }: MerchSectionProps) {
   }
 
   const handleSkip = () => {
+    for (const item of cart.merch) {
+      updateMerchQuantity(item.productId, 0)
+    }
     onSkip?.()
   }
 
@@ -97,7 +100,12 @@ function MerchItem({ product, quantity, onQuantityChange }: MerchItemProps) {
         />
         <div className="relative w-14 h-14 shrink-0 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center">
           {product.image_url ? (
-            <Image src={product.image_url} alt={product.name} fill className="object-cover" />
+            <Image
+              src={product.image_url}
+              alt={product.name}
+              fill
+              className="object-cover"
+            />
           ) : (
             <ShoppingBag className="w-6 h-6 text-gray-300" />
           )}
@@ -136,7 +144,12 @@ function MerchItem({ product, quantity, onQuantityChange }: MerchItemProps) {
         <div className="flex gap-3 mb-3">
           <div className="relative w-16 h-16 shrink-0 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center">
             {product.image_url ? (
-              <Image src={product.image_url} alt={product.name} fill className="object-cover" />
+              <Image
+                src={product.image_url}
+                alt={product.name}
+                fill
+                className="object-cover"
+              />
             ) : (
               <ShoppingBag className="w-7 h-7 text-gray-300" />
             )}

@@ -3,7 +3,12 @@ import { DynamicField } from "./fields/dynamic-field"
 import SectionWrapper from "./SectionWrapper"
 import { SectionSeparator } from "./section-separator"
 
-const FULL_WIDTH_TYPES = new Set(["textarea", "multiselect", "url", "select_cards"])
+const FULL_WIDTH_TYPES = new Set([
+  "textarea",
+  "multiselect",
+  "url",
+  "select_cards",
+])
 
 interface FormSectionProps {
   title: string

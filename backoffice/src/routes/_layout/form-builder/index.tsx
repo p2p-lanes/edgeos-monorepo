@@ -14,26 +14,19 @@ import {
   useSensors,
 } from "@dnd-kit/core"
 import { arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable"
-import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
 import { Loader2 } from "lucide-react"
 import { useCallback, useMemo, useState } from "react"
 
 import {
   type FormFieldPublic,
-  type FormFieldUpdate,
   FormFieldsService,
-  type FormSectionUpdate,
+  type FormFieldUpdate,
   FormSectionsService,
+  type FormSectionUpdate,
 } from "@/client"
-import { DragOverlayContent } from "@/components/form-builder/DragOverlayContent"
-import { FieldConfigPanel } from "@/components/form-builder/FieldConfigPanel"
-import { FieldPalette } from "@/components/form-builder/FieldPalette"
-import { FormCanvas } from "@/components/form-builder/FormCanvas"
+import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import {
   FIELD_TYPES,
   isSpecialField,
@@ -41,6 +34,10 @@ import {
   parseSortableSectionId,
   SORTABLE_SECTION_PREFIX,
 } from "@/components/form-builder/constants"
+import { DragOverlayContent } from "@/components/form-builder/DragOverlayContent"
+import { FieldConfigPanel } from "@/components/form-builder/FieldConfigPanel"
+import { FieldPalette } from "@/components/form-builder/FieldPalette"
+import { FormCanvas } from "@/components/form-builder/FormCanvas"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -60,7 +57,6 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
-import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
@@ -130,8 +126,13 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null)
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<FormFieldPublic | null>(null)
-  const [liveOrderMap, setLiveOrderMap] = useState<Record<string, string[]> | null>(null)
-  const [liveSectionOrder, setLiveSectionOrder] = useState<string[] | null>(null)
+  const [liveOrderMap, setLiveOrderMap] = useState<Record<
+    string,
+    string[]
+  > | null>(null)
+  const [liveSectionOrder, setLiveSectionOrder] = useState<string[] | null>(
+    null,
+  )
 
   const { data: formFieldsData, isLoading: isLoadingFields } = useQuery({
     ...getAllFormFieldsQueryOptions(popupId),
@@ -230,10 +231,8 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
   })
 
   const updateFieldMutation = useMutation({
-    mutationFn: (data: {
-      fieldId: string
-      requestBody: FormFieldUpdate
-    }) => FormFieldsService.updateFormField(data),
+    mutationFn: (data: { fieldId: string; requestBody: FormFieldUpdate }) =>
+      FormFieldsService.updateFormField(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["form-fields"] })
     },
@@ -299,9 +298,13 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
         const field = reorderedFields[i]
         const updates: FormFieldUpdate = {}
         if (field.position !== i) updates.position = i
-        if (field.section_id !== targetSectionId) updates.section_id = targetSectionId
+        if (field.section_id !== targetSectionId)
+          updates.section_id = targetSectionId
         if (Object.keys(updates).length > 0) {
-          updateFieldMutation.mutate({ fieldId: field.id, requestBody: updates })
+          updateFieldMutation.mutate({
+            fieldId: field.id,
+            requestBody: updates,
+          })
         }
       }
     },
@@ -357,7 +360,10 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
 
       const activeIdStr = String(active.id)
       if (activeIdStr.startsWith(SORTABLE_SECTION_PREFIX)) {
-        if (over.data.current?.type === "section-sortable" && liveSectionOrder) {
+        if (
+          over.data.current?.type === "section-sortable" &&
+          liveSectionOrder
+        ) {
           const overSectionId = over.data.current.sectionId as string
           const activeSectionId = parseSortableSectionId(activeIdStr)
           if (!activeSectionId || activeSectionId === overSectionId) return
@@ -707,7 +713,10 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
         </DialogContent>
       </Dialog>
 
-      {(createFieldMutation.isPending || updateFieldMutation.isPending || createSectionMutation.isPending || updateSectionMutation.isPending) && (
+      {(createFieldMutation.isPending ||
+        updateFieldMutation.isPending ||
+        createSectionMutation.isPending ||
+        updateSectionMutation.isPending) && (
         <div className="fixed bottom-4 right-4 flex items-center gap-2 rounded-lg border bg-background px-3 py-2 shadow-lg text-sm text-muted-foreground">
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
           Saving...

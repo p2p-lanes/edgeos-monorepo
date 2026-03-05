@@ -92,8 +92,10 @@ export default function ConfirmStep() {
     cart.patron ||
     hasEditChanges
 
-  // Insurance available if any product has insurance potential
-  const hasInsurableProducts = cart.insurancePotentialPrice > 0
+  // Insurance available if any product has insurance potential and total is not zero
+  const hasInsurableProducts =
+    cart.insurancePotentialPrice > 0 &&
+    summary.grandTotal - summary.insuranceSubtotal > 0
 
   if (!hasCartItems) {
     return (

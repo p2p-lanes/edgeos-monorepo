@@ -1,16 +1,17 @@
 import { useDroppable } from "@dnd-kit/core"
-import {
-  verticalListSortingStrategy,
-  SortableContext,
-} from "@dnd-kit/sortable"
+import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { Check, Pencil, Trash2, X } from "lucide-react"
 import { useRef, useState } from "react"
-import type { FormFieldPublic, FormSectionPublic, FormSectionUpdate } from "@/client"
+import type {
+  FormFieldPublic,
+  FormSectionPublic,
+  FormSectionUpdate,
+} from "@/client"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
 import { CanvasField } from "./CanvasField"
 import { isSpecialField, isSpecialSection } from "./constants"
 
@@ -196,8 +197,8 @@ export function SectionDropZone({
               </div>
 
               {/* Description — editable for all sections */}
-              {isApiSection && (
-                isEditingDescription ? (
+              {isApiSection &&
+                (isEditingDescription ? (
                   <div className="space-y-1.5">
                     <Textarea
                       ref={descriptionInputRef}
@@ -235,16 +236,14 @@ export function SectionDropZone({
                     className="text-sm text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
                     onClick={handleStartEditDescription}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") handleStartEditDescription()
+                      if (e.key === "Enter" || e.key === " ")
+                        handleStartEditDescription()
                     }}
-                    tabIndex={0}
-                    role="button"
                     aria-label="Edit section description"
                   >
                     {sectionDescription || "Click to add description..."}
                   </p>
-                )
-              )}
+                ))}
 
               {!isApiSection && (
                 <p className="text-sm text-muted-foreground">
@@ -262,9 +261,7 @@ export function SectionDropZone({
           items={fields.map((f) => f.id)}
           strategy={verticalListSortingStrategy}
         >
-          <div
-            className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5 min-h-[48px]"
-          >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5 min-h-[48px]">
             {fields.length === 0 && (
               <div
                 className={`md:col-span-2 flex items-center justify-center py-8 text-sm rounded-lg transition-all duration-150 ${

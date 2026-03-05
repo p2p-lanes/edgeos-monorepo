@@ -11,6 +11,7 @@ import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
 import { FormErrorSummary } from "@/components/Common/FormErrorSummary"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
+import { isSpecialSection } from "@/components/form-builder/constants"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -31,7 +32,6 @@ import {
   useUnsavedChanges,
 } from "@/hooks/useUnsavedChanges"
 import { createErrorHandler } from "@/utils"
-import { isSpecialSection } from "@/components/form-builder/constants"
 
 interface FormSectionFormProps {
   defaultValues?: FormSectionPublic
@@ -49,7 +49,8 @@ export function FormSectionForm({
   const { isAdmin } = useAuth()
   const isEdit = !!defaultValues
   const readOnly = !isAdmin
-  const isProtectedSection = isEdit && defaultValues ? isSpecialSection(defaultValues) : false
+  const isProtectedSection =
+    isEdit && defaultValues ? isSpecialSection(defaultValues) : false
 
   const createMutation = useMutation({
     mutationFn: (data: FormSectionCreate) =>

@@ -45,11 +45,7 @@ export function SortableSectionWrapper({
   }
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className="flex gap-2 items-stretch"
-    >
+    <div ref={setNodeRef} style={style} className="flex gap-2 items-stretch">
       <div
         className="flex items-center justify-center w-8 shrink-0 rounded-l-md cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground transition-colors touch-none"
         {...attributes}
@@ -58,9 +54,7 @@ export function SortableSectionWrapper({
       >
         <GripVertical className="h-4 w-4" />
       </div>
-      <div className="flex-1 min-w-0">
-        {children}
-      </div>
+      <div className="flex-1 min-w-0">{children}</div>
     </div>
   )
 }

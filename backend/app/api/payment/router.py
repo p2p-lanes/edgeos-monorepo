@@ -253,22 +253,21 @@ async def preview_my_payment(
 
 @router.post(
     "/my",
-    response_model=PaymentPublic | PaymentPreview,
+    response_model=PaymentPublic,
     status_code=status.HTTP_201_CREATED,
 )
 async def create_my_payment(
     payment_in: PaymentCreate,
     db: HumanTenantSession,
     current_human: CurrentHuman,
-) -> PaymentPublic | PaymentPreview:
+) -> PaymentPublic:
     """
     Create a payment for current human's application (Portal).
 
     If the total is zero or negative (covered by credit), the products
-    are immediately assigned and no payment record is created - returns
-    PaymentPreview with approved status.
+    are immediately assigned and the payment is auto-approved.
 
-    Otherwise, returns PaymentPublic with checkout URL.
+    Otherwise, returns PaymentPublic with checkout URL for external payment.
     """
     from app.api.application.crud import applications_crud
 
@@ -280,11 +279,7 @@ async def create_my_payment(
             detail="Application not found",
         )
 
-    payment, preview = payments_crud.create_payment(db, payment_in)
-
-    # Zero-amount payment (covered by credit)
-    if payment is None:
-        return preview
+    payment, _preview = payments_crud.create_payment(db, payment_in)
 
     return PaymentPublic.model_validate(payment)
 

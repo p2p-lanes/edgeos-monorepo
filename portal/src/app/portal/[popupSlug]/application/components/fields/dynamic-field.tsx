@@ -133,13 +133,14 @@ export function DynamicField({
       const radioGroupId = `${name}-select-cards`
       return (
         <FormInputWrapper>
-          <LabelRequired isRequired={field.required} id={`${radioGroupId}-label`}>
+          <LabelRequired
+            isRequired={field.required}
+            id={`${radioGroupId}-label`}
+          >
             {displayLabel}
           </LabelRequired>
           {displayHelpText && (
-            <p className="text-sm text-muted-foreground">
-              {displayHelpText}
-            </p>
+            <p className="text-sm text-muted-foreground">{displayHelpText}</p>
           )}
           <RadioGroup
             value={currentValue}
@@ -157,9 +158,7 @@ export function DynamicField({
                   className={cn(
                     "flex cursor-pointer items-center gap-3 rounded-lg border p-2 transition-colors",
                     "hover:border-muted-foreground/30",
-                    isSelected
-                      ? "border-primary/50 bg-muted"
-                      : "border-input",
+                    isSelected ? "border-primary/50 bg-muted" : "border-input",
                   )}
                   htmlFor={optionId}
                 >

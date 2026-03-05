@@ -1,6 +1,5 @@
 import { ChevronRight, QrCode, Ticket, User } from "lucide-react"
 import React, { useState } from "react"
-import { Button } from "@/components/ui/button"
 import {
   Collapsible,
   CollapsibleContent,
