@@ -67,8 +67,28 @@ function getInitialValues(
   return values
 }
 
+/** Base field names that belong to a "Children" section (replaced by CompanionsSection UI). */
+function getFieldsReplacedByChildrenSection(
+  schema: ApplicationFormSchema,
+): Set<string> {
+  const childrenSectionIds = (schema.sections ?? [])
+    .filter((s) => s.label?.toLowerCase().includes("children"))
+    .map((s) => s.id)
+  return new Set(
+    Object.entries(schema.base_fields)
+      .filter(
+        ([, f]) => f.section_id && childrenSectionIds.includes(f.section_id),
+      )
+      .map(([name]) => name),
+  )
+}
+
 export function useApplicationForm(schema: ApplicationFormSchema) {
   const initialValues = useMemo(() => getInitialValues(schema), [schema])
+  const fieldsReplacedByChildrenSection = useMemo(
+    () => getFieldsReplacedByChildrenSection(schema),
+    [schema],
+  )
 
   const [state, dispatch] = useReducer(formReducer, {
     values: initialValues,
@@ -84,7 +104,11 @@ export function useApplicationForm(schema: ApplicationFormSchema) {
     (
       isDraft: boolean,
     ): { isValid: boolean; errors: Record<string, string> } => {
-      const zodSchema = buildFormZodSchema(schema, isDraft)
+      const zodSchema = buildFormZodSchema(
+        schema,
+        isDraft,
+        fieldsReplacedByChildrenSection,
+      )
       const result = zodSchema.safeParse(state.values)
 
       if (result.success) {
@@ -103,7 +127,7 @@ export function useApplicationForm(schema: ApplicationFormSchema) {
       dispatch({ type: "SET_ERRORS", errors })
       return { isValid: false, errors }
     },
-    [schema, state.values],
+    [schema, state.values, fieldsReplacedByChildrenSection],
   )
 
   const populateFromApplication = useCallback(
@@ -144,7 +168,8 @@ export function useApplicationForm(schema: ApplicationFormSchema) {
   const progress = useMemo(() => {
     const allFields = { ...schema.base_fields, ...schema.custom_fields }
     const requiredFields = Object.entries(allFields).filter(
-      ([, f]) => f.required,
+      ([name, f]) =>
+        f.required && !fieldsReplacedByChildrenSection.has(name),
     )
     if (requiredFields.length === 0) return 100
 
@@ -166,7 +191,7 @@ export function useApplicationForm(schema: ApplicationFormSchema) {
     }
 
     return Math.round((filled / total) * 100)
-  }, [schema, state.values])
+  }, [schema, state.values, fieldsReplacedByChildrenSection])
 
   return {
     values: state.values,

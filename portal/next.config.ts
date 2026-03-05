@@ -4,6 +4,7 @@ import type { NextConfig } from "next"
 const nextConfig: NextConfig = {
   output: "standalone",
   outputFileTracingRoot: path.resolve(__dirname, ".."),
+  transpilePackages: ["@edgeos/shared-form-ui"],
   env: {
     NEXT_PUBLIC_API_URL:
       process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000",

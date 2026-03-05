@@ -89,6 +89,8 @@ export default function FormPage() {
     }
   }, [application, city, router])
 
+  console.log('entro')
+
   const handleImport = () => {
     if (importSource) {
       setImportedData(importSource)

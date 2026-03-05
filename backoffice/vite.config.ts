@@ -14,6 +14,12 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  optimizeDeps: {
+    include: ["@edgeos/shared-form-ui"],
+  },
+  ssr: {
+    noExternal: ["@edgeos/shared-form-ui"],
+  },
   plugins: [
     tanstackRouter({
       target: "react",

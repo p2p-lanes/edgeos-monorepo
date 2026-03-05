@@ -1,3 +1,4 @@
+import type { FormFieldSchema } from "@edgeos/shared-form-ui"
 import {
   AlignLeft,
   Calendar,
@@ -13,6 +14,40 @@ import {
 import type { LucideIcon } from "lucide-react"
 import type { FormFieldPublic, FormSectionPublic } from "@/client"
 
+/** Map API form field to shared FormFieldSchema for SchemaField / portal-style components. */
+export function formFieldPublicToFormFieldSchema(
+  f: FormFieldPublic,
+): FormFieldSchema {
+  return {
+    type: f.field_type as FormFieldSchema["type"],
+    label: f.label,
+    required: f.required ?? false,
+    section_id: f.section_id ?? null,
+    position: f.position,
+    options: f.options ?? undefined,
+    placeholder: f.placeholder ?? undefined,
+    help_text: f.help_text ?? undefined,
+    target: (f.target as "human" | "application") ?? undefined,
+  }
+}
+
+/** Preview value for a field type (for form builder canvas). */
+export function getPreviewValueForFieldType(
+  field: FormFieldPublic,
+): string | string[] | boolean {
+  switch (field.field_type) {
+    case "boolean":
+      return false
+    case "multiselect":
+      return (field.options ?? []).slice(0, 2)
+    case "select_cards":
+    case "select":
+      return (field.options ?? [])[0] ?? ""
+    default:
+      return ""
+  }
+}
+
 export interface FieldTypeDefinition {
   value: string
   label: string
@@ -26,7 +61,7 @@ export const FIELD_TYPES: FieldTypeDefinition[] = [
   { value: "boolean", label: "Boolean (Yes/No)", icon: CheckSquare },
   { value: "select", label: "Select (Single)", icon: List },
   { value: "select_cards", label: "Single select (visible options)", icon: LayoutGrid },
-  { value: "multiselect", label: "Multi-Select", icon: ListChecks },
+  { value: "multiselect", label: "Pills (multiple selections)", icon: ListChecks },
   { value: "date", label: "Date", icon: Calendar },
   { value: "email", label: "Email", icon: Mail },
   { value: "url", label: "URL", icon: Link },

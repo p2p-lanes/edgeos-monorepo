@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion"
 import { Plus, X } from "lucide-react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import type { CompanionCreate } from "@/client"
 import { Button } from "@/components/ui/button"
 import {
@@ -58,6 +58,14 @@ export function CompanionsSection({
   const [showKidModal, setShowKidModal] = useState(false)
   const [kidName, setKidName] = useState("")
   const [kidGender, setKidGender] = useState("")
+
+  // Sync checkboxes when companions are loaded from existing application
+  useEffect(() => {
+    const hasSpouseData = companions.some((c) => c.category === "spouse")
+    const hasKidsData = companions.some((c) => c.category === "kid")
+    setHasSpouse(hasSpouseData)
+    setHasKids(hasKidsData)
+  }, [companions])
 
   if (!allowsSpouse && !allowsChildren) return null
 
