@@ -54,7 +54,7 @@ BASE_FIELD_DEFINITIONS: dict[str, dict[str, Any]] = {
     "residence": {
         "type": "text",
         "label": "Usual location of residence",
-        "required": False,
+        "required": True,
         "target": "human",
         "default_section_key": "profile",
         "default_position": 3,
@@ -111,7 +111,7 @@ BASE_FIELD_DEFINITIONS: dict[str, dict[str, Any]] = {
     "partner": {
         "type": "text",
         "label": "Name of spouse/partner + duration of their stay",
-        "required": True,
+        "required": False,
         "target": "application",
         "default_section_key": "companions",
         "default_position": 0,
@@ -121,7 +121,7 @@ BASE_FIELD_DEFINITIONS: dict[str, dict[str, Any]] = {
     "partner_email": {
         "type": "email",
         "label": "Spouse/partner email",
-        "required": True,
+        "required": False,
         "target": "application",
         "default_section_key": "companions",
         "default_position": 1,
