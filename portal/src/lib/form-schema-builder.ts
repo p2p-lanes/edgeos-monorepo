@@ -20,14 +20,17 @@ function fieldToZod(field: FormFieldSchema): z.ZodType {
 export function buildFormZodSchema(
   schema: ApplicationFormSchema,
   isDraft: boolean,
+  fieldsOptionalWhenChildrenSection?: Set<string>,
 ): z.ZodObject {
   const shape: Record<string, z.ZodType> = {}
 
   // Base fields from schema (all profile + application fields)
   for (const [name, field] of Object.entries(schema.base_fields)) {
     const zodType = fieldToZod(field)
+    const isReplacedByChildrenSection =
+      fieldsOptionalWhenChildrenSection?.has(name)
     shape[name] =
-      isDraft || !field.required
+      isDraft || !field.required || isReplacedByChildrenSection
         ? makeOptional(zodType)
         : makeRequired(zodType, field)
   }

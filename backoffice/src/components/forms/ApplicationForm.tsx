@@ -16,13 +16,17 @@ import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
+  SchemaField,
+  type FormFieldSchema as SharedFormFieldSchema,
+  type FormSectionSchema as SharedFormSectionSchema,
+} from "@edgeos/shared-form-ui"
+import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { LoadingButton } from "@/components/ui/loading-button"
@@ -35,7 +39,6 @@ import {
 } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Textarea } from "@/components/ui/textarea"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useCustomToast from "@/hooks/useCustomToast"
 import {
@@ -44,27 +47,9 @@ import {
 } from "@/hooks/useUnsavedChanges"
 import { createErrorHandler } from "@/utils"
 
-// Type for the application schema response
-interface FormFieldSchema {
-  type: string
-  label: string
-  required: boolean
-  section?: string
-  section_id?: string | null
-  position?: number
-  options?: string[]
-  placeholder?: string
-  help_text?: string
-  target?: "human" | "application"
-}
-
-interface FormSectionSchema {
-  id: string
-  label: string
-  description: string | null
-  order: number
-}
-
+// Use shared form schema types (API schema response matches this shape)
+type FormFieldSchema = SharedFormFieldSchema
+type FormSectionSchema = SharedFormSectionSchema
 interface ApplicationSchema {
   base_fields: Record<string, FormFieldSchema>
   custom_fields: Record<string, FormFieldSchema>
@@ -301,11 +286,6 @@ export function ApplicationForm({ onSuccess }: ApplicationFormProps) {
     }
   }
 
-  const renderFieldError = (errors: string[]) => {
-    if (errors.length === 0) return null
-    return <p className="text-destructive text-sm">{errors.join(", ")}</p>
-  }
-
   /** Render a field using form.Field with the given path.
    * fieldPath is cast because base fields are added dynamically via schema
    * and can't be statically inferred by tanstack/react-form's type system. */
@@ -317,258 +297,29 @@ export function ApplicationForm({ onSuccess }: ApplicationFormProps) {
   ) => {
     const validators = getRequiredValidator(field)
 
-    switch (field.type) {
-      case "text":
-      case "email":
-      case "url":
-        return (
-          <form.Field name={fieldPath} key={name} validators={validators}>
-            {(formField) => (
-              <div className="space-y-2">
-                <Label htmlFor={name}>
-                  {field.label}
-                  {field.required && (
-                    <span className="text-destructive"> *</span>
-                  )}
-                </Label>
-                <Input
-                  id={name}
-                  type={field.type === "email" ? "email" : "text"}
-                  placeholder={field.placeholder}
-                  value={(formField.state.value as string) || ""}
-                  onBlur={formField.handleBlur}
-                  onChange={(e) => formField.handleChange(e.target.value)}
-                />
-                {field.help_text && (
-                  <p className="text-sm text-muted-foreground">
-                    {field.help_text}
-                  </p>
-                )}
-                {renderFieldError(formField.state.meta.errors as string[])}
-              </div>
-            )}
-          </form.Field>
-        )
-
-      case "textarea":
-        return (
-          <form.Field name={fieldPath} key={name} validators={validators}>
-            {(formField) => (
-              <div className="space-y-2">
-                <Label htmlFor={name}>
-                  {field.label}
-                  {field.required && (
-                    <span className="text-destructive"> *</span>
-                  )}
-                </Label>
-                <Textarea
-                  id={name}
-                  placeholder={field.placeholder}
-                  value={(formField.state.value as string) || ""}
-                  onBlur={formField.handleBlur}
-                  onChange={(e) => formField.handleChange(e.target.value)}
-                />
-                {field.help_text && (
-                  <p className="text-sm text-muted-foreground">
-                    {field.help_text}
-                  </p>
-                )}
-                {renderFieldError(formField.state.meta.errors as string[])}
-              </div>
-            )}
-          </form.Field>
-        )
-
-      case "number":
-        return (
-          <form.Field name={fieldPath} key={name} validators={validators}>
-            {(formField) => (
-              <div className="space-y-2">
-                <Label htmlFor={name}>
-                  {field.label}
-                  {field.required && (
-                    <span className="text-destructive"> *</span>
-                  )}
-                </Label>
-                <Input
-                  id={name}
-                  type="number"
-                  placeholder={field.placeholder}
-                  value={(formField.state.value as string) || ""}
-                  onBlur={formField.handleBlur}
-                  onChange={(e) => formField.handleChange(e.target.value)}
-                />
-                {field.help_text && (
-                  <p className="text-sm text-muted-foreground">
-                    {field.help_text}
-                  </p>
-                )}
-                {renderFieldError(formField.state.meta.errors as string[])}
-              </div>
-            )}
-          </form.Field>
-        )
-
-      case "boolean":
-        return (
-          <form.Field name={fieldPath} key={name} validators={validators}>
-            {(formField) => (
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id={name}
-                    checked={(formField.state.value as boolean) || false}
-                    onCheckedChange={(checked) => {
-                      formField.handleChange(checked)
-                      formField.handleBlur()
-                    }}
-                  />
-                  <Label htmlFor={name} className="font-normal">
-                    {field.label}
-                    {field.required && (
-                      <span className="text-destructive"> *</span>
-                    )}
-                  </Label>
-                </div>
-                {field.help_text && (
-                  <p className="text-sm text-muted-foreground">
-                    {field.help_text}
-                  </p>
-                )}
-                {renderFieldError(formField.state.meta.errors as string[])}
-              </div>
-            )}
-          </form.Field>
-        )
-
-      case "select":
-        return (
-          <form.Field name={fieldPath} key={name} validators={validators}>
-            {(formField) => (
-              <div className="space-y-2">
-                <Label htmlFor={name}>
-                  {field.label}
-                  {field.required && (
-                    <span className="text-destructive"> *</span>
-                  )}
-                </Label>
-                <Select
-                  value={(formField.state.value as string) || ""}
-                  onValueChange={(val) => {
-                    formField.handleChange(val)
-                    formField.handleBlur()
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue
-                      placeholder={field.placeholder || "Select..."}
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {field.options?.map((option) => (
-                      <SelectItem key={option} value={option}>
-                        {option}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {field.help_text && (
-                  <p className="text-sm text-muted-foreground">
-                    {field.help_text}
-                  </p>
-                )}
-                {renderFieldError(formField.state.meta.errors as string[])}
-              </div>
-            )}
-          </form.Field>
-        )
-
-      case "multiselect":
-        return (
-          <form.Field name={fieldPath} key={name} validators={validators}>
-            {(formField) => {
-              const selectedValues = (formField.state.value as string[]) || []
-              return (
-                <div className="space-y-2">
-                  <Label>
-                    {field.label}
-                    {field.required && (
-                      <span className="text-destructive"> *</span>
-                    )}
-                  </Label>
-                  <div className="space-y-2 rounded-md border p-3">
-                    {field.options?.map((option) => (
-                      <div key={option} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`${name}-${option}`}
-                          checked={selectedValues.includes(option)}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              formField.handleChange([
-                                ...selectedValues,
-                                option,
-                              ])
-                            } else {
-                              formField.handleChange(
-                                selectedValues.filter((v) => v !== option),
-                              )
-                            }
-                            formField.handleBlur()
-                          }}
-                        />
-                        <Label
-                          htmlFor={`${name}-${option}`}
-                          className="font-normal"
-                        >
-                          {option}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                  {field.help_text && (
-                    <p className="text-sm text-muted-foreground">
-                      {field.help_text}
-                    </p>
-                  )}
-                  {renderFieldError(formField.state.meta.errors as string[])}
-                </div>
-              )
-            }}
-          </form.Field>
-        )
-
-      case "date":
-        return (
-          <form.Field name={fieldPath} key={name} validators={validators}>
-            {(formField) => (
-              <div className="space-y-2">
-                <Label htmlFor={name}>
-                  {field.label}
-                  {field.required && (
-                    <span className="text-destructive"> *</span>
-                  )}
-                </Label>
-                <Input
-                  id={name}
-                  type="date"
-                  value={(formField.state.value as string) || ""}
-                  onBlur={formField.handleBlur}
-                  onChange={(e) => formField.handleChange(e.target.value)}
-                />
-                {field.help_text && (
-                  <p className="text-sm text-muted-foreground">
-                    {field.help_text}
-                  </p>
-                )}
-                {renderFieldError(formField.state.meta.errors as string[])}
-              </div>
-            )}
-          </form.Field>
-        )
-
-      default:
-        return null
-    }
+    return (
+      <form.Field name={fieldPath} key={name} validators={validators}>
+        {(formField) => {
+          const errors = formField.state.meta.errors as string[] | undefined
+          const errorStr =
+            Array.isArray(errors) && errors.length > 0
+              ? errors.join(", ")
+              : undefined
+          return (
+            <SchemaField
+              name={name}
+              field={field}
+              value={formField.state.value}
+              error={errorStr}
+              onChange={(_name: string, v: unknown) => {
+                formField.handleChange(v)
+                formField.handleBlur()
+              }}
+            />
+          )
+        }}
+      </form.Field>
+    )
   }
 
   const renderCustomField = (name: string, field: FormFieldSchema) =>
@@ -702,7 +453,7 @@ export function ApplicationForm({ onSuccess }: ApplicationFormProps) {
                           <Label>Gender</Label>
                           <Select
                             value={companion.gender || ""}
-                            onValueChange={(val) => {
+                            onValueChange={(val: string) => {
                               setCompanions((prev) =>
                                 prev.map((c) =>
                                   c._id === companion._id

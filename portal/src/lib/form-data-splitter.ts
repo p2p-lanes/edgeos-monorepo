@@ -53,14 +53,35 @@ export function splitForCreate({
     }
   }
 
+  // Fallback: known human fields are always sent from values when present
+  // (schema may omit target or use "application" for age/gender)
+  const humanFieldKeys = [
+    "first_name",
+    "last_name",
+    "telegram",
+    "gender",
+    "age",
+    "residence",
+  ] as const
+  for (const k of humanFieldKeys) {
+    if (
+      profile[k] === undefined &&
+      values[k] !== undefined &&
+      values[k] !== "" &&
+      values[k] !== null
+    ) {
+      profile[k] = values[k]
+    }
+  }
+
   return {
     popup_id: popupId,
     first_name: (profile.first_name as string) ?? "",
     last_name: (profile.last_name as string) ?? "",
-    telegram: profile.telegram as string | undefined,
-    gender: profile.gender as string | undefined,
-    age: profile.age as string | undefined,
-    residence: profile.residence as string | undefined,
+    telegram: (profile.telegram ?? values.telegram) as string | undefined,
+    gender: (profile.gender ?? values.gender) as string | undefined,
+    age: (profile.age ?? values.age) as string | undefined,
+    residence: (profile.residence ?? values.residence) as string | undefined,
     referral: application.referral as string | undefined,
     info_not_shared: application.info_not_shared as string[] | undefined,
     custom_fields:
@@ -101,13 +122,33 @@ export function splitForUpdate({
     }
   }
 
+  // Fallback: known human fields from values when not in profile
+  const humanFieldKeys = [
+    "first_name",
+    "last_name",
+    "telegram",
+    "gender",
+    "age",
+    "residence",
+  ] as const
+  for (const k of humanFieldKeys) {
+    if (
+      profile[k] === undefined &&
+      values[k] !== undefined &&
+      values[k] !== "" &&
+      values[k] !== null
+    ) {
+      profile[k] = values[k]
+    }
+  }
+
   return {
-    first_name: profile.first_name as string | undefined,
-    last_name: profile.last_name as string | undefined,
-    telegram: profile.telegram as string | undefined,
-    gender: profile.gender as string | undefined,
-    age: profile.age as string | undefined,
-    residence: profile.residence as string | undefined,
+    first_name: (profile.first_name ?? values.first_name) as string | undefined,
+    last_name: (profile.last_name ?? values.last_name) as string | undefined,
+    telegram: (profile.telegram ?? values.telegram) as string | undefined,
+    gender: (profile.gender ?? values.gender) as string | undefined,
+    age: (profile.age ?? values.age) as string | undefined,
+    residence: (profile.residence ?? values.residence) as string | undefined,
     referral: application.referral as string | undefined,
     info_not_shared: application.info_not_shared as string[] | undefined,
     custom_fields:

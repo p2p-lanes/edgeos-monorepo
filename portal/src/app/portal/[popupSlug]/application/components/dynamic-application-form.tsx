@@ -3,7 +3,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { AnimatePresence, motion } from "framer-motion"
 import { useRouter } from "next/navigation"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { memo, useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import type { ApplicationPublic, PopupPublic } from "@/client"
 import { ApplicationsService } from "@/client"
@@ -36,6 +36,89 @@ const FULL_WIDTH_TYPES = new Set(["textarea", "multiselect", "url", "select_card
 function mapOptions(options?: string[]) {
   return (options ?? []).map((opt) => ({ value: opt, label: opt }))
 }
+
+interface BaseFieldProps {
+  name: string
+  field: FormFieldSchema
+  value: unknown
+  error?: string
+  onChange: (name: string, value: unknown) => void
+  displayGender: string
+  handleGenderChange: (value: string) => void
+  genderSpecifyValue: string
+  genderSpecifyError?: string
+}
+
+const BaseField = memo(function BaseField({
+  name,
+  field,
+  value,
+  error,
+  onChange,
+  displayGender,
+  handleGenderChange,
+  genderSpecifyValue,
+  genderSpecifyError,
+}: BaseFieldProps) {
+  if (name === "telegram") {
+    return (
+      <AddonInputForm
+        label={field.label}
+        id="telegram"
+        value={(value as string) ?? ""}
+        onChange={(v) => onChange("telegram", v)}
+        error={error}
+        isRequired={field.required}
+        subtitle={field.help_text}
+        addon="@"
+        placeholder={field.placeholder}
+      />
+    )
+  }
+
+  if (name === "gender") {
+    return (
+      <div className="flex flex-col gap-4 w-full">
+        <SelectForm
+          label={field.label}
+          id="gender"
+          value={displayGender}
+          onChange={handleGenderChange}
+          error={error}
+          isRequired={field.required}
+          options={mapOptions(field.options)}
+        />
+        <AnimatePresence>
+          {displayGender === "Specify" && (
+            <motion.div {...animationProps}>
+              <InputForm
+                isRequired
+                label="Specify your gender"
+                id="gender_specify"
+                value={genderSpecifyValue}
+                onChange={(v) => onChange("gender_specify", v)}
+                error={genderSpecifyError}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    )
+  }
+
+  return (
+    <div className={FULL_WIDTH_TYPES.has(field.type) ? "md:col-span-2" : ""}>
+      <DynamicField
+        name={name}
+        field={field}
+        value={value}
+        error={error}
+        onChange={onChange}
+        hideLabelAndSubtitle={name === "info_not_shared"}
+      />
+    </div>
+  )
+})
 
 interface DynamicApplicationFormProps {
   schema: ApplicationFormSchema
@@ -285,76 +368,6 @@ export function DynamicApplicationForm({
     [mergedSections],
   )
 
-  /** Render a single base field — special cases inline, rest via DynamicField */
-  const renderBaseField = (name: string, field: FormFieldSchema) => {
-    // --- Telegram: addon input with @ prefix ---
-    if (name === "telegram") {
-      return (
-        <div key={name}>
-          <AddonInputForm
-            label={field.label}
-            id="telegram"
-            value={(values.telegram as string) ?? ""}
-            onChange={(v) => handleChange("telegram", v)}
-            error={errors.telegram}
-            isRequired={field.required}
-            subtitle={field.help_text}
-            addon="@"
-            placeholder={field.placeholder}
-          />
-        </div>
-      )
-    }
-
-    // --- Gender: select with animated "Specify" sub-field ---
-    if (name === "gender") {
-      return (
-        <div key={name} className="flex flex-col gap-4 w-full">
-          <SelectForm
-            label={field.label}
-            id="gender"
-            value={displayGender}
-            onChange={handleGenderChange}
-            error={errors.gender}
-            isRequired={field.required}
-            options={mapOptions(field.options)}
-          />
-          <AnimatePresence>
-            {displayGender === "Specify" && (
-              <motion.div {...animationProps}>
-                <InputForm
-                  isRequired
-                  label="Specify your gender"
-                  id="gender_specify"
-                  value={(values.gender_specify as string) ?? ""}
-                  onChange={(v) => handleChange("gender_specify", v)}
-                  error={errors.gender_specify}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      )
-    }
-
-    // --- Generic field: rendered via DynamicField ---
-    return (
-      <div
-        key={name}
-        className={FULL_WIDTH_TYPES.has(field.type) ? "md:col-span-2" : ""}
-      >
-        <DynamicField
-          name={name}
-          field={field}
-          value={values[name]}
-          error={errors[name]}
-          onChange={handleChange}
-          hideLabelAndSubtitle={name === "info_not_shared"}
-        />
-      </div>
-    )
-  }
-
   return (
     <>
       <form onSubmit={handleSubmit} className="space-y-8 px-8 md:px-12">
@@ -377,7 +390,20 @@ export function DynamicApplicationForm({
             <div key={id}>
               <SectionWrapper title={title} subtitle={subtitle}>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  {baseFields.map(([name, field]) => renderBaseField(name, field))}
+                  {baseFields.map(([name, field]) => (
+                    <BaseField
+                      key={name}
+                      name={name}
+                      field={field}
+                      value={values[name]}
+                      error={errors[name]}
+                      onChange={handleChange}
+                      displayGender={displayGender}
+                      handleGenderChange={handleGenderChange}
+                      genderSpecifyValue={(values.gender_specify as string) ?? ""}
+                      genderSpecifyError={errors.gender_specify}
+                    />
+                  ))}
                   {customFields.map(([name, field]) => (
                     <div
                       key={name}
