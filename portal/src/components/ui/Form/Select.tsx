@@ -35,7 +35,7 @@ const SelectForm = ({
         <LabelRequired htmlFor={id} isRequired={isRequired}>
           {label}
         </LabelRequired>
-        <Select onValueChange={onChange} value={value || undefined}>
+        <Select onValueChange={onChange} value={value}>
           <SelectTrigger id={id} className={error ? "border-red-500" : ""}>
             <SelectValue
               placeholder={placeholder}
