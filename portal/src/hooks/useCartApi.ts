@@ -60,12 +60,12 @@ export function useCart(popupId: string | null) {
   return useQuery({
     queryKey: queryKeys.cart.byPopup(popupId ?? ""),
     queryFn: async (): Promise<CartState> => {
-      const result = await request<CartPublic>(OpenAPI, {
+      const result = await request<CartPublic | null>(OpenAPI, {
         method: "GET",
         url: "/api/v1/carts/my/{popup_id}",
         path: { popup_id: popupId! },
       })
-      return result.items ?? EMPTY_CART
+      return result?.items ?? EMPTY_CART
     },
     enabled: !!popupId,
     staleTime: 30_000,

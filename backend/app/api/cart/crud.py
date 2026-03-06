@@ -35,6 +35,19 @@ class CartsCRUD:
 
         return results, total
 
+    def find_by_human_popup(
+        self,
+        session: Session,
+        human_id: uuid.UUID,
+        popup_id: uuid.UUID,
+    ) -> Carts | None:
+        """Find cart by human and popup (read-only, no creation)."""
+        statement = select(Carts).where(
+            Carts.human_id == human_id,
+            Carts.popup_id == popup_id,
+        )
+        return session.exec(statement).first()
+
     def get_or_create(
         self,
         session: Session,

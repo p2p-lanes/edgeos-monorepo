@@ -98,21 +98,22 @@ async def list_abandoned_carts(
     )
 
 
-@router.get("/my/{popup_id}", response_model=CartPublic)
+@router.get("/my/{popup_id}", response_model=CartPublic | None)
 async def get_my_cart(
     popup_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
-) -> CartPublic:
-    """Get or create cart for current human and popup (Portal)."""
-    cart = carts_crud.get_or_create(
+) -> CartPublic | None:
+    """Get cart for current human and popup (Portal). Returns null if none exists."""
+    cart = carts_crud.find_by_human_popup(
         db,
         human_id=current_human.id,
         popup_id=popup_id,
-        tenant_id=current_human.tenant_id,
     )
 
-    # Parse items from JSONB into CartState
+    if not cart:
+        return None
+
     items = CartState.model_validate(cart.items) if cart.items else CartState()
 
     return CartPublic(
