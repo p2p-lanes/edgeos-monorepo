@@ -1,10 +1,11 @@
 import uuid
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import Index, text
+from sqlalchemy import Index, Numeric, text
 from sqlalchemy.dialects.postgresql import UUID
-from sqlmodel import Column, DateTime, Field, Relationship, func
+from sqlmodel import Column, DateTime, Field, Relationship, SQLModel, func
 
 from app.api.payment.schemas import PaymentBase, PaymentProductBase
 
@@ -33,6 +34,10 @@ class PaymentProducts(PaymentProductBase, table=True):
     payment: "Payments" = Relationship(back_populates="products_snapshot")
     product: "Products" = Relationship(back_populates="payment_products")
     attendee: "Attendees" = Relationship(back_populates="payment_products")
+
+    @property
+    def attendee_name(self) -> str | None:
+        return self.attendee.name if self.attendee else None
 
 
 class Payments(PaymentBase, table=True):
@@ -80,6 +85,10 @@ class Payments(PaymentBase, table=True):
     )
     coupon: Optional["Coupons"] = Relationship(back_populates="payments")
     group: Optional["Groups"] = Relationship(back_populates="payments")
+    installments: list["PaymentInstallments"] = Relationship(
+        back_populates="payment",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
+    )
 
     def get_total_products(self) -> int:
         """Get total number of products in this payment."""
@@ -90,3 +99,34 @@ class Payments(PaymentBase, table=True):
     ) -> list["PaymentProducts"]:
         """Get products for a specific attendee."""
         return [pp for pp in self.products_snapshot if pp.attendee_id == attendee_id]
+
+
+class PaymentInstallments(SQLModel, table=True):
+    """Individual installment records for installment plan payments."""
+
+    __tablename__ = "payment_installments"
+
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        sa_column=Column(UUID(as_uuid=True), primary_key=True),
+    )
+    tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
+    payment_id: uuid.UUID = Field(foreign_key="payments.id", index=True)
+    external_payment_id: str = Field(nullable=False)
+    installment_number: int = Field(nullable=False)
+    amount: Decimal = Field(sa_column=Column(Numeric(10, 2), nullable=False))
+    currency: str = Field(default="USD")
+    paid_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
+
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_column=Column(
+            DateTime(timezone=True), server_default=func.now(), nullable=False
+        ),
+    )
+
+    # Relationships
+    payment: "Payments" = Relationship(back_populates="installments")

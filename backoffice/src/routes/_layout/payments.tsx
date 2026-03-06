@@ -1,8 +1,8 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
-import type { ColumnDef } from "@tanstack/react-table"
-import { CreditCard, Download } from "lucide-react"
-import { Suspense, useState } from "react"
+import type { ColumnDef, Row } from "@tanstack/react-table"
+import { ChevronDown, ChevronRight, CreditCard, Download } from "lucide-react"
+import { Fragment, Suspense, useState } from "react"
 
 import { type PaymentPublic, PaymentsService } from "@/client"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
@@ -114,20 +114,107 @@ const columns: ColumnDef<PaymentPublic>[] = [
       const products = row.original.products_snapshot
       if (!products || products.length === 0)
         return <span className="text-muted-foreground">—</span>
+      const isExpanded = row.getIsExpanded()
       return (
-        <span className="text-sm">
-          {products[0].product_name}
-          {products.length > 1 && (
-            <span className="text-muted-foreground">
-              {" "}
-              +{products.length - 1} more
-            </span>
+        <button
+          type="button"
+          className="flex items-center gap-1.5 text-sm"
+          onClick={(e) => {
+            e.stopPropagation()
+            row.toggleExpanded()
+          }}
+        >
+          {isExpanded ? (
+            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+          ) : (
+            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
           )}
-        </span>
+          <Badge variant="secondary">
+            {products.length} {products.length === 1 ? "product" : "products"}
+          </Badge>
+        </button>
       )
     },
   },
 ]
+
+const categoryLabels: Record<string, string> = {
+  ticket: "Pass",
+  housing: "Housing",
+  merch: "Merch",
+  patreon: "Patron",
+}
+
+function PaymentSubRow({ row }: { row: Row<PaymentPublic> }) {
+  const products = row.original.products_snapshot ?? []
+
+  const byAttendee = products.reduce<
+    Record<string, { name: string; items: (typeof products)[number][] }>
+  >((acc, p) => {
+    const key = p.attendee_id
+    if (!acc[key]) {
+      acc[key] = { name: p.attendee_name || "Unknown", items: [] }
+    }
+    acc[key].items.push(p)
+    return acc
+  }, {})
+
+  const entries = Object.entries(byAttendee)
+
+  return (
+    <div className="border-l-2 border-primary/20 bg-muted/20 py-3 pl-6 pr-4">
+      <table className="w-full">
+        <thead>
+          <tr className="text-xs text-muted-foreground">
+            <th className="pb-2 text-left font-medium">Product</th>
+            <th className="pb-2 text-left font-medium">Type</th>
+            <th className="pb-2 text-right font-medium">Qty</th>
+            <th className="pb-2 text-right font-medium">Unit Price</th>
+            <th className="pb-2 text-right font-medium">Total</th>
+          </tr>
+        </thead>
+        <tbody className="text-sm">
+          {entries.map(([attendeeId, { name, items }], groupIdx) => (
+            <Fragment key={attendeeId}>
+              <tr>
+                <td
+                  colSpan={5}
+                  className={`pb-1 text-xs font-semibold tracking-wide text-muted-foreground ${groupIdx > 0 ? "pt-3" : ""}`}
+                >
+                  {name}
+                </td>
+              </tr>
+              {items.map((item, i) => {
+                const lineTotal = Number(item.product_price) * item.quantity
+                return (
+                  <tr
+                    key={`${attendeeId}-${item.product_name}-${i}`}
+                    className="border-b border-border/40 last:border-0"
+                  >
+                    <td className="py-1.5 pr-4">{item.product_name}</td>
+                    <td className="py-1.5 pr-4 text-muted-foreground">
+                      {categoryLabels[item.product_category] ??
+                        item.product_category}
+                    </td>
+                    <td className="py-1.5 text-right tabular-nums">
+                      {item.quantity}
+                    </td>
+                    <td className="py-1.5 text-right font-mono tabular-nums text-muted-foreground">
+                      ${Number(item.product_price)}
+                    </td>
+                    <td className="py-1.5 pl-4 text-right font-mono tabular-nums">
+                      ${lineTotal}
+                    </td>
+                  </tr>
+                )
+              })}
+            </Fragment>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
 
 function PaymentsTableContent() {
   const { selectedPopupId } = useWorkspace()
@@ -152,6 +239,7 @@ function PaymentsTableContent() {
     ? payments.results.filter((p) => {
         const term = search.toLowerCase()
         return (
+          p.id.toLowerCase().includes(term) ||
           (p.status ?? "").toLowerCase().includes(term) ||
           (p.source ?? "").toLowerCase().includes(term) ||
           (p.coupon_code ?? "").toLowerCase().includes(term) ||
@@ -181,6 +269,7 @@ function PaymentsTableContent() {
           : pagination,
         onPaginationChange: setPagination,
       }}
+      renderSubComponent={PaymentSubRow}
       emptyState={
         !search ? (
           <EmptyState

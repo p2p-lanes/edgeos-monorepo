@@ -438,6 +438,7 @@ export type CartState = {
     patron?: (CartItemPatron | null);
     promo_code?: (string | null);
     insurance?: boolean;
+    current_step?: (string | null);
 };
 
 /**
@@ -1017,6 +1018,7 @@ export type PaymentProductResponse = {
     product_description?: (string | null);
     product_price: string;
     product_category: string;
+    attendee_name?: (string | null);
     created_at: string;
 };
 
@@ -1038,6 +1040,9 @@ export type PaymentPublic = {
     coupon_code?: (string | null);
     discount_value?: (string | null);
     edit_passes?: boolean;
+    is_installment_plan?: boolean;
+    installments_total?: (number | null);
+    installments_paid?: (number | null);
     group_id?: (string | null);
     id: string;
     products_snapshot?: Array<PaymentProductResponse>;
@@ -1379,83 +1384,6 @@ export type SendTestRequest = {
     custom_variables?: ({
     [key: string]: unknown;
 } | null);
-};
-
-/**
- * Card payment info from SimpleFI.
- */
-export type SimpleFICardPayment = {
-    provider: string;
-    status: string;
-    coin?: string;
-};
-
-/**
- * Data payload from SimpleFI webhook.
- */
-export type SimpleFIData = {
-    payment_request: SimpleFIPaymentRequest;
-    new_payment?: (SimpleFIPaymentInfo | SimpleFICardPayment | null);
-};
-
-/**
- * Payment info from SimpleFI.
- */
-export type SimpleFIPaymentInfo = {
-    coin: string;
-    hash: string;
-    amount: number;
-    paid_at: string;
-};
-
-/**
- * Payment request details from SimpleFI.
- */
-export type SimpleFIPaymentRequest = {
-    id: string;
-    order_id: number;
-    amount: number;
-    amount_paid: number;
-    currency: string;
-    reference: {
-        [key: string]: unknown;
-    };
-    status: string;
-    status_detail: string;
-    transactions: Array<SimpleFITransaction>;
-    card_payment?: (SimpleFICardPayment | null);
-    payments: Array<SimpleFIPaymentInfo>;
-};
-
-/**
- * Price details for a SimpleFI transaction.
- */
-export type SimpleFIPriceDetails = {
-    currency: string;
-    final_amount: number;
-    rate: number;
-};
-
-/**
- * Transaction details from SimpleFI.
- */
-export type SimpleFITransaction = {
-    id: string;
-    coin: string;
-    chain_id: number;
-    status: string;
-    price_details: SimpleFIPriceDetails;
-};
-
-/**
- * SimpleFI webhook payload schema.
- */
-export type SimpleFIWebhookPayload = {
-    id: string;
-    event_type: string;
-    entity_type: string;
-    entity_id: string;
-    data: SimpleFIData;
 };
 
 export type TemplateTypeInfo = {
@@ -2397,11 +2325,7 @@ export type PaymentsCreateMyPaymentData = {
     requestBody: PaymentCreate;
 };
 
-export type PaymentsCreateMyPaymentResponse = ((PaymentPublic | PaymentPreview));
-
-export type PaymentsSimplefiWebhookData = {
-    requestBody: SimpleFIWebhookPayload;
-};
+export type PaymentsCreateMyPaymentResponse = (PaymentPublic);
 
 export type PaymentsSimplefiWebhookResponse = ({
     [key: string]: unknown;

@@ -9,6 +9,7 @@ import {
   useState,
 } from "react"
 import { sortAttendees } from "@/helpers/filters"
+import { useCart } from "@/hooks/useCartApi"
 import useGetPassesData from "@/hooks/useGetPassesData"
 import { getPriceStrategy } from "@/strategies/PriceStrategy"
 import { getProductStrategy } from "@/strategies/ProductStrategies"
@@ -29,7 +30,15 @@ interface PassesContext_interface {
 
 export const PassesContext = createContext<PassesContext_interface | null>(null)
 
-const PassesProvider = ({ children }: { children: ReactNode }) => {
+interface PassesProviderProps {
+  children: ReactNode
+  restoreFromCart?: boolean
+}
+
+const PassesProvider = ({
+  children,
+  restoreFromCart = false,
+}: PassesProviderProps) => {
   const { getAttendees } = useApplication()
   const { discountApplied } = useDiscount()
   const [attendeePasses, setAttendeePasses] = useState<AttendeePassState[]>([])
@@ -46,6 +55,7 @@ const PassesProvider = ({ children }: { children: ReactNode }) => {
   const cityId = city?.id ? String(city.id) : null
   const previousCityIdRef = useRef(cityId)
   const attendeePassesRef = useRef<AttendeePassState[]>([])
+  const { data: savedCartPasses } = useCart(restoreFromCart ? cityId : null)
 
   // Reset attendeePasses when city changes so stale data doesn't persist
   useEffect(() => {
@@ -85,11 +95,6 @@ const PassesProvider = ({ children }: { children: ReactNode }) => {
             (product: ProductsPass) =>
               product.attendee_category === attendee.category &&
               product.is_active,
-            // (
-            //   localResident
-            //     ? (product.category.includes('local'))
-            //     : (product.category !== 'local week' && product.category !== 'local month')
-            // )
           )
           .map((product: ProductsPass) => {
             const originalQuantity =
@@ -98,15 +103,32 @@ const PassesProvider = ({ children }: { children: ReactNode }) => {
                     .find((a) => a.id === attendee.id)
                     ?.products.find((p) => p.id === product.id)?.quantity ?? 0)
                 : 1
+
+            // Check if this pass was previously selected (ref) or saved in cart
+            const refProduct = attendeePassesRef.current
+              .find((a) => a.id === attendee.id)
+              ?.products.find((p) => p.id === product.id)
+            const cartPass =
+              !refProduct?.selected
+                ? savedCartPasses?.passes?.find(
+                    (cp) =>
+                      cp.attendee_id === attendee.id &&
+                      cp.product_id === product.id,
+                  )
+                : undefined
+            const isSelected = refProduct?.selected || !!cartPass
+            const quantity =
+              refProduct?.selected
+                ? (refProduct.quantity ?? originalQuantity)
+                : cartPass && product.duration_type === "day"
+                  ? originalQuantity + cartPass.quantity
+                  : originalQuantity
+
             return {
               ...product,
               original_quantity: originalQuantity,
-              quantity: originalQuantity,
-              selected:
-                attendeePassesRef.current
-                  .find((a) => a.id === attendee.id)
-                  ?.products.find((p) => p.id === product.id)?.selected ||
-                false,
+              quantity,
+              selected: isSelected,
               attendee_id: attendee.id,
               original_price: product.price,
               disabled: false,
@@ -128,7 +150,7 @@ const PassesProvider = ({ children }: { children: ReactNode }) => {
       })
       setAttendeePasses(initialAttendees)
     }
-  }, [attendees, products, discountApplied])
+  }, [attendees, products, discountApplied, savedCartPasses])
 
   useEffect(() => {
     attendeePassesRef.current = attendeePasses

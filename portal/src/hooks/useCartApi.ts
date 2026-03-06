@@ -34,6 +34,7 @@ export interface CartState {
   patron: CartItemPatron | null
   promo_code: string | null
   insurance: boolean
+  current_step: string | null
 }
 
 interface CartPublic {
@@ -52,6 +53,7 @@ const EMPTY_CART: CartState = {
   patron: null,
   promo_code: null,
   insurance: false,
+  current_step: null,
 }
 
 export function useCart(popupId: string | null) {

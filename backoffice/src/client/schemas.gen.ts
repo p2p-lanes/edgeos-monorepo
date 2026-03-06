@@ -2131,6 +2131,17 @@ export const CartStateSchema = {
             type: 'boolean',
             title: 'Insurance',
             default: false
+        },
+        current_step: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Current Step'
         }
     },
     type: 'object',
@@ -5016,6 +5027,17 @@ export const PaymentProductResponseSchema = {
             type: 'string',
             title: 'Product Category'
         },
+        attendee_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Attendee Name'
+        },
         created_at: {
             type: 'string',
             format: 'date-time',
@@ -5146,6 +5168,34 @@ export const PaymentPublicSchema = {
             type: 'boolean',
             title: 'Edit Passes',
             default: false
+        },
+        is_installment_plan: {
+            type: 'boolean',
+            title: 'Is Installment Plan',
+            default: false
+        },
+        installments_total: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Total'
+        },
+        installments_paid: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Installments Paid',
+            default: 0
         },
         group_id: {
             anyOf: [
@@ -7113,223 +7163,6 @@ export const SendTestRequestSchema = {
     type: 'object',
     required: ['html_content', 'template_type', 'to_email'],
     title: 'SendTestRequest'
-} as const;
-
-export const SimpleFICardPaymentSchema = {
-    properties: {
-        provider: {
-            type: 'string',
-            title: 'Provider'
-        },
-        status: {
-            type: 'string',
-            title: 'Status'
-        },
-        coin: {
-            type: 'string',
-            title: 'Coin',
-            default: 'USD'
-        }
-    },
-    type: 'object',
-    required: ['provider', 'status'],
-    title: 'SimpleFICardPayment',
-    description: 'Card payment info from SimpleFI.'
-} as const;
-
-export const SimpleFIDataSchema = {
-    properties: {
-        payment_request: {
-            '$ref': '#/components/schemas/SimpleFIPaymentRequest'
-        },
-        new_payment: {
-            anyOf: [
-                {
-                    '$ref': '#/components/schemas/SimpleFIPaymentInfo'
-                },
-                {
-                    '$ref': '#/components/schemas/SimpleFICardPayment'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'New Payment'
-        }
-    },
-    type: 'object',
-    required: ['payment_request'],
-    title: 'SimpleFIData',
-    description: 'Data payload from SimpleFI webhook.'
-} as const;
-
-export const SimpleFIPaymentInfoSchema = {
-    properties: {
-        coin: {
-            type: 'string',
-            title: 'Coin'
-        },
-        hash: {
-            type: 'string',
-            title: 'Hash'
-        },
-        amount: {
-            type: 'number',
-            title: 'Amount'
-        },
-        paid_at: {
-            type: 'string',
-            format: 'date-time',
-            title: 'Paid At'
-        }
-    },
-    type: 'object',
-    required: ['coin', 'hash', 'amount', 'paid_at'],
-    title: 'SimpleFIPaymentInfo',
-    description: 'Payment info from SimpleFI.'
-} as const;
-
-export const SimpleFIPaymentRequestSchema = {
-    properties: {
-        id: {
-            type: 'string',
-            title: 'Id'
-        },
-        order_id: {
-            type: 'integer',
-            title: 'Order Id'
-        },
-        amount: {
-            type: 'number',
-            title: 'Amount'
-        },
-        amount_paid: {
-            type: 'number',
-            title: 'Amount Paid'
-        },
-        currency: {
-            type: 'string',
-            title: 'Currency'
-        },
-        reference: {
-            additionalProperties: true,
-            type: 'object',
-            title: 'Reference'
-        },
-        status: {
-            type: 'string',
-            title: 'Status'
-        },
-        status_detail: {
-            type: 'string',
-            title: 'Status Detail'
-        },
-        transactions: {
-            items: {
-                '$ref': '#/components/schemas/SimpleFITransaction'
-            },
-            type: 'array',
-            title: 'Transactions'
-        },
-        card_payment: {
-            anyOf: [
-                {
-                    '$ref': '#/components/schemas/SimpleFICardPayment'
-                },
-                {
-                    type: 'null'
-                }
-            ]
-        },
-        payments: {
-            items: {
-                '$ref': '#/components/schemas/SimpleFIPaymentInfo'
-            },
-            type: 'array',
-            title: 'Payments'
-        }
-    },
-    type: 'object',
-    required: ['id', 'order_id', 'amount', 'amount_paid', 'currency', 'reference', 'status', 'status_detail', 'transactions', 'payments'],
-    title: 'SimpleFIPaymentRequest',
-    description: 'Payment request details from SimpleFI.'
-} as const;
-
-export const SimpleFIPriceDetailsSchema = {
-    properties: {
-        currency: {
-            type: 'string',
-            title: 'Currency'
-        },
-        final_amount: {
-            type: 'number',
-            title: 'Final Amount'
-        },
-        rate: {
-            type: 'number',
-            title: 'Rate'
-        }
-    },
-    type: 'object',
-    required: ['currency', 'final_amount', 'rate'],
-    title: 'SimpleFIPriceDetails',
-    description: 'Price details for a SimpleFI transaction.'
-} as const;
-
-export const SimpleFITransactionSchema = {
-    properties: {
-        id: {
-            type: 'string',
-            title: 'Id'
-        },
-        coin: {
-            type: 'string',
-            title: 'Coin'
-        },
-        chain_id: {
-            type: 'integer',
-            title: 'Chain Id'
-        },
-        status: {
-            type: 'string',
-            title: 'Status'
-        },
-        price_details: {
-            '$ref': '#/components/schemas/SimpleFIPriceDetails'
-        }
-    },
-    type: 'object',
-    required: ['id', 'coin', 'chain_id', 'status', 'price_details'],
-    title: 'SimpleFITransaction',
-    description: 'Transaction details from SimpleFI.'
-} as const;
-
-export const SimpleFIWebhookPayloadSchema = {
-    properties: {
-        id: {
-            type: 'string',
-            title: 'Id'
-        },
-        event_type: {
-            type: 'string',
-            title: 'Event Type'
-        },
-        entity_type: {
-            type: 'string',
-            title: 'Entity Type'
-        },
-        entity_id: {
-            type: 'string',
-            title: 'Entity Id'
-        },
-        data: {
-            '$ref': '#/components/schemas/SimpleFIData'
-        }
-    },
-    type: 'object',
-    required: ['id', 'event_type', 'entity_type', 'entity_id', 'data'],
-    title: 'SimpleFIWebhookPayload',
-    description: 'SimpleFI webhook payload schema.'
 } as const;
 
 export const TemplateTypeInfoSchema = {

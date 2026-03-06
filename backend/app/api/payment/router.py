@@ -1,6 +1,10 @@
 import uuid
 
 from fastapi import APIRouter, HTTPException, Request, status
+from sqlmodel import Session
+
+from app.api.payment.models import Payments
+from app.core.redis import WebhookCache
 
 from app.api.payment.crud import payments_crud
 from app.api.payment.schemas import (
@@ -10,6 +14,8 @@ from app.api.payment.schemas import (
     PaymentPublic,
     PaymentStatus,
     PaymentUpdate,
+    SimpleFIInstallmentPlanPayload,
+    SimpleFIPaymentInfo,
     SimpleFIWebhookPayload,
 )
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
@@ -34,8 +40,6 @@ router = APIRouter(prefix="/payments", tags=["payments"])
 async def _send_payment_confirmed_email(payment, db_session=None) -> None:
     """Send payment confirmation email."""
     from loguru import logger
-
-    from app.api.payment.models import Payments
 
     payment_model: Payments = payment
 
@@ -71,7 +75,9 @@ async def _send_payment_confirmed_email(payment, db_session=None) -> None:
 
     email_service = get_email_service()
 
-    portal_url = f"https://{tenant.slug}.{settings.PORTAL_URL}"
+    portal_host = settings.PORTAL_URL.replace("https://", "").replace("http://", "")
+    portal_url = f"https://{tenant.slug}.{portal_host}"
+
     await email_service.send_payment_confirmed(
         to=human.email,
         subject=f"Payment Confirmed for {popup.name}",
@@ -287,32 +293,59 @@ async def create_my_payment(
 @router.post("/webhook/simplefi", status_code=status.HTTP_200_OK)
 async def simplefi_webhook(
     request: Request,
-    payload: SimpleFIWebhookPayload,
     db: SessionDep,
 ) -> dict:
     """
     Webhook endpoint for SimpleFI payment notifications.
 
-    Called by SimpleFI when payment status changes.
-    Validates signature using the popup's simplefi_api_key.
+    Routes by event_type to handle regular payments, installment payments,
+    and installment plan lifecycle events.
     """
+    from loguru import logger
+
+    from app.core.redis import webhook_cache
+
+    raw_body = await request.json()
+    event_type = raw_body.get("event_type")
+    logger.info("SimpleFI webhook received, event_type: %s", event_type)
+
+    if event_type == "installment_plan_completed":
+        return await _handle_installment_plan_completed(raw_body, db, webhook_cache)
+
+    if event_type == "installment_plan_activated":
+        return await _handle_installment_plan_activated(raw_body, db, webhook_cache)
+
+    if event_type == "installment_plan_cancelled":
+        return await _handle_installment_plan_cancelled(raw_body, db, webhook_cache)
+
+    if event_type not in ("new_payment", "new_card_payment"):
+        logger.info("Unhandled event type: %s. Ignoring.", event_type)
+        return {"message": f"Event type {event_type} not handled"}
+
+    # Parse the full payload for payment events
+    payload = SimpleFIWebhookPayload(**raw_body)
+
+    # Check if this is an installment payment
+    if payload.data.payment_request.installment_plan_id:
+        return await _handle_installment_payment(payload, db, webhook_cache)
+
+    # Regular payment flow
+    return await _handle_regular_payment(payload, db, webhook_cache)
+
+
+async def _handle_regular_payment(
+    payload: SimpleFIWebhookPayload,
+    db: Session,
+    webhook_cache: WebhookCache,
+) -> dict:
+    """Handle new_payment/new_card_payment for regular (non-installment) payments."""
     from decimal import Decimal
 
     from loguru import logger
 
-    from app.core.redis import webhook_cache
-    from app.services.simplefi import verify_webhook_signature
-
     payment_request_id = payload.data.payment_request.id
     event_type = payload.event_type
 
-    logger.info(
-        "SimpleFI webhook received - payment_request_id: %s, event_type: %s",
-        payment_request_id,
-        event_type,
-    )
-
-    # Deduplication check
     fingerprint = f"simplefi:{payment_request_id}:{event_type}"
     if not webhook_cache.add(fingerprint):
         logger.info(
@@ -320,15 +353,12 @@ async def simplefi_webhook(
         )
         return {"message": "Webhook already processed"}
 
-    # Only process payment events - return 200 for unknown types to prevent retries
-    if event_type not in ["new_payment", "new_card_payment"]:
-        logger.info("Event type %s not supported. Skipping...", event_type)
-        return {
-            "status": "ignored",
-            "message": f"Event type {event_type} not supported",
-        }
+    logger.info(
+        "Regular payment - payment_request_id: %s, event_type: %s",
+        payment_request_id,
+        event_type,
+    )
 
-    # Find payment by external_id
     payment = payments_crud.get_by_external_id(db, payment_request_id)
     if not payment:
         logger.warning("Payment not found for external_id: %s", payment_request_id)
@@ -337,24 +367,8 @@ async def simplefi_webhook(
             detail="Payment not found",
         )
 
-    # Validate webhook signature using popup's simplefi_api_key
-    signature = request.headers.get("X-SimpleFI-Signature")
-    raw_body = await request.body()
-    api_key = (
-        payment.application.popup.simplefi_api_key
-        if payment.application and payment.application.popup
-        else None
-    )
-    if not verify_webhook_signature(raw_body, signature, api_key):
-        logger.warning("Invalid SimpleFI webhook signature for payment %s", payment.id)
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid webhook signature",
-        )
-
     payment_request_status = payload.data.payment_request.status
 
-    # Skip if status unchanged
     if payment.status == payment_request_status:
         logger.info(
             "Payment status unchanged (%s). Skipping...", payment_request_status
@@ -371,24 +385,14 @@ async def simplefi_webhook(
                 rate = Decimal(str(t.price_details.rate))
                 break
 
-    # Update payment based on status
     if payment_request_status == "approved":
         payment = payments_crud.approve_payment(
-            db,
-            payment.id,
-            currency=currency,
-            rate=rate,
+            db, payment.id, currency=currency, rate=rate
         )
-        # Send confirmation email
         await _send_payment_confirmed_email(payment, db_session=db)
         logger.info("Payment %s approved via SimpleFI webhook", payment.id)
     else:
-        # Mark as expired for other statuses
-        payments_crud.update(
-            db,
-            payment,
-            PaymentUpdate(status=PaymentStatus.EXPIRED),
-        )
+        payments_crud.update(db, payment, PaymentUpdate(status=PaymentStatus.EXPIRED))
         logger.info(
             "Payment %s marked as expired (status: %s)",
             payment.id,
@@ -396,3 +400,226 @@ async def simplefi_webhook(
         )
 
     return {"message": "Payment status updated successfully"}
+
+
+async def _handle_installment_payment(
+    payload: SimpleFIWebhookPayload,
+    db: Session,
+    webhook_cache: WebhookCache,
+) -> dict:
+    """Handle new_payment/new_card_payment for installment plans."""
+    from datetime import UTC, datetime
+    from decimal import Decimal
+
+    from loguru import logger
+
+    from app.api.payment.models import PaymentInstallments
+
+    payment_request = payload.data.payment_request
+    installment_plan_id = payment_request.installment_plan_id
+    new_payment = payload.data.new_payment
+    payment_request_id = payment_request.id
+
+    fingerprint = f"simplefi:installment:{installment_plan_id}:{payment_request_id}"
+    if not webhook_cache.add(fingerprint):
+        logger.info("Webhook already processed. Skipping...")
+        return {"message": "Webhook already processed"}
+
+    logger.info(
+        "Installment payment: plan_id=%s, payment_request_id=%s",
+        installment_plan_id,
+        payment_request_id,
+    )
+
+    # Look up Payment by installment_plan_id (stored in external_id)
+    payment = payments_crud.get_by_external_id(db, installment_plan_id)
+    if not payment:
+        logger.warning("Payment not found for installment plan %s", installment_plan_id)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Payment not found",
+        )
+
+    # Extract payment details
+    if isinstance(new_payment, SimpleFIPaymentInfo):
+        amount = Decimal(str(new_payment.amount))
+        currency = new_payment.coin
+        paid_at = new_payment.paid_at
+    else:
+        amount = Decimal(str(payment_request.amount_paid))
+        currency = new_payment.coin if new_payment else "USD"
+        paid_at = datetime.now(UTC)
+
+    # Create PaymentInstallments record
+    installment_number = len(payment.installments) + 1
+    installment = PaymentInstallments(
+        tenant_id=payment.tenant_id,
+        payment_id=payment.id,
+        external_payment_id=payment_request_id,
+        installment_number=installment_number,
+        amount=amount,
+        currency=currency,
+        paid_at=paid_at,
+    )
+    db.add(installment)
+
+    # First installment: approve payment to assign products
+    is_first_installment = (payment.installments_paid or 0) == 0
+    if is_first_installment and payment.status != "approved":
+        payment = payments_crud.approve_payment(db, payment.id, currency=currency)
+        logger.info("First installment received - payment %s approved", payment.id)
+
+    # Increment installments_paid
+    payment.installments_paid = (payment.installments_paid or 0) + 1
+    db.commit()
+
+    logger.info(
+        "Installment %s recorded for payment %s (paid: %s/%s)",
+        installment_number,
+        payment.id,
+        payment.installments_paid,
+        payment.installments_total,
+    )
+
+    return {"message": "Installment payment recorded"}
+
+
+async def _handle_installment_plan_completed(
+    raw_body: dict,
+    db: Session,
+    webhook_cache: WebhookCache,
+) -> dict:
+    """Handle the installment_plan_completed webhook event."""
+    from loguru import logger
+
+    payload = SimpleFIInstallmentPlanPayload(**raw_body)
+    entity_id = payload.entity_id
+    event_type = payload.event_type
+
+    fingerprint = f"simplefi:installment:{entity_id}:{event_type}"
+    if not webhook_cache.add(fingerprint):
+        logger.info("Webhook already processed. Skipping...")
+        return {"message": "Webhook already processed"}
+
+    logger.info("Installment plan completed: %s", entity_id)
+
+    payment = payments_crud.get_by_external_id(db, entity_id)
+    if not payment:
+        logger.warning("Payment not found for installment plan %s", entity_id)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Payment not found",
+        )
+
+    if not payment.is_installment_plan:
+        logger.warning(
+            "Payment %s is not marked as an installment plan but received "
+            "installment_plan_completed webhook",
+            payment.id,
+        )
+
+    installment_plan = payload.data.installment_plan
+
+    # Idempotent: if already approved, sync installments_paid and send email
+    if payment.status == "approved":
+        logger.info(
+            "Payment %s already approved, syncing installments_paid", payment.id
+        )
+        payment.installments_paid = installment_plan.paid_installments_count
+        db.commit()
+        await _send_payment_confirmed_email(payment, db_session=db)
+        return {"message": "Installment plan completed - count synced"}
+
+    # Edge case: plan completed but payment not approved
+    logger.warning(
+        "Payment %s not approved when installment_plan_completed received", payment.id
+    )
+    payment.installments_paid = installment_plan.paid_installments_count
+    payment = payments_crud.approve_payment(db, payment.id, currency="USD")
+    await _send_payment_confirmed_email(payment, db_session=db)
+
+    return {"message": "Installment plan payment approved successfully"}
+
+
+async def _handle_installment_plan_activated(
+    raw_body: dict,
+    db: Session,
+    webhook_cache: WebhookCache,
+) -> dict:
+    """Handle the installment_plan_activated webhook event."""
+    from loguru import logger
+
+    payload = SimpleFIInstallmentPlanPayload(**raw_body)
+    entity_id = payload.entity_id
+    event_type = payload.event_type
+
+    fingerprint = f"simplefi:installment:{entity_id}:{event_type}"
+    if not webhook_cache.add(fingerprint):
+        logger.info("Webhook already processed. Skipping...")
+        return {"message": "Webhook already processed"}
+
+    logger.info("Installment plan activated: %s", entity_id)
+
+    payment = payments_crud.get_by_external_id(db, entity_id)
+    if not payment:
+        logger.warning("Payment not found for installment plan %s", entity_id)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Payment not found",
+        )
+
+    installment_plan = payload.data.installment_plan
+    payment.installments_total = installment_plan.number_of_installments
+    db.commit()
+
+    logger.info(
+        "Payment %s: installments_total updated to %s",
+        payment.id,
+        installment_plan.number_of_installments,
+    )
+
+    return {"message": "Installment plan activated successfully"}
+
+
+async def _handle_installment_plan_cancelled(
+    raw_body: dict,
+    db: Session,
+    webhook_cache: WebhookCache,
+) -> dict:
+    """Handle the installment_plan_cancelled webhook event."""
+    from loguru import logger
+
+    payload = SimpleFIInstallmentPlanPayload(**raw_body)
+    entity_id = payload.entity_id
+    event_type = payload.event_type
+
+    fingerprint = f"simplefi:installment:{entity_id}:{event_type}"
+    if not webhook_cache.add(fingerprint):
+        logger.info("Webhook already processed. Skipping...")
+        return {"message": "Webhook already processed"}
+
+    logger.info("Installment plan cancelled: %s", entity_id)
+
+    payment = payments_crud.get_by_external_id(db, entity_id)
+    if not payment:
+        logger.warning("Payment not found for installment plan %s", entity_id)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Payment not found",
+        )
+
+    # Idempotent: skip if already cancelled
+    if payment.status == "cancelled":
+        logger.info("Payment %s already cancelled. Skipping...", payment.id)
+        return {"message": "Payment already cancelled"}
+
+    # If payment was approved, revoke products
+    if payment.status == "approved":
+        logger.info("Revoking products for cancelled payment %s", payment.id)
+        payments_crud._remove_products_from_attendees(db, payment)
+
+    payment.status = "cancelled"
+    db.commit()
+
+    logger.info("Payment %s cancelled", payment.id)
+    return {"message": "Installment plan cancelled successfully"}

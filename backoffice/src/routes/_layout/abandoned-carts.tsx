@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
-import { createFileRoute } from "@tanstack/react-router"
+import { createFileRoute, Link } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
 import { Download, ShoppingCart } from "lucide-react"
 import { Suspense, useState } from "react"
@@ -107,12 +107,17 @@ const columns: ColumnDef<AbandonedCartPublic>[] = [
       return (
         <div className="flex flex-col gap-1">
           {payments.slice(0, 2).map((p) => (
-            <div key={p.id} className="flex items-center gap-2">
+            <Link
+              key={p.id}
+              to="/payments"
+              search={{ search: p.id }}
+              className="flex items-center gap-2 rounded px-1 -mx-1 transition-colors hover:bg-muted"
+            >
               <StatusBadge status={p.status} />
               <span className="font-mono text-xs">
                 ${p.amount} {p.currency}
               </span>
-            </div>
+            </Link>
           ))}
           {payments.length > 2 && (
             <span className="text-muted-foreground text-xs">

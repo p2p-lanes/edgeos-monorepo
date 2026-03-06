@@ -210,16 +210,46 @@ export function CheckoutProvider({
       }
     }
 
-    // Restore promo code
-    if (savedCart.promo_code) {
-      setPromoCode(savedCart.promo_code)
-    }
+    // Promo code re-validation is handled in a separate effect
 
     // Restore insurance
     if (savedCart.insurance) {
       setInsurance(true)
     }
+
+    // Step restore is deferred — availableSteps depends on products loading
   }, [cartLoaded, savedCart, products, initialStep, clearCartMutation])
+
+  // Re-validate promo code from saved cart
+  const hasRevalidatedPromoRef = useRef(false)
+  useEffect(() => {
+    if (hasRevalidatedPromoRef.current || !hasRestoredCheckoutRef.current) return
+    if (!savedCart?.promo_code || !city?.id) return
+
+    hasRevalidatedPromoRef.current = true
+
+    CouponsService.validateCoupon({
+      requestBody: {
+        popup_id: city.id,
+        code: savedCart.promo_code,
+      },
+    })
+      .then((result) => {
+        const discountValue = result.discount_value ?? 0
+        setPromoCode(savedCart.promo_code!)
+        setPromoCodeValid(true)
+        setPromoCodeDiscount(discountValue)
+        setDiscount({
+          discount_value: discountValue,
+          discount_type: "percentage",
+          discount_code: savedCart.promo_code!,
+          city_id: city.id,
+        })
+      })
+      .catch(() => {
+        toast.info("Your promo code is no longer valid")
+      })
+  }, [savedCart, city?.id, setDiscount])
 
   // Loading states
   const [isLoading, setIsLoading] = useState(false)
@@ -271,6 +301,22 @@ export function CheckoutProvider({
 
     return steps
   }, [patronProducts.length, housingProducts.length, merchProducts.length])
+
+  // Restore current step from saved cart (after availableSteps is ready)
+  const hasRestoredStepRef = useRef(false)
+  useEffect(() => {
+    if (hasRestoredStepRef.current || !hasRestoredCheckoutRef.current) return
+    if (initialStep === "success") return
+    if (!savedCart?.current_step) return
+    if (
+      availableSteps.length <= 1 ||
+      !availableSteps.includes(savedCart.current_step as CheckoutStep)
+    )
+      return
+
+    hasRestoredStepRef.current = true
+    setCurrentStep(savedCart.current_step as CheckoutStep)
+  }, [availableSteps, savedCart, initialStep])
 
   // Build selected passes from attendeePasses
   const selectedPasses = useMemo<SelectedPassItem[]>(() => {
@@ -459,6 +505,7 @@ export function CheckoutProvider({
         : null,
       promo_code: promoCodeValid ? promoCode : null,
       insurance,
+      current_step: currentStep !== "success" ? currentStep : null,
     }
     debouncedSaveCart(cartState)
   }, [
@@ -469,6 +516,7 @@ export function CheckoutProvider({
     promoCode,
     promoCodeValid,
     insurance,
+    currentStep,
     cityId,
     debouncedSaveCart,
   ])

@@ -11,7 +11,7 @@ const layout = ({ children }: { children: React.ReactNode }) => {
     <CityProvider>
       <ApplicationProvider>
         <DiscountProvider>
-          <PassesProvider>
+          <PassesProvider restoreFromCart>
             <CheckoutProvider>{children}</CheckoutProvider>
           </PassesProvider>
         </DiscountProvider>

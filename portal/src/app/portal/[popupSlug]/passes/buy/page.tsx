@@ -5,7 +5,7 @@ import CheckoutFlow from "@/app/checkout/components/CheckoutFlow"
 import { Loader } from "@/components/ui/Loader"
 import useAttendee from "@/hooks/useAttendee"
 import { CheckoutProvider } from "@/providers/checkoutProvider"
-import { usePassesProvider } from "@/providers/passesProvider"
+import PassesProvider, { usePassesProvider } from "@/providers/passesProvider"
 import type { AttendeeCategory, AttendeePassState } from "@/types/Attendee"
 import type { CheckoutStep } from "@/types/checkout"
 import { AttendeeModal } from "../components/AttendeeModal"
@@ -49,13 +49,15 @@ export default function BuyPassesPage() {
 
   return (
     <div className="w-full md:mt-0 mx-auto items-center max-w-3xl bg-[#F5F5F7]">
-      <CheckoutProvider initialStep={initialStep}>
-        <CheckoutFlow
-          onBack={handleBack}
-          onAddAttendee={handleAddAttendee}
-          onPaymentComplete={() => {}}
-        />
-      </CheckoutProvider>
+      <PassesProvider restoreFromCart>
+        <CheckoutProvider initialStep={initialStep}>
+          <CheckoutFlow
+            onBack={handleBack}
+            onAddAttendee={handleAddAttendee}
+            onPaymentComplete={() => {}}
+          />
+        </CheckoutProvider>
+      </PassesProvider>
 
       {modal.isOpen && (
         <AttendeeModal

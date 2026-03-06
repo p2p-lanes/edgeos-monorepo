@@ -46,6 +46,7 @@ class CartState(BaseModel):
     patron: CartItemPatron | None = None
     promo_code: str | None = None
     insurance: bool = False
+    current_step: str | None = None
 
 
 class CartBase(SQLModel):

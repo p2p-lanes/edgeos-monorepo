@@ -189,6 +189,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         statement = statement.order_by(desc(Payments.created_at))  # type: ignore[arg-type]
         statement = statement.offset(skip).limit(limit)
+        statement = statement.options(
+            selectinload(Payments.products_snapshot).selectinload(PaymentProducts.attendee),  # type: ignore[arg-type]
+        )
         results = list(session.exec(statement).all())
 
         return results, total
@@ -217,6 +220,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         statement = statement.order_by(desc(Payments.created_at))  # type: ignore[arg-type]
         statement = statement.offset(skip).limit(limit)
+        statement = statement.options(
+            selectinload(Payments.products_snapshot).selectinload(PaymentProducts.attendee),  # type: ignore[arg-type]
+        )
         results = list(session.exec(statement).all())
 
         return results, total
@@ -681,6 +687,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             simplefi_response = simplefi_client.create_payment(
                 amount=preview.amount,
                 reference=reference,
+                memo=application.popup.tenant.name,
             )
         except Exception as e:
             logger.error("Failed to create SimpleFI payment: %s", e)
@@ -915,6 +922,27 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         )
 
         return group
+
+    def _remove_products_from_attendees(
+        self,
+        session: Session,
+        payment: Payments,
+    ) -> None:
+        """Remove products from attendees that were added by this payment."""
+        if not payment.products_snapshot:
+            return
+
+        logger.info("Removing products from attendees for payment %s", payment.id)
+        for product_snapshot in payment.products_snapshot:
+            statement = select(AttendeeProducts).where(
+                AttendeeProducts.attendee_id == product_snapshot.attendee_id,
+                AttendeeProducts.product_id == product_snapshot.product_id,
+            )
+            attendee_product = session.exec(statement).first()
+            if attendee_product:
+                session.delete(attendee_product)
+
+        session.flush()
 
     def _add_products_to_attendees(
         self,
