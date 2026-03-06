@@ -62,4 +62,5 @@ coverage/
 dist/
 dist-ssr/
 .next/
+*.tsbuildinfo
 infra/
