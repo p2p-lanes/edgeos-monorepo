@@ -107,7 +107,7 @@ class Settings(BaseSettings):
     def SIMPLEFI_API_URL(self) -> str:
         if self.ENVIRONMENT == Environment.PRODUCTION:
             return "https://api.simplefi.tech"
-        return "https://api-dev.simplefi.tech"
+        return "https://apidev.simplefi.tech"
 
 
 settings = Settings()
