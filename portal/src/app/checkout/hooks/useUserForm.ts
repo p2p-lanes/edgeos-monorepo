@@ -66,7 +66,6 @@ export const useUserForm = ({
   }, [applicationData])
 
   const handleInputChange = (field: string, value: string) => {
-    console.log("handle input change", field, value)
     setFormData((prev) => ({
       ...prev,
       [field]: value,

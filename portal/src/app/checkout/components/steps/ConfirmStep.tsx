@@ -147,9 +147,9 @@ export default function ConfirmStep() {
                   <p className="text-sm font-medium text-gray-700 mb-1">
                     {getAttendeeName(attendeeId)}
                   </p>
-                  {passes.map((pass, idx) => (
+                  {passes.map((pass) => (
                     <div
-                      key={`${pass.productId}-${idx}`}
+                      key={pass.productId}
                       className="flex items-center justify-between text-sm py-0.5"
                     >
                       <span className="text-gray-600">{pass.product.name}</span>

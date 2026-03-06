@@ -404,33 +404,41 @@ export function FormFieldForm({
                 </div>
 
                 <form.Subscribe selector={(state) => state.values.field_type}>
-                  {(fieldType) =>
-                    (fieldType === "select" ||
+                  {(fieldType) => {
+                    const showOptions =
+                      fieldType === "select" ||
                       fieldType === "select_cards" ||
-                      fieldType === "multiselect") && (
-                      <form.Field name="options">
-                        {(field) => (
-                          <div className="space-y-2">
-                            <Label htmlFor="options">Options</Label>
-                            <Textarea
-                              id="options"
-                              placeholder="Option 1&#10;Option 2&#10;Option 3"
-                              rows={4}
-                              value={field.state.value}
-                              onBlur={field.handleBlur}
-                              onChange={(e) =>
-                                field.handleChange(e.target.value)
-                              }
-                              disabled={readOnly || isProtectedField}
-                            />
-                            <p className="text-sm text-muted-foreground">
-                              One option per line
-                            </p>
-                          </div>
-                        )}
-                      </form.Field>
+                      fieldType === "multiselect"
+                    return (
+                      <div
+                        className={`grid transition-[grid-template-rows] duration-200 ease-in-out ${showOptions ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}
+                      >
+                        <div className="overflow-hidden">
+                          <form.Field name="options">
+                            {(field) => (
+                              <div className="space-y-2">
+                                <Label htmlFor="options">Options</Label>
+                                <Textarea
+                                  id="options"
+                                  placeholder="Option 1&#10;Option 2&#10;Option 3"
+                                  rows={4}
+                                  value={field.state.value}
+                                  onBlur={field.handleBlur}
+                                  onChange={(e) =>
+                                    field.handleChange(e.target.value)
+                                  }
+                                  disabled={readOnly || isProtectedField}
+                                />
+                                <p className="text-sm text-muted-foreground">
+                                  One option per line
+                                </p>
+                              </div>
+                            )}
+                          </form.Field>
+                        </div>
+                      </div>
                     )
-                  }
+                  }}
                 </form.Subscribe>
 
                 <form.Field name="help_text">

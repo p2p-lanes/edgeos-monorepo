@@ -231,7 +231,7 @@ const UserInfoForm = ({
           />
         )}
       </CardHeader>
-      <form onSubmit={handleSubmit}>
+      <form noValidate onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
           {/* Email section - visible only when not verified */}
           {!formData.email_verified && (

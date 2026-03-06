@@ -1,10 +1,11 @@
 import { useQuery } from "@tanstack/react-query"
+import type { PaymentProductResponse, PaymentPublic } from "@/client"
 import { PaymentsService } from "@/client"
 import { queryKeys } from "@/lib/query-keys"
 import { useApplication } from "@/providers/applicationProvider"
 import type { PaymentsProps } from "@/types/passes"
 
-function mapPayment(p: any): PaymentsProps {
+function mapPayment(p: PaymentPublic): PaymentsProps {
   return {
     id: Number(p.id),
     application_id: Number(p.application_id),
@@ -15,16 +16,18 @@ function mapPayment(p: any): PaymentsProps {
     source: p.source ?? null,
     currency: p.currency ?? "USD",
     checkout_url: p.checkout_url ?? null,
-    products_snapshot: (p.products_snapshot ?? []).map((ps: any) => ({
-      product_id: Number(ps.product_id),
-      attendee_id: Number(ps.attendee_id),
-      quantity: ps.quantity ?? 1,
-      product_name: ps.product_name ?? "",
-      product_description: ps.product_description ?? null,
-      product_price: Number(ps.product_price ?? 0),
-      product_category: ps.product_category ?? "",
-      created_at: ps.created_at ?? "",
-    })),
+    products_snapshot: (p.products_snapshot ?? []).map(
+      (ps: PaymentProductResponse) => ({
+        product_id: Number(ps.product_id),
+        attendee_id: Number(ps.attendee_id),
+        quantity: ps.quantity ?? 1,
+        product_name: ps.product_name ?? "",
+        product_description: ps.product_description ?? null,
+        product_price: Number(ps.product_price ?? 0),
+        product_category: ps.product_category ?? "",
+        created_at: ps.created_at ?? "",
+      }),
+    ),
     created_at: p.created_at ?? "",
     updated_at: p.updated_at ?? "",
   }

@@ -10,7 +10,6 @@ const useResources = () => {
   const city = getCity()
 
   const canSeeAttendees = application?.status === "accepted"
-  console.log(canSeeAttendees)
 
   const resources: Resource[] = [
     {

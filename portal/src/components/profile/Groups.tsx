@@ -41,7 +41,7 @@ const Groups = () => {
 
       <div className="p-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {groups.map((group, index) => {
+          {groups.map((group) => {
             const groupPopup = popups.find(
               (popup) => popup.id === group.popup_id,
             )
@@ -49,7 +49,7 @@ const Groups = () => {
 
             return (
               <Card
-                key={`group-${index}`}
+                key={group.id}
                 className={`p-4 hover:shadow-md transition-shadow ${isPopupActive ? "cursor-pointer" : ""}`}
                 onClick={
                   isPopupActive

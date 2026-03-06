@@ -187,7 +187,7 @@ const MemberFormModal = ({
           : "Fill in the details to add a new member to your group."
       }
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form noValidate onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* First Name */}
           <FormInputWrapper>

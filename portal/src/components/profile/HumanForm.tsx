@@ -207,9 +207,9 @@ const HumanForm = ({
                       </button>
                       {showLinkedEmails && (
                         <div className="mt-1 space-y-0.5">
-                          {filteredLinkedEmails.map((email, index) => (
+                          {filteredLinkedEmails.map((email) => (
                             <p
-                              key={index}
+                              key={email}
                               className="text-xs text-gray-500 break-all"
                             >
                               {email}

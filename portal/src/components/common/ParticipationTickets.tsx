@@ -7,11 +7,18 @@ import {
 import { toDateRange } from "@/helpers/dates"
 import type { ProductsPass } from "@/types/Products"
 
+interface ParticipationProduct {
+  category?: string | null
+  duration_type?: string | null
+  start_date?: string | null
+  end_date?: string | null
+}
+
 const ParticipationTickets = ({
   participation,
   passes,
 }: {
-  participation: ProductsPass[] | string
+  participation: ParticipationProduct[] | string
   className?: string
   passes: ProductsPass[]
 }) => {
@@ -51,12 +58,10 @@ const ParticipationTickets = ({
     weeks[index] = product
   })
 
-  console.log("participation", hasMonthPass, participation)
-
   return (
     <div className="flex gap-2">
       {weeks.map((week, index) => (
-        <Ticket key={index} week={week} isPatreon={isPatreon} />
+        <Ticket key={week?.id ?? index} week={week} isPatreon={isPatreon} />
       ))}
     </div>
   )

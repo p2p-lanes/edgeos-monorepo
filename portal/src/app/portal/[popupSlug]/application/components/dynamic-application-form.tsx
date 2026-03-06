@@ -375,7 +375,11 @@ export function DynamicApplicationForm({
 
   return (
     <>
-      <form onSubmit={handleSubmit} className="space-y-8 px-8 md:px-12">
+      <form
+        noValidate
+        onSubmit={handleSubmit}
+        className="space-y-8 px-8 md:px-12"
+      >
         {/* Sections in schema order (base + custom fields per section) */}
         {mergedSections.map(
           ({ id, title, subtitle, baseFields, customFields }) => {

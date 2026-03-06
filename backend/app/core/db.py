@@ -34,32 +34,9 @@ def _generate_check_in_code() -> str:
     return secrets.token_hex(4).upper()
 
 
-def init_db(session: Session) -> None:
-    from app.api.approval_strategy.schemas import ApprovalStrategyType
-    from app.core.tenant_db import ensure_tenant_credentials
-    from app.models import (
-        Applications,
-        ApprovalStrategies,
-        AttendeeProducts,
-        Attendees,
-        Coupons,
-        FormFields,
-        FormSections,
-        GroupLeaders,
-        GroupMembers,
-        Groups,
-        Humans,
-        PaymentProducts,
-        Payments,
-        Popups,
-        Products,
-        Tenants,
-        Users,
-    )
+def _seed_superadmin(session: Session) -> None:
+    from app.models import Users
 
-    seed_data = _load_seed_data()
-
-    # Create superadmin
     user = session.exec(select(Users).where(Users.email == settings.SUPERADMIN)).first()
     if not user:
         user = Users(
@@ -70,7 +47,11 @@ def init_db(session: Session) -> None:
         session.commit()
         logger.info(f"Superadmin created: {settings.SUPERADMIN}")
 
-    # Create demo tenant from seed data
+
+def _seed_tenant(session: Session, seed_data: dict):
+    from app.core.tenant_db import ensure_tenant_credentials
+    from app.models import Tenants
+
     tenant_data = seed_data["tenant"]
     demo_tenant = session.exec(
         select(Tenants).where(Tenants.slug == tenant_data["slug"])
@@ -88,12 +69,16 @@ def init_db(session: Session) -> None:
         ensure_tenant_credentials(session, demo_tenant.id)
         logger.info("Demo tenant credentials created")
 
-    # Create demo users from seed data
-    users_data = seed_data["users"]
-    for user_key, user_data in users_data.items():
+    return demo_tenant
+
+
+def _seed_users(session: Session, seed_data: dict, tenant_id) -> None:
+    from app.models import Users
+
+    for user_key, user_data in seed_data["users"].items():
         existing_user = session.exec(
             select(Users).where(
-                Users.email == user_data["email"], Users.tenant_id == demo_tenant.id
+                Users.email == user_data["email"], Users.tenant_id == tenant_id
             )
         ).first()
         if not existing_user:
@@ -101,25 +86,29 @@ def init_db(session: Session) -> None:
                 email=user_data["email"],
                 full_name=user_data.get("full_name"),
                 role=UserRole(user_data["role"]),
-                tenant_id=demo_tenant.id,
+                tenant_id=tenant_id,
             )
             session.add(new_user)
             session.commit()
             logger.info(f"Demo {user_key} user created: {user_data['email']}")
+
+
+def _seed_popups(session: Session, seed_data: dict, tenant_id) -> dict:
+    from app.models import Popups
 
     popup_map: dict[str, Popups] = {}
     for popup_data in seed_data.get("popups", []):
         popup_key = popup_data["key"]
         existing_popup = session.exec(
             select(Popups).where(
-                Popups.slug == popup_data["slug"], Popups.tenant_id == demo_tenant.id
+                Popups.slug == popup_data["slug"], Popups.tenant_id == tenant_id
             )
         ).first()
         if existing_popup:
             popup_map[popup_key] = existing_popup
         else:
             popup = Popups(
-                tenant_id=demo_tenant.id,
+                tenant_id=tenant_id,
                 name=popup_data["name"],
                 slug=popup_data["slug"],
                 status=popup_data.get("status", "draft"),
@@ -143,20 +132,22 @@ def init_db(session: Session) -> None:
             popup_map[popup_key] = popup
             logger.info(f"Popup created: {popup.name} ({popup_key})")
 
-    # Create default sections and base field configs for each popup
+    return popup_map
+
+
+def _seed_base_field_configs(session: Session, popup_map: dict, tenant_id) -> None:
     from app.api.base_field_config.constants import DEFAULT_SECTIONS
     from app.api.base_field_config.crud import base_field_configs_crud
     from app.api.base_field_config.models import BaseFieldConfigs
+    from app.models import FormSections
 
     for popup_key, popup in popup_map.items():
-        # Check if base field configs already exist for this popup
         existing_configs = session.exec(
             select(BaseFieldConfigs).where(BaseFieldConfigs.popup_id == popup.id)
         ).first()
         if existing_configs:
             continue
 
-        # Create default sections
         default_section_map = {}
         for section_key, section_def in DEFAULT_SECTIONS.items():
             existing_section = session.exec(
@@ -169,7 +160,7 @@ def init_db(session: Session) -> None:
                 default_section_map[section_key] = existing_section.id
             else:
                 section = FormSections(
-                    tenant_id=demo_tenant.id,
+                    tenant_id=tenant_id,
                     popup_id=popup.id,
                     label=section_def["label"],
                     order=section_def["order"],
@@ -181,20 +172,23 @@ def init_db(session: Session) -> None:
                 default_section_map[section_key] = section.id
                 logger.info(f"Default section created: {section.label} for {popup_key}")
 
-        # Create base field configs
         base_field_configs_crud.create_defaults_for_popup(
-            session, popup.id, demo_tenant.id, default_section_map
+            session, popup.id, tenant_id, default_section_map
         )
         logger.info(f"Base field configs created for {popup_key}")
 
-    # Create default approval strategy (auto_accept) for each popup
+
+def _seed_approval_strategies(session: Session, popup_map: dict, tenant_id) -> None:
+    from app.api.approval_strategy.schemas import ApprovalStrategyType
+    from app.models import ApprovalStrategies
+
     for popup_key, popup in popup_map.items():
         existing_strategy = session.exec(
             select(ApprovalStrategies).where(ApprovalStrategies.popup_id == popup.id)
         ).first()
         if not existing_strategy:
             strategy = ApprovalStrategies(
-                tenant_id=demo_tenant.id,
+                tenant_id=tenant_id,
                 popup_id=popup.id,
                 strategy_type=ApprovalStrategyType.AUTO_ACCEPT,
             )
@@ -202,7 +196,13 @@ def init_db(session: Session) -> None:
             session.commit()
             logger.info(f"Approval strategy created: auto_accept for {popup_key}")
 
-    product_map: dict[str, Products] = {}  # Key: "{popup_key}:{product_slug}"
+
+def _seed_products(
+    session: Session, seed_data: dict, popup_map: dict, tenant_id
+) -> dict:
+    from app.models import Products
+
+    product_map: dict[str, Products] = {}
     for product_data in seed_data.get("products", []):
         popup_key = product_data["popup_key"]
         popup = popup_map.get(popup_key)
@@ -224,7 +224,7 @@ def init_db(session: Session) -> None:
             product_map[map_key] = existing_product
         else:
             product = Products(
-                tenant_id=demo_tenant.id,
+                tenant_id=tenant_id,
                 popup_id=popup.id,
                 name=product_data["name"],
                 slug=product_slug,
@@ -258,6 +258,14 @@ def init_db(session: Session) -> None:
             product_map[map_key] = product
             logger.info(f"Product created: {product.name} for {popup_key}")
 
+    return product_map
+
+
+def _seed_form_sections(
+    session: Session, seed_data: dict, popup_map: dict, tenant_id
+) -> dict:
+    from app.models import FormSections
+
     section_map: dict[str, FormSections] = {}
     for section_data in seed_data.get("form_sections", []):
         section_key = section_data["key"]
@@ -279,7 +287,7 @@ def init_db(session: Session) -> None:
             section_map[section_key] = existing_section
         else:
             section = FormSections(
-                tenant_id=demo_tenant.id,
+                tenant_id=tenant_id,
                 popup_id=popup.id,
                 label=section_data["label"],
                 description=section_data.get("description"),
@@ -292,6 +300,14 @@ def init_db(session: Session) -> None:
             section_map[section_key] = section
             logger.info(f"Form section created: {section.label} for {popup_key}")
 
+    return section_map
+
+
+def _seed_form_fields(
+    session: Session, seed_data: dict, popup_map: dict, section_map: dict, tenant_id
+) -> None:
+    from app.models import FormFields
+
     for field_data in seed_data.get("form_fields", []):
         popup_key = field_data["popup_key"]
         popup = popup_map.get(popup_key)
@@ -301,7 +317,6 @@ def init_db(session: Session) -> None:
             )
             continue
 
-        # Resolve section_id from section_key
         section_id = None
         if field_data.get("section_key"):
             section = section_map.get(field_data["section_key"])
@@ -315,7 +330,7 @@ def init_db(session: Session) -> None:
         ).first()
         if not existing_field:
             field = FormFields(
-                tenant_id=demo_tenant.id,
+                tenant_id=tenant_id,
                 popup_id=popup.id,
                 name=field_data["name"],
                 label=field_data["label"],
@@ -331,7 +346,13 @@ def init_db(session: Session) -> None:
             session.commit()
             logger.info(f"Form field created: {field.name} for {popup_key}")
 
-    coupon_map: dict[str, Coupons] = {}  # Key: "{popup_key}:{code}"
+
+def _seed_coupons(
+    session: Session, seed_data: dict, popup_map: dict, tenant_id
+) -> dict:
+    from app.models import Coupons
+
+    coupon_map: dict[str, Coupons] = {}
     for coupon_data in seed_data.get("coupons", []):
         popup_key = coupon_data["popup_key"]
         popup = popup_map.get(popup_key)
@@ -351,7 +372,7 @@ def init_db(session: Session) -> None:
             coupon_map[map_key] = existing_coupon
         else:
             coupon = Coupons(
-                tenant_id=demo_tenant.id,
+                tenant_id=tenant_id,
                 popup_id=popup.id,
                 code=code,
                 discount_value=coupon_data["discount_value"],
@@ -374,21 +395,25 @@ def init_db(session: Session) -> None:
             coupon_map[map_key] = coupon
             logger.info(f"Coupon created: {coupon.code} for {popup_key}")
 
+    return coupon_map
+
+
+def _seed_humans(session: Session, seed_data: dict, tenant_id) -> dict:
+    from app.models import Humans
+
     human_map: dict[str, Humans] = {}
     for human_data in seed_data.get("humans", []):
         human_key = human_data["key"]
         email = human_data["email"].lower().strip()
 
         existing_human = session.exec(
-            select(Humans).where(
-                Humans.email == email, Humans.tenant_id == demo_tenant.id
-            )
+            select(Humans).where(Humans.email == email, Humans.tenant_id == tenant_id)
         ).first()
         if existing_human:
             human_map[human_key] = existing_human
         else:
             human = Humans(
-                tenant_id=demo_tenant.id,
+                tenant_id=tenant_id,
                 email=email,
                 first_name=human_data.get("first_name"),
                 last_name=human_data.get("last_name"),
@@ -403,6 +428,14 @@ def init_db(session: Session) -> None:
             session.refresh(human)
             human_map[human_key] = human
             logger.info(f"Human created: {human.email} ({human_key})")
+
+    return human_map
+
+
+def _seed_groups(
+    session: Session, seed_data: dict, popup_map: dict, human_map: dict, tenant_id
+) -> dict:
+    from app.models import GroupLeaders, GroupMembers, Groups
 
     group_map: dict[str, Groups] = {}
     for group_data in seed_data.get("groups", []):
@@ -430,7 +463,7 @@ def init_db(session: Session) -> None:
                     ambassador_id = ambassador.id
 
             group = Groups(
-                tenant_id=demo_tenant.id,
+                tenant_id=tenant_id,
                 popup_id=popup.id,
                 name=group_data["name"],
                 slug=group_data["slug"],
@@ -454,7 +487,6 @@ def init_db(session: Session) -> None:
         if not group:
             continue
 
-        # Add leaders
         for leader_key in group_data.get("leader_keys", []):
             human = human_map.get(leader_key)
             if human:
@@ -466,7 +498,7 @@ def init_db(session: Session) -> None:
                 ).first()
                 if not existing_leader:
                     leader_link = GroupLeaders(
-                        tenant_id=demo_tenant.id,
+                        tenant_id=tenant_id,
                         group_id=group.id,
                         human_id=human.id,
                     )
@@ -474,7 +506,6 @@ def init_db(session: Session) -> None:
                     session.commit()
                     logger.info(f"Added {leader_key} as leader to {group_key}")
 
-        # Add members
         for member_key in group_data.get("member_keys", []):
             human = human_map.get(member_key)
             if human:
@@ -486,7 +517,7 @@ def init_db(session: Session) -> None:
                 ).first()
                 if not existing_member:
                     member_link = GroupMembers(
-                        tenant_id=demo_tenant.id,
+                        tenant_id=tenant_id,
                         group_id=group.id,
                         human_id=human.id,
                     )
@@ -494,8 +525,22 @@ def init_db(session: Session) -> None:
                     session.commit()
                     logger.info(f"Added {member_key} as member to {group_key}")
 
+    return group_map
+
+
+def _seed_applications(
+    session: Session,
+    seed_data: dict,
+    popup_map: dict,
+    human_map: dict,
+    group_map: dict,
+    product_map: dict,
+    tenant_id,
+) -> tuple[dict, dict]:
+    from app.models import Applications, AttendeeProducts, Attendees
+
     application_map: dict[str, Applications] = {}
-    attendee_lists: dict[str, list[Attendees]] = {}  # app_key -> list of attendees
+    attendee_lists: dict[str, list[Attendees]] = {}
 
     for app_data in seed_data.get("applications", []):
         app_key = app_data["key"]
@@ -509,7 +554,6 @@ def init_db(session: Session) -> None:
             logger.warning(f"Popup or human not found for application {app_key}")
             continue
 
-        # Check if application already exists
         existing_app = session.exec(
             select(Applications).where(
                 Applications.human_id == human.id, Applications.popup_id == popup.id
@@ -517,7 +561,6 @@ def init_db(session: Session) -> None:
         ).first()
         if existing_app:
             application_map[app_key] = existing_app
-            # Load existing attendees
             existing_attendees = session.exec(
                 select(Attendees).where(Attendees.application_id == existing_app.id)
             ).all()
@@ -530,7 +573,6 @@ def init_db(session: Session) -> None:
             if group:
                 group_id = group.id
 
-        # Determine timestamps based on status
         submitted_at = None
         accepted_at = None
         status = app_data.get("status", "draft")
@@ -540,7 +582,7 @@ def init_db(session: Session) -> None:
             accepted_at = datetime.now(UTC)
 
         application = Applications(
-            tenant_id=demo_tenant.id,
+            tenant_id=tenant_id,
             popup_id=popup.id,
             human_id=human.id,
             group_id=group_id,
@@ -556,12 +598,10 @@ def init_db(session: Session) -> None:
         application_map[app_key] = application
         logger.info(f"Application created: {app_key} ({application.status})")
 
-        # Create attendees for this application
         attendees_data = app_data.get("attendees", [])
         created_attendees: list[Attendees] = []
 
         for attendee_data in attendees_data:
-            # Link to human if this is the main attendee with same email
             attendee_human_id = None
             if (
                 attendee_data.get("category") == "main"
@@ -570,7 +610,7 @@ def init_db(session: Session) -> None:
                 attendee_human_id = human.id
 
             attendee = Attendees(
-                tenant_id=demo_tenant.id,
+                tenant_id=tenant_id,
                 application_id=application.id,
                 human_id=attendee_human_id,
                 name=attendee_data["name"],
@@ -584,14 +624,13 @@ def init_db(session: Session) -> None:
             session.refresh(attendee)
             created_attendees.append(attendee)
 
-            # Create attendee products
             for prod_data in attendee_data.get("products", []):
                 product_slug = prod_data["product_slug"]
                 product_map_key = f"{popup_key}:{product_slug}"
                 product = product_map.get(product_map_key)
                 if product:
                     attendee_product = AttendeeProducts(
-                        tenant_id=demo_tenant.id,
+                        tenant_id=tenant_id,
                         attendee_id=attendee.id,
                         product_id=product.id,
                         quantity=prod_data.get("quantity", 1),
@@ -607,6 +646,21 @@ def init_db(session: Session) -> None:
 
         attendee_lists[app_key] = created_attendees
 
+    return application_map, attendee_lists
+
+
+def _seed_payments(
+    session: Session,
+    seed_data: dict,
+    popup_map: dict,
+    application_map: dict,
+    attendee_lists: dict,
+    product_map: dict,
+    coupon_map: dict,
+    tenant_id,
+) -> None:
+    from app.models import PaymentProducts, Payments, Popups
+
     for payment_data in seed_data.get("payments", []):
         app_key = payment_data["application_key"]
         application = application_map.get(app_key)
@@ -614,7 +668,6 @@ def init_db(session: Session) -> None:
             logger.warning(f"Application {app_key} not found for payment")
             continue
 
-        # Check if payment already exists for this application
         existing_payment = session.exec(
             select(Payments).where(
                 Payments.application_id == application.id,
@@ -624,12 +677,10 @@ def init_db(session: Session) -> None:
         if existing_payment:
             continue
 
-        # Get popup for product lookup
         popup = session.get(Popups, application.popup_id)
         if not popup:
             continue
 
-        # Find popup key from map
         popup_key = None
         for key, p in popup_map.items():
             if p.id == popup.id:
@@ -638,7 +689,6 @@ def init_db(session: Session) -> None:
         if not popup_key:
             continue
 
-        # Resolve coupon
         coupon_id = None
         if payment_data.get("coupon_code"):
             coupon_map_key = f"{popup_key}:{payment_data['coupon_code'].upper()}"
@@ -646,11 +696,10 @@ def init_db(session: Session) -> None:
             if coupon:
                 coupon_id = coupon.id
 
-        # Resolve group from application
         group_id = application.group_id
 
         payment = Payments(
-            tenant_id=demo_tenant.id,
+            tenant_id=tenant_id,
             application_id=application.id,
             status=payment_data.get("status", "pending"),
             amount=Decimal(payment_data.get("amount", "0")),
@@ -671,7 +720,6 @@ def init_db(session: Session) -> None:
         session.refresh(payment)
         logger.info(f"Payment created for {app_key}: {payment.status}")
 
-        # Create payment products (snapshot)
         attendees = attendee_lists.get(app_key, [])
         for prod_data in payment_data.get("products", []):
             product_slug = prod_data["product_slug"]
@@ -693,7 +741,6 @@ def init_db(session: Session) -> None:
 
             attendee = attendees[attendee_index]
 
-            # Check if payment product already exists
             existing_pp = session.exec(
                 select(PaymentProducts).where(
                     PaymentProducts.payment_id == payment.id,
@@ -705,7 +752,7 @@ def init_db(session: Session) -> None:
                 continue
 
             payment_product = PaymentProducts(
-                tenant_id=demo_tenant.id,
+                tenant_id=tenant_id,
                 payment_id=payment.id,
                 product_id=product.id,
                 attendee_id=attendee.id,
@@ -717,5 +764,41 @@ def init_db(session: Session) -> None:
             )
             session.add(payment_product)
             session.commit()
+
+
+def init_db(session: Session) -> None:
+    seed_data = _load_seed_data()
+
+    _seed_superadmin(session)
+    demo_tenant = _seed_tenant(session, seed_data)
+    tenant_id = demo_tenant.id
+
+    _seed_users(session, seed_data, tenant_id)
+
+    popup_map = _seed_popups(session, seed_data, tenant_id)
+    _seed_base_field_configs(session, popup_map, tenant_id)
+    _seed_approval_strategies(session, popup_map, tenant_id)
+
+    product_map = _seed_products(session, seed_data, popup_map, tenant_id)
+    section_map = _seed_form_sections(session, seed_data, popup_map, tenant_id)
+    _seed_form_fields(session, seed_data, popup_map, section_map, tenant_id)
+
+    coupon_map = _seed_coupons(session, seed_data, popup_map, tenant_id)
+    human_map = _seed_humans(session, seed_data, tenant_id)
+    group_map = _seed_groups(session, seed_data, popup_map, human_map, tenant_id)
+
+    application_map, attendee_lists = _seed_applications(
+        session, seed_data, popup_map, human_map, group_map, product_map, tenant_id
+    )
+    _seed_payments(
+        session,
+        seed_data,
+        popup_map,
+        application_map,
+        attendee_lists,
+        product_map,
+        coupon_map,
+        tenant_id,
+    )
 
     logger.info("Seed data initialization complete!")

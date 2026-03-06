@@ -1,5 +1,4 @@
 import { EyeOff } from "lucide-react"
-import type { ProductsPass } from "@/types/Products"
 
 const CellControl = ({
   children,
@@ -7,7 +6,7 @@ const CellControl = ({
   className,
 }: {
   children: React.ReactNode
-  value: string | boolean | ProductsPass[]
+  value: string | boolean | unknown[]
   className?: string
 }) => {
   if (value === "*") {

@@ -331,6 +331,7 @@ export function ApplicationForm({ onSuccess }: ApplicationFormProps) {
   return (
     <div className="space-y-6">
       <form
+        noValidate
         onSubmit={(e) => {
           e.preventDefault()
           form.handleSubmit()
@@ -565,7 +566,7 @@ export function ApplicationForm({ onSuccess }: ApplicationFormProps) {
               </Button>
               <Button
                 type="button"
-                variant="secondary"
+                variant="outline"
                 disabled={createMutation.isPending}
                 onClick={() => {
                   setSavingAsDraft(true)

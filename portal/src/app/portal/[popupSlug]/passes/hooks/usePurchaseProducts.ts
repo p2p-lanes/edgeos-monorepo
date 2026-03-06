@@ -60,9 +60,9 @@ const usePurchaseProducts = () => {
         ? `${window.location.origin}/checkout/success`
         : window.location.href
 
-      if ((result as any).status === "pending") {
-        window.location.href = `${(result as any).checkout_url}?redirect_url=${redirectUrl}`
-      } else if ((result as any).status === "approved") {
+      if (result.status === "pending") {
+        window.location.href = `${result.checkout_url}?redirect_url=${redirectUrl}`
+      } else if (result.status === "approved") {
         await queryClient.invalidateQueries({
           queryKey: queryKeys.applications.mine(),
         })

@@ -93,7 +93,7 @@ async def get_attendee(
     for ap in attendee.attendee_products:
         from app.api.product.schemas import ProductWithQuantity
 
-        product_data = ap.product.__dict__.copy()
+        product_data = ap.product.model_dump()
         product_data["quantity"] = ap.quantity
         products.append(ProductWithQuantity(**product_data))
 
@@ -125,7 +125,7 @@ async def update_attendee(
     for ap in updated.attendee_products:
         from app.api.product.schemas import ProductWithQuantity
 
-        product_data = ap.product.__dict__.copy()
+        product_data = ap.product.model_dump()
         product_data["quantity"] = ap.quantity
         products.append(ProductWithQuantity(**product_data))
 
@@ -179,7 +179,7 @@ async def get_by_check_in_code(
     for ap in attendee.attendee_products:
         from app.api.product.schemas import ProductWithQuantity
 
-        product_data = ap.product.__dict__.copy()
+        product_data = ap.product.model_dump()
         product_data["quantity"] = ap.quantity
         products.append(ProductWithQuantity(**product_data))
 

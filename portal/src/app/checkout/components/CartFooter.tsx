@@ -123,9 +123,9 @@ export default function CartFooter({ onPay, onBack }: CartFooterProps) {
                 Passes
               </h4>
               <div className="space-y-2">
-                {cart.passes.map((pass, idx) => (
+                {cart.passes.map((pass) => (
                   <div
-                    key={`${pass.attendeeId}-${pass.productId}-${idx}`}
+                    key={`${pass.attendeeId}-${pass.productId}`}
                     className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0"
                   >
                     <div className="flex items-center gap-3 flex-1 min-w-0">

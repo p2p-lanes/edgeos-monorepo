@@ -4,7 +4,6 @@ import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table"
 import { useProductsQuery } from "@/hooks/useProductsQuery"
 import { useCityProvider } from "@/providers/cityProvider"
 import type { AttendeeDirectory } from "@/types/Attendee"
-import type { ProductsPass } from "@/types/Products"
 import AttendeeCell from "./Table/Cells/AttendeeCell"
 import CellControl from "./Table/Cells/CellControl"
 import CommonCell from "./Table/Cells/CommonCell"
@@ -66,13 +65,9 @@ const AttendeesTable = ({
                 <CommonCell value={attendee.email ?? ""} />
                 <CommonCell value={attendee.telegram ?? ""} />
                 <TableCell>
-                  <CellControl
-                    value={attendee.participation as unknown as ProductsPass[]}
-                  >
+                  <CellControl value={attendee.participation}>
                     <ParticipationTickets
-                      participation={
-                        attendee.participation as unknown as ProductsPass[]
-                      }
+                      participation={attendee.participation}
                       passes={products}
                     />
                   </CellControl>
