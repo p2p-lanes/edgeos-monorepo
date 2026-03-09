@@ -3,16 +3,15 @@ import uuid
 from fastapi import APIRouter, HTTPException, Request, status
 from sqlmodel import Session
 
-from app.api.payment.models import Payments
-from app.core.redis import WebhookCache
-
 from app.api.payment.crud import payments_crud
+from app.api.payment.models import Payments
 from app.api.payment.schemas import (
     PaymentCreate,
     PaymentFilter,
     PaymentPreview,
     PaymentPublic,
     PaymentStatus,
+    PaymentStatusCheck,
     PaymentUpdate,
     SimpleFIInstallmentPlanPayload,
     SimpleFIPaymentInfo,
@@ -28,6 +27,7 @@ from app.core.dependencies.users import (
     SessionDep,
     TenantSession,
 )
+from app.core.redis import WebhookCache
 from app.services.email import (
     PaymentConfirmedContext,
     PaymentProductItem,
@@ -201,6 +201,36 @@ async def approve_payment(
     await _send_payment_confirmed_email(payment, db_session=db)
 
     return PaymentPublic.model_validate(payment)
+
+
+@router.get("/my/latest", response_model=PaymentStatusCheck)
+async def get_my_latest_payment(
+    application_id: uuid.UUID,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+) -> PaymentStatusCheck:
+    """Get the latest payment status for an application owned by current human (Portal)."""
+    from app.api.application.crud import applications_crud
+
+    # Verify human owns this application
+    application = applications_crud.get(db, application_id)
+    if not application or application.human_id != current_human.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Application not found",
+        )
+
+    payment = payments_crud.get_latest_by_application(db, application_id)
+    if not payment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No payments found for this application",
+        )
+
+    return PaymentStatusCheck(
+        id=payment.id,
+        status=PaymentStatus(payment.status),
+    )
 
 
 @router.get("/my/{application_id}", response_model=ListModel[PaymentPublic])

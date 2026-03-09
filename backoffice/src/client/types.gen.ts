@@ -1077,6 +1077,14 @@ export type PaymentStats = {
 export type PaymentStatus = 'pending' | 'approved' | 'rejected' | 'expired' | 'cancelled';
 
 /**
+ * Minimal response for checking a payment's current status.
+ */
+export type PaymentStatusCheck = {
+    id: string;
+    status: PaymentStatus;
+};
+
+/**
  * Schema for updating a payment (mainly status updates).
  */
 export type PaymentUpdate = {
@@ -1859,7 +1867,7 @@ export type CartsGetMyCartData = {
     popupId: string;
 };
 
-export type CartsGetMyCartResponse = (CartPublic);
+export type CartsGetMyCartResponse = ((CartPublic | null));
 
 export type CartsUpdateMyCartData = {
     popupId: string;
@@ -2300,6 +2308,12 @@ export type PaymentsApprovePaymentData = {
 };
 
 export type PaymentsApprovePaymentResponse = (PaymentPublic);
+
+export type PaymentsGetMyLatestPaymentData = {
+    applicationId: string;
+};
+
+export type PaymentsGetMyLatestPaymentResponse = (PaymentStatusCheck);
 
 export type PaymentsListMyPaymentsData = {
     applicationId: string;

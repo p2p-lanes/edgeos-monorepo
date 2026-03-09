@@ -187,6 +187,15 @@ class PaymentFilter(BaseModel):
     status: PaymentStatus | None = None
 
 
+class PaymentStatusCheck(BaseModel):
+    """Minimal response for checking a payment's current status."""
+
+    id: uuid.UUID
+    status: PaymentStatus
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class SimpleFICardPayment(BaseModel):
     """Card payment info from SimpleFI."""
 

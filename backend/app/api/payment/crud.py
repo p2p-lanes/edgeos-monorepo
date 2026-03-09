@@ -167,6 +167,20 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         return results, total
 
+    def get_latest_by_application(
+        self,
+        session: Session,
+        application_id: uuid.UUID,
+    ) -> Payments | None:
+        """Get the most recent payment for an application."""
+        statement = (
+            select(Payments)
+            .where(Payments.application_id == application_id)
+            .order_by(desc(Payments.created_at))  # type: ignore[arg-type]
+            .limit(1)
+        )
+        return session.exec(statement).first()
+
     def find_by_popup(
         self,
         session: Session,

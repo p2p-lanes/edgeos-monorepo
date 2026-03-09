@@ -1,28 +1,46 @@
 "use client"
 
 import { motion } from "framer-motion"
-import { ArrowRight } from "lucide-react"
+import {
+  AlertCircle,
+  ArrowRight,
+  Clock,
+  Loader2,
+  RefreshCw,
+} from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
+import type { VerifiedPaymentStatus } from "@/hooks/checkout"
 import { cn } from "@/lib/utils"
 import { useCityProvider } from "@/providers/cityProvider"
 
-export default function SuccessStep() {
+interface SuccessStepProps {
+  paymentStatus?: VerifiedPaymentStatus
+}
+
+export default function SuccessStep({
+  paymentStatus = "approved",
+}: SuccessStepProps) {
   const router = useRouter()
   const { getCity } = useCityProvider()
   const city = getCity()
   const [countdown, setCountdown] = useState(30)
 
+  const passesUrl = city?.slug ? `/portal/${city.slug}/passes` : "/portal"
+
   const handleGoToPasses = useCallback(() => {
-    if (city?.slug) {
-      router.push(`/portal/${city.slug}/passes`)
-    } else {
-      router.push("/portal")
-    }
+    router.push(passesUrl)
+  }, [passesUrl, router])
+
+  const handleRetry = useCallback(() => {
+    router.push(city?.slug ? `/portal/${city.slug}/passes/buy` : "/portal")
   }, [city?.slug, router])
 
+  // Only countdown when payment is approved
   useEffect(() => {
+    if (paymentStatus !== "approved") return
+
     const timer = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
@@ -35,8 +53,102 @@ export default function SuccessStep() {
     }, 1000)
 
     return () => clearInterval(timer)
-  }, [handleGoToPasses])
+  }, [paymentStatus, handleGoToPasses])
 
+  // Verifying state
+  if (paymentStatus === "verifying") {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[55vh] text-center px-4">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.4 }}
+          className="flex flex-col items-center"
+        >
+          <Loader2 className="w-16 h-16 text-blue-500 animate-spin mb-6" />
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">
+            Verifying your payment...
+          </h1>
+          <p className="text-gray-500 max-w-xs">
+            Please wait while we confirm your payment with the provider.
+          </p>
+        </motion.div>
+      </div>
+    )
+  }
+
+  // Pending state (max retries reached, still processing)
+  if (paymentStatus === "pending") {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[55vh] text-center px-4">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.4 }}
+          className="flex flex-col items-center"
+        >
+          <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center mb-6">
+            <Clock className="w-8 h-8 text-amber-600" />
+          </div>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">
+            Payment Still Processing
+          </h1>
+          <p className="text-gray-500 max-w-sm">
+            Your payment is still being processed. You will receive a
+            confirmation email shortly once it is completed.
+          </p>
+          <div className="mt-8">
+            <Button onClick={handleGoToPasses}>
+              Go to My Passes
+              <ArrowRight className="w-4 h-4" />
+            </Button>
+          </div>
+        </motion.div>
+      </div>
+    )
+  }
+
+  // Rejected / Expired / Cancelled / Error states
+  if (
+    paymentStatus === "rejected" ||
+    paymentStatus === "expired" ||
+    paymentStatus === "cancelled" ||
+    paymentStatus === "error"
+  ) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[55vh] text-center px-4">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.4 }}
+          className="flex flex-col items-center"
+        >
+          <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mb-6">
+            <AlertCircle className="w-8 h-8 text-red-600" />
+          </div>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">
+            Payment was not completed
+          </h1>
+          <p className="text-gray-500 max-w-sm">
+            {paymentStatus === "error"
+              ? "We could not verify your payment status. Please check your email or try again."
+              : "Your payment was not processed successfully. Please try again."}
+          </p>
+          <div className="flex flex-col items-center gap-3 mt-8">
+            <Button onClick={handleRetry}>
+              <RefreshCw className="w-4 h-4" />
+              Try Again
+            </Button>
+            <Button variant="ghost" onClick={handleGoToPasses}>
+              Go to My Passes
+            </Button>
+          </div>
+        </motion.div>
+      </div>
+    )
+  }
+
+  // Approved state (default) — original success animation
   return (
     <div className="flex flex-col items-center justify-center min-h-[55vh] text-center px-4">
       {/* Pulse ring */}

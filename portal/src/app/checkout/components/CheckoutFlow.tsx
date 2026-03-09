@@ -1,7 +1,10 @@
 "use client"
 
 import { AnimatePresence } from "framer-motion"
-import { useEffect } from "react"
+import { useSearchParams } from "next/navigation"
+import { useEffect, useMemo } from "react"
+import { usePaymentVerification } from "@/hooks/checkout"
+import { useApplication } from "@/providers/applicationProvider"
 import { useCheckout } from "@/providers/checkoutProvider"
 import type { AttendeeCategory } from "@/types/Attendee"
 import type { CheckoutStep } from "@/types/checkout"
@@ -76,6 +79,21 @@ export default function CheckoutFlow({
     submitPayment,
   } = useCheckout()
 
+  const searchParams = useSearchParams()
+  const { getRelevantApplication } = useApplication()
+  const application = getRelevantApplication()
+
+  // Verify payment status when returning from SimpleFI redirect
+  const isSimpleFIReturn = useMemo(
+    () => searchParams.has("checkout", "success"),
+    [searchParams],
+  )
+
+  const { paymentStatus } = usePaymentVerification({
+    applicationId: application?.id,
+    enabled: isSimpleFIReturn && currentStep === "success",
+  })
+
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll on step change
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" })
@@ -131,7 +149,11 @@ export default function CheckoutFlow({
       case "confirm":
         return <ConfirmStep />
       case "success":
-        return <SuccessStep />
+        return (
+          <SuccessStep
+            paymentStatus={isSimpleFIReturn ? paymentStatus : "approved"}
+          />
+        )
       default:
         return null
     }

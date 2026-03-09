@@ -1,6 +1,5 @@
 "use client"
 
-import { useQueryClient } from "@tanstack/react-query"
 import {
   createContext,
   type ReactNode,
@@ -11,30 +10,27 @@ import {
   useRef,
   useState,
 } from "react"
-import { toast } from "sonner"
-import type { PaymentProductRequest } from "@/client"
-import { CouponsService, PaymentsService } from "@/client"
 import {
-  type CartState,
-  useCart,
-  useClearCart,
-  useSaveCart,
-} from "@/hooks/useCartApi"
+  type CartSelectionState,
+  useCartPersistence,
+  useCartSummary,
+  useCheckoutSteps,
+  useCreditCalculation,
+  useHousingSelection,
+  useInsuranceCalculation,
+  useMerchSelection,
+  usePatronSelection,
+  usePaymentSubmit,
+  useProductCategories,
+  usePromoCode,
+} from "@/hooks/checkout"
 import useGetPassesData from "@/hooks/useGetPassesData"
-import {
-  checkAndClearPurchasePending,
-  markPurchasePending,
-} from "@/hooks/usePaymentRedirect"
-import { queryKeys } from "@/lib/query-keys"
 import type { AttendeePassState } from "@/types/Attendee"
 import type {
   CheckoutCartState,
   CheckoutCartSummary,
   CheckoutStep,
-  SelectedHousingItem,
-  SelectedMerchItem,
   SelectedPassItem,
-  SelectedPatronItem,
 } from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
 import { useApplication } from "./applicationProvider"
@@ -93,7 +89,6 @@ export function CheckoutProvider({
   children,
   initialStep = "passes",
 }: CheckoutProviderProps) {
-  const queryClient = useQueryClient()
   const { attendeePasses, toggleProduct, isEditing, toggleEditing } =
     usePassesProvider()
   const { discountApplied, setDiscount, resetDiscount } = useDiscount()
@@ -105,252 +100,25 @@ export function CheckoutProvider({
   const city = getCity()
   const cityId = city?.id ? String(city.id) : null
 
-  // Cart API hooks
-  const { data: savedCart, isSuccess: cartLoaded } = useCart(cityId)
-  const { save: debouncedSaveCart } = useSaveCart(cityId)
-  const clearCartMutation = useClearCart(cityId)
-
   const hasRestoredCheckoutRef = useRef(false)
   const previousCityIdRef = useRef(cityId)
   const paymentCompleteRef = useRef(false)
 
-  // Step management
-  const [currentStep, setCurrentStep] = useState<CheckoutStep>(initialStep)
+  // Product categories
+  const { passProducts, housingProducts, merchProducts, patronProducts } =
+    useProductCategories(products)
 
-  // Cart state for non-pass items
-  const [housing, setHousing] = useState<SelectedHousingItem | null>(null)
-  const [merch, setMerch] = useState<SelectedMerchItem[]>([])
-  const [patron, setPatron] = useState<SelectedPatronItem | null>(null)
-  const [promoCode, setPromoCode] = useState("")
-  const [promoCodeValid, setPromoCodeValid] = useState(false)
-  const [promoCodeDiscount, setPromoCodeDiscount] = useState(0)
+  // Item selection hooks
+  const { housing, setHousing, selectHousing, clearHousing } =
+    useHousingSelection(housingProducts)
+
+  const { merch, setMerch, updateMerchQuantity } =
+    useMerchSelection(merchProducts)
+
+  const { patron, setPatron, setPatronAmount, clearPatron } =
+    usePatronSelection(patronProducts)
+
   const [insurance, setInsurance] = useState(false)
-
-  // Reset state when city changes so we re-restore from new city's cart
-  useEffect(() => {
-    if (previousCityIdRef.current === cityId) return
-    previousCityIdRef.current = cityId
-
-    hasRestoredCheckoutRef.current = false
-    setHousing(null)
-    setMerch([])
-    setPatron(null)
-    setPromoCode("")
-    setPromoCodeValid(false)
-    setPromoCodeDiscount(0)
-    setInsurance(false)
-    setCurrentStep("passes")
-  }, [cityId])
-
-  // Restore checkout cart from DB
-  useEffect(() => {
-    if (hasRestoredCheckoutRef.current || !cartLoaded || !savedCart) return
-    if (!products.length) return
-
-    hasRestoredCheckoutRef.current = true
-
-    if (initialStep === "success") {
-      checkAndClearPurchasePending()
-      clearCartMutation.mutate(undefined, {
-        onSettled: () => {
-          // Always clear cart cache, even if DELETE fails (backend may have already cleared it)
-          queryClient.setQueryData(queryKeys.cart.byPopup(cityId ?? ""), {
-            passes: [],
-            housing: null,
-            merch: [],
-            patron: null,
-            promo_code: null,
-            insurance: false,
-            current_step: null,
-          })
-        },
-      })
-      // Refetch application data (attendees with purchased products) and payments
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.applications.mine(),
-      })
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.payments.all,
-      })
-      return
-    }
-
-    // Restore housing
-    if (savedCart.housing) {
-      const product = products.find(
-        (p) => p.id === savedCart.housing?.product_id,
-      )
-      if (product) {
-        const start = new Date(savedCart.housing.check_in)
-        const end = new Date(savedCart.housing.check_out)
-        const nights = Math.max(
-          1,
-          Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)),
-        )
-        setHousing({
-          productId: product.id,
-          product,
-          checkIn: savedCart.housing.check_in,
-          checkOut: savedCart.housing.check_out,
-          nights,
-          pricePerNight: product.price,
-          totalPrice: product.price * nights,
-        })
-      }
-    }
-
-    // Restore merch
-    if (savedCart.merch?.length) {
-      const restoredMerch = savedCart.merch.reduce<SelectedMerchItem[]>(
-        (acc, saved) => {
-          const product = products.find((p) => p.id === saved.product_id)
-          if (!product || saved.quantity <= 0) return acc
-          acc.push({
-            productId: product.id,
-            product,
-            quantity: saved.quantity,
-            unitPrice: product.price,
-            totalPrice: product.price * saved.quantity,
-          })
-          return acc
-        },
-        [],
-      )
-      if (restoredMerch.length > 0) setMerch(restoredMerch)
-    }
-
-    // Restore patron
-    if (savedCart.patron) {
-      const product = products.find(
-        (p) => p.id === savedCart.patron?.product_id,
-      )
-      if (product) {
-        setPatron({
-          productId: product.id,
-          product,
-          amount: savedCart.patron.amount,
-          isCustomAmount: savedCart.patron.is_custom_amount,
-        })
-      }
-    }
-
-    // Promo code re-validation is handled in a separate effect
-
-    // Restore insurance
-    if (savedCart.insurance) {
-      setInsurance(true)
-    }
-
-    // Step restore is deferred — availableSteps depends on products loading
-  }, [
-    cartLoaded,
-    savedCart,
-    products,
-    initialStep,
-    clearCartMutation,
-    cityId,
-    queryClient.invalidateQueries,
-    queryClient.setQueryData,
-  ])
-
-  // Re-validate promo code from saved cart
-  const hasRevalidatedPromoRef = useRef(false)
-  useEffect(() => {
-    if (hasRevalidatedPromoRef.current || !hasRestoredCheckoutRef.current)
-      return
-    if (!savedCart?.promo_code || !city?.id) return
-
-    hasRevalidatedPromoRef.current = true
-
-    CouponsService.validateCoupon({
-      requestBody: {
-        popup_id: city.id,
-        code: savedCart.promo_code,
-      },
-    })
-      .then((result) => {
-        const discountValue = result.discount_value ?? 0
-        setPromoCode(savedCart.promo_code!)
-        setPromoCodeValid(true)
-        setPromoCodeDiscount(discountValue)
-        setDiscount({
-          discount_value: discountValue,
-          discount_type: "percentage",
-          discount_code: savedCart.promo_code!,
-          city_id: city.id,
-        })
-      })
-      .catch(() => {
-        toast.info("Your promo code is no longer valid")
-      })
-  }, [savedCart, city?.id, setDiscount])
-
-  // Loading states
-  const [isLoading, setIsLoading] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  // Reset isSubmitting when page is restored from bfcache
-  useEffect(() => {
-    const handlePageShow = (event: PageTransitionEvent) => {
-      if (event.persisted) {
-        setIsSubmitting(false)
-      }
-    }
-
-    window.addEventListener("pageshow", handlePageShow)
-    return () => window.removeEventListener("pageshow", handlePageShow)
-  }, [])
-
-  // Filter products by category
-  const passProducts = useMemo(
-    () => products.filter((p) => p.category === "ticket" && p.is_active),
-    [products],
-  )
-
-  const housingProducts = useMemo(
-    () => products.filter((p) => p.category === "housing" && p.is_active),
-    [products],
-  )
-
-  const merchProducts = useMemo(
-    () => products.filter((p) => p.category === "merch" && p.is_active),
-    [products],
-  )
-
-  const patronProducts = useMemo(
-    () => products.filter((p) => p.category === "patreon" && p.is_active),
-    [products],
-  )
-
-  // Calculate available steps dynamically
-  const availableSteps = useMemo<CheckoutStep[]>(() => {
-    const steps: CheckoutStep[] = ["passes"]
-
-    if (patronProducts.length > 0) steps.push("patron")
-    if (housingProducts.length > 0) steps.push("housing")
-    if (merchProducts.length > 0) steps.push("merch")
-
-    steps.push("confirm")
-
-    return steps
-  }, [patronProducts.length, housingProducts.length, merchProducts.length])
-
-  // Restore current step from saved cart (after availableSteps is ready)
-  const hasRestoredStepRef = useRef(false)
-  useEffect(() => {
-    if (hasRestoredStepRef.current || !hasRestoredCheckoutRef.current) return
-    if (initialStep === "success") return
-    if (!savedCart?.current_step) return
-    if (
-      availableSteps.length <= 1 ||
-      !availableSteps.includes(savedCart.current_step as CheckoutStep)
-    )
-      return
-
-    hasRestoredStepRef.current = true
-    setCurrentStep(savedCart.current_step as CheckoutStep)
-  }, [availableSteps, savedCart, initialStep])
 
   // Build selected passes from attendeePasses
   const selectedPasses = useMemo<SelectedPassItem[]>(() => {
@@ -384,97 +152,166 @@ export function CheckoutProvider({
     return passes
   }, [attendeePasses, isEditing])
 
-  // Compute edit credit from attendeePasses
-  const editCredit = useMemo(() => {
-    if (!isEditing) return 0
-    return attendeePasses.reduce((total, attendee) => {
-      return (
-        total +
-        attendee.products
-          .filter((p) => p.edit && p.purchased)
-          .reduce((sum, p) => sum + p.price * (p.quantity ?? 1), 0)
-      )
-    }, 0)
-  }, [attendeePasses, isEditing])
+  // Ref that holds the latest selection state for cart persistence.
+  // Initialized with defaults — updated to real values after all hooks run.
+  const selectionStateRef = useRef<CartSelectionState>({
+    selectedPasses,
+    housing,
+    merch,
+    patron,
+    promoCode: "",
+    promoCodeValid: false,
+    insurance,
+    currentStep: initialStep,
+  })
 
-  // Month upgrade credit
-  const monthUpgradeCredit = useMemo(() => {
-    if (isEditing) return 0
-
-    const hasPatreonSelected = attendeePasses.some((a) =>
-      a.products.some((p) => p.category === "patreon" && p.selected),
-    )
-    if (hasPatreonSelected) return 0
-
-    return attendeePasses.reduce((total, attendee) => {
-      const hasFullOrMonthSelected = attendee.products.some(
-        (p) =>
-          (p.duration_type === "full" || p.duration_type === "month") &&
-          p.selected &&
-          !p.purchased,
-      )
-      if (!hasFullOrMonthSelected) return total
-
-      const hasPurchasedWeekOrDay = attendee.products.some(
-        (p) =>
-          (p.duration_type === "week" || p.duration_type === "day") &&
-          p.purchased,
-      )
-      if (!hasPurchasedWeekOrDay) return total
-
-      const purchasedCredit = attendee.products
-        .filter((p) => p.category !== "patreon" && p.purchased)
-        .reduce((sum, p) => sum + p.price * (p.quantity ?? 1), 0)
-
-      return total + purchasedCredit
-    }, 0)
-  }, [attendeePasses, isEditing])
-
-  // Calculate insurance amount
-  const calculateInsuranceAmount = useCallback(
-    (
-      passes: SelectedPassItem[],
-      housingItem: SelectedHousingItem | null,
-      merchItems: SelectedMerchItem[],
-    ): number => {
-      // Insurance percentage defaults to 5% if not specified on product
-      const DEFAULT_INSURANCE_PCT = 5
-      let total = 0
-
-      for (const pass of passes) {
-        const pct =
-          Number(pass.product.insurance_percentage) || DEFAULT_INSURANCE_PCT
-        const basePrice = pass.originalPrice ?? pass.price
-        total += (basePrice * pct) / 100
-      }
-
-      if (housingItem) {
-        const pct =
-          Number(housingItem.product.insurance_percentage) ||
-          DEFAULT_INSURANCE_PCT
-        total += (housingItem.totalPrice * pct) / 100
-      }
-
-      for (const item of merchItems) {
-        const pct =
-          Number(item.product.insurance_percentage) || DEFAULT_INSURANCE_PCT
-        total += (item.totalPrice * pct) / 100
-      }
-
-      return total
+  // Cart persistence hook (replaces debounced save + restoration effects)
+  const {
+    savedCart,
+    saveCart,
+    clearCart: clearPersistedCart,
+  } = useCartPersistence({
+    cityId,
+    initialStep,
+    products,
+    selectionStateRef,
+    restorationSetters: {
+      setHousing,
+      setMerch,
+      setPatron,
+      setInsurance,
     },
-    [],
+    hasRestoredCheckoutRef,
+    paymentCompleteRef,
+  })
+
+  // Promo code hook
+  const {
+    promoCode,
+    promoCodeValid,
+    promoCodeDiscount,
+    setPromoCode,
+    setPromoCodeValid,
+    setPromoCodeDiscount,
+    applyPromoCode,
+    clearPromoCode,
+    promoIsLoading,
+    promoError,
+    setPromoError,
+  } = usePromoCode({
+    cityId: city?.id,
+    discountAppliedValue: discountApplied.discount_value,
+    setDiscount,
+    resetDiscount,
+    savedCart,
+    hasRestoredCheckoutRef,
+  })
+
+  // Step management
+  const {
+    currentStep,
+    setCurrentStep,
+    availableSteps,
+    goToStep: goToStepRaw,
+    goToNextStep: goToNextStepRaw,
+    goToPreviousStep: goToPreviousStepRaw,
+    canProceedToStep: canProceedToStepFn,
+    isStepComplete: isStepCompleteFn,
+  } = useCheckoutSteps({
+    initialStep,
+    patronCount: patronProducts.length,
+    housingCount: housingProducts.length,
+    merchCount: merchProducts.length,
+    selectedPassesCount: selectedPasses.length,
+    isEditing,
+  })
+
+  // Keep selection state ref in sync — promoCode, promoCodeValid, currentStep
+  // are defined after useCartPersistence, so we update the ref each render.
+  selectionStateRef.current = {
+    selectedPasses,
+    housing,
+    merch,
+    patron,
+    promoCode,
+    promoCodeValid,
+    insurance,
+    currentStep,
+  }
+
+  // Credit calculations
+  const { editCredit, monthUpgradeCredit } = useCreditCalculation({
+    attendeePasses,
+    isEditing,
+  })
+
+  // Insurance calculations
+  const { insurancePotentialAmount, insuranceAmount } = useInsuranceCalculation(
+    {
+      selectedPasses,
+      housing,
+      merch,
+      insurance,
+    },
   )
 
-  const insurancePotentialAmount = useMemo(
-    () => calculateInsuranceAmount(selectedPasses, housing, merch),
-    [selectedPasses, housing, merch, calculateInsuranceAmount],
-  )
+  // Cart summary
+  const { summary } = useCartSummary({
+    selectedPasses,
+    housing,
+    merch,
+    patron,
+    insuranceAmount,
+    isEditing,
+    editCredit,
+    monthUpgradeCredit,
+    appCredit,
+  })
 
-  const insuranceAmount = useMemo(() => {
-    if (!insurance) return 0
-    return insurancePotentialAmount
-  }, [insurance, insurancePotentialAmount])
+  // Reset state when city changes so we re-restore from new city's cart
+  useEffect(() => {
+    if (previousCityIdRef.current === cityId) return
+    previousCityIdRef.current = cityId
+
+    hasRestoredCheckoutRef.current = false
+    setHousing(null)
+    setMerch([])
+    setPatron(null)
+    setPromoCode("")
+    setPromoCodeValid(false)
+    setPromoCodeDiscount(0)
+    setInsurance(false)
+    setCurrentStep("passes")
+  }, [
+    cityId,
+    setCurrentStep,
+    setHousing,
+    setMerch,
+    setPatron,
+    setPromoCode,
+    setPromoCodeValid,
+    setPromoCodeDiscount,
+  ])
+
+  // Loading states
+  const isLoading = promoIsLoading
+  const error = promoError
+
+  // Restore current step from saved cart (after availableSteps is ready)
+  const hasRestoredStepRef = useRef(false)
+  useEffect(() => {
+    if (hasRestoredStepRef.current || !hasRestoredCheckoutRef.current) return
+    if (initialStep === "success") return
+    if (!savedCart?.current_step) return
+    if (
+      availableSteps.length <= 1 ||
+      !availableSteps.includes(savedCart.current_step as CheckoutStep)
+    )
+      return
+
+    hasRestoredStepRef.current = true
+    setCurrentStep(savedCart.current_step as CheckoutStep)
+  }, [availableSteps, savedCart, initialStep, setCurrentStep])
 
   // Build cart state
   const cart = useMemo<CheckoutCartState>(
@@ -504,139 +341,27 @@ export function CheckoutProvider({
     ],
   )
 
-  // Persist checkout cart to DB (debounced)
-  useEffect(() => {
-    if (
-      !cityId ||
-      !hasRestoredCheckoutRef.current ||
-      paymentCompleteRef.current
-    )
-      return
-
-    const cartState: CartState = {
-      passes: selectedPasses.map((p) => ({
-        attendee_id: p.attendeeId,
-        product_id: p.productId,
-        quantity: p.quantity,
-      })),
-      housing: housing
-        ? {
-            product_id: housing.productId,
-            check_in: housing.checkIn,
-            check_out: housing.checkOut,
-          }
-        : null,
-      merch: merch.map((m) => ({
-        product_id: m.productId,
-        quantity: m.quantity,
-      })),
-      patron: patron
-        ? {
-            product_id: patron.productId,
-            amount: patron.amount,
-            is_custom_amount: patron.isCustomAmount,
-          }
-        : null,
-      promo_code: promoCodeValid ? promoCode : null,
-      insurance,
-      current_step: currentStep !== "success" ? currentStep : null,
-    }
-    debouncedSaveCart(cartState)
-  }, [
-    housing,
-    merch,
-    patron,
-    selectedPasses,
-    promoCode,
-    promoCodeValid,
-    insurance,
-    currentStep,
-    cityId,
-    debouncedSaveCart,
-  ])
-
-  // Calculate summary
-  const summary = useMemo<CheckoutCartSummary>(() => {
-    const passesSubtotal = selectedPasses.reduce((sum, p) => sum + p.price, 0)
-    const passesOriginalSubtotal = selectedPasses.reduce(
-      (sum, p) => sum + (p.originalPrice ?? p.price),
-      0,
-    )
-    const housingSubtotal = housing?.totalPrice ?? 0
-    const merchSubtotal = merch.reduce((sum, m) => sum + m.totalPrice, 0)
-    const patronSubtotal = patron?.amount ?? 0
-    const insuranceSubtotal = insuranceAmount
-
-    const subtotal =
-      passesSubtotal +
-      housingSubtotal +
-      merchSubtotal +
-      patronSubtotal +
-      insuranceSubtotal
-    const originalSubtotal =
-      passesOriginalSubtotal +
-      housingSubtotal +
-      merchSubtotal +
-      patronSubtotal +
-      insuranceSubtotal
-    const discount = originalSubtotal - subtotal
-    const accountCredit = appCredit ? Number(appCredit) : 0
-    const credit = isEditing
-      ? editCredit + accountCredit
-      : accountCredit + monthUpgradeCredit
-    const grandTotal = Math.max(0, subtotal - credit)
-
-    const itemCount =
-      selectedPasses.length +
-      (housing ? 1 : 0) +
-      merch.length +
-      (patron ? 1 : 0)
-
-    return {
-      passesSubtotal,
-      housingSubtotal,
-      merchSubtotal,
-      patronSubtotal,
-      insuranceSubtotal,
-      subtotal: originalSubtotal,
-      discount,
-      credit,
-      grandTotal,
-      itemCount,
-    }
-  }, [
-    selectedPasses,
-    housing,
-    merch,
-    patron,
-    insuranceAmount,
-    isEditing,
-    editCredit,
-    monthUpgradeCredit,
-    appCredit,
-  ])
-
-  // Navigation
-  const goToStep = useCallback((step: CheckoutStep) => {
-    setCurrentStep(step)
-    setError(null)
-  }, [])
+  // Navigation (wrap hook navigation to save cart and clear error)
+  const goToStep = useCallback(
+    (step: CheckoutStep) => {
+      saveCart()
+      goToStepRaw(step)
+      setPromoError(null)
+    },
+    [goToStepRaw, setPromoError, saveCart],
+  )
 
   const goToNextStep = useCallback(() => {
-    const currentIndex = availableSteps.indexOf(currentStep)
-    if (currentIndex < availableSteps.length - 1) {
-      setCurrentStep(availableSteps[currentIndex + 1])
-      setError(null)
-    }
-  }, [currentStep, availableSteps])
+    saveCart()
+    goToNextStepRaw()
+    setPromoError(null)
+  }, [goToNextStepRaw, setPromoError, saveCart])
 
   const goToPreviousStep = useCallback(() => {
-    const currentIndex = availableSteps.indexOf(currentStep)
-    if (currentIndex > 0) {
-      setCurrentStep(availableSteps[currentIndex - 1])
-      setError(null)
-    }
-  }, [currentStep, availableSteps])
+    saveCart()
+    goToPreviousStepRaw()
+    setPromoError(null)
+  }, [goToPreviousStepRaw, setPromoError, saveCart])
 
   // Pass actions (delegate to passesProvider)
   const togglePass = useCallback(
@@ -665,143 +390,6 @@ export function CheckoutProvider({
     [attendeePasses, toggleProduct],
   )
 
-  // Housing actions
-  const selectHousing = useCallback(
-    (productId: string, checkIn: string, checkOut: string) => {
-      const product = housingProducts.find((p) => p.id === productId)
-      if (!product) return
-
-      const start = new Date(checkIn)
-      const end = new Date(checkOut)
-      const nights = Math.max(
-        1,
-        Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)),
-      )
-
-      setHousing({
-        productId,
-        product,
-        checkIn,
-        checkOut,
-        nights,
-        pricePerNight: product.price,
-        totalPrice: product.price * nights,
-      })
-    },
-    [housingProducts],
-  )
-
-  const clearHousing = useCallback(() => {
-    setHousing(null)
-  }, [])
-
-  // Merch actions
-  const updateMerchQuantity = useCallback(
-    (productId: string, quantity: number) => {
-      const product = merchProducts.find((p) => p.id === productId)
-      if (!product) return
-
-      if (quantity <= 0) {
-        setMerch((prev) => prev.filter((m) => m.productId !== productId))
-      } else {
-        setMerch((prev) => {
-          const existing = prev.find((m) => m.productId === productId)
-          if (existing) {
-            return prev.map((m) =>
-              m.productId === productId
-                ? { ...m, quantity, totalPrice: product.price * quantity }
-                : m,
-            )
-          }
-          return [
-            ...prev,
-            {
-              productId,
-              product,
-              quantity,
-              unitPrice: product.price,
-              totalPrice: product.price * quantity,
-            },
-          ]
-        })
-      }
-    },
-    [merchProducts],
-  )
-
-  // Patron actions
-  const setPatronAmount = useCallback(
-    (productId: string, amount: number, isCustom = false) => {
-      const product = patronProducts.find((p) => p.id === productId)
-      if (!product) return
-
-      setPatron({
-        productId,
-        product,
-        amount,
-        isCustomAmount: isCustom,
-      })
-    },
-    [patronProducts],
-  )
-
-  const clearPatron = useCallback(() => {
-    setPatron(null)
-  }, [])
-
-  // Promo code validation
-  const applyPromoCode = useCallback(
-    async (code: string): Promise<boolean> => {
-      if (!city?.id) return false
-
-      setIsLoading(true)
-      setError(null)
-
-      try {
-        const result = await CouponsService.validateCoupon({
-          requestBody: {
-            popup_id: city.id,
-            code: code.toUpperCase(),
-          },
-        })
-
-        const discountValue = result.discount_value ?? 0
-
-        if (discountValue >= discountApplied.discount_value) {
-          setPromoCode(code.toUpperCase())
-          setPromoCodeValid(true)
-          setPromoCodeDiscount(discountValue)
-
-          setDiscount({
-            discount_value: discountValue,
-            discount_type: "percentage",
-            discount_code: code.toUpperCase(),
-            city_id: city.id,
-          })
-
-          return true
-        }
-        setError("You already have a higher discount than this coupon")
-        return false
-      } catch (err: unknown) {
-        const message =
-          err instanceof Error ? err.message : "Failed to validate promo code"
-        setError(message)
-        return false
-      } finally {
-        setIsLoading(false)
-      }
-    },
-    [city?.id, discountApplied.discount_value, setDiscount],
-  )
-
-  const clearPromoCode = useCallback(() => {
-    setPromoCode("")
-    setPromoCodeValid(false)
-    setPromoCodeDiscount(0)
-    resetDiscount()
-  }, [resetDiscount])
-
   // Insurance
   const toggleInsurance = useCallback(() => {
     setInsurance((prev) => !prev)
@@ -809,259 +397,33 @@ export function CheckoutProvider({
 
   // Cart management
   const clearCart = useCallback(() => {
-    setHousing(null)
+    clearPersistedCart()
+    clearHousing()
     setMerch([])
-    setPatron(null)
-    setPromoCode("")
-    setPromoCodeValid(false)
-    setPromoCodeDiscount(0)
+    clearPatron()
+    clearPromoCode()
     setInsurance(false)
-    clearCartMutation.mutate()
-  }, [clearCartMutation])
+  }, [clearPersistedCart, clearHousing, setMerch, clearPatron, clearPromoCode])
 
-  // Validation helpers
-  const canProceedToStepFn = useCallback(
-    (step: CheckoutStep): boolean => {
-      const targetIndex = availableSteps.indexOf(step)
-
-      if (isEditing) {
-        return selectedPasses.length > 0
-      }
-
-      if (targetIndex > 0 && selectedPasses.length === 0) {
-        return false
-      }
-
-      return true
-    },
-    [selectedPasses.length, availableSteps, isEditing],
-  )
-
-  const isStepCompleteFn = useCallback(
-    (step: CheckoutStep): boolean => {
-      switch (step) {
-        case "passes":
-          return selectedPasses.length > 0
-        case "housing":
-        case "merch":
-        case "patron":
-          return true
-        case "confirm":
-          return false
-        default:
-          return false
-      }
-    },
-    [selectedPasses.length],
-  )
-
-  // Submit payment
-  const submitPayment = useCallback(async (): Promise<{
-    success: boolean
-    error?: string
-  }> => {
-    if (!application?.id) {
-      return { success: false, error: "Application not available" }
-    }
-
-    if (selectedPasses.length === 0) {
-      return {
-        success: false,
-        error: isEditing
-          ? "Please select a new pass"
-          : "Please select at least one pass",
-      }
-    }
-
-    setIsSubmitting(true)
-    setError(null)
-
-    try {
-      const productsToSend: PaymentProductRequest[] = []
-
-      const fullOrMonthSelectedWithWeekOrDay = attendeePasses.some(
-        (a) =>
-          a.products.some(
-            (p) =>
-              (p.duration_type === "full" || p.duration_type === "month") &&
-              p.selected &&
-              !p.purchased,
-          ) &&
-          (a.products.some((p) => p.duration_type === "week" && p.purchased) ||
-            a.products.some((p) => p.duration_type === "day" && p.purchased)),
-      )
-      const hasPatreonSelected = attendeePasses.some((a) =>
-        a.products.some((p) => p.category === "patreon" && p.selected),
-      )
-      const isMonthUpgrade =
-        fullOrMonthSelectedWithWeekOrDay && !hasPatreonSelected
-
-      if (isEditing) {
-        for (const attendee of attendeePasses) {
-          for (const product of attendee.products) {
-            // Kept: purchased and NOT given up for credit
-            if (product.purchased && !product.edit) {
-              productsToSend.push({
-                product_id: product.id,
-                attendee_id: attendee.id,
-                quantity: product.quantity ?? 1,
-              })
-            }
-            // New: selected and not previously purchased
-            if (product.selected && !product.purchased) {
-              productsToSend.push({
-                product_id: product.id,
-                attendee_id: attendee.id,
-                quantity:
-                  product.duration_type === "day"
-                    ? (product.quantity ?? 1) - (product.original_quantity ?? 0)
-                    : (product.quantity ?? 1),
-              })
-            }
-          }
-        }
-      } else {
-        const hasAccountCredit = appCredit ? Number(appCredit) > 0 : false
-
-        if (hasAccountCredit || isMonthUpgrade) {
-          for (const attendee of attendeePasses) {
-            const hasFullOrMonth = attendee.products.some(
-              (p) =>
-                (p.duration_type === "full" || p.duration_type === "month") &&
-                (p.purchased || p.selected),
-            )
-
-            for (const product of attendee.products) {
-              if (!product.purchased) continue
-              if (
-                hasFullOrMonth &&
-                (product.duration_type === "week" ||
-                  product.duration_type === "day")
-              )
-                continue
-              if (patron && product.category === "patreon") continue
-
-              productsToSend.push({
-                product_id: product.id,
-                attendee_id: attendee.id,
-                quantity: product.quantity ?? 1,
-              })
-            }
-          }
-        }
-
-        // Add selected passes
-        for (const pass of selectedPasses) {
-          productsToSend.push({
-            product_id: pass.productId,
-            attendee_id: pass.attendeeId,
-            quantity: pass.quantity,
-          })
-        }
-
-        // Add merch
-        for (const item of merch) {
-          const firstAttendeeId = selectedPasses[0]?.attendeeId ?? ""
-          productsToSend.push({
-            product_id: item.productId,
-            attendee_id: firstAttendeeId,
-            quantity: item.quantity,
-          })
-        }
-
-        // Add housing
-        if (housing) {
-          const firstAttendeeId = selectedPasses[0]?.attendeeId ?? ""
-          productsToSend.push({
-            product_id: housing.productId,
-            attendee_id: firstAttendeeId,
-            quantity: housing.nights,
-          })
-        }
-
-        // Add patron
-        if (patron) {
-          const firstAttendeeId = selectedPasses[0]?.attendeeId ?? ""
-          productsToSend.push({
-            product_id: patron.productId,
-            attendee_id: firstAttendeeId,
-            quantity: 1,
-          })
-        }
-      }
-
-      const result = await PaymentsService.createMyPayment({
-        requestBody: {
-          application_id: application.id,
-          products: productsToSend,
-          coupon_code: promoCodeValid ? promoCode : undefined,
-          edit_passes: isEditing || isMonthUpgrade ? true : undefined,
-          insurance: insurance || undefined,
-        },
-      })
-
-      const data = result as {
-        status?: string
-        checkout_url?: string | null
-      }
-
-      if (data.status === "pending" && data.checkout_url) {
-        markPurchasePending()
-        const currentUrl = new URL(window.location.href)
-        currentUrl.searchParams.set("checkout", "success")
-        const redirectUrl = currentUrl.toString()
-        window.location.href = `${data.checkout_url}?redirect_url=${encodeURIComponent(redirectUrl)}`
-        return { success: true }
-      }
-
-      if (data.status === "approved") {
-        toast.success(
-          isEditing
-            ? "Your passes have been updated successfully!"
-            : "Payment completed successfully!",
-        )
-        if (isEditing) {
-          toggleEditing(false)
-        }
-        paymentCompleteRef.current = true
-        clearCart()
-        await queryClient.invalidateQueries({
-          queryKey: queryKeys.applications.mine(),
-        })
-        await queryClient.invalidateQueries({
-          queryKey: queryKeys.payments.all,
-        })
-        setCurrentStep("success")
-        setIsSubmitting(false)
-        return { success: true }
-      }
-
-      setIsSubmitting(false)
-      return { success: true }
-    } catch (err: unknown) {
-      const errorMsg =
-        err instanceof Error ? err.message : "Failed to create payment"
-      setError(errorMsg)
-      toast.error(errorMsg)
-      setIsSubmitting(false)
-      return { success: false, error: errorMsg }
-    }
-  }, [
-    application?.id,
+  // Submit payment (consolidated via usePaymentSubmit)
+  const { submitPayment, isSubmitting } = usePaymentSubmit({
+    applicationId: application?.id,
     appCredit,
-    selectedPasses,
-    merch,
-    housing,
-    patron,
-    promoCodeValid,
-    promoCode,
-    insurance,
-    clearCart,
-    isEditing,
     attendeePasses,
+    selectedPasses,
+    housing,
+    merch,
+    patron,
+    promoCode,
+    promoCodeValid,
+    insurance,
+    isEditing,
     toggleEditing,
-    queryClient,
-  ])
+    clearCart,
+    setCurrentStep,
+    setPromoError,
+    paymentCompleteRef,
+  })
 
   const value: CheckoutContextValue = {
     currentStep,

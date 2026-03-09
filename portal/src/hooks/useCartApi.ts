@@ -108,7 +108,30 @@ export function useSaveCart(popupId: string | null) {
     [popupId],
   )
 
-  return { save: debouncedSave, ...mutation }
+  const saveImmediate = useCallback(
+    (items: CartState) => {
+      if (!popupId) return
+
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current)
+        debounceRef.current = null
+      }
+
+      // Optimistically update the RQ cache before the server responds
+      queryClient.setQueryData(queryKeys.cart.byPopup(popupId), items)
+      mutationRef.current?.mutate(items)
+    },
+    [popupId, queryClient],
+  )
+
+  const cancelPendingSave = useCallback(() => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current)
+      debounceRef.current = null
+    }
+  }, [])
+
+  return { save: debouncedSave, saveImmediate, cancelPendingSave, ...mutation }
 }
 
 export function useClearCart(popupId: string | null) {

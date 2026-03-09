@@ -5329,6 +5329,23 @@ export const PaymentStatusSchema = {
     description: 'Payment status.'
 } as const;
 
+export const PaymentStatusCheckSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        status: {
+            '$ref': '#/components/schemas/PaymentStatus'
+        }
+    },
+    type: 'object',
+    required: ['id', 'status'],
+    title: 'PaymentStatusCheck',
+    description: "Minimal response for checking a payment's current status."
+} as const;
+
 export const PaymentUpdateSchema = {
     properties: {
         status: {
