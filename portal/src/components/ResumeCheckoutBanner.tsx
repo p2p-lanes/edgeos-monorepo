@@ -2,6 +2,7 @@
 
 import { ShoppingCart, X } from "lucide-react"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { useState } from "react"
 import { useCart } from "@/hooks/useCartApi"
 import { useCityProvider } from "@/providers/cityProvider"
@@ -9,10 +10,13 @@ import { useCityProvider } from "@/providers/cityProvider"
 const DISMISS_KEY = "resume-checkout-dismissed"
 
 const ResumeCheckoutBanner = () => {
+  const pathname = usePathname()
   const { getCity } = useCityProvider()
   const city = getCity()
   const cityId = city?.id ? String(city.id) : null
   const { data: cart } = useCart(cityId)
+
+  const isOnCheckoutPage = pathname?.endsWith("/passes/buy")
 
   const [dismissed, setDismissed] = useState(() => {
     if (typeof window === "undefined") return false
@@ -25,7 +29,7 @@ const ResumeCheckoutBanner = () => {
     (cart?.merch?.length ?? 0) +
     (cart?.patron ? 1 : 0)
 
-  if (!itemCount || !city?.slug || dismissed) return null
+  if (!itemCount || !city?.slug || dismissed || isOnCheckoutPage) return null
 
   const handleDismiss = () => {
     sessionStorage.setItem(DISMISS_KEY, "true")
