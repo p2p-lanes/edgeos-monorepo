@@ -6,21 +6,13 @@ import { useCityProvider } from "@/providers/cityProvider"
 import type { CreateAttendee } from "@/types/Attendee"
 
 const handleNetworkError = (error: unknown) => {
-  if (
-    error &&
-    typeof error === "object" &&
-    "status" in error &&
-    (error as any).status === 400
-  ) {
-    toast.error((error as any).body?.detail ?? "Bad request")
-    return
-  }
+  console.error("Attendee operation failed:", error)
   if (error instanceof TypeError && error.message.includes("fetch")) {
     toast.error("Network error. Please check your connection and try again.")
   } else if (error instanceof Error && error.name === "AbortError") {
     toast.error("Request timeout. Please try again.")
   } else {
-    toast.error("Unknown error, please try again later")
+    toast.error("Something went wrong. Please try again.")
   }
 }
 

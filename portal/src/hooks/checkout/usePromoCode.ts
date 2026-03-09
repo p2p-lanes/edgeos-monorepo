@@ -65,12 +65,8 @@ export function usePromoCode({
 
           return true
         }
-        setError("You already have a higher discount than this coupon")
         return false
-      } catch (err: unknown) {
-        const message =
-          err instanceof Error ? err.message : "Failed to validate promo code"
-        setError(message)
+      } catch {
         return false
       } finally {
         setIsLoading(false)

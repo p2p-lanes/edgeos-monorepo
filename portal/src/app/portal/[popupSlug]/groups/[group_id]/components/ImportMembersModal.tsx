@@ -255,9 +255,9 @@ const ImportMembersModal = ({
       } else {
         onClose()
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error importing members:", error)
-      toast.error(error?.body?.message || "Failed to import members")
+      toast.error("Failed to import members. Please try again.")
     } finally {
       setIsSubmitting(false)
     }

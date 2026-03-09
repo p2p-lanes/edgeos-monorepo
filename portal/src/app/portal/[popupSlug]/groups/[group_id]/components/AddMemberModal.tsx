@@ -162,14 +162,13 @@ const MemberFormModal = ({
       } else {
         onClose()
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(
         `Error ${isEditMode ? "updating" : "adding"} member:`,
         error,
       )
       toast.error(
-        error.response?.data?.message ||
-          `Failed to ${isEditMode ? "update" : "add"} member`,
+        `Failed to ${isEditMode ? "update" : "add"} member. Please try again.`,
       )
     } finally {
       setIsSubmitting(false)

@@ -66,9 +66,9 @@ const WelcomeMessageModal = ({
       } else {
         onClose()
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error updating welcome message:", error)
-      toast.error(error?.body?.message || "Failed to update welcome message")
+      toast.error("Failed to update welcome message. Please try again.")
     } finally {
       setIsSubmitting(false)
     }

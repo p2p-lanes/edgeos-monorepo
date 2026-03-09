@@ -61,11 +61,8 @@ export default function AuthForm() {
       startCountdown()
     },
     onError: (err) => {
-      if (err instanceof ApiError) {
-        setError(err.message || "Failed to send verification code")
-      } else {
-        setError("Something went wrong. Please try again.")
-      }
+      console.error("Failed to send verification code:", err)
+      setError("Failed to send verification code. Please try again.")
     },
   })
 

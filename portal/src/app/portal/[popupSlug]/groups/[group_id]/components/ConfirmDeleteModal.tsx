@@ -37,9 +37,9 @@ const ConfirmDeleteModal = ({
       } else {
         onClose()
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error deleting member:", error)
-      toast.error(error.response?.data?.message || "Failed to delete member")
+      toast.error("Failed to delete member. Please try again.")
     } finally {
       setIsDeleting(false)
     }
