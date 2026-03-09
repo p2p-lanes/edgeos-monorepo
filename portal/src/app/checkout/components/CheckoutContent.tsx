@@ -1,6 +1,8 @@
 "use client"
 
 import { AnimatePresence, motion } from "framer-motion"
+import { useEffect, useRef } from "react"
+import { useApplication } from "@/providers/applicationProvider"
 import useCheckoutState from "../hooks/useCheckoutState"
 import type { FormDataProps } from "../types"
 import CheckoutFlow from "./CheckoutFlow"
@@ -31,6 +33,17 @@ export const CheckoutContent = ({
     handleSubmit,
     setCheckoutState,
   } = useCheckoutState()
+  const { getRelevantApplication } = useApplication()
+  const hasSkippedForm = useRef(false)
+
+  useEffect(() => {
+    if (hasSkippedForm.current) return
+    const existingApp = getRelevantApplication()
+    if (existingApp && checkoutState === "form") {
+      hasSkippedForm.current = true
+      setCheckoutState("passes")
+    }
+  }, [getRelevantApplication, checkoutState, setCheckoutState])
 
   // Función que maneja el envío del formulario
   const handleFormSubmit = async (formData: FormDataProps): Promise<void> => {

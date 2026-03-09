@@ -73,6 +73,7 @@ export default function CheckoutFlow({
     availableSteps,
     goToNextStep,
     goToPreviousStep,
+    goToStep,
     housingProducts,
     merchProducts,
     patronProducts,
@@ -88,6 +89,13 @@ export default function CheckoutFlow({
     () => searchParams.has("checkout", "success"),
     [searchParams],
   )
+
+  // Navigate to success step when returning from Stripe redirect
+  useEffect(() => {
+    if (isSimpleFIReturn && currentStep !== "success") {
+      goToStep("success")
+    }
+  }, [isSimpleFIReturn, currentStep, goToStep])
 
   const { paymentStatus } = usePaymentVerification({
     applicationId: application?.id,
