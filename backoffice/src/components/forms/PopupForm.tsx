@@ -12,6 +12,7 @@ import {
   Key,
   Mail,
   MapPin,
+  Scale,
   Ticket,
   Twitter,
 } from "lucide-react"
@@ -138,6 +139,8 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
       web_url: defaultValues?.web_url ?? "",
       blog_url: defaultValues?.blog_url ?? "",
       twitter_url: defaultValues?.twitter_url ?? "",
+      terms_and_conditions_url:
+        defaultValues?.terms_and_conditions_url ?? "",
       simplefi_api_key: defaultValues?.simplefi_api_key ?? "",
       invoice_company_name: defaultValues?.invoice_company_name ?? "",
       invoice_company_address: defaultValues?.invoice_company_address ?? "",
@@ -165,6 +168,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         web_url: value.web_url || null,
         blog_url: value.blog_url || null,
         twitter_url: value.twitter_url || null,
+        terms_and_conditions_url: value.terms_and_conditions_url || null,
         simplefi_api_key: value.simplefi_api_key || null,
         invoice_company_name: value.invoice_company_name || null,
         invoice_company_address: value.invoice_company_address || null,
@@ -571,6 +575,25 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                   id="twitter_url"
                   type="url"
                   placeholder="https://twitter.com/example"
+                  value={field.state.value}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  disabled={readOnly}
+                  className="max-w-xs text-sm"
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+
+          <form.Field name="terms_and_conditions_url">
+            {(field) => (
+              <InlineRow
+                icon={<Scale className="h-4 w-4 text-muted-foreground" />}
+                label="Terms & Conditions"
+              >
+                <Input
+                  id="terms_and_conditions_url"
+                  type="url"
+                  placeholder="https://example.com/terms"
                   value={field.state.value}
                   onChange={(e) => field.handleChange(e.target.value)}
                   disabled={readOnly}
