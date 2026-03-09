@@ -108,21 +108,19 @@ const PassesProvider = ({
             const refProduct = attendeePassesRef.current
               .find((a) => a.id === attendee.id)
               ?.products.find((p) => p.id === product.id)
-            const cartPass =
-              !refProduct?.selected
-                ? savedCartPasses?.passes?.find(
-                    (cp) =>
-                      cp.attendee_id === attendee.id &&
-                      cp.product_id === product.id,
-                  )
-                : undefined
+            const cartPass = !refProduct?.selected
+              ? savedCartPasses?.passes?.find(
+                  (cp) =>
+                    cp.attendee_id === attendee.id &&
+                    cp.product_id === product.id,
+                )
+              : undefined
             const isSelected = refProduct?.selected || !!cartPass
-            const quantity =
-              refProduct?.selected
-                ? (refProduct.quantity ?? originalQuantity)
-                : cartPass && product.duration_type === "day"
-                  ? originalQuantity + cartPass.quantity
-                  : originalQuantity
+            const quantity = refProduct?.selected
+              ? (refProduct.quantity ?? originalQuantity)
+              : cartPass && product.duration_type === "day"
+                ? originalQuantity + cartPass.quantity
+                : originalQuantity
 
             return {
               ...product,

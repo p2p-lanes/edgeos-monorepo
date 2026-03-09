@@ -16,7 +16,8 @@ export const useApplicationData = ({
 }: UseApplicationDataProps) => {
   const queryClient = useQueryClient()
 
-  const hasToken = typeof window !== "undefined" && !!localStorage.getItem("token")
+  const hasToken =
+    typeof window !== "undefined" && !!localStorage.getItem("token")
 
   const {
     data: applicationData = null,
@@ -54,10 +55,15 @@ export const useApplicationData = ({
           if (matchingApp) {
             return {
               ...baseData,
-              first_name: matchingApp.human?.first_name || human.first_name || "",
+              first_name:
+                matchingApp.human?.first_name || human.first_name || "",
               last_name: matchingApp.human?.last_name || human.last_name || "",
               telegram: matchingApp.human?.telegram || human.telegram || "",
-              gender: (matchingApp.human?.gender || human.gender || "").toLowerCase(),
+              gender: (
+                matchingApp.human?.gender ||
+                human.gender ||
+                ""
+              ).toLowerCase(),
               red_flag: matchingApp.red_flag || false,
             }
           }
@@ -73,7 +79,11 @@ export const useApplicationData = ({
 
   const refreshApplicationData = () => {
     queryClient.invalidateQueries({
-      queryKey: [...queryKeys.applications.mine(), "checkout", groupPopupCityId],
+      queryKey: [
+        ...queryKeys.applications.mine(),
+        "checkout",
+        groupPopupCityId,
+      ],
     })
   }
 

@@ -21,7 +21,10 @@ import {
   useSaveCart,
 } from "@/hooks/useCartApi"
 import useGetPassesData from "@/hooks/useGetPassesData"
-import { markPurchasePending } from "@/hooks/usePaymentRedirect"
+import {
+  checkAndClearPurchasePending,
+  markPurchasePending,
+} from "@/hooks/usePaymentRedirect"
 import { queryKeys } from "@/lib/query-keys"
 import type { AttendeePassState } from "@/types/Attendee"
 import type {
@@ -147,7 +150,28 @@ export function CheckoutProvider({
     hasRestoredCheckoutRef.current = true
 
     if (initialStep === "success") {
-      clearCartMutation.mutate()
+      checkAndClearPurchasePending()
+      clearCartMutation.mutate(undefined, {
+        onSettled: () => {
+          // Always clear cart cache, even if DELETE fails (backend may have already cleared it)
+          queryClient.setQueryData(queryKeys.cart.byPopup(cityId ?? ""), {
+            passes: [],
+            housing: null,
+            merch: [],
+            patron: null,
+            promo_code: null,
+            insurance: false,
+            current_step: null,
+          })
+        },
+      })
+      // Refetch application data (attendees with purchased products) and payments
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.applications.mine(),
+      })
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.payments.all,
+      })
       return
     }
 
@@ -218,12 +242,22 @@ export function CheckoutProvider({
     }
 
     // Step restore is deferred — availableSteps depends on products loading
-  }, [cartLoaded, savedCart, products, initialStep, clearCartMutation])
+  }, [
+    cartLoaded,
+    savedCart,
+    products,
+    initialStep,
+    clearCartMutation,
+    cityId,
+    queryClient.invalidateQueries,
+    queryClient.setQueryData,
+  ])
 
   // Re-validate promo code from saved cart
   const hasRevalidatedPromoRef = useRef(false)
   useEffect(() => {
-    if (hasRevalidatedPromoRef.current || !hasRestoredCheckoutRef.current) return
+    if (hasRevalidatedPromoRef.current || !hasRestoredCheckoutRef.current)
+      return
     if (!savedCart?.promo_code || !city?.id) return
 
     hasRevalidatedPromoRef.current = true
