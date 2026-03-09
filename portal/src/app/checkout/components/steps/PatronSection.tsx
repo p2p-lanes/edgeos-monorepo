@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
+import { useCityProvider } from "@/providers/cityProvider"
 import {
   formatCurrency,
   PATRON_MINIMUM,
@@ -17,6 +18,8 @@ interface PatronSectionProps {
 
 export default function PatronSection({ onSkip }: PatronSectionProps) {
   const { patronProducts, cart, setPatronAmount, clearPatron } = useCheckout()
+  const { getCity } = useCityProvider()
+  const city = getCity()
 
   const patronProduct = patronProducts[0]
   const isVariablePrice = patronProduct?.category === "patreon"
@@ -131,22 +134,20 @@ export default function PatronSection({ onSkip }: PatronSectionProps) {
             )}
           </div>
           <div className="space-y-3 text-sm text-gray-600 leading-relaxed">
-            <p>
-              Add an optional donation to support Edge City&apos;s mission.
-              Every contribution goes toward fellowships for researchers,
-              artists, and builders who&apos;d have difficulty attending
-              otherwise, and toward sustaining the community infrastructure that
-              makes all of this work.
-            </p>
-            <p>
-              Edge Institute is a 501(c)(3) nonprofit. All contributions are
-              tax-deductible and documentation is provided.
-            </p>
-            <p>
-              As a patron, you&apos;ll be featured on our website, invited to a
-              gathering with the core team during the event, and if you&apos;d
-              like, introduced to the fellow you helped bring.
-            </p>
+            {patronProduct?.description ? (
+              <p>{patronProduct.description}</p>
+            ) : (
+              <p>
+                Add an optional contribution to support{" "}
+                {city?.name ? `${city.name}'s` : "the"} mission.
+              </p>
+            )}
+            {city?.invoice_company_name && (
+              <p>
+                {city.invoice_company_name} is a nonprofit. All contributions
+                are tax-deductible and documentation is provided.
+              </p>
+            )}
           </div>
         </div>
 
@@ -234,9 +235,6 @@ export default function PatronSection({ onSkip }: PatronSectionProps) {
         )}
       </div>
 
-      <p className="text-xs text-gray-400 text-center">
-        47 builders & 12 projects funded in 2025
-      </p>
     </div>
   )
 }

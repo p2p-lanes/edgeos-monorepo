@@ -28,7 +28,7 @@ const StatsCards = ({
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-gray-600 mb-1">
-              Days at {tenant?.name ?? "Edge"}
+              Days at {tenant?.name}
             </p>
             <p className="text-3xl font-bold text-gray-900">—</p>
           </div>

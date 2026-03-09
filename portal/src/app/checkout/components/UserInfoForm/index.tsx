@@ -17,7 +17,6 @@ import { useUserForm } from "../../hooks/useUserForm"
 import type { FormDataProps } from "../../types"
 import EmailVerification from "./EmailVerification"
 import PersonalInfoForm from "./PersonalInfoForm"
-import RedFlagScreen from "./RedFlagScreen"
 
 interface UserInfoFormProps {
   group: GroupPublic | null
@@ -37,7 +36,6 @@ const UserInfoForm = ({
   isInvite: _isInvite = false,
 }: UserInfoFormProps) => {
   const [_isAutoFilled, setIsAutoFilled] = useState(false)
-  const [showRedFlagScreen, setShowRedFlagScreen] = useState(false)
 
   // Get application data based on group's popup_id
   const {
@@ -140,12 +138,6 @@ const UserInfoForm = ({
 
     // If verified, validate and submit form
     if (validateForm()) {
-      // Check for red flag before proceeding with purchase
-      if (applicationData?.red_flag) {
-        setShowRedFlagScreen(true)
-        return
-      }
-
       try {
         await onSubmit(formData)
       } catch (error: any) {
@@ -194,23 +186,6 @@ const UserInfoForm = ({
           <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500" />
         </CardContent>
       </Card>
-    )
-  }
-
-  // Show red flag screen if triggered by form submission
-  if (showRedFlagScreen) {
-    const userName =
-      applicationData?.first_name || formData.first_name || "User"
-    const popupName = group?.name || "this location"
-
-    const popupSlug = group?.slug || "unknown"
-
-    return (
-      <RedFlagScreen
-        userName={userName}
-        popupName={popupName}
-        popupSlug={popupSlug}
-      />
     )
   }
 

@@ -10,6 +10,7 @@ import {
 import type { TenantPublic } from "@/client"
 import { ApiError, TenantsService } from "@/client"
 import "@/lib/api-client"
+import { extractSubdomain } from "@/lib/tenant"
 
 const TENANT_STORAGE_KEY = "portal_tenant_id"
 
@@ -22,15 +23,6 @@ interface TenantContextValue {
 }
 
 const TenantContext = createContext<TenantContextValue | null>(null)
-
-function extractSubdomain(hostname: string): string | null {
-  const parts = hostname.split(".")
-  if (parts.length >= 2 && parts[0] !== "www") {
-    return parts[0]
-  }
-
-  return null
-}
 
 export const TenantProvider = ({ children }: { children: ReactNode }) => {
   const [tenant, setTenant] = useState<TenantPublic | null>(null)

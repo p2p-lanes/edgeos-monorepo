@@ -92,6 +92,8 @@ services:
     restart: "no"
     ports:
       - "3000:3000"
+    environment:
+      - INTERNAL_API_URL=http://backend:8000
     build:
       context: .
       dockerfile: portal/Dockerfile

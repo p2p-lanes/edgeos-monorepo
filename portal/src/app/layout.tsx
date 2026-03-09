@@ -1,31 +1,50 @@
 import { GeistMono } from "geist/font/mono"
 import { GeistSans } from "geist/font/sans"
 import type { Metadata, Viewport } from "next"
+import { headers } from "next/headers"
 import "./globals.css"
 import { Toaster } from "sonner"
 import GoogleAnalytics from "@/components/utils/GoogleAnalytics"
-import { config } from "@/constants/config"
+import { extractSubdomain, fetchTenantBySlug } from "@/lib/tenant"
 import QueryProvider from "@/providers/queryProvider"
 import { TenantProvider } from "@/providers/tenantProvider"
 
-export const metadata: Metadata = {
-  title: config.metadata.title,
-  description: config.metadata.description,
-  icons: {
-    icon: config.metadata.icon,
-  },
-  openGraph: {
-    title: config.metadata.openGraph.title,
-    description: config.metadata.openGraph.description,
-    images: [
-      {
-        url: config.metadata.openGraph.images[0].url,
-        width: config.metadata.openGraph.images[0].width,
-        height: config.metadata.openGraph.images[0].height,
-        alt: config.metadata.openGraph.images[0].alt,
-      },
-    ],
-  },
+const FALLBACK_NAME = "Edge Portal"
+const FALLBACK_DESCRIPTION =
+  "Welcome to the Edge Portal. Log in or sign up to access events."
+
+export async function generateMetadata(): Promise<Metadata> {
+  const headersList = await headers()
+  const host = headersList.get("host") ?? ""
+  const slug = extractSubdomain(host)
+
+  const tenant = slug ? await fetchTenantBySlug(slug) : null
+  const name = tenant?.name ? `${tenant.name} Portal` : FALLBACK_NAME
+  const description = tenant?.name
+    ? `Welcome to the ${tenant.name} Portal. Log in or sign up to access ${tenant.name} events.`
+    : FALLBACK_DESCRIPTION
+
+  return {
+    title: name,
+    description,
+    icons: {
+      icon: tenant?.icon_url ?? "/icon.png",
+    },
+    openGraph: {
+      title: name,
+      description,
+      ...(tenant?.image_url && {
+        images: [
+          {
+            url: tenant.image_url,
+            alt: name,
+            width: 1200,
+            height: 630,
+          },
+        ],
+      }),
+    },
+  }
 }
 
 export const viewport: Viewport = {

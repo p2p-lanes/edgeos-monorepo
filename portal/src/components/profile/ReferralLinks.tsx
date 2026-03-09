@@ -4,7 +4,9 @@ import { Check, Copy } from "lucide-react"
 import { useState } from "react"
 import type { GroupPublic, PopupPublic } from "@/client"
 import { Button } from "@/components/ui/button"
+import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
+import { useTenant } from "@/providers/tenantProvider"
 import useGetGroups from "../Sidebar/hooks/useGetGroups"
 import { Card } from "../ui/card"
 
@@ -15,6 +17,8 @@ export default function ReferralLinks({
 }) {
   const { data: groups = [] } = useGetGroups()
   const { getPopups } = useCityProvider()
+  const { applications } = useApplication()
+  const { tenant } = useTenant()
   const popups = getPopups()
   const [copiedId, setCopiedId] = useState<string | null>(null)
 
@@ -22,9 +26,19 @@ export default function ReferralLinks({
     const groupPopup = popups.find(
       (popup: PopupPublic) => popup.id === group.popup_id,
     )
-    return (
-      groupPopup?.status === "active" && groupPopup && group.is_ambassador_group
+    if (!groupPopup || groupPopup.status !== "active" || !group.is_ambassador_group) {
+      return false
+    }
+
+    const application = applications?.find(
+      (app) => app.popup_id === groupPopup.id && app.status === "accepted",
     )
+    if (!application) return false
+
+    const hasProducts = (application.attendees ?? []).some(
+      (attendee) => ((attendee.products as any[] | undefined) ?? []).length > 0,
+    )
+    return hasProducts
   })
 
   const copyToClipboard = (url: string, id: string) => {
@@ -43,7 +57,8 @@ export default function ReferralLinks({
             Referral Links
           </h3>
           <p className="text-sm text-[#64748b]">
-            Give your friends an auto-approval for upcoming EdgeCity events
+            Give your friends an auto-approval for upcoming{" "}
+            {tenant?.name ?? ""} events
           </p>
         </div>
         <div className="flex gap-2 items-center mt-4 md:mt-0 md:items-end">

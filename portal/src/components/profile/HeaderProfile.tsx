@@ -5,11 +5,14 @@ import InvoiceModal from "@/app/portal/[popupSlug]/passes/components/common/Invo
 import useAuth from "@/hooks/useAuth"
 import { SidebarTrigger } from "../Sidebar/SidebarComponents"
 import { Button } from "../ui/button"
+import { useTenant } from "@/providers/tenantProvider"
+
 
 const HeaderProfile = () => {
   const router = useRouter()
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false)
   const { logout } = useAuth()
+  const { tenant } = useTenant()
 
   return (
     <div className="p-4 md:p-6 border-b border-gray-200 bg-white">
@@ -19,7 +22,7 @@ const HeaderProfile = () => {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">My Profile</h1>
             <p className="text-gray-600">
-              Manage your Edge experience and history
+              Manage your {tenant?.name}&apos;s experience and history
             </p>
           </div>
         </div>

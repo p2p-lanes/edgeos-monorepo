@@ -47,7 +47,12 @@ const ProductTitle = ({ product, selected, disabled }: ProductTitleProps) => (
       className={cn("w-5 h-5 text-orange-500", disabled && "text-neutral-300")}
     />
     {product.name}
-    {!disabled && <TooltipPatreon purchased={product.purchased} />}
+    {!disabled && (
+      <TooltipPatreon
+        purchased={product.purchased}
+        description={product.description}
+      />
+    )}
   </span>
 )
 
@@ -69,7 +74,10 @@ const ProductPrice = ({ product, selected, disabled }: ProductPriceProps) => (
   </span>
 )
 
-const TooltipPatreon = ({ purchased }: { purchased?: boolean }) => (
+const TooltipPatreon = ({
+  purchased,
+  description,
+}: { purchased?: boolean; description?: string | null }) => (
   <Tooltip>
     <TooltipTrigger asChild>
       <div className="cursor-pointer">
@@ -79,10 +87,8 @@ const TooltipPatreon = ({ purchased }: { purchased?: boolean }) => (
       </div>
     </TooltipTrigger>
     <TooltipContent className="bg-white text-black max-w-[420px] border border-gray-200">
-      ÔüáA patron pass gives you access to the whole month and supports
-      scholarships for researchers, artists and young builders. Edge Institute
-      is a certified 501c3 and you will receive a written acknowledgement from
-      us for your records.
+      {description ||
+        "A patron pass supports the community and gives you access to the full event."}
     </TooltipContent>
   </Tooltip>
 )
