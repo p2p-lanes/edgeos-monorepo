@@ -2,6 +2,7 @@ import { CheckCircle, Loader2, XCircle } from "lucide-react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { useDiscount } from "@/providers/discountProvider"
 import useDiscountCode from "../../hooks/useDiscountCode"
 
 const DiscountCode = ({
@@ -11,8 +12,12 @@ const DiscountCode = ({
   defaultOpen?: boolean
   label?: boolean
 }) => {
-  const [open, setOpen] = useState(defaultOpen)
-  const [discountCode, setDiscountCode] = useState("")
+  const { discountApplied } = useDiscount()
+  const hasPreAppliedCode = !!discountApplied.discount_code
+  const [open, setOpen] = useState(defaultOpen || hasPreAppliedCode)
+  const [discountCode, setDiscountCode] = useState(
+    discountApplied.discount_code ?? "",
+  )
   const {
     getDiscountCode,
     loading,
@@ -20,6 +25,7 @@ const DiscountCode = ({
     validDiscount,
     clearDiscountMessage,
   } = useDiscountCode()
+  const isValid = validDiscount || hasPreAppliedCode
 
   const handleApplyDiscount = () => {
     getDiscountCode(discountCode)
@@ -45,9 +51,9 @@ const DiscountCode = ({
         <div className="flex flex-col items-end gap-2">
           <div className="flex items-end gap-4">
             <Input
-              disabled={loading || validDiscount}
+              disabled={loading || isValid}
               error={
-                !validDiscount && !!discountMsg && discountCode.length > 0
+                !isValid && !!discountMsg && discountCode.length > 0
                   ? discountMsg
                   : ""
               }
@@ -61,34 +67,30 @@ const DiscountCode = ({
                   handleApplyDiscount()
                 }
               }}
-              autoFocus
+              autoFocus={!hasPreAppliedCode}
             />
             <Button
               variant="secondary"
               className="hover:no-underline font-bold text-[#7F22FE] bg-[#7F22FE]/10"
               onClick={handleApplyDiscount}
-              disabled={discountCode.length === 0 || loading || validDiscount}
+              disabled={discountCode.length === 0 || loading || isValid}
             >
               {loading && <Loader2 className="size-4 animate-spin" />}
               Apply
             </Button>
           </div>
-          {!loading &&
-            discountCode.length > 0 &&
-            (discountMsg || validDiscount) && (
-              <p
-                className={`flex items-center gap-1 text-xs ${validDiscount ? "text-green-500" : "text-red-500"}`}
-              >
-                {validDiscount ? (
-                  <CheckCircle className="w-4 h-4 text-green-500" />
-                ) : (
-                  <XCircle className="w-4 h-4 text-red-500" />
-                )}
-                {validDiscount
-                  ? "Coupon code applied successfully."
-                  : discountMsg}
-              </p>
-            )}
+          {!loading && discountCode.length > 0 && (discountMsg || isValid) && (
+            <p
+              className={`flex items-center gap-1 text-xs ${isValid ? "text-green-500" : "text-red-500"}`}
+            >
+              {isValid ? (
+                <CheckCircle className="w-4 h-4 text-green-500" />
+              ) : (
+                <XCircle className="w-4 h-4 text-red-500" />
+              )}
+              {isValid ? "Coupon code applied successfully." : discountMsg}
+            </p>
+          )}
         </div>
       ) : null}
     </div>

@@ -185,9 +185,24 @@ const PassesProvider = ({
   const hasRestoredCartRef = useRef(false)
   const { data: savedCartPasses } = useCart(restoreFromCart ? cityId : null)
 
-  // Track attendee/product counts to detect structural changes
+  // Track attendee/product counts and purchase state to detect changes
   const prevAttendeeCountRef = useRef(0)
   const prevProductCountRef = useRef(0)
+  const prevPurchaseFingerprintRef = useRef("")
+
+  // Build a fingerprint of purchased products to detect purchase changes
+  const purchaseFingerprint = useMemo(() => {
+    return attendees
+      .map((a) => {
+        const purchased = a.products
+          .filter((p) => p.purchased)
+          .map((p) => p.id)
+          .sort()
+          .join(",")
+        return `${a.id}:${purchased}`
+      })
+      .join("|")
+  }, [attendees])
 
   // Reset when city changes so stale data doesn't persist
   useEffect(() => {
@@ -215,17 +230,21 @@ const PassesProvider = ({
   )
 
   // Step 1: Initialize attendeePasses from server data (one-time)
-  // Re-runs only when attendee/product counts change (structural change)
+  // Re-runs when attendee/product counts or purchase state changes
   useEffect(() => {
     if (attendees.length === 0 || products.length === 0) return
 
     const attendeeCountChanged =
       attendees.length !== prevAttendeeCountRef.current
     const productCountChanged = products.length !== prevProductCountRef.current
-    const structuralChange = attendeeCountChanged || productCountChanged
+    const purchaseChanged =
+      purchaseFingerprint !== prevPurchaseFingerprintRef.current
+    const structuralChange =
+      attendeeCountChanged || productCountChanged || purchaseChanged
 
     prevAttendeeCountRef.current = attendees.length
     prevProductCountRef.current = products.length
+    prevPurchaseFingerprintRef.current = purchaseFingerprint
 
     if (!hasInitializedRef.current) {
       // First initialization
@@ -237,7 +256,7 @@ const PassesProvider = ({
       hasInitializedRef.current = true
       setAttendeePasses(basePasses)
     } else if (structuralChange) {
-      // Structural change (new attendee added, product activated/deactivated)
+      // Structural change (new attendee, product change, or purchase completed)
       // Rebuild but preserve existing selections
       const basePasses = buildBaseAttendeePasses(
         attendees,
@@ -247,7 +266,7 @@ const PassesProvider = ({
       setAttendeePasses((current) => preserveSelections(basePasses, current))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [attendees, products, discountApplied.discount_value])
+  }, [attendees, products, discountApplied.discount_value, purchaseFingerprint])
 
   // Step 2: Apply cart selections (one-time, after initialization)
   useEffect(() => {

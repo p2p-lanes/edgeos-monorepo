@@ -6,7 +6,8 @@
       "**",
       "!**/node_modules/**/*",
       "!**/.next/**/*",
-      "!**/src/client/**/*"
+      "!**/src/client/**/*",
+      "!next-env.d.ts"
     ]
   },
   "linter": {
