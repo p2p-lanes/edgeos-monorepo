@@ -32,9 +32,6 @@ const HeaderProfile = () => {
             <Medal className="mr-2 size-4" />
             My Collectibles
           </Button>
-          {/* <Button variant="outline" className="text-gray-700 border-gray-300 hover:bg-gray-50 bg-transparent">
-              My Referrals
-            </Button> */}
           <Button
             variant="outline"
             className="text-gray-700 border-gray-300 hover:bg-gray-50 bg-transparent"

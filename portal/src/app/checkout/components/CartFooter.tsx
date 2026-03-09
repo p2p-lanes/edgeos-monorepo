@@ -17,6 +17,7 @@ import {
 import { useState } from "react"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
+import { useCityProvider } from "@/providers/cityProvider"
 import { formatCurrency } from "@/types/checkout"
 
 interface CartFooterProps {
@@ -43,7 +44,10 @@ export default function CartFooter({ onPay, onBack }: CartFooterProps) {
     isSubmitting,
     isEditing,
     editCredit,
+    termsAccepted,
   } = useCheckout()
+  const { getCity } = useCityProvider()
+  const popup = getCity()
 
   const [isExpanded, setIsExpanded] = useState(false)
 
@@ -57,13 +61,17 @@ export default function CartFooter({ onPay, onBack }: CartFooterProps) {
 
   const hasEditChanges =
     isEditing && attendees.some((a) => a.products.some((p) => p.edit))
-  const canContinue = isEditing
-    ? cart.passes.length > 0
-    : isConfirmStep
+  const requiresTerms =
+    isConfirmStep && !!popup?.terms_and_conditions_url && !termsAccepted
+  const canContinue = requiresTerms
+    ? false
+    : isEditing
       ? cart.passes.length > 0
-      : nextStepId
-        ? canProceedToStep(nextStepId)
-        : false
+      : isConfirmStep
+        ? cart.passes.length > 0
+        : nextStepId
+          ? canProceedToStep(nextStepId)
+          : false
 
   const hasItems = summary.itemCount > 0 || (isEditing && hasEditChanges)
 

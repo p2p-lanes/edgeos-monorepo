@@ -54,6 +54,9 @@ const PaymentHistory = ({ payments }: { payments: PaymentsProps[] }) => {
             (product: any) => product.category === "patreon",
           ),
         )}
+        invoiceCompanyName={city?.invoice_company_name ?? ""}
+        invoiceCompanyAddress={city?.invoice_company_address ?? ""}
+        invoiceCompanyEmail={city?.invoice_company_email ?? ""}
       />,
     ).toBlob()
     saveAs(blob, `${clientName}-invoice.pdf`)

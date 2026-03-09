@@ -147,13 +147,6 @@ export function AttendeeModal({
       title={title}
       description={description}
     >
-      {/* {isChildCategory && (
-        <div className="-mt-4 text-sm text-gray-500">
-          <Link href="https://edgeesmeralda2025.substack.com/p/kids-and-families-at-edge-esmeralda" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
-            Learn more about children tickets
-          </Link>.
-        </div>
-      )} */}
       <form noValidate onSubmit={handleSubmit}>
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
@@ -244,7 +237,7 @@ export function AttendeeModal({
           {/* {
             category !== 'spouse' && category !== 'main' && (
               <p className="text-sm text-gray-500">Please note: Parents are asked to contribute at least 4 hours/week, with those of kids under 7 volunteering one full day (or two half days). Scheduling is flexible.</p>
-            ) 
+            )
           } */}
         </div>
         <DialogFooter>

@@ -99,23 +99,26 @@ const ToolbarTop = ({
         {canEdit && canEditDate && (
           <EditPassesButton onSwitchToBuy={onSwitchToBuy} />
         )}
-        {viewInvoices && (
-          <>
-            <Button
-              variant={"ghost"}
-              onClick={() => setIsInvoiceModalOpen(true)}
-            >
-              <Newspaper className="h-4 w-4" />
-              <p className="text-sm font-medium hidden md:block">
-                View Invoices
-              </p>
-            </Button>
-            <InvoiceModal
-              isOpen={isInvoiceModalOpen}
-              onClose={() => setIsInvoiceModalOpen(false)}
-            />
-          </>
-        )}
+        {viewInvoices &&
+          city?.invoice_company_name &&
+          city?.invoice_company_address &&
+          city?.invoice_company_email && (
+            <>
+              <Button
+                variant={"ghost"}
+                onClick={() => setIsInvoiceModalOpen(true)}
+              >
+                <Newspaper className="h-4 w-4" />
+                <p className="text-sm font-medium hidden md:block">
+                  View Invoices
+                </p>
+              </Button>
+              <InvoiceModal
+                isOpen={isInvoiceModalOpen}
+                onClose={() => setIsInvoiceModalOpen(false)}
+              />
+            </>
+          )}
 
         {positionCoupon === "right" && allows_coupons && (
           <div className="ml-2">

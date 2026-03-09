@@ -3,12 +3,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import {
   Baby,
+  Building2,
   Calendar,
   FileText,
   Globe,
   Heart,
   Image,
   Key,
+  Mail,
+  MapPin,
   Ticket,
   Twitter,
 } from "lucide-react"
@@ -136,6 +139,9 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
       blog_url: defaultValues?.blog_url ?? "",
       twitter_url: defaultValues?.twitter_url ?? "",
       simplefi_api_key: defaultValues?.simplefi_api_key ?? "",
+      invoice_company_name: defaultValues?.invoice_company_name ?? "",
+      invoice_company_address: defaultValues?.invoice_company_address ?? "",
+      invoice_company_email: defaultValues?.invoice_company_email ?? "",
     },
     onSubmit: ({ value }) => {
       if (readOnly) return
@@ -160,6 +166,9 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         blog_url: value.blog_url || null,
         twitter_url: value.twitter_url || null,
         simplefi_api_key: value.simplefi_api_key || null,
+        invoice_company_name: value.invoice_company_name || null,
+        invoice_company_address: value.invoice_company_address || null,
+        invoice_company_email: value.invoice_company_email || null,
       }
       if (isEdit) {
         updateMutation.mutate(payload)
@@ -587,6 +596,66 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                   id="simplefi_api_key"
                   type="password"
                   placeholder="Enter API key"
+                  value={field.state.value}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  disabled={readOnly}
+                  className="max-w-xs text-sm"
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+        </InlineSection>
+
+        <Separator />
+
+        {/* Invoice Settings */}
+        <InlineSection title="Invoice Settings">
+          <form.Field name="invoice_company_name">
+            {(field) => (
+              <InlineRow
+                icon={<Building2 className="h-4 w-4 text-muted-foreground" />}
+                label="Company Name"
+              >
+                <Input
+                  id="invoice_company_name"
+                  placeholder="Acme Inc"
+                  value={field.state.value}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  disabled={readOnly}
+                  className="max-w-xs text-sm"
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+
+          <form.Field name="invoice_company_address">
+            {(field) => (
+              <InlineRow
+                icon={<MapPin className="h-4 w-4 text-muted-foreground" />}
+                label="Address"
+              >
+                <Input
+                  id="invoice_company_address"
+                  placeholder="123 Main St, City, Country"
+                  value={field.state.value}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  disabled={readOnly}
+                  className="max-w-xs text-sm"
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+
+          <form.Field name="invoice_company_email">
+            {(field) => (
+              <InlineRow
+                icon={<Mail className="h-4 w-4 text-muted-foreground" />}
+                label="Email"
+              >
+                <Input
+                  id="invoice_company_email"
+                  type="email"
+                  placeholder="billing@example.com"
                   value={field.state.value}
                   onChange={(e) => field.handleChange(e.target.value)}
                   disabled={readOnly}

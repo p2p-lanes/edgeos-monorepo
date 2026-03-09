@@ -5627,6 +5627,50 @@ export const PopupCreateSchema = {
                 }
             ],
             title: 'Simplefi Api Key'
+        },
+        terms_and_conditions_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Terms And Conditions Url'
+        },
+        invoice_company_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Invoice Company Name'
+        },
+        invoice_company_address: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Invoice Company Address'
+        },
+        invoice_company_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Invoice Company Email'
         }
     },
     type: 'object',
@@ -5811,6 +5855,50 @@ export const PopupPublicSchema = {
                 }
             ],
             title: 'Simplefi Api Key'
+        },
+        terms_and_conditions_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Terms And Conditions Url'
+        },
+        invoice_company_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Invoice Company Name'
+        },
+        invoice_company_address: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Invoice Company Address'
+        },
+        invoice_company_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Invoice Company Email'
         },
         id: {
             type: 'string',
@@ -6143,6 +6231,50 @@ export const PopupUpdateSchema = {
                 }
             ],
             title: 'Simplefi Api Key'
+        },
+        terms_and_conditions_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Terms And Conditions Url'
+        },
+        invoice_company_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Invoice Company Name'
+        },
+        invoice_company_address: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Invoice Company Address'
+        },
+        invoice_company_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Invoice Company Email'
         }
     },
     type: 'object',

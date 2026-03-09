@@ -24,8 +24,6 @@ interface TenantContextValue {
 const TenantContext = createContext<TenantContextValue | null>(null)
 
 function extractSubdomain(hostname: string): string | null {
-  // e.g. "edge-city.portal.muvinai.com" -> "edge-city"
-  // For local dev, use "edge-city.localhost" which resolves to 127.0.0.1
   const parts = hostname.split(".")
   if (parts.length >= 2 && parts[0] !== "www") {
     return parts[0]

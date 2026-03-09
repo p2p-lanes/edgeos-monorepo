@@ -1124,6 +1124,10 @@ export type PopupCreate = {
     blog_url?: (string | null);
     twitter_url?: (string | null);
     simplefi_api_key?: (string | null);
+    terms_and_conditions_url?: (string | null);
+    invoice_company_name?: (string | null);
+    invoice_company_address?: (string | null);
+    invoice_company_email?: (string | null);
 };
 
 export type PopupPublic = {
@@ -1145,6 +1149,10 @@ export type PopupPublic = {
     blog_url?: (string | null);
     twitter_url?: (string | null);
     simplefi_api_key?: (string | null);
+    terms_and_conditions_url?: (string | null);
+    invoice_company_name?: (string | null);
+    invoice_company_address?: (string | null);
+    invoice_company_email?: (string | null);
     id: string;
 };
 
@@ -1200,6 +1208,10 @@ export type PopupUpdate = {
     blog_url?: (string | null);
     twitter_url?: (string | null);
     simplefi_api_key?: (string | null);
+    terms_and_conditions_url?: (string | null);
+    invoice_company_name?: (string | null);
+    invoice_company_address?: (string | null);
+    invoice_company_email?: (string | null);
 };
 
 /**

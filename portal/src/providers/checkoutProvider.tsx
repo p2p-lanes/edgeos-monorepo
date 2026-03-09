@@ -76,6 +76,8 @@ interface CheckoutContextValue {
   toggleEditing: (editing?: boolean) => void
   editCredit: number
   monthUpgradeCredit: number
+  termsAccepted: boolean
+  setTermsAccepted: (accepted: boolean) => void
 }
 
 const CheckoutContext = createContext<CheckoutContextValue | null>(null)
@@ -119,6 +121,7 @@ export function CheckoutProvider({
     usePatronSelection(patronProducts)
 
   const [insurance, setInsurance] = useState(false)
+  const [termsAccepted, setTermsAccepted] = useState(false)
 
   // Build selected passes from attendeePasses
   const selectedPasses = useMemo<SelectedPassItem[]>(() => {
@@ -460,6 +463,8 @@ export function CheckoutProvider({
     toggleEditing,
     editCredit,
     monthUpgradeCredit,
+    termsAccepted,
+    setTermsAccepted,
   }
 
   return (

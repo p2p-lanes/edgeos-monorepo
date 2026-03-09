@@ -72,6 +72,9 @@ interface InvoiceProps {
   hasPatreon?: boolean
   imageUrl?: string
   clientName: string
+  invoiceCompanyName: string
+  invoiceCompanyAddress: string
+  invoiceCompanyEmail: string
 }
 
 // Componente del PDF
@@ -81,6 +84,9 @@ export const Invoice = ({
   hasPatreon,
   imageUrl,
   clientName,
+  invoiceCompanyName,
+  invoiceCompanyAddress,
+  invoiceCompanyEmail,
 }: InvoiceProps) => {
   const total =
     payment.rate > 1
@@ -107,9 +113,9 @@ export const Invoice = ({
               flex: 1,
             }}
           >
-            <Text>Edge Institute Inc</Text>
-            <Text>Address: 1300 S 6th St, Austin, TX 78704</Text>
-            <Text>Email: syl@edgecity.live</Text>
+            <Text>{invoiceCompanyName}</Text>
+            <Text>Address: {invoiceCompanyAddress}</Text>
+            <Text>Email: {invoiceCompanyEmail}</Text>
           </View>
           <View
             style={{

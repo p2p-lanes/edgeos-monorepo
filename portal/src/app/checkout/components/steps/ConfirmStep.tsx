@@ -15,6 +15,7 @@ import { useState } from "react"
 import { cn } from "@/lib/utils"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCheckout } from "@/providers/checkoutProvider"
+import { useCityProvider } from "@/providers/cityProvider"
 import { formatCheckoutDate, formatCurrency } from "@/types/checkout"
 import InsuranceCard from "../InsuranceCard"
 
@@ -31,7 +32,11 @@ export default function ConfirmStep() {
     isEditing,
     editCredit,
     monthUpgradeCredit,
+    termsAccepted,
+    setTermsAccepted,
   } = useCheckout()
+  const { getCity } = useCityProvider()
+  const popup = getCity()
   const { getRelevantApplication } = useApplication()
   const application = getRelevantApplication()
   const accountCredit = application?.credit ? Number(application.credit) : 0
@@ -337,6 +342,39 @@ export default function ConfirmStep() {
             <p className="text-green-600 text-xs mt-2">Code applied!</p>
           )}
         </div>
+
+        {/* Terms and Conditions */}
+        {popup?.terms_and_conditions_url && (
+          <>
+            <div className="border-t border-gray-100" />
+            <div className="px-5 py-4">
+              <label
+                htmlFor="terms-checkbox"
+                className="flex items-start gap-3 cursor-pointer"
+              >
+                <input
+                  id="terms-checkbox"
+                  type="checkbox"
+                  checked={termsAccepted}
+                  onChange={(e) => setTermsAccepted(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-2 focus:ring-gray-900 shrink-0"
+                />
+                <span className="text-sm text-gray-600">
+                  I agree to the{" "}
+                  <a
+                    href={popup.terms_and_conditions_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 underline hover:text-blue-800"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    Terms and Conditions
+                  </a>
+                </span>
+              </label>
+            </div>
+          </>
+        )}
 
         {/* Subtotal */}
         <div

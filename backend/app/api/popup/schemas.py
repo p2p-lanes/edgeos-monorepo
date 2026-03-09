@@ -35,6 +35,10 @@ class PopupBase(SQLModel):
     blog_url: str | None = None
     twitter_url: str | None = None
     simplefi_api_key: str | None = None
+    terms_and_conditions_url: str | None = None
+    invoice_company_name: str | None = None
+    invoice_company_address: str | None = None
+    invoice_company_email: str | None = None
 
 
 class PopupCreate(SQLModel):
@@ -56,6 +60,10 @@ class PopupCreate(SQLModel):
     blog_url: str | None = None
     twitter_url: str | None = None
     simplefi_api_key: str | None = None
+    terms_and_conditions_url: str | None = None
+    invoice_company_name: str | None = None
+    invoice_company_address: str | None = None
+    invoice_company_email: str | None = None
 
     @model_validator(mode="after")
     def generate_slug(self) -> Self:
@@ -81,6 +89,10 @@ class PopupUpdate(SQLModel):
     blog_url: str | None = None
     twitter_url: str | None = None
     simplefi_api_key: str | None = None
+    terms_and_conditions_url: str | None = None
+    invoice_company_name: str | None = None
+    invoice_company_address: str | None = None
+    invoice_company_email: str | None = None
 
 
 class PopupPublic(PopupBase):
