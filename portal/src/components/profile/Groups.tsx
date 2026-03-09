@@ -4,7 +4,6 @@ import { useState } from "react"
 import { toast } from "sonner"
 import type { GroupPublic, PopupPublic } from "@/client"
 import { useCityProvider } from "@/providers/cityProvider"
-import { getBaseUrl } from "@/utils/environment"
 import useGetGroups from "../Sidebar/hooks/useGetGroups"
 import { Badge } from "../ui/badge"
 import { Button } from "../ui/button"
@@ -15,14 +14,14 @@ const getCheckoutLinkForGroup = (
   group: GroupPublic,
   popups: PopupPublic[],
 ): string | null => {
-  const baseUrl = getBaseUrl()
+  const origin = window.location.origin
   const groupPopup = popups.find((popup) => popup.id === group.popup_id)
   if (!groupPopup) return null
 
   if (group.is_ambassador_group) {
-    return `${baseUrl}/${groupPopup.slug}/invite/${group.slug}`
+    return `${origin}/${groupPopup.slug}/invite/${group.slug}`
   }
-  return `${baseUrl}/checkout?group=${group.slug}`
+  return `${origin}/checkout?group=${group.slug}`
 }
 
 const Groups = () => {

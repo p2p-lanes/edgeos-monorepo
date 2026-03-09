@@ -1,6 +1,4 @@
-import { jwtDecode } from "jwt-decode"
 import { useEffect, useState } from "react"
-import { configureApiClient } from "@/lib/api-client"
 import type { FormDataProps } from "../types"
 
 interface UseUserFormProps {
@@ -24,36 +22,6 @@ export const useUserForm = ({
   })
 
   const [errors, setErrors] = useState<Record<string, string>>({})
-
-  // Cargar datos del token si existe y no está expirado
-  useEffect(() => {
-    const token = window?.localStorage?.getItem("token")
-    if (token) {
-      try {
-        const decodedToken = jwtDecode(token) as {
-          email: string
-          exp?: number
-        }
-        const isExpired = decodedToken.exp
-          ? decodedToken.exp * 1000 < Date.now()
-          : false
-
-        if (isExpired) {
-          localStorage.removeItem("token")
-          return
-        }
-
-        configureApiClient(token)
-        setFormData((prev) => ({
-          ...prev,
-          email: decodedToken.email,
-          email_verified: true,
-        }))
-      } catch {
-        localStorage.removeItem("token")
-      }
-    }
-  }, [])
 
   // Actualizar formData cuando llegan nuevos datos de aplicación
   useEffect(() => {
@@ -91,7 +59,6 @@ export const useUserForm = ({
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
-    // if (!formData.local_resident || formData.local_resident === "") newErrors.local_resident = "Local resident is required";
     if (!formData.first_name) newErrors.first_name = "First name is required"
     if (!formData.last_name) newErrors.last_name = "Last name is required"
 
@@ -131,8 +98,6 @@ export const useUserForm = ({
       local_resident: "",
     })
     setErrors({})
-
-    configureApiClient()
   }
 
   return {

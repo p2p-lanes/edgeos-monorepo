@@ -190,7 +190,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         statement = statement.order_by(desc(Payments.created_at))  # type: ignore[arg-type]
         statement = statement.offset(skip).limit(limit)
         statement = statement.options(
-            selectinload(Payments.products_snapshot).selectinload(PaymentProducts.attendee),  # type: ignore[arg-type]
+            selectinload(Payments.products_snapshot).selectinload(
+                PaymentProducts.attendee
+            ),  # type: ignore[arg-type]
         )
         results = list(session.exec(statement).all())
 
@@ -221,7 +223,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         statement = statement.order_by(desc(Payments.created_at))  # type: ignore[arg-type]
         statement = statement.offset(skip).limit(limit)
         statement = statement.options(
-            selectinload(Payments.products_snapshot).selectinload(PaymentProducts.attendee),  # type: ignore[arg-type]
+            selectinload(Payments.products_snapshot).selectinload(
+                PaymentProducts.attendee
+            ),  # type: ignore[arg-type]
         )
         results = list(session.exec(statement).all())
 
@@ -690,7 +694,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 memo=application.popup.tenant.name,
             )
         except Exception as e:
-            logger.error("Failed to create SimpleFI payment: %s", e)
+            logger.error(f"Failed to create SimpleFI payment: {e}")
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail="Failed to create payment with payment provider",

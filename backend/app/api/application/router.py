@@ -33,7 +33,11 @@ from app.core.dependencies.users import (
     HumanTenantSession,
     TenantSession,
 )
-from app.services.email import ApplicationReceivedContext, get_email_service
+from app.services.email import (
+    ApplicationAcceptedContext,
+    ApplicationReceivedContext,
+    get_email_service,
+)
 
 router = APIRouter(prefix="/applications", tags=["applications"])
 
@@ -379,8 +383,8 @@ async def create_my_application(
         human_id=current_human.id,
     )
 
-    # Send application received email if status is IN_REVIEW
-    if application.status == ApplicationStatus.IN_REVIEW:
+    # Send appropriate email based on application status
+    if application.status == ApplicationStatus.IN_REVIEW.value:
         email_service = get_email_service()
         await email_service.send_application_received(
             to=current_human.email,
@@ -389,6 +393,21 @@ async def create_my_application(
                 first_name=current_human.first_name or "",
                 last_name=current_human.last_name or "",
                 email=current_human.email,
+                popup_name=application.popup.name,
+            ),
+            from_address=application.popup.tenant.sender_email,
+            from_name=application.popup.tenant.sender_name,
+            popup_id=application.popup_id,
+            db_session=db,
+        )
+    elif application.status == ApplicationStatus.ACCEPTED.value:
+        email_service = get_email_service()
+        await email_service.send_application_accepted(
+            to=current_human.email,
+            subject=f"Application Accepted for {application.popup.name}",
+            context=ApplicationAcceptedContext(
+                first_name=current_human.first_name or "",
+                last_name=current_human.last_name or "",
                 popup_name=application.popup.name,
             ),
             from_address=application.popup.tenant.sender_email,

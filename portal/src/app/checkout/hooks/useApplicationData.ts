@@ -1,17 +1,10 @@
-import { useQuery } from "@tanstack/react-query"
-import { jwtDecode } from "jwt-decode"
-import { ApplicationsService } from "@/client"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { ApplicationsService, HumansService } from "@/client"
 import { queryKeys } from "@/lib/query-keys"
 import type { FormDataProps } from "../types"
 
 interface ExtendedApplicationData extends Partial<FormDataProps> {
   red_flag?: boolean
-  popup?: {
-    id: string
-    name: string
-    slug: string
-    [key: string]: any
-  }
 }
 
 interface UseApplicationDataProps {
@@ -21,6 +14,10 @@ interface UseApplicationDataProps {
 export const useApplicationData = ({
   groupPopupCityId,
 }: UseApplicationDataProps) => {
+  const queryClient = useQueryClient()
+
+  const hasToken = typeof window !== "undefined" && !!localStorage.getItem("token")
+
   const {
     data: applicationData = null,
     isLoading,
@@ -31,40 +28,59 @@ export const useApplicationData = ({
       const token = window?.localStorage?.getItem("token")
       if (!token) return null
 
-      const decodedToken = jwtDecode(token) as { email: string }
-      if (!decodedToken.email) return null
+      // Get current human info from API (email, name, etc.)
+      const human = await HumansService.getCurrentHumanInfo()
+      if (!human?.email) return null
 
-      const result = await ApplicationsService.listMyApplications()
-      const matchingApp = result.results.find(
-        (app) => app.popup_id === groupPopupCityId,
-      )
+      const baseData: ExtendedApplicationData = {
+        email: human.email,
+        first_name: human.first_name || "",
+        last_name: human.last_name || "",
+        telegram: human.telegram || "",
+        gender: human.gender?.toLowerCase() || "",
+        email_verified: true,
+        local_resident: "",
+        red_flag: human.red_flag || false,
+      }
 
-      if (matchingApp) {
-        return {
-          first_name: matchingApp.human?.first_name || "",
-          last_name: matchingApp.human?.last_name || "",
-          email: decodedToken.email,
-          telegram: matchingApp.human?.telegram || "",
-          gender: matchingApp.human?.gender?.toLowerCase() || "",
-          email_verified: true,
-          local_resident: "",
-          red_flag: matchingApp.red_flag || false,
+      // If we have a group, check for matching application to get app-specific data
+      if (groupPopupCityId) {
+        try {
+          const result = await ApplicationsService.listMyApplications()
+          const matchingApp = result.results.find(
+            (app) => app.popup_id === groupPopupCityId,
+          )
+
+          if (matchingApp) {
+            return {
+              ...baseData,
+              first_name: matchingApp.human?.first_name || human.first_name || "",
+              last_name: matchingApp.human?.last_name || human.last_name || "",
+              telegram: matchingApp.human?.telegram || human.telegram || "",
+              gender: (matchingApp.human?.gender || human.gender || "").toLowerCase(),
+              red_flag: matchingApp.red_flag || false,
+            }
+          }
+        } catch {
+          // If applications fetch fails, still return human data
         }
       }
 
-      return {
-        email: decodedToken.email,
-        email_verified: true,
-        red_flag: false,
-      }
+      return baseData
     },
-    enabled: !!groupPopupCityId,
+    enabled: hasToken,
   })
+
+  const refreshApplicationData = () => {
+    queryClient.invalidateQueries({
+      queryKey: [...queryKeys.applications.mine(), "checkout", groupPopupCityId],
+    })
+  }
 
   return {
     isLoading,
     error: queryError?.message ?? null,
     applicationData,
-    refreshApplicationData: () => {},
+    refreshApplicationData,
   }
 }

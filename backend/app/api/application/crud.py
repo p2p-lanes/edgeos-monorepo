@@ -371,7 +371,11 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
 
         # Auto-accept applications that come through a group (checkout/referral)
         if data.get("group_id"):
-            data["status"] = ApplicationStatus.ACCEPTED.value
+            if human.red_flag:
+                data["status"] = ApplicationStatus.REJECTED.value
+            else:
+                data["status"] = ApplicationStatus.ACCEPTED.value
+                data["accepted_at"] = datetime.now(UTC)
 
         # Set submitted_at if status is IN_REVIEW or ACCEPTED
         if app_data.status in [
@@ -421,6 +425,15 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 tenant_id=tenant_id,
                 check_in_prefix=prefix,
             )
+
+        # Apply approval strategy for non-group applications still in review
+        if not data.get("group_id") and application.status == ApplicationStatus.IN_REVIEW.value:
+            self._apply_approval_strategy(session, application, human)
+
+        # Create snapshot for group auto-accept/reject
+        if data.get("group_id"):
+            event = "auto_rejected" if application.status == ApplicationStatus.REJECTED.value else "auto_accepted"
+            self.create_snapshot(session, application, event)
 
         session.commit()
         session.refresh(application)

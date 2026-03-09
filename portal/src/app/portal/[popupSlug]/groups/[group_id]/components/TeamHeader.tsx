@@ -5,7 +5,6 @@ import type { GroupWithMembers } from "@/client"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useCityProvider } from "@/providers/cityProvider"
-import { getBaseUrl } from "@/utils/environment"
 import MemberFormModal from "./AddMemberModal"
 import ImportMembersModal from "./ImportMembersModal"
 import WelcomeMessageModal from "./WelcomeMessageModal"
@@ -64,13 +63,13 @@ const TeamHeader = ({
   }
 
   const handleCopyCheckoutLink = async () => {
-    const baseUrl = getBaseUrl()
+    const origin = window.location.origin
     let checkoutLink = ""
     if (group.is_ambassador_group) {
       const city = getCity()
-      checkoutLink = `${baseUrl}/${city?.slug}/invite/${group.slug}`
+      checkoutLink = `${origin}/${city?.slug}/invite/${group.slug}`
     } else {
-      checkoutLink = `${baseUrl}/checkout?group=${group.slug}`
+      checkoutLink = `${origin}/checkout?group=${group.slug}`
     }
 
     try {

@@ -5,7 +5,6 @@ import { useState } from "react"
 import type { GroupPublic, PopupPublic } from "@/client"
 import { Button } from "@/components/ui/button"
 import { useCityProvider } from "@/providers/cityProvider"
-import { getBaseUrl } from "@/utils/environment"
 import useGetGroups from "../Sidebar/hooks/useGetGroups"
 import { Card } from "../ui/card"
 
@@ -69,8 +68,7 @@ export default function ReferralLinks({
 
             if (!groupPopup) return null
 
-            const baseUrl = getBaseUrl()
-            const link = `${baseUrl}/${groupPopup.slug}/invite/${group.slug}`
+            const link = `${window.location.origin}/${groupPopup.slug}/invite/${group.slug}`
 
             return (
               <div
