@@ -267,6 +267,16 @@ export type AttendeePublic = {
 };
 
 /**
+ * Purchased products grouped by attendee.
+ */
+export type AttendeePurchases = {
+    attendee_id: string;
+    attendee_name: string;
+    attendee_category: string;
+    products?: Array<ProductWithQuantity>;
+};
+
+/**
  * Single entry in the attendees directory.
  */
 export type AttendeesDirectoryEntry = {
@@ -1367,6 +1377,31 @@ export type ProductUpdate = {
 };
 
 /**
+ * Product with quantity for attendee products.
+ */
+export type ProductWithQuantity = {
+    tenant_id: string;
+    popup_id: string;
+    name: string;
+    slug: string;
+    price: string;
+    compare_price?: (string | null);
+    description?: (string | null);
+    image_url?: (string | null);
+    category?: ProductCategory;
+    attendee_category?: (TicketAttendeeCategory | null);
+    duration_type?: (TicketDuration | null);
+    start_date?: (string | null);
+    end_date?: (string | null);
+    is_active?: boolean;
+    exclusive?: boolean;
+    max_quantity?: (number | null);
+    insurance_percentage?: (string | null);
+    id: string;
+    quantity?: number;
+};
+
+/**
  * Decision options for application reviews.
  */
 export type ReviewDecision = 'strong_yes' | 'yes' | 'no' | 'strong_no';
@@ -1654,6 +1689,12 @@ export type ApplicationsListMyApplicationsData = {
 export type ApplicationsListMyApplicationsResponse = (ListModel_ApplicationPublic_);
 
 export type ApplicationsListMyTicketsResponse = (Array<AttendeeWithTickets>);
+
+export type ApplicationsGetMyPurchasesData = {
+    popupId: string;
+};
+
+export type ApplicationsGetMyPurchasesResponse = (Array<AttendeePurchases>);
 
 export type ApplicationsGetMyApplicationData = {
     popupId: string;

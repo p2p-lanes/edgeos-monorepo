@@ -20,6 +20,7 @@ from app.api.application.schemas import (
 )
 from app.api.attendee.schemas import (
     AttendeeCreate,
+    AttendeePurchases,
     AttendeePublic,
     AttendeeUpdate,
     AttendeeWithTickets,
@@ -329,6 +330,40 @@ async def list_my_tickets(
                 popup_id=popup.id,
                 popup_name=popup.name,
                 popup_slug=popup.slug,
+                products=products,
+            )
+        )
+
+    return results
+
+
+@router.get("/my/{popup_id}/purchases", response_model=list[AttendeePurchases])
+async def get_my_purchases(
+    popup_id: uuid.UUID,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+) -> list[AttendeePurchases]:
+    """Get purchased products grouped by attendee for a popup (Portal)."""
+    from app.api.attendee.crud import attendees_crud
+    from app.api.product.schemas import ProductWithQuantity
+
+    attendees = attendees_crud.find_purchases_by_human_popup(
+        db, human_id=current_human.id, popup_id=popup_id
+    )
+
+    results = []
+    for attendee in attendees:
+        products = []
+        for ap in attendee.attendee_products:
+            product = ProductWithQuantity.model_validate(ap.product)
+            product.quantity = ap.quantity
+            products.append(product)
+
+        results.append(
+            AttendeePurchases(
+                attendee_id=attendee.id,
+                attendee_name=attendee.name,
+                attendee_category=attendee.category,
                 products=products,
             )
         )

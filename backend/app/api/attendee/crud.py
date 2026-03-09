@@ -205,6 +205,30 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
 
         return results, total
 
+    def find_purchases_by_human_popup(
+        self,
+        session: Session,
+        human_id: uuid.UUID,
+        popup_id: uuid.UUID,
+    ) -> list[Attendees]:
+        """Find attendees with purchased products for a human+popup combination."""
+        from app.api.application.models import Applications
+
+        statement = (
+            select(Attendees)
+            .join(Applications, Attendees.application_id == Applications.id)  # type: ignore[arg-type]
+            .where(
+                Applications.human_id == human_id,
+                Applications.popup_id == popup_id,
+            )
+            .options(
+                selectinload(Attendees.attendee_products).selectinload(  # type: ignore[arg-type]
+                    AttendeeProducts.product  # ty: ignore[invalid-argument-type]
+                ),
+            )
+        )
+        return list(session.exec(statement).all())
+
     def update_attendee(
         self,
         session: Session,

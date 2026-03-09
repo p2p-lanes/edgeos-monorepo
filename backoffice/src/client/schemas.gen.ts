@@ -1367,6 +1367,36 @@ export const AttendeePublicSchema = {
     description: 'Attendee schema for API responses.'
 } as const;
 
+export const AttendeePurchasesSchema = {
+    properties: {
+        attendee_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Attendee Id'
+        },
+        attendee_name: {
+            type: 'string',
+            title: 'Attendee Name'
+        },
+        attendee_category: {
+            type: 'string',
+            title: 'Attendee Category'
+        },
+        products: {
+            items: {
+                '$ref': '#/components/schemas/ProductWithQuantity'
+            },
+            type: 'array',
+            title: 'Products',
+            default: []
+        }
+    },
+    type: 'object',
+    required: ['attendee_id', 'attendee_name', 'attendee_category'],
+    title: 'AttendeePurchases',
+    description: 'Purchased products grouped by attendee.'
+} as const;
+
 export const AttendeeStatsSchema = {
     properties: {
         total: {
@@ -7082,6 +7112,163 @@ export const ProductUpdateSchema = {
     type: 'object',
     title: 'ProductUpdate',
     description: 'Product schema for updates.'
+} as const;
+
+export const ProductWithQuantitySchema = {
+    properties: {
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        slug: {
+            type: 'string',
+            title: 'Slug'
+        },
+        price: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Price'
+        },
+        compare_price: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Compare Price'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        image_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Image Url'
+        },
+        category: {
+            '$ref': '#/components/schemas/ProductCategory',
+            default: 'ticket'
+        },
+        attendee_category: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TicketAttendeeCategory'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        duration_type: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TicketDuration'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        start_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Start Date'
+        },
+        end_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'End Date'
+        },
+        is_active: {
+            type: 'boolean',
+            title: 'Is Active',
+            default: true
+        },
+        exclusive: {
+            type: 'boolean',
+            title: 'Exclusive',
+            default: false
+        },
+        max_quantity: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Quantity'
+        },
+        insurance_percentage: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Insurance Percentage'
+        },
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        quantity: {
+            type: 'integer',
+            title: 'Quantity',
+            default: 1
+        }
+    },
+    type: 'object',
+    required: ['tenant_id', 'popup_id', 'name', 'slug', 'price', 'id'],
+    title: 'ProductWithQuantity',
+    description: 'Product with quantity for attendee products.'
 } as const;
 
 export const ReviewDecisionSchema = {

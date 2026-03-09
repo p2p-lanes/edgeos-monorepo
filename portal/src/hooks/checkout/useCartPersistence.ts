@@ -151,6 +151,11 @@ export function useCartPersistence({
       queryClient.invalidateQueries({
         queryKey: queryKeys.payments.all,
       })
+      if (cityId) {
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.purchases.byPopup(cityId),
+        })
+      }
       return
     }
 

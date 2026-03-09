@@ -408,6 +408,7 @@ export function CheckoutProvider({
   // Submit payment (consolidated via usePaymentSubmit)
   const { submitPayment, isSubmitting } = usePaymentSubmit({
     applicationId: application?.id,
+    popupId: cityId,
     appCredit,
     attendeePasses,
     selectedPasses,

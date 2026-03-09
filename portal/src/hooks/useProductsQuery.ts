@@ -18,5 +18,7 @@ export function useProductsQuery(popupId: string | null) {
       }))
     },
     enabled: !!popupId,
+    staleTime: 0,
+    refetchInterval: 30_000,
   })
 }

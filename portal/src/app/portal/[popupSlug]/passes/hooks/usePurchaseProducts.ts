@@ -4,6 +4,7 @@ import { PaymentsService } from "@/client"
 import { markPurchasePending } from "@/hooks/usePaymentRedirect"
 import { queryKeys } from "@/lib/query-keys"
 import { useApplication } from "@/providers/applicationProvider"
+import { useCityProvider } from "@/providers/cityProvider"
 import { useDiscount } from "@/providers/discountProvider"
 import { usePassesProvider } from "@/providers/passesProvider"
 import type { AttendeePassState } from "@/types/Attendee"
@@ -11,6 +12,7 @@ import { filterProductsToPurchase } from "../helpers/filter"
 
 const usePurchaseProducts = () => {
   const { getRelevantApplication } = useApplication()
+  const { getCity } = useCityProvider()
   const { discountApplied } = useDiscount()
   const { isEditing, toggleEditing } = usePassesProvider()
   const queryClient = useQueryClient()
@@ -65,12 +67,21 @@ const usePurchaseProducts = () => {
         markPurchasePending()
         window.location.href = `${result.checkout_url}?redirect_url=${redirectUrl}`
       } else if (result.status === "approved") {
-        await queryClient.invalidateQueries({
-          queryKey: queryKeys.applications.mine(),
-        })
-        await queryClient.invalidateQueries({
-          queryKey: queryKeys.payments.all,
-        })
+        const city = getCity()
+        const popupId = city?.id ? String(city.id) : null
+        await Promise.all([
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.applications.mine(),
+          }),
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.payments.all,
+          }),
+          popupId
+            ? queryClient.invalidateQueries({
+                queryKey: queryKeys.purchases.byPopup(popupId),
+              })
+            : Promise.resolve(),
+        ])
         if (editableMode) {
           toggleEditing(false)
         }

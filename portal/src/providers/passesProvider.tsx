@@ -4,13 +4,14 @@ import {
   useCallback,
   useContext,
   useEffect,
-  useMemo,
   useRef,
   useState,
 } from "react"
+import type { AttendeePurchases } from "@/client"
 import { sortAttendees } from "@/helpers/filters"
 import { useCart } from "@/hooks/useCartApi"
 import useGetPassesData from "@/hooks/useGetPassesData"
+import { usePurchasesQuery } from "@/hooks/useGetPurchases"
 import { getPriceStrategy } from "@/strategies/PriceStrategy"
 import { getProductStrategy } from "@/strategies/ProductStrategies"
 import { getPurchaseStrategy } from "@/strategies/PurchaseStrategy"
@@ -36,21 +37,44 @@ interface PassesProviderProps {
 }
 
 /**
+ * Build a Map<attendeeId, ProductsPass[]> from the purchases query data.
+ */
+function buildPurchasesMap(
+  purchasesData: AttendeePurchases[] | undefined,
+): Map<string, ProductsPass[]> {
+  const map = new Map<string, ProductsPass[]>()
+  if (!purchasesData) return map
+
+  for (const entry of purchasesData) {
+    const products = (entry.products ?? []).map((p) => ({
+      ...p,
+      price: Number(p.price),
+      compare_price: p.compare_price ? Number(p.compare_price) : null,
+      category: p.category as string,
+    })) as ProductsPass[]
+    map.set(entry.attendee_id, products)
+  }
+  return map
+}
+
+/**
  * Builds the base attendeePasses structure from server data (attendees + products).
  * All products start with `selected: false`. Purchase rules and prices are applied.
+ * Uses purchasesMap (from dedicated purchases endpoint) for purchased product state.
  */
 function buildBaseAttendeePasses(
   attendees: AttendeePassState[],
   products: ProductsPass[],
   discountValue: number,
+  purchasesMap: Map<string, ProductsPass[]>,
 ): AttendeePassState[] {
   const priceStrategy = getPriceStrategy()
   const purchaseStrategy = getPurchaseStrategy()
 
   return attendees.map((attendee) => {
-    const hasPatreonPurchased = attendee.products.some(
-      (p) => p.category === "patreon",
-    )
+    const purchased = purchasesMap.get(attendee.id) ?? []
+
+    const hasPatreonPurchased = purchased.some((p) => p.category === "patreon")
 
     const attendeeProducts = products
       .filter(
@@ -60,8 +84,7 @@ function buildBaseAttendeePasses(
       .map((product: ProductsPass) => {
         const originalQuantity =
           product.duration_type === "day"
-            ? (attendee.products.find((p) => p.id === product.id)?.quantity ??
-              0)
+            ? (purchased.find((p) => p.id === product.id)?.quantity ?? 0)
             : 1
 
         return {
@@ -84,7 +107,7 @@ function buildBaseAttendeePasses(
       ...attendee,
       products: purchaseStrategy.applyPurchaseRules(
         attendeeProducts,
-        attendee.products || [],
+        purchased,
       ),
     }
   })
@@ -170,10 +193,7 @@ const PassesProvider = ({
   const { discountApplied } = useDiscount()
   const [attendeePasses, setAttendeePasses] = useState<AttendeePassState[]>([])
 
-  const attendees = useMemo(() => {
-    const result = sortAttendees(getAttendees())
-    return result
-  }, [getAttendees])
+  const attendees = sortAttendees(getAttendees())
 
   const [isEditing, setIsEditing] = useState(false)
   const { products } = useGetPassesData()
@@ -185,24 +205,14 @@ const PassesProvider = ({
   const hasRestoredCartRef = useRef(false)
   const { data: savedCartPasses } = useCart(restoreFromCart ? cityId : null)
 
-  // Track attendee/product counts and purchase state to detect changes
+  // Dedicated purchases query — granular invalidation after payment
+  const { data: purchasesData } = usePurchasesQuery(cityId)
+  const purchasesMap = buildPurchasesMap(purchasesData)
+
+  // Track attendee/product counts to detect structural changes
   const prevAttendeeCountRef = useRef(0)
   const prevProductCountRef = useRef(0)
-  const prevPurchaseFingerprintRef = useRef("")
-
-  // Build a fingerprint of purchased products to detect purchase changes
-  const purchaseFingerprint = useMemo(() => {
-    return attendees
-      .map((a) => {
-        const purchased = a.products
-          .filter((p) => p.purchased)
-          .map((p) => p.id)
-          .sort()
-          .join(",")
-        return `${a.id}:${purchased}`
-      })
-      .join("|")
-  }, [attendees])
+  const prevPurchasesDataRef = useRef(purchasesData)
 
   // Reset when city changes so stale data doesn't persist
   useEffect(() => {
@@ -230,21 +240,20 @@ const PassesProvider = ({
   )
 
   // Step 1: Initialize attendeePasses from server data (one-time)
-  // Re-runs when attendee/product counts or purchase state changes
+  // Re-runs when attendee/product counts or purchases data changes
   useEffect(() => {
     if (attendees.length === 0 || products.length === 0) return
 
     const attendeeCountChanged =
       attendees.length !== prevAttendeeCountRef.current
     const productCountChanged = products.length !== prevProductCountRef.current
-    const purchaseChanged =
-      purchaseFingerprint !== prevPurchaseFingerprintRef.current
+    const purchasesChanged = purchasesData !== prevPurchasesDataRef.current
     const structuralChange =
-      attendeeCountChanged || productCountChanged || purchaseChanged
+      attendeeCountChanged || productCountChanged || purchasesChanged
 
     prevAttendeeCountRef.current = attendees.length
     prevProductCountRef.current = products.length
-    prevPurchaseFingerprintRef.current = purchaseFingerprint
+    prevPurchasesDataRef.current = purchasesData
 
     if (!hasInitializedRef.current) {
       // First initialization
@@ -252,6 +261,7 @@ const PassesProvider = ({
         attendees,
         products,
         discountApplied.discount_value,
+        purchasesMap,
       )
       hasInitializedRef.current = true
       setAttendeePasses(basePasses)
@@ -262,11 +272,18 @@ const PassesProvider = ({
         attendees,
         products,
         discountApplied.discount_value,
+        purchasesMap,
       )
       setAttendeePasses((current) => preserveSelections(basePasses, current))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [attendees, products, discountApplied.discount_value, purchaseFingerprint])
+  }, [
+    attendees,
+    products,
+    discountApplied.discount_value,
+    purchasesData,
+    purchasesMap,
+  ])
 
   // Step 2: Apply cart selections (one-time, after initialization)
   useEffect(() => {

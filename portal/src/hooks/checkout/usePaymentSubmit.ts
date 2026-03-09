@@ -18,6 +18,7 @@ import { buildPaymentProducts } from "./buildPaymentProducts"
 
 interface UsePaymentSubmitParams {
   applicationId: string | undefined
+  popupId: string | null
   appCredit: string | number | null | undefined
   attendeePasses: AttendeePassState[]
   selectedPasses: SelectedPassItem[]
@@ -42,6 +43,7 @@ interface PaymentSubmitResult {
 
 export function usePaymentSubmit({
   applicationId,
+  popupId,
   appCredit,
   attendeePasses,
   selectedPasses,
@@ -138,12 +140,19 @@ export function usePaymentSubmit({
         }
         paymentCompleteRef.current = true
         clearCart()
-        await queryClient.invalidateQueries({
-          queryKey: queryKeys.applications.mine(),
-        })
-        await queryClient.invalidateQueries({
-          queryKey: queryKeys.payments.all,
-        })
+        await Promise.all([
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.applications.mine(),
+          }),
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.payments.all,
+          }),
+          popupId
+            ? queryClient.invalidateQueries({
+                queryKey: queryKeys.purchases.byPopup(popupId),
+              })
+            : Promise.resolve(),
+        ])
         setCurrentStep("success")
         setIsSubmitting(false)
         return { success: true }
@@ -177,6 +186,7 @@ export function usePaymentSubmit({
     setCurrentStep,
     setPromoError,
     paymentCompleteRef,
+    popupId,
   ])
 
   return { submitPayment, isSubmitting }
