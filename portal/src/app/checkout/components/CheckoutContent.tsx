@@ -1,8 +1,10 @@
 "use client"
 
 import { AnimatePresence, motion } from "framer-motion"
+import { useRouter } from "next/navigation"
 import { useEffect, useRef } from "react"
 import { useApplication } from "@/providers/applicationProvider"
+import { useCityProvider } from "@/providers/cityProvider"
 import useCheckoutState from "../hooks/useCheckoutState"
 import type { FormDataProps } from "../types"
 import CheckoutFlow from "./CheckoutFlow"
@@ -34,16 +36,28 @@ export const CheckoutContent = ({
     setCheckoutState,
   } = useCheckoutState()
   const { getRelevantApplication } = useApplication()
+  const { getCity } = useCityProvider()
+  const router = useRouter()
   const hasSkippedForm = useRef(false)
 
   useEffect(() => {
     if (hasSkippedForm.current) return
     const existingApp = getRelevantApplication()
-    if (existingApp && checkoutState === "form") {
-      hasSkippedForm.current = true
-      setCheckoutState("passes")
+    if (!existingApp || checkoutState !== "form") return
+
+    hasSkippedForm.current = true
+
+    const hasPurchasedPasses = existingApp.attendees?.some(
+      (a) => a.products && a.products.length > 0,
+    )
+    if (hasPurchasedPasses) {
+      const city = getCity()
+      router.replace(city?.slug ? `/portal/${city.slug}/passes` : "/portal")
+      return
     }
-  }, [getRelevantApplication, checkoutState, setCheckoutState])
+
+    setCheckoutState("passes")
+  }, [getRelevantApplication, checkoutState, setCheckoutState, getCity, router])
 
   // Función que maneja el envío del formulario
   const handleFormSubmit = async (formData: FormDataProps): Promise<void> => {
