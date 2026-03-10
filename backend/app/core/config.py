@@ -1,11 +1,9 @@
 from enum import StrEnum
-from typing import Annotated, Any, Self
+from typing import Self
 from urllib.parse import quote
 
 from dotenv import load_dotenv
 from pydantic import (
-    AnyUrl,
-    BeforeValidator,
     EmailStr,
     Field,
     HttpUrl,
@@ -16,14 +14,6 @@ from pydantic import (
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 load_dotenv()
-
-
-def parse_cors(v: Any) -> list[str] | str:
-    if isinstance(v, str) and not v.startswith("["):
-        return [i.strip() for i in v.split(",") if i.strip()]
-    elif isinstance(v, list | str):
-        return v
-    raise ValueError(v)
 
 
 class Environment(StrEnum):
@@ -44,17 +34,6 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8
     BACKOFFICE_URL: str = "http://localhost:5173"
     ENVIRONMENT: Environment = Environment.DEV
-
-    BACKEND_CORS_ORIGINS: Annotated[
-        list[AnyUrl] | str, BeforeValidator(parse_cors)
-    ] = []
-
-    @computed_field
-    @property
-    def all_cors_origins(self) -> list[str]:
-        return [str(origin).rstrip("/") for origin in self.BACKEND_CORS_ORIGINS] + [
-            self.BACKOFFICE_URL
-        ]
 
     PROJECT_NAME: str = Field(...)
     SENTRY_DSN: HttpUrl | None = None
@@ -128,7 +107,7 @@ class Settings(BaseSettings):
     def SIMPLEFI_API_URL(self) -> str:
         if self.ENVIRONMENT == Environment.PRODUCTION:
             return "https://api.simplefi.tech"
-        return "https://api-dev.simplefi.tech"
+        return "https://apidev.simplefi.tech"
 
 
 settings = Settings()

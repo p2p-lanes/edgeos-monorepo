@@ -47,6 +47,7 @@ class ProductBase(SQLModel):
         default=None, sa_column=Column(Numeric(10, 2), nullable=True)
     )
     description: str | None = Field(default=None, nullable=True, sa_type=Text())
+    image_url: str | None = Field(default=None, nullable=True)
     category: ProductCategory = Field(default=ProductCategory.TICKET, index=True)
     attendee_category: TicketAttendeeCategory | None = Field(
         default=None, nullable=True
@@ -61,6 +62,9 @@ class ProductBase(SQLModel):
     is_active: bool = Field(default=True)
     exclusive: bool = Field(default=False)
     max_quantity: int | None = Field(default=None, nullable=True)
+    insurance_percentage: Decimal | None = Field(
+        default=None, sa_column=Column(Numeric(5, 2), nullable=True)
+    )
 
 
 class ProductPublic(ProductBase):
@@ -80,6 +84,7 @@ class ProductCreate(BaseModel):
     price: Decimal = Field(ge=0)
     compare_price: Decimal | None = Field(default=None, ge=0)
     description: str | None = None
+    image_url: str | None = None
     category: ProductCategory = ProductCategory.TICKET
     attendee_category: TicketAttendeeCategory | None = None
     duration_type: TicketDuration | None = None
@@ -88,6 +93,7 @@ class ProductCreate(BaseModel):
     is_active: bool = True
     exclusive: bool = False
     max_quantity: int | None = None
+    insurance_percentage: Decimal | None = None
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -112,6 +118,7 @@ class ProductUpdate(BaseModel):
     price: Decimal | None = Field(default=None, ge=0)
     compare_price: Decimal | None = Field(default=None, ge=0)
     description: str | None = None
+    image_url: str | None = None
     category: ProductCategory | None = None
     attendee_category: TicketAttendeeCategory | None = None
     duration_type: TicketDuration | None = None
@@ -120,6 +127,7 @@ class ProductUpdate(BaseModel):
     is_active: bool | None = None
     exclusive: bool | None = None
     max_quantity: int | None = None
+    insurance_percentage: Decimal | None = None
 
 
 class ProductBatchItem(BaseModel):
@@ -130,6 +138,7 @@ class ProductBatchItem(BaseModel):
     price: Decimal = Field(ge=0)
     compare_price: Decimal | None = Field(default=None, ge=0)
     description: str | None = None
+    image_url: str | None = None
     category: ProductCategory = ProductCategory.TICKET
     attendee_category: TicketAttendeeCategory | None = None
     duration_type: TicketDuration | None = None
@@ -138,6 +147,7 @@ class ProductBatchItem(BaseModel):
     is_active: bool = True
     exclusive: bool = False
     max_quantity: int | None = None
+    insurance_percentage: Decimal | None = None
 
     model_config = ConfigDict(str_strip_whitespace=True)
 

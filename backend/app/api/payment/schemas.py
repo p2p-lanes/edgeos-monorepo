@@ -4,7 +4,7 @@ from decimal import Decimal
 from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, field_validator
-from sqlalchemy import Numeric, Text
+from sqlalchemy import Integer, Numeric, Text
 from sqlmodel import Column, Field, SQLModel
 
 
@@ -55,6 +55,10 @@ class PaymentBase(SQLModel):
     amount: Decimal = Field(
         default=Decimal("0"), sa_column=Column(Numeric(10, 2), nullable=False)
     )
+    insurance_amount: Decimal = Field(
+        default=Decimal("0"),
+        sa_column=Column(Numeric(10, 2), nullable=False, server_default="0"),
+    )
     currency: str = Field(default="USD")
     rate: Decimal | None = Field(
         default=None, sa_column=Column(Numeric(18, 8), nullable=True)
@@ -73,6 +77,13 @@ class PaymentBase(SQLModel):
 
     # Edit passes (for modifying existing purchases)
     edit_passes: bool = Field(default=False)
+
+    # Installment plan tracking
+    is_installment_plan: bool = Field(default=False)
+    installments_total: int | None = Field(default=None, nullable=True)
+    installments_paid: int | None = Field(
+        default=0, sa_column=Column(Integer, nullable=True, server_default="0")
+    )
 
     # Group discount tracking
     group_id: uuid.UUID | None = Field(
@@ -98,6 +109,7 @@ class PaymentProductResponse(BaseModel):
     product_description: str | None = None
     product_price: Decimal
     product_category: str
+    attendee_name: str | None = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -110,6 +122,7 @@ class PaymentCreate(BaseModel):
     products: list[PaymentProductRequest]
     coupon_code: str | None = None
     edit_passes: bool = False
+    insurance: bool = False
 
     @field_validator("products", mode="before")
     @classmethod
@@ -129,6 +142,7 @@ class PaymentPreview(BaseModel):
     products: list[PaymentProductRequest]
     original_amount: Decimal
     amount: Decimal
+    insurance_amount: Decimal = Decimal("0")
     currency: str = "USD"
     edit_passes: bool = False
 
@@ -171,6 +185,15 @@ class PaymentFilter(BaseModel):
     application_id: uuid.UUID | None = None
     external_id: str | None = None
     status: PaymentStatus | None = None
+
+
+class PaymentStatusCheck(BaseModel):
+    """Minimal response for checking a payment's current status."""
+
+    id: uuid.UUID
+    status: PaymentStatus
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class SimpleFICardPayment(BaseModel):
@@ -222,6 +245,7 @@ class SimpleFIPaymentRequest(BaseModel):
     transactions: list[SimpleFITransaction]
     card_payment: SimpleFICardPayment | None = None
     payments: list[SimpleFIPaymentInfo]
+    installment_plan_id: str | None = None
 
 
 class SimpleFIData(BaseModel):
@@ -239,3 +263,37 @@ class SimpleFIWebhookPayload(BaseModel):
     entity_type: str
     entity_id: str
     data: SimpleFIData
+
+
+# Installment Plan Webhook Schemas
+
+
+class SimpleFIInstallmentPlan(BaseModel):
+    """Installment plan details from SimpleFI."""
+
+    id: str
+    status: str
+    paid_installments_count: int
+    number_of_installments: int
+    user_email: str
+    payment_method: str | None = None
+    reference: dict | None = None
+
+    model_config = ConfigDict(extra="allow")
+
+
+class SimpleFIInstallmentPlanData(BaseModel):
+    """Data payload for installment plan webhooks."""
+
+    installment_plan: SimpleFIInstallmentPlan
+
+
+class SimpleFIInstallmentPlanPayload(BaseModel):
+    """Webhook payload for installment plan events (activated/completed/cancelled)."""
+
+    id: str | None = None
+    event_type: str
+    entity_type: str
+    entity_id: str
+    merchant_id: str | None = None
+    data: SimpleFIInstallmentPlanData

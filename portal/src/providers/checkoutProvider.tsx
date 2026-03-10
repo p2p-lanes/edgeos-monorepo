@@ -1,0 +1,483 @@
+"use client"
+
+import {
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
+import {
+  type CartSelectionState,
+  useCartPersistence,
+  useCartSummary,
+  useCheckoutSteps,
+  useCreditCalculation,
+  useHousingSelection,
+  useInsuranceCalculation,
+  useMerchSelection,
+  usePatronSelection,
+  usePaymentSubmit,
+  useProductCategories,
+  usePromoCode,
+} from "@/hooks/checkout"
+import useGetPassesData from "@/hooks/useGetPassesData"
+import type { AttendeePassState } from "@/types/Attendee"
+import type {
+  CheckoutCartState,
+  CheckoutCartSummary,
+  CheckoutStep,
+  SelectedPassItem,
+} from "@/types/checkout"
+import type { ProductsPass } from "@/types/Products"
+import { useApplication } from "./applicationProvider"
+import { useCityProvider } from "./cityProvider"
+import { useDiscount } from "./discountProvider"
+import { usePassesProvider } from "./passesProvider"
+
+interface CheckoutContextValue {
+  currentStep: CheckoutStep
+  availableSteps: CheckoutStep[]
+  cart: CheckoutCartState
+  summary: CheckoutCartSummary
+  passProducts: ProductsPass[]
+  housingProducts: ProductsPass[]
+  merchProducts: ProductsPass[]
+  patronProducts: ProductsPass[]
+  attendees: AttendeePassState[]
+  isLoading: boolean
+  isSubmitting: boolean
+  error: string | null
+  goToStep: (step: CheckoutStep) => void
+  goToNextStep: () => void
+  goToPreviousStep: () => void
+  togglePass: (attendeeId: string, productId: string) => void
+  resetDayProduct: (attendeeId: string, productId: string) => void
+  selectHousing: (productId: string, checkIn: string, checkOut: string) => void
+  clearHousing: () => void
+  updateMerchQuantity: (productId: string, quantity: number) => void
+  setPatronAmount: (
+    productId: string,
+    amount: number,
+    isCustom?: boolean,
+  ) => void
+  clearPatron: () => void
+  applyPromoCode: (code: string) => Promise<boolean>
+  clearPromoCode: () => void
+  toggleInsurance: () => void
+  clearCart: () => void
+  canProceedToStep: (step: CheckoutStep) => boolean
+  isStepComplete: (step: CheckoutStep) => boolean
+  submitPayment: () => Promise<{ success: boolean; error?: string }>
+  isEditing: boolean
+  toggleEditing: (editing?: boolean) => void
+  editCredit: number
+  monthUpgradeCredit: number
+  termsAccepted: boolean
+  setTermsAccepted: (accepted: boolean) => void
+}
+
+const CheckoutContext = createContext<CheckoutContextValue | null>(null)
+
+interface CheckoutProviderProps {
+  children: ReactNode
+  initialStep?: CheckoutStep
+}
+
+export function CheckoutProvider({
+  children,
+  initialStep = "passes",
+}: CheckoutProviderProps) {
+  const { attendeePasses, toggleProduct, isEditing, toggleEditing } =
+    usePassesProvider()
+  const { discountApplied, setDiscount, resetDiscount } = useDiscount()
+  const { getRelevantApplication } = useApplication()
+  const { getCity } = useCityProvider()
+  const { products } = useGetPassesData()
+  const application = getRelevantApplication()
+  const appCredit = application?.credit
+  const city = getCity()
+  const cityId = city?.id ? String(city.id) : null
+
+  const hasRestoredCheckoutRef = useRef(false)
+  const previousCityIdRef = useRef(cityId)
+  const paymentCompleteRef = useRef(false)
+
+  // Product categories
+  const { passProducts, housingProducts, merchProducts, patronProducts } =
+    useProductCategories(products)
+
+  // Item selection hooks
+  const { housing, setHousing, selectHousing, clearHousing } =
+    useHousingSelection(housingProducts)
+
+  const { merch, setMerch, updateMerchQuantity } =
+    useMerchSelection(merchProducts)
+
+  const { patron, setPatron, setPatronAmount, clearPatron } =
+    usePatronSelection(patronProducts)
+
+  const [insurance, setInsurance] = useState(false)
+  const [termsAccepted, setTermsAccepted] = useState(false)
+
+  // Build selected passes from attendeePasses
+  const selectedPasses = useMemo<SelectedPassItem[]>(() => {
+    const passes: SelectedPassItem[] = []
+
+    for (const attendee of attendeePasses) {
+      for (const product of attendee.products) {
+        if (product.selected && !(isEditing && product.purchased)) {
+          const isDayPass = product.duration_type === "day"
+          const quantity = isDayPass
+            ? (product.quantity ?? 1) - (product.original_quantity ?? 0)
+            : 1
+
+          if (quantity > 0) {
+            passes.push({
+              productId: product.id,
+              product,
+              attendeeId: attendee.id,
+              attendee,
+              quantity,
+              price: product.price * quantity,
+              originalPrice: product.original_price
+                ? product.original_price * quantity
+                : undefined,
+            })
+          }
+        }
+      }
+    }
+
+    return passes
+  }, [attendeePasses, isEditing])
+
+  // Ref that holds the latest selection state for cart persistence.
+  // Initialized with defaults — updated to real values after all hooks run.
+  const selectionStateRef = useRef<CartSelectionState>({
+    selectedPasses,
+    housing,
+    merch,
+    patron,
+    promoCode: "",
+    promoCodeValid: false,
+    insurance,
+    currentStep: initialStep,
+  })
+
+  // Cart persistence hook (replaces debounced save + restoration effects)
+  const {
+    savedCart,
+    saveCart,
+    clearCart: clearPersistedCart,
+  } = useCartPersistence({
+    cityId,
+    initialStep,
+    products,
+    selectionStateRef,
+    restorationSetters: {
+      setHousing,
+      setMerch,
+      setPatron,
+      setInsurance,
+    },
+    hasRestoredCheckoutRef,
+    paymentCompleteRef,
+  })
+
+  // Promo code hook
+  const {
+    promoCode,
+    promoCodeValid,
+    promoCodeDiscount,
+    setPromoCode,
+    setPromoCodeValid,
+    setPromoCodeDiscount,
+    applyPromoCode,
+    clearPromoCode,
+    promoIsLoading,
+    promoError,
+    setPromoError,
+  } = usePromoCode({
+    cityId: city?.id,
+    discountAppliedValue: discountApplied.discount_value,
+    setDiscount,
+    resetDiscount,
+    savedCart,
+    hasRestoredCheckoutRef,
+  })
+
+  // Step management
+  const {
+    currentStep,
+    setCurrentStep,
+    availableSteps,
+    goToStep: goToStepRaw,
+    goToNextStep: goToNextStepRaw,
+    goToPreviousStep: goToPreviousStepRaw,
+    canProceedToStep: canProceedToStepFn,
+    isStepComplete: isStepCompleteFn,
+  } = useCheckoutSteps({
+    initialStep,
+    patronCount: patronProducts.length,
+    housingCount: housingProducts.length,
+    merchCount: merchProducts.length,
+    selectedPassesCount: selectedPasses.length,
+    isEditing,
+  })
+
+  // Keep selection state ref in sync — promoCode, promoCodeValid, currentStep
+  // are defined after useCartPersistence, so we update the ref each render.
+  selectionStateRef.current = {
+    selectedPasses,
+    housing,
+    merch,
+    patron,
+    promoCode,
+    promoCodeValid,
+    insurance,
+    currentStep,
+  }
+
+  // Credit calculations
+  const { editCredit, monthUpgradeCredit } = useCreditCalculation({
+    attendeePasses,
+    isEditing,
+  })
+
+  // Insurance calculations
+  const { insurancePotentialAmount, insuranceAmount } = useInsuranceCalculation(
+    {
+      selectedPasses,
+      housing,
+      merch,
+      insurance,
+    },
+  )
+
+  // Cart summary
+  const { summary } = useCartSummary({
+    selectedPasses,
+    housing,
+    merch,
+    patron,
+    insuranceAmount,
+    isEditing,
+    editCredit,
+    monthUpgradeCredit,
+    appCredit,
+  })
+
+  // Reset state when city changes so we re-restore from new city's cart
+  useEffect(() => {
+    if (previousCityIdRef.current === cityId) return
+    previousCityIdRef.current = cityId
+
+    hasRestoredCheckoutRef.current = false
+    setHousing(null)
+    setMerch([])
+    setPatron(null)
+    setPromoCode("")
+    setPromoCodeValid(false)
+    setPromoCodeDiscount(0)
+    setInsurance(false)
+    setCurrentStep("passes")
+  }, [
+    cityId,
+    setCurrentStep,
+    setHousing,
+    setMerch,
+    setPatron,
+    setPromoCode,
+    setPromoCodeValid,
+    setPromoCodeDiscount,
+  ])
+
+  // Loading states
+  const isLoading = promoIsLoading
+  const error = promoError
+
+  // Restore current step from saved cart (after availableSteps is ready)
+  const hasRestoredStepRef = useRef(false)
+  useEffect(() => {
+    if (hasRestoredStepRef.current || !hasRestoredCheckoutRef.current) return
+    if (initialStep === "success") return
+    if (!savedCart?.current_step) return
+    if (
+      availableSteps.length <= 1 ||
+      !availableSteps.includes(savedCart.current_step as CheckoutStep)
+    )
+      return
+
+    hasRestoredStepRef.current = true
+    setCurrentStep(savedCart.current_step as CheckoutStep)
+  }, [availableSteps, savedCart, initialStep, setCurrentStep])
+
+  // Build cart state
+  const cart = useMemo<CheckoutCartState>(
+    () => ({
+      passes: selectedPasses,
+      housing,
+      merch,
+      patron,
+      promoCode,
+      promoCodeValid,
+      promoCodeDiscount,
+      insurance,
+      insurancePrice: insuranceAmount,
+      insurancePotentialPrice: insurancePotentialAmount,
+    }),
+    [
+      selectedPasses,
+      housing,
+      merch,
+      patron,
+      promoCode,
+      promoCodeValid,
+      promoCodeDiscount,
+      insurance,
+      insuranceAmount,
+      insurancePotentialAmount,
+    ],
+  )
+
+  // Navigation (wrap hook navigation to save cart and clear error)
+  const goToStep = useCallback(
+    (step: CheckoutStep) => {
+      saveCart()
+      goToStepRaw(step)
+      setPromoError(null)
+    },
+    [goToStepRaw, setPromoError, saveCart],
+  )
+
+  const goToNextStep = useCallback(() => {
+    saveCart()
+    goToNextStepRaw()
+    setPromoError(null)
+  }, [goToNextStepRaw, setPromoError, saveCart])
+
+  const goToPreviousStep = useCallback(() => {
+    saveCart()
+    goToPreviousStepRaw()
+    setPromoError(null)
+  }, [goToPreviousStepRaw, setPromoError, saveCart])
+
+  // Pass actions (delegate to passesProvider)
+  const togglePass = useCallback(
+    (attendeeId: string, productId: string) => {
+      const attendee = attendeePasses.find((a) => a.id === attendeeId)
+      const product = attendee?.products.find((p) => p.id === productId)
+      if (product) {
+        toggleProduct(attendeeId, product)
+      }
+    },
+    [attendeePasses, toggleProduct],
+  )
+
+  const resetDayProduct = useCallback(
+    (attendeeId: string, productId: string) => {
+      const attendee = attendeePasses.find((a) => a.id === attendeeId)
+      const product = attendee?.products.find((p) => p.id === productId)
+      if (product) {
+        const resetProduct = {
+          ...product,
+          quantity: product.original_quantity ?? 0,
+        }
+        toggleProduct(attendeeId, resetProduct)
+      }
+    },
+    [attendeePasses, toggleProduct],
+  )
+
+  // Insurance
+  const toggleInsurance = useCallback(() => {
+    setInsurance((prev) => !prev)
+  }, [])
+
+  // Cart management
+  const clearCart = useCallback(() => {
+    clearPersistedCart()
+    clearHousing()
+    setMerch([])
+    clearPatron()
+    clearPromoCode()
+    setInsurance(false)
+  }, [clearPersistedCart, clearHousing, setMerch, clearPatron, clearPromoCode])
+
+  // Submit payment (consolidated via usePaymentSubmit)
+  const { submitPayment, isSubmitting } = usePaymentSubmit({
+    applicationId: application?.id,
+    popupId: cityId,
+    appCredit,
+    attendeePasses,
+    selectedPasses,
+    housing,
+    merch,
+    patron,
+    promoCode,
+    promoCodeValid,
+    insurance,
+    isEditing,
+    toggleEditing,
+    clearCart,
+    setCurrentStep,
+    setPromoError,
+    paymentCompleteRef,
+  })
+
+  const value: CheckoutContextValue = {
+    currentStep,
+    availableSteps,
+    cart,
+    summary,
+    passProducts,
+    housingProducts,
+    merchProducts,
+    patronProducts,
+    attendees: attendeePasses,
+    isLoading,
+    isSubmitting,
+    error,
+    goToStep,
+    goToNextStep,
+    goToPreviousStep,
+    togglePass,
+    resetDayProduct,
+    selectHousing,
+    clearHousing,
+    updateMerchQuantity,
+    setPatronAmount,
+    clearPatron,
+    applyPromoCode,
+    clearPromoCode,
+    toggleInsurance,
+    clearCart,
+    canProceedToStep: canProceedToStepFn,
+    isStepComplete: isStepCompleteFn,
+    submitPayment,
+    isEditing,
+    toggleEditing,
+    editCredit,
+    monthUpgradeCredit,
+    termsAccepted,
+    setTermsAccepted,
+  }
+
+  return (
+    <CheckoutContext.Provider value={value}>
+      {children}
+    </CheckoutContext.Provider>
+  )
+}
+
+export function useCheckout(): CheckoutContextValue {
+  const context = useContext(CheckoutContext)
+  if (!context) {
+    throw new Error("useCheckout must be used within a CheckoutProvider")
+  }
+  return context
+}

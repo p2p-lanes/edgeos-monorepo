@@ -190,10 +190,6 @@ export function GroupForm({ defaultValues, onSuccess }: GroupFormProps) {
               <span className="text-xs uppercase tracking-wider">Slug</span>
               <p className="font-mono">{defaultValues.slug}</p>
             </div>
-            <div>
-              <span className="text-xs uppercase tracking-wider">ID</span>
-              <p className="font-mono text-xs">{defaultValues.id}</p>
-            </div>
           </div>
         )}
 

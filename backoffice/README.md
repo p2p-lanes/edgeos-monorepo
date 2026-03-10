@@ -11,16 +11,16 @@ React-based admin dashboard for managing tenants, popups, applications, and more
 - **Data Fetching**: TanStack Query
 - **Styling**: Tailwind CSS
 - **UI Components**: shadcn/ui
-- **Package Manager**: Bun
+- **Package Manager**: pnpm
 
 ## Quick Start
 
 ```bash
 # Install dependencies
-bun install
+pnpm install
 
 # Start development server
-bun run dev
+pnpm run dev
 
 # Open http://localhost:5173
 ```
@@ -65,11 +65,11 @@ backoffice/
 ## Available Scripts
 
 ```bash
-bun run dev           # Start dev server (localhost:5173)
-bun run build         # Production build
-bun run preview       # Preview production build
-bun run lint          # Run Biome linter
-bun run generate-client  # Regenerate OpenAPI client from backend
+pnpm run dev           # Start dev server (localhost:5173)
+pnpm run build         # Production build
+pnpm run preview       # Preview production build
+pnpm run lint          # Run Biome linter
+pnpm run generate-client  # Regenerate OpenAPI client from backend
 ```
 
 ## Routing
@@ -107,7 +107,7 @@ After backend API changes:
 docker compose up -d backend
 
 # Regenerate client
-bun run generate-client
+pnpm run generate-client
 ```
 
 ### Usage Example
@@ -196,7 +196,7 @@ UI components are from [shadcn/ui](https://ui.shadcn.com/). They live in `src/co
 To add new shadcn components:
 
 ```bash
-bunx shadcn@latest add <component-name>
+pnpm dlx shadcn@latest add <component-name>
 ```
 
 ## Styling
@@ -226,10 +226,10 @@ VITE_API_URL=http://localhost:8000
 
 ```bash
 # Create production build
-bun run build
+pnpm run build
 
 # Preview locally
-bun run preview
+pnpm run preview
 
 # Build outputs to dist/
 ```
@@ -241,7 +241,7 @@ The Dockerfile builds a production image with nginx serving the static files.
 Uses Biome for linting and formatting:
 
 ```bash
-bun run lint          # Check and auto-fix
+pnpm run lint          # Check and auto-fix
 ```
 
 Configuration in `biome.json`:

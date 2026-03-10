@@ -21,7 +21,6 @@
       "name": "Tech Summit 2025",
       "slug": "tech-summit-2025",
       "status": "active",
-      "requires_approval": true,
       "allows_spouse": true,
       "allows_children": true,
       "allows_coupons": true,
@@ -33,7 +32,6 @@
       "name": "Community Meetup",
       "slug": "community-meetup",
       "status": "active",
-      "requires_approval": false,
       "allows_spouse": false,
       "allows_children": false,
       "allows_coupons": true,
@@ -45,7 +43,6 @@
       "name": "Annual Retreat 2025",
       "slug": "annual-retreat-2025",
       "status": "draft",
-      "requires_approval": true,
       "allows_spouse": true,
       "allows_children": true,
       "allows_coupons": false,
@@ -196,13 +193,39 @@
       "exclusive": false
     }
   ],
+  "form_sections": [
+    {
+      "key": "tech-summit-preferences",
+      "popup_key": "tech-summit",
+      "label": "Preferences",
+      "order": 3
+    },
+    {
+      "key": "tech-summit-professional",
+      "popup_key": "tech-summit",
+      "label": "Professional",
+      "order": 4
+    },
+    {
+      "key": "retreat-safety",
+      "popup_key": "retreat",
+      "label": "Safety",
+      "order": 3
+    },
+    {
+      "key": "retreat-logistics",
+      "popup_key": "retreat",
+      "label": "Logistics",
+      "order": 4
+    }
+  ],
   "form_fields": [
     {
       "popup_key": "tech-summit",
+      "section_key": "tech-summit-preferences",
       "name": "dietary_requirements",
       "label": "Dietary Requirements",
       "field_type": "select",
-      "section": "Personal Info",
       "position": 1,
       "required": false,
       "options": [
@@ -218,10 +241,10 @@
     },
     {
       "popup_key": "tech-summit",
+      "section_key": "tech-summit-preferences",
       "name": "tshirt_size",
       "label": "T-Shirt Size",
       "field_type": "select",
-      "section": "Personal Info",
       "position": 2,
       "required": true,
       "options": ["XS", "S", "M", "L", "XL", "XXL"],
@@ -229,10 +252,10 @@
     },
     {
       "popup_key": "tech-summit",
+      "section_key": "tech-summit-professional",
       "name": "linkedin_profile",
       "label": "LinkedIn Profile",
       "field_type": "url",
-      "section": "Professional",
       "position": 3,
       "required": false,
       "placeholder": "https://linkedin.com/in/yourprofile",
@@ -240,10 +263,10 @@
     },
     {
       "popup_key": "tech-summit",
+      "section_key": "tech-summit-professional",
       "name": "interests",
       "label": "Topics of Interest",
       "field_type": "multiselect",
-      "section": "Professional",
       "position": 4,
       "required": false,
       "options": [
@@ -259,10 +282,10 @@
     },
     {
       "popup_key": "tech-summit",
+      "section_key": "tech-summit-professional",
       "name": "bio",
       "label": "Short Bio",
       "field_type": "textarea",
-      "section": "Professional",
       "position": 5,
       "required": false,
       "placeholder": "Tell us a bit about yourself",
@@ -273,37 +296,36 @@
       "name": "how_heard",
       "label": "How did you hear about us?",
       "field_type": "select",
-      "section": null,
       "position": 1,
       "required": false,
       "options": ["Twitter/X", "LinkedIn", "Friend", "Newsletter", "Other"]
     },
     {
       "popup_key": "retreat",
+      "section_key": "retreat-safety",
       "name": "emergency_contact",
       "label": "Emergency Contact Name",
       "field_type": "text",
-      "section": "Safety",
       "position": 1,
       "required": true,
       "placeholder": "Full name"
     },
     {
       "popup_key": "retreat",
+      "section_key": "retreat-safety",
       "name": "emergency_phone",
       "label": "Emergency Contact Phone",
       "field_type": "text",
-      "section": "Safety",
       "position": 2,
       "required": true,
       "placeholder": "+1 555 123 4567"
     },
     {
       "popup_key": "retreat",
+      "section_key": "retreat-safety",
       "name": "medical_conditions",
       "label": "Medical Conditions",
       "field_type": "textarea",
-      "section": "Safety",
       "position": 3,
       "required": false,
       "placeholder": "Any medical conditions we should be aware of",
@@ -311,10 +333,10 @@
     },
     {
       "popup_key": "retreat",
+      "section_key": "retreat-logistics",
       "name": "arrival_date",
       "label": "Expected Arrival Date",
       "field_type": "date",
-      "section": "Logistics",
       "position": 4,
       "required": true
     }
@@ -356,8 +378,6 @@
       "first_name": "Alice",
       "last_name": "Johnson",
       "telegram": "@alice_j",
-      "organization": "TechCorp Inc",
-      "role": "Software Engineer",
       "gender": "female",
       "age": "25-34",
       "residence": "San Francisco, CA"
@@ -368,8 +388,6 @@
       "first_name": "Bob",
       "last_name": "Smith",
       "telegram": "@bob_smith",
-      "organization": "StartupXYZ",
-      "role": "CTO",
       "gender": "male",
       "age": "35-44",
       "residence": "New York, NY"
@@ -379,8 +397,6 @@
       "email": "carol@example.com",
       "first_name": "Carol",
       "last_name": "Williams",
-      "organization": "DataDriven LLC",
-      "role": "Data Scientist",
       "gender": "female",
       "age": "25-34",
       "residence": "Austin, TX"
@@ -391,8 +407,6 @@
       "first_name": "David",
       "last_name": "Brown",
       "telegram": "@david_b",
-      "organization": "CloudSystems",
-      "role": "DevOps Lead",
       "gender": "male",
       "age": "35-44",
       "residence": "Seattle, WA"
@@ -402,8 +416,6 @@
       "email": "emma@example.com",
       "first_name": "Emma",
       "last_name": "Davis",
-      "organization": "DesignStudio",
-      "role": "UX Designer",
       "gender": "female",
       "age": "25-34",
       "residence": "Los Angeles, CA"
@@ -414,8 +426,6 @@
       "first_name": "Frank",
       "last_name": "Miller",
       "telegram": "@frankmiller",
-      "organization": "SecurityFirst",
-      "role": "Security Analyst",
       "gender": "male",
       "age": "45-54",
       "residence": "Chicago, IL",
@@ -427,8 +437,6 @@
       "first_name": "Grace",
       "last_name": "Lee",
       "telegram": "@grace_lee",
-      "organization": "AI Labs",
-      "role": "ML Engineer",
       "gender": "female",
       "age": "25-34",
       "residence": "Boston, MA"
@@ -438,8 +446,6 @@
       "email": "henry@example.com",
       "first_name": "Henry",
       "last_name": "Wilson",
-      "organization": "Freelance",
-      "role": "Consultant",
       "gender": "male",
       "age": "35-44",
       "residence": "Denver, CO"

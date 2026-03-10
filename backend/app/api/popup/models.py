@@ -9,9 +9,11 @@ from app.api.popup.schemas import PopupBase
 if TYPE_CHECKING:
     from app.api.application.models import Applications
     from app.api.approval_strategy.models import ApprovalStrategies
+    from app.api.base_field_config.models import BaseFieldConfigs
     from app.api.coupon.models import Coupons
     from app.api.email_template.models import EmailTemplates
     from app.api.form_field.models import FormFields
+    from app.api.form_section.models import FormSections
     from app.api.group.models import Groups
     from app.api.popup_reviewer.models import PopupReviewers
     from app.api.product.models import Products
@@ -41,7 +43,10 @@ class Popups(PopupBase, table=True):
         back_populates="popup", cascade_delete=True
     )
 
-    # Form field definitions
+    # Form sections and field definitions
+    form_sections: list["FormSections"] = Relationship(
+        back_populates="popup", cascade_delete=True
+    )
     form_fields: list["FormFields"] = Relationship(
         back_populates="popup", cascade_delete=True
     )
@@ -57,5 +62,10 @@ class Popups(PopupBase, table=True):
         sa_relationship_kwargs={"cascade": "all, delete-orphan", "uselist": False},
     )
     reviewers: list["PopupReviewers"] = Relationship(
+        back_populates="popup", cascade_delete=True
+    )
+
+    # Base field presentation configs
+    base_field_configs: list["BaseFieldConfigs"] = Relationship(
         back_populates="popup", cascade_delete=True
     )

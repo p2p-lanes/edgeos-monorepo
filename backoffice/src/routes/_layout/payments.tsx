@@ -1,18 +1,8 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
-import type { ColumnDef } from "@tanstack/react-table"
-import {
-  Copy,
-  CreditCard,
-  Download,
-  EllipsisVertical,
-  ExternalLink,
-  Eye,
-  Fingerprint,
-  Hash,
-  Tag,
-} from "lucide-react"
-import { Suspense, useState } from "react"
+import type { ColumnDef, Row } from "@tanstack/react-table"
+import { ChevronDown, ChevronRight, CreditCard, Download } from "lucide-react"
+import { Fragment, Suspense, useState } from "react"
 
 import { type PaymentPublic, PaymentsService } from "@/client"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
@@ -22,26 +12,8 @@ import { StatusBadge } from "@/components/Common/StatusBadge"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { InlineRow, InlineSection } from "@/components/ui/inline-form"
-import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
-import { useCopyToClipboard } from "@/hooks/useCopyToClipboard"
-import useCustomToast from "@/hooks/useCustomToast"
 import {
   useTableSearchParams,
   validateTableSearch,
@@ -72,217 +44,6 @@ export const Route = createFileRoute("/_layout/payments")({
   }),
 })
 
-function ViewPayment({ payment }: { payment: PaymentPublic }) {
-  const [isOpen, setIsOpen] = useState(false)
-  const [, copy] = useCopyToClipboard()
-  const { showSuccessToast } = useCustomToast()
-
-  const copyToClipboard = (text: string, label: string) => {
-    copy(text)
-    showSuccessToast(`${label} copied to clipboard`)
-  }
-
-  return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DropdownMenuItem
-        onSelect={(e) => e.preventDefault()}
-        onClick={() => setIsOpen(true)}
-      >
-        <Eye className="mr-2 h-4 w-4" />
-        View Details
-      </DropdownMenuItem>
-      <DialogContent className="max-w-md gap-0 p-0">
-        <DialogHeader className="sr-only">
-          <DialogTitle>Payment Details</DialogTitle>
-          <DialogDescription>
-            Payment #{payment.id.slice(0, 8)}
-          </DialogDescription>
-        </DialogHeader>
-
-        {/* Hero */}
-        <div className="space-y-1 px-6 pt-6 pb-4">
-          <p className="font-mono text-3xl font-semibold">
-            ${payment.amount}{" "}
-            <span className="text-lg text-muted-foreground">
-              {payment.currency}
-            </span>
-          </p>
-          <StatusBadge status={payment.status ?? ""} />
-        </div>
-
-        <Separator />
-
-        {/* Details */}
-        <InlineSection title="Details" className="px-6 py-4">
-          {payment.source && (
-            <InlineRow
-              icon={<CreditCard className="h-4 w-4 text-muted-foreground" />}
-              label="Source"
-            >
-              <span className="text-sm">{payment.source}</span>
-            </InlineRow>
-          )}
-          {payment.rate && (
-            <InlineRow
-              icon={<Hash className="h-4 w-4 text-muted-foreground" />}
-              label="Rate"
-            >
-              <span className="font-mono text-sm">{payment.rate}</span>
-            </InlineRow>
-          )}
-          {payment.coupon_code && (
-            <InlineRow
-              icon={<Tag className="h-4 w-4 text-muted-foreground" />}
-              label="Coupon"
-            >
-              <div className="flex items-center gap-2">
-                <Badge variant="outline">{payment.coupon_code}</Badge>
-                {payment.discount_value && (
-                  <span className="text-sm text-green-600">
-                    -{payment.discount_value}%
-                  </span>
-                )}
-              </div>
-            </InlineRow>
-          )}
-        </InlineSection>
-
-        <Separator />
-
-        {/* Identifiers */}
-        <InlineSection title="Identifiers" className="px-6 py-4">
-          <InlineRow
-            icon={<Fingerprint className="h-4 w-4 text-muted-foreground" />}
-            label="Payment ID"
-          >
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-xs text-muted-foreground">
-                {payment.id.slice(0, 8)}...
-              </span>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7"
-                aria-label="Copy Payment ID"
-                onClick={() => copyToClipboard(payment.id, "Payment ID")}
-              >
-                <Copy className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          </InlineRow>
-          {payment.external_id && (
-            <InlineRow
-              icon={<ExternalLink className="h-4 w-4 text-muted-foreground" />}
-              label="External ID"
-            >
-              <div className="flex items-center gap-2">
-                <span className="font-mono text-xs text-muted-foreground">
-                  {payment.external_id.slice(0, 12)}...
-                </span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  aria-label="Copy External ID"
-                  onClick={() =>
-                    copyToClipboard(payment.external_id!, "External ID")
-                  }
-                >
-                  <Copy className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </InlineRow>
-          )}
-          {payment.checkout_url && (
-            <InlineRow
-              icon={<ExternalLink className="h-4 w-4 text-muted-foreground" />}
-              label="Checkout"
-            >
-              <a
-                href={payment.checkout_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-primary hover:underline"
-              >
-                Open link
-              </a>
-            </InlineRow>
-          )}
-        </InlineSection>
-
-        {/* Products */}
-        {payment.products_snapshot && payment.products_snapshot.length > 0 && (
-          <>
-            <Separator />
-            <InlineSection title="Products" className="px-6 py-4">
-              {payment.products_snapshot.map((product) => (
-                <div
-                  key={`${product.product_id}-${product.attendee_id}`}
-                  className="flex items-center justify-between py-2.5"
-                >
-                  <span className="text-sm">{product.product_name}</span>
-                  <span className="font-mono text-sm text-muted-foreground">
-                    {product.quantity}x ${product.product_price}
-                  </span>
-                </div>
-              ))}
-            </InlineSection>
-          </>
-        )}
-
-        {/* Footer */}
-        <Separator />
-        <div className="flex items-center justify-between px-6 py-4">
-          <div className="flex gap-4 text-xs text-muted-foreground">
-            {payment.created_at && (
-              <span>{new Date(payment.created_at).toLocaleDateString()}</span>
-            )}
-            {payment.updated_at && (
-              <span>
-                Updated {new Date(payment.updated_at).toLocaleDateString()}
-              </span>
-            )}
-          </div>
-          <DialogClose asChild>
-            <Button variant="outline" size="sm">
-              Close
-            </Button>
-          </DialogClose>
-        </div>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-function PaymentActionsMenu({ payment }: { payment: PaymentPublic }) {
-  const [open, setOpen] = useState(false)
-  const [, copy] = useCopyToClipboard()
-  const { showSuccessToast } = useCustomToast()
-
-  const copyPaymentId = () => {
-    copy(payment.id)
-    showSuccessToast("Payment ID copied")
-    setOpen(false)
-  }
-
-  return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="Payment actions">
-          <EllipsisVertical className="h-4 w-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <ViewPayment payment={payment} />
-        <DropdownMenuItem onClick={copyPaymentId}>
-          <Copy className="mr-2 h-4 w-4" />
-          Copy Payment ID
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
-}
-
 const columns: ColumnDef<PaymentPublic>[] = [
   {
     accessorKey: "amount",
@@ -306,6 +67,19 @@ const columns: ColumnDef<PaymentPublic>[] = [
         {row.original.source || "N/A"}
       </span>
     ),
+  },
+  {
+    accessorKey: "insurance_amount",
+    header: "Insurance",
+    cell: ({ row }) => {
+      const val = row.original.insurance_amount
+      const num = Number(val)
+      return num > 0 ? (
+        <span className="font-mono">${val}</span>
+      ) : (
+        <span className="text-muted-foreground">—</span>
+      )
+    },
   },
   {
     accessorKey: "coupon_code",
@@ -334,15 +108,113 @@ const columns: ColumnDef<PaymentPublic>[] = [
     },
   },
   {
-    id: "actions",
-    header: () => <span className="sr-only">Actions</span>,
-    cell: ({ row }) => (
-      <div className="flex justify-end">
-        <PaymentActionsMenu payment={row.original} />
-      </div>
-    ),
+    id: "products",
+    header: "Products",
+    cell: ({ row }) => {
+      const products = row.original.products_snapshot
+      if (!products || products.length === 0)
+        return <span className="text-muted-foreground">—</span>
+      const isExpanded = row.getIsExpanded()
+      return (
+        <button
+          type="button"
+          className="flex items-center gap-1.5 text-sm"
+          onClick={(e) => {
+            e.stopPropagation()
+            row.toggleExpanded()
+          }}
+        >
+          {isExpanded ? (
+            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+          ) : (
+            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+          )}
+          <Badge variant="secondary">
+            {products.length} {products.length === 1 ? "product" : "products"}
+          </Badge>
+        </button>
+      )
+    },
   },
 ]
+
+const categoryLabels: Record<string, string> = {
+  ticket: "Pass",
+  housing: "Housing",
+  merch: "Merch",
+  patreon: "Patron",
+}
+
+function PaymentSubRow({ row }: { row: Row<PaymentPublic> }) {
+  const products = row.original.products_snapshot ?? []
+
+  const byAttendee = products.reduce<
+    Record<string, { name: string; items: (typeof products)[number][] }>
+  >((acc, p) => {
+    const key = p.attendee_id
+    if (!acc[key]) {
+      acc[key] = { name: p.attendee_name || "Unknown", items: [] }
+    }
+    acc[key].items.push(p)
+    return acc
+  }, {})
+
+  const entries = Object.entries(byAttendee)
+
+  return (
+    <div className="border-l-2 border-primary/20 bg-muted/20 py-3 pl-6 pr-4">
+      <table className="w-full">
+        <thead>
+          <tr className="text-xs text-muted-foreground">
+            <th className="pb-2 text-left font-medium">Product</th>
+            <th className="pb-2 text-left font-medium">Type</th>
+            <th className="pb-2 text-right font-medium">Qty</th>
+            <th className="pb-2 text-right font-medium">Unit Price</th>
+            <th className="pb-2 text-right font-medium">Total</th>
+          </tr>
+        </thead>
+        <tbody className="text-sm">
+          {entries.map(([attendeeId, { name, items }], groupIdx) => (
+            <Fragment key={attendeeId}>
+              <tr>
+                <td
+                  colSpan={5}
+                  className={`pb-1 text-xs font-semibold tracking-wide text-muted-foreground ${groupIdx > 0 ? "pt-3" : ""}`}
+                >
+                  {name}
+                </td>
+              </tr>
+              {items.map((item, i) => {
+                const lineTotal = Number(item.product_price) * item.quantity
+                return (
+                  <tr
+                    key={`${attendeeId}-${item.product_name}-${i}`}
+                    className="border-b border-border/40 last:border-0"
+                  >
+                    <td className="py-1.5 pr-4">{item.product_name}</td>
+                    <td className="py-1.5 pr-4 text-muted-foreground">
+                      {categoryLabels[item.product_category] ??
+                        item.product_category}
+                    </td>
+                    <td className="py-1.5 text-right tabular-nums">
+                      {item.quantity}
+                    </td>
+                    <td className="py-1.5 text-right font-mono tabular-nums text-muted-foreground">
+                      ${Number(item.product_price)}
+                    </td>
+                    <td className="py-1.5 pl-4 text-right font-mono tabular-nums">
+                      ${lineTotal}
+                    </td>
+                  </tr>
+                )
+              })}
+            </Fragment>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
 
 function PaymentsTableContent() {
   const { selectedPopupId } = useWorkspace()
@@ -367,6 +239,7 @@ function PaymentsTableContent() {
     ? payments.results.filter((p) => {
         const term = search.toLowerCase()
         return (
+          p.id.toLowerCase().includes(term) ||
           (p.status ?? "").toLowerCase().includes(term) ||
           (p.source ?? "").toLowerCase().includes(term) ||
           (p.coupon_code ?? "").toLowerCase().includes(term) ||
@@ -380,7 +253,13 @@ function PaymentsTableContent() {
       columns={columns}
       data={filtered}
       searchPlaceholder="Search by status, source, coupon, or amount..."
-      hiddenOnMobile={["source", "coupon_code", "created_at"]}
+      hiddenOnMobile={[
+        "source",
+        "insurance_amount",
+        "coupon_code",
+        "created_at",
+        "products",
+      ]}
       searchValue={search}
       onSearchChange={setSearch}
       serverPagination={{
@@ -390,6 +269,7 @@ function PaymentsTableContent() {
           : pagination,
         onPaginationChange: setPagination,
       }}
+      renderSubComponent={PaymentSubRow}
       emptyState={
         !search ? (
           <EmptyState
@@ -423,6 +303,7 @@ function Payments() {
         { key: "currency", label: "Currency" },
         { key: "status", label: "Status" },
         { key: "source", label: "Source" },
+        { key: "insurance_amount", label: "Insurance" },
         { key: "coupon_code", label: "Coupon" },
         { key: "created_at", label: "Date" },
       ])

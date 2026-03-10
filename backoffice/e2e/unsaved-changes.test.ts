@@ -1,6 +1,6 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { type Browser, chromium, type Page } from "playwright"
 import { expect as pwExpect } from "playwright/test"
+import { afterAll, beforeAll, describe, expect, test } from "vitest"
 
 const BASE_URL = "http://localhost:4173"
 const TEST_TIMEOUT = 30_000

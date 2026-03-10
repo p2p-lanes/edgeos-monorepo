@@ -62,13 +62,27 @@ def handle_integrity_error(_: Request, exc: IntegrityError) -> JSONResponse:
             status_code=status.HTTP_403_FORBIDDEN,
             content={"detail": "Access denied by security policy"},
         )
-    # Detect unique constraint violations (PostgreSQL error code 23505)
     pgcode = getattr(exc.orig, "pgcode", None)
+    # Unique constraint violation (23505)
     if pgcode == "23505":
         logger.warning(f"Unique constraint violation: {error_msg}")
         return JSONResponse(
             status_code=status.HTTP_409_CONFLICT,
             content={"detail": "A record with this data already exists"},
+        )
+    # Foreign key violation (23503) — referenced record doesn't exist
+    if pgcode == "23503":
+        logger.warning(f"Foreign key violation: {error_msg}")
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={"detail": "Referenced record not found"},
+        )
+    # Check constraint violation (23514) — invalid field value
+    if pgcode == "23514":
+        logger.warning(f"Check constraint violation: {error_msg}")
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            content={"detail": "Invalid field value"},
         )
     logger.error(f"Integrity error: {error_msg}")
     return JSONResponse(
@@ -77,15 +91,13 @@ def handle_integrity_error(_: Request, exc: IntegrityError) -> JSONResponse:
     )
 
 
-# Set all CORS enabled origins
-if settings.all_cors_origins:
-    application.add_middleware(
-        CORSMiddleware,  # type: ignore[arg-type]
-        allow_origins=settings.all_cors_origins,
-        allow_credentials=True,
-        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type", "X-Tenant-Id"],
-    )
+application.add_middleware(
+    CORSMiddleware,  # type: ignore[arg-type]
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Tenant-Id"],
+)
 
 
 @application.get("/health-check", tags=["utils"], include_in_schema=False)

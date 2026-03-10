@@ -1,15 +1,108 @@
 import uuid
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, HTTPException, status
 
+from app.api.base_field_config.constants import BASE_FIELD_DEFINITIONS
+from app.api.base_field_config.crud import base_field_configs_crud
+from app.api.base_field_config.models import BaseFieldConfigs
+from app.api.base_field_config.schemas import BaseFieldConfigUpdate
 from app.api.form_field import crud
+
+if TYPE_CHECKING:
+    from sqlmodel import Session
+from app.api.form_field.models import FormFields
 from app.api.form_field.schemas import FormFieldCreate, FormFieldPublic, FormFieldUpdate
 from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
-from app.core.dependencies.users import CurrentUser, CurrentWriter, TenantSession
+from app.core.dependencies.users import (
+    CurrentHuman,
+    CurrentUser,
+    CurrentWriter,
+    HumanTenantSession,
+    TenantSession,
+)
 
 router = APIRouter(prefix="/form-fields", tags=["form-fields"])
+
+
+def _to_public(field: FormFields) -> FormFieldPublic:
+    """Convert a FormFields model to a FormFieldPublic with section_label."""
+    data = FormFieldPublic.model_validate(field)
+    data.section_label = field.section.label if field.section else None
+    return data
+
+
+def _base_config_to_public(config: BaseFieldConfigs) -> FormFieldPublic:
+    """Convert a BaseFieldConfigs model to a FormFieldPublic."""
+    definition = BASE_FIELD_DEFINITIONS[config.field_name]
+    section_label = config.section.label if config.section else None
+    return FormFieldPublic(
+        id=config.id,
+        tenant_id=config.tenant_id,
+        popup_id=config.popup_id,
+        name=config.field_name,
+        label=definition["label"],
+        field_type=definition["type"],
+        section_id=config.section_id,
+        section_label=section_label,
+        position=config.position,
+        required=definition["required"],
+        options=config.options or definition.get("default_options"),
+        placeholder=config.placeholder or definition.get("default_placeholder"),
+        help_text=config.help_text or definition.get("default_help_text"),
+        protected=True,
+        target=definition["target"],
+    )
+
+
+def _get_base_fields_as_public(
+    db: "Session", popup_id: uuid.UUID
+) -> list[FormFieldPublic]:
+    """Build FormFieldPublic entries for base fields from BaseFieldConfigs."""
+    from app.api.popup.models import Popups
+
+    configs = base_field_configs_crud.find_by_popup(db, popup_id)
+    config_map = {c.field_name: c for c in configs}
+
+    # Determine which companion fields to skip based on popup settings
+    popup = db.get(Popups, popup_id)
+    spouse_fields = {"partner", "partner_email"}
+    children_fields = {"kids"}
+    skip_fields: set[str] = set()
+    if popup and not popup.allows_spouse:
+        skip_fields |= spouse_fields
+    if popup and not popup.allows_children:
+        skip_fields |= children_fields
+
+    results: list[FormFieldPublic] = []
+    for field_name, definition in BASE_FIELD_DEFINITIONS.items():
+        if field_name in skip_fields:
+            continue
+        config = config_map.get(field_name)
+        if config:
+            results.append(_base_config_to_public(config))
+        else:
+            results.append(
+                FormFieldPublic(
+                    id=uuid.uuid4(),
+                    tenant_id=uuid.UUID(int=0),
+                    popup_id=popup_id,
+                    name=field_name,
+                    label=definition["label"],
+                    field_type=definition["type"],
+                    section_id=None,
+                    section_label=None,
+                    position=definition.get("default_position", 0),
+                    required=definition["required"],
+                    options=definition.get("default_options"),
+                    placeholder=definition.get("default_placeholder"),
+                    help_text=definition.get("default_help_text"),
+                    protected=True,
+                    target=definition["target"],
+                )
+            )
+    return results
 
 
 @router.get("", response_model=ListModel[FormFieldPublic])
@@ -22,16 +115,22 @@ async def list_form_fields(
     limit: PaginationLimit = 100,
 ) -> ListModel[FormFieldPublic]:
     if popup_id:
-        fields, total = crud.form_fields_crud.find_by_popup(
+        base_fields = _get_base_fields_as_public(db, popup_id)
+        custom_fields, custom_total = crud.form_fields_crud.find_by_popup(
             db, popup_id=popup_id, skip=skip, limit=limit, search=search
         )
+        all_fields = base_fields + [_to_public(f) for f in custom_fields]
+        # Sort by position
+        all_fields.sort(key=lambda f: (f.position or 0))
+        total = len(base_fields) + custom_total
     else:
-        fields, total = crud.form_fields_crud.find(
+        custom_fields, total = crud.form_fields_crud.find(
             db, skip=skip, limit=limit, search=search, search_fields=["label", "name"]
         )
+        all_fields = [_to_public(f) for f in custom_fields]
 
     return ListModel[FormFieldPublic](
-        results=[FormFieldPublic.model_validate(f) for f in fields],
+        results=all_fields,
         paging=Paging(offset=skip, limit=limit, total=total),
     )
 
@@ -44,13 +143,18 @@ async def get_form_field(
 ) -> FormFieldPublic:
     field = crud.form_fields_crud.get(db, field_id)
 
-    if not field:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Form field not found",
-        )
+    if field:
+        return _to_public(field)
 
-    return FormFieldPublic.model_validate(field)
+    # Check if it's a base field config
+    base_config = base_field_configs_crud.get(db, field_id)
+    if base_config:
+        return _base_config_to_public(base_config)
+
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="Form field not found",
+    )
 
 
 @router.post("", response_model=FormFieldPublic, status_code=status.HTTP_201_CREATED)
@@ -59,13 +163,6 @@ async def create_form_field(
     db: TenantSession,
     current_user: CurrentWriter,
 ) -> FormFieldPublic:
-    existing = crud.form_fields_crud.get_by_name(db, field_in.name, field_in.popup_id)
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="A form field with this name already exists in this popup",
-        )
-
     if current_user.role == UserRole.SUPERADMIN:
         from app.api.popup.crud import popups_crud
 
@@ -79,17 +176,21 @@ async def create_form_field(
     else:
         tenant_id = current_user.tenant_id
 
-    from app.api.form_field.models import FormFields
+    # Auto-generate the internal field name from label
+    name = crud.form_fields_crud.generate_field_name(
+        db, field_in.label, field_in.popup_id
+    )
 
     field_data = field_in.model_dump()
     field_data["tenant_id"] = tenant_id
+    field_data["name"] = name
     field = FormFields(**field_data)
 
     db.add(field)
     db.commit()
     db.refresh(field)
 
-    return FormFieldPublic.model_validate(field)
+    return _to_public(field)
 
 
 @router.patch("/{field_id}", response_model=FormFieldPublic)
@@ -101,22 +202,33 @@ async def update_form_field(
 ) -> FormFieldPublic:
     field = crud.form_fields_crud.get(db, field_id)
 
-    if not field:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Form field not found",
-        )
-
-    if field_in.name and field_in.name != field.name:
-        existing = crud.form_fields_crud.get_by_name(db, field_in.name, field.popup_id)
-        if existing:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="A form field with this name already exists in this popup",
+    if field:
+        # Regenerate internal name when label changes
+        if field_in.label and field_in.label != field.label:
+            new_name = crud.form_fields_crud.generate_field_name(
+                db, field_in.label, field.popup_id
             )
+            field.name = new_name
 
-    updated = crud.form_fields_crud.update(db, field, field_in)
-    return FormFieldPublic.model_validate(updated)
+        updated = crud.form_fields_crud.update(db, field, field_in)
+        return _to_public(updated)
+
+    # Check if it's a base field config
+    base_config = base_field_configs_crud.get(db, field_id)
+    if base_config:
+        # Only forward fields that were actually sent and are configurable
+        configurable = {"section_id", "position", "placeholder", "help_text", "options"}
+        update_data = {
+            k: getattr(field_in, k) for k in field_in.model_fields_set & configurable
+        }
+        config_update = BaseFieldConfigUpdate(**update_data)
+        updated_config = base_field_configs_crud.update(db, base_config, config_update)
+        return _base_config_to_public(updated_config)
+
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="Form field not found",
+    )
 
 
 @router.delete("/{field_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -147,6 +259,25 @@ async def get_application_schema(
     Returns a schema combining base application fields with
     custom form fields defined for the popup.
     """
+    from app.api.popup.crud import popups_crud
+
+    popup = popups_crud.get(db, popup_id)
+    if not popup:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Popup not found",
+        )
+
+    return crud.form_fields_crud.build_schema_for_popup(db, popup_id)
+
+
+@router.get("/portal/schema/{popup_id}", response_model=dict[str, Any])
+async def get_portal_application_schema(
+    popup_id: uuid.UUID,
+    db: HumanTenantSession,
+    _: CurrentHuman,
+) -> dict[str, Any]:
+    """Get the application form schema for a popup (Portal)."""
     from app.api.popup.crud import popups_crud
 
     popup = popups_crud.get(db, popup_id)

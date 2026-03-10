@@ -3,12 +3,16 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import {
   Baby,
+  Building2,
   Calendar,
   FileText,
   Globe,
   Heart,
   Image,
   Key,
+  Mail,
+  MapPin,
+  Scale,
   Ticket,
   Twitter,
 } from "lucide-react"
@@ -75,7 +79,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
     mutationFn: (data: PopupCreate) =>
       PopupsService.createPopup({ requestBody: data }),
     onSuccess: (data) => {
-      showSuccessToast("Popup created successfully", {
+      showSuccessToast("Event created successfully", {
         label: "View",
         onClick: () =>
           navigate({ to: "/popups/$id/edit", params: { id: data.id } }),
@@ -94,7 +98,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         requestBody: data,
       }),
     onSuccess: () => {
-      showSuccessToast("Popup updated successfully")
+      showSuccessToast("Event updated successfully")
       queryClient.invalidateQueries({ queryKey: ["popups"] })
       form.reset()
       onSuccess()
@@ -105,7 +109,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
   const deleteMutation = useMutation({
     mutationFn: () => PopupsService.deletePopup({ popupId: defaultValues!.id }),
     onSuccess: () => {
-      showSuccessToast("Popup deleted successfully")
+      showSuccessToast("Event deleted successfully")
       queryClient.invalidateQueries({ queryKey: ["popups"] })
       navigate({ to: "/popups" })
     },
@@ -122,7 +126,6 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
       name: defaultValues?.name ?? "",
       tagline: defaultValues?.tagline ?? "",
       location: defaultValues?.location ?? "",
-      slug: defaultValues?.slug ?? "",
       status: defaultValues?.status ?? "draft",
       start_date: formatDateForInput(defaultValues?.start_date),
       end_date: formatDateForInput(defaultValues?.end_date),
@@ -136,7 +139,12 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
       web_url: defaultValues?.web_url ?? "",
       blog_url: defaultValues?.blog_url ?? "",
       twitter_url: defaultValues?.twitter_url ?? "",
+      terms_and_conditions_url:
+        defaultValues?.terms_and_conditions_url ?? "",
       simplefi_api_key: defaultValues?.simplefi_api_key ?? "",
+      invoice_company_name: defaultValues?.invoice_company_name ?? "",
+      invoice_company_address: defaultValues?.invoice_company_address ?? "",
+      invoice_company_email: defaultValues?.invoice_company_email ?? "",
     },
     onSubmit: ({ value }) => {
       if (readOnly) return
@@ -148,7 +156,6 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         name: value.name,
         tagline: value.tagline || null,
         location: value.location || null,
-        slug: value.slug || undefined,
         status: value.status as PopupCreate["status"],
         start_date: toUTCDate(value.start_date),
         end_date: toUTCDate(value.end_date),
@@ -161,7 +168,11 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         web_url: value.web_url || null,
         blog_url: value.blog_url || null,
         twitter_url: value.twitter_url || null,
+        terms_and_conditions_url: value.terms_and_conditions_url || null,
         simplefi_api_key: value.simplefi_api_key || null,
+        invoice_company_name: value.invoice_company_name || null,
+        invoice_company_address: value.invoice_company_address || null,
+        invoice_company_email: value.invoice_company_email || null,
       }
       if (isEdit) {
         updateMutation.mutate(payload)
@@ -189,7 +200,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         <FormErrorSummary
           form={form}
           fieldLabels={{
-            name: "Popup Name",
+            name: "Event Name",
             tagline: "Tagline",
             location: "Location",
             slug: "Slug",
@@ -210,7 +221,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
             {(field) => (
               <div>
                 <HeroInput
-                  placeholder="Popup Name"
+                  placeholder="Event Name"
                   value={field.state.value}
                   onBlur={field.handleBlur}
                   onChange={(e) => field.handleChange(e.target.value)}
@@ -297,10 +308,6 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
             <div>
               <span className="text-xs uppercase tracking-wider">Slug</span>
               <p className="font-mono">{defaultValues.slug}</p>
-            </div>
-            <div>
-              <span className="text-xs uppercase tracking-wider">ID</span>
-              <p className="font-mono text-xs">{defaultValues.id}</p>
             </div>
           </div>
         )}
@@ -462,7 +469,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
               <InlineRow
                 icon={<Ticket className="h-4 w-4 text-muted-foreground" />}
                 label="Discount Coupons"
-                description="Enable discount coupons for this popup"
+                description="Enable discount coupons for this event"
               >
                 <Switch
                   id="allows_coupons"
@@ -576,6 +583,25 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
               </InlineRow>
             )}
           </form.Field>
+
+          <form.Field name="terms_and_conditions_url">
+            {(field) => (
+              <InlineRow
+                icon={<Scale className="h-4 w-4 text-muted-foreground" />}
+                label="Terms & Conditions"
+              >
+                <Input
+                  id="terms_and_conditions_url"
+                  type="url"
+                  placeholder="https://example.com/terms"
+                  value={field.state.value}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  disabled={readOnly}
+                  className="max-w-xs text-sm"
+                />
+              </InlineRow>
+            )}
+          </form.Field>
         </InlineSection>
 
         <Separator />
@@ -593,6 +619,66 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                   id="simplefi_api_key"
                   type="password"
                   placeholder="Enter API key"
+                  value={field.state.value}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  disabled={readOnly}
+                  className="max-w-xs text-sm"
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+        </InlineSection>
+
+        <Separator />
+
+        {/* Invoice Settings */}
+        <InlineSection title="Invoice Settings">
+          <form.Field name="invoice_company_name">
+            {(field) => (
+              <InlineRow
+                icon={<Building2 className="h-4 w-4 text-muted-foreground" />}
+                label="Company Name"
+              >
+                <Input
+                  id="invoice_company_name"
+                  placeholder="Acme Inc"
+                  value={field.state.value}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  disabled={readOnly}
+                  className="max-w-xs text-sm"
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+
+          <form.Field name="invoice_company_address">
+            {(field) => (
+              <InlineRow
+                icon={<MapPin className="h-4 w-4 text-muted-foreground" />}
+                label="Address"
+              >
+                <Input
+                  id="invoice_company_address"
+                  placeholder="123 Main St, City, Country"
+                  value={field.state.value}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  disabled={readOnly}
+                  className="max-w-xs text-sm"
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+
+          <form.Field name="invoice_company_email">
+            {(field) => (
+              <InlineRow
+                icon={<Mail className="h-4 w-4 text-muted-foreground" />}
+                label="Email"
+              >
+                <Input
+                  id="invoice_company_email"
+                  type="email"
+                  placeholder="billing@example.com"
                   value={field.state.value}
                   onChange={(e) => field.handleChange(e.target.value)}
                   disabled={readOnly}
@@ -638,7 +724,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
           </Button>
           {!readOnly && (
             <LoadingButton type="submit" loading={isPending}>
-              {isEdit ? "Save Changes" : "Create Popup"}
+              {isEdit ? "Save Changes" : "Create Event"}
             </LoadingButton>
           )}
         </div>
@@ -647,10 +733,10 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
       {isEdit && !readOnly && (
         <div className="mx-auto max-w-2xl">
           <DangerZone
-            description="Once you delete this popup, all associated products, groups, coupons, and attendee data will be permanently removed. This action cannot be undone."
+            description="Once you delete this event, all associated products, groups, coupons, and attendee data will be permanently removed. This action cannot be undone."
             onDelete={() => deleteMutation.mutate()}
             isDeleting={deleteMutation.isPending}
-            confirmText="Delete Popup"
+            confirmText="Delete Event"
             resourceName={defaultValues.name}
             variant="inline"
           />

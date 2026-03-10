@@ -3,8 +3,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   Braces,
   ChevronRight,
-  Eye,
-  FileCode,
   Loader2,
   RotateCcw,
   Save,
@@ -435,23 +433,16 @@ export function EmailTemplateEditor({
           <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
           Default
         </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setShowPreview(!showPreview)}
-        >
-          {showPreview ? (
-            <>
-              <FileCode className="mr-1.5 h-3.5 w-3.5" />
-              Code
-            </>
-          ) : (
-            <>
-              <Eye className="mr-1.5 h-3.5 w-3.5" />
-              Preview
-            </>
-          )}
-        </Button>
+        <div className="flex items-center gap-1.5">
+          <Switch
+            id="preview-toggle"
+            checked={showPreview}
+            onCheckedChange={setShowPreview}
+          />
+          <Label htmlFor="preview-toggle" className="whitespace-nowrap text-xs">
+            Preview
+          </Label>
+        </div>
 
         <Popover>
           <PopoverTrigger asChild>

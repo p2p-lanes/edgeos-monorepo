@@ -29,7 +29,7 @@ import { CREATE_ROUTES, formatShortcut, SHORTCUTS } from "@/lib/shortcuts"
 
 const pages = [
   { label: "Dashboard", to: "/", icon: Home },
-  { label: "Popups", to: "/popups", icon: Calendar },
+  { label: "Events", to: "/popups", icon: Calendar },
   { label: "Products", to: "/products", icon: Package },
   { label: "Coupons", to: "/coupons", icon: Tag },
   { label: "Groups", to: "/groups", icon: UsersRound },
@@ -42,7 +42,9 @@ const pages = [
 
 const adminPages = [{ label: "Users", to: "/admin", icon: Users }]
 
-const superadminPages = [{ label: "Tenants", to: "/tenants", icon: Users }]
+const superadminPages = [
+  { label: "Organizations", to: "/tenants", icon: Users },
+]
 
 const createActions = Object.values(CREATE_ROUTES).map((route) => ({
   label: route.label,

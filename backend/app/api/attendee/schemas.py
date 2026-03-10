@@ -5,6 +5,8 @@ from enum import Enum
 from pydantic import BaseModel, ConfigDict, field_validator
 from sqlmodel import Field, SQLModel
 
+from app.api.product.schemas import ProductWithQuantity
+
 
 class AttendeeCategory(str, Enum):
     """Categories for attendees."""
@@ -164,3 +166,14 @@ class AttendeeWithTickets(BaseModel):
     popup_name: str
     popup_slug: str | None = None
     products: list[TicketProduct]
+
+
+class AttendeePurchases(BaseModel):
+    """Purchased products grouped by attendee."""
+
+    attendee_id: uuid.UUID
+    attendee_name: str
+    attendee_category: str
+    products: list[ProductWithQuantity] = []
+
+    model_config = ConfigDict(from_attributes=True)

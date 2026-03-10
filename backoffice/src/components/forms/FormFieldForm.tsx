@@ -1,11 +1,12 @@
 import { useForm } from "@tanstack/react-form"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import {
   AlignLeft,
   Calendar,
   CheckSquare,
   Hash,
+  LayoutGrid,
   Link,
   List,
   ListChecks,
@@ -17,11 +18,13 @@ import {
   type FormFieldPublic,
   FormFieldsService,
   type FormFieldUpdate,
+  FormSectionsService,
 } from "@/client"
 import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
 import { FormErrorSummary } from "@/components/Common/FormErrorSummary"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
+import { isSpecialField } from "@/components/form-builder/constants"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -58,11 +61,18 @@ const FIELD_TYPES = [
   { value: "number", label: "Number", icon: Hash },
   { value: "boolean", label: "Boolean (Yes/No)", icon: CheckSquare },
   { value: "select", label: "Select (Single)", icon: List },
+  {
+    value: "select_cards",
+    label: "Single select (visible options)",
+    icon: LayoutGrid,
+  },
   { value: "multiselect", label: "Multi-Select", icon: ListChecks },
   { value: "date", label: "Date", icon: Calendar },
   { value: "email", label: "Email", icon: Mail },
   { value: "url", label: "URL", icon: Link },
 ]
+
+const NO_SECTION = "__none__"
 
 interface FormFieldFormProps {
   defaultValues?: FormFieldPublic
@@ -80,6 +90,21 @@ export function FormFieldForm({
   const { isAdmin } = useAuth()
   const isEdit = !!defaultValues
   const readOnly = !isAdmin
+  const isProtectedField =
+    isEdit && defaultValues ? isSpecialField(defaultValues) : false
+
+  const popupId = isEdit ? defaultValues.popup_id : selectedPopupId
+
+  const { data: sectionsData } = useQuery({
+    queryKey: ["form-sections", popupId],
+    queryFn: () =>
+      FormSectionsService.listFormSections({
+        popupId: popupId || undefined,
+      }),
+    enabled: !!popupId,
+  })
+
+  const sections = sectionsData?.results ?? []
 
   const createMutation = useMutation({
     mutationFn: (data: FormFieldCreate) =>
@@ -125,10 +150,9 @@ export function FormFieldForm({
 
   const form = useForm({
     defaultValues: {
-      name: defaultValues?.name ?? "",
       label: defaultValues?.label ?? "",
       field_type: defaultValues?.field_type ?? "text",
-      section: defaultValues?.section ?? "",
+      section_id: defaultValues?.section_id ?? "",
       position: defaultValues?.position?.toString() ?? "0",
       required: defaultValues?.required ?? false,
       options: defaultValues?.options?.join("\n") ?? "",
@@ -143,16 +167,29 @@ export function FormFieldForm({
         .map((o) => o.trim())
         .filter((o) => o.length > 0)
 
+      const sectionId =
+        value.section_id && value.section_id !== NO_SECTION
+          ? value.section_id
+          : undefined
+
       if (isEdit) {
+        if (isProtectedField) {
+          updateMutation.mutate({
+            placeholder: value.placeholder || undefined,
+            help_text: value.help_text || undefined,
+          })
+          return
+        }
         updateMutation.mutate({
-          name: value.name,
           label: value.label,
           field_type: value.field_type,
-          section: value.section || undefined,
+          section_id: sectionId || null,
           position: Number.parseInt(value.position, 10) || 0,
           required: value.required,
           options: optionsArray.length > 0 ? optionsArray : undefined,
-          placeholder: value.placeholder || undefined,
+          ...(value.field_type !== "select_cards" && {
+            placeholder: value.placeholder || undefined,
+          }),
           help_text: value.help_text || undefined,
         })
       } else {
@@ -162,14 +199,15 @@ export function FormFieldForm({
         }
         createMutation.mutate({
           popup_id: selectedPopupId,
-          name: value.name,
           label: value.label,
           field_type: value.field_type,
-          section: value.section || undefined,
+          section_id: sectionId || null,
           position: Number.parseInt(value.position, 10) || 0,
           required: value.required,
           options: optionsArray.length > 0 ? optionsArray : undefined,
-          placeholder: value.placeholder || undefined,
+          ...(value.field_type !== "select_cards" && {
+            placeholder: value.placeholder || undefined,
+          }),
           help_text: value.help_text || undefined,
         })
       }
@@ -200,10 +238,9 @@ export function FormFieldForm({
         <FormErrorSummary
           form={form}
           fieldLabels={{
-            name: "Field Name",
             label: "Label",
             field_type: "Field Type",
-            section: "Section",
+            section_id: "Section",
           }}
         />
         <div>
@@ -219,77 +256,46 @@ export function FormFieldForm({
                       : "Form Field Details"}
                 </CardTitle>
                 <CardDescription>
-                  {readOnly
-                    ? "View form field configuration (read-only)"
-                    : isEdit
-                      ? "Update the form field configuration"
-                      : "Configure a custom field for applications"}
+                  {isProtectedField
+                    ? "Protected field – only placeholder and help text can be edited."
+                    : readOnly
+                      ? "View form field configuration (read-only)"
+                      : isEdit
+                        ? "Update the form field configuration"
+                        : "Configure a custom field for applications"}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <form.Field
-                    name="name"
-                    validators={{
-                      onBlur: ({ value }) =>
-                        !readOnly && !value ? "Name is required" : undefined,
-                    }}
-                  >
-                    {(field) => (
-                      <div className="space-y-2">
-                        <Label htmlFor="name">
-                          Field Name{" "}
-                          {!readOnly && (
-                            <span className="text-destructive">*</span>
-                          )}
-                        </Label>
-                        <Input
-                          id="name"
-                          placeholder="dietary_restrictions"
-                          value={field.state.value}
-                          onBlur={field.handleBlur}
-                          onChange={(e) => field.handleChange(e.target.value)}
-                          disabled={readOnly}
-                        />
-                        <p className="text-sm text-muted-foreground">
-                          Internal identifier (no spaces)
-                        </p>
-                        <FieldError errors={field.state.meta.errors} />
-                      </div>
-                    )}
-                  </form.Field>
-
-                  <form.Field
-                    name="label"
-                    validators={{
-                      onBlur: ({ value }) =>
-                        !readOnly && !value ? "Label is required" : undefined,
-                    }}
-                  >
-                    {(field) => (
-                      <div className="space-y-2">
-                        <Label htmlFor="label">
-                          Display Label{" "}
-                          {!readOnly && (
-                            <span className="text-destructive">*</span>
-                          )}
-                        </Label>
-                        <Input
-                          id="label"
-                          placeholder="Dietary Restrictions"
-                          value={field.state.value}
-                          onBlur={field.handleBlur}
-                          onChange={(e) => field.handleChange(e.target.value)}
-                          disabled={readOnly}
-                        />
-                        <p className="text-sm text-muted-foreground">
-                          Label shown to users
-                        </p>
-                        <FieldError errors={field.state.meta.errors} />
-                      </div>
-                    )}
-                  </form.Field>
-                </div>
+                <form.Field
+                  name="label"
+                  validators={{
+                    onBlur: ({ value }) =>
+                      !readOnly && !value ? "Label is required" : undefined,
+                  }}
+                >
+                  {(field) => (
+                    <div className="space-y-2">
+                      <Label htmlFor="label">
+                        Display Label{" "}
+                        {!readOnly && (
+                          <span className="text-destructive">*</span>
+                        )}
+                      </Label>
+                      <Input
+                        id="label"
+                        placeholder="Dietary Restrictions"
+                        value={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                        disabled={readOnly || isProtectedField}
+                      />
+                      <p className="text-sm text-muted-foreground">
+                        Label shown to users
+                      </p>
+                      <FieldError errors={field.state.meta.errors} />
+                    </div>
+                  )}
+                </form.Field>
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <form.Field name="field_type">
@@ -299,9 +305,10 @@ export function FormFieldForm({
                         <Select
                           value={field.state.value}
                           onValueChange={(val) => field.handleChange(val)}
-                          disabled={readOnly}
                         >
-                          <SelectTrigger>
+                          <SelectTrigger
+                            disabled={readOnly || isProtectedField}
+                          >
                             <SelectValue placeholder="Select type" />
                           </SelectTrigger>
                           <SelectContent>
@@ -316,20 +323,34 @@ export function FormFieldForm({
                     )}
                   </form.Field>
 
-                  <form.Field name="section">
+                  <form.Field name="section_id">
                     {(field) => (
                       <div className="space-y-2">
-                        <Label htmlFor="section">Section</Label>
-                        <Input
-                          id="section"
-                          placeholder="preferences"
-                          value={field.state.value}
-                          onBlur={field.handleBlur}
-                          onChange={(e) => field.handleChange(e.target.value)}
-                          disabled={readOnly}
-                        />
+                        <Label htmlFor="section_id">Section</Label>
+                        <Select
+                          value={field.state.value || NO_SECTION}
+                          onValueChange={(val) =>
+                            field.handleChange(val === NO_SECTION ? "" : val)
+                          }
+                        >
+                          <SelectTrigger
+                            disabled={readOnly || isProtectedField}
+                          >
+                            <SelectValue placeholder="Select section" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={NO_SECTION}>
+                              No section
+                            </SelectItem>
+                            {sections.map((s) => (
+                              <SelectItem key={s.id} value={s.id}>
+                                {s.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <p className="text-sm text-muted-foreground">
-                          Group fields by section
+                          Group this field into a section
                         </p>
                       </div>
                     )}
@@ -348,58 +369,76 @@ export function FormFieldForm({
                           value={field.state.value}
                           onBlur={field.handleBlur}
                           onChange={(e) => field.handleChange(e.target.value)}
-                          disabled={readOnly}
+                          disabled={readOnly || isProtectedField}
                         />
                         <p className="text-sm text-muted-foreground">
-                          Display order (lower = first)
+                          Display order within section (lower = first)
                         </p>
                       </div>
                     )}
                   </form.Field>
 
-                  <form.Field name="placeholder">
-                    {(field) => (
-                      <div className="space-y-2">
-                        <Label htmlFor="placeholder">Placeholder</Label>
-                        <Input
-                          id="placeholder"
-                          placeholder="Enter your answer..."
-                          value={field.state.value}
-                          onBlur={field.handleBlur}
-                          onChange={(e) => field.handleChange(e.target.value)}
-                          disabled={readOnly}
-                        />
-                      </div>
-                    )}
-                  </form.Field>
+                  <form.Subscribe selector={(state) => state.values.field_type}>
+                    {(fieldType) =>
+                      fieldType !== "select_cards" && (
+                        <form.Field name="placeholder">
+                          {(field) => (
+                            <div className="space-y-2">
+                              <Label htmlFor="placeholder">Placeholder</Label>
+                              <Input
+                                id="placeholder"
+                                placeholder="Enter your answer..."
+                                value={field.state.value}
+                                onBlur={field.handleBlur}
+                                onChange={(e) =>
+                                  field.handleChange(e.target.value)
+                                }
+                                disabled={readOnly}
+                              />
+                            </div>
+                          )}
+                        </form.Field>
+                      )
+                    }
+                  </form.Subscribe>
                 </div>
 
                 <form.Subscribe selector={(state) => state.values.field_type}>
-                  {(fieldType) =>
-                    (fieldType === "select" || fieldType === "multiselect") && (
-                      <form.Field name="options">
-                        {(field) => (
-                          <div className="space-y-2">
-                            <Label htmlFor="options">Options</Label>
-                            <Textarea
-                              id="options"
-                              placeholder="Option 1&#10;Option 2&#10;Option 3"
-                              rows={4}
-                              value={field.state.value}
-                              onBlur={field.handleBlur}
-                              onChange={(e) =>
-                                field.handleChange(e.target.value)
-                              }
-                              disabled={readOnly}
-                            />
-                            <p className="text-sm text-muted-foreground">
-                              One option per line
-                            </p>
-                          </div>
-                        )}
-                      </form.Field>
+                  {(fieldType) => {
+                    const showOptions =
+                      fieldType === "select" ||
+                      fieldType === "select_cards" ||
+                      fieldType === "multiselect"
+                    return (
+                      <div
+                        className={`grid transition-[grid-template-rows] duration-200 ease-in-out ${showOptions ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}
+                      >
+                        <div className="overflow-hidden">
+                          <form.Field name="options">
+                            {(field) => (
+                              <div className="space-y-2">
+                                <Label htmlFor="options">Options</Label>
+                                <Textarea
+                                  id="options"
+                                  placeholder="Option 1&#10;Option 2&#10;Option 3"
+                                  rows={4}
+                                  value={field.state.value}
+                                  onBlur={field.handleBlur}
+                                  onChange={(e) =>
+                                    field.handleChange(e.target.value)
+                                  }
+                                  disabled={readOnly || isProtectedField}
+                                />
+                                <p className="text-sm text-muted-foreground">
+                                  One option per line
+                                </p>
+                              </div>
+                            )}
+                          </form.Field>
+                        </div>
+                      </div>
                     )
-                  }
+                  }}
                 </form.Subscribe>
 
                 <form.Field name="help_text">
@@ -433,7 +472,7 @@ export function FormFieldForm({
                         id="required"
                         checked={field.state.value}
                         onCheckedChange={(val) => field.handleChange(val)}
-                        disabled={readOnly}
+                        disabled={readOnly || isProtectedField}
                       />
                     </div>
                   )}
@@ -460,7 +499,7 @@ export function FormFieldForm({
         </div>
       </form>
 
-      {isEdit && !readOnly && (
+      {isEdit && !readOnly && !isProtectedField && (
         <DangerZone
           description="Once you delete this form field, applications may lose their stored data for this field. This action cannot be undone."
           onDelete={() => deleteMutation.mutate()}

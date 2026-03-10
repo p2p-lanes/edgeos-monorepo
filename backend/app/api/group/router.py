@@ -88,14 +88,15 @@ async def get_group(
                 products.append(ap.product)
 
         human = application.human
+        custom = application.custom_fields or {}
         member = GroupMemberPublic(
             id=application.human_id,
             first_name=human.first_name or "",
             last_name=human.last_name or "",
             email=human.email,
             telegram=human.telegram,
-            organization=human.organization,
-            role=human.role,
+            organization=custom.get("organization"),
+            role=custom.get("role"),
             gender=human.gender,
             local_resident=None,
             products=products,
@@ -249,14 +250,15 @@ async def get_my_group(
                 products.append(ap.product)
 
         human = application.human
+        custom = application.custom_fields or {}
         member = GroupMemberPublic(
             id=application.human_id,
             first_name=human.first_name or "",
             last_name=human.last_name or "",
             email=human.email,
             telegram=human.telegram,
-            organization=human.organization,
-            role=human.role,
+            organization=custom.get("organization"),
+            role=custom.get("role"),
             gender=human.gender,
             local_resident=None,
             products=products,
@@ -349,8 +351,6 @@ async def add_group_member(
             last_name=member_in.last_name,
             email=member_in.email,
             telegram=member_in.telegram,
-            organization=member_in.organization,
-            role=member_in.role,
             gender=member_in.gender,
             status=ApplicationStatus.ACCEPTED,
         )
@@ -368,8 +368,6 @@ async def add_group_member(
         human.first_name = member_in.first_name
         human.last_name = member_in.last_name
         human.telegram = member_in.telegram
-        human.organization = member_in.organization
-        human.role = member_in.role
         human.gender = member_in.gender
         db.add(human)
         db.add(application)
@@ -387,14 +385,15 @@ async def add_group_member(
     for attendee in application.attendees:
         products.extend(attendee.products)
 
+    custom = application.custom_fields or {}
     return GroupMemberPublic(
         id=human.id,
         first_name=human.first_name or "",
         last_name=human.last_name or "",
         email=human.email,
         telegram=human.telegram,
-        organization=human.organization,
-        role=human.role,
+        organization=custom.get("organization"),
+        role=custom.get("role"),
         gender=human.gender,
         local_resident=None,
         products=products,
@@ -445,8 +444,6 @@ async def add_group_members_batch(
                     last_name=member.last_name,
                     email=member.email,
                     telegram=member.telegram,
-                    organization=member.organization,
-                    role=member.role,
                     gender=member.gender,
                     local_resident=member.local_resident,
                     products=[],
@@ -521,14 +518,15 @@ async def update_group_member(
     for attendee in application.attendees:
         products.extend(attendee.products)
 
+    custom = application.custom_fields or {}
     return GroupMemberPublic(
         id=human_id,
         first_name=human.first_name or "",
         last_name=human.last_name or "",
         email=human.email,
         telegram=human.telegram,
-        organization=human.organization,
-        role=human.role,
+        organization=custom.get("organization"),
+        role=custom.get("role"),
         gender=human.gender,
         local_resident=None,
         products=products,

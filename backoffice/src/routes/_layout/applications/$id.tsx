@@ -138,10 +138,6 @@ function ViewApplicationContent({ applicationId }: { applicationId: string }) {
                 <p>{new Date(application.accepted_at).toLocaleDateString()}</p>
               </div>
             )}
-            <div>
-              <span className="text-xs uppercase tracking-wider">ID</span>
-              <p className="font-mono text-xs">{application.id}</p>
-            </div>
           </div>
 
           {/* Stepper */}

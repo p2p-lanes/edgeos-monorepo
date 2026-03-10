@@ -1,9 +1,10 @@
 import uuid
 from datetime import datetime
+from decimal import Decimal
 from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, field_validator
-from sqlalchemy import String
+from sqlalchemy import Numeric, String
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlmodel import Column, DateTime, Field, SQLModel
 
@@ -63,6 +64,12 @@ class ApplicationBase(SQLModel):
         sa_column=Column(JSONB, nullable=True),
     )
 
+    # Credit balance (remaining credit from edit-passes overpayment)
+    credit: Decimal = Field(
+        default=Decimal("0"),
+        sa_column=Column(Numeric(10, 2), nullable=False, server_default="0"),
+    )
+
     # Timestamps
     submitted_at: datetime | None = Field(
         default=None, nullable=True, sa_type=DateTime(timezone=True)
@@ -87,6 +94,9 @@ class ApplicationPublic(BaseModel):
     status: str
     custom_fields: dict = {}
     custom_fields_schema: dict | None = None
+
+    # Credit balance
+    credit: Decimal = Decimal("0")
 
     # Timestamps
     submitted_at: datetime | None = None
@@ -121,8 +131,6 @@ class ApplicationCreate(BaseModel):
     last_name: str
     email: str | None = None
     telegram: str | None = None
-    organization: str | None = None
-    role: str | None = None
     gender: str | None = None
     age: str | None = None
     residence: str | None = None
@@ -158,8 +166,6 @@ class ApplicationUpdate(BaseModel):
     first_name: str | None = None
     last_name: str | None = None
     telegram: str | None = None
-    organization: str | None = None
-    role: str | None = None
     gender: str | None = None
     age: str | None = None
     residence: str | None = None
@@ -192,8 +198,6 @@ class ApplicationAdminCreate(BaseModel):
     last_name: str | None = None
     email: str  # Required for admin creation
     telegram: str | None = None
-    organization: str | None = None
-    role: str | None = None
     gender: str | None = None
     age: str | None = None
     residence: str | None = None
@@ -243,8 +247,6 @@ class ApplicationSnapshotBase(SQLModel):
     last_name: str | None = None
     email: str
     telegram: str | None = None
-    organization: str | None = None
-    role: str | None = None
     gender: str | None = None
     age: str | None = None
     residence: str | None = None
@@ -275,8 +277,6 @@ class ApplicationSnapshotPublic(BaseModel):
     last_name: str | None = None
     email: str
     telegram: str | None = None
-    organization: str | None = None
-    role: str | None = None
     gender: str | None = None
     age: str | None = None
     residence: str | None = None
@@ -310,3 +310,55 @@ class AttendeeDirectoryFilter(BaseModel):
 
     q: str | None = None
     email: str | None = None
+
+
+class DirectoryProduct(BaseModel):
+    """Minimal product info for directory participation display."""
+
+    id: uuid.UUID
+    name: str
+    slug: str
+    category: str | None = None
+    duration_type: str | None = None
+    start_date: datetime | None = None
+    end_date: datetime | None = None
+
+
+class AssociatedAttendee(BaseModel):
+    """Non-main attendee summary for directory."""
+
+    name: str
+    category: str
+    gender: str | None = None
+    email: str | None = None
+
+
+class AttendeesDirectoryEntry(BaseModel):
+    """Single entry in the attendees directory."""
+
+    id: uuid.UUID  # application id
+
+    # Human profile (from application.human)
+    first_name: str | None = None
+    last_name: str | None = None
+    email: str | None = None
+    telegram: str | None = None
+    role: str | None = None
+    organization: str | None = None
+    residence: str | None = None
+    age: str | None = None
+    gender: str | None = None
+    picture_url: str | None = None
+
+    # Computed from attendees
+    brings_kids: bool | str = False  # str "*" when hidden
+
+    # Participation
+    participation: list[DirectoryProduct] = []
+    check_in: datetime | None = None
+    check_out: datetime | None = None
+
+    # Associated attendees (spouse/kids)
+    associated_attendees: list[AssociatedAttendee] = []
+
+    model_config = ConfigDict(from_attributes=True)

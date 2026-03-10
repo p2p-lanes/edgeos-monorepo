@@ -6,10 +6,13 @@ from app.api import (
     approval_strategy,
     attendee,
     auth,
+    base_field_config,
+    cart,
     coupon,
     dashboard,
     email_template,
     form_field,
+    form_section,
     group,
     human,
     payment,
@@ -34,8 +37,10 @@ api_router.include_router(popup.router)
 api_router.include_router(product.router)
 api_router.include_router(coupon.router)
 api_router.include_router(group.router)
+api_router.include_router(form_section.router)
 api_router.include_router(form_field.router)
 api_router.include_router(email_template.router)
+api_router.include_router(base_field_config.router)
 
 # Approval system resources (registered before application so static paths
 # like /applications/pending-review are matched before /{application_id})
@@ -47,6 +52,7 @@ api_router.include_router(application_review.router)
 api_router.include_router(application.router)
 api_router.include_router(attendee.router)
 api_router.include_router(payment.router)
+api_router.include_router(cart.router)
 
 # Utility resources
 api_router.include_router(upload.router)

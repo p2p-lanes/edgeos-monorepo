@@ -16,9 +16,11 @@ from app.api.product.schemas import (
 from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
+    CurrentHuman,
     CurrentSuperadmin,
     CurrentUser,
     CurrentWriter,
+    HumanTenantSession,
     TenantSession,
 )
 from app.utils.utils import slugify
@@ -248,3 +250,36 @@ async def delete_product(
         )
 
     crud.products_crud.delete(db, product)
+
+
+@router.get("/portal/products", response_model=ListModel[ProductPublic])
+async def list_portal_products(
+    db: HumanTenantSession,
+    _: CurrentHuman,
+    popup_id: uuid.UUID | None = None,
+    is_active: bool | None = None,
+    category: ProductCategory | None = None,
+    skip: PaginationSkip = 0,
+    limit: PaginationLimit = 100,
+) -> ListModel[ProductPublic]:
+    """List products visible to the current human (Portal)."""
+    if popup_id:
+        products, total = crud.products_crud.find_by_popup(
+            db,
+            popup_id=popup_id,
+            skip=skip,
+            limit=limit,
+            is_active=is_active,
+            category=category,
+        )
+    else:
+        products, total = crud.products_crud.find(
+            db,
+            skip=skip,
+            limit=limit,
+        )
+
+    return ListModel[ProductPublic](
+        results=[ProductPublic.model_validate(p) for p in products],
+        paging=Paging(offset=skip, limit=limit, total=total),
+    )

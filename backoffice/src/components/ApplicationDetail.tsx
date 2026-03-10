@@ -1,14 +1,13 @@
 import { useMutation, useQuery } from "@tanstack/react-query"
 import {
   AlertTriangle,
-  Building,
   ChevronDown,
   ChevronUp,
+  DollarSign,
   MapPin,
   MessageCircle,
   ThumbsDown,
   ThumbsUp,
-  User,
 } from "lucide-react"
 import { type ReactNode, useState } from "react"
 
@@ -37,7 +36,6 @@ import { LoadingButton } from "@/components/ui/loading-button"
 import { Separator } from "@/components/ui/separator"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
-import { cn } from "@/lib/utils"
 import { createErrorHandler } from "@/utils"
 
 // ========================
@@ -48,17 +46,25 @@ interface FormFieldSchema {
   type: string
   label: string
   required: boolean
-  section: string
+  section?: string
+  section_id?: string | null
   position?: number
   options?: string[]
   placeholder?: string
   help_text?: string
 }
 
+interface FormSectionSchema {
+  id: string
+  label: string
+  description: string | null
+  order: number
+}
+
 interface ApplicationSchema {
   base_fields: Record<string, FormFieldSchema>
   custom_fields: Record<string, FormFieldSchema>
-  sections: string[]
+  sections: FormSectionSchema[]
 }
 
 // ========================
@@ -112,9 +118,8 @@ function WeightedVoting({
         </p>
         <div className="flex flex-col gap-1">
           <Button
-            variant="ghost"
             size="sm"
-            className="w-full justify-start text-green-600 hover:bg-green-50 hover:text-green-700"
+            className="w-full justify-start bg-green-700 hover:bg-green-800 text-white"
             onClick={() => handleVote("strong_yes")}
           >
             <ChevronUp className="h-3.5 w-3.5" />
@@ -122,27 +127,24 @@ function WeightedVoting({
             Strong Yes
           </Button>
           <Button
-            variant="ghost"
             size="sm"
-            className="w-full justify-start text-green-600 hover:bg-green-50 hover:text-green-700"
+            className="w-full justify-start bg-green-500 hover:bg-green-600 text-white"
             onClick={() => handleVote("yes")}
           >
             <ThumbsUp className="h-3.5 w-3.5" />
             Yes
           </Button>
           <Button
-            variant="ghost"
             size="sm"
-            className="w-full justify-start text-red-600 hover:bg-red-50 hover:text-red-700"
+            className="w-full justify-start bg-red-400 hover:bg-red-500 text-white"
             onClick={() => handleVote("no")}
           >
             <ThumbsDown className="h-3.5 w-3.5" />
             No
           </Button>
           <Button
-            variant="ghost"
             size="sm"
-            className="w-full justify-start text-red-600 hover:bg-red-50 hover:text-red-700"
+            className="w-full justify-start bg-red-700 hover:bg-red-800 text-white"
             onClick={() => handleVote("strong_no")}
           >
             <ChevronDown className="h-3.5 w-3.5" />
@@ -234,16 +236,15 @@ function SimpleVoting({
         <div className="flex flex-col gap-1">
           <Button
             size="sm"
-            className="w-full justify-start"
+            className="w-full justify-start bg-green-600 hover:bg-green-700 text-white border-0"
             onClick={() => handleClick("yes")}
           >
             <ThumbsUp className="h-3.5 w-3.5" />
             Approve
           </Button>
           <Button
-            variant="destructive"
             size="sm"
-            className="w-full justify-start"
+            className="w-full justify-start bg-red-600 hover:bg-red-700 text-white border-0"
             onClick={() => handleClick("no")}
           >
             <ThumbsDown className="h-3.5 w-3.5" />
@@ -415,7 +416,10 @@ export function ApplicationDetail({
     ) {
       return {
         unsectioned: [] as [string, unknown][],
-        sectioned: {} as Record<string, [string, unknown][]>,
+        sectioned: {} as Record<
+          string,
+          { label: string; fields: [string, unknown][] }
+        >,
       }
     }
     const entries = Object.entries(application.custom_fields)
@@ -427,12 +431,21 @@ export function ApplicationDetail({
         })
       : entries
     const unsectioned: [string, unknown][] = []
-    const sectioned: Record<string, [string, unknown][]> = {}
+    const sectioned: Record<
+      string,
+      { label: string; fields: [string, unknown][] }
+    > = {}
+    const detailSectionMap = new Map(
+      (schema?.sections ?? []).map((s) => [s.id, s]),
+    )
     for (const [key, value] of sorted) {
-      const section = schema?.custom_fields?.[key]?.section
-      if (section) {
-        if (!sectioned[section]) sectioned[section] = []
-        sectioned[section].push([key, value])
+      const sectionId = schema?.custom_fields?.[key]?.section_id
+      if (sectionId) {
+        if (!sectioned[sectionId]) {
+          const info = detailSectionMap.get(sectionId)
+          sectioned[sectionId] = { label: info?.label ?? "Other", fields: [] }
+        }
+        sectioned[sectionId].fields.push([key, value])
       } else {
         unsectioned.push([key, value])
       }
@@ -457,136 +470,120 @@ export function ApplicationDetail({
     reviewSummary.total_reviews > 0
 
   return (
-    <div
-      className={cn(
-        "mx-auto",
-        canReview ? "flex max-w-5xl gap-8" : "max-w-2xl",
-      )}
-    >
-      {/* Main content */}
-      <div
-        className={cn(
-          "min-w-0 space-y-6",
-          canReview ? "max-w-2xl flex-1" : "w-full",
-        )}
-      >
-        {/* Hero */}
-        <div className="space-y-1">
-          <div className="flex items-start justify-between gap-4">
-            <h2 className="text-3xl font-semibold">
-              {application.human?.first_name} {application.human?.last_name}
-            </h2>
-            <div className="flex shrink-0 items-center gap-2">
-              {application.red_flag && (
-                <Badge variant="destructive">
-                  <AlertTriangle className="mr-1 h-3 w-3" />
-                  Flagged
-                </Badge>
-              )}
-              <StatusBadge status={application.status} />
-            </div>
+    <div className="relative mx-auto w-[32rem] max-w-full space-y-6">
+      {/* Hero */}
+      <div className="space-y-1">
+        <div className="flex items-start justify-between gap-4">
+          <h2 className="text-3xl font-semibold">
+            {application.human?.first_name} {application.human?.last_name}
+          </h2>
+          <div className="flex shrink-0 items-center gap-2">
+            {application.red_flag && (
+              <Badge variant="destructive">
+                <AlertTriangle className="mr-1 h-3 w-3" />
+                Flagged
+              </Badge>
+            )}
+            <StatusBadge status={application.status} />
           </div>
-          <p className="text-sm text-muted-foreground">
-            {application.human?.email}
-          </p>
         </div>
+        <p className="text-sm text-muted-foreground">
+          {application.human?.email}
+        </p>
+      </div>
 
-        {headerExtra}
+      {headerExtra}
 
-        {/* Mobile action panel */}
-        {canReview && (
-          <div className="space-y-4 lg:hidden">
-            {votingPanel}
-            {hasReviews && <ReviewSummary summary={reviewSummary} />}
-            <Separator />
+      {/* Mobile action panel */}
+      {canReview && (
+        <div className="space-y-4 lg:hidden">
+          {votingPanel}
+          {hasReviews && <ReviewSummary summary={reviewSummary} />}
+          <Separator />
+        </div>
+      )}
+
+      <Separator />
+
+      {/* Review summary (when not reviewer but reviews exist) */}
+      {!canReview && hasReviews && (
+        <>
+          <ReviewSummary summary={reviewSummary} />
+          <Separator />
+        </>
+      )}
+
+      {/* Applicant */}
+      <InlineSection title="Applicant">
+        {application.human?.residence && (
+          <InlineRow
+            icon={<MapPin className="h-4 w-4 text-muted-foreground" />}
+            label="Residence"
+          >
+            <span className="text-sm">{application.human.residence}</span>
+          </InlineRow>
+        )}
+        {application.human?.telegram && (
+          <InlineRow
+            icon={<MessageCircle className="h-4 w-4 text-muted-foreground" />}
+            label="Telegram"
+          >
+            <span className="text-sm">{application.human.telegram}</span>
+          </InlineRow>
+        )}
+        {application.human?.gender && (
+          <InlineRow label="Gender">
+            <span className="text-sm capitalize">
+              {application.human.gender}
+            </span>
+          </InlineRow>
+        )}
+        {application.human?.age && (
+          <InlineRow label="Age Range">
+            <span className="text-sm">{application.human.age}</span>
+          </InlineRow>
+        )}
+        {application.referral && (
+          <InlineRow label="Referral">
+            <span className="text-sm">{application.referral}</span>
+          </InlineRow>
+        )}
+        {(() => {
+          const credit = Number(application.credit)
+          return credit > 0 ? (
+            <InlineRow
+              icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
+              label="Account Credit"
+            >
+              <span className="font-mono text-sm">${credit.toFixed(2)}</span>
+            </InlineRow>
+          ) : null
+        })()}
+      </InlineSection>
+
+      {/* Unsectioned custom fields */}
+      {unsectionedCustomFields.length > 0 && (
+        <>
+          <Separator />
+          <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+            {unsectionedCustomFields.map(([key, value]) => (
+              <div key={key}>
+                <p className="text-xs text-muted-foreground">
+                  {getFieldLabel(key)}
+                </p>
+                <p className="text-sm">{formatFieldValue(key, value)}</p>
+              </div>
+            ))}
           </div>
-        )}
+        </>
+      )}
 
-        <Separator className={cn(canReview && "hidden lg:block")} />
-
-        {/* Review summary (when not reviewer but reviews exist) */}
-        {!canReview && hasReviews && (
-          <>
-            <ReviewSummary summary={reviewSummary} />
+      {/* Sectioned custom fields */}
+      {Object.entries(sectionedCustomFields).map(
+        ([sectionId, { label: sectionLabel, fields }]) => (
+          <div key={sectionId}>
             <Separator />
-          </>
-        )}
-
-        {/* Applicant */}
-        <InlineSection title="Applicant">
-          {application.human?.organization && (
-            <InlineRow
-              icon={<Building className="h-4 w-4 text-muted-foreground" />}
-              label="Organization"
-            >
-              <span className="text-sm">{application.human.organization}</span>
-            </InlineRow>
-          )}
-          {application.human?.role && (
-            <InlineRow
-              icon={<User className="h-4 w-4 text-muted-foreground" />}
-              label="Role"
-            >
-              <span className="text-sm">{application.human.role}</span>
-            </InlineRow>
-          )}
-          {application.human?.residence && (
-            <InlineRow
-              icon={<MapPin className="h-4 w-4 text-muted-foreground" />}
-              label="Residence"
-            >
-              <span className="text-sm">{application.human.residence}</span>
-            </InlineRow>
-          )}
-          {application.human?.telegram && (
-            <InlineRow
-              icon={<MessageCircle className="h-4 w-4 text-muted-foreground" />}
-              label="Telegram"
-            >
-              <span className="text-sm">{application.human.telegram}</span>
-            </InlineRow>
-          )}
-          {application.human?.gender && (
-            <InlineRow label="Gender">
-              <span className="text-sm capitalize">
-                {application.human.gender}
-              </span>
-            </InlineRow>
-          )}
-          {application.human?.age && (
-            <InlineRow label="Age Range">
-              <span className="text-sm">{application.human.age}</span>
-            </InlineRow>
-          )}
-          {application.referral && (
-            <InlineRow label="Referral">
-              <span className="text-sm">{application.referral}</span>
-            </InlineRow>
-          )}
-        </InlineSection>
-
-        {/* Unsectioned custom fields */}
-        {unsectionedCustomFields.length > 0 && (
-          <>
-            <Separator />
-            <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
-              {unsectionedCustomFields.map(([key, value]) => (
-                <div key={key}>
-                  <p className="text-xs text-muted-foreground">
-                    {getFieldLabel(key)}
-                  </p>
-                  <p className="text-sm">{formatFieldValue(key, value)}</p>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-
-        {/* Sectioned custom fields */}
-        {Object.entries(sectionedCustomFields).map(([section, fields]) => (
-          <div key={section}>
-            <Separator />
-            <InlineSection title={section} className="capitalize pt-4">
+            <InlineSection title={sectionLabel} className="capitalize pt-4">
               <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2 py-3">
                 {fields.map(([key, value]) => (
                   <div key={key}>
@@ -599,38 +596,38 @@ export function ApplicationDetail({
               </div>
             </InlineSection>
           </div>
-        ))}
+        ),
+      )}
 
-        {/* Companions */}
-        {companions.length > 0 && (
-          <>
-            <Separator />
-            <InlineSection title={`Companions (${companions.length})`}>
-              {companions.map((attendee) => (
-                <div
-                  key={attendee.id}
-                  className="flex items-center justify-between py-3"
-                >
-                  <div>
-                    <p className="text-sm font-medium">{attendee.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {attendee.email} ·{" "}
-                      <span className="capitalize">{attendee.category}</span>
-                    </p>
-                  </div>
-                  <code className="rounded bg-muted px-2 py-1 font-mono text-xs">
-                    {attendee.check_in_code}
-                  </code>
+      {/* Companions */}
+      {companions.length > 0 && (
+        <>
+          <Separator />
+          <InlineSection title={`Companions (${companions.length})`}>
+            {companions.map((attendee) => (
+              <div
+                key={attendee.id}
+                className="flex items-center justify-between py-3"
+              >
+                <div>
+                  <p className="text-sm font-medium">{attendee.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {attendee.email} ·{" "}
+                    <span className="capitalize">{attendee.category}</span>
+                  </p>
                 </div>
-              ))}
-            </InlineSection>
-          </>
-        )}
-      </div>
+                <code className="rounded bg-muted px-2 py-1 font-mono text-xs">
+                  {attendee.check_in_code}
+                </code>
+              </div>
+            ))}
+          </InlineSection>
+        </>
+      )}
 
       {/* Desktop action panel */}
       {canReview && (
-        <aside className="hidden w-56 shrink-0 lg:block">
+        <aside className="absolute top-0 left-[calc(100%+2rem)] hidden w-56 lg:block">
           <div className="sticky top-24 space-y-6">
             {votingPanel}
             {hasReviews && <ReviewSummary summary={reviewSummary} />}

@@ -8,11 +8,20 @@ from app.api.approval_strategy.schemas import (
     ApprovalStrategyCreate,
     ApprovalStrategyType,
 )
+from app.api.base_field_config.constants import DEFAULT_SECTIONS
+from app.api.base_field_config.crud import base_field_configs_crud
+from app.api.form_section.models import FormSections
 from app.api.popup import crud
-from app.api.popup.schemas import PopupCreate, PopupPublic, PopupUpdate
+from app.api.popup.schemas import PopupCreate, PopupPublic, PopupStatus, PopupUpdate
 from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
-from app.core.dependencies.users import CurrentUser, CurrentWriter, TenantSession
+from app.core.dependencies.users import (
+    CurrentHuman,
+    CurrentUser,
+    CurrentWriter,
+    HumanTenantSession,
+    TenantSession,
+)
 
 router = APIRouter(prefix="/popups", tags=["popups"])
 
@@ -93,6 +102,28 @@ async def create_popup(
         ),
     )
 
+    # Create default form sections and base field configs
+    section_map: dict[str, uuid.UUID] = {}
+    for key, section_def in DEFAULT_SECTIONS.items():
+        section = FormSections(
+            tenant_id=popup.tenant_id,
+            popup_id=popup.id,
+            label=section_def["label"],
+            order=section_def["order"],
+            protected=True,
+        )
+        db.add(section)
+        db.commit()
+        db.refresh(section)
+        section_map[key] = section.id
+
+    base_field_configs_crud.create_defaults_for_popup(
+        db,
+        popup_id=popup.id,
+        tenant_id=popup.tenant_id,
+        section_map=section_map,
+    )
+
     return PopupPublic.model_validate(popup)
 
 
@@ -138,3 +169,31 @@ async def delete_popup(
         )
 
     crud.delete(db, popup)
+
+
+@router.get("/portal/list", response_model=list[PopupPublic])
+async def list_portal_popups(
+    db: HumanTenantSession,
+    _: CurrentHuman,
+) -> list[PopupPublic]:
+    """List active popups for the current human's tenant (Portal)."""
+    popups, _ = crud.find(db, status=PopupStatus.active, limit=100)
+    return [PopupPublic.model_validate(p) for p in popups]
+
+
+@router.get("/portal/{slug}", response_model=PopupPublic)
+async def get_portal_popup(
+    slug: str,
+    db: HumanTenantSession,
+    _: CurrentHuman,
+) -> PopupPublic:
+    """Get a popup by slug (Portal)."""
+    popup = crud.get_by_slug(db, slug)
+
+    if not popup or popup.status != PopupStatus.active:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Event not found",
+        )
+
+    return PopupPublic.model_validate(popup)

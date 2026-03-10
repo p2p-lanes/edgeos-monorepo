@@ -23,7 +23,7 @@ const PendingUsers = () => (
     </TableHeader>
     <TableBody>
       {Array.from({ length: 5 }).map((_, index) => (
-        <TableRow key={index}>
+        <TableRow key={`skeleton-${index}`}>
           <TableCell>
             <Skeleton className="h-4 w-32" />
           </TableCell>

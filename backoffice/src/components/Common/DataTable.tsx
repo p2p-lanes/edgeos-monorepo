@@ -1,9 +1,12 @@
 import {
   type ColumnDef,
+  type ExpandedState,
   flexRender,
   getCoreRowModel,
+  getExpandedRowModel,
   getPaginationRowModel,
   getSortedRowModel,
+  type Row,
   type RowSelectionState,
   type SortingState,
   useReactTable,
@@ -19,8 +22,10 @@ import {
   ChevronsRight,
   Columns3,
   Search,
+  X,
 } from "lucide-react"
 import {
+  Fragment,
   type ReactNode,
   useCallback,
   useEffect,
@@ -100,6 +105,7 @@ interface DataTableProps<TData, TValue> {
   bulkActions?: (selectedRows: TData[]) => ReactNode
   hiddenOnMobile?: string[]
   tableId?: string
+  renderSubComponent?: (props: { row: Row<TData> }) => ReactNode
 }
 
 function loadColumnVisibility(tableId: string): VisibilityState {
@@ -161,6 +167,7 @@ export function DataTable<TData, TValue>({
   bulkActions,
   hiddenOnMobile,
   tableId,
+  renderSubComponent,
 }: DataTableProps<TData, TValue>) {
   const [localSorting, setLocalSorting] = useState<SortingState>([])
   const sorting = serverSorting ? serverSorting.sorting : localSorting
@@ -174,6 +181,7 @@ export function DataTable<TData, TValue>({
       }
     : setLocalSorting
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
+  const [expanded, setExpanded] = useState<ExpandedState>({})
   const isMobile = useIsMobile()
 
   // Debounced search
@@ -267,6 +275,11 @@ export function DataTable<TData, TValue>({
     }),
     ...(serverSorting && { manualSorting: true }),
     ...(!serverSorting && { getSortedRowModel: getSortedRowModel() }),
+    ...(renderSubComponent && {
+      getExpandedRowModel: getExpandedRowModel(),
+      onExpandedChange: setExpanded,
+      getRowCanExpand: () => true,
+    }),
     onSortingChange: handleSortingChange,
     ...(tableId && { onColumnVisibilityChange: handleColumnVisibilityChange }),
     ...(selectable && {
@@ -275,6 +288,7 @@ export function DataTable<TData, TValue>({
     state: {
       sorting,
       columnVisibility,
+      ...(renderSubComponent && { expanded }),
       ...(selectable && { rowSelection }),
       ...(isServerPaginated && {
         pagination: serverPagination.pagination,
@@ -330,8 +344,17 @@ export function DataTable<TData, TValue>({
                   placeholder={searchPlaceholder ?? "Search..."}
                   value={localSearch}
                   onChange={(e) => handleSearchChange(e.target.value)}
-                  className="pl-9"
+                  className="pl-9 pr-8"
                 />
+                {localSearch && (
+                  <button
+                    type="button"
+                    onClick={() => handleSearchChange("")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
               </div>
             )}
             {filterBar && (
@@ -418,16 +441,36 @@ export function DataTable<TData, TValue>({
           <TableBody>
             {table.getRowModel().rows.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext(),
-                      )}
-                    </TableCell>
-                  ))}
-                </TableRow>
+                <Fragment key={row.id}>
+                  <TableRow
+                    {...(renderSubComponent && {
+                      className: "cursor-pointer",
+                      onClick: () => row.toggleExpanded(),
+                    })}
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id}>
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext(),
+                        )}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                  {renderSubComponent && row.getIsExpanded() && (
+                    <TableRow
+                      key={`${row.id}-expanded`}
+                      className="hover:bg-transparent"
+                    >
+                      <TableCell
+                        colSpan={row.getVisibleCells().length}
+                        className="p-0"
+                      >
+                        {renderSubComponent({ row })}
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </Fragment>
               ))
             ) : emptyState ? (
               <TableRow className="hover:bg-transparent">

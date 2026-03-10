@@ -50,7 +50,7 @@ export const Route = createFileRoute("/_layout")({
 
 const routeLabels: Record<string, string> = {
   admin: "Users",
-  popups: "Popups",
+  popups: "Events",
   products: "Products",
   coupons: "Coupons",
   groups: "Groups",
@@ -59,7 +59,7 @@ const routeLabels: Record<string, string> = {
   attendees: "Attendees",
   humans: "Humans",
   payments: "Payments",
-  tenants: "Tenants",
+  tenants: "Organizations",
   settings: "Settings",
   new: "New",
   edit: "Edit",
@@ -98,7 +98,7 @@ const entityResolvers: Record<
   popups: {
     queryKey: "popups",
     queryFn: (id) => PopupsService.getPopup({ popupId: id }) as never,
-    getName: (d) => (d.name as string) || "Popup",
+    getName: (d) => (d.name as string) || "Event",
   },
   products: {
     queryKey: "products",
@@ -131,7 +131,7 @@ const entityResolvers: Record<
   tenants: {
     queryKey: "tenants",
     queryFn: (id) => TenantsService.getTenant({ tenantId: id }) as never,
-    getName: (d) => (d.name as string) || "Tenant",
+    getName: (d) => (d.name as string) || "Organization",
   },
   admin: {
     queryKey: "users",

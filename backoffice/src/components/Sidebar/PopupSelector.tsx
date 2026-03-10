@@ -102,7 +102,7 @@ export function PopupSelector() {
   if (needsTenantSelection) {
     return (
       <div className="py-2 text-sm text-muted-foreground">
-        Select a tenant first
+        Select an organization first
       </div>
     )
   }
@@ -110,7 +110,7 @@ export function PopupSelector() {
   if (isLoading) {
     return (
       <div className="space-y-2">
-        <Label className="text-xs text-muted-foreground">Popup</Label>
+        <Label className="text-xs text-muted-foreground">Event</Label>
         <Skeleton className="h-9 w-full" />
       </div>
     )
@@ -119,7 +119,7 @@ export function PopupSelector() {
   if (!popups?.results?.length) {
     return (
       <div className="py-2 text-sm text-muted-foreground">
-        {isError ? "Failed to load popups" : "No popups available"}
+        {isError ? "Failed to load events" : "No events available"}
       </div>
     )
   }
@@ -128,11 +128,11 @@ export function PopupSelector() {
     <div className="space-y-2">
       <Label className="text-xs text-muted-foreground flex items-center gap-1">
         <Calendar className="h-3 w-3" />
-        Popup
+        Event
       </Label>
       <Select value={selectedPopupId ?? ""} onValueChange={handlePopupChange}>
         <SelectTrigger className="w-full">
-          <SelectValue placeholder="Select popup" />
+          <SelectValue placeholder="Select event" />
         </SelectTrigger>
         <SelectContent>
           {popups.results.map((popup) => (
@@ -151,7 +151,7 @@ export function PopupSelector() {
           <DialogHeader>
             <DialogTitle>Unsaved changes</DialogTitle>
             <DialogDescription>
-              You have unsaved changes that will be lost if you switch popups.
+              You have unsaved changes that will be lost if you switch events.
               Are you sure you want to continue?
             </DialogDescription>
           </DialogHeader>

@@ -41,7 +41,7 @@ const DeleteUser = ({ id, onSuccess }: DeleteUserProps) => {
     },
     onError: createErrorHandler(showErrorToast),
     onSettled: () => {
-      queryClient.invalidateQueries()
+      queryClient.invalidateQueries({ queryKey: ["users"] })
     },
   })
 

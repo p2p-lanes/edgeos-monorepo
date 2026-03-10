@@ -1,3 +1,5 @@
+import re
+import unicodedata
 import uuid
 from typing import Any
 
@@ -6,8 +8,17 @@ from sqlmodel import Session, col, func, select
 
 from app.api.form_field.models import FormFields
 from app.api.form_field.schemas import FormFieldCreate, FormFieldType, FormFieldUpdate
+from app.api.form_section.models import FormSections
 from app.api.popup.models import Popups
 from app.api.shared.crud import BaseCRUD
+
+
+def _slugify(text: str) -> str:
+    """Convert text to a slug suitable for use as a field name."""
+    text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
+    text = re.sub(r"[^\w\s]", "", text.lower())
+    text = re.sub(r"[\s]+", "_", text).strip("_")
+    return text[:80] or "field"
 
 
 class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
@@ -22,6 +33,18 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
         )
         return session.exec(statement).first()
 
+    def generate_field_name(
+        self, session: Session, label: str, popup_id: uuid.UUID
+    ) -> str:
+        """Generate a unique field name from a label."""
+        base = _slugify(label)
+        name = base
+        counter = 1
+        while self.get_by_name(session, name, popup_id):
+            name = f"{base}_{counter}"
+            counter += 1
+        return name
+
     def find_by_popup(
         self,
         session: Session,
@@ -32,8 +55,9 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
     ) -> tuple[list[FormFields], int]:
         statement = (
             select(FormFields)
+            .outerjoin(FormSections, FormFields.section_id == FormSections.id)
             .where(FormFields.popup_id == popup_id)
-            .order_by(FormFields.section, FormFields.position)  # type: ignore[arg-type]
+            .order_by(FormSections.order, FormFields.position)  # type: ignore[arg-type]
         )
 
         # Apply text search if provided
@@ -113,6 +137,12 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
                         f"Field '{field.label}' must be one of: {', '.join(field.options)}"
                     )
 
+            elif field_type == FormFieldType.SELECT_CARDS.value:
+                if field.options and value not in field.options:
+                    errors.append(
+                        f"Field '{field.label}' must be one of: {', '.join(field.options)}"
+                    )
+
             elif field_type == FormFieldType.MULTISELECT.value:
                 if not isinstance(value, list):
                     errors.append(f"Field '{field.label}' must be a list")
@@ -153,129 +183,102 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
         popup = session.get(Popups, popup_id)
         popup_name = popup.name if popup else "the event"
 
-        base_fields: dict[str, Any] = {
-            # Human profile fields (target: "human")
-            "first_name": {
-                "type": "text",
-                "label": "First name",
-                "required": True,
-                "section": "profile",
-                "position": 0,
-                "target": "human",
-            },
-            "last_name": {
-                "type": "text",
-                "label": "Last name",
-                "required": True,
-                "section": "profile",
-                "position": 1,
-                "target": "human",
-            },
-            "telegram": {
-                "type": "text",
-                "label": "Telegram username",
-                "required": True,
-                "section": "profile",
-                "position": 2,
-                "target": "human",
-                "placeholder": "username",
-                "help_text": f"The primary form of communication during {popup_name} will be a Telegram group, so create an account if you don't already have one",
-            },
-            "residence": {
-                "type": "text",
-                "label": "Usual location of residence",
-                "required": False,
-                "section": "profile",
-                "position": 3,
-                "target": "human",
-                "placeholder": "City, State/Region, Country",
-                "help_text": "Please format it like [City, State/Region, Country].",
-            },
-            "gender": {
-                "type": "select",
-                "label": "Gender",
-                "required": True,
-                "section": "profile",
-                "position": 4,
-                "target": "human",
-                "options": ["Male", "Female", "Non-binary", "Specify"],
-            },
-            "age": {
-                "type": "select",
-                "label": "Age",
-                "required": True,
-                "section": "profile",
-                "position": 5,
-                "target": "human",
-                "options": ["18-24", "25-34", "35-44", "45-54", "55+"],
-            },
-            "organization": {
-                "type": "text",
-                "label": "Organization",
-                "required": False,
-                "section": "profile",
-                "position": 6,
-                "target": "human",
-            },
-            "role": {
-                "type": "text",
-                "label": "Role",
-                "required": False,
-                "section": "profile",
-                "position": 7,
-                "target": "human",
-            },
-            # Application fields (target: "application")
-            "referral": {
-                "type": "text",
-                "label": "Did anyone refer you?",
-                "required": False,
-                "section": "profile",
-                "position": 8,
-                "target": "application",
-                "help_text": "List everyone who encouraged you to apply.",
-            },
-            "info_not_shared": {
-                "type": "multiselect",
-                "label": "Info I'm NOT willing to share with other attendees",
-                "required": False,
-                "section": "profile",
-                "position": 9,
-                "target": "application",
-                "help_text": "We will make a directory to make it easier for attendees to coordinate",
-                "options": [
-                    "Email",
-                    "Telegram",
-                    "Organization",
-                    "Role",
-                    "Gender",
-                    "Age",
-                    "Residence",
-                ],
-            },
-        }
+        # Load sections for this popup
+        from app.api.form_section.crud import form_sections_crud
+
+        db_sections, _ = form_sections_crud.find_by_popup(
+            session, popup_id, skip=0, limit=100
+        )
+
+        # Load base field configs from DB
+        from app.api.base_field_config.constants import BASE_FIELD_DEFINITIONS
+        from app.api.base_field_config.crud import base_field_configs_crud
+
+        db_configs = base_field_configs_crud.find_by_popup(session, popup_id)
+        config_map = {c.field_name: c for c in db_configs}
+
+        # Determine which companion fields to include based on popup settings
+        spouse_fields = {"partner", "partner_email"}
+        children_fields = {"kids"}
+        skip_fields: set[str] = set()
+        if popup and not popup.allows_spouse:
+            skip_fields |= spouse_fields
+        if popup and not popup.allows_children:
+            skip_fields |= children_fields
+
+        # Build base fields by merging hardcoded definitions with DB configs
+        base_fields: dict[str, Any] = {}
+        for field_name, definition in BASE_FIELD_DEFINITIONS.items():
+            if field_name in skip_fields:
+                continue
+            entry: dict[str, Any] = {
+                "type": definition["type"],
+                "label": definition["label"],
+                "required": definition["required"],
+                "target": definition["target"],
+            }
+
+            # Merge configurable attrs from DB config or fall back to defaults
+            config = config_map.get(field_name)
+            if config:
+                entry["section_id"] = (
+                    str(config.section_id) if config.section_id else None
+                )
+                entry["position"] = config.position
+                if config.options:
+                    entry["options"] = config.options
+                if config.placeholder:
+                    entry["placeholder"] = config.placeholder
+                if config.help_text:
+                    entry["help_text"] = config.help_text.replace(
+                        "{popup_name}", popup_name
+                    )
+            else:
+                # Fallback for old popups without configs
+                entry["section_id"] = None
+                entry["position"] = definition.get("default_position", 0)
+                default_options = definition.get("default_options")
+                if default_options:
+                    entry["options"] = default_options
+                default_placeholder = definition.get("default_placeholder")
+                if default_placeholder:
+                    entry["placeholder"] = default_placeholder
+                default_help_text = definition.get("default_help_text")
+                if default_help_text:
+                    entry["help_text"] = default_help_text.replace(
+                        "{popup_name}", popup_name
+                    )
+
+            base_fields[field_name] = entry
 
         # Build custom fields schema
         custom_fields = {}
         for field in fields:
-            custom_fields[field.name] = {
+            custom_entry: dict[str, Any] = {
                 "type": field.field_type,
                 "label": field.label,
                 "required": field.required,
-                "section": field.section or None,
+                "section_id": str(field.section_id) if field.section_id else None,
                 "position": field.position,
             }
             if field.options:
-                custom_fields[field.name]["options"] = field.options
+                custom_entry["options"] = field.options
             if field.placeholder:
-                custom_fields[field.name]["placeholder"] = field.placeholder
+                custom_entry["placeholder"] = field.placeholder
             if field.help_text:
-                custom_fields[field.name]["help_text"] = field.help_text
+                custom_entry["help_text"] = field.help_text
+            custom_fields[field.name] = custom_entry
 
-        sections = ["profile"]
-        for f in custom_fields.values():
-            if f["section"] and f["section"] not in sections:
-                sections.append(f["section"])
+        # Build sections list from DB
+        sections = [
+            {
+                "id": str(s.id),
+                "label": s.label,
+                "description": s.description,
+                "order": s.order,
+            }
+            for s in db_sections
+        ]
 
         return {
             "base_fields": base_fields,

@@ -10,9 +10,11 @@ from app.api.tenant.schemas import TenantBase
 if TYPE_CHECKING:
     from app.api.application.models import Applications
     from app.api.attendee.models import Attendees
+    from app.api.base_field_config.models import BaseFieldConfigs
     from app.api.coupon.models import Coupons
     from app.api.email_template.models import EmailTemplates
     from app.api.form_field.models import FormFields
+    from app.api.form_section.models import FormSections
     from app.api.group.models import Groups
     from app.api.human.models import Humans
     from app.api.payment.models import Payments
@@ -54,6 +56,9 @@ class Tenants(TenantBase, table=True):
     form_fields: list["FormFields"] = Relationship(
         back_populates="tenant", cascade_delete=True
     )
+    form_sections: list["FormSections"] = Relationship(
+        back_populates="tenant", cascade_delete=True
+    )
     email_templates: list["EmailTemplates"] = Relationship(
         back_populates="tenant", cascade_delete=True
     )
@@ -66,5 +71,8 @@ class Tenants(TenantBase, table=True):
         back_populates="tenant", cascade_delete=True
     )
     payments: list["Payments"] = Relationship(
+        back_populates="tenant", cascade_delete=True
+    )
+    base_field_configs: list["BaseFieldConfigs"] = Relationship(
         back_populates="tenant", cascade_delete=True
     )

@@ -1,7 +1,16 @@
 import { useForm } from "@tanstack/react-form"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
-import { Clock, DollarSign, Hash, Power, Users } from "lucide-react"
+import {
+  Calendar,
+  Clock,
+  CloudRain,
+  DollarSign,
+  Hash,
+  Power,
+  Shield,
+  Users,
+} from "lucide-react"
 import {
   type ProductCategory,
   type ProductCreate,
@@ -16,6 +25,7 @@ import { FieldError } from "@/components/Common/FieldError"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { ImageUpload } from "@/components/ui/image-upload"
 import {
   HeroInput,
   InlineRow,
@@ -71,6 +81,12 @@ const ATTENDEE_CATEGORIES: { value: TicketAttendeeCategory; label: string }[] =
     { value: "spouse", label: "Spouse" },
     { value: "kid", label: "Kid" },
   ]
+
+/** Extract YYYY-MM-DD from an ISO date string like "2026-05-10T00:00:00Z" */
+const toDateInputValue = (iso?: string | null): string => {
+  if (!iso) return ""
+  return iso.slice(0, 10)
+}
 
 export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
   const navigate = useNavigate()
@@ -128,12 +144,18 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
       name: defaultValues?.name ?? "",
       price: defaultValues?.price?.toString() ?? "",
       description: defaultValues?.description ?? "",
+      image_url: defaultValues?.image_url ?? "",
       category: (defaultValues?.category ?? "ticket") as ProductCategory,
       attendee_category: (defaultValues?.attendee_category ??
         "main") as TicketAttendeeCategory,
       duration_type: (defaultValues?.duration_type ?? "full") as TicketDuration,
       is_active: defaultValues?.is_active ?? true,
+      exclusive: defaultValues?.exclusive ?? false,
       max_quantity: defaultValues?.max_quantity?.toString() ?? "",
+      start_date: toDateInputValue(defaultValues?.start_date),
+      end_date: toDateInputValue(defaultValues?.end_date),
+      insurance_percentage:
+        defaultValues?.insurance_percentage?.toString() ?? "",
     },
     onSubmit: ({ value }) => {
       if (readOnly) return
@@ -149,11 +171,16 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
           name: value.name,
           price: value.price,
           description: value.description || null,
+          image_url: value.image_url || null,
           category: value.category,
           attendee_category: isTicket ? value.attendee_category : null,
           duration_type: isTicket ? value.duration_type : null,
+          start_date: isTicket && value.start_date ? value.start_date : null,
+          end_date: isTicket && value.end_date ? value.end_date : null,
           is_active: value.is_active,
+          exclusive: value.exclusive,
           max_quantity: maxQty,
+          insurance_percentage: value.insurance_percentage || null,
         })
       } else {
         if (!selectedPopupId) {
@@ -165,11 +192,17 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
           name: value.name,
           price: value.price,
           description: value.description || undefined,
+          image_url: value.image_url || undefined,
           category: value.category,
           attendee_category: isTicket ? value.attendee_category : undefined,
           duration_type: isTicket ? value.duration_type : undefined,
+          start_date:
+            isTicket && value.start_date ? value.start_date : undefined,
+          end_date: isTicket && value.end_date ? value.end_date : undefined,
           is_active: value.is_active,
+          exclusive: value.exclusive,
           max_quantity: maxQty ?? undefined,
+          insurance_percentage: value.insurance_percentage || undefined,
         })
       }
     },
@@ -253,10 +286,6 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
               <span className="text-xs uppercase tracking-wider">Slug</span>
               <p className="font-mono">{defaultValues.slug}</p>
             </div>
-            <div>
-              <span className="text-xs uppercase tracking-wider">ID</span>
-              <p className="font-mono text-xs">{defaultValues.id}</p>
-            </div>
           </div>
         )}
 
@@ -275,6 +304,22 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
                 value={field.state.value}
                 onBlur={field.handleBlur}
                 onChange={(e) => field.handleChange(e.target.value)}
+                disabled={readOnly}
+              />
+            </div>
+          )}
+        </form.Field>
+
+        {/* Image */}
+        <form.Field name="image_url">
+          {(field) => (
+            <div className="space-y-2">
+              <p className="px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Image
+              </p>
+              <ImageUpload
+                value={field.state.value || null}
+                onChange={(url) => field.handleChange(url ?? "")}
                 disabled={readOnly}
               />
             </div>
@@ -352,12 +397,49 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
             )}
           </form.Field>
 
+          <form.Field name="insurance_percentage">
+            {(field) => (
+              <InlineRow
+                icon={<CloudRain className="h-4 w-4 text-muted-foreground" />}
+                label="Insurance %"
+                description="Leave empty to disable insurance for this product"
+              >
+                <Input
+                  placeholder="—"
+                  type="text"
+                  inputMode="decimal"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  disabled={readOnly}
+                  className="max-w-24 text-sm"
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+
           <form.Field name="is_active">
             {(field) => (
               <InlineRow
                 icon={<Power className="h-4 w-4 text-muted-foreground" />}
                 label="Active"
                 description="Product is available for purchase"
+              >
+                <Switch
+                  checked={field.state.value}
+                  onCheckedChange={(checked) => field.handleChange(checked)}
+                  disabled={readOnly}
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+
+          <form.Field name="exclusive">
+            {(field) => (
+              <InlineRow
+                icon={<Shield className="h-4 w-4 text-muted-foreground" />}
+                label="Exclusive"
+                description="Only one exclusive product can be selected at a time"
               >
                 <Switch
                   checked={field.state.value}
@@ -434,6 +516,46 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
                             ))}
                           </SelectContent>
                         </Select>
+                      </InlineRow>
+                    )}
+                  </form.Field>
+
+                  <form.Field name="start_date">
+                    {(field) => (
+                      <InlineRow
+                        icon={
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                        }
+                        label="Start Date"
+                        description="When the ticket validity begins"
+                      >
+                        <Input
+                          type="date"
+                          value={field.state.value}
+                          onChange={(e) => field.handleChange(e.target.value)}
+                          disabled={readOnly}
+                          className="max-w-44 text-sm"
+                        />
+                      </InlineRow>
+                    )}
+                  </form.Field>
+
+                  <form.Field name="end_date">
+                    {(field) => (
+                      <InlineRow
+                        icon={
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                        }
+                        label="End Date"
+                        description="When the ticket validity ends"
+                      >
+                        <Input
+                          type="date"
+                          value={field.state.value}
+                          onChange={(e) => field.handleChange(e.target.value)}
+                          disabled={readOnly}
+                          className="max-w-44 text-sm"
+                        />
                       </InlineRow>
                     )}
                   </form.Field>

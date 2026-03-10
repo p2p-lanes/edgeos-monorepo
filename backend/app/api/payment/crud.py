@@ -54,7 +54,7 @@ def _get_credit(application: Applications, discount_value: Decimal) -> Decimal:
         if not patreon:
             total += subtotal
 
-    credit = Decimal(str(application.credit)) if application.credit else Decimal("0")  # type: ignore[attr-defined]
+    credit = Decimal(str(application.credit)) if application.credit else Decimal("0")
     return _get_discounted_price(total, discount_value) + credit
 
 
@@ -167,6 +167,20 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         return results, total
 
+    def get_latest_by_application(
+        self,
+        session: Session,
+        application_id: uuid.UUID,
+    ) -> Payments | None:
+        """Get the most recent payment for an application."""
+        statement = (
+            select(Payments)
+            .where(Payments.application_id == application_id)
+            .order_by(desc(Payments.created_at))  # type: ignore[arg-type]
+            .limit(1)
+        )
+        return session.exec(statement).first()
+
     def find_by_popup(
         self,
         session: Session,
@@ -189,6 +203,11 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         statement = statement.order_by(desc(Payments.created_at))  # type: ignore[arg-type]
         statement = statement.offset(skip).limit(limit)
+        statement = statement.options(
+            selectinload(Payments.products_snapshot).selectinload(
+                PaymentProducts.attendee
+            ),  # type: ignore[arg-type]
+        )
         results = list(session.exec(statement).all())
 
         return results, total
@@ -217,6 +236,11 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         statement = statement.order_by(desc(Payments.created_at))  # type: ignore[arg-type]
         statement = statement.offset(skip).limit(limit)
+        statement = statement.options(
+            selectinload(Payments.products_snapshot).selectinload(
+                PaymentProducts.attendee
+            ),  # type: ignore[arg-type]
+        )
         results = list(session.exec(statement).all())
 
         return results, total
@@ -383,6 +407,27 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         return already_patreon
 
+    def _calculate_insurance(
+        self,
+        session: Session,
+        requested_products: list[PaymentProductRequest],
+    ) -> Decimal:
+        """Calculate insurance amount based on product insurance percentages."""
+        product_ids = list({rp.product_id for rp in requested_products})
+        statement = select(Products).where(Products.id.in_(product_ids))  # type: ignore[attr-defined]
+        product_models = {p.id: p for p in session.exec(statement).all()}
+
+        total = Decimal("0")
+        for req_prod in requested_products:
+            product = product_models.get(req_prod.product_id)
+            if not product or not product.insurance_percentage:
+                continue
+            total += (
+                product.price * req_prod.quantity * product.insurance_percentage / 100
+            ).quantize(MONEY_PRECISION, rounding=ROUND_HALF_UP)
+
+        return total
+
     def _apply_discounts(
         self,
         session: Session,
@@ -391,7 +436,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         already_patreon: bool,
     ) -> PaymentPreview:
         """Calculate all discounts and return payment preview."""
-        discount_assigned = Decimal(str(application.discount_assigned or 0))  # type: ignore[attr-defined]
+        discount_assigned = Decimal("0")
 
         response = PaymentPreview(
             application_id=application.id,
@@ -457,6 +502,12 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 response.coupon_code = coupon.code
                 response.discount_value = coupon_discount
 
+        # Calculate insurance if requested
+        if obj.insurance:
+            insurance_amount = self._calculate_insurance(session, obj.products)
+            response.insurance_amount = insurance_amount
+            response.amount += insurance_amount
+
         return response
 
     def preview_payment(
@@ -512,12 +563,12 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         self,
         session: Session,
         obj: PaymentCreate,
-    ) -> tuple[Payments | None, PaymentPreview]:
+    ) -> tuple[Payments, PaymentPreview]:
         """
         Create a payment with all validations and discount calculations.
 
-        For zero-amount payments, returns (None, preview) with status approved.
-        For paid payments, returns (payment, preview) with checkout info from SimpleFI.
+        For zero-amount payments, auto-approves and adds products directly.
+        For paid payments, returns payment with checkout info from SimpleFI.
         """
         preview = self.preview_payment(session, obj)
 
@@ -538,16 +589,79 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             else:
                 application.credit = 0.0
 
+            # Clear existing products if editing passes
+            if obj.edit_passes:
+                # Build a temporary payment-like object to reuse _clear_application_products
+                attendee_ids = {p.attendee_id for p in obj.products}
+                statement = select(AttendeeProducts).where(
+                    AttendeeProducts.attendee_id.in_(attendee_ids)  # type: ignore[attr-defined]
+                )
+                existing_products = list(session.exec(statement).all())
+                for ap in existing_products:
+                    session.delete(ap)
+                session.flush()
+
             # Auto-approve and add products directly
             self._add_products_to_attendees(session, obj.products)
 
+            # Get product details for snapshot
+            product_ids = [p.product_id for p in obj.products]
+            prod_statement = select(Products).where(Products.id.in_(product_ids))  # type: ignore[attr-defined]
+            products_map = {p.id: p for p in session.exec(prod_statement).all()}
+
+            # Create payment record for audit trail
+            payment = Payments(
+                tenant_id=application.tenant_id,
+                application_id=obj.application_id,
+                status=PaymentStatus.APPROVED.value,
+                amount=preview.amount,
+                insurance_amount=preview.insurance_amount,
+                currency=preview.currency,
+                coupon_id=preview.coupon_id,
+                coupon_code=preview.coupon_code,
+                discount_value=preview.discount_value,
+                edit_passes=obj.edit_passes,
+                group_id=preview.group_id,
+                source=None,
+            )
+            session.add(payment)
+            session.flush()
+
+            # Create product snapshots
+            for req_prod in obj.products:
+                product = products_map.get(req_prod.product_id)
+                if product:
+                    payment_product = PaymentProducts(
+                        tenant_id=application.tenant_id,
+                        payment_id=payment.id,
+                        product_id=req_prod.product_id,
+                        attendee_id=req_prod.attendee_id,
+                        quantity=req_prod.quantity,
+                        product_name=product.name,
+                        product_description=product.description,
+                        product_price=product.price,
+                        product_category=product.category or "",
+                    )
+                    session.add(payment_product)
+
+            # Increment coupon usage if used
+            if preview.coupon_id:
+                coupons_crud.use_coupon(session, preview.coupon_id)
+
+            # Clear cart after successful purchase
+            from app.api.cart.crud import carts_crud
+
+            carts_crud.delete_by_human_popup(
+                session, human_id=application.human_id, popup_id=application.popup_id
+            )
+
             session.add(application)
             session.commit()
-            session.refresh(application)
+            session.refresh(payment)
 
-            # Return preview with approved status
+            # Return payment with approved status
             preview.status = PaymentStatus.APPROVED.value
-            return None, preview
+            return payment, preview
 
         # Validate popup has SimpleFI API key configured
         if not application.popup or not application.popup.simplefi_api_key:
@@ -591,9 +705,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             simplefi_response = simplefi_client.create_payment(
                 amount=preview.amount,
                 reference=reference,
+                memo=application.popup.tenant.name,
             )
         except Exception as e:
-            logger.error("Failed to create SimpleFI payment: %s", e)
+            logger.error(f"Failed to create SimpleFI payment: {e}")
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail="Failed to create payment with payment provider",
@@ -605,6 +720,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             application_id=obj.application_id,
             status=simplefi_response.status,
             amount=preview.amount,
+            insurance_amount=preview.insurance_amount,
             currency=preview.currency,
             coupon_id=preview.coupon_id,
             coupon_code=preview.coupon_code,
@@ -708,6 +824,16 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
             # Create ambassador group if patreon product was purchased
             self._create_ambassador_group(session, payment)
+
+            # Clear cart after successful payment
+            from app.api.cart.crud import carts_crud
+
+            if payment.application:
+                carts_crud.delete_by_human_popup(
+                    session,
+                    human_id=payment.application.human_id,
+                    popup_id=payment.application.popup_id,
+                )
 
             # Single atomic commit for the entire operation
             session.commit()
@@ -814,6 +940,27 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         )
 
         return group
+
+    def _remove_products_from_attendees(
+        self,
+        session: Session,
+        payment: Payments,
+    ) -> None:
+        """Remove products from attendees that were added by this payment."""
+        if not payment.products_snapshot:
+            return
+
+        logger.info("Removing products from attendees for payment %s", payment.id)
+        for product_snapshot in payment.products_snapshot:
+            statement = select(AttendeeProducts).where(
+                AttendeeProducts.attendee_id == product_snapshot.attendee_id,
+                AttendeeProducts.product_id == product_snapshot.product_id,
+            )
+            attendee_product = session.exec(statement).first()
+            if attendee_product:
+                session.delete(attendee_product)
+
+        session.flush()
 
     def _add_products_to_attendees(
         self,

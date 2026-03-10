@@ -1,7 +1,10 @@
+import csv
+import io
 import uuid
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, status
+from fastapi.responses import Response
 
 from app.api.application import crud
 from app.api.application.schemas import (
@@ -11,9 +14,13 @@ from app.api.application.schemas import (
     ApplicationPublic,
     ApplicationStatus,
     ApplicationUpdate,
+    AssociatedAttendee,
+    AttendeesDirectoryEntry,
+    DirectoryProduct,
 )
 from app.api.attendee.schemas import (
     AttendeeCreate,
+    AttendeePurchases,
     AttendeePublic,
     AttendeeUpdate,
     AttendeeWithTickets,
@@ -27,7 +34,11 @@ from app.core.dependencies.users import (
     HumanTenantSession,
     TenantSession,
 )
-from app.services.email import ApplicationReceivedContext, get_email_service
+from app.services.email import (
+    ApplicationAcceptedContext,
+    ApplicationReceivedContext,
+    get_email_service,
+)
 
 router = APIRouter(prefix="/applications", tags=["applications"])
 
@@ -326,6 +337,40 @@ async def list_my_tickets(
     return results
 
 
+@router.get("/my/{popup_id}/purchases", response_model=list[AttendeePurchases])
+async def get_my_purchases(
+    popup_id: uuid.UUID,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+) -> list[AttendeePurchases]:
+    """Get purchased products grouped by attendee for a popup (Portal)."""
+    from app.api.attendee.crud import attendees_crud
+    from app.api.product.schemas import ProductWithQuantity
+
+    attendees = attendees_crud.find_purchases_by_human_popup(
+        db, human_id=current_human.id, popup_id=popup_id
+    )
+
+    results = []
+    for attendee in attendees:
+        products = []
+        for ap in attendee.attendee_products:
+            product = ProductWithQuantity.model_validate(ap.product)
+            product.quantity = ap.quantity
+            products.append(product)
+
+        results.append(
+            AttendeePurchases(
+                attendee_id=attendee.id,
+                attendee_name=attendee.name,
+                attendee_category=attendee.category,
+                products=products,
+            )
+        )
+
+    return results
+
+
 @router.get("/my/{popup_id}", response_model=ApplicationPublic)
 async def get_my_application(
     popup_id: uuid.UUID,
@@ -373,8 +418,8 @@ async def create_my_application(
         human_id=current_human.id,
     )
 
-    # Send application received email if status is IN_REVIEW
-    if application.status == ApplicationStatus.IN_REVIEW:
+    # Send appropriate email based on application status
+    if application.status == ApplicationStatus.IN_REVIEW.value:
         email_service = get_email_service()
         await email_service.send_application_received(
             to=current_human.email,
@@ -383,6 +428,21 @@ async def create_my_application(
                 first_name=current_human.first_name or "",
                 last_name=current_human.last_name or "",
                 email=current_human.email,
+                popup_name=application.popup.name,
+            ),
+            from_address=application.popup.tenant.sender_email,
+            from_name=application.popup.tenant.sender_name,
+            popup_id=application.popup_id,
+            db_session=db,
+        )
+    elif application.status == ApplicationStatus.ACCEPTED.value:
+        email_service = get_email_service()
+        await email_service.send_application_accepted(
+            to=current_human.email,
+            subject=f"Application Accepted for {application.popup.name}",
+            context=ApplicationAcceptedContext(
+                first_name=current_human.first_name or "",
+                last_name=current_human.last_name or "",
                 popup_name=application.popup.name,
             ),
             from_address=application.popup.tenant.sender_email,
@@ -422,17 +482,37 @@ async def update_my_application(
             detail="Cannot update application in current status",
         )
 
-    # Handle status change to IN_REVIEW
+    # Separate profile fields from application fields
+    from app.api.human.crud import humans_crud
+    from app.api.human.schemas import HumanUpdate
+
     update_data = app_in.model_dump(exclude_unset=True)
-    if "status" in update_data:
-        if hasattr(update_data["status"], "value"):
-            update_data["status"] = update_data["status"].value
 
-        if update_data["status"] == ApplicationStatus.IN_REVIEW.value:
+    profile_fields = {
+        "first_name",
+        "last_name",
+        "telegram",
+        "gender",
+        "age",
+        "residence",
+    }
+    profile_update = {k: v for k, v in update_data.items() if k in profile_fields}
+    app_update = {k: v for k, v in update_data.items() if k not in profile_fields}
+
+    # Update human profile if needed
+    if profile_update:
+        humans_crud.update(db, application.human, HumanUpdate(**profile_update))
+
+    # Handle status change to IN_REVIEW
+    if "status" in app_update:
+        if hasattr(app_update["status"], "value"):
+            app_update["status"] = app_update["status"].value
+
+        if app_update["status"] == ApplicationStatus.IN_REVIEW.value:
             if not application.submitted_at:
-                update_data["submitted_at"] = datetime.now(UTC)
+                app_update["submitted_at"] = datetime.now(UTC)
 
-    for field, value in update_data.items():
+    for field, value in app_update.items():
         setattr(application, field, value)
 
     db.add(application)
@@ -440,6 +520,182 @@ async def update_my_application(
     db.refresh(application)
 
     return _build_application_public(application)
+
+
+def _build_directory_entry(application) -> AttendeesDirectoryEntry:
+    """Build a single directory entry from an application."""
+    human = application.human
+    info_hidden = set(application.info_not_shared or [])
+
+    def mask(field: str, value: str | None) -> str | None:
+        return "*" if field in info_hidden else value
+
+    # Find main attendee and their products
+    main_attendee = application.get_main_attendee()
+    products: list[DirectoryProduct] = []
+    check_in = None
+    check_out = None
+
+    if main_attendee:
+        for ap in main_attendee.attendee_products:
+            p = ap.product
+            products.append(
+                DirectoryProduct(
+                    id=p.id,
+                    name=p.name,
+                    slug=p.slug,
+                    category=p.category,
+                    duration_type=p.duration_type,
+                    start_date=p.start_date,
+                    end_date=p.end_date,
+                )
+            )
+            if p.start_date:
+                if check_in is None or p.start_date < check_in:
+                    check_in = p.start_date
+            if p.end_date:
+                if check_out is None or p.end_date > check_out:
+                    check_out = p.end_date
+
+    has_kids = any(a.category == "kid" for a in application.attendees)
+    brings_kids: bool | str = "*" if "brings_kids" in info_hidden else has_kids
+
+    associated = [
+        AssociatedAttendee(
+            name=a.name,
+            category=a.category,
+            gender=a.gender,
+            email=a.email,
+        )
+        for a in application.attendees
+        if a.category != "main"
+    ]
+
+    # Read organization/role from application custom_fields
+    custom = application.custom_fields or {}
+
+    return AttendeesDirectoryEntry(
+        id=application.id,
+        first_name=mask("first_name", human.first_name if human else None),
+        last_name=mask("last_name", human.last_name if human else None),
+        email=mask("email", human.email if human else None),
+        telegram=mask("telegram", human.telegram if human else None),
+        role=mask("role", custom.get("role")),
+        organization=mask("organization", custom.get("organization")),
+        residence=mask("residence", human.residence if human else None),
+        age=mask("age", human.age if human else None),
+        gender=mask("gender", human.gender if human else None),
+        picture_url=human.picture_url if human else None,
+        brings_kids=brings_kids,
+        participation=products,
+        check_in=check_in,
+        check_out=check_out,
+        associated_attendees=associated,
+    )
+
+
+@router.get(
+    "/my/directory/{popup_id}", response_model=ListModel[AttendeesDirectoryEntry]
+)
+async def list_attendees_directory(
+    popup_id: uuid.UUID,
+    db: HumanTenantSession,
+    _: CurrentHuman,
+    skip: PaginationSkip = 0,
+    limit: PaginationLimit = 100,
+    q: str | None = None,
+    brings_kids: bool | None = None,
+    participation: str | None = None,
+) -> ListModel[AttendeesDirectoryEntry]:
+    """List attendees directory for a popup (Portal).
+
+    Returns accepted/in-review applications with at least one product.
+    Respects info_not_shared masking.
+    """
+    applications, total = crud.applications_crud.find_directory(
+        db,
+        popup_id=popup_id,
+        skip=skip,
+        limit=limit,
+        q=q,
+        brings_kids=brings_kids,
+        participation=participation,
+    )
+
+    results = [_build_directory_entry(a) for a in applications]
+
+    return ListModel[AttendeesDirectoryEntry](
+        results=results,
+        paging=Paging(offset=skip, limit=limit, total=total),
+    )
+
+
+@router.get("/my/directory/{popup_id}/csv")
+async def export_attendees_directory_csv(
+    popup_id: uuid.UUID,
+    db: HumanTenantSession,
+    _: CurrentHuman,
+    q: str | None = None,
+    brings_kids: bool | None = None,
+    participation: str | None = None,
+) -> Response:
+    """Export attendees directory as CSV (Portal).
+
+    No pagination — fetches all matching entries.
+    """
+    applications, _ = crud.applications_crud.find_directory(
+        db,
+        popup_id=popup_id,
+        skip=0,
+        limit=10000,
+        q=q,
+        brings_kids=brings_kids,
+        participation=participation,
+    )
+
+    entries = [_build_directory_entry(a) for a in applications]
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(
+        [
+            "First Name",
+            "Last Name",
+            "Email",
+            "Telegram",
+            "Role",
+            "Organization",
+            "Residence",
+            "Age",
+            "Gender",
+            "Brings Kids",
+            "Check In",
+            "Check Out",
+        ]
+    )
+    for e in entries:
+        writer.writerow(
+            [
+                e.first_name or "",
+                e.last_name or "",
+                e.email or "",
+                e.telegram or "",
+                e.role or "",
+                e.organization or "",
+                e.residence or "",
+                e.age or "",
+                e.gender or "",
+                str(e.brings_kids),
+                e.check_in.isoformat() if e.check_in else "",
+                e.check_out.isoformat() if e.check_out else "",
+            ]
+        )
+
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=attendees.csv"},
+    )
 
 
 @router.post(

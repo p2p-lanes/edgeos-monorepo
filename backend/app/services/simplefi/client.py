@@ -67,6 +67,7 @@ class SimpleFIClient:
         self,
         amount: Decimal,
         reference: dict[str, Any] | None = None,
+        memo: str = "EdgeOS Payment",
     ) -> SimpleFIPaymentResponse:
         """
         Create a payment request in SimpleFI.
@@ -86,7 +87,7 @@ class SimpleFIClient:
             "amount": float(amount),
             "currency": "USD",
             "reference": reference or {},
-            "memo": "EdgeOS Payment",
+            "memo": memo,
             "notification_url": notification_url,
         }
 
@@ -96,7 +97,7 @@ class SimpleFIClient:
         return SimpleFIPaymentResponse(
             id=data["id"],
             status=data["status"],
-            checkout_url=data["checkout_url"],
+            checkout_url=data["checkout_v2_url"],
         )
 
 

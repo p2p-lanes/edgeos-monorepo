@@ -204,6 +204,18 @@ const columns: ColumnDef<ProductPublic>[] = [
     cell: ({ row }) => <StatusBadge status={row.original.category || "N/A"} />,
   },
   {
+    accessorKey: "insurance_percentage",
+    header: "Insurance",
+    cell: ({ row }) => {
+      const val = row.original.insurance_percentage
+      return val ? (
+        <span className="font-mono text-sm">{val}%</span>
+      ) : (
+        <span className="text-muted-foreground">—</span>
+      )
+    },
+  },
+  {
     accessorKey: "is_active",
     header: "Status",
     cell: ({ row }) => (
@@ -253,7 +265,11 @@ function ProductsTableContent() {
       columns={columns}
       data={products.results}
       searchPlaceholder="Search by name..."
-      hiddenOnMobile={["attendee_category", "is_active"]}
+      hiddenOnMobile={[
+        "attendee_category",
+        "insurance_percentage",
+        "is_active",
+      ]}
       searchValue={search}
       onSearchChange={setSearch}
       serverPagination={{

@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 export const Route = createFileRoute("/_layout/popups/$id/edit")({
   component: EditPopupPage,
   head: () => ({
-    meta: [{ title: "Edit Popup - EdgeOS" }],
+    meta: [{ title: "Edit Event - EdgeOS" }],
   }),
 })
 
@@ -39,8 +39,8 @@ function EditPopupPage() {
 
   return (
     <FormPageLayout
-      title="Edit Popup"
-      description="Update popup settings and configuration"
+      title="Edit Event"
+      description="Update event settings and configuration"
       backTo="/popups"
     >
       <QueryErrorBoundary>
