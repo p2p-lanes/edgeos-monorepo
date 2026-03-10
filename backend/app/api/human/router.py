@@ -12,6 +12,7 @@ from app.api.human.schemas import (
 )
 from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
+from app.services.email_helpers import send_application_status_email
 from app.core.dependencies.users import (
     CurrentHuman,
     CurrentUser,
@@ -165,11 +166,19 @@ async def update_human(
         from app.api.application.schemas import ApplicationStatus
 
         applications, _ = applications_crud.find_by_human(db, human_id)
+        rejected_apps = []
         for app in applications:
             if app.status == ApplicationStatus.IN_REVIEW.value:
                 app.status = ApplicationStatus.REJECTED.value
                 db.add(app)
                 applications_crud.create_snapshot(db, app, "auto_rejected")
+                rejected_apps.append(app)
         db.commit()
+
+        # Send rejection emails after commit so popup/tenant data is accessible
+        for app in rejected_apps:
+            db.refresh(app)
+            if app.human:
+                await send_application_status_email(app, app.human, db)
 
     return HumanPublic.model_validate(updated)

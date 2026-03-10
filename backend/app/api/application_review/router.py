@@ -15,6 +15,7 @@ from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, 
 from app.api.user.models import Users
 from app.core.db import engine
 from app.core.dependencies.users import CurrentUser, CurrentWriter, TenantSession
+from app.services.email_helpers import send_application_status_email
 
 router = APIRouter(prefix="/applications", tags=["application-reviews"])
 
@@ -208,7 +209,17 @@ async def submit_review(
     )
 
     # Recalculate application status based on strategy
-    approval_calculator.recalculate_status(db, application)
+    status_before = application.status
+    updated_application = approval_calculator.recalculate_status(db, application)
+
+    # Send status-change emails if the application just reached a final decision
+    if updated_application.human:
+        await send_application_status_email(
+            updated_application,
+            updated_application.human,
+            db,
+            status_before=status_before,
+        )
 
     return _review_to_public(review, current_user.email, current_user.full_name)
 
