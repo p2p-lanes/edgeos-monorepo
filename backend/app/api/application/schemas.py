@@ -177,12 +177,6 @@ class ApplicationUpdate(BaseModel):
     status: UserSettableStatus | None = None
 
 
-class ApplicationAdminUpdate(ApplicationUpdate):
-    """Application schema for admin updates (can set any status)."""
-
-    status: ApplicationStatus | None = None
-
-
 class ApplicationAdminCreate(BaseModel):
     """Application schema for admin creation.
 

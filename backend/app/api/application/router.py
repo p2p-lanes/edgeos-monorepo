@@ -9,7 +9,6 @@ from fastapi.responses import Response
 from app.api.application import crud
 from app.api.application.schemas import (
     ApplicationAdminCreate,
-    ApplicationAdminUpdate,
     ApplicationCreate,
     ApplicationPublic,
     ApplicationStatus,
@@ -34,33 +33,9 @@ from app.core.dependencies.users import (
     HumanTenantSession,
     TenantSession,
 )
-from app.services.email import (
-    ApplicationAcceptedContext,
-    ApplicationReceivedContext,
-    get_email_service,
-)
+from app.services.email_helpers import send_application_status_email
 
 router = APIRouter(prefix="/applications", tags=["applications"])
-
-# Valid admin status transitions: current_status -> set of allowed next statuses
-ALLOWED_ADMIN_TRANSITIONS: dict[str, set[str]] = {
-    ApplicationStatus.DRAFT.value: {
-        ApplicationStatus.IN_REVIEW.value,
-        ApplicationStatus.WITHDRAWN.value,
-    },
-    ApplicationStatus.IN_REVIEW.value: {
-        ApplicationStatus.ACCEPTED.value,
-        ApplicationStatus.REJECTED.value,
-        ApplicationStatus.WITHDRAWN.value,
-    },
-    ApplicationStatus.ACCEPTED.value: {
-        ApplicationStatus.WITHDRAWN.value,
-    },
-    ApplicationStatus.REJECTED.value: {
-        ApplicationStatus.IN_REVIEW.value,
-    },
-    ApplicationStatus.WITHDRAWN.value: set(),  # terminal state
-}
 
 
 def _build_application_public(application) -> ApplicationPublic:
@@ -160,6 +135,9 @@ async def create_application_admin(
         app_data=app_in,
         tenant_id=tenant_id,
     )
+
+    if application.human:
+        await send_application_status_email(application, application.human, db)
 
     return _build_application_public(application)
 
@@ -419,37 +397,7 @@ async def create_my_application(
     )
 
     # Send appropriate email based on application status
-    if application.status == ApplicationStatus.IN_REVIEW.value:
-        email_service = get_email_service()
-        await email_service.send_application_received(
-            to=current_human.email,
-            subject=f"Application Received for {application.popup.name}",
-            context=ApplicationReceivedContext(
-                first_name=current_human.first_name or "",
-                last_name=current_human.last_name or "",
-                email=current_human.email,
-                popup_name=application.popup.name,
-            ),
-            from_address=application.popup.tenant.sender_email,
-            from_name=application.popup.tenant.sender_name,
-            popup_id=application.popup_id,
-            db_session=db,
-        )
-    elif application.status == ApplicationStatus.ACCEPTED.value:
-        email_service = get_email_service()
-        await email_service.send_application_accepted(
-            to=current_human.email,
-            subject=f"Application Accepted for {application.popup.name}",
-            context=ApplicationAcceptedContext(
-                first_name=current_human.first_name or "",
-                last_name=current_human.last_name or "",
-                popup_name=application.popup.name,
-            ),
-            from_address=application.popup.tenant.sender_email,
-            from_name=application.popup.tenant.sender_name,
-            popup_id=application.popup_id,
-            db_session=db,
-        )
+    await send_application_status_email(application, current_human, db)
 
     return _build_application_public(application)
 
