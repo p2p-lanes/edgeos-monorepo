@@ -62,7 +62,7 @@ export function ImageUpload({
 
   if (value) {
     return (
-      <div className={cn("relative inline-block", className)}>
+      <div className={cn("relative inline-block min-h-[80px] min-w-[80px]", className)}>
         <img
           src={value}
           alt="Uploaded"
@@ -74,7 +74,7 @@ export function ImageUpload({
             variant="destructive"
             size="icon"
             aria-label="Remove image"
-            className="absolute top-2 right-2 h-6 w-6"
+            className="absolute -top-2 -right-2 h-6 w-6"
             onClick={handleRemove}
           >
             <X className="h-3 w-3" />
@@ -87,7 +87,7 @@ export function ImageUpload({
   return (
     <div
       className={cn(
-        "border-2 border-dashed rounded-lg p-8 text-center transition-colors",
+        "border-2 border-dashed rounded-lg p-8 text-center transition-colors min-h-[140px] flex items-center justify-center",
         dragActive && "border-primary bg-primary/5",
         uploadProgress.status === "error" && "border-destructive",
         disabled && "opacity-50 cursor-not-allowed",
@@ -101,7 +101,7 @@ export function ImageUpload({
       onDrop={handleDrop}
     >
       {isUploading ? (
-        <div className="flex flex-col items-center gap-2">
+        <div className="flex w-full flex-col items-center gap-2">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           <p className="text-sm text-muted-foreground">
             Uploading... {uploadProgress.progress}%
