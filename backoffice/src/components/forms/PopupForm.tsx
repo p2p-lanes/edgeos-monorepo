@@ -139,8 +139,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
       web_url: defaultValues?.web_url ?? "",
       blog_url: defaultValues?.blog_url ?? "",
       twitter_url: defaultValues?.twitter_url ?? "",
-      terms_and_conditions_url:
-        defaultValues?.terms_and_conditions_url ?? "",
+      terms_and_conditions_url: defaultValues?.terms_and_conditions_url ?? "",
       simplefi_api_key: defaultValues?.simplefi_api_key ?? "",
       invoice_company_name: defaultValues?.invoice_company_name ?? "",
       invoice_company_address: defaultValues?.invoice_company_address ?? "",

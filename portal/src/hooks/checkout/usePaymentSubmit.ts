@@ -162,7 +162,8 @@ export function usePaymentSubmit({
       return { success: true }
     } catch (err: unknown) {
       console.error("Payment failed:", err)
-      const errorMsg = "Something went wrong with your payment. Please try again."
+      const errorMsg =
+        "Something went wrong with your payment. Please try again."
       setPromoError(errorMsg)
       toast.error(errorMsg)
       setIsSubmitting(false)

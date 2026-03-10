@@ -234,7 +234,6 @@ export default function PatronSection({ onSkip }: PatronSectionProps) {
           </div>
         )}
       </div>
-
     </div>
   )
 }

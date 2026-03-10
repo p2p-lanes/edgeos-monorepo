@@ -40,24 +40,6 @@ export type ApplicationAdminCreate = {
 };
 
 /**
- * Application schema for admin updates (can set any status).
- */
-export type ApplicationAdminUpdate = {
-    first_name?: (string | null);
-    last_name?: (string | null);
-    telegram?: (string | null);
-    gender?: (string | null);
-    age?: (string | null);
-    residence?: (string | null);
-    referral?: (string | null);
-    info_not_shared?: (Array<(string)> | null);
-    custom_fields?: ({
-    [key: string]: unknown;
-} | null);
-    status?: (ApplicationStatus | null);
-};
-
-/**
  * Application schema for creation.
  *
  * Profile fields can be provided here and will update the Human record.
@@ -1671,21 +1653,6 @@ export type ApplicationsGetApplicationData = {
 };
 
 export type ApplicationsGetApplicationResponse = (ApplicationPublic);
-
-export type ApplicationsUpdateApplicationAdminData = {
-    applicationId: string;
-    requestBody: ApplicationAdminUpdate;
-    xTenantId?: (string | null);
-};
-
-export type ApplicationsUpdateApplicationAdminResponse = (ApplicationPublic);
-
-export type ApplicationsDeleteApplicationData = {
-    applicationId: string;
-    xTenantId?: (string | null);
-};
-
-export type ApplicationsDeleteApplicationResponse = (void);
 
 export type ApplicationsListMyApplicationsData = {
     /**
