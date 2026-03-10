@@ -3,6 +3,7 @@ import { useRouter } from "next/navigation"
 import { useState } from "react"
 import InvoiceModal from "@/app/portal/[popupSlug]/passes/components/common/InvoiceModal"
 import useAuth from "@/hooks/useAuth"
+import { useCityProvider } from "@/providers/cityProvider"
 import { SidebarTrigger } from "../Sidebar/SidebarComponents"
 import { Button } from "../ui/button"
 import { useTenant } from "@/providers/tenantProvider"
@@ -13,6 +14,12 @@ const HeaderProfile = () => {
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false)
   const { logout } = useAuth()
   const { tenant } = useTenant()
+  const { getCity } = useCityProvider()
+  const city = getCity()
+  const hasInvoiceFields =
+    !!city?.invoice_company_name &&
+    !!city?.invoice_company_address &&
+    !!city?.invoice_company_email
 
   return (
     <div className="p-4 md:p-6 border-b border-gray-200 bg-white">
@@ -35,18 +42,22 @@ const HeaderProfile = () => {
             <Medal className="mr-2 size-4" />
             My Collectibles
           </Button>
-          <Button
-            variant="outline"
-            className="text-gray-700 border-gray-300 hover:bg-gray-50 bg-transparent"
-            onClick={() => setIsInvoiceModalOpen(true)}
-          >
-            <Newspaper className="h-4 w-4" />
-            Invoices
-          </Button>
-          <InvoiceModal
-            isOpen={isInvoiceModalOpen}
-            onClose={() => setIsInvoiceModalOpen(false)}
-          />
+          {hasInvoiceFields && (
+            <>
+              <Button
+                variant="outline"
+                className="text-gray-700 border-gray-300 hover:bg-gray-50 bg-transparent"
+                onClick={() => setIsInvoiceModalOpen(true)}
+              >
+                <Newspaper className="h-4 w-4" />
+                Invoices
+              </Button>
+              <InvoiceModal
+                isOpen={isInvoiceModalOpen}
+                onClose={() => setIsInvoiceModalOpen(false)}
+              />
+            </>
+          )}
 
           <div className="hidden md:block h-6 w-px bg-gray-300" />
 
