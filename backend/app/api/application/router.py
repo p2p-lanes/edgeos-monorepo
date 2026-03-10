@@ -9,7 +9,6 @@ from fastapi.responses import Response
 from app.api.application import crud
 from app.api.application.schemas import (
     ApplicationAdminCreate,
-    ApplicationAdminUpdate,
     ApplicationCreate,
     ApplicationPublic,
     ApplicationStatus,
@@ -34,33 +33,9 @@ from app.core.dependencies.users import (
     HumanTenantSession,
     TenantSession,
 )
-from app.services.email import (
-    ApplicationAcceptedContext,
-    ApplicationReceivedContext,
-    get_email_service,
-)
+from app.services.email_helpers import send_application_status_email
 
 router = APIRouter(prefix="/applications", tags=["applications"])
-
-# Valid admin status transitions: current_status -> set of allowed next statuses
-ALLOWED_ADMIN_TRANSITIONS: dict[str, set[str]] = {
-    ApplicationStatus.DRAFT.value: {
-        ApplicationStatus.IN_REVIEW.value,
-        ApplicationStatus.WITHDRAWN.value,
-    },
-    ApplicationStatus.IN_REVIEW.value: {
-        ApplicationStatus.ACCEPTED.value,
-        ApplicationStatus.REJECTED.value,
-        ApplicationStatus.WITHDRAWN.value,
-    },
-    ApplicationStatus.ACCEPTED.value: {
-        ApplicationStatus.WITHDRAWN.value,
-    },
-    ApplicationStatus.REJECTED.value: {
-        ApplicationStatus.IN_REVIEW.value,
-    },
-    ApplicationStatus.WITHDRAWN.value: set(),  # terminal state
-}
 
 
 def _build_application_public(application) -> ApplicationPublic:
@@ -161,6 +136,9 @@ async def create_application_admin(
         tenant_id=tenant_id,
     )
 
+    if application.human:
+        await send_application_status_email(application, application.human, db)
+
     return _build_application_public(application)
 
 
@@ -181,85 +159,6 @@ async def get_application(
 
     return _build_application_public(application)
 
-
-@router.patch("/{application_id}", response_model=ApplicationPublic)
-async def update_application_admin(
-    application_id: uuid.UUID,
-    app_in: ApplicationAdminUpdate,
-    db: TenantSession,
-    _current_user: CurrentWriter,
-) -> ApplicationPublic:
-    """Update an application (BO - admin access with extended fields)."""
-
-    application = crud.applications_crud.get(db, application_id)
-    if not application:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Application not found",
-        )
-
-    # Validate state transition
-    if app_in.status is not None:
-        current = application.status
-        requested = app_in.status.value
-        allowed = ALLOWED_ADMIN_TRANSITIONS.get(current, set())
-        if requested != current and requested not in allowed:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Cannot transition from '{current}' to '{requested}'",
-            )
-
-    # Prevent accepting red-flagged humans
-    if app_in.status == ApplicationStatus.ACCEPTED:
-        human_red_flag = application.human.red_flag if application.human else False
-        if human_red_flag:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cannot accept application from a red-flagged human.",
-            )
-
-    # Handle status change to ACCEPTED
-    if (
-        app_in.status == ApplicationStatus.ACCEPTED
-        and application.status != ApplicationStatus.ACCEPTED.value
-    ):
-        app_in_dict = app_in.model_dump(exclude_unset=True)
-        app_in_dict["accepted_at"] = datetime.now(UTC)
-        app_in_dict["status"] = app_in.status.value
-
-        for field, value in app_in_dict.items():
-            setattr(application, field, value)
-    else:
-        update_data = app_in.model_dump(exclude_unset=True)
-        if "status" in update_data and hasattr(update_data["status"], "value"):
-            update_data["status"] = update_data["status"].value
-
-        for field, value in update_data.items():
-            setattr(application, field, value)
-
-    db.add(application)
-    db.commit()
-    db.refresh(application)
-
-    return _build_application_public(application)
-
-
-@router.delete("/{application_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_application(
-    application_id: uuid.UUID,
-    db: TenantSession,
-    _current_user: CurrentWriter,
-) -> None:
-    """Delete an application (BO only)."""
-
-    application = crud.applications_crud.get(db, application_id)
-    if not application:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Application not found",
-        )
-
-    crud.applications_crud.delete(db, application)
 
 
 @router.get("/my/applications", response_model=ListModel[ApplicationPublic])
@@ -419,37 +318,7 @@ async def create_my_application(
     )
 
     # Send appropriate email based on application status
-    if application.status == ApplicationStatus.IN_REVIEW.value:
-        email_service = get_email_service()
-        await email_service.send_application_received(
-            to=current_human.email,
-            subject=f"Application Received for {application.popup.name}",
-            context=ApplicationReceivedContext(
-                first_name=current_human.first_name or "",
-                last_name=current_human.last_name or "",
-                email=current_human.email,
-                popup_name=application.popup.name,
-            ),
-            from_address=application.popup.tenant.sender_email,
-            from_name=application.popup.tenant.sender_name,
-            popup_id=application.popup_id,
-            db_session=db,
-        )
-    elif application.status == ApplicationStatus.ACCEPTED.value:
-        email_service = get_email_service()
-        await email_service.send_application_accepted(
-            to=current_human.email,
-            subject=f"Application Accepted for {application.popup.name}",
-            context=ApplicationAcceptedContext(
-                first_name=current_human.first_name or "",
-                last_name=current_human.last_name or "",
-                popup_name=application.popup.name,
-            ),
-            from_address=application.popup.tenant.sender_email,
-            from_name=application.popup.tenant.sender_name,
-            popup_id=application.popup_id,
-            db_session=db,
-        )
+    await send_application_status_email(application, current_human, db)
 
     return _build_application_public(application)
 
@@ -515,9 +384,19 @@ async def update_my_application(
     for field, value in app_update.items():
         setattr(application, field, value)
 
+    # Capture status before approval strategy may change it
+    status_before_str = application.status
+
+    # Apply approval strategy when transitioning draft → IN_REVIEW
+    if app_update.get("status") == ApplicationStatus.IN_REVIEW.value and application.human:
+        crud.applications_crud._apply_approval_strategy(db, application, application.human)
+
     db.add(application)
     db.commit()
     db.refresh(application)
+
+    # Send appropriate email based on final application status
+    await send_application_status_email(application, current_human, db, status_before=status_before_str)
 
     return _build_application_public(application)
 
@@ -609,7 +488,7 @@ async def list_attendees_directory(
 ) -> ListModel[AttendeesDirectoryEntry]:
     """List attendees directory for a popup (Portal).
 
-    Returns accepted/in-review applications with at least one product.
+    Returns accepted applications with at least one product.
     Respects info_not_shared masking.
     """
     applications, total = crud.applications_crud.find_directory(

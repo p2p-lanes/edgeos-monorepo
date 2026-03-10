@@ -26,7 +26,11 @@ export default function ReferralLinks({
     const groupPopup = popups.find(
       (popup: PopupPublic) => popup.id === group.popup_id,
     )
-    if (!groupPopup || groupPopup.status !== "active" || !group.is_ambassador_group) {
+    if (
+      !groupPopup ||
+      groupPopup.status !== "active" ||
+      !group.is_ambassador_group
+    ) {
       return false
     }
 
@@ -57,8 +61,8 @@ export default function ReferralLinks({
             Referral Links
           </h3>
           <p className="text-sm text-[#64748b]">
-            Give your friends an auto-approval for upcoming{" "}
-            {tenant?.name ?? ""} events
+            Give your friends an auto-approval for upcoming {tenant?.name ?? ""}{" "}
+            events
           </p>
         </div>
         <div className="flex gap-2 items-center mt-4 md:mt-0 md:items-end">

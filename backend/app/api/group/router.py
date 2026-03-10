@@ -340,6 +340,8 @@ async def add_group_member(
     # Check for existing application
     application = applications_crud.get_by_human_popup(db, human.id, group.popup_id)
 
+    existing_app_status: str | None = application.status if application else None
+
     if not application:
         # Create new application with ACCEPTED status
         # Note: local_resident and created_by_leader are not on ApplicationAdminCreate
@@ -363,22 +365,47 @@ async def add_group_member(
     else:
         # Update existing application and human profile
         application.group_id = group.id
-        application.status = ApplicationStatus.ACCEPTED
+        try:
+            applications_crud.accept(db, application)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Cannot accept application from a red-flagged human.")
         # Update human profile
         human.first_name = member_in.first_name
         human.last_name = member_in.last_name
         human.telegram = member_in.telegram
         human.gender = member_in.gender
         db.add(human)
-        db.add(application)
 
     # Add to group members
     if not crud.groups_crud.is_member(db, group.id, human.id):
-        crud.groups_crud.add_member(db, group.id, human.id)
+        crud.groups_crud.add_member(db, group.id, human.id, tenant_id=group.tenant_id)
 
     db.commit()
     db.refresh(application)
     db.refresh(human)
+
+    # Send accepted email if an existing application just got accepted via group
+    if (
+        existing_app_status is not None
+        and existing_app_status != ApplicationStatus.ACCEPTED.value
+        and application.popup
+    ):
+        from app.services.email import ApplicationAcceptedContext, get_email_service
+
+        email_service = get_email_service()
+        await email_service.send_application_accepted(
+            to=human.email,
+            subject=f"Application Accepted for {application.popup.name}",
+            context=ApplicationAcceptedContext(
+                first_name=human.first_name or "",
+                last_name=human.last_name or "",
+                popup_name=application.popup.name,
+            ),
+            from_address=application.popup.tenant.sender_email,
+            from_name=application.popup.tenant.sender_name,
+            popup_id=application.popup_id,
+            db_session=db,
+        )
 
     # Get products
     products = []

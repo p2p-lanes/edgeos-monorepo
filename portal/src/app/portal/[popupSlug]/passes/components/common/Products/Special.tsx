@@ -77,7 +77,10 @@ const ProductPrice = ({ product, selected, disabled }: ProductPriceProps) => (
 const TooltipPatreon = ({
   purchased,
   description,
-}: { purchased?: boolean; description?: string | null }) => (
+}: {
+  purchased?: boolean
+  description?: string | null
+}) => (
   <Tooltip>
     <TooltipTrigger asChild>
       <div className="cursor-pointer">

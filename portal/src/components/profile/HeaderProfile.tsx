@@ -4,10 +4,9 @@ import { useState } from "react"
 import InvoiceModal from "@/app/portal/[popupSlug]/passes/components/common/InvoiceModal"
 import useAuth from "@/hooks/useAuth"
 import { useCityProvider } from "@/providers/cityProvider"
+import { useTenant } from "@/providers/tenantProvider"
 import { SidebarTrigger } from "../Sidebar/SidebarComponents"
 import { Button } from "../ui/button"
-import { useTenant } from "@/providers/tenantProvider"
-
 
 const HeaderProfile = () => {
   const router = useRouter()
