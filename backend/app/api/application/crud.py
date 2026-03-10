@@ -172,9 +172,9 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
     ) -> tuple[list[Applications], int]:
         """Find applications for the attendees directory.
 
-        Returns accepted/in-review applications whose main attendee has at
-        least one product assigned. Supports text search, brings_kids filter,
-        and participation (week) filter.
+        Returns accepted applications whose main attendee has at least one
+        product assigned. Supports text search, brings_kids filter, and
+        participation (week) filter.
         """
         base_statement = (
             select(Applications)
@@ -183,7 +183,6 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 Applications.status.in_(  # type: ignore[union-attr]
                     [
                         ApplicationStatus.ACCEPTED.value,
-                        ApplicationStatus.IN_REVIEW.value,
                     ]
                 )
             )
@@ -746,60 +745,14 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         application: Applications,
         event: str,
     ) -> ApplicationSnapshots:
-        """Create a snapshot of the application and human profile state."""
+        """Create a snapshot of the application and human profile state.
+
+        Uses flush (not commit) — the caller owns the transaction boundary.
+        """
         snapshot = application.create_snapshot(event)
         session.add(snapshot)
-        session.commit()
-        session.refresh(snapshot)
+        session.flush()
         return snapshot
-
-    def submit(
-        self,
-        session: Session,
-        application: Applications,
-    ) -> Applications:
-        """Submit an application.
-
-        If the human is red-flagged, the application is automatically rejected.
-        If no approval strategy exists or strategy is AUTO_ACCEPT, the application
-        is automatically accepted.
-        Otherwise, sets status to IN_REVIEW for manual review.
-        """
-        from app.api.approval_strategy.crud import approval_strategies_crud
-        from app.api.approval_strategy.schemas import ApprovalStrategyType
-
-        application.submitted_at = datetime.now(UTC)
-
-        # Red-flagged humans are automatically rejected
-        human_red_flag = application.human.red_flag if application.human else False
-        if human_red_flag:
-            application.status = ApplicationStatus.REJECTED.value
-            session.add(application)
-            self.create_snapshot(session, application, "auto_rejected")
-            session.commit()
-            session.refresh(application)
-            return application
-
-        # Check approval strategy - no strategy means auto-accept
-        strategy = approval_strategies_crud.get_by_popup(session, application.popup_id)
-        should_auto_accept = (
-            strategy is None
-            or strategy.strategy_type == ApprovalStrategyType.AUTO_ACCEPT
-        )
-
-        if should_auto_accept:
-            application.status = ApplicationStatus.ACCEPTED.value
-            application.accepted_at = datetime.now(UTC)
-            session.add(application)
-            self.create_snapshot(session, application, "auto_accepted")
-        else:
-            application.status = ApplicationStatus.IN_REVIEW.value
-            session.add(application)
-            self.create_snapshot(session, application, "submitted")
-
-        session.commit()
-        session.refresh(application)
-        return application
 
     def accept(
         self,
@@ -822,11 +775,8 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         application.accepted_at = datetime.now(UTC)
         session.add(application)
 
-        # Create snapshot
+        # Create snapshot — uses flush internally, caller owns the commit
         self.create_snapshot(session, application, "accepted")
-
-        session.commit()
-        session.refresh(application)
         return application
 
     def create_attendee(
