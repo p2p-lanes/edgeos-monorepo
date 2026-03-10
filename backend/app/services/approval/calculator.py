@@ -6,7 +6,7 @@ Calculates application status based on reviews and approval strategy.
 
 from datetime import UTC, datetime
 
-from sqlmodel import Session
+from sqlmodel import Session, col, select as sm_select
 
 from app.api.application.models import Applications
 from app.api.application.schemas import ApplicationStatus
@@ -52,20 +52,22 @@ class ApprovalCalculator:
         # Calculate based on strategy type
         match strategy.strategy_type:
             case ApprovalStrategyType.ANY_REVIEWER:
-                return self._calc_any_reviewer(reviews)
+                return self._calc_any_reviewer(reviews, designated_reviewers)
             case ApprovalStrategyType.ALL_REVIEWERS:
                 return self._calc_all_reviewers(reviews, designated_reviewers)
             case ApprovalStrategyType.THRESHOLD:
-                return self._calc_threshold(reviews, strategy.required_approvals)
+                return self._calc_threshold(reviews, strategy.required_approvals, designated_reviewers)
             case ApprovalStrategyType.WEIGHTED:
                 return self._calc_weighted(reviews, strategy)
 
         return ApplicationStatus.IN_REVIEW
 
     def _calc_any_reviewer(
-        self, reviews: list[ApplicationReviews]
+        self,
+        reviews: list[ApplicationReviews],
+        designated_reviewers: list[PopupReviewers],
     ) -> ApplicationStatus:
-        """Any single approval = accepted."""
+        """Any single approval = accepted. All required reviewers rejected = REJECTED."""
         approvals = [
             r
             for r in reviews
@@ -73,6 +75,19 @@ class ApprovalCalculator:
         ]
         if approvals:
             return ApplicationStatus.ACCEPTED
+
+        # REJECTED path: if designated reviewers exist and all required have voted
+        # and none voted YES/STRONG_YES
+        if designated_reviewers:
+            required_reviewer_ids = {
+                r.user_id for r in designated_reviewers if r.is_required
+            }
+            if required_reviewer_ids:
+                reviewed_ids = {r.reviewer_id for r in reviews}
+                all_required_voted = required_reviewer_ids <= reviewed_ids
+                if all_required_voted:
+                    return ApplicationStatus.REJECTED
+
         return ApplicationStatus.IN_REVIEW
 
     def _calc_all_reviewers(
@@ -87,7 +102,7 @@ class ApprovalCalculator:
 
         # If no required reviewers, fall back to any reviewer
         if not required_reviewer_ids:
-            return self._calc_any_reviewer(reviews)
+            return self._calc_any_reviewer(reviews, designated_reviewers)
 
         approved_ids = {
             r.reviewer_id
@@ -103,8 +118,9 @@ class ApprovalCalculator:
         self,
         reviews: list[ApplicationReviews],
         required: int,
+        designated_reviewers: list[PopupReviewers],
     ) -> ApplicationStatus:
-        """N approvals required."""
+        """N approvals required. All required reviewers voted with no approval = REJECTED."""
         approvals = [
             r
             for r in reviews
@@ -112,6 +128,19 @@ class ApprovalCalculator:
         ]
         if len(approvals) >= required:
             return ApplicationStatus.ACCEPTED
+
+        # REJECTED path: if designated reviewers exist and all required have voted
+        # and approvals still below threshold
+        if designated_reviewers:
+            required_reviewer_ids = {
+                r.user_id for r in designated_reviewers if r.is_required
+            }
+            if required_reviewer_ids:
+                reviewed_ids = {r.reviewer_id for r in reviews}
+                all_required_voted = required_reviewer_ids <= reviewed_ids
+                if all_required_voted:
+                    return ApplicationStatus.REJECTED
+
         return ApplicationStatus.IN_REVIEW
 
     def _calc_weighted(
@@ -159,6 +188,11 @@ class ApprovalCalculator:
         from app.api.approval_strategy.crud import approval_strategies_crud
         from app.api.human.crud import humans_crud
         from app.api.popup_reviewer.crud import popup_reviewers_crud
+
+        # Lock the application row to prevent concurrent recalculations
+        session.exec(
+            sm_select(Applications).where(col(Applications.id) == application.id).with_for_update()
+        )
 
         # Skip if already in a final state (accepted, rejected, withdrawn)
         if application.status not in [
