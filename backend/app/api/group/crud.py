@@ -159,10 +159,10 @@ class GroupsCRUD(BaseCRUD[Groups, GroupCreate, GroupUpdate]):
             session.commit()
 
     def add_member(
-        self, session: Session, group_id: uuid.UUID, human_id: uuid.UUID
+        self, session: Session, group_id: uuid.UUID, human_id: uuid.UUID, tenant_id: uuid.UUID | None = None
     ) -> None:
         """Add a member to a group."""
-        member = GroupMembers(group_id=group_id, human_id=human_id)
+        member = GroupMembers(group_id=group_id, human_id=human_id, tenant_id=tenant_id)
         session.add(member)
         session.commit()
 
