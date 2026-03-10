@@ -97,7 +97,7 @@ class SimpleFIClient:
         return SimpleFIPaymentResponse(
             id=data["id"],
             status=data["status"],
-            checkout_url=data["checkout_url"],
+            checkout_url=data["checkout_v2_url"],
         )
 
 
