@@ -384,9 +384,19 @@ async def update_my_application(
     for field, value in app_update.items():
         setattr(application, field, value)
 
+    # Capture status before approval strategy may change it
+    status_before_str = application.status
+
+    # Apply approval strategy when transitioning draft → IN_REVIEW
+    if app_update.get("status") == ApplicationStatus.IN_REVIEW.value and application.human:
+        crud.applications_crud._apply_approval_strategy(db, application, application.human)
+
     db.add(application)
     db.commit()
     db.refresh(application)
+
+    # Send appropriate email based on final application status
+    await send_application_status_email(application, current_human, db, status_before=status_before_str)
 
     return _build_application_public(application)
 
@@ -478,7 +488,7 @@ async def list_attendees_directory(
 ) -> ListModel[AttendeesDirectoryEntry]:
     """List attendees directory for a popup (Portal).
 
-    Returns accepted/in-review applications with at least one product.
+    Returns accepted applications with at least one product.
     Respects info_not_shared masking.
     """
     applications, total = crud.applications_crud.find_directory(
