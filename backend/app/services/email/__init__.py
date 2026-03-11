@@ -1,4 +1,5 @@
 from app.services.email.service import (
+    EmailAttachment,
     EmailService,
     compute_order_summary,
     get_email_service,
@@ -37,4 +38,5 @@ __all__ = [
     "PaymentAttendeeItem",
     # Helpers
     "compute_order_summary",
+    "EmailAttachment",
 ]
