@@ -22,6 +22,7 @@ import { CompanionsSection, type CompanionWithId } from "./companions-section"
 import { DynamicField } from "./fields/dynamic-field"
 import { ProgressBar } from "./progress-bar"
 import SectionWrapper from "./SectionWrapper"
+import { ScholarshipSection } from "./scholarship-section"
 import { SectionSeparator } from "./section-separator"
 
 const animationProps = {
@@ -147,6 +148,7 @@ export function DynamicApplicationForm({
     handleChange,
     validate,
     populateFromApplication,
+    setErrors,
     progress,
   } = useApplicationForm(schema)
 
@@ -212,11 +214,27 @@ export function DynamicApplicationForm({
     setStatusBtn({ loadingDraft: false, loadingSubmit: true })
 
     const { isValid, errors: validationErrors } = validate(false)
-    if (!isValid) {
-      const fields = Object.keys(validationErrors).join(", ")
+
+    // Scholarship validation: details required when scholarship_request is true
+    // Uses schema presence (via _hasScholarshipSection) rather than popup flag directly
+    const scholarshipErrors: Record<string, string> = {}
+    if (_hasScholarshipSection && values.scholarship_request) {
+      const details = (values.scholarship_details as string) ?? ""
+      if (!details.trim()) {
+        scholarshipErrors.scholarship_details =
+          "Please tell us why you need financial support"
+      }
+    }
+
+    if (!isValid || Object.keys(scholarshipErrors).length > 0) {
+      const allErrors = { ...validationErrors, ...scholarshipErrors }
+      const fields = Object.keys(allErrors).join(", ")
       toast.error("Error", {
         description: `Please fill in the following required fields: ${fields}`,
       })
+      if (Object.keys(scholarshipErrors).length > 0) {
+        setErrors(allErrors)
+      }
       setStatusBtn({ loadingDraft: false, loadingSubmit: false })
       return
     }
@@ -373,6 +391,14 @@ export function DynamicApplicationForm({
     [mergedSections],
   )
 
+  const _hasScholarshipSection = useMemo(
+    () =>
+      mergedSections.some((block) =>
+        block.title.toLowerCase().includes("scholarship"),
+      ),
+    [mergedSections],
+  )
+
   return (
     <>
       <form
@@ -394,6 +420,45 @@ export function DynamicApplicationForm({
                     onCompanionsChange={setCompanions}
                   />
                 </div>
+              )
+            }
+            const isScholarshipSection = title
+              .toLowerCase()
+              .includes("scholarship")
+            if (isScholarshipSection) {
+              const scholarshipFields = Object.fromEntries(
+                baseFields.map(([name, field]) => [name, field]),
+              )
+              return (
+                <ScholarshipSection
+                  key={id}
+                  section={{ id, label: title, description: subtitle }}
+                  fields={scholarshipFields}
+                  scholarshipRequest={
+                    (values.scholarship_request as boolean) ?? false
+                  }
+                  scholarshipDetails={
+                    (values.scholarship_details as string) ?? ""
+                  }
+                  scholarshipVideoUrl={
+                    (values.scholarship_video_url as string) ?? ""
+                  }
+                  detailsError={errors.scholarship_details}
+                  videoUrlError={errors.scholarship_video_url}
+                  onScholarshipRequestChange={(checked) => {
+                    handleChange("scholarship_request", checked)
+                    if (!checked) {
+                      handleChange("scholarship_details", "")
+                      handleChange("scholarship_video_url", "")
+                    }
+                  }}
+                  onDetailsChange={(value) =>
+                    handleChange("scholarship_details", value)
+                  }
+                  onVideoUrlChange={(value) =>
+                    handleChange("scholarship_video_url", value)
+                  }
+                />
               )
             }
             return (
