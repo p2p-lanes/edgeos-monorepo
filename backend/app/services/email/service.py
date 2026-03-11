@@ -22,6 +22,9 @@ from app.services.email.templates import (
     TEMPLATE_TYPE_TO_FILE,
     AbandonedCartContext,
     ApplicationAcceptedContext,
+    ApplicationAcceptedScholarshipRejectedContext,
+    ApplicationAcceptedWithDiscountContext,
+    ApplicationAcceptedWithIncentiveContext,
     ApplicationReceivedContext,
     ApplicationRejectedContext,
     EditPassesConfirmedContext,
@@ -455,6 +458,75 @@ class EmailService:
             subject=subject,
             template_type=EmailTemplateType.APPLICATION_REJECTED,
             template_name=EmailTemplates.APPLICATION_REJECTED,
+            context=context.model_dump(exclude_none=True),
+            from_address=from_address,
+            from_name=from_name,
+            popup_id=popup_id,
+            db_session=db_session,
+        )
+
+    async def send_application_accepted_with_discount(
+        self,
+        to: str,
+        subject: str,
+        context: ApplicationAcceptedWithDiscountContext,
+        from_address: str | None = None,
+        from_name: str | None = None,
+        popup_id: uuid.UUID | None = None,
+        db_session: Session | None = None,
+    ) -> bool:
+        """Send application accepted email with scholarship discount (no cash incentive)."""
+        return await self._send_with_fallback(
+            to=to,
+            subject=subject,
+            template_type=EmailTemplateType.APPLICATION_ACCEPTED_WITH_DISCOUNT,
+            template_name=EmailTemplates.APPLICATION_ACCEPTED_WITH_DISCOUNT,
+            context=context.model_dump(exclude_none=True),
+            from_address=from_address,
+            from_name=from_name,
+            popup_id=popup_id,
+            db_session=db_session,
+        )
+
+    async def send_application_accepted_with_incentive(
+        self,
+        to: str,
+        subject: str,
+        context: ApplicationAcceptedWithIncentiveContext,
+        from_address: str | None = None,
+        from_name: str | None = None,
+        popup_id: uuid.UUID | None = None,
+        db_session: Session | None = None,
+    ) -> bool:
+        """Send application accepted email with scholarship discount and cash incentive grant."""
+        return await self._send_with_fallback(
+            to=to,
+            subject=subject,
+            template_type=EmailTemplateType.APPLICATION_ACCEPTED_WITH_INCENTIVE,
+            template_name=EmailTemplates.APPLICATION_ACCEPTED_WITH_INCENTIVE,
+            context=context.model_dump(exclude_none=True),
+            from_address=from_address,
+            from_name=from_name,
+            popup_id=popup_id,
+            db_session=db_session,
+        )
+
+    async def send_application_accepted_scholarship_rejected(
+        self,
+        to: str,
+        subject: str,
+        context: ApplicationAcceptedScholarshipRejectedContext,
+        from_address: str | None = None,
+        from_name: str | None = None,
+        popup_id: uuid.UUID | None = None,
+        db_session: Session | None = None,
+    ) -> bool:
+        """Send application accepted email when scholarship request was not approved."""
+        return await self._send_with_fallback(
+            to=to,
+            subject=subject,
+            template_type=EmailTemplateType.APPLICATION_ACCEPTED_SCHOLARSHIP_REJECTED,
+            template_name=EmailTemplates.APPLICATION_ACCEPTED_SCHOLARSHIP_REJECTED,
             context=context.model_dump(exclude_none=True),
             from_address=from_address,
             from_name=from_name,

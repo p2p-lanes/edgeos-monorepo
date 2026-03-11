@@ -1,12 +1,112 @@
 """Email dispatch helpers for application status transitions."""
+from typing import Union
+
 from sqlmodel import Session
 
+from app.api.email_template.schemas import EmailTemplateType
 from app.services.email import (
     ApplicationAcceptedContext,
+    ApplicationAcceptedScholarshipRejectedContext,
+    ApplicationAcceptedWithDiscountContext,
+    ApplicationAcceptedWithIncentiveContext,
     ApplicationReceivedContext,
     ApplicationRejectedContext,
     get_email_service,
 )
+
+_AcceptedContext = Union[
+    ApplicationAcceptedContext,
+    ApplicationAcceptedWithDiscountContext,
+    ApplicationAcceptedWithIncentiveContext,
+    ApplicationAcceptedScholarshipRejectedContext,
+]
+
+
+def _get_scholarship_email_variant(
+    application,
+    popup,
+) -> tuple[EmailTemplateType, _AcceptedContext]:
+    """Determine the correct email template and context for an ACCEPTED application.
+
+    This function is PURE — it reads only from the application and popup objects,
+    performs no DB access, and has no side effects.
+
+    Decision tree:
+    1. scholarship_request=False → standard APPLICATION_ACCEPTED
+    2. scholarship_request=True, scholarship_status=APPROVED, incentive_amount > 0
+       → APPLICATION_ACCEPTED_WITH_INCENTIVE
+    3. scholarship_request=True, scholarship_status=APPROVED, no incentive
+       → APPLICATION_ACCEPTED_WITH_DISCOUNT
+    4. scholarship_request=True, scholarship_status=REJECTED
+       → APPLICATION_ACCEPTED_SCHOLARSHIP_REJECTED
+    5. Fallback (pending/None — shouldn't happen post-decision) → standard APPLICATION_ACCEPTED
+    """
+    from app.api.application.schemas import ScholarshipStatus
+
+    first_name = application.human.first_name or "" if application.human else ""
+    last_name = application.human.last_name or "" if application.human else ""
+    popup_name = popup.name
+
+    if not application.scholarship_request:
+        # Standard case — no scholarship involvement
+        return (
+            EmailTemplateType.APPLICATION_ACCEPTED,
+            ApplicationAcceptedContext(
+                first_name=first_name,
+                last_name=last_name,
+                popup_name=popup_name,
+            ),
+        )
+
+    if application.scholarship_status == ScholarshipStatus.APPROVED.value:
+        # Incentive path: popup must allow it AND incentive_amount must be > 0
+        if (
+            getattr(popup, "allows_incentive", False)
+            and application.incentive_amount
+            and application.incentive_amount > 0
+        ):
+            return (
+                EmailTemplateType.APPLICATION_ACCEPTED_WITH_INCENTIVE,
+                ApplicationAcceptedWithIncentiveContext(
+                    first_name=first_name,
+                    last_name=last_name,
+                    popup_name=popup_name,
+                    discount_percentage=int(application.discount_percentage or 0),
+                    incentive_amount=float(application.incentive_amount),
+                    incentive_currency=application.incentive_currency or "USD",
+                ),
+            )
+        # Discount-only path
+        return (
+            EmailTemplateType.APPLICATION_ACCEPTED_WITH_DISCOUNT,
+            ApplicationAcceptedWithDiscountContext(
+                first_name=first_name,
+                last_name=last_name,
+                popup_name=popup_name,
+                discount_percentage=int(application.discount_percentage or 0),
+            ),
+        )
+
+    if application.scholarship_status == ScholarshipStatus.REJECTED.value:
+        return (
+            EmailTemplateType.APPLICATION_ACCEPTED_SCHOLARSHIP_REJECTED,
+            ApplicationAcceptedScholarshipRejectedContext(
+                first_name=first_name,
+                last_name=last_name,
+                popup_name=popup_name,
+            ),
+        )
+
+    # Fallback: scholarship requested but no decision yet (defensive — shouldn't
+    # reach here in normal flow since email is sent after scholarship decision)
+    return (
+        EmailTemplateType.APPLICATION_ACCEPTED,
+        ApplicationAcceptedContext(
+            first_name=first_name,
+            last_name=last_name,
+            popup_name=popup_name,
+        ),
+    )
 
 
 async def send_application_status_email(
@@ -50,19 +150,48 @@ async def send_application_status_email(
             db_session=db,
         )
     elif current_status == ApplicationStatus.ACCEPTED.value:
-        await email_service.send_application_accepted(
-            to=human.email,
-            subject=f"Application Accepted for {popup.name}",
-            context=ApplicationAcceptedContext(
-                first_name=human.first_name or "",
-                last_name=human.last_name or "",
-                popup_name=popup.name,
-            ),
-            from_address=from_address,
-            from_name=from_name,
-            popup_id=application.popup_id,
-            db_session=db,
-        )
+        template_type, context = _get_scholarship_email_variant(application, popup)
+
+        if template_type == EmailTemplateType.APPLICATION_ACCEPTED:
+            await email_service.send_application_accepted(
+                to=human.email,
+                subject=f"Application Accepted for {popup.name}",
+                context=context,
+                from_address=from_address,
+                from_name=from_name,
+                popup_id=application.popup_id,
+                db_session=db,
+            )
+        elif template_type == EmailTemplateType.APPLICATION_ACCEPTED_WITH_DISCOUNT:
+            await email_service.send_application_accepted_with_discount(
+                to=human.email,
+                subject=f"Your scholarship & application — {popup.name}",
+                context=context,
+                from_address=from_address,
+                from_name=from_name,
+                popup_id=application.popup_id,
+                db_session=db,
+            )
+        elif template_type == EmailTemplateType.APPLICATION_ACCEPTED_WITH_INCENTIVE:
+            await email_service.send_application_accepted_with_incentive(
+                to=human.email,
+                subject=f"Your scholarship award — {popup.name}",
+                context=context,
+                from_address=from_address,
+                from_name=from_name,
+                popup_id=application.popup_id,
+                db_session=db,
+            )
+        elif template_type == EmailTemplateType.APPLICATION_ACCEPTED_SCHOLARSHIP_REJECTED:
+            await email_service.send_application_accepted_scholarship_rejected(
+                to=human.email,
+                subject=f"Your application to {popup.name} — accepted",
+                context=context,
+                from_address=from_address,
+                from_name=from_name,
+                popup_id=application.popup_id,
+                db_session=db,
+            )
     elif current_status == ApplicationStatus.REJECTED.value:
         await email_service.send_application_rejected(
             to=human.email,

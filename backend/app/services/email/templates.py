@@ -69,6 +69,49 @@ class ApplicationRejectedContext(BaseModel):
     popup_name: str
 
 
+class ApplicationAcceptedWithDiscountContext(BaseModel):
+    """Context for application/accepted_with_discount.html template.
+
+    Sent when an application is accepted and a scholarship discount (no cash
+    incentive) was approved. The discount may be partial or full (100%).
+    """
+
+    first_name: str
+    last_name: str
+    popup_name: str
+    discount_percentage: int  # e.g. 50 = "50% off", 100 = "full waiver"
+    portal_url: str | None = None
+
+
+class ApplicationAcceptedWithIncentiveContext(BaseModel):
+    """Context for application/accepted_with_incentive.html template.
+
+    Sent when an application is accepted with both a scholarship discount
+    and a cash incentive grant.
+    """
+
+    first_name: str
+    last_name: str
+    popup_name: str
+    discount_percentage: int  # ticket discount percentage
+    incentive_amount: float  # e.g. 1000.00
+    incentive_currency: str  # e.g. "USD"
+    portal_url: str | None = None
+
+
+class ApplicationAcceptedScholarshipRejectedContext(BaseModel):
+    """Context for application/accepted_scholarship_rejected.html template.
+
+    Sent when an application is accepted but the scholarship request was
+    not approved. The human may still purchase at the standard price.
+    """
+
+    first_name: str
+    last_name: str
+    popup_name: str
+    portal_url: str | None = None
+
+
 class PaymentProductItem(BaseModel):
     """Product item for payment email templates."""
 
@@ -149,6 +192,9 @@ class EmailTemplates:
     APPLICATION_RECEIVED = "application/received.html"
     APPLICATION_ACCEPTED = "application/accepted.html"
     APPLICATION_REJECTED = "application/rejected.html"
+    APPLICATION_ACCEPTED_WITH_DISCOUNT = "application/accepted_with_discount.html"
+    APPLICATION_ACCEPTED_WITH_INCENTIVE = "application/accepted_with_incentive.html"
+    APPLICATION_ACCEPTED_SCHOLARSHIP_REJECTED = "application/accepted_scholarship_rejected.html"
 
     # Payment
     PAYMENT_CONFIRMED = "payment/confirmed.html"
@@ -162,6 +208,9 @@ TEMPLATE_TYPE_TO_FILE: dict[EmailTemplateType, str] = {
     EmailTemplateType.APPLICATION_RECEIVED: "application/received.html",
     EmailTemplateType.APPLICATION_ACCEPTED: "application/accepted.html",
     EmailTemplateType.APPLICATION_REJECTED: "application/rejected.html",
+    EmailTemplateType.APPLICATION_ACCEPTED_WITH_DISCOUNT: "application/accepted_with_discount.html",
+    EmailTemplateType.APPLICATION_ACCEPTED_WITH_INCENTIVE: "application/accepted_with_incentive.html",
+    EmailTemplateType.APPLICATION_ACCEPTED_SCHOLARSHIP_REJECTED: "application/accepted_scholarship_rejected.html",
     EmailTemplateType.PAYMENT_CONFIRMED: "payment/confirmed.html",
     EmailTemplateType.ABANDONED_CART: "payment/abandoned_cart.html",
     EmailTemplateType.EDIT_PASSES_CONFIRMED: "payment/edit_passes_confirmed.html",
@@ -360,6 +409,140 @@ TEMPLATE_TYPE_METADATA: list[dict[str, Any]] = [
                 "description": "Applicant's last name",
                 "required": True,
                 "group": "Applicant",
+            },
+            *_POPUP_EVENT_VARIABLES,
+        ],
+    },
+    {
+        "type": EmailTemplateType.APPLICATION_ACCEPTED_WITH_DISCOUNT,
+        "label": "Application Accepted — Scholarship Discount",
+        "description": "Sent when an application is accepted with a scholarship discount (no cash incentive).",
+        "category": "Application",
+        "default_subject": "Your scholarship & application — {{ popup_name }}",
+        "variables": [
+            {
+                "name": "first_name",
+                "label": "First Name",
+                "type": "string",
+                "description": "Applicant's first name",
+                "required": True,
+                "group": "Applicant",
+            },
+            {
+                "name": "last_name",
+                "label": "Last Name",
+                "type": "string",
+                "description": "Applicant's last name",
+                "required": True,
+                "group": "Applicant",
+            },
+            {
+                "name": "discount_percentage",
+                "label": "Discount Percentage",
+                "type": "number",
+                "description": "Scholarship discount percentage (e.g. 100 = full ticket waiver)",
+                "required": True,
+                "group": "Scholarship",
+            },
+            {
+                "name": "portal_url",
+                "label": "Portal URL",
+                "type": "string",
+                "description": "Link to the attendee portal",
+                "required": False,
+                "group": "General",
+            },
+            *_POPUP_EVENT_VARIABLES,
+        ],
+    },
+    {
+        "type": EmailTemplateType.APPLICATION_ACCEPTED_WITH_INCENTIVE,
+        "label": "Application Accepted — Scholarship + Incentive",
+        "description": "Sent when an application is accepted with both a scholarship discount and a cash grant.",
+        "category": "Application",
+        "default_subject": "Your scholarship award — {{ popup_name }}",
+        "variables": [
+            {
+                "name": "first_name",
+                "label": "First Name",
+                "type": "string",
+                "description": "Applicant's first name",
+                "required": True,
+                "group": "Applicant",
+            },
+            {
+                "name": "last_name",
+                "label": "Last Name",
+                "type": "string",
+                "description": "Applicant's last name",
+                "required": True,
+                "group": "Applicant",
+            },
+            {
+                "name": "discount_percentage",
+                "label": "Discount Percentage",
+                "type": "number",
+                "description": "Scholarship discount percentage",
+                "required": True,
+                "group": "Scholarship",
+            },
+            {
+                "name": "incentive_amount",
+                "label": "Incentive Amount",
+                "type": "number",
+                "description": "Cash grant amount (e.g. 1000.00)",
+                "required": True,
+                "group": "Scholarship",
+            },
+            {
+                "name": "incentive_currency",
+                "label": "Incentive Currency",
+                "type": "string",
+                "description": "ISO currency code for the grant (e.g. USD)",
+                "required": True,
+                "group": "Scholarship",
+            },
+            {
+                "name": "portal_url",
+                "label": "Portal URL",
+                "type": "string",
+                "description": "Link to the attendee portal",
+                "required": False,
+                "group": "General",
+            },
+            *_POPUP_EVENT_VARIABLES,
+        ],
+    },
+    {
+        "type": EmailTemplateType.APPLICATION_ACCEPTED_SCHOLARSHIP_REJECTED,
+        "label": "Application Accepted — Scholarship Not Approved",
+        "description": "Sent when an application is accepted but the scholarship request was denied.",
+        "category": "Application",
+        "default_subject": "Your application to {{ popup_name }} — accepted",
+        "variables": [
+            {
+                "name": "first_name",
+                "label": "First Name",
+                "type": "string",
+                "description": "Applicant's first name",
+                "required": True,
+                "group": "Applicant",
+            },
+            {
+                "name": "last_name",
+                "label": "Last Name",
+                "type": "string",
+                "description": "Applicant's last name",
+                "required": True,
+                "group": "Applicant",
+            },
+            {
+                "name": "portal_url",
+                "label": "Portal URL",
+                "type": "string",
+                "description": "Link to the attendee portal",
+                "required": False,
+                "group": "General",
             },
             *_POPUP_EVENT_VARIABLES,
         ],

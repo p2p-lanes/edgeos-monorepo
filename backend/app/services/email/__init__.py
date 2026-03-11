@@ -7,6 +7,9 @@ from app.services.email.service import (
 from app.services.email.templates import (
     AbandonedCartContext,
     ApplicationAcceptedContext,
+    ApplicationAcceptedScholarshipRejectedContext,
+    ApplicationAcceptedWithDiscountContext,
+    ApplicationAcceptedWithIncentiveContext,
     ApplicationReceivedContext,
     ApplicationRejectedContext,
     EditPassesConfirmedContext,
@@ -30,6 +33,9 @@ __all__ = [
     "ApplicationReceivedContext",
     "ApplicationAcceptedContext",
     "ApplicationRejectedContext",
+    "ApplicationAcceptedWithDiscountContext",
+    "ApplicationAcceptedWithIncentiveContext",
+    "ApplicationAcceptedScholarshipRejectedContext",
     # Payment contexts
     "PaymentConfirmedContext",
     "AbandonedCartContext",
