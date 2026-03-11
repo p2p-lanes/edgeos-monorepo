@@ -24,7 +24,7 @@ const PaymentHistory = ({ payments }: { payments: PaymentsProps[] }) => {
   const approvedPayments = payments?.filter(
     (payment) => payment.status === "approved",
   )
-  const [downloadingId, setDownloadingId] = useState<number | null>(null)
+  const [downloadingId, setDownloadingId] = useState<string | null>(null)
 
   if (!approvedPayments || approvedPayments.length === 0) {
     return (
