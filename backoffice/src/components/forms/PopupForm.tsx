@@ -5,8 +5,10 @@ import {
   Baby,
   Building2,
   Calendar,
+  DollarSign,
   FileText,
   Globe,
+  GraduationCap,
   Heart,
   Image,
   Key,
@@ -132,6 +134,8 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
       allows_spouse: defaultValues?.allows_spouse ?? false,
       allows_children: defaultValues?.allows_children ?? false,
       allows_coupons: defaultValues?.allows_coupons ?? false,
+      allows_scholarship: defaultValues?.allows_scholarship ?? false,
+      allows_incentive: defaultValues?.allows_incentive ?? false,
       image_url: defaultValues?.image_url ?? "",
       icon_url: defaultValues?.icon_url ?? "",
       express_checkout_background:
@@ -161,6 +165,8 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         allows_spouse: value.allows_spouse,
         allows_children: value.allows_children,
         allows_coupons: value.allows_coupons,
+        allows_scholarship: value.allows_scholarship,
+        allows_incentive: value.allows_incentive,
         image_url: value.image_url || null,
         icon_url: value.icon_url || null,
         express_checkout_background: value.express_checkout_background || null,
@@ -479,6 +485,52 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
               </InlineRow>
             )}
           </form.Field>
+
+          <form.Field name="allows_scholarship">
+            {(field) => (
+              <InlineRow
+                icon={
+                  <GraduationCap className="h-4 w-4 text-muted-foreground" />
+                }
+                label="Scholarship Requests"
+                description="Allow applicants to request financial assistance"
+              >
+                <Switch
+                  id="allows_scholarship"
+                  checked={!!field.state.value}
+                  onCheckedChange={(checked) => field.handleChange(checked)}
+                  disabled={readOnly}
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+
+          <form.Subscribe selector={(state) => state.values.allows_scholarship}>
+            {(allowsScholarship) =>
+              allowsScholarship ? (
+                <form.Field name="allows_incentive">
+                  {(field) => (
+                    <InlineRow
+                      icon={
+                        <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      }
+                      label="Cash Incentives"
+                      description="Allow assigning a cash grant alongside scholarship approval"
+                    >
+                      <Switch
+                        id="allows_incentive"
+                        checked={!!field.state.value}
+                        onCheckedChange={(checked) =>
+                          field.handleChange(checked)
+                        }
+                        disabled={readOnly}
+                      />
+                    </InlineRow>
+                  )}
+                </form.Field>
+              ) : null
+            }
+          </form.Subscribe>
         </InlineSection>
 
         <Separator />
