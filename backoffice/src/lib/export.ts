@@ -21,10 +21,31 @@ export async function fetchAllPages<T>(
   return [first, ...pages].flatMap((p) => p.results)
 }
 
+type CsvColumn = { key: string; label: string; type?: "date" }
+
+function formatDate(value: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  })
+}
+
+function formatValue(value: unknown, type?: CsvColumn["type"]): string {
+  if (value == null) return ""
+  if (type === "date") return formatDate(String(value))
+  return String(value)
+}
+
 export function exportToCsv<T extends Record<string, unknown>>(
   filename: string,
   data: T[],
-  columnMap: { key: string; label: string }[],
+  columnMap: CsvColumn[],
 ) {
   if (data.length === 0) return
 
@@ -38,7 +59,7 @@ export function exportToCsv<T extends Record<string, unknown>>(
         for (const k of keys) {
           value = (value as Record<string, unknown>)?.[k]
         }
-        const str = value == null ? "" : String(value)
+        const str = formatValue(value, col.type)
         return str.includes(",") || str.includes('"') || str.includes("\n")
           ? `"${str.replace(/"/g, '""')}"`
           : str
