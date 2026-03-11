@@ -1,11 +1,12 @@
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from enum import Enum
+from enum import Enum, StrEnum
 
 from pydantic import BaseModel, ConfigDict, field_validator
-from sqlalchemy import Numeric, String
+from sqlalchemy import Numeric, String, Text
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
+from sqlalchemy import Boolean
 from sqlmodel import Column, DateTime, Field, SQLModel
 
 from app.api.attendee.schemas import AttendeePublic, CompanionCreate
@@ -27,6 +28,14 @@ class UserSettableStatus(str, Enum):
 
     DRAFT = "draft"
     IN_REVIEW = "in review"
+
+
+class ScholarshipStatus(StrEnum):
+    """Status of a scholarship request on an application."""
+
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
 
 
 class ApplicationBase(SQLModel):
@@ -78,6 +87,30 @@ class ApplicationBase(SQLModel):
         default=None, nullable=True, sa_type=DateTime(timezone=True)
     )
 
+    # Scholarship request fields (human-submitted)
+    scholarship_request: bool = Field(
+        default=False,
+        sa_column=Column(Boolean, nullable=False, server_default="false"),
+    )
+    scholarship_details: str | None = Field(
+        default=None, sa_column=Column(Text(), nullable=True)
+    )
+    scholarship_video_url: str | None = Field(default=None, nullable=True)
+
+    # Scholarship decision fields (admin-assigned)
+    scholarship_status: str | None = Field(default=None, nullable=True)
+    discount_percentage: Decimal | None = Field(
+        default=None,
+        sa_column=Column(Numeric(5, 2), nullable=True),
+    )
+    incentive_amount: Decimal | None = Field(
+        default=None,
+        sa_column=Column(Numeric(12, 2), nullable=True),
+    )
+    incentive_currency: str | None = Field(
+        default=None, max_length=10, nullable=True
+    )
+
 
 class ApplicationPublic(BaseModel):
     """Application schema for API responses."""
@@ -103,6 +136,15 @@ class ApplicationPublic(BaseModel):
     accepted_at: datetime | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
+
+    # Scholarship fields
+    scholarship_request: bool = False
+    scholarship_details: str | None = None
+    scholarship_video_url: str | None = None
+    scholarship_status: str | None = None
+    discount_percentage: Decimal | None = None
+    incentive_amount: Decimal | None = None
+    incentive_currency: str | None = None
 
     # Related data
     human: HumanPublic | None = None
@@ -146,6 +188,11 @@ class ApplicationCreate(BaseModel):
     # Companions (spouse/kids) to create along with application
     companions: list[CompanionCreate] | None = None
 
+    # Scholarship request (human-submittable fields only)
+    scholarship_request: bool = False
+    scholarship_details: str | None = None
+    scholarship_video_url: str | None = None
+
     @field_validator("email")
     @classmethod
     def clean_email(cls, v: str | None) -> str | None:
@@ -175,6 +222,11 @@ class ApplicationUpdate(BaseModel):
     info_not_shared: list[str] | None = None
     custom_fields: dict | None = None
     status: UserSettableStatus | None = None
+
+    # Scholarship human-editable fields (admin-only decision fields excluded)
+    scholarship_request: bool | None = None
+    scholarship_details: str | None = None
+    scholarship_video_url: str | None = None
 
 
 class ApplicationAdminCreate(BaseModel):
@@ -221,6 +273,18 @@ class ApplicationFilter(BaseModel):
     human_id: uuid.UUID | None = None
     status: ApplicationStatus | None = None
     email: str | None = None
+    scholarship_status: str | None = None
+
+
+class ScholarshipDecisionRequest(BaseModel):
+    """Admin request body for PATCH /applications/{id}/scholarship."""
+
+    scholarship_status: ScholarshipStatus  # required: "approved" | "rejected"
+    discount_percentage: Decimal | None = None  # 0–100, required when approved
+    incentive_amount: Decimal | None = None  # only if popup.allows_incentive
+    incentive_currency: str | None = None  # required if incentive_amount set
+
+    model_config = ConfigDict(str_strip_whitespace=True)
 
 
 class ApplicationSnapshotBase(SQLModel):

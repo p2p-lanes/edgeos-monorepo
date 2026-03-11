@@ -105,6 +105,8 @@ async def create_popup(
     # Create default form sections and base field configs
     section_map: dict[str, uuid.UUID] = {}
     for key, section_def in DEFAULT_SECTIONS.items():
+        if key == "scholarship" and not popup.allows_scholarship:
+            continue
         section = FormSections(
             tenant_id=popup.tenant_id,
             popup_id=popup.id,

@@ -43,6 +43,9 @@ class BaseFieldConfigsCRUD(
         configs = []
         for field_name, definition in BASE_FIELD_DEFINITIONS.items():
             section_key = definition.get("default_section_key", "profile")
+            # Skip fields whose section was not created (e.g. scholarship when not enabled)
+            if section_key not in section_map:
+                continue
             config = BaseFieldConfigs(
                 tenant_id=tenant_id,
                 popup_id=popup_id,

@@ -4,7 +4,8 @@ from enum import StrEnum
 from typing import Self
 
 from pydantic import model_validator
-from sqlmodel import Field, SQLModel
+from sqlalchemy import Boolean
+from sqlmodel import Column, Field, SQLModel
 
 from app.utils.utils import slugify
 
@@ -28,6 +29,14 @@ class PopupBase(SQLModel):
     allows_spouse: bool | None = False
     allows_children: bool | None = False
     allows_coupons: bool | None = False
+    allows_scholarship: bool = Field(
+        default=False,
+        sa_column=Column(Boolean, nullable=False, server_default="false"),
+    )
+    allows_incentive: bool = Field(
+        default=False,
+        sa_column=Column(Boolean, nullable=False, server_default="false"),
+    )
     image_url: str | None = None
     icon_url: str | None = None
     express_checkout_background: str | None = None
@@ -53,6 +62,8 @@ class PopupCreate(SQLModel):
     allows_spouse: bool | None = False
     allows_children: bool | None = False
     allows_coupons: bool | None = False
+    allows_scholarship: bool | None = False
+    allows_incentive: bool | None = False
     image_url: str | None = None
     icon_url: str | None = None
     express_checkout_background: str | None = None
@@ -82,6 +93,8 @@ class PopupUpdate(SQLModel):
     allows_spouse: bool | None = None
     allows_children: bool | None = None
     allows_coupons: bool | None = None
+    allows_scholarship: bool | None = None
+    allows_incentive: bool | None = None
     image_url: str | None = None
     icon_url: str | None = None
     express_checkout_background: str | None = None
