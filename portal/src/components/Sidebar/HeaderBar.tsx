@@ -10,7 +10,6 @@ import {
   BreadcrumbSeparator,
 } from "../ui/breadcrumb"
 import BreadcrumbSegment from "./BreadcrumbSegment"
-import CartBadge from "./CartBadge"
 import useGroupMapping from "./hooks/useGroupMapping"
 import { SidebarTrigger } from "./SidebarComponents"
 
@@ -56,9 +55,6 @@ const HeaderBar = () => {
           ))}
         </BreadcrumbList>
       </Breadcrumb>
-      <div className="ml-auto">
-        <CartBadge />
-      </div>
     </header>
   )
 }

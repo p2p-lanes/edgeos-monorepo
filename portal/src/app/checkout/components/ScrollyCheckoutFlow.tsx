@@ -7,13 +7,18 @@ import {
   ArrowLeft,
   ArrowRight,
   BookOpen,
+  Heart,
+  Home,
   Layers,
   Loader2,
+  Shield,
   ShoppingBag,
-  Zap,
+  Tag,
+  Ticket,
+  X,
 } from "lucide-react"
 import { useSearchParams } from "next/navigation"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   DesignVariantProvider,
   useDesignVariant,
@@ -304,12 +309,267 @@ function SnapDotNav({
   )
 }
 
+function CartDrawerContent() {
+  const {
+    cart,
+    summary,
+    attendees,
+    togglePass,
+    resetDayProduct,
+    clearHousing,
+    updateMerchQuantity,
+    clearPatron,
+    clearPromoCode,
+  } = useCheckout()
+
+  const hasItems =
+    cart.passes.length > 0 ||
+    !!cart.housing ||
+    cart.merch.length > 0 ||
+    !!cart.patron ||
+    !!cart.insurance ||
+    cart.promoCodeValid
+
+  const getAttendeeName = (attendeeId: string): string => {
+    const attendee = attendees.find((a) => a.id === attendeeId)
+    return attendee?.name || "Unknown"
+  }
+
+  const handleRemovePass = (attendeeId: string, productId: string) => {
+    const pass = cart.passes.find(
+      (p) => p.attendeeId === attendeeId && p.productId === productId,
+    )
+    if (pass?.product.duration_type === "day") {
+      resetDayProduct(attendeeId, productId)
+    } else {
+      togglePass(attendeeId, productId)
+    }
+  }
+
+  return (
+    <div className="bg-white shadow-2xl rounded-2xl mb-2 relative z-30 max-h-[60vh] overflow-hidden">
+      <div className="px-4 py-4 overflow-y-auto max-h-[calc(60vh-80px)]">
+        {/* Passes */}
+        {cart.passes.length > 0 && (
+          <div className="mb-4">
+            <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+              Passes
+            </h4>
+            <div className="space-y-2">
+              {cart.passes.map((pass) => (
+                <div
+                  key={`${pass.attendeeId}-${pass.productId}`}
+                  className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0"
+                >
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <Ticket className="w-4 h-4 text-gray-400 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">
+                        {getAttendeeName(pass.attendeeId)}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {pass.product.name}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-gray-900">
+                      {formatCurrency(pass.originalPrice ?? pass.price)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleRemovePass(pass.attendeeId, pass.productId)
+                      }
+                      className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Housing */}
+        {cart.housing && (
+          <div className="mb-4">
+            <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+              Housing
+            </h4>
+            <div className="flex items-center justify-between py-2">
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <Home className="w-4 h-4 text-gray-400 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate">
+                    {cart.housing.product.name}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {cart.housing.nights} night
+                    {cart.housing.nights !== 1 ? "s" : ""}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-gray-900">
+                  {formatCurrency(cart.housing.totalPrice)}
+                </span>
+                <button
+                  type="button"
+                  onClick={clearHousing}
+                  className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Merch */}
+        {cart.merch.length > 0 && (
+          <div className="mb-4">
+            <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+              Merchandise
+            </h4>
+            <div className="space-y-2">
+              {cart.merch.map((item) => (
+                <div
+                  key={item.productId}
+                  className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0"
+                >
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <ShoppingBag className="w-4 h-4 text-gray-400 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">
+                        {item.product.name}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Qty: {item.quantity}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-gray-900">
+                      {formatCurrency(item.totalPrice)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => updateMerchQuantity(item.productId, 0)}
+                      className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Patron */}
+        {cart.patron && (
+          <div className="mb-4">
+            <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+              Patron Contribution
+            </h4>
+            <div className="flex items-center justify-between py-2">
+              <div className="flex items-center gap-3">
+                <Heart className="w-4 h-4 text-gray-400 shrink-0" />
+                <span className="text-sm font-medium text-gray-900">
+                  Community Support
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-gray-900">
+                  {formatCurrency(cart.patron.amount)}
+                </span>
+                <button
+                  type="button"
+                  onClick={clearPatron}
+                  className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Insurance */}
+        {cart.insurance && summary.insuranceSubtotal > 0 && (
+          <div className="mb-4">
+            <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+              Pass Protection
+            </h4>
+            <div className="flex items-center justify-between py-2">
+              <div className="flex items-center gap-3">
+                <Shield className="w-4 h-4 text-gray-400 shrink-0" />
+                <span className="text-sm font-medium text-gray-900">
+                  Coverage for all passes
+                </span>
+              </div>
+              <span className="text-sm font-medium text-gray-900">
+                {formatCurrency(summary.insuranceSubtotal)}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Promo Code */}
+        {cart.promoCodeValid && cart.promoCode && (
+          <div className="mb-4">
+            <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+              Promo Code
+            </h4>
+            <div className="flex items-center justify-between py-2">
+              <div className="flex items-center gap-3">
+                <Tag className="w-4 h-4 text-green-500 shrink-0" />
+                <span className="text-sm font-medium text-green-700">
+                  {cart.promoCode}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-green-600">
+                  -{cart.promoCodeDiscount}%
+                </span>
+                <button
+                  type="button"
+                  onClick={clearPromoCode}
+                  className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!hasItems && (
+          <div className="py-8 text-center">
+            <p className="text-gray-500">Your cart is empty</p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function QuickPayFooter({
   onPay,
   onBack,
+  onCartToggle,
+  itemCount = 0,
+  isOnConfirm,
+  onGoToConfirm,
 }: {
   onPay?: () => void
   onBack?: () => void
+  onCartToggle?: () => void
+  itemCount?: number
+  isOnConfirm?: boolean
+  onGoToConfirm?: () => void
 }) {
   const { cart, summary, isSubmitting, termsAccepted } = useCheckout()
   const { getCity } = useCityProvider()
@@ -331,6 +591,19 @@ function QuickPayFooter({
             <ArrowLeft className="w-4 h-4" />
           </button>
 
+          <button
+            type="button"
+            onClick={onCartToggle}
+            className="relative flex items-center justify-center p-2.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors shrink-0"
+          >
+            <ShoppingBag className="w-4 h-4" />
+            {itemCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-white text-gray-900 text-[9px] rounded-full flex items-center justify-center font-bold">
+                {itemCount}
+              </span>
+            )}
+          </button>
+
           <div className="flex-1 flex flex-col items-start min-w-0 overflow-hidden">
             <span className="text-[10px] text-gray-500 uppercase tracking-wider font-medium">
               Total
@@ -344,6 +617,14 @@ function QuickPayFooter({
             <span className="text-gray-400 text-xs text-right max-w-[80px]">
               Add passes first
             </span>
+          ) : !isOnConfirm ? (
+            <button
+              type="button"
+              onClick={onGoToConfirm}
+              className="flex items-center gap-1.5 px-4 py-3 rounded-xl font-semibold text-sm bg-white text-gray-900 hover:bg-gray-100 shadow-lg active:scale-95 shrink-0 whitespace-nowrap"
+            >
+              Review <ArrowRight className="w-4 h-4 shrink-0" />
+            </button>
           ) : requiresTerms ? (
             <span className="text-gray-400 text-xs text-right max-w-[80px]">
               Accept terms to pay
@@ -379,9 +660,17 @@ function QuickPayFooter({
 function StripeFooter({
   onPay,
   onBack,
+  onCartToggle,
+  itemCount = 0,
+  isOnConfirm,
+  onGoToConfirm,
 }: {
   onPay?: () => void
   onBack?: () => void
+  onCartToggle?: () => void
+  itemCount?: number
+  isOnConfirm?: boolean
+  onGoToConfirm?: () => void
 }) {
   const { cart, summary, isSubmitting, termsAccepted } = useCheckout()
   const { getCity } = useCityProvider()
@@ -391,15 +680,27 @@ function StripeFooter({
 
   return (
     <div className="mb-4 bg-white/80 backdrop-blur-md border-t border-gray-200 rounded-2xl shadow-sm">
-      <div className="flex items-center justify-between px-4 py-3">
+      <div className="flex items-center gap-3 px-4 py-3">
         <button
           type="button"
           onClick={onBack}
-          className="text-gray-500 hover:text-gray-900 transition-colors"
+          className="text-gray-500 hover:text-gray-900 transition-colors shrink-0"
         >
           <ArrowLeft className="w-4 h-4" />
         </button>
-        <div className="flex flex-col items-center">
+        <button
+          type="button"
+          onClick={onCartToggle}
+          className="relative text-gray-500 hover:text-gray-900 hover:bg-gray-100 p-1.5 rounded-lg transition-colors shrink-0"
+        >
+          <ShoppingBag className="w-4 h-4" />
+          {itemCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-gray-900 text-white text-[9px] rounded-full flex items-center justify-center font-bold">
+              {itemCount}
+            </span>
+          )}
+        </button>
+        <div className="flex-1 flex flex-col items-center">
           <span className="text-[10px] text-gray-400 uppercase tracking-wider">
             Total
           </span>
@@ -407,25 +708,35 @@ function StripeFooter({
             {formatCurrency(summary.grandTotal)}
           </span>
         </div>
-        <button
-          type="button"
-          onClick={onPay}
-          disabled={!canPay}
-          className={cn(
-            "px-5 py-2 rounded-xl text-sm font-semibold transition-all",
-            canPay
-              ? "bg-gray-900 text-white hover:bg-gray-700"
-              : "bg-gray-100 text-gray-400 cursor-not-allowed",
-          )}
-        >
-          {isSubmitting ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : summary.grandTotal === 0 ? (
-            "Claim"
-          ) : (
-            "Pay"
-          )}
-        </button>
+        {!isOnConfirm && cart.passes.length > 0 ? (
+          <button
+            type="button"
+            onClick={onGoToConfirm}
+            className="px-5 py-2 rounded-xl text-sm font-semibold bg-gray-900 text-white hover:bg-gray-700 shrink-0"
+          >
+            Review
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onPay}
+            disabled={!canPay}
+            className={cn(
+              "px-5 py-2 rounded-xl text-sm font-semibold transition-all shrink-0",
+              canPay
+                ? "bg-gray-900 text-white hover:bg-gray-700"
+                : "bg-gray-100 text-gray-400 cursor-not-allowed",
+            )}
+          >
+            {isSubmitting ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : summary.grandTotal === 0 ? (
+              "Claim"
+            ) : (
+              "Pay"
+            )}
+          </button>
+        )}
       </div>
     </div>
   )
@@ -434,17 +745,23 @@ function StripeFooter({
 function DockFooter({
   onPay,
   onBack,
+  onCartToggle,
+  itemCount = 0,
+  isOnConfirm,
+  onGoToConfirm,
 }: {
   onPay?: () => void
   onBack?: () => void
+  onCartToggle?: () => void
+  itemCount?: number
+  isOnConfirm?: boolean
+  onGoToConfirm?: () => void
 }) {
   const { cart, summary, isSubmitting, termsAccepted } = useCheckout()
   const { getCity } = useCityProvider()
   const popup = getCity()
   const requiresTerms = !!popup?.terms_and_conditions_url && !termsAccepted
   const canPay = cart.passes.length > 0 && !requiresTerms && !isSubmitting
-  const itemCount =
-    cart.passes.length + (cart.housing ? 1 : 0) + cart.merch.length
 
   return (
     <div className="mb-4 flex items-end justify-center gap-2">
@@ -459,6 +776,7 @@ function DockFooter({
       {/* cart badge */}
       <button
         type="button"
+        onClick={onCartToggle}
         className="relative w-12 h-12 rounded-2xl bg-white/90 backdrop-blur-sm shadow-lg border border-gray-200 flex items-center justify-center hover:scale-110 transition-transform"
       >
         <ShoppingBag className="w-5 h-5 text-gray-700" />
@@ -468,27 +786,44 @@ function DockFooter({
           </span>
         )}
       </button>
-      {/* pay */}
-      <button
-        type="button"
-        onClick={onPay}
-        disabled={!canPay}
-        className={cn(
-          "h-12 px-5 rounded-2xl shadow-lg font-semibold text-sm flex items-center gap-2 hover:scale-105 transition-transform",
-          canPay
-            ? "bg-gray-900 text-white"
-            : "bg-white/60 text-gray-400 cursor-not-allowed border border-gray-200",
-        )}
-      >
-        {isSubmitting ? (
-          <Loader2 className="w-4 h-4 animate-spin" />
-        ) : (
-          <>
-            {formatCurrency(summary.grandTotal)}{" "}
-            <ArrowRight className="w-4 h-4" />
-          </>
-        )}
-      </button>
+      {/* navigate to confirm or pay */}
+      {!isOnConfirm ? (
+        <button
+          type="button"
+          onClick={onGoToConfirm}
+          disabled={cart.passes.length === 0}
+          className={cn(
+            "h-12 px-5 rounded-2xl shadow-lg font-semibold text-sm flex items-center gap-2 hover:scale-105 transition-transform",
+            cart.passes.length > 0
+              ? "bg-gray-900 text-white"
+              : "bg-white/60 text-gray-400 cursor-not-allowed border border-gray-200",
+          )}
+        >
+          {formatCurrency(summary.grandTotal)}{" "}
+          <ArrowRight className="w-4 h-4" />
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={onPay}
+          disabled={!canPay}
+          className={cn(
+            "h-12 px-5 rounded-2xl shadow-lg font-semibold text-sm flex items-center gap-2 hover:scale-105 transition-transform",
+            canPay
+              ? "bg-gray-900 text-white"
+              : "bg-white/60 text-gray-400 cursor-not-allowed border border-gray-200",
+          )}
+        >
+          {isSubmitting ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <>
+              {formatCurrency(summary.grandTotal)}{" "}
+              <ArrowRight className="w-4 h-4" />
+            </>
+          )}
+        </button>
+      )}
     </div>
   )
 }
@@ -498,29 +833,69 @@ function SnapFooter({
   footerDesign,
   onPay,
   onBack,
+  activeSection,
+  onGoToConfirm,
 }: {
   footerMode: "guided" | "quickpay"
   footerDesign: FooterDesign
   onPay?: () => void
   onBack?: () => void
+  activeSection?: string
+  onGoToConfirm?: () => void
 }) {
   const isMobile = useIsMobile()
   const { state: sidebarState } = useSidebar()
+  const { cart } = useCheckout()
+  const [isCartOpen, setIsCartOpen] = useState(false)
+
   const leftOffset = isMobile
     ? 0
     : sidebarState === "expanded"
       ? "var(--sidebar-width)"
       : "var(--sidebar-width-icon)"
 
+  const itemCount =
+    cart.passes.length +
+    (cart.housing ? 1 : 0) +
+    cart.merch.length +
+    (cart.patron ? 1 : 0)
+
+  const isOnConfirm = activeSection === "confirm"
+
   const footer = {
     pill:
       footerMode === "quickpay" ? (
-        <QuickPayFooter onPay={onPay} onBack={onBack} />
+        <QuickPayFooter
+          onPay={onPay}
+          onBack={onBack}
+          onCartToggle={() => setIsCartOpen((v) => !v)}
+          itemCount={itemCount}
+          isOnConfirm={isOnConfirm}
+          onGoToConfirm={onGoToConfirm}
+        />
       ) : (
         <CartFooter onPay={onPay} onBack={onBack} />
       ),
-    stripe: <StripeFooter onPay={onPay} onBack={onBack} />,
-    dock: <DockFooter onPay={onPay} onBack={onBack} />,
+    stripe: (
+      <StripeFooter
+        onPay={onPay}
+        onBack={onBack}
+        onCartToggle={() => setIsCartOpen((v) => !v)}
+        itemCount={itemCount}
+        isOnConfirm={isOnConfirm}
+        onGoToConfirm={onGoToConfirm}
+      />
+    ),
+    dock: (
+      <DockFooter
+        onPay={onPay}
+        onBack={onBack}
+        onCartToggle={() => setIsCartOpen((v) => !v)}
+        itemCount={itemCount}
+        isOnConfirm={isOnConfirm}
+        onGoToConfirm={onGoToConfirm}
+      />
+    ),
   }[footerDesign]
 
   return (
@@ -528,7 +903,20 @@ function SnapFooter({
       className="fixed bottom-0 z-30 transition-[left] duration-200"
       style={{ left: leftOffset, right: 0 }}
     >
-      <div className="max-w-2xl mx-auto px-4">{footer}</div>
+      <div className="max-w-2xl mx-auto px-4">
+        {isCartOpen && (
+          <CartDrawerContent />
+        )}
+        {isCartOpen && (
+          <button
+            type="button"
+            aria-label="Close cart"
+            className="fixed inset-0 z-20 cursor-default"
+            onClick={() => setIsCartOpen(false)}
+          />
+        )}
+        {footer}
+      </div>
     </div>
   )
 }
@@ -575,7 +963,7 @@ function ScrollyCheckoutFlowInner({
   const [footerMode, setFooterMode] = useState<"guided" | "quickpay">(
     "guided",
   )
-  const [footerDesign, setFooterDesign] = useState<FooterDesign>("pill")
+  const [footerDesign, setFooterDesign] = useState<FooterDesign>("stripe")
 
   useEffect(() => {
     const storedMode = localStorage.getItem(
@@ -623,6 +1011,11 @@ function ScrollyCheckoutFlowInner({
     list.push({ id: "confirm", label: "Review & Confirm" })
     return list
   }, [housingProducts, merchProducts, patronProducts])
+
+  const goToConfirm = useCallback(() => {
+    const idx = allSections.findIndex((s) => s.id === "confirm")
+    scrollToIndexRef.current?.(idx)
+  }, [allSections])
 
   // GSAP-powered snap scroll — blocks native scroll, animates between sections
   useEffect(() => {
@@ -812,6 +1205,8 @@ function ScrollyCheckoutFlowInner({
           footerDesign={footerDesign}
           onPay={handlePayment}
           onBack={onBack}
+          activeSection={activeSection}
+          onGoToConfirm={goToConfirm}
         />
       </div>
     )
