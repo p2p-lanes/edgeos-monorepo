@@ -237,6 +237,18 @@ class ApprovalCalculator:
             strategy, reviews, reviewers, human_red_flag=False
         )
 
+        # Scholarship gate: if the application would be ACCEPTED but has a
+        # pending scholarship, keep it in IN_REVIEW until the scholarship is
+        # resolved. This applies to ALL strategy types, not just AUTO_ACCEPT.
+        if new_status == ApplicationStatus.ACCEPTED and application.scholarship_request:
+            from app.api.application.schemas import ScholarshipStatus
+
+            if application.scholarship_status not in (
+                ScholarshipStatus.APPROVED.value,
+                ScholarshipStatus.REJECTED.value,
+            ):
+                return application  # stay in IN_REVIEW
+
         # Update if changed
         if new_status.value != application.status:
             application.status = new_status.value
