@@ -164,15 +164,6 @@ export default function HousingStep({ onSkip }: HousingStepProps) {
         ))}
       </div>
 
-      <div className="text-center py-2">
-        <button
-          type="button"
-          onClick={handleSkip}
-          className="text-gray-500 hover:text-gray-700 underline text-sm transition-colors"
-        >
-          I don&apos;t need housing
-        </button>
-      </div>
     </div>
   )
 }

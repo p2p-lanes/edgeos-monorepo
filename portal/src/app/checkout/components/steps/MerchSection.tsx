@@ -59,15 +59,6 @@ export default function MerchSection({ onSkip }: MerchSectionProps) {
         ))}
       </div>
 
-      <div className="text-center py-2">
-        <button
-          type="button"
-          onClick={handleSkip}
-          className="text-gray-500 hover:text-gray-700 underline text-sm transition-colors"
-        >
-          Skip merchandise
-        </button>
-      </div>
     </div>
   )
 }
