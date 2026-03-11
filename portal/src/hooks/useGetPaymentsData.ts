@@ -7,8 +7,8 @@ import type { PaymentsProps } from "@/types/passes"
 
 function mapPayment(p: PaymentPublic): PaymentsProps {
   return {
-    id: Number(p.id),
-    application_id: Number(p.application_id),
+    id: p.id,
+    application_id: p.application_id,
     external_id: p.external_id ?? null,
     status: (p.status ?? "pending") as PaymentsProps["status"],
     amount: Number(p.amount ?? 0),
@@ -18,8 +18,8 @@ function mapPayment(p: PaymentPublic): PaymentsProps {
     checkout_url: p.checkout_url ?? null,
     products_snapshot: (p.products_snapshot ?? []).map(
       (ps: PaymentProductResponse) => ({
-        product_id: Number(ps.product_id),
-        attendee_id: Number(ps.attendee_id),
+        product_id: ps.product_id,
+        attendee_id: ps.attendee_id,
         quantity: ps.quantity ?? 1,
         product_name: ps.product_name ?? "",
         product_description: ps.product_description ?? null,

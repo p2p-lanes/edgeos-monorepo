@@ -179,10 +179,6 @@ def generate_invoice_pdf(
                 "Failed to load invoice header image from %s", header_image_url
             )
 
-    # ---- Title ---------------------------------------------------------------
-    flow.append(Paragraph("Invoice", styles["Header"]))
-    flow.append(Spacer(1, 6))
-
     # ---- Two-column header (seller | invoice meta) ---------------------------
     left = [
         Paragraph(escape(invoice_company_name), styles["Body"]),
@@ -191,7 +187,7 @@ def generate_invoice_pdf(
     ]
     right = [
         Paragraph(f"Date: {_format_date(payment.created_at)}", styles["Right"]),
-        Paragraph(f"Invoice #: {payment.id}", styles["Right"]),
+        Paragraph(f"Invoice #: {payment.external_id or payment.id}", styles["Right"]),
         Paragraph(f"Bill to: {escape(client_name)}", styles["Right"]),
     ]
 
