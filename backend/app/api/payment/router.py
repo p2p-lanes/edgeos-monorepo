@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, HTTPException, Request, Response, status
 from sqlmodel import Session
 
 from app.api.payment.crud import payments_crud
@@ -29,6 +29,7 @@ from app.core.dependencies.users import (
 )
 from app.core.redis import WebhookCache
 from app.services.email import (
+    EmailAttachment,
     PaymentConfirmedContext,
     PaymentProductItem,
     get_email_service,
@@ -38,7 +39,11 @@ router = APIRouter(prefix="/payments", tags=["payments"])
 
 
 async def _send_payment_confirmed_email(payment, db_session=None) -> None:
-    """Send payment confirmation email."""
+    """Send payment confirmation email.
+
+    If the popup has invoice details configured (company name, address, email),
+    an invoice PDF is generated and attached to the email.
+    """
     from loguru import logger
 
     payment_model: Payments = payment
@@ -73,6 +78,41 @@ async def _send_payment_confirmed_email(payment, db_session=None) -> None:
             for pp in payment_model.products_snapshot
         )
 
+    # Generate invoice PDF attachment if popup has invoice details configured
+    attachments: list[EmailAttachment] | None = None
+    popup_has_invoice = (
+        popup.invoice_company_name
+        and popup.invoice_company_address
+        and popup.invoice_company_email
+    )
+    if popup_has_invoice:
+        try:
+            from app.core.invoice import generate_invoice_pdf
+
+            client_name = f"{human.first_name or ''} {human.last_name or ''}".strip()
+
+            pdf_bytes = generate_invoice_pdf(
+                payment=payment_model,
+                client_name=client_name or "N/A",
+                invoice_company_name=popup.invoice_company_name,
+                invoice_company_address=popup.invoice_company_address,
+                invoice_company_email=popup.invoice_company_email,
+                header_image_url=popup.image_url,
+            )
+            attachments = [
+                EmailAttachment(
+                    filename=f"invoice-{payment_model.id}.pdf",
+                    content=pdf_bytes,
+                    mime_type="application/pdf",
+                )
+            ]
+            logger.info(f"Invoice PDF generated for payment {payment_model.id}")
+        except Exception as e:
+            logger.error(
+                f"Failed to generate invoice PDF for payment {payment_model.id}: {e}"
+            )
+            # Continue sending email without attachment
+
     email_service = get_email_service()
 
     portal_host = settings.PORTAL_URL.replace("https://", "").replace("http://", "")
@@ -98,6 +138,7 @@ async def _send_payment_confirmed_email(payment, db_session=None) -> None:
         from_name=tenant.sender_name,
         popup_id=popup.id,
         db_session=db_session,
+        attachments=attachments,
     )
     logger.info(
         f"Payment confirmed email sent to {human.email} for payment {payment.id}"
@@ -152,6 +193,57 @@ async def get_payment(
         )
 
     return PaymentPublic.model_validate(payment)
+
+
+@router.get("/{payment_id}/invoice")
+async def get_payment_invoice(
+    payment_id: uuid.UUID,
+    db: TenantSession,
+    _: CurrentUser,
+) -> Response:
+    """Download invoice PDF for a payment (BO only).
+
+    Only available if the popup has invoice details configured.
+    """
+    from app.core.invoice import generate_invoice_pdf
+
+    payment = payments_crud.get(db, payment_id)
+    if not payment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Payment not found",
+        )
+
+    popup = payment.application.popup
+    if not (
+        popup.invoice_company_name
+        and popup.invoice_company_address
+        and popup.invoice_company_email
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invoice not available for this event",
+        )
+
+    human = payment.application.human
+    client_name = f"{human.first_name or ''} {human.last_name or ''}".strip() or "N/A"
+
+    pdf_bytes = generate_invoice_pdf(
+        payment=payment,
+        client_name=client_name,
+        invoice_company_name=popup.invoice_company_name,
+        invoice_company_address=popup.invoice_company_address,
+        invoice_company_email=popup.invoice_company_email,
+        header_image_url=popup.image_url,
+    )
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="invoice-{payment_id}.pdf"',
+        },
+    )
 
 
 @router.patch("/{payment_id}", response_model=PaymentPublic)
@@ -259,6 +351,67 @@ async def list_my_payments(
     return ListModel[PaymentPublic](
         results=[PaymentPublic.model_validate(p) for p in payments],
         paging=Paging(offset=skip, limit=limit, total=total),
+    )
+
+
+@router.get("/my/{payment_id}/invoice")
+async def get_my_invoice(
+    payment_id: uuid.UUID,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+) -> Response:
+    """Download invoice PDF for a payment owned by current human (Portal).
+
+    Only available if the popup has invoice details configured.
+    """
+    from app.api.application.crud import applications_crud
+    from app.core.invoice import generate_invoice_pdf
+
+    payment = payments_crud.get(db, payment_id)
+    if not payment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Payment not found",
+        )
+
+    # Verify human owns this payment's application
+    application = applications_crud.get(db, payment.application_id)
+    if not application or application.human_id != current_human.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Payment not found",
+        )
+
+    # Only generate invoice if popup has all invoice fields configured
+    popup = application.popup
+    if not (
+        popup.invoice_company_name
+        and popup.invoice_company_address
+        and popup.invoice_company_email
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invoice not available for this event",
+        )
+
+    human = application.human
+    client_name = f"{human.first_name or ''} {human.last_name or ''}".strip() or "N/A"
+
+    pdf_bytes = generate_invoice_pdf(
+        payment=payment,
+        client_name=client_name,
+        invoice_company_name=popup.invoice_company_name,
+        invoice_company_address=popup.invoice_company_address,
+        invoice_company_email=popup.invoice_company_email,
+        header_image_url=popup.image_url,
+    )
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="invoice-{payment_id}.pdf"',
+        },
     )
 
 
