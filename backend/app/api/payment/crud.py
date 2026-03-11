@@ -12,7 +12,7 @@ from app.api.application.models import Applications
 
 if TYPE_CHECKING:
     from app.api.group.models import Groups
-from app.api.application.schemas import ApplicationStatus
+from app.api.application.schemas import ApplicationStatus, ScholarshipStatus
 from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.coupon.crud import coupons_crud
 from app.api.payment.models import PaymentProducts, Payments
@@ -502,6 +502,28 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 response.coupon_code = coupon.code
                 response.discount_value = coupon_discount
 
+        # Check scholarship discount (third competitor — best-of-three)
+        if (
+            application.scholarship_status == ScholarshipStatus.APPROVED.value
+            and application.discount_percentage
+        ):
+            scholarship_discount_pct = Decimal(str(application.discount_percentage))
+            discounted_amount = _calculate_price(
+                standard_amount=standard_amount,
+                supporter_amount=supporter_amount,
+                patreon_amount=patreon_amount,
+                discount_value=scholarship_discount_pct,
+                application=application,
+                edit_passes=obj.edit_passes,
+            )
+            if discounted_amount <= response.amount:
+                response.amount = discounted_amount
+                response.discount_value = scholarship_discount_pct
+                response.coupon_id = None
+                response.coupon_code = None
+                response.group_id = None
+                response.scholarship_discount = True
+
         # Calculate insurance if requested
         if obj.insurance:
             insurance_amount = self._calculate_insurance(session, obj.products)
@@ -704,6 +726,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         try:
             simplefi_response = simplefi_client.create_payment(
                 amount=preview.amount,
+                popup_slug=application.popup.slug,
                 reference=reference,
                 memo=application.popup.tenant.name,
             )
