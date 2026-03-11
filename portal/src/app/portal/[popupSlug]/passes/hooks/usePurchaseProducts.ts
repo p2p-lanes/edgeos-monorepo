@@ -58,14 +58,9 @@ const usePurchaseProducts = () => {
       return { result, editableMode }
     },
     onSuccess: async ({ result, editableMode }) => {
-      const isFastCheckout = window.location.href.includes("/checkout")
-      const redirectUrl = isFastCheckout
-        ? `${window.location.origin}/checkout/success`
-        : window.location.href
-
-      if (result.status === "pending") {
+      if (result.status === "pending" && result.checkout_url) {
         markPurchasePending()
-        window.location.href = `${result.checkout_url}?redirect_url=${redirectUrl}`
+        window.location.href = result.checkout_url
       } else if (result.status === "approved") {
         const city = getCity()
         const popupId = city?.id ? String(city.id) : null
@@ -85,8 +80,8 @@ const usePurchaseProducts = () => {
         if (editableMode) {
           toggleEditing(false)
         }
-        if (isFastCheckout) {
-          window.location.href = redirectUrl
+        if (window.location.href.includes("/checkout")) {
+          window.location.href = `${window.location.origin}/checkout/success`
           return
         }
         toast.success(
