@@ -87,9 +87,7 @@ const PopupsMenu = () => {
                         <div
                           className={cn(
                             "flex items-center justify-center rounded-lg bg-neutral-200 font-bold text-neutral-500",
-                            isCollapsed
-                              ? "size-8 text-sm"
-                              : "size-12 text-lg",
+                            isCollapsed ? "size-8 text-sm" : "size-12 text-lg",
                           )}
                         >
                           {city.name?.charAt(0) ?? "?"}
