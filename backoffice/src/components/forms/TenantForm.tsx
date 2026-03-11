@@ -58,9 +58,7 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
       }),
     onSuccess: () => {
       showSuccessToast("Organization updated successfully")
-      queryClient.invalidateQueries({
-        queryKey: ["tenants", defaultValues!.id],
-      })
+      queryClient.invalidateQueries({ queryKey: ["tenants"] })
       form.reset()
       onSuccess()
     },
