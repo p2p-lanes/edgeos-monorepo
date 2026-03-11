@@ -66,6 +66,7 @@ class SimpleFIClient:
     def create_payment(
         self,
         amount: Decimal,
+        popup_slug: str,
         reference: dict[str, Any] | None = None,
         memo: str = "EdgeOS Payment",
     ) -> SimpleFIPaymentResponse:
@@ -74,6 +75,7 @@ class SimpleFIClient:
 
         Args:
             amount: The payment amount in USD
+            popup_slug: The popup slug for building portal redirect URLs
             reference: Optional reference data (application_id, email, products)
 
         Returns:
@@ -83,12 +85,20 @@ class SimpleFIClient:
             settings.BACKEND_URL, "/api/v1/payments/webhook/simplefi"
         )
 
+        portal_base = settings.PORTAL_URL.rstrip("/")
+        success_url = f"{portal_base}/portal/{popup_slug}/checkout/success"
+        cancel_url = f"{portal_base}/portal/{popup_slug}/passes/buy"
+
         body = {
             "amount": float(amount),
             "currency": "USD",
             "reference": reference or {},
             "memo": memo,
             "notification_url": notification_url,
+            "redirect_urls": {
+                "success_url": success_url,
+                "cancel_url": cancel_url,
+            },
         }
 
         logger.info("Creating SimpleFI payment for amount: %s", amount)
