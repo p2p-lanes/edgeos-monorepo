@@ -727,6 +727,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             simplefi_response = simplefi_client.create_payment(
                 amount=preview.amount,
                 popup_slug=application.popup.slug,
+                tenant_slug=application.popup.tenant.slug,
                 reference=reference,
                 memo=application.popup.tenant.name,
             )
