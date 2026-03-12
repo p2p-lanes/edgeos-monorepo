@@ -103,9 +103,12 @@ async def create_popup(
     )
 
     # Create default form sections and base field configs
+    # Feature-gated sections are only created when their flag is enabled
     section_map: dict[str, uuid.UUID] = {}
     for key, section_def in DEFAULT_SECTIONS.items():
         if key == "scholarship" and not popup.allows_scholarship:
+            continue
+        if key == "companions" and not popup.allows_spouse and not popup.allows_children:
             continue
         section = FormSections(
             tenant_id=popup.tenant_id,
@@ -152,7 +155,47 @@ async def update_popup(
                 detail="A popup with this slug already exists",
             )
 
+    # Detect feature flags being enabled for the first time
+    scholarship_enabling = (
+        popup_in.allows_scholarship is True and not popup.allows_scholarship
+    )
+    companions_enabling = (
+        not popup.allows_spouse
+        and not popup.allows_children
+        and (popup_in.allows_spouse is True or popup_in.allows_children is True)
+    )
+
     updated = crud.update(db, popup, popup_in)
+
+    # Create gated sections and base field configs on first enable
+    section_map: dict[str, uuid.UUID] = {}
+    for key, should_create in [
+        ("scholarship", scholarship_enabling),
+        ("companions", companions_enabling),
+    ]:
+        if not should_create:
+            continue
+        section_def = DEFAULT_SECTIONS[key]
+        section = FormSections(
+            tenant_id=updated.tenant_id,
+            popup_id=updated.id,
+            label=section_def["label"],
+            order=section_def["order"],
+            protected=True,
+        )
+        db.add(section)
+        db.commit()
+        db.refresh(section)
+        section_map[key] = section.id
+
+    if section_map:
+        base_field_configs_crud.create_defaults_for_popup(
+            db,
+            popup_id=updated.id,
+            tenant_id=updated.tenant_id,
+            section_map=section_map,
+        )
+
     return PopupPublic.model_validate(updated)
 
 
