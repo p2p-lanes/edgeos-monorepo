@@ -16,6 +16,7 @@ from app.api.application.schemas import (
     AssociatedAttendee,
     AttendeesDirectoryEntry,
     DirectoryProduct,
+    ScholarshipDecisionRequest,
 )
 from app.api.attendee.schemas import (
     AttendeeCreate,
@@ -27,6 +28,7 @@ from app.api.attendee.schemas import (
 from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
+    CurrentAdmin,
     CurrentHuman,
     CurrentUser,
     CurrentWriter,
@@ -308,6 +310,17 @@ async def create_my_application(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="You already have an application for this popup",
         )
+
+    # Validate scholarship request against popup settings
+    if app_in.scholarship_request is True:
+        from app.api.popup.crud import popups_crud
+
+        popup = popups_crud.get(db, app_in.popup_id)
+        if not popup or not popup.allows_scholarship:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="This popup does not accept scholarship requests",
+            )
 
     # Create application
     application = crud.applications_crud.create_internal(
@@ -682,5 +695,49 @@ async def delete_my_attendee(
         )
 
     crud.applications_crud.delete_attendee(db, application, attendee_id)
+
+    return _build_application_public(application)
+
+
+@router.patch(
+    "/{application_id}/scholarship",
+    response_model=ApplicationPublic,
+)
+async def review_scholarship(
+    application_id: uuid.UUID,
+    decision: ScholarshipDecisionRequest,
+    db: TenantSession,
+    _: CurrentAdmin,
+) -> ApplicationPublic:
+    """Approve or reject a scholarship request on an application (BO admin only).
+
+    Updates scholarship fields and re-runs the approval calculator.
+    If the application transitions to ACCEPTED as a result, sends the
+    appropriate scholarship acceptance email to the applicant.
+    """
+    # Capture status before the CRUD call so we can detect transitions
+    application = crud.applications_crud.get(db, application_id)
+    if not application:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Application not found",
+        )
+    status_before = application.status
+
+    # Perform scholarship decision + recalculate approval status
+    application = crud.applications_crud.review_scholarship(
+        db,
+        application_id=application_id,
+        decision=decision,
+    )
+
+    # Send email only if status changed (e.g., IN_REVIEW → ACCEPTED)
+    if application.human:
+        await send_application_status_email(
+            application,
+            application.human,
+            db,
+            status_before=status_before,
+        )
 
     return _build_application_public(application)

@@ -33,6 +33,19 @@ class SimpleFIClient:
         self.base_url = settings.SIMPLEFI_API_URL
         self.timeout = 20.0
 
+    @staticmethod
+    def _build_tenant_portal_url(tenant_slug: str) -> str:
+        """Build tenant-specific portal URL by prepending tenant slug as subdomain.
+
+        Example: https://edge.muvin.co -> https://tenant-slug.edge.muvin.co
+        For localhost: http://localhost:3000 -> http://tenant-slug.localhost:3000
+        """
+        parsed = urllib.parse.urlparse(settings.PORTAL_URL)
+        tenant_host = f"{tenant_slug}.{parsed.hostname}"
+        if parsed.port:
+            tenant_host = f"{tenant_host}:{parsed.port}"
+        return f"{parsed.scheme}://{tenant_host}"
+
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
@@ -66,6 +79,8 @@ class SimpleFIClient:
     def create_payment(
         self,
         amount: Decimal,
+        popup_slug: str,
+        tenant_slug: str,
         reference: dict[str, Any] | None = None,
         memo: str = "EdgeOS Payment",
     ) -> SimpleFIPaymentResponse:
@@ -74,6 +89,8 @@ class SimpleFIClient:
 
         Args:
             amount: The payment amount in USD
+            popup_slug: The popup slug for building portal redirect URLs
+            tenant_slug: The tenant slug for the portal subdomain
             reference: Optional reference data (application_id, email, products)
 
         Returns:
@@ -83,12 +100,20 @@ class SimpleFIClient:
             settings.BACKEND_URL, "/api/v1/payments/webhook/simplefi"
         )
 
+        portal_base = self._build_tenant_portal_url(tenant_slug)
+        success_url = f"{portal_base}/portal/{popup_slug}/passes/buy?checkout=success"
+        cancel_url = f"{portal_base}/portal/{popup_slug}/passes/buy"
+
         body = {
             "amount": float(amount),
             "currency": "USD",
             "reference": reference or {},
             "memo": memo,
             "notification_url": notification_url,
+            "redirect_urls": {
+                "success_url": success_url,
+                "cancel_url": cancel_url,
+            },
         }
 
         logger.info("Creating SimpleFI payment for amount: %s", amount)

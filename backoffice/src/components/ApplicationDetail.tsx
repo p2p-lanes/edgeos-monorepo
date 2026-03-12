@@ -1,9 +1,11 @@
-import { useMutation, useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   AlertTriangle,
   ChevronDown,
   ChevronUp,
   DollarSign,
+  ExternalLink,
+  GraduationCap,
   MapPin,
   MessageCircle,
   ThumbsDown,
@@ -15,9 +17,13 @@ import {
   type ApiError,
   type ApplicationPublic,
   ApplicationReviewsService,
+  ApplicationsService,
   ApprovalStrategiesService,
   FormFieldsService,
+  type PopupPublic,
+  PopupsService,
   type ReviewDecision,
+  type ScholarshipDecisionRequest,
 } from "@/client"
 import { StatusBadge } from "@/components/Common/StatusBadge"
 import { Badge } from "@/components/ui/badge"
@@ -32,6 +38,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { InlineRow, InlineSection } from "@/components/ui/inline-form"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { LoadingButton } from "@/components/ui/loading-button"
 import { Separator } from "@/components/ui/separator"
 import useAuth from "@/hooks/useAuth"
@@ -332,6 +340,268 @@ function ReviewSummary({
 }
 
 // ========================
+// Scholarship Panel
+// ========================
+
+function ScholarshipPanel({
+  application,
+  popup,
+  onSuccess,
+}: {
+  application: ApplicationPublic
+  popup: PopupPublic
+  onSuccess: () => void
+}) {
+  const { showSuccessToast, showErrorToast } = useCustomToast()
+  const queryClient = useQueryClient()
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false)
+  const [discountPct, setDiscountPct] = useState("")
+  const [incentiveAmount, setIncentiveAmount] = useState("")
+  const [incentiveCurrency, setIncentiveCurrency] = useState("USD")
+
+  const scholarshipStatus = application.scholarship_status ?? null
+  const isPending =
+    scholarshipStatus === null || scholarshipStatus === "pending"
+
+  const mutation = useMutation({
+    mutationFn: (payload: ScholarshipDecisionRequest) =>
+      ApplicationsService.reviewScholarship({
+        applicationId: application.id,
+        requestBody: payload,
+      }),
+    onSuccess: () => {
+      showSuccessToast("Scholarship decision saved")
+      setRejectDialogOpen(false)
+      queryClient.invalidateQueries({
+        queryKey: ["applications", application.id],
+      })
+      onSuccess()
+    },
+    onError: (err) => createErrorHandler(showErrorToast)(err as ApiError),
+  })
+
+  const sanitizeNumericInput = (
+    value: string,
+    max?: number,
+  ): string => {
+    // Strip non-numeric chars except decimal point
+    const cleaned = value.replace(/[^0-9.]/g, "")
+    // Prevent multiple decimal points
+    const parts = cleaned.split(".")
+    const sanitized =
+      parts.length > 2 ? `${parts[0]}.${parts.slice(1).join("")}` : cleaned
+    // Enforce max value
+    if (max !== undefined && sanitized !== "" && Number(sanitized) > max) {
+      return String(max)
+    }
+    return sanitized
+  }
+
+  const handleApprove = () => {
+    const discount = Number(discountPct)
+    if (Number.isNaN(discount) || discount < 0 || discount > 100) {
+      showErrorToast("Discount percentage must be between 0 and 100")
+      return
+    }
+    const payload: ScholarshipDecisionRequest = {
+      scholarship_status: "approved",
+      discount_percentage: discount,
+    }
+    if (popup.allows_incentive && incentiveAmount) {
+      const amount = Number(incentiveAmount)
+      if (Number.isNaN(amount) || amount < 0) {
+        showErrorToast("Incentive amount must be a positive number")
+        return
+      }
+      payload.incentive_amount = amount
+      payload.incentive_currency = incentiveCurrency || "USD"
+    }
+    mutation.mutate(payload)
+  }
+
+  const handleReject = () => {
+    mutation.mutate({ scholarship_status: "rejected" })
+  }
+
+  const discountValue = application.discount_percentage
+    ? Number(application.discount_percentage)
+    : null
+  const incentiveValue = application.incentive_amount
+    ? Number(application.incentive_amount)
+    : null
+
+  return (
+    <>
+      <Separator />
+      <InlineSection title="Scholarship">
+        {/* Status */}
+        <InlineRow
+          icon={<GraduationCap className="h-4 w-4 text-muted-foreground" />}
+          label="Scholarship Status"
+        >
+          <StatusBadge status={scholarshipStatus ?? "none"} />
+        </InlineRow>
+
+        {/* Approved details */}
+        {scholarshipStatus === "approved" && discountValue !== null && (
+          <InlineRow label="Discount">
+            <span className="font-mono text-sm font-medium">
+              {discountValue}%
+            </span>
+          </InlineRow>
+        )}
+        {scholarshipStatus === "approved" &&
+          popup.allows_incentive &&
+          incentiveValue !== null &&
+          incentiveValue > 0 && (
+            <InlineRow label="Incentive">
+              <span className="font-mono text-sm font-medium">
+                {incentiveValue} {application.incentive_currency}
+              </span>
+            </InlineRow>
+          )}
+
+        {/* Details text */}
+        {application.scholarship_details && (
+          <div className="py-3">
+            <p className="text-xs text-muted-foreground mb-1">
+              Scholarship Details
+            </p>
+            <p className="text-sm whitespace-pre-wrap">
+              {application.scholarship_details}
+            </p>
+          </div>
+        )}
+
+        {/* Video URL */}
+        {application.scholarship_video_url && (
+          <InlineRow label="Video">
+            <a
+              href={application.scholarship_video_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 text-sm text-primary hover:underline"
+            >
+              Watch
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          </InlineRow>
+        )}
+
+        {/* Admin controls — only when pending */}
+        {isPending && (
+          <div className="space-y-4 py-3">
+            <div className="space-y-3">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Approve Scholarship
+              </p>
+              <div className="space-y-2">
+                <Label htmlFor="discount_pct" className="text-sm">
+                  Discount Percentage (0–100)
+                </Label>
+                <Input
+                  id="discount_pct"
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="e.g. 100"
+                  value={discountPct}
+                  onChange={(e) =>
+                    setDiscountPct(sanitizeNumericInput(e.target.value, 100))
+                  }
+                  className="max-w-[160px]"
+                />
+              </div>
+
+              {popup.allows_incentive && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="incentive_amount" className="text-sm">
+                      Incentive Amount (optional)
+                    </Label>
+                    <Input
+                      id="incentive_amount"
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="e.g. 1000"
+                      value={incentiveAmount}
+                      onChange={(e) =>
+                        setIncentiveAmount(
+                          sanitizeNumericInput(e.target.value),
+                        )
+                      }
+                      className="max-w-[160px]"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="incentive_currency" className="text-sm">
+                      Currency
+                    </Label>
+                    <Input
+                      id="incentive_currency"
+                      type="text"
+                      placeholder="USD"
+                      value={incentiveCurrency}
+                      onChange={(e) => setIncentiveCurrency(e.target.value)}
+                      className="max-w-[100px] uppercase"
+                    />
+                  </div>
+                </>
+              )}
+
+              <div className="flex gap-2">
+                <LoadingButton
+                  size="sm"
+                  className="bg-green-600 hover:bg-green-700 text-white border-0"
+                  loading={mutation.isPending}
+                  onClick={handleApprove}
+                >
+                  Approve Scholarship
+                </LoadingButton>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => setRejectDialogOpen(true)}
+                  disabled={mutation.isPending}
+                >
+                  Reject Scholarship
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+      </InlineSection>
+
+      {/* Reject confirmation dialog */}
+      <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reject Scholarship</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to reject the scholarship request from "
+              {application.human?.first_name} {application.human?.last_name}"?
+              This action will mark the scholarship as rejected and re-evaluate
+              the application status.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
+            <LoadingButton
+              variant="destructive"
+              loading={mutation.isPending}
+              onClick={handleReject}
+            >
+              Reject Scholarship
+            </LoadingButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
+
+// ========================
 // Main Component
 // ========================
 
@@ -374,6 +644,11 @@ export function ApplicationDetail({
         popupId: application.popup_id,
       }),
     retry: false,
+  })
+
+  const { data: popup } = useQuery({
+    queryKey: ["popups", application.popup_id],
+    queryFn: () => PopupsService.getPopup({ popupId: application.popup_id }),
   })
 
   const isWeightedVoting = approvalStrategy?.strategy_type === "weighted"
@@ -623,6 +898,15 @@ export function ApplicationDetail({
             ))}
           </InlineSection>
         </>
+      )}
+
+      {/* Scholarship Panel */}
+      {application.scholarship_request && popup?.allows_scholarship && (
+        <ScholarshipPanel
+          application={application}
+          popup={popup}
+          onSuccess={onReviewSuccess}
+        />
       )}
 
       {/* Desktop action panel */}
