@@ -102,6 +102,8 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
     onSuccess: () => {
       showSuccessToast("Event updated successfully")
       queryClient.invalidateQueries({ queryKey: ["popups"] })
+      queryClient.invalidateQueries({ queryKey: ["form-fields"] })
+      queryClient.invalidateQueries({ queryKey: ["form-sections"] })
       form.reset()
       onSuccess()
     },
