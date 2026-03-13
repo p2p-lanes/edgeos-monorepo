@@ -27,15 +27,23 @@ export function FormHeader() {
 
   return (
     <div className="flex flex-col md:flex-row gap-6">
-      <div className="relative flex items-center w-full md:min-h-[190px] md:w-[20vw] md:max-w-[240px]">
-        <Image
-          src={city.image_url ?? ""}
-          alt={city.name}
-          className="object-cover dark:invert rounded-2xl"
-          fill
-          sizes="(max-width: 768px) 100vw, 20vw"
-        />
-      </div>
+      {city.image_url ? (
+        <div className="relative flex items-center w-full md:min-h-[190px] md:w-[20vw] md:max-w-[240px]">
+          <Image
+            src={city.image_url}
+            alt={city.name}
+            className="object-cover dark:invert rounded-2xl"
+            fill
+            sizes="(max-width: 768px) 100vw, 20vw"
+          />
+        </div>
+      ) : (
+        <div className="flex items-center justify-center w-full md:min-h-[190px] md:w-[20vw] md:max-w-[240px] rounded-2xl bg-gradient-to-br from-neutral-200 to-neutral-300">
+          <span className="text-4xl font-bold text-neutral-400">
+            {city.name?.charAt(0) ?? "?"}
+          </span>
+        </div>
+      )}
       <div className="space-y-2">
         <h1 className="text-3xl font-bold tracking-tight">{city.name}</h1>
         <p className="text-md text-muted-foreground">{city.tagline}</p>

@@ -1,6 +1,8 @@
 "use client"
 
 import { Suspense } from "react"
+import { getBackgroundProps } from "@/lib/background-image"
+import { useCityProvider } from "@/providers/cityProvider"
 import { useTenant } from "@/providers/tenantProvider"
 import { CheckoutContent } from "./components/CheckoutContent"
 import useGetCheckoutData from "./hooks/useGetCheckoutData"
@@ -13,11 +15,15 @@ const LoadingFallback = () => (
 
 const CheckoutPage = () => {
   const { tenant } = useTenant()
+  const { getCity } = useCityProvider()
   const {
     data: { group },
     error,
     isLoading,
   } = useGetCheckoutData()
+
+  const popup = getCity()
+  const background = getBackgroundProps(popup, tenant)
 
   if (isLoading) {
     return <LoadingFallback />
@@ -25,18 +31,8 @@ const CheckoutPage = () => {
 
   return (
     <div
-      className={`min-h-screen w-full py-8 flex items-center justify-center ${!tenant?.image_url ? "bg-gradient-to-br from-neutral-100 to-neutral-300" : ""}`}
-      style={
-        tenant?.image_url
-          ? {
-              backgroundImage: `url(${tenant.image_url})`,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-              backgroundRepeat: "no-repeat",
-              backgroundAttachment: "fixed",
-            }
-          : undefined
-      }
+      className={`min-h-screen w-full py-8 flex items-center justify-center ${background.className}`}
+      style={background.style}
     >
       <div className="container mx-auto">
         <Suspense fallback={<LoadingFallback />}>

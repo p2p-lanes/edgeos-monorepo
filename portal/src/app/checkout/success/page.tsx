@@ -5,12 +5,18 @@ import { CheckCircle, Home } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { useApplicationsQuery } from "@/hooks/useGetApplications"
+import { getBackgroundProps } from "@/lib/background-image"
+import { useCityProvider } from "@/providers/cityProvider"
 import { useTenant } from "@/providers/tenantProvider"
 
 const SuccessPage = () => {
   const router = useRouter()
   const { tenant } = useTenant()
+  const { getCity } = useCityProvider()
   useApplicationsQuery()
+
+  const popup = getCity()
+  const background = getBackgroundProps(popup, tenant)
 
   const _handleDownloadReceipt = () => {
     // Implementation to download the receipt
@@ -24,18 +30,8 @@ const SuccessPage = () => {
 
   return (
     <div
-      className={`min-h-screen w-full py-12 flex items-center justify-center ${!tenant?.image_url ? "bg-gradient-to-br from-neutral-100 to-neutral-300" : ""}`}
-      style={
-        tenant?.image_url
-          ? {
-              backgroundImage: `url(${tenant.image_url})`,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-              backgroundRepeat: "no-repeat",
-              backgroundAttachment: "fixed",
-            }
-          : undefined
-      }
+      className={`min-h-screen w-full py-12 flex items-center justify-center ${background.className}`}
+      style={background.style}
     >
       <motion.div
         className="container max-w-xl mx-auto bg-white/90 backdrop-blur-sm rounded-xl shadow-xl overflow-hidden"
