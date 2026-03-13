@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Any
 
 from jinja2 import Environment, FileSystemLoader, Undefined
+from loguru import logger
 from pydantic import BaseModel
 
 from app.api.email_template.schemas import EmailTemplateType
@@ -194,7 +195,9 @@ class EmailTemplates:
     APPLICATION_REJECTED = "application/rejected.html"
     APPLICATION_ACCEPTED_WITH_DISCOUNT = "application/accepted_with_discount.html"
     APPLICATION_ACCEPTED_WITH_INCENTIVE = "application/accepted_with_incentive.html"
-    APPLICATION_ACCEPTED_SCHOLARSHIP_REJECTED = "application/accepted_scholarship_rejected.html"
+    APPLICATION_ACCEPTED_SCHOLARSHIP_REJECTED = (
+        "application/accepted_scholarship_rejected.html"
+    )
 
     # Payment
     PAYMENT_CONFIRMED = "payment/confirmed.html"
@@ -802,6 +805,69 @@ TEMPLATE_TYPE_METADATA: list[dict[str, Any]] = [
         ],
     },
 ]
+
+
+def validate_template_variables(
+    template_type: EmailTemplateType, context: dict[str, Any]
+) -> list[str]:
+    """Return names of required variables missing from *context*.
+
+    Looks up ``TEMPLATE_TYPE_METADATA`` for *template_type* and checks that
+    every variable marked ``required=True`` is present (and not ``None``) in
+    *context*.
+
+    Returns an empty list when:
+    - all required variables are present, **or**
+    - *template_type* has no metadata entry (e.g. login-code templates).
+    """
+    metadata = next(
+        (m for m in TEMPLATE_TYPE_METADATA if m["type"] == template_type), None
+    )
+    if metadata is None:
+        return []
+
+    required_names = [
+        var["name"] for var in metadata["variables"] if var.get("required")
+    ]
+    return [name for name in required_names if context.get(name) is None]
+
+
+def log_missing_template_variables(
+    template_type: EmailTemplateType, context: dict[str, Any]
+) -> None:
+    """Validate required template variables and log a warning if any are missing."""
+    missing = validate_template_variables(template_type, context)
+    if missing:
+        logger.warning(
+            "Missing required template variables for {}: {}",
+            template_type.value,
+            ", ".join(missing),
+        )
+
+
+class SilentUndefined(Undefined):
+    """Permissive Undefined that renders missing variables as empty strings.
+
+    Used in production email rendering so that a missing variable never
+    prevents the email from being sent.  Instead of raising
+    ``UndefinedError``, each access silently resolves:
+
+    * ``{{ missing_var }}`` → ``""``
+    * ``{% if missing_var %}`` → ``False``
+    * ``{% for x in missing_var %}`` → zero iterations
+    """
+
+    def _fail_with_undefined_error(self, *args, **kwargs):  # type: ignore[override]
+        return ""
+
+    def __str__(self) -> str:
+        return ""
+
+    def __iter__(self):
+        return iter([])
+
+    def __bool__(self) -> bool:
+        return False
 
 
 class PreservingUndefined(Undefined):

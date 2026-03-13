@@ -218,7 +218,7 @@ export function EmailTemplateEditor({
               html_content: reconstructFullHtml(content),
               template_type: templateType,
               subject: subjectValue || undefined,
-              preview_variables: getPopupPreviewVariables(popupData),
+              popup_id: popupId,
             },
           })
           setPreviewHtml(result.rendered_html)
@@ -227,7 +227,7 @@ export function EmailTemplateEditor({
         }
       }, 500)
     },
-    [templateType, popupData],
+    [templateType, popupId],
   )
 
   useEffect(() => {
@@ -367,7 +367,7 @@ export function EmailTemplateEditor({
           template_type: templateType,
           subject: subject || undefined,
           to_email: email,
-          custom_variables: getPopupPreviewVariables(popupData),
+          popup_id: popupId,
         },
       }),
     onSuccess: () => {
@@ -653,29 +653,6 @@ const POPUP_FIELD_MAP: Record<string, keyof PopupPublic> = {
   popup_twitter_url: "twitter_url",
   popup_start_date: "start_date",
   popup_end_date: "end_date",
-}
-
-/** Extract real popup data as preview variables (popup_name, popup_start_date, etc.). */
-function getPopupPreviewVariables(
-  popup?: PopupPublic,
-): Record<string, unknown> {
-  if (!popup) return {}
-  const vars: Record<string, unknown> = {}
-  for (const [varName, field] of Object.entries(POPUP_FIELD_MAP)) {
-    const value = popup[field]
-    if (value == null) continue
-    // Format date fields for display
-    if (field === "start_date" || field === "end_date") {
-      vars[varName] = new Date(value as string).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      })
-    } else {
-      vars[varName] = value
-    }
-  }
-  return vars
 }
 
 function VariableGroups({

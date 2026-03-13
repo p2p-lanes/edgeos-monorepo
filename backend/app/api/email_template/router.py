@@ -41,6 +41,7 @@ class PreviewRequest(BaseModel):
     template_type: str
     subject: str | None = None
     preview_variables: dict[str, Any] | None = None
+    popup_id: uuid.UUID | None = None
 
 
 class PreviewResponse(BaseModel):
@@ -54,6 +55,7 @@ class SendTestRequest(BaseModel):
     subject: str | None = None
     to_email: EmailStr
     custom_variables: dict[str, Any] | None = None
+    popup_id: uuid.UUID | None = None
 
 
 @router.get("/types", response_model=list[TemplateTypeInfo])
@@ -80,6 +82,7 @@ async def get_default_template(
 async def preview_template(
     body: PreviewRequest,
     _: CurrentUser,
+    db: TenantSession,
 ) -> PreviewResponse:
     try:
         EmailTemplateType(body.template_type)
@@ -89,7 +92,15 @@ async def preview_template(
             detail=f"Invalid template type: {body.template_type}",
         )
 
-    variables = body.preview_variables or {}
+    # Start with enriched popup data as the base, then let preview_variables override
+    variables: dict[str, Any] = {}
+    if body.popup_id:
+        from app.services.email.service import _enrich_with_popup_data
+
+        variables = _enrich_with_popup_data(variables, body.popup_id, db)
+
+    if body.preview_variables:
+        variables.update(body.preview_variables)
 
     from app.services.email.service import get_email_service
 
@@ -121,6 +132,7 @@ async def preview_template(
 async def send_test_email(
     body: SendTestRequest,
     _: CurrentWriter,
+    db: TenantSession,
 ) -> dict[str, str]:
     try:
         EmailTemplateType(body.template_type)
@@ -130,7 +142,15 @@ async def send_test_email(
             detail=f"Invalid template type: {body.template_type}",
         )
 
-    variables = body.custom_variables or {}
+    # Start with enriched popup data as the base, then let custom_variables override
+    variables: dict[str, Any] = {}
+    if body.popup_id:
+        from app.services.email.service import _enrich_with_popup_data
+
+        variables = _enrich_with_popup_data(variables, body.popup_id, db)
+
+    if body.custom_variables:
+        variables.update(body.custom_variables)
 
     from app.services.email.service import get_email_service
 

@@ -1255,6 +1255,7 @@ export type PreviewRequest = {
     preview_variables?: ({
     [key: string]: unknown;
 } | null);
+    popup_id?: (string | null);
 };
 
 export type PreviewResponse = {
@@ -1456,6 +1457,7 @@ export type SendTestRequest = {
     custom_variables?: ({
     [key: string]: unknown;
 } | null);
+    popup_id?: (string | null);
 };
 
 export type TemplateTypeInfo = {
@@ -2019,12 +2021,14 @@ export type EmailTemplatesGetDefaultTemplateResponse = ({
 
 export type EmailTemplatesPreviewTemplateData = {
     requestBody: PreviewRequest;
+    xTenantId?: (string | null);
 };
 
 export type EmailTemplatesPreviewTemplateResponse = (PreviewResponse);
 
 export type EmailTemplatesSendTestEmailData = {
     requestBody: SendTestRequest;
+    xTenantId?: (string | null);
 };
 
 export type EmailTemplatesSendTestEmailResponse = ({

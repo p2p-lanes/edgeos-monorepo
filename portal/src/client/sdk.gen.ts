@@ -1277,6 +1277,7 @@ export class EmailTemplatesService {
      * Preview Template
      * @param data The data for the request.
      * @param data.requestBody
+     * @param data.xTenantId
      * @returns PreviewResponse Successful Response
      * @throws ApiError
      */
@@ -1284,6 +1285,9 @@ export class EmailTemplatesService {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/api/v1/email-templates/preview',
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
             body: data.requestBody,
             mediaType: 'application/json',
             errors: {
@@ -1296,6 +1300,7 @@ export class EmailTemplatesService {
      * Send Test Email
      * @param data The data for the request.
      * @param data.requestBody
+     * @param data.xTenantId
      * @returns string Successful Response
      * @throws ApiError
      */
@@ -1303,6 +1308,9 @@ export class EmailTemplatesService {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/api/v1/email-templates/send-test',
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
             body: data.requestBody,
             mediaType: 'application/json',
             errors: {
