@@ -6429,6 +6429,18 @@ export const PreviewRequestSchema = {
                 }
             ],
             title: 'Preview Variables'
+        },
+        popup_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Id'
         }
     },
     type: 'object',
@@ -7627,6 +7639,18 @@ export const SendTestRequestSchema = {
                 }
             ],
             title: 'Custom Variables'
+        },
+        popup_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Id'
         }
     },
     type: 'object',

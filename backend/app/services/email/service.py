@@ -32,6 +32,8 @@ from app.services.email.templates import (
     LoginCodeHumanContext,
     LoginCodeUserContext,
     PaymentConfirmedContext,
+    SilentUndefined,
+    log_missing_template_variables,
 )
 
 if TYPE_CHECKING:
@@ -74,7 +76,7 @@ def _enrich_with_popup_data(
         return context
 
     enriched = dict(context)
-    popup_fields = {
+    popup_fields: dict[str, Any] = {
         "popup_name": popup.name,
         "popup_image_url": popup.image_url,
         "popup_icon_url": popup.icon_url,
@@ -88,6 +90,18 @@ def _enrich_with_popup_data(
         if popup.end_date
         else None,
     }
+
+    # Build portal_url from tenant slug + PORTAL_URL setting
+    if "portal_url" not in enriched:
+        from app.api.tenant.models import Tenants
+
+        tenant = db_session.get(Tenants, popup.tenant_id)
+        if tenant:
+            portal_host = settings.PORTAL_URL.replace("https://", "").replace(
+                "http://", ""
+            )
+            popup_fields["portal_url"] = f"https://{tenant.slug}.{portal_host}"
+
     for key, value in popup_fields.items():
         if key not in enriched:
             enriched[key] = value
@@ -101,6 +115,7 @@ class EmailService:
         self.template_env = Environment(
             loader=FileSystemLoader(str(template_dir)),
             autoescape=True,
+            undefined=SilentUndefined,
         )
 
         self.template_env.globals.update(
@@ -118,7 +133,7 @@ class EmailService:
         Uses SandboxedEnvironment to prevent SSTI attacks.
         """
         try:
-            env = SandboxedEnvironment()
+            env = SandboxedEnvironment(undefined=SilentUndefined)
             env.globals.update(
                 {
                     "project_name": settings.PROJECT_NAME,
@@ -625,6 +640,7 @@ class EmailService:
                 enriched_context = _enrich_with_popup_data(
                     dict(context), popup_id, db_session
                 )
+                log_missing_template_variables(template_type, dict(enriched_context))
                 rendered_html, custom_subject = self.render_with_fallback(
                     template_type, enriched_context, popup_id, db_session
                 )

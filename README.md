@@ -1,6 +1,6 @@
 # EdgeOS
 
-A multi-tenant SaaS platform for event management with a FastAPI backend and React-based backoffice dashboard.
+A multi-tenant SaaS platform for event management with a FastAPI backend, React-based backoffice dashboard, and a Next.js public-facing portal.
 
 ## Overview
 
@@ -11,16 +11,19 @@ EdgeOS provides a complete solution for managing events (called "popups"), atten
 - **Passwordless Authentication**: Secure email-based login with 6-digit codes
 - **RESTful API**: Full-featured API with auto-generated OpenAPI documentation
 - **Modern Frontend**: React 19 dashboard with TanStack Router and Query
+- **Public Portal**: Next.js 16 SSR portal for attendees (applications, passes, checkout)
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                       Backoffice (React)                    │
-│                    localhost:5173 (dev)                     │
-└─────────────────────────┬───────────────────────────────────┘
-                          │
-                          ▼
+┌──────────────────────────────┐  ┌──────────────────────────────┐
+│      Backoffice (React)      │  │      Portal (Next.js)        │
+│     localhost:5173 (dev)     │  │     localhost:3000 (dev)     │
+│     Admin dashboard (SPA)    │  │   Public-facing portal (SSR) │
+└──────────────┬───────────────┘  └──────────────┬───────────────┘
+               │                                  │
+               └──────────────┬───────────────────┘
+                              ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                    Backend (FastAPI)                        │
 │                    localhost:8000                           │
@@ -33,8 +36,8 @@ EdgeOS provides a complete solution for managing events (called "popups"), atten
 │   • /v1/payments        │                                   │
 │   • /v1/...             │                                   │
 └─────────────────────────┴───────────────────────────────────┘
-                          │
-                          ▼
+                              │
+                              ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                PostgreSQL with RLS                          │
 │                    localhost:5432                           │
@@ -75,7 +78,8 @@ That's it. The default `.env.example` is pre-configured for local development wi
 
 | Service | URL | Description |
 |---------|-----|-------------|
-| **Backoffice** | http://localhost:5173 | React dashboard |
+| **Backoffice** | http://localhost:5173 | React admin dashboard |
+| **Portal** | http://localhost:3000 | Public-facing attendee portal |
 | **API Docs** | http://localhost:8000/docs | Swagger UI |
 | **API ReDoc** | http://localhost:8000/redoc | ReDoc documentation |
 | **Mailpit** | http://localhost:8025 | Email testing inbox |
@@ -143,18 +147,33 @@ edgeos-monorepo/
 │   ├── app/
 │   │   ├── api/            # API modules (router, crud, models, schemas)
 │   │   ├── core/           # Configuration, database, security
-│   │   ├── services/       # Email, storage services
+│   │   ├── services/       # Email, storage, approval services
 │   │   ├── alembic/        # Database migrations
 │   │   └── templates/      # Email templates
 │   └── tests/              # Backend tests
-├── backoffice/             # React frontend
+├── backoffice/             # React admin dashboard (SPA)
 │   └── src/
 │       ├── routes/         # TanStack Router pages
 │       ├── components/     # React components
 │       ├── client/         # Auto-generated API client
 │       ├── hooks/          # Custom React hooks
 │       └── contexts/       # React contexts
-├── compose.yaml             # Docker Compose configuration
+├── portal/                 # Next.js public portal (SSR)
+│   └── src/
+│       ├── app/            # App Router pages & layouts
+│       │   ├── auth/       # Login/signup
+│       │   ├── checkout/   # Public checkout flow
+│       │   └── portal/     # Authenticated portal
+│       │       └── [popupSlug]/  # Dynamic event routes
+│       ├── components/     # UI & layout components
+│       ├── providers/      # Context providers (tenant, city, etc.)
+│       ├── hooks/          # Custom React hooks
+│       ├── lib/            # Utilities (API client, tenant, schemas)
+│       ├── client/         # Auto-generated API client
+│       └── types/          # TypeScript definitions
+├── packages/
+│   └── shared-form-ui/    # Shared form components & schema types
+├── compose.yaml            # Docker Compose configuration
 └── .env                    # Environment variables
 ```
 
@@ -193,7 +212,7 @@ bash scripts/lint.sh
 bash scripts/format.sh
 ```
 
-#### Frontend Development
+#### Backoffice Development
 
 ```bash
 cd backoffice
@@ -211,6 +230,27 @@ pnpm run generate-client
 pnpm run lint
 ```
 
+#### Portal Development
+
+```bash
+cd portal
+
+# Install dependencies
+pnpm install
+
+# Run development server (Turbopack, port 3000)
+pnpm run dev
+
+# Regenerate API client (after backend changes)
+pnpm run generate-client
+
+# Lint
+pnpm run lint
+
+# Production build (standalone output)
+pnpm run build
+```
+
 ### Database Migrations
 
 ```bash
@@ -226,6 +266,98 @@ alembic upgrade head
 # Rollback one migration
 alembic downgrade -1
 ```
+
+## Portal (Public-Facing Application)
+
+The portal is a **Next.js 16 App Router** application that serves as the public-facing interface for event attendees. It handles event applications, pass purchases, checkout, and attendee directories.
+
+### Key Features
+
+| Feature | Description |
+|---------|-------------|
+| **Event Applications** | Dynamic form builder with draft saving, custom fields, and scholarship requests |
+| **Pass Management** | Browse, purchase, and manage event passes with QR codes |
+| **Checkout Flow** | Multi-step public checkout (passes → housing → merch → patron → confirm) |
+| **Attendee Directory** | Searchable, filterable directory with CSV export |
+| **Social Groups** | User-created groups with member management and invites |
+| **Profile** | User settings and account management |
+
+### Multi-Tenant Resolution
+
+The portal resolves the current tenant from the **subdomain**:
+
+```
+https://event-name.portal.yourdomain.com → tenant slug: "event-name"
+```
+
+The `TenantProvider` calls `/api/v1/tenants/public/{slug}` to fetch tenant metadata (name, logo, branding) and injects it into all API requests via the `X-Tenant-Id` header.
+
+### Routing
+
+#### Public Routes (No Authentication)
+
+| Route | Description |
+|-------|-------------|
+| `/auth` | Login/signup with passwordless email codes |
+| `/checkout` | Public checkout flow (no login required) |
+| `/[popup]/invite/[inviteId]` | Public event invite links |
+
+#### Protected Routes (Requires Authentication)
+
+| Route | Description |
+|-------|-------------|
+| `/portal` | Portal home — lists events or redirects to active event |
+| `/portal/[popupSlug]` | Event overview page |
+| `/portal/[popupSlug]/application` | Event application form (dynamic fields) |
+| `/portal/[popupSlug]/passes` | Pass shopping and management |
+| `/portal/[popupSlug]/attendees` | Event attendee directory |
+| `/portal/[popupSlug]/groups/[group_id]` | Social group details |
+| `/portal/profile` | User profile settings |
+
+### Authentication
+
+- **Passwordless login** via 6-digit email codes (same as backoffice)
+- JWT token stored in `localStorage`
+- `<Authentication>` component guards protected routes
+- 401 responses auto-redirect to `/auth`
+
+### State Management
+
+| Provider | Purpose |
+|----------|---------|
+| `TenantProvider` | Tenant resolution from subdomain |
+| `CityProvider` | Current event (popup) selection |
+| `ApplicationProvider` | User's applications cache |
+| `PassesProvider` | Pass inventory |
+| `GroupsProvider` | Social groups |
+| `CheckoutProvider` | Multi-step checkout state |
+| `DiscountProvider` | Coupon/scholarship discounts |
+
+All server state is managed with **TanStack React Query** via the auto-generated OpenAPI client.
+
+### Dynamic Forms
+
+Application forms are schema-driven from the backend. The portal uses:
+- `@edgeos/shared-form-ui` — Shared form field components and schema types
+- `form-schema-builder.ts` — Converts backend schemas to Zod validation
+- `form-data-splitter.ts` — Splits form data into human profile, application, and custom fields
+
+### Portal Environment Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `NEXT_PUBLIC_API_URL` | Yes | `http://localhost:8000` | Backend API endpoint |
+
+### Portal Production Deployment
+
+The portal builds as a **standalone Next.js application** suitable for Docker:
+
+```bash
+pnpm run build   # Produces .next/standalone
+pnpm run start   # Runs the standalone server
+```
+
+The `Dockerfile` in `portal/` handles the multi-stage build with dependency caching.
 
 ## Configuration Reference
 
@@ -294,7 +426,8 @@ alembic downgrade -1
 | Service | Port | Description |
 |---------|------|-------------|
 | `backend` | 8000 | FastAPI application (hot reload enabled) |
-| `backoffice` | 5173 | React dashboard |
+| `backoffice` | 5173 | React admin dashboard |
+| `portal` | 3000 | Next.js public portal |
 | `db` | 5432 | PostgreSQL database |
 | `mailpit` | 8025 (web), 1025 (smtp) | Email testing |
 | `adminer` | 8080 | Database admin UI |
@@ -380,6 +513,7 @@ For production, you must properly configure the environment variables. The `.env
    ```bash
    BACKOFFICE_URL=https://app.yourdomain.com
    BACKEND_URL=https://api.yourdomain.com
+   NEXT_PUBLIC_API_URL=https://api.yourdomain.com
    ENVIRONMENT=production
    ```
 

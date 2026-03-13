@@ -380,10 +380,7 @@ function ScholarshipPanel({
     onError: (err) => createErrorHandler(showErrorToast)(err as ApiError),
   })
 
-  const sanitizeNumericInput = (
-    value: string,
-    max?: number,
-  ): string => {
+  const sanitizeNumericInput = (value: string, max?: number): string => {
     // Strip non-numeric chars except decimal point
     const cleaned = value.replace(/[^0-9.]/g, "")
     // Prevent multiple decimal points
@@ -525,9 +522,7 @@ function ScholarshipPanel({
                       placeholder="e.g. 1000"
                       value={incentiveAmount}
                       onChange={(e) =>
-                        setIncentiveAmount(
-                          sanitizeNumericInput(e.target.value),
-                        )
+                        setIncentiveAmount(sanitizeNumericInput(e.target.value))
                       }
                       className="max-w-[160px]"
                     />
