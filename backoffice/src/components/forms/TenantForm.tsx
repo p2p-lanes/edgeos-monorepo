@@ -210,9 +210,9 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
                     <Image className="h-4 w-4 text-muted-foreground" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium">Cover Image</p>
+                    <p className="text-sm font-medium">Background Image</p>
                     <p className="text-xs text-muted-foreground">
-                      Main image for tenant branding
+                      Full-screen background for the portal login page
                     </p>
                   </div>
                 </div>
@@ -234,7 +234,8 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
                   <div>
                     <p className="text-sm font-medium">Logo</p>
                     <p className="text-xs text-muted-foreground">
-                      Main logo for the login page
+                      Main brand logo shown in the backoffice sidebar and the
+                      portal login page
                     </p>
                   </div>
                 </div>
@@ -256,7 +257,8 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
                   <div>
                     <p className="text-sm font-medium">Icon</p>
                     <p className="text-xs text-muted-foreground">
-                      Small icon for navigation
+                      Small icon used as the browser favicon and on the portal
+                      login page
                     </p>
                   </div>
                 </div>

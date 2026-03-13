@@ -128,7 +128,9 @@ const AttendeeTicket = ({
             <div
               className="absolute inset-0 z-0 rounded-t-3xl lg:rounded-l-3xl lg:rounded-tr-none"
               style={{
-                background: `linear-gradient(0deg, transparent, rgba(255, 255, 255, 0.8) 20%, rgb(255, 255, 255) 90%) center top / cover, url(${city?.image_url}) center top / cover`,
+                background: city?.image_url
+                  ? `linear-gradient(0deg, transparent, rgba(255, 255, 255, 0.8) 20%, rgb(255, 255, 255) 90%) center top / cover, url(${city.image_url}) center top / cover`
+                  : "linear-gradient(0deg, transparent, rgba(255, 255, 255, 0.8) 20%, rgb(255, 255, 255) 90%)",
               }}
             />
             <div className="relative z-10 h-full flex flex-col justify-between">

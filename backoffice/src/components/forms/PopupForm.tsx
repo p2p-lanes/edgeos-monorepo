@@ -328,6 +328,10 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
               <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 Cover Image
               </Label>
+              <p className="text-xs text-muted-foreground">
+                Main event image used in cards, tickets, application headers,
+                invoices, and emails
+              </p>
               <ImageUpload
                 value={field.state.value || null}
                 onChange={(url) => field.handleChange(url ?? "")}
@@ -546,7 +550,12 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
                     <Image className="h-4 w-4 text-muted-foreground" />
                   </div>
-                  <p className="text-sm font-medium">Icon</p>
+                  <div>
+                    <p className="text-sm font-medium">Icon</p>
+                    <p className="text-xs text-muted-foreground">
+                      Small icon shown in the portal sidebar popup menu
+                    </p>
+                  </div>
                 </div>
                 <ImageUpload
                   value={field.state.value || null}
@@ -564,7 +573,13 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
                     <Image className="h-4 w-4 text-muted-foreground" />
                   </div>
-                  <p className="text-sm font-medium">Checkout Background</p>
+                  <div>
+                    <p className="text-sm font-medium">Checkout Background</p>
+                    <p className="text-xs text-muted-foreground">
+                      Full-screen background for checkout, invite, and success
+                      pages. Falls back to Cover Image, then tenant background.
+                    </p>
+                  </div>
                 </div>
                 <ImageUpload
                   value={field.state.value || null}
