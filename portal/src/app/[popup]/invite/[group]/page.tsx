@@ -15,7 +15,7 @@ const LoadingFallback = () => (
 
 const InvitePage = () => {
   const { tenant } = useTenant()
-  const { getCity } = useCityProvider()
+  const { getCity, popupsLoaded } = useCityProvider()
   const {
     data: { group },
     error,
@@ -25,7 +25,7 @@ const InvitePage = () => {
   const popup = getCity()
   const background = getBackgroundProps(popup, tenant)
 
-  if (isLoading) {
+  if (isLoading || !popupsLoaded) {
     return <LoadingFallback />
   }
 
