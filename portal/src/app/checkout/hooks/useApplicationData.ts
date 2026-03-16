@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { ApplicationsService, HumansService } from "@/client"
+import { useIsAuthenticated } from "@/hooks/useIsAuthenticated"
 import { queryKeys } from "@/lib/query-keys"
 import type { FormDataProps } from "../types"
 
@@ -15,9 +16,7 @@ export const useApplicationData = ({
   groupPopupCityId,
 }: UseApplicationDataProps) => {
   const queryClient = useQueryClient()
-
-  const hasToken =
-    typeof window !== "undefined" && !!localStorage.getItem("token")
+  const isAuthenticated = useIsAuthenticated()
 
   const {
     data: applicationData = null,
@@ -74,7 +73,7 @@ export const useApplicationData = ({
 
       return baseData
     },
-    enabled: hasToken,
+    enabled: isAuthenticated,
   })
 
   const refreshApplicationData = () => {

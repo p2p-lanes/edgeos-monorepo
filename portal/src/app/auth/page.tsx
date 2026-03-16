@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { Suspense, useEffect } from "react"
 import Quote from "@/app/auth/Quote"
 import { Loader } from "@/components/ui/Loader"
-import { isLoggedIn } from "@/hooks/useAuth"
+import { useIsAuthenticated } from "@/hooks/useIsAuthenticated"
 
 const AuthForm = dynamic(() => import("@/app/auth/AuthForm"), {
   ssr: false,
@@ -15,7 +15,7 @@ function AuthContent() {
   const router = useRouter()
   const params = useSearchParams()
   const popupSlug = params.get("popup")
-  const loggedIn = isLoggedIn()
+  const loggedIn = useIsAuthenticated()
 
   useEffect(() => {
     if (loggedIn) {
