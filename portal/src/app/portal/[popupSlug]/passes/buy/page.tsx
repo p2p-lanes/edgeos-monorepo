@@ -43,7 +43,7 @@ export default function BuyPassesPage() {
   if (!attendees.length || !products.length) return <Loader />
 
   return (
-    <div className="w-full md:mt-0 mx-auto items-center max-w-3xl bg-[#F5F5F7]">
+    <div className="w-full md:mt-0 mx-auto items-center bg-[#F5F5F7]">
       <PassesProvider restoreFromCart>
         <CheckoutProvider initialStep="passes">
           <ScrollyCheckoutFlow

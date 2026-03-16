@@ -19,6 +19,7 @@ import {
 } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useSidebar } from "@/components/Sidebar/SidebarComponents"
 import {
   DesignVariantProvider,
   useDesignVariant,
@@ -29,11 +30,11 @@ import { cn } from "@/lib/utils"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCheckout } from "@/providers/checkoutProvider"
 import { useCityProvider } from "@/providers/cityProvider"
-import { useSidebar } from "@/components/Sidebar/SidebarComponents"
 import type { AttendeeCategory } from "@/types/Attendee"
 import { formatCurrency } from "@/types/checkout"
 import CartFooter from "./CartFooter"
 import ScrollySection from "./ScrollySection"
+import ScrollySectionNav, { type NavDesign } from "./ScrollySectionNav"
 import ConfirmStep from "./steps/ConfirmStep"
 import HousingStep from "./steps/HousingStep"
 import MerchSection from "./steps/MerchSection"
@@ -56,6 +57,7 @@ const VARIANT_ICONS = {
 
 const FOOTER_MODE_STORAGE_KEY = "passes-footer-mode"
 const FOOTER_DESIGN_STORAGE_KEY = "passes-footer-design"
+const NAV_DESIGN_STORAGE_KEY = "passes-nav-design"
 
 type FooterDesign = "pill" | "stripe" | "dock"
 
@@ -79,13 +81,13 @@ function DesignToggle() {
   )
 }
 
-function FooterModeToggle({
+function _FooterModeToggle({
   footerMode,
   onToggle,
 }: {
   footerMode: "guided"
   onToggle: () => void
-}) {  
+}) {
   const Icon = Layers
   const label = "guided"
   return (
@@ -126,6 +128,32 @@ function FooterDesignToggle({
       </button>
       <div className="absolute bottom-full right-0 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
         {footerDesign}
+      </div>
+    </div>
+  )
+}
+
+function NavDesignToggle({
+  navDesign,
+  onCycle,
+}: {
+  navDesign: NavDesign
+  onCycle: () => void
+}) {
+  return (
+    <div className="fixed bottom-60 right-4 z-50 group">
+      <button
+        type="button"
+        onClick={onCycle}
+        className="flex items-center justify-center w-10 h-10 rounded-full bg-white/90 backdrop-blur-sm shadow-lg border border-gray-200 hover:scale-110 transition-transform"
+        aria-label={`Switch nav design (current: ${navDesign})`}
+      >
+        <span className="text-[10px] font-bold text-gray-700 uppercase">
+          {navDesign[0]}
+        </span>
+      </button>
+      <div className="absolute bottom-full right-0 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+        nav: {navDesign}
       </div>
     </div>
   )
@@ -576,8 +604,7 @@ function QuickPayFooter({
   const popup = getCity()
 
   const requiresTerms = !!popup?.terms_and_conditions_url && !termsAccepted
-  const canPay =
-    cart.passes.length > 0 && !requiresTerms && !isSubmitting
+  const canPay = cart.passes.length > 0 && !requiresTerms && !isSubmitting
 
   return (
     <div className="mb-4">
@@ -904,9 +931,7 @@ function SnapFooter({
       style={{ left: leftOffset, right: 0 }}
     >
       <div className="max-w-2xl mx-auto px-4">
-        {isCartOpen && (
-          <CartDrawerContent />
-        )}
+        {isCartOpen && <CartDrawerContent />}
         {isCartOpen && (
           <button
             type="button"
@@ -927,12 +952,8 @@ function ScrollyCheckoutFlowInner({
   onBack,
 }: ScrollyCheckoutFlowProps) {
   const { variant } = useDesignVariant()
-  const {
-    housingProducts,
-    merchProducts,
-    patronProducts,
-    submitPayment,
-  } = useCheckout()
+  const { housingProducts, merchProducts, patronProducts, submitPayment } =
+    useCheckout()
 
   const searchParams = useSearchParams()
   const { getRelevantApplication } = useApplication()
@@ -960,15 +981,15 @@ function ScrollyCheckoutFlowInner({
   const scrollToIndexRef = useRef<((index: number) => void) | null>(null)
 
   // Footer mode (only used in snap variant)
-  const [footerMode, setFooterMode] = useState<"guided" | "quickpay">(
-    "guided",
-  )
+  const [footerMode, setFooterMode] = useState<"guided" | "quickpay">("guided")
   const [footerDesign, setFooterDesign] = useState<FooterDesign>("stripe")
+  const [navDesign, setNavDesign] = useState<NavDesign>("pills")
 
   useEffect(() => {
-    const storedMode = localStorage.getItem(
-      FOOTER_MODE_STORAGE_KEY,
-    ) as "guided" | "quickpay" | null
+    const storedMode = localStorage.getItem(FOOTER_MODE_STORAGE_KEY) as
+      | "guided"
+      | "quickpay"
+      | null
     if (storedMode === "guided" || storedMode === "quickpay") {
       setFooterMode(storedMode)
     }
@@ -982,9 +1003,19 @@ function ScrollyCheckoutFlowInner({
     ) {
       setFooterDesign(storedDesign)
     }
+    const storedNavDesign = localStorage.getItem(
+      NAV_DESIGN_STORAGE_KEY,
+    ) as NavDesign | null
+    if (
+      storedNavDesign === "pills" ||
+      storedNavDesign === "progress" ||
+      storedNavDesign === "underline"
+    ) {
+      setNavDesign(storedNavDesign)
+    }
   }, [])
 
-  const toggleFooterMode = () => {
+  const _toggleFooterMode = () => {
     const next = footerMode === "guided" ? "quickpay" : "guided"
     setFooterMode(next)
     localStorage.setItem(FOOTER_MODE_STORAGE_KEY, next)
@@ -995,6 +1026,13 @@ function ScrollyCheckoutFlowInner({
     const next = order[(order.indexOf(footerDesign) + 1) % order.length]
     setFooterDesign(next)
     localStorage.setItem(FOOTER_DESIGN_STORAGE_KEY, next)
+  }
+
+  const cycleNavDesign = () => {
+    const order: NavDesign[] = ["pills", "progress", "underline"]
+    const next = order[(order.indexOf(navDesign) + 1) % order.length]
+    setNavDesign(next)
+    localStorage.setItem(NAV_DESIGN_STORAGE_KEY, next)
   }
 
   // Build sections list (respects available products)
@@ -1016,6 +1054,94 @@ function ScrollyCheckoutFlowInner({
     const idx = allSections.findIndex((s) => s.id === "confirm")
     scrollToIndexRef.current?.(idx)
   }, [allSections])
+
+  // Scroll-to-section handler for the scrolly variant nav bar
+  const scrollToSection = useCallback((sectionId: string) => {
+    const target = document.getElementById(sectionId)
+    if (!target) return
+
+    // Walk up to find the scroll container
+    let scrollContainer: HTMLElement | null = target.parentElement
+    while (scrollContainer && scrollContainer !== document.documentElement) {
+      const { overflowY, overflow } = getComputedStyle(scrollContainer)
+      if (/(auto|scroll)/.test(overflowY) || /(auto|scroll)/.test(overflow)) {
+        break
+      }
+      scrollContainer = scrollContainer.parentElement
+    }
+    if (!scrollContainer || scrollContainer === document.documentElement) return
+
+    const targetTop =
+      scrollContainer.scrollTop +
+      target.getBoundingClientRect().top -
+      scrollContainer.getBoundingClientRect().top -
+      56 // offset for sticky nav height
+
+    gsap.to(scrollContainer, {
+      scrollTo: { y: targetTop },
+      duration: 0.6,
+      ease: "power2.inOut",
+    })
+  }, [])
+
+  // IntersectionObserver to track active section in scrolly variant
+  useEffect(() => {
+    if (variant !== "scrolly") return
+
+    const sectionIds = allSections.map((s) => s.id)
+    const elements = sectionIds
+      .map((id) => document.getElementById(id))
+      .filter(Boolean) as HTMLElement[]
+
+    if (elements.length === 0) return
+
+    // Find scroll container
+    let root: Element | null = null
+    let parent = elements[0].parentElement
+    while (parent && parent !== document.body) {
+      const style = getComputedStyle(parent)
+      if (
+        /(auto|scroll)/.test(style.overflowY) ||
+        /(auto|scroll)/.test(style.overflow)
+      ) {
+        root = parent
+        break
+      }
+      parent = parent.parentElement
+    }
+
+    const visibleSections = new Set<string>()
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            visibleSections.add(entry.target.id)
+          } else {
+            visibleSections.delete(entry.target.id)
+          }
+        }
+        // Pick the first visible section in document order
+        for (const id of sectionIds) {
+          if (visibleSections.has(id)) {
+            setActiveSection(id)
+            break
+          }
+        }
+      },
+      {
+        root: root as Element | null,
+        rootMargin: "-48px 0px -40% 0px",
+        threshold: 0,
+      },
+    )
+
+    for (const el of elements) {
+      observer.observe(el)
+    }
+
+    return () => observer.disconnect()
+  }, [variant, allSections])
 
   // GSAP-powered snap scroll — blocks native scroll, animates between sections
   useEffect(() => {
@@ -1053,7 +1179,9 @@ function ScrollyCheckoutFlowInner({
 
     // Compute the scrollTop needed to align an element's top with the container top
     const getScrollTop = (el: HTMLElement): number =>
-      mainEl.scrollTop + el.getBoundingClientRect().top - mainEl.getBoundingClientRect().top
+      mainEl.scrollTop +
+      el.getBoundingClientRect().top -
+      mainEl.getBoundingClientRect().top
 
     // Snapshot sections at effect creation time
     const sectionsSnapshot = allSections
@@ -1132,6 +1260,15 @@ function ScrollyCheckoutFlowInner({
   if (variant === "snap") {
     return (
       <div className="relative font-sans bg-white">
+        <ScrollySectionNav
+          sections={allSections}
+          activeSection={activeSection}
+          onSectionClick={(sectionId) => {
+            const idx = allSections.findIndex((s) => s.id === sectionId)
+            if (idx >= 0) scrollToIndexRef.current?.(idx)
+          }}
+          variant={navDesign}
+        />
         {/* Sections — overflow/scroll is applied to <main> via useEffect */}
         <SnapSection id="passes">
           <SectionHeader
@@ -1189,7 +1326,8 @@ function ScrollyCheckoutFlowInner({
           <ConfirmStep />
         </SnapSection>
 
-        <DesignToggle />  
+        <DesignToggle />
+        <NavDesignToggle navDesign={navDesign} onCycle={cycleNavDesign} />
         <FooterDesignToggle
           footerDesign={footerDesign}
           onCycle={cycleFooterDesign}
@@ -1218,6 +1356,12 @@ function ScrollyCheckoutFlowInner({
       data-variant={variant}
       className="relative min-h-screen font-sans bg-[#F5F5F7]"
     >
+      <ScrollySectionNav
+        sections={allSections}
+        activeSection={activeSection}
+        onSectionClick={scrollToSection}
+        variant={navDesign}
+      />
       <main className="max-w-2xl mx-auto px-4 pt-6 pb-32">
         <ScrollySection id="passes">
           <SectionHeader
@@ -1267,6 +1411,7 @@ function ScrollyCheckoutFlowInner({
       </main>
 
       <DesignToggle />
+      <NavDesignToggle navDesign={navDesign} onCycle={cycleNavDesign} />
 
       <div className="sticky bottom-0 z-30">
         <div className="max-w-2xl mx-auto px-4">

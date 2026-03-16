@@ -58,7 +58,6 @@ export default function MerchSection({ onSkip }: MerchSectionProps) {
           />
         ))}
       </div>
-
     </div>
   )
 }

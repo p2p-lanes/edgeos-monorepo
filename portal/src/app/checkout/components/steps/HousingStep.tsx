@@ -163,7 +163,6 @@ export default function HousingStep({ onSkip }: HousingStepProps) {
           />
         ))}
       </div>
-
     </div>
   )
 }
