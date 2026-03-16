@@ -205,6 +205,35 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
 
         return results, total
 
+    def find_companion_for_popup(
+        self,
+        session: Session,
+        human_id: uuid.UUID,
+        popup_id: uuid.UUID,
+    ) -> Attendees | None:
+        """Find an attendee record where human is a companion (not the application owner).
+
+        Joins Attendees → Applications and filters:
+        - Attendees.human_id == human_id
+        - Applications.popup_id == popup_id
+        - Applications.human_id != human_id (excludes self — prevents main applicant
+          from being classified as companion of their own application)
+        """
+        from app.api.application.models import Applications
+
+        statement = (
+            select(Attendees)
+            .join(Applications, Attendees.application_id == Applications.id)  # type: ignore[arg-type]
+            .where(
+                Attendees.human_id == human_id,
+                Applications.popup_id == popup_id,
+                Applications.human_id != human_id,
+            )
+            .options(selectinload(Attendees.application))  # type: ignore[arg-type]
+            .limit(1)
+        )
+        return session.exec(statement).first()
+
     def find_purchases_by_human_popup(
         self,
         session: Session,
