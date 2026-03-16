@@ -1,6 +1,7 @@
 {
   "name": "edgeos",
   "private": true,
+  "packageManager": "pnpm@10.2.1",
   "scripts": {
     "dev": "pnpm --filter backoffice dev",
     "dev:portal": "pnpm --filter portal dev",
