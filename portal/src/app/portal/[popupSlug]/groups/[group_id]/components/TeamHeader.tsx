@@ -4,7 +4,6 @@ import { toast } from "sonner"
 import type { GroupWithMembers } from "@/client"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { useCityProvider } from "@/providers/cityProvider"
 import MemberFormModal from "./AddMemberModal"
 import ImportMembersModal from "./ImportMembersModal"
 import WelcomeMessageModal from "./WelcomeMessageModal"
@@ -27,7 +26,6 @@ const TeamHeader = ({
   const [isWelcomeMessageModalOpen, setIsWelcomeMessageModalOpen] =
     useState(false)
   const [isCopied, setIsCopied] = useState(false)
-  const { getCity } = useCityProvider()
 
   const handleModalClose = () => {
     setIsModalOpen(false)
@@ -64,18 +62,12 @@ const TeamHeader = ({
 
   const handleCopyCheckoutLink = async () => {
     const origin = window.location.origin
-    let checkoutLink = ""
-    if (group.is_ambassador_group) {
-      const city = getCity()
-      checkoutLink = `${origin}/${city?.slug}/invite/${group.slug}`
-    } else {
-      checkoutLink = `${origin}/checkout?group=${group.slug}`
-    }
+    const checkoutLink = `${origin}/checkout?group=${group.slug}`
 
     try {
       await navigator.clipboard.writeText(checkoutLink)
       setIsCopied(true)
-      toast.success("Express Checkout link copied to clipboard!")
+      toast.success("Checkout link copied to clipboard!")
 
       // Reset copied state after 2 seconds
       setTimeout(() => {
@@ -137,17 +129,11 @@ const TeamHeader = ({
           <Button onClick={handleCopyCheckoutLink}>
             {isCopied ? (
               <>
-                <Check className="w-4 h-4" />{" "}
-                {isAmbassadorGroup
-                  ? "Copy Referral Link"
-                  : "Copy Express Checkout Link"}
+                <Check className="w-4 h-4" /> Copy Checkout Link
               </>
             ) : (
               <>
-                <Copy className="w-4 h-4" />{" "}
-                {isAmbassadorGroup
-                  ? "Copy Referral Link"
-                  : "Copy Express Checkout Link"}
+                <Copy className="w-4 h-4" /> Copy Checkout Link
               </>
             )}
           </Button>

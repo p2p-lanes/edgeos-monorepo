@@ -2,7 +2,7 @@ import { Check, Copy } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { toast } from "sonner"
-import type { GroupPublic, PopupPublic } from "@/client"
+import type { GroupPublic } from "@/client"
 import { useCityProvider } from "@/providers/cityProvider"
 import useGetGroups from "../Sidebar/hooks/useGetGroups"
 import { Badge } from "../ui/badge"
@@ -10,17 +10,8 @@ import { Button } from "../ui/button"
 import { Card } from "../ui/card"
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip"
 
-const getCheckoutLinkForGroup = (
-  group: GroupPublic,
-  popups: PopupPublic[],
-): string | null => {
+const getCheckoutLinkForGroup = (group: GroupPublic): string => {
   const origin = window.location.origin
-  const groupPopup = popups.find((popup) => popup.id === group.popup_id)
-  if (!groupPopup) return null
-
-  if (group.is_ambassador_group) {
-    return `${origin}/${groupPopup.slug}/invite/${group.slug}`
-  }
   return `${origin}/checkout?group=${group.slug}`
 }
 
@@ -69,11 +60,7 @@ const Groups = () => {
                       {group.is_ambassador_group ? "Ambassador" : "Group"}
                     </Badge>
                   </div>
-                  <ButtonCopyLink
-                    group={group}
-                    popups={popups}
-                    isPopupActive={isPopupActive}
-                  />
+                  <ButtonCopyLink group={group} isPopupActive={isPopupActive} />
                 </div>
               </Card>
             )
@@ -86,11 +73,9 @@ const Groups = () => {
 
 export const ButtonCopyLink = ({
   group,
-  popups,
   isPopupActive,
 }: {
   group: GroupPublic
-  popups: PopupPublic[]
   isPopupActive: boolean
 }) => {
   const [isCopied, setIsCopied] = useState(false)
@@ -99,17 +84,12 @@ export const ButtonCopyLink = ({
   if (!isPopupActive) return null
 
   const handleCopyCheckoutLink = async (group: GroupPublic) => {
-    const checkoutLink = getCheckoutLinkForGroup(group, popups)
-
-    if (!checkoutLink) {
-      toast.error("No se pudo generar el link para este grupo")
-      return
-    }
+    const checkoutLink = getCheckoutLinkForGroup(group)
 
     try {
       await navigator.clipboard.writeText(checkoutLink)
       setIsCopied(true)
-      toast.success("Express Checkout link copied to clipboard!")
+      toast.success("Checkout link copied to clipboard!")
 
       // Reset copied state after 2 seconds
       setTimeout(() => {
@@ -138,11 +118,7 @@ export const ButtonCopyLink = ({
           )}
         </Button>
       </TooltipTrigger>
-      <TooltipContent>
-        {group.is_ambassador_group
-          ? "Copy Referral Link"
-          : "Copy Express Checkout Link"}
-      </TooltipContent>
+      <TooltipContent>Copy Checkout Link</TooltipContent>
     </Tooltip>
   )
 }

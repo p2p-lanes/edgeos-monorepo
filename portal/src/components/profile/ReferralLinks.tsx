@@ -87,7 +87,7 @@ export default function ReferralLinks({
 
             if (!groupPopup) return null
 
-            const link = `${window.location.origin}/${groupPopup.slug}/invite/${group.slug}`
+            const link = `${window.location.origin}/checkout?group=${group.slug}`
 
             return (
               <div

@@ -21,12 +21,10 @@ export const CheckoutContent = ({
   group,
   isLoading,
   error,
-  isInvite = false,
 }: {
   group: any
   isLoading: boolean
   error: any
-  isInvite?: boolean
 }) => {
   const {
     checkoutState,
@@ -39,6 +37,12 @@ export const CheckoutContent = ({
   const { getCity } = useCityProvider()
   const router = useRouter()
   const hasSkippedForm = useRef(false)
+
+  useEffect(() => {
+    if (checkoutState === "passes") {
+      hasSkippedForm.current = true
+    }
+  }, [checkoutState])
 
   useEffect(() => {
     if (hasSkippedForm.current) return
@@ -86,7 +90,6 @@ export const CheckoutContent = ({
               error={error}
               onSubmit={handleFormSubmit}
               isSubmitting={isSubmitting}
-              isInvite={isInvite}
             />
           </motion.div>
         )

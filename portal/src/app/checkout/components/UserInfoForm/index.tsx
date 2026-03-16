@@ -24,7 +24,6 @@ interface UserInfoFormProps {
   error: string | null
   onSubmit: (data: FormDataProps) => Promise<void>
   isSubmitting: boolean
-  isInvite?: boolean
 }
 
 const UserInfoForm = ({
@@ -33,7 +32,6 @@ const UserInfoForm = ({
   isSubmitting,
   isLoading: _isLoading,
   error,
-  isInvite: _isInvite = false,
 }: UserInfoFormProps) => {
   const [_isAutoFilled, setIsAutoFilled] = useState(false)
 
