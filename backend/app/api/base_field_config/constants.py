@@ -13,6 +13,7 @@ DEFAULT_SECTIONS: dict[str, dict[str, Any]] = {
     "profile": {"label": "Personal Information", "order": 0},
     "info_not_shared": {"label": "Info not shared", "order": 1},
     "companions": {"label": "Children and +1s", "order": 2},
+    "scholarship": {"label": "Scholarship", "order": 3},
 }
 
 # Each entry defines:
@@ -130,11 +131,44 @@ BASE_FIELD_DEFINITIONS: dict[str, dict[str, Any]] = {
     },
     "kids": {
         "type": "kids",
-        "label": "I’m bringing kids",
+        "label": "I'm bringing kids",
         "required": False,
         "target": "application",
         "default_section_key": "companions",
         "default_position": 2,
         "default_help_text": "We will approve your kids if we approve you. Your kids do not need to fill out their own version of this form however.",
+    },
+    "scholarship_request": {
+        "type": "boolean",
+        "label": "I am requesting a scholarship",
+        "required": False,
+        "target": "application",
+        "default_section_key": "scholarship",
+        "default_position": 0,
+        "default_placeholder": None,
+        "default_help_text": "Apply for financial support to attend this event",
+        "default_options": None,
+    },
+    "scholarship_details": {
+        "type": "textarea",
+        "label": "If you want to add any more detail in written form, you can use this textbox (you will still need to upload the video above, even if you fill this out).",
+        "required": False,
+        "target": "application",
+        "default_section_key": "scholarship",
+        "default_position": 2,
+        "default_placeholder": "Describe why you need financial support...",
+        "default_help_text": None,
+        "default_options": None,
+    },
+    "scholarship_video_url": {
+        "type": "url",
+        "label": "Please share a ~60 second video answering why you’re applying for a scholarship and what your contribution might be. If you are applying for a scholarship and want to receive a ticket discount.",
+        "required": False,
+        "target": "application",
+        "default_section_key": "scholarship",
+        "default_position": 1,
+        "default_placeholder": "https://...",
+        "default_help_text": "You can upload your video to Dropbox, Google Drive, Youtube, or anywhere where you can make the link public and viewable.",
+        "default_options": None,
     },
 }

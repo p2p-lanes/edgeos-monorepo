@@ -151,6 +151,7 @@ class PaymentPreview(BaseModel):
     coupon_code: str | None = None
     discount_value: Decimal | None = None
     group_id: uuid.UUID | None = None
+    scholarship_discount: bool = False
 
     # Payment provider response (populated on creation)
     status: str | None = None

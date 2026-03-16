@@ -170,10 +170,10 @@ export default function AuthForm() {
           }}
           className="relative aspect-square w-[180px] mx-auto mb-8"
         >
-          {tenant?.icon_url ? (
+          {tenant?.logo_url ? (
             <Image
-              src={tenant.icon_url}
-              alt={tenant.name ?? "Icon"}
+              src={tenant.logo_url}
+              alt={tenant.name ?? "Logo"}
               className="size-full rounded-lg object-cover"
               fill
               sizes="180px"

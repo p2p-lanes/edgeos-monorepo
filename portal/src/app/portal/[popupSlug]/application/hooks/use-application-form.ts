@@ -83,10 +83,30 @@ function getFieldsReplacedByChildrenSection(
   )
 }
 
+/** Base field names that belong to a "Scholarship" section (replaced by ScholarshipSection UI). */
+function getFieldsReplacedByScholarshipSection(
+  schema: ApplicationFormSchema,
+): Set<string> {
+  const scholarshipSectionIds = (schema.sections ?? [])
+    .filter((s) => s.label?.toLowerCase().includes("scholarship"))
+    .map((s) => s.id)
+  return new Set(
+    Object.entries(schema.base_fields)
+      .filter(
+        ([, f]) => f.section_id && scholarshipSectionIds.includes(f.section_id),
+      )
+      .map(([name]) => name),
+  )
+}
+
 export function useApplicationForm(schema: ApplicationFormSchema) {
   const initialValues = useMemo(() => getInitialValues(schema), [schema])
   const fieldsReplacedByChildrenSection = useMemo(
     () => getFieldsReplacedByChildrenSection(schema),
+    [schema],
+  )
+  const fieldsReplacedByScholarshipSection = useMemo(
+    () => getFieldsReplacedByScholarshipSection(schema),
     [schema],
   )
 
@@ -100,6 +120,15 @@ export function useApplicationForm(schema: ApplicationFormSchema) {
     dispatch({ type: "SET_FIELD", name, value })
   }, [])
 
+  const fieldsReplacedByCustomSection = useMemo(
+    () =>
+      new Set([
+        ...fieldsReplacedByChildrenSection,
+        ...fieldsReplacedByScholarshipSection,
+      ]),
+    [fieldsReplacedByChildrenSection, fieldsReplacedByScholarshipSection],
+  )
+
   const validate = useCallback(
     (
       isDraft: boolean,
@@ -107,7 +136,7 @@ export function useApplicationForm(schema: ApplicationFormSchema) {
       const zodSchema = buildFormZodSchema(
         schema,
         isDraft,
-        fieldsReplacedByChildrenSection,
+        fieldsReplacedByCustomSection,
       )
       const result = zodSchema.safeParse(state.values)
 
@@ -127,22 +156,22 @@ export function useApplicationForm(schema: ApplicationFormSchema) {
       dispatch({ type: "SET_ERRORS", errors })
       return { isValid: false, errors }
     },
-    [schema, state.values, fieldsReplacedByChildrenSection],
+    [schema, state.values, fieldsReplacedByCustomSection],
   )
 
   const populateFromApplication = useCallback(
     (app: ApplicationPublic) => {
       const values: Record<string, unknown> = {}
 
-      // Populate base fields using target to know the source
+      // Only populate human profile fields (target === "human") from the
+      // previous application. Application-scoped fields (referral, scholarship,
+      // companions, etc.) and custom fields are popup-specific and should NOT
+      // be carried over between different popups.
       for (const [name, field] of Object.entries(schema.base_fields)) {
         if (field.target === "human" && app.human) {
           values[name] =
             (app.human as Record<string, unknown>)[name] ??
             getDefaultValue(field)
-        } else if (field.target === "application") {
-          values[name] =
-            (app as Record<string, unknown>)[name] ?? getDefaultValue(field)
         }
       }
 
@@ -153,13 +182,6 @@ export function useApplicationForm(schema: ApplicationFormSchema) {
         values.gender = "Specify"
       }
 
-      // Custom fields
-      if (app.custom_fields) {
-        for (const [name, value] of Object.entries(app.custom_fields)) {
-          values[`custom_${name}`] = value
-        }
-      }
-
       dispatch({ type: "SET_VALUES", values })
     },
     [schema],
@@ -168,7 +190,7 @@ export function useApplicationForm(schema: ApplicationFormSchema) {
   const progress = useMemo(() => {
     const allFields = { ...schema.base_fields, ...schema.custom_fields }
     const requiredFields = Object.entries(allFields).filter(
-      ([name, f]) => f.required && !fieldsReplacedByChildrenSection.has(name),
+      ([name, f]) => f.required && !fieldsReplacedByCustomSection.has(name),
     )
     if (requiredFields.length === 0) return 100
 
@@ -190,7 +212,7 @@ export function useApplicationForm(schema: ApplicationFormSchema) {
     }
 
     return Math.round((filled / total) * 100)
-  }, [schema, state.values, fieldsReplacedByChildrenSection])
+  }, [schema, state.values, fieldsReplacedByCustomSection])
 
   return {
     values: state.values,
@@ -200,6 +222,8 @@ export function useApplicationForm(schema: ApplicationFormSchema) {
     populateFromApplication,
     setValues: (values: Record<string, unknown>) =>
       dispatch({ type: "SET_VALUES", values }),
+    setErrors: (errors: Record<string, string>) =>
+      dispatch({ type: "SET_ERRORS", errors }),
     progress,
   }
 }

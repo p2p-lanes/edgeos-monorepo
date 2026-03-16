@@ -59,50 +59,9 @@ def _base_config_to_public(config: BaseFieldConfigs) -> FormFieldPublic:
 def _get_base_fields_as_public(
     db: "Session", popup_id: uuid.UUID
 ) -> list[FormFieldPublic]:
-    """Build FormFieldPublic entries for base fields from BaseFieldConfigs."""
-    from app.api.popup.models import Popups
-
+    """Build FormFieldPublic entries from existing BaseFieldConfigs only."""
     configs = base_field_configs_crud.find_by_popup(db, popup_id)
-    config_map = {c.field_name: c for c in configs}
-
-    # Determine which companion fields to skip based on popup settings
-    popup = db.get(Popups, popup_id)
-    spouse_fields = {"partner", "partner_email"}
-    children_fields = {"kids"}
-    skip_fields: set[str] = set()
-    if popup and not popup.allows_spouse:
-        skip_fields |= spouse_fields
-    if popup and not popup.allows_children:
-        skip_fields |= children_fields
-
-    results: list[FormFieldPublic] = []
-    for field_name, definition in BASE_FIELD_DEFINITIONS.items():
-        if field_name in skip_fields:
-            continue
-        config = config_map.get(field_name)
-        if config:
-            results.append(_base_config_to_public(config))
-        else:
-            results.append(
-                FormFieldPublic(
-                    id=uuid.uuid4(),
-                    tenant_id=uuid.UUID(int=0),
-                    popup_id=popup_id,
-                    name=field_name,
-                    label=definition["label"],
-                    field_type=definition["type"],
-                    section_id=None,
-                    section_label=None,
-                    position=definition.get("default_position", 0),
-                    required=definition["required"],
-                    options=definition.get("default_options"),
-                    placeholder=definition.get("default_placeholder"),
-                    help_text=definition.get("default_help_text"),
-                    protected=True,
-                    target=definition["target"],
-                )
-            )
-    return results
+    return [_base_config_to_public(c) for c in configs]
 
 
 @router.get("", response_model=ListModel[FormFieldPublic])

@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation"
 import { EventCard } from "@/components/Card/EventCard"
 import type { EventStatus } from "@/components/Card/EventProgressBar"
+import { ScholarshipStatusBadge } from "@/components/ScholarshipStatusBadge"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 
@@ -36,6 +37,12 @@ export default function Home() {
             <EventCard.Location />
             <EventCard.DateRange />
             <EventCard.Progress />
+            {relevantApplication && (
+              <ScholarshipStatusBadge
+                application={relevantApplication}
+                popup={city}
+              />
+            )}
             <EventCard.ApplyButton onClick={onClickApply} />
           </EventCard.Content>
         </EventCard>

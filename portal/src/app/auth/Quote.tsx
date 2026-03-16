@@ -21,10 +21,10 @@ export default function Quote() {
       }
     >
       <div className="absolute top-8 left-8">
-        {tenant?.logo_url ? (
+        {tenant?.icon_url ? (
           <Image
-            src={tenant.logo_url}
-            alt={tenant.name ?? "Logo"}
+            src={tenant.icon_url}
+            alt={tenant.name ?? "Icon"}
             width={100}
             height={40}
             priority

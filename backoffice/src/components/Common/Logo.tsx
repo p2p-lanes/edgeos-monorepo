@@ -33,10 +33,9 @@ export function Logo({
     staleTime: 5 * 60 * 1000,
   })
 
-  const tenantLogo = tenant?.image_url
-  const tenantIcon = tenant?.icon_url
+  const tenantLogo = tenant?.logo_url
 
-  const shouldUseTenantLogo = !isSuperadmin && (tenantLogo || tenantIcon)
+  const shouldUseTenantLogo = !isSuperadmin && !!tenantLogo
 
   const altText = tenant?.name || "EdgeOS"
 
@@ -71,32 +70,54 @@ export function Logo({
     />
   )
 
+  // Tenant full logo: logo image + tenant name
+  const TenantFullLogo = ({
+    className: logoClassName,
+  }: {
+    className?: string
+  }) => (
+    <div className={cn("flex items-center gap-2", logoClassName)}>
+      <img src={tenantLogo!} alt={altText} className="size-8 object-contain" />
+      <span
+        className={cn(
+          "text-xl font-semibold truncate",
+          isDark ? "text-slate-50" : "text-slate-900",
+        )}
+      >
+        {tenant?.name}
+      </span>
+    </div>
+  )
+
+  // Tenant icon logo: logo image only
+  const TenantIconLogo = ({
+    className: iconClassName,
+  }: {
+    className?: string
+  }) => (
+    <img
+      src={tenantLogo!}
+      alt={altText}
+      className={cn("size-10 object-contain", iconClassName)}
+    />
+  )
+
   const content =
     variant === "responsive" ? (
       <>
-        {shouldUseTenantLogo && tenantLogo ? (
-          <img
-            src={tenantLogo}
-            alt={altText}
-            className={cn(
-              "h-10 w-auto object-contain group-data-[collapsible=icon]:hidden",
-              className,
-            )}
-          />
+        {shouldUseTenantLogo ? (
+          <div className="group-data-[collapsible=icon]:hidden">
+            <TenantFullLogo className={className} />
+          </div>
         ) : (
           <div className="group-data-[collapsible=icon]:hidden">
             <DefaultFullLogo className={className} />
           </div>
         )}
-        {shouldUseTenantLogo && tenantIcon ? (
-          <img
-            src={tenantIcon}
-            alt={altText}
-            className={cn(
-              "size-10 object-contain hidden group-data-[collapsible=icon]:block",
-              className,
-            )}
-          />
+        {shouldUseTenantLogo ? (
+          <div className="hidden group-data-[collapsible=icon]:block">
+            <TenantIconLogo className={className} />
+          </div>
         ) : (
           <div className="hidden group-data-[collapsible=icon]:block">
             <DefaultIconLogo className={className} />
@@ -104,21 +125,13 @@ export function Logo({
         )}
       </>
     ) : variant === "full" ? (
-      shouldUseTenantLogo && tenantLogo ? (
-        <img
-          src={tenantLogo}
-          alt={altText}
-          className={cn("h-10 w-auto object-contain", className)}
-        />
+      shouldUseTenantLogo ? (
+        <TenantFullLogo className={className} />
       ) : (
         <DefaultFullLogo className={className} />
       )
-    ) : shouldUseTenantLogo && tenantIcon ? (
-      <img
-        src={tenantIcon}
-        alt={altText}
-        className={cn("size-10 object-contain", className)}
-      />
+    ) : shouldUseTenantLogo ? (
+      <TenantIconLogo className={className} />
     ) : (
       <DefaultIconLogo className={className} />
     )

@@ -364,6 +364,33 @@ export const ApplicationCreateSchema = {
                 }
             ],
             title: 'Companions'
+        },
+        scholarship_request: {
+            type: 'boolean',
+            title: 'Scholarship Request',
+            default: false
+        },
+        scholarship_details: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Scholarship Details'
+        },
+        scholarship_video_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Scholarship Video Url'
         }
     },
     type: 'object',
@@ -503,6 +530,79 @@ export const ApplicationPublicSchema = {
                 }
             ],
             title: 'Updated At'
+        },
+        scholarship_request: {
+            type: 'boolean',
+            title: 'Scholarship Request',
+            default: false
+        },
+        scholarship_details: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Scholarship Details'
+        },
+        scholarship_video_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Scholarship Video Url'
+        },
+        scholarship_status: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Scholarship Status'
+        },
+        discount_percentage: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Discount Percentage'
+        },
+        incentive_amount: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Incentive Amount'
+        },
+        incentive_currency: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Incentive Currency'
         },
         human: {
             anyOf: [
@@ -820,6 +920,39 @@ export const ApplicationUpdateSchema = {
                     type: 'null'
                 }
             ]
+        },
+        scholarship_request: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Scholarship Request'
+        },
+        scholarship_details: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Scholarship Details'
+        },
+        scholarship_video_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Scholarship Video Url'
         }
     },
     type: 'object',
@@ -2567,7 +2700,7 @@ export const EmailTemplatePublicSchema = {
 
 export const EmailTemplateTypeSchema = {
     type: 'string',
-    enum: ['login_code_user', 'login_code_human', 'application_received', 'application_accepted', 'application_rejected', 'payment_confirmed', 'abandoned_cart', 'edit_passes_confirmed'],
+    enum: ['login_code_user', 'login_code_human', 'application_received', 'application_accepted', 'application_rejected', 'application_accepted_with_discount', 'application_accepted_with_incentive', 'application_accepted_scholarship_rejected', 'payment_confirmed', 'abandoned_cart', 'edit_passes_confirmed'],
     title: 'EmailTemplateType'
 } as const;
 
@@ -4832,6 +4965,11 @@ export const PaymentPreviewSchema = {
             ],
             title: 'Group Id'
         },
+        scholarship_discount: {
+            type: 'boolean',
+            title: 'Scholarship Discount',
+            default: false
+        },
         status: {
             anyOf: [
                 {
@@ -5430,6 +5568,30 @@ export const PopupCreateSchema = {
             title: 'Allows Coupons',
             default: false
         },
+        allows_scholarship: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Allows Scholarship',
+            default: false
+        },
+        allows_incentive: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Allows Incentive',
+            default: false
+        },
         image_url: {
             anyOf: [
                 {
@@ -5656,6 +5818,16 @@ export const PopupPublicSchema = {
                 }
             ],
             title: 'Allows Coupons',
+            default: false
+        },
+        allows_scholarship: {
+            type: 'boolean',
+            title: 'Allows Scholarship',
+            default: false
+        },
+        allows_incentive: {
+            type: 'boolean',
+            title: 'Allows Incentive',
             default: false
         },
         image_url: {
@@ -6034,6 +6206,28 @@ export const PopupUpdateSchema = {
             ],
             title: 'Allows Coupons'
         },
+        allows_scholarship: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Allows Scholarship'
+        },
+        allows_incentive: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Allows Incentive'
+        },
         image_url: {
             anyOf: [
                 {
@@ -6235,6 +6429,18 @@ export const PreviewRequestSchema = {
                 }
             ],
             title: 'Preview Variables'
+        },
+        popup_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Id'
         }
     },
     type: 'object',
@@ -7336,6 +7542,66 @@ export const ReviewSummarySchema = {
     description: 'Summary of reviews for an application.'
 } as const;
 
+export const ScholarshipDecisionRequestSchema = {
+    properties: {
+        scholarship_status: {
+            '$ref': '#/components/schemas/ScholarshipStatus'
+        },
+        discount_percentage: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Discount Percentage'
+        },
+        incentive_amount: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Incentive Amount'
+        },
+        incentive_currency: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Incentive Currency'
+        }
+    },
+    type: 'object',
+    required: ['scholarship_status'],
+    title: 'ScholarshipDecisionRequest',
+    description: 'Admin request body for PATCH /applications/{id}/scholarship.'
+} as const;
+
+export const ScholarshipStatusSchema = {
+    type: 'string',
+    enum: ['pending', 'approved', 'rejected'],
+    title: 'ScholarshipStatus',
+    description: 'Status of a scholarship request on an application.'
+} as const;
+
 export const SendTestRequestSchema = {
     properties: {
         html_content: {
@@ -7373,6 +7639,18 @@ export const SendTestRequestSchema = {
                 }
             ],
             title: 'Custom Variables'
+        },
+        popup_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Id'
         }
     },
     type: 'object',

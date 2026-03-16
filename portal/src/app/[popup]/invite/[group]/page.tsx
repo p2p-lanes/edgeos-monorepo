@@ -2,6 +2,8 @@
 
 import { Suspense } from "react"
 import { CheckoutContent } from "@/app/checkout/components/CheckoutContent"
+import { getBackgroundProps } from "@/lib/background-image"
+import { useCityProvider } from "@/providers/cityProvider"
 import { useTenant } from "@/providers/tenantProvider"
 import useGetInviteData from "./hook/useGetInviteData"
 
@@ -13,30 +15,24 @@ const LoadingFallback = () => (
 
 const InvitePage = () => {
   const { tenant } = useTenant()
+  const { getCity, popupsLoaded } = useCityProvider()
   const {
     data: { group },
     error,
     isLoading,
   } = useGetInviteData()
 
-  if (isLoading) {
+  const popup = getCity()
+  const background = getBackgroundProps(popup, tenant)
+
+  if (isLoading || !popupsLoaded) {
     return <LoadingFallback />
   }
 
   return (
     <div
-      className={`min-h-screen w-full py-8 flex items-center justify-center ${!tenant?.image_url ? "bg-gradient-to-br from-neutral-100 to-neutral-300" : ""}`}
-      style={
-        tenant?.image_url
-          ? {
-              backgroundImage: `url(${tenant.image_url})`,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-              backgroundRepeat: "no-repeat",
-              backgroundAttachment: "fixed",
-            }
-          : undefined
-      }
+      className={`min-h-screen w-full py-8 flex items-center justify-center ${background.className}`}
+      style={background.style}
     >
       <div className="container mx-auto">
         <Suspense fallback={<LoadingFallback />}>

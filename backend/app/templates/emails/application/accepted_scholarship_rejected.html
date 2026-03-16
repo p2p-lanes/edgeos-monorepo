@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}Your Application to {{ popup_name }} — Accepted{% endblock %}
+
+{% block content %}
+<h1>Congratulations — You're Accepted!</h1>
+
+<p>Hi {{ first_name }},</p>
+
+<p>
+    We have carefully reviewed your scholarship application to <strong>{{ popup_name }}</strong>.
+    While we were unable to approve the scholarship at this time, we are pleased to inform
+    you that your application to <strong>{{ popup_name }}</strong> has been approved!
+</p>
+
+<div style="background-color: #d4edda; border-radius: 8px; padding: 20px; margin: 20px 0; border-left: 4px solid #28a745;">
+    <h2 style="margin-top: 0; color: #155724;">Application Approved</h2>
+    <p style="color: #155724; margin-bottom: 0;">
+        You are welcome to purchase your pass at the standard price and join us at
+        <strong>{{ popup_name }}</strong>.
+    </p>
+</div>
+
+<div style="background-color: #f8f9fa; border-radius: 8px; padding: 20px; margin: 20px 0;">
+    <h2 style="margin-top: 0;">Application Details</h2>
+    <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+            <td style="padding: 8px 0; color: #666;">Event</td>
+            <td style="padding: 8px 0; font-weight: 600;">{{ popup_name }}</td>
+        </tr>
+        <tr>
+            <td style="padding: 8px 0; color: #666;">Name</td>
+            <td style="padding: 8px 0;">{{ first_name }} {{ last_name }}</td>
+        </tr>
+        <tr>
+            <td style="padding: 8px 0; color: #666;">Application Status</td>
+            <td style="padding: 8px 0;">
+                <span style="background-color: #28a745; color: #ffffff; padding: 4px 12px; border-radius: 4px; font-size: 14px;">
+                    Accepted
+                </span>
+            </td>
+        </tr>
+    </table>
+</div>
+
+{% if portal_url %}
+<div style="text-align: center; margin: 30px 0;">
+    <a href="{{ portal_url }}" class="button" style="background-color: #28a745;">
+        Purchase Your Pass
+    </a>
+</div>
+{% endif %}
+
+<div class="spacer"></div>
+
+<p>
+    We look forward to welcoming you to {{ popup_name }}!
+</p>
+
+<p style="font-size: 14px; color: #666;">
+    If you have any questions, please don't hesitate to reach out.
+</p>
+
+<p>
+    Best regards,<br>
+    The {{ project_name }} Team
+</p>
+{% endblock %}

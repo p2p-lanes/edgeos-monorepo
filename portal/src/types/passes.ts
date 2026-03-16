@@ -13,8 +13,8 @@ export interface AttendeePassesProps {
 }
 
 export interface ProductsSnapshotProps {
-  product_id: number
-  attendee_id: number
+  product_id: string
+  attendee_id: string
   quantity: number
   product_name: string
   product_description: string | null
@@ -24,7 +24,8 @@ export interface ProductsSnapshotProps {
 }
 
 export interface PaymentsProps {
-  application_id: number
+  id: string
+  application_id: string
   external_id: string | null
   status: "approved" | "pending" | "rejected"
   amount: number
@@ -35,5 +36,4 @@ export interface PaymentsProps {
   products_snapshot: ProductsSnapshotProps[]
   created_at: string
   updated_at: string
-  id: number
 }

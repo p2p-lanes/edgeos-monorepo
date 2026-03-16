@@ -260,8 +260,8 @@ function AbandonedCarts() {
           { key: "event", label: "Event" },
           { key: "items", label: "Items" },
           { key: "payment_attempts", label: "Payment Attempts" },
-          { key: "last_activity", label: "Last Activity" },
-          { key: "created", label: "Created" },
+          { key: "last_activity", label: "Last Activity", type: "date" },
+          { key: "created", label: "Created", type: "date" },
         ],
       )
     } finally {

@@ -51,6 +51,7 @@ export function splitForCreate({
     } else if (targetMap[key] === "application") {
       application[key] = value
     }
+    // Fields NOT in targetMap (not in current schema) are silently dropped
   }
 
   // Fallback: known human fields are always sent from values when present
@@ -88,6 +89,11 @@ export function splitForCreate({
       Object.keys(customFields).length > 0 ? customFields : undefined,
     status,
     companions: companions.length > 0 ? companions : undefined,
+    // Application-target base fields from the schema (scholarship, etc.)
+    // Only fields present in the current popup's schema are included —
+    // fields from a previous popup that don't exist here are already
+    // filtered out by the targetMap loop above.
+    ...application,
   }
 }
 
@@ -120,6 +126,7 @@ export function splitForUpdate({
     } else if (targetMap[key] === "application") {
       application[key] = value
     }
+    // Fields NOT in targetMap (not in current schema) are silently dropped
   }
 
   // Fallback: known human fields from values when not in profile
@@ -154,5 +161,8 @@ export function splitForUpdate({
     custom_fields:
       Object.keys(customFields).length > 0 ? customFields : undefined,
     status,
+    // Application-target base fields from the schema (scholarship, etc.)
+    // Only fields present in the current popup's schema are included.
+    ...application,
   }
 }

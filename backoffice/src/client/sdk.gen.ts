@@ -3,7 +3,7 @@
 import type { CancelablePromise } from './core/CancelablePromise';
 import { OpenAPI } from './core/OpenAPI';
 import { request as __request } from './core/request';
-import type { ApplicationReviewsListReviewsData, ApplicationReviewsListReviewsResponse, ApplicationReviewsSubmitReviewData, ApplicationReviewsSubmitReviewResponse, ApplicationReviewsGetReviewSummaryData, ApplicationReviewsGetReviewSummaryResponse, ApplicationReviewsListPendingReviewsData, ApplicationReviewsListPendingReviewsResponse, ApplicationReviewsListMyReviewsData, ApplicationReviewsListMyReviewsResponse, ApplicationsListApplicationsData, ApplicationsListApplicationsResponse, ApplicationsCreateApplicationAdminData, ApplicationsCreateApplicationAdminResponse, ApplicationsGetApplicationData, ApplicationsGetApplicationResponse, ApplicationsListMyApplicationsData, ApplicationsListMyApplicationsResponse, ApplicationsListMyTicketsResponse, ApplicationsGetMyPurchasesData, ApplicationsGetMyPurchasesResponse, ApplicationsGetMyApplicationData, ApplicationsGetMyApplicationResponse, ApplicationsUpdateMyApplicationData, ApplicationsUpdateMyApplicationResponse, ApplicationsCreateMyApplicationData, ApplicationsCreateMyApplicationResponse, ApplicationsListAttendeesDirectoryData, ApplicationsListAttendeesDirectoryResponse, ApplicationsExportAttendeesDirectoryCsvData, ApplicationsExportAttendeesDirectoryCsvResponse, ApplicationsAddMyAttendeeData, ApplicationsAddMyAttendeeResponse, ApplicationsUpdateMyAttendeeData, ApplicationsUpdateMyAttendeeResponse, ApplicationsDeleteMyAttendeeData, ApplicationsDeleteMyAttendeeResponse, ApprovalStrategiesGetApprovalStrategyData, ApprovalStrategiesGetApprovalStrategyResponse, ApprovalStrategiesCreateOrUpdateApprovalStrategyData, ApprovalStrategiesCreateOrUpdateApprovalStrategyResponse, ApprovalStrategiesUpdateApprovalStrategyData, ApprovalStrategiesUpdateApprovalStrategyResponse, ApprovalStrategiesDeleteApprovalStrategyData, ApprovalStrategiesDeleteApprovalStrategyResponse, AttendeesListAttendeesData, AttendeesListAttendeesResponse, AttendeesGetAttendeeData, AttendeesGetAttendeeResponse, AttendeesUpdateAttendeeData, AttendeesUpdateAttendeeResponse, AttendeesDeleteAttendeeData, AttendeesDeleteAttendeeResponse, AttendeesGetByCheckInCodeData, AttendeesGetByCheckInCodeResponse, AttendeesGetTicketsByEmailData, AttendeesGetTicketsByEmailResponse, AuthUserLoginData, AuthUserLoginResponse, AuthUserAuthenticateData, AuthUserAuthenticateResponse, AuthHumanLoginData, AuthHumanLoginResponse, AuthHumanAuthenticateData, AuthHumanAuthenticateResponse, BaseFieldConfigsListBaseFieldConfigsData, BaseFieldConfigsListBaseFieldConfigsResponse, BaseFieldConfigsUpdateBaseFieldConfigData, BaseFieldConfigsUpdateBaseFieldConfigResponse, CartsListAbandonedCartsData, CartsListAbandonedCartsResponse, CartsGetMyCartData, CartsGetMyCartResponse, CartsUpdateMyCartData, CartsUpdateMyCartResponse, CartsDeleteMyCartData, CartsDeleteMyCartResponse, CouponsListCouponsData, CouponsListCouponsResponse, CouponsCreateCouponData, CouponsCreateCouponResponse, CouponsGetCouponData, CouponsGetCouponResponse, CouponsUpdateCouponData, CouponsUpdateCouponResponse, CouponsDeleteCouponData, CouponsDeleteCouponResponse, CouponsValidateCouponData, CouponsValidateCouponResponse, DashboardGetDashboardStatsData, DashboardGetDashboardStatsResponse, EmailTemplatesListTemplateTypesResponse, EmailTemplatesGetDefaultTemplateData, EmailTemplatesGetDefaultTemplateResponse, EmailTemplatesPreviewTemplateData, EmailTemplatesPreviewTemplateResponse, EmailTemplatesSendTestEmailData, EmailTemplatesSendTestEmailResponse, EmailTemplatesListEmailTemplatesData, EmailTemplatesListEmailTemplatesResponse, EmailTemplatesCreateEmailTemplateData, EmailTemplatesCreateEmailTemplateResponse, EmailTemplatesGetEmailTemplateData, EmailTemplatesGetEmailTemplateResponse, EmailTemplatesUpdateEmailTemplateData, EmailTemplatesUpdateEmailTemplateResponse, EmailTemplatesDeleteEmailTemplateData, EmailTemplatesDeleteEmailTemplateResponse, FormFieldsListFormFieldsData, FormFieldsListFormFieldsResponse, FormFieldsCreateFormFieldData, FormFieldsCreateFormFieldResponse, FormFieldsGetFormFieldData, FormFieldsGetFormFieldResponse, FormFieldsUpdateFormFieldData, FormFieldsUpdateFormFieldResponse, FormFieldsDeleteFormFieldData, FormFieldsDeleteFormFieldResponse, FormFieldsGetApplicationSchemaData, FormFieldsGetApplicationSchemaResponse, FormFieldsGetPortalApplicationSchemaData, FormFieldsGetPortalApplicationSchemaResponse, FormSectionsListFormSectionsData, FormSectionsListFormSectionsResponse, FormSectionsCreateFormSectionData, FormSectionsCreateFormSectionResponse, FormSectionsGetFormSectionData, FormSectionsGetFormSectionResponse, FormSectionsUpdateFormSectionData, FormSectionsUpdateFormSectionResponse, FormSectionsDeleteFormSectionData, FormSectionsDeleteFormSectionResponse, GroupsListGroupsData, GroupsListGroupsResponse, GroupsCreateGroupData, GroupsCreateGroupResponse, GroupsGetGroupData, GroupsGetGroupResponse, GroupsUpdateGroupData, GroupsUpdateGroupResponse, GroupsDeleteGroupData, GroupsDeleteGroupResponse, GroupsListMyGroupsData, GroupsListMyGroupsResponse, GroupsGetMyGroupData, GroupsGetMyGroupResponse, GroupsUpdateMyGroupData, GroupsUpdateMyGroupResponse, GroupsAddGroupMemberData, GroupsAddGroupMemberResponse, GroupsAddGroupMembersBatchData, GroupsAddGroupMembersBatchResponse, GroupsUpdateGroupMemberData, GroupsUpdateGroupMemberResponse, GroupsRemoveGroupMemberData, GroupsRemoveGroupMemberResponse, GroupsGetGroupPublicData, GroupsGetGroupPublicResponse, HumansListHumansData, HumansListHumansResponse, HumansCreateHumanData, HumansCreateHumanResponse, HumansGetCurrentHumanInfoResponse, HumansUpdateCurrentHumanData, HumansUpdateCurrentHumanResponse, HumansGetHumanData, HumansGetHumanResponse, HumansUpdateHumanData, HumansUpdateHumanResponse, PaymentsListPaymentsData, PaymentsListPaymentsResponse, PaymentsGetPaymentData, PaymentsGetPaymentResponse, PaymentsUpdatePaymentData, PaymentsUpdatePaymentResponse, PaymentsApprovePaymentData, PaymentsApprovePaymentResponse, PaymentsGetMyLatestPaymentData, PaymentsGetMyLatestPaymentResponse, PaymentsListMyPaymentsData, PaymentsListMyPaymentsResponse, PaymentsPreviewMyPaymentData, PaymentsPreviewMyPaymentResponse, PaymentsCreateMyPaymentData, PaymentsCreateMyPaymentResponse, PaymentsSimplefiWebhookResponse, PopupReviewersListReviewersData, PopupReviewersListReviewersResponse, PopupReviewersAddReviewerData, PopupReviewersAddReviewerResponse, PopupReviewersUpdateReviewerData, PopupReviewersUpdateReviewerResponse, PopupReviewersRemoveReviewerData, PopupReviewersRemoveReviewerResponse, PopupsListPopupsData, PopupsListPopupsResponse, PopupsCreatePopupData, PopupsCreatePopupResponse, PopupsGetPopupData, PopupsGetPopupResponse, PopupsUpdatePopupData, PopupsUpdatePopupResponse, PopupsDeletePopupData, PopupsDeletePopupResponse, PopupsListPortalPopupsResponse, PopupsGetPortalPopupData, PopupsGetPortalPopupResponse, ProductsListProductsData, ProductsListProductsResponse, ProductsCreateProductData, ProductsCreateProductResponse, ProductsCreateProductsBatchData, ProductsCreateProductsBatchResponse, ProductsGetProductData, ProductsGetProductResponse, ProductsUpdateProductData, ProductsUpdateProductResponse, ProductsDeleteProductData, ProductsDeleteProductResponse, ProductsListPortalProductsData, ProductsListPortalProductsResponse, TenantsGetTenantBySlugData, TenantsGetTenantBySlugResponse, TenantsListTenantsData, TenantsListTenantsResponse, TenantsCreateTenantData, TenantsCreateTenantResponse, TenantsGetTenantData, TenantsGetTenantResponse, TenantsUpdateTenantData, TenantsUpdateTenantResponse, TenantsDeleteTenantData, TenantsDeleteTenantResponse, TenantsGetCredentialsData, TenantsGetCredentialsResponse, TenantsDeleteCredentialsData, TenantsDeleteCredentialsResponse, UploadsGetPresignedUploadUrlData, UploadsGetPresignedUploadUrlResponse, UsersListUsersData, UsersListUsersResponse, UsersCreateUserData, UsersCreateUserResponse, UsersGetCurrentUserInfoResponse, UsersGetUserData, UsersGetUserResponse, UsersUpdateUserData, UsersUpdateUserResponse, UsersDeleteUserData, UsersDeleteUserResponse } from './types.gen';
+import type { ApplicationReviewsListReviewsData, ApplicationReviewsListReviewsResponse, ApplicationReviewsSubmitReviewData, ApplicationReviewsSubmitReviewResponse, ApplicationReviewsGetReviewSummaryData, ApplicationReviewsGetReviewSummaryResponse, ApplicationReviewsListPendingReviewsData, ApplicationReviewsListPendingReviewsResponse, ApplicationReviewsListMyReviewsData, ApplicationReviewsListMyReviewsResponse, ApplicationsListApplicationsData, ApplicationsListApplicationsResponse, ApplicationsCreateApplicationAdminData, ApplicationsCreateApplicationAdminResponse, ApplicationsGetApplicationData, ApplicationsGetApplicationResponse, ApplicationsListMyApplicationsData, ApplicationsListMyApplicationsResponse, ApplicationsListMyTicketsResponse, ApplicationsGetMyPurchasesData, ApplicationsGetMyPurchasesResponse, ApplicationsGetMyApplicationData, ApplicationsGetMyApplicationResponse, ApplicationsUpdateMyApplicationData, ApplicationsUpdateMyApplicationResponse, ApplicationsCreateMyApplicationData, ApplicationsCreateMyApplicationResponse, ApplicationsListAttendeesDirectoryData, ApplicationsListAttendeesDirectoryResponse, ApplicationsExportAttendeesDirectoryCsvData, ApplicationsExportAttendeesDirectoryCsvResponse, ApplicationsAddMyAttendeeData, ApplicationsAddMyAttendeeResponse, ApplicationsUpdateMyAttendeeData, ApplicationsUpdateMyAttendeeResponse, ApplicationsDeleteMyAttendeeData, ApplicationsDeleteMyAttendeeResponse, ApplicationsReviewScholarshipData, ApplicationsReviewScholarshipResponse, ApprovalStrategiesGetApprovalStrategyData, ApprovalStrategiesGetApprovalStrategyResponse, ApprovalStrategiesCreateOrUpdateApprovalStrategyData, ApprovalStrategiesCreateOrUpdateApprovalStrategyResponse, ApprovalStrategiesUpdateApprovalStrategyData, ApprovalStrategiesUpdateApprovalStrategyResponse, ApprovalStrategiesDeleteApprovalStrategyData, ApprovalStrategiesDeleteApprovalStrategyResponse, AttendeesListAttendeesData, AttendeesListAttendeesResponse, AttendeesGetAttendeeData, AttendeesGetAttendeeResponse, AttendeesUpdateAttendeeData, AttendeesUpdateAttendeeResponse, AttendeesDeleteAttendeeData, AttendeesDeleteAttendeeResponse, AttendeesGetByCheckInCodeData, AttendeesGetByCheckInCodeResponse, AttendeesGetTicketsByEmailData, AttendeesGetTicketsByEmailResponse, AuthUserLoginData, AuthUserLoginResponse, AuthUserAuthenticateData, AuthUserAuthenticateResponse, AuthHumanLoginData, AuthHumanLoginResponse, AuthHumanAuthenticateData, AuthHumanAuthenticateResponse, BaseFieldConfigsListBaseFieldConfigsData, BaseFieldConfigsListBaseFieldConfigsResponse, BaseFieldConfigsUpdateBaseFieldConfigData, BaseFieldConfigsUpdateBaseFieldConfigResponse, CartsListAbandonedCartsData, CartsListAbandonedCartsResponse, CartsGetMyCartData, CartsGetMyCartResponse, CartsUpdateMyCartData, CartsUpdateMyCartResponse, CartsDeleteMyCartData, CartsDeleteMyCartResponse, CouponsListCouponsData, CouponsListCouponsResponse, CouponsCreateCouponData, CouponsCreateCouponResponse, CouponsGetCouponData, CouponsGetCouponResponse, CouponsUpdateCouponData, CouponsUpdateCouponResponse, CouponsDeleteCouponData, CouponsDeleteCouponResponse, CouponsValidateCouponData, CouponsValidateCouponResponse, DashboardGetDashboardStatsData, DashboardGetDashboardStatsResponse, EmailTemplatesListTemplateTypesResponse, EmailTemplatesGetDefaultTemplateData, EmailTemplatesGetDefaultTemplateResponse, EmailTemplatesPreviewTemplateData, EmailTemplatesPreviewTemplateResponse, EmailTemplatesSendTestEmailData, EmailTemplatesSendTestEmailResponse, EmailTemplatesListEmailTemplatesData, EmailTemplatesListEmailTemplatesResponse, EmailTemplatesCreateEmailTemplateData, EmailTemplatesCreateEmailTemplateResponse, EmailTemplatesGetEmailTemplateData, EmailTemplatesGetEmailTemplateResponse, EmailTemplatesUpdateEmailTemplateData, EmailTemplatesUpdateEmailTemplateResponse, EmailTemplatesDeleteEmailTemplateData, EmailTemplatesDeleteEmailTemplateResponse, FormFieldsListFormFieldsData, FormFieldsListFormFieldsResponse, FormFieldsCreateFormFieldData, FormFieldsCreateFormFieldResponse, FormFieldsGetFormFieldData, FormFieldsGetFormFieldResponse, FormFieldsUpdateFormFieldData, FormFieldsUpdateFormFieldResponse, FormFieldsDeleteFormFieldData, FormFieldsDeleteFormFieldResponse, FormFieldsGetApplicationSchemaData, FormFieldsGetApplicationSchemaResponse, FormFieldsGetPortalApplicationSchemaData, FormFieldsGetPortalApplicationSchemaResponse, FormSectionsListFormSectionsData, FormSectionsListFormSectionsResponse, FormSectionsCreateFormSectionData, FormSectionsCreateFormSectionResponse, FormSectionsGetFormSectionData, FormSectionsGetFormSectionResponse, FormSectionsUpdateFormSectionData, FormSectionsUpdateFormSectionResponse, FormSectionsDeleteFormSectionData, FormSectionsDeleteFormSectionResponse, GroupsListGroupsData, GroupsListGroupsResponse, GroupsCreateGroupData, GroupsCreateGroupResponse, GroupsGetGroupData, GroupsGetGroupResponse, GroupsUpdateGroupData, GroupsUpdateGroupResponse, GroupsDeleteGroupData, GroupsDeleteGroupResponse, GroupsListMyGroupsData, GroupsListMyGroupsResponse, GroupsGetMyGroupData, GroupsGetMyGroupResponse, GroupsUpdateMyGroupData, GroupsUpdateMyGroupResponse, GroupsAddGroupMemberData, GroupsAddGroupMemberResponse, GroupsAddGroupMembersBatchData, GroupsAddGroupMembersBatchResponse, GroupsUpdateGroupMemberData, GroupsUpdateGroupMemberResponse, GroupsRemoveGroupMemberData, GroupsRemoveGroupMemberResponse, GroupsGetGroupPublicData, GroupsGetGroupPublicResponse, HumansListHumansData, HumansListHumansResponse, HumansCreateHumanData, HumansCreateHumanResponse, HumansGetCurrentHumanInfoResponse, HumansUpdateCurrentHumanData, HumansUpdateCurrentHumanResponse, HumansGetHumanData, HumansGetHumanResponse, HumansUpdateHumanData, HumansUpdateHumanResponse, PaymentsListPaymentsData, PaymentsListPaymentsResponse, PaymentsGetPaymentData, PaymentsGetPaymentResponse, PaymentsUpdatePaymentData, PaymentsUpdatePaymentResponse, PaymentsGetPaymentInvoiceData, PaymentsGetPaymentInvoiceResponse, PaymentsApprovePaymentData, PaymentsApprovePaymentResponse, PaymentsGetMyLatestPaymentData, PaymentsGetMyLatestPaymentResponse, PaymentsListMyPaymentsData, PaymentsListMyPaymentsResponse, PaymentsGetMyInvoiceData, PaymentsGetMyInvoiceResponse, PaymentsPreviewMyPaymentData, PaymentsPreviewMyPaymentResponse, PaymentsCreateMyPaymentData, PaymentsCreateMyPaymentResponse, PaymentsSimplefiWebhookResponse, PopupReviewersListReviewersData, PopupReviewersListReviewersResponse, PopupReviewersAddReviewerData, PopupReviewersAddReviewerResponse, PopupReviewersUpdateReviewerData, PopupReviewersUpdateReviewerResponse, PopupReviewersRemoveReviewerData, PopupReviewersRemoveReviewerResponse, PopupsListPopupsData, PopupsListPopupsResponse, PopupsCreatePopupData, PopupsCreatePopupResponse, PopupsGetPopupData, PopupsGetPopupResponse, PopupsUpdatePopupData, PopupsUpdatePopupResponse, PopupsDeletePopupData, PopupsDeletePopupResponse, PopupsListPortalPopupsResponse, PopupsGetPortalPopupData, PopupsGetPortalPopupResponse, ProductsListProductsData, ProductsListProductsResponse, ProductsCreateProductData, ProductsCreateProductResponse, ProductsCreateProductsBatchData, ProductsCreateProductsBatchResponse, ProductsGetProductData, ProductsGetProductResponse, ProductsUpdateProductData, ProductsUpdateProductResponse, ProductsDeleteProductData, ProductsDeleteProductResponse, ProductsListPortalProductsData, ProductsListPortalProductsResponse, TenantsGetTenantBySlugData, TenantsGetTenantBySlugResponse, TenantsListTenantsData, TenantsListTenantsResponse, TenantsCreateTenantData, TenantsCreateTenantResponse, TenantsGetTenantData, TenantsGetTenantResponse, TenantsUpdateTenantData, TenantsUpdateTenantResponse, TenantsDeleteTenantData, TenantsDeleteTenantResponse, TenantsGetCredentialsData, TenantsGetCredentialsResponse, TenantsDeleteCredentialsData, TenantsDeleteCredentialsResponse, UploadsGetPresignedUploadUrlData, UploadsGetPresignedUploadUrlResponse, UsersListUsersData, UsersListUsersResponse, UsersCreateUserData, UsersCreateUserResponse, UsersGetCurrentUserInfoResponse, UsersGetUserData, UsersGetUserResponse, UsersUpdateUserData, UsersUpdateUserResponse, UsersDeleteUserData, UsersDeleteUserResponse } from './types.gen';
 
 export class ApplicationReviewsService {
     /**
@@ -375,7 +375,7 @@ export class ApplicationsService {
      * List Attendees Directory
      * List attendees directory for a popup (Portal).
      *
-     * Returns accepted/in-review applications with at least one product.
+     * Returns accepted applications with at least one product.
      * Respects info_not_shared masking.
      * @param data The data for the request.
      * @param data.popupId
@@ -505,6 +505,38 @@ export class ApplicationsService {
                 popup_id: data.popupId,
                 attendee_id: data.attendeeId
             },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Review Scholarship
+     * Approve or reject a scholarship request on an application (BO admin only).
+     *
+     * Updates scholarship fields and re-runs the approval calculator.
+     * If the application transitions to ACCEPTED as a result, sends the
+     * appropriate scholarship acceptance email to the applicant.
+     * @param data The data for the request.
+     * @param data.applicationId
+     * @param data.requestBody
+     * @param data.xTenantId
+     * @returns ApplicationPublic Successful Response
+     * @throws ApiError
+     */
+    public static reviewScholarship(data: ApplicationsReviewScholarshipData): CancelablePromise<ApplicationsReviewScholarshipResponse> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/api/v1/applications/{application_id}/scholarship',
+            path: {
+                application_id: data.applicationId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
             errors: {
                 422: 'Validation Error'
             }
@@ -1245,6 +1277,7 @@ export class EmailTemplatesService {
      * Preview Template
      * @param data The data for the request.
      * @param data.requestBody
+     * @param data.xTenantId
      * @returns PreviewResponse Successful Response
      * @throws ApiError
      */
@@ -1252,6 +1285,9 @@ export class EmailTemplatesService {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/api/v1/email-templates/preview',
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
             body: data.requestBody,
             mediaType: 'application/json',
             errors: {
@@ -1264,6 +1300,7 @@ export class EmailTemplatesService {
      * Send Test Email
      * @param data The data for the request.
      * @param data.requestBody
+     * @param data.xTenantId
      * @returns string Successful Response
      * @throws ApiError
      */
@@ -1271,6 +1308,9 @@ export class EmailTemplatesService {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/api/v1/email-templates/send-test',
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
             body: data.requestBody,
             mediaType: 'application/json',
             errors: {
@@ -2261,6 +2301,33 @@ export class PaymentsService {
     }
     
     /**
+     * Get Payment Invoice
+     * Download invoice PDF for a payment (BO only).
+     *
+     * Only available if the popup has invoice details configured.
+     * @param data The data for the request.
+     * @param data.paymentId
+     * @param data.xTenantId
+     * @returns unknown Successful Response
+     * @throws ApiError
+     */
+    public static getPaymentInvoice(data: PaymentsGetPaymentInvoiceData): CancelablePromise<PaymentsGetPaymentInvoiceResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/payments/{payment_id}/invoice',
+            path: {
+                payment_id: data.paymentId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
      * Approve Payment
      * Manually approve a payment (BO only).
      * @param data The data for the request.
@@ -2326,6 +2393,29 @@ export class PaymentsService {
             query: {
                 skip: data.skip,
                 limit: data.limit
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get My Invoice
+     * Download invoice PDF for a payment owned by current human (Portal).
+     *
+     * Only available if the popup has invoice details configured.
+     * @param data The data for the request.
+     * @param data.paymentId
+     * @returns unknown Successful Response
+     * @throws ApiError
+     */
+    public static getMyInvoice(data: PaymentsGetMyInvoiceData): CancelablePromise<PaymentsGetMyInvoiceResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/payments/my/{payment_id}/invoice',
+            path: {
+                payment_id: data.paymentId
             },
             errors: {
                 422: 'Validation Error'

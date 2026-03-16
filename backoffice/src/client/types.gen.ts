@@ -63,6 +63,9 @@ export type ApplicationCreate = {
     human_id?: (string | null);
     group_id?: (string | null);
     companions?: (Array<CompanionCreate> | null);
+    scholarship_request?: boolean;
+    scholarship_details?: (string | null);
+    scholarship_video_url?: (string | null);
 };
 
 /**
@@ -88,6 +91,13 @@ export type ApplicationPublic = {
     accepted_at?: (string | null);
     created_at?: (string | null);
     updated_at?: (string | null);
+    scholarship_request?: boolean;
+    scholarship_details?: (string | null);
+    scholarship_video_url?: (string | null);
+    scholarship_status?: (string | null);
+    discount_percentage?: (string | null);
+    incentive_amount?: (string | null);
+    incentive_currency?: (string | null);
     human?: (HumanPublic | null);
     attendees?: Array<AttendeePublic>;
     red_flag?: boolean;
@@ -155,6 +165,9 @@ export type ApplicationUpdate = {
     [key: string]: unknown;
 } | null);
     status?: (UserSettableStatus | null);
+    scholarship_request?: (boolean | null);
+    scholarship_details?: (string | null);
+    scholarship_video_url?: (string | null);
 };
 
 /**
@@ -552,7 +565,7 @@ export type EmailTemplatePublic = {
     updated_at?: (string | null);
 };
 
-export type EmailTemplateType = 'login_code_user' | 'login_code_human' | 'application_received' | 'application_accepted' | 'application_rejected' | 'payment_confirmed' | 'abandoned_cart' | 'edit_passes_confirmed';
+export type EmailTemplateType = 'login_code_user' | 'login_code_human' | 'application_received' | 'application_accepted' | 'application_rejected' | 'application_accepted_with_discount' | 'application_accepted_with_incentive' | 'application_accepted_scholarship_rejected' | 'payment_confirmed' | 'abandoned_cart' | 'edit_passes_confirmed';
 
 export type EmailTemplateUpdate = {
     subject?: (string | null);
@@ -985,6 +998,7 @@ export type PaymentPreview = {
     coupon_code?: (string | null);
     discount_value?: (string | null);
     group_id?: (string | null);
+    scholarship_discount?: boolean;
     status?: (string | null);
     external_id?: (string | null);
     checkout_url?: (string | null);
@@ -1099,6 +1113,8 @@ export type PopupCreate = {
     allows_spouse?: (boolean | null);
     allows_children?: (boolean | null);
     allows_coupons?: (boolean | null);
+    allows_scholarship?: (boolean | null);
+    allows_incentive?: (boolean | null);
     image_url?: (string | null);
     icon_url?: (string | null);
     express_checkout_background?: (string | null);
@@ -1124,6 +1140,8 @@ export type PopupPublic = {
     allows_spouse?: (boolean | null);
     allows_children?: (boolean | null);
     allows_coupons?: (boolean | null);
+    allows_scholarship?: boolean;
+    allows_incentive?: boolean;
     image_url?: (string | null);
     icon_url?: (string | null);
     express_checkout_background?: (string | null);
@@ -1183,6 +1201,8 @@ export type PopupUpdate = {
     allows_spouse?: (boolean | null);
     allows_children?: (boolean | null);
     allows_coupons?: (boolean | null);
+    allows_scholarship?: (boolean | null);
+    allows_incentive?: (boolean | null);
     image_url?: (string | null);
     icon_url?: (string | null);
     express_checkout_background?: (string | null);
@@ -1235,6 +1255,7 @@ export type PreviewRequest = {
     preview_variables?: ({
     [key: string]: unknown;
 } | null);
+    popup_id?: (string | null);
 };
 
 export type PreviewResponse = {
@@ -1413,6 +1434,21 @@ export type ReviewSummary = {
     reviews: Array<ApplicationReviewPublic>;
 };
 
+/**
+ * Admin request body for PATCH /applications/{id}/scholarship.
+ */
+export type ScholarshipDecisionRequest = {
+    scholarship_status: ScholarshipStatus;
+    discount_percentage?: (number | string | null);
+    incentive_amount?: (number | string | null);
+    incentive_currency?: (string | null);
+};
+
+/**
+ * Status of a scholarship request on an application.
+ */
+export type ScholarshipStatus = 'pending' | 'approved' | 'rejected';
+
 export type SendTestRequest = {
     html_content: string;
     template_type: string;
@@ -1421,6 +1457,7 @@ export type SendTestRequest = {
     custom_variables?: ({
     [key: string]: unknown;
 } | null);
+    popup_id?: (string | null);
 };
 
 export type TemplateTypeInfo = {
@@ -1742,6 +1779,14 @@ export type ApplicationsDeleteMyAttendeeData = {
 
 export type ApplicationsDeleteMyAttendeeResponse = (ApplicationPublic);
 
+export type ApplicationsReviewScholarshipData = {
+    applicationId: string;
+    requestBody: ScholarshipDecisionRequest;
+    xTenantId?: (string | null);
+};
+
+export type ApplicationsReviewScholarshipResponse = (ApplicationPublic);
+
 export type ApprovalStrategiesGetApprovalStrategyData = {
     popupId: string;
     xTenantId?: (string | null);
@@ -1976,12 +2021,14 @@ export type EmailTemplatesGetDefaultTemplateResponse = ({
 
 export type EmailTemplatesPreviewTemplateData = {
     requestBody: PreviewRequest;
+    xTenantId?: (string | null);
 };
 
 export type EmailTemplatesPreviewTemplateResponse = (PreviewResponse);
 
 export type EmailTemplatesSendTestEmailData = {
     requestBody: SendTestRequest;
+    xTenantId?: (string | null);
 };
 
 export type EmailTemplatesSendTestEmailResponse = ({
@@ -2322,6 +2369,13 @@ export type PaymentsUpdatePaymentData = {
 
 export type PaymentsUpdatePaymentResponse = (PaymentPublic);
 
+export type PaymentsGetPaymentInvoiceData = {
+    paymentId: string;
+    xTenantId?: (string | null);
+};
+
+export type PaymentsGetPaymentInvoiceResponse = (unknown);
+
 export type PaymentsApprovePaymentData = {
     paymentId: string;
     xTenantId?: (string | null);
@@ -2348,6 +2402,12 @@ export type PaymentsListMyPaymentsData = {
 };
 
 export type PaymentsListMyPaymentsResponse = (ListModel_PaymentPublic_);
+
+export type PaymentsGetMyInvoiceData = {
+    paymentId: string;
+};
+
+export type PaymentsGetMyInvoiceResponse = (unknown);
 
 export type PaymentsPreviewMyPaymentData = {
     requestBody: PaymentCreate;

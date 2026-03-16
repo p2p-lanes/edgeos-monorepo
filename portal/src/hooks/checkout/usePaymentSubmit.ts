@@ -122,10 +122,7 @@ export function usePaymentSubmit({
 
       if (data.status === "pending" && data.checkout_url) {
         markPurchasePending()
-        const currentUrl = new URL(window.location.href)
-        currentUrl.searchParams.set("checkout", "success")
-        const redirectUrl = currentUrl.toString()
-        window.location.href = `${data.checkout_url}?redirect_url=${encodeURIComponent(redirectUrl)}`
+        window.location.href = data.checkout_url
         return { success: true }
       }
 

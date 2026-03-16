@@ -1,6 +1,9 @@
 import datetime
 import uuid
 from collections.abc import Mapping
+from dataclasses import dataclass
+from email import encoders
+from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
@@ -19,6 +22,9 @@ from app.services.email.templates import (
     TEMPLATE_TYPE_TO_FILE,
     AbandonedCartContext,
     ApplicationAcceptedContext,
+    ApplicationAcceptedScholarshipRejectedContext,
+    ApplicationAcceptedWithDiscountContext,
+    ApplicationAcceptedWithIncentiveContext,
     ApplicationReceivedContext,
     ApplicationRejectedContext,
     EditPassesConfirmedContext,
@@ -26,10 +32,21 @@ from app.services.email.templates import (
     LoginCodeHumanContext,
     LoginCodeUserContext,
     PaymentConfirmedContext,
+    SilentUndefined,
+    log_missing_template_variables,
 )
 
 if TYPE_CHECKING:
     from app.api.payment.models import Payments
+
+
+@dataclass
+class EmailAttachment:
+    """A file attachment for an email."""
+
+    filename: str
+    content: bytes
+    mime_type: str = "application/octet-stream"
 
 
 def compute_order_summary(payment: "Payments") -> str:
@@ -59,7 +76,7 @@ def _enrich_with_popup_data(
         return context
 
     enriched = dict(context)
-    popup_fields = {
+    popup_fields: dict[str, Any] = {
         "popup_name": popup.name,
         "popup_image_url": popup.image_url,
         "popup_icon_url": popup.icon_url,
@@ -73,6 +90,18 @@ def _enrich_with_popup_data(
         if popup.end_date
         else None,
     }
+
+    # Build portal_url from tenant slug + PORTAL_URL setting
+    if "portal_url" not in enriched:
+        from app.api.tenant.models import Tenants
+
+        tenant = db_session.get(Tenants, popup.tenant_id)
+        if tenant:
+            portal_host = settings.PORTAL_URL.replace("https://", "").replace(
+                "http://", ""
+            )
+            popup_fields["portal_url"] = f"https://{tenant.slug}.{portal_host}"
+
     for key, value in popup_fields.items():
         if key not in enriched:
             enriched[key] = value
@@ -86,6 +115,7 @@ class EmailService:
         self.template_env = Environment(
             loader=FileSystemLoader(str(template_dir)),
             autoescape=True,
+            undefined=SilentUndefined,
         )
 
         self.template_env.globals.update(
@@ -103,7 +133,7 @@ class EmailService:
         Uses SandboxedEnvironment to prevent SSTI attacks.
         """
         try:
-            env = SandboxedEnvironment()
+            env = SandboxedEnvironment(undefined=SilentUndefined)
             env.globals.update(
                 {
                     "project_name": settings.PROJECT_NAME,
@@ -213,6 +243,7 @@ class EmailService:
         text_content: str | None = None,
         from_address: str | None = None,
         from_name: str | None = None,
+        attachments: list[EmailAttachment] | None = None,
     ) -> bool:
         """
         Send an email via SMTP.
@@ -224,6 +255,7 @@ class EmailService:
             text_content: Optional plain text version
             from_address: Override default from address (tenant-specific)
             from_name: Override default from name (tenant-specific)
+            attachments: Optional list of file attachments
 
         Returns:
             True if email was sent successfully, False otherwise
@@ -239,8 +271,30 @@ class EmailService:
                 logger.error("No from address configured (neither tenant nor global)")
                 return False
 
-            # Create message
-            message = MIMEMultipart("alternative")
+            # Build the text/html alternative part
+            alt_part = MIMEMultipart("alternative")
+            if text_content:
+                alt_part.attach(MIMEText(text_content, "plain"))
+            alt_part.attach(MIMEText(html_content, "html"))
+
+            # If there are attachments, wrap in a mixed container
+            if attachments:
+                message = MIMEMultipart("mixed")
+                message.attach(alt_part)
+                for att in attachments:
+                    maintype, _, subtype = att.mime_type.partition("/")
+                    part = MIMEBase(maintype, subtype or "octet-stream")
+                    part.set_payload(att.content)
+                    encoders.encode_base64(part)
+                    part.add_header(
+                        "Content-Disposition",
+                        "attachment",
+                        filename=att.filename,
+                    )
+                    message.attach(part)
+            else:
+                message = alt_part
+
             message["Subject"] = subject
             message["From"] = f"{sender_name} <{sender_email}>"
 
@@ -251,15 +305,6 @@ class EmailService:
             else:
                 message["To"] = to
                 recipients = [to]
-
-            # Add plain text version if provided
-            if text_content:
-                text_part = MIMEText(text_content, "plain")
-                message.attach(text_part)
-
-            # Add HTML version
-            html_part = MIMEText(html_content, "html")
-            message.attach(html_part)
 
             smtp_kwargs: dict[str, Any] = {
                 "hostname": settings.SMTP_HOST,
@@ -293,6 +338,7 @@ class EmailService:
         text_content: str | None = None,
         from_address: str | None = None,
         from_name: str | None = None,
+        attachments: list[EmailAttachment] | None = None,
     ) -> bool:
         """
         Render and send a templated email.
@@ -305,6 +351,7 @@ class EmailService:
             text_content: Optional plain text version
             from_address: Override default from address (tenant-specific)
             from_name: Override default from name (tenant-specific)
+            attachments: Optional list of file attachments
 
         Returns:
             True if email was sent successfully, False otherwise
@@ -321,6 +368,7 @@ class EmailService:
                 text_content=text_content,
                 from_address=from_address,
                 from_name=from_name,
+                attachments=attachments,
             )
 
         except Exception as e:
@@ -432,6 +480,75 @@ class EmailService:
             db_session=db_session,
         )
 
+    async def send_application_accepted_with_discount(
+        self,
+        to: str,
+        subject: str,
+        context: ApplicationAcceptedWithDiscountContext,
+        from_address: str | None = None,
+        from_name: str | None = None,
+        popup_id: uuid.UUID | None = None,
+        db_session: Session | None = None,
+    ) -> bool:
+        """Send application accepted email with scholarship discount (no cash incentive)."""
+        return await self._send_with_fallback(
+            to=to,
+            subject=subject,
+            template_type=EmailTemplateType.APPLICATION_ACCEPTED_WITH_DISCOUNT,
+            template_name=EmailTemplates.APPLICATION_ACCEPTED_WITH_DISCOUNT,
+            context=context.model_dump(exclude_none=True),
+            from_address=from_address,
+            from_name=from_name,
+            popup_id=popup_id,
+            db_session=db_session,
+        )
+
+    async def send_application_accepted_with_incentive(
+        self,
+        to: str,
+        subject: str,
+        context: ApplicationAcceptedWithIncentiveContext,
+        from_address: str | None = None,
+        from_name: str | None = None,
+        popup_id: uuid.UUID | None = None,
+        db_session: Session | None = None,
+    ) -> bool:
+        """Send application accepted email with scholarship discount and cash incentive grant."""
+        return await self._send_with_fallback(
+            to=to,
+            subject=subject,
+            template_type=EmailTemplateType.APPLICATION_ACCEPTED_WITH_INCENTIVE,
+            template_name=EmailTemplates.APPLICATION_ACCEPTED_WITH_INCENTIVE,
+            context=context.model_dump(exclude_none=True),
+            from_address=from_address,
+            from_name=from_name,
+            popup_id=popup_id,
+            db_session=db_session,
+        )
+
+    async def send_application_accepted_scholarship_rejected(
+        self,
+        to: str,
+        subject: str,
+        context: ApplicationAcceptedScholarshipRejectedContext,
+        from_address: str | None = None,
+        from_name: str | None = None,
+        popup_id: uuid.UUID | None = None,
+        db_session: Session | None = None,
+    ) -> bool:
+        """Send application accepted email when scholarship request was not approved."""
+        return await self._send_with_fallback(
+            to=to,
+            subject=subject,
+            template_type=EmailTemplateType.APPLICATION_ACCEPTED_SCHOLARSHIP_REJECTED,
+            template_name=EmailTemplates.APPLICATION_ACCEPTED_SCHOLARSHIP_REJECTED,
+            context=context.model_dump(exclude_none=True),
+            from_address=from_address,
+            from_name=from_name,
+            popup_id=popup_id,
+            db_session=db_session,
+        )
+
     async def send_payment_confirmed(
         self,
         to: str,
@@ -441,6 +558,7 @@ class EmailService:
         from_name: str | None = None,
         popup_id: uuid.UUID | None = None,
         db_session: Session | None = None,
+        attachments: list[EmailAttachment] | None = None,
     ) -> bool:
         """Send payment confirmed email."""
         return await self._send_with_fallback(
@@ -453,6 +571,7 @@ class EmailService:
             from_name=from_name,
             popup_id=popup_id,
             db_session=db_session,
+            attachments=attachments,
         )
 
     async def send_abandoned_cart(
@@ -512,6 +631,7 @@ class EmailService:
         from_name: str | None = None,
         popup_id: uuid.UUID | None = None,
         db_session: Session | None = None,
+        attachments: list[EmailAttachment] | None = None,
     ) -> bool:
         """Send email using DB custom template if available, else file-based fallback."""
         try:
@@ -520,6 +640,7 @@ class EmailService:
                 enriched_context = _enrich_with_popup_data(
                     dict(context), popup_id, db_session
                 )
+                log_missing_template_variables(template_type, dict(enriched_context))
                 rendered_html, custom_subject = self.render_with_fallback(
                     template_type, enriched_context, popup_id, db_session
                 )
@@ -530,6 +651,7 @@ class EmailService:
                     html_content=rendered_html,
                     from_address=from_address,
                     from_name=from_name,
+                    attachments=attachments,
                 )
 
             return await self.send_template_email(
@@ -539,6 +661,7 @@ class EmailService:
                 context=enriched_context,
                 from_address=from_address,
                 from_name=from_name,
+                attachments=attachments,
             )
         except Exception as e:
             logger.error(f"Error sending email with fallback to {to}: {e}")

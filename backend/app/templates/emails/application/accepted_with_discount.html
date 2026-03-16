@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Your Scholarship & Application — {{ popup_name }}{% endblock %}
+
+{% block content %}
+<h1>Great News — You're In!</h1>
+
+<p>Hi {{ first_name }},</p>
+
+<p>
+    Thank you for your scholarship application to <strong>{{ popup_name }}</strong>.
+    We have carefully reviewed your request.
+</p>
+
+<p>
+    Given the limited scholarship spots available, we have to prioritize based on need.
+    While we are unable to provide a full financial scholarship covering travel and
+    accommodation at this time, we are still fully committed to having you join us.
+</p>
+
+<div style="background-color: #d4edda; border-radius: 8px; padding: 20px; margin: 20px 0; border-left: 4px solid #28a745;">
+    <h2 style="margin-top: 0; color: #155724;">Your Scholarship Award</h2>
+    {% if discount_percentage >= 100 %}
+    <p style="color: #155724; margin-bottom: 0;">
+        To help make your journey to <strong>{{ popup_name }}</strong> easier, we have decided to
+        <strong>completely waive your Co-Creator ticket fee</strong> — your participation is on us!
+    </p>
+    {% else %}
+    <p style="color: #155724; margin-bottom: 0;">
+        To help make your journey to <strong>{{ popup_name }}</strong> easier, we have decided to
+        reduce your Co-Creator ticket by <strong>{{ discount_percentage }}%</strong>.
+    </p>
+    {% endif %}
+</div>
+
+<div style="background-color: #f8f9fa; border-radius: 8px; padding: 20px; margin: 20px 0;">
+    <h2 style="margin-top: 0;">Award Summary</h2>
+    <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+            <td style="padding: 8px 0; color: #666;">Event</td>
+            <td style="padding: 8px 0; font-weight: 600;">{{ popup_name }}</td>
+        </tr>
+        <tr>
+            <td style="padding: 8px 0; color: #666;">Name</td>
+            <td style="padding: 8px 0;">{{ first_name }} {{ last_name }}</td>
+        </tr>
+        <tr>
+            <td style="padding: 8px 0; color: #666;">Application Status</td>
+            <td style="padding: 8px 0;">
+                <span style="background-color: #28a745; color: #ffffff; padding: 4px 12px; border-radius: 4px; font-size: 14px;">
+                    Accepted
+                </span>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 8px 0; color: #666;">Ticket Discount</td>
+            <td style="padding: 8px 0; color: #28a745; font-weight: 600;">
+                {% if discount_percentage >= 100 %}
+                100% — Full Waiver
+                {% else %}
+                {{ discount_percentage }}% off standard passes
+                {% endif %}
+            </td>
+        </tr>
+    </table>
+</div>
+
+{% if portal_url %}
+<div style="text-align: center; margin: 30px 0;">
+    <a href="{{ portal_url }}" class="button" style="background-color: #28a745;">
+        Proceed to Portal
+    </a>
+</div>
+{% endif %}
+
+<div class="spacer"></div>
+
+<p>
+    We look forward to welcoming you to {{ popup_name }}!
+</p>
+
+<p>
+    Best regards,<br>
+    The {{ project_name }} Team
+</p>
+{% endblock %}

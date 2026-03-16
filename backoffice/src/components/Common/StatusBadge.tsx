@@ -10,6 +10,7 @@ const statusMap: Record<string, { variant: StatusVariant; label?: string }> = {
   pending: { variant: "secondary" },
   inactive: { variant: "secondary" },
   draft: { variant: "outline" },
+  none: { variant: "outline", label: "None" },
   withdrawn: { variant: "outline" },
   rejected: { variant: "destructive" },
   expired: { variant: "destructive" },

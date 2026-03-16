@@ -10,6 +10,7 @@ import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useCallback } from "react"
 import type { PopupPublic } from "@/client"
+import { cn } from "@/lib/utils"
 import { useCityProvider } from "@/providers/cityProvider"
 import { DropdownMenuContent, DropdownMenuItem } from "./DropdownMenu"
 import {
@@ -70,18 +71,25 @@ const PopupsMenu = () => {
                         repeatType: "loop",
                         ease: "easeIn",
                       }}
-                      className="relative aspect-square shrink-0"
+                      className={cn(
+                        "relative shrink-0 transition-all duration-200",
+                        isCollapsed ? "size-8" : "size-12",
+                      )}
                     >
                       {city.icon_url ? (
                         <Image
                           src={city.icon_url}
                           alt={city.name ?? "Popup icon"}
-                          width={48}
-                          height={48}
+                          fill
                           className="rounded-lg object-cover"
                         />
                       ) : (
-                        <div className="flex size-12 items-center justify-center rounded-lg bg-neutral-200 text-lg font-bold text-neutral-500">
+                        <div
+                          className={cn(
+                            "flex items-center justify-center rounded-lg bg-neutral-200 font-bold text-neutral-500",
+                            isCollapsed ? "size-8 text-sm" : "size-12 text-lg",
+                          )}
+                        >
                           {city.name?.charAt(0) ?? "?"}
                         </div>
                       )}

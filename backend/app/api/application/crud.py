@@ -13,6 +13,7 @@ from app.api.application.schemas import (
     ApplicationCreate,
     ApplicationStatus,
     ApplicationUpdate,
+    ScholarshipDecisionRequest,
 )
 from app.api.attendee.crud import attendees_crud, generate_check_in_code
 from app.api.attendee.models import AttendeeProducts, Attendees
@@ -359,6 +360,10 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             "custom_fields",
             "status",
             "group_id",
+            # Scholarship human-submittable fields (Phase 2.2)
+            "scholarship_request",
+            "scholarship_details",
+            "scholarship_video_url",
         ]
         data = {
             k: v
@@ -569,6 +574,10 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             "custom_fields",
             "status",
             "group_id",
+            # Scholarship human-submittable fields
+            "scholarship_request",
+            "scholarship_details",
+            "scholarship_video_url",
         ]
         data = {
             k: v
@@ -666,6 +675,17 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         )
 
         if should_auto_accept:
+            # Scholarship gate: if scholarship is requested and not yet decided,
+            # hold the application in IN_REVIEW instead of auto-accepting.
+            # Condition uses `not in (APPROVED, REJECTED)` to catch both None and "pending".
+            from app.api.application.schemas import ScholarshipStatus
+
+            if application.scholarship_request and application.scholarship_status not in (
+                ScholarshipStatus.APPROVED.value,
+                ScholarshipStatus.REJECTED.value,
+            ):
+                self.create_snapshot(session, application, "submitted")
+                return
             application.status = ApplicationStatus.ACCEPTED.value
             application.accepted_at = datetime.now(UTC)
             self.create_snapshot(session, application, "auto_accepted")
@@ -846,6 +866,81 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
 
         attendees_crud.delete_attendee(session, attendee)
         session.refresh(application)
+
+    def review_scholarship(
+        self,
+        session: Session,
+        application_id: uuid.UUID,
+        decision: ScholarshipDecisionRequest,
+    ) -> Applications:
+        """Apply an admin scholarship decision to an application.
+
+        Validates popup flags, updates scholarship fields, then re-runs
+        the approval calculator so the application status reflects the
+        scholarship outcome (e.g., AUTO_ACCEPT gate lifts → ACCEPTED).
+        """
+        from app.api.application.schemas import ScholarshipStatus
+        from app.api.popup.crud import popups_crud
+        from app.services.approval.calculator import approval_calculator
+
+        # 1. Fetch application
+        application = self.get(session, application_id)
+        if not application:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Application not found",
+            )
+
+        # 2. Fetch popup
+        popup = popups_crud.get(session, application.popup_id)
+        if not popup:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Popup not found",
+            )
+
+        # 3. Validate popup allows scholarship
+        if not popup.allows_scholarship:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Scholarship is not enabled for this popup",
+            )
+
+        # 4. Validate APPROVED-specific rules
+        if decision.scholarship_status == ScholarshipStatus.APPROVED:
+            if decision.discount_percentage is None:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="discount_percentage is required when approving a scholarship",
+                )
+            if decision.incentive_amount is not None and not popup.allows_incentive:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Incentives are not enabled for this popup",
+                )
+
+        # 5. Update scholarship fields
+        application.scholarship_status = decision.scholarship_status.value
+        application.discount_percentage = decision.discount_percentage
+        application.incentive_amount = decision.incentive_amount
+        application.incentive_currency = decision.incentive_currency
+
+        # 6. Persist scholarship decision
+        session.add(application)
+        session.flush()
+
+        # 7. Re-evaluate application status (may lift AUTO_ACCEPT gate → ACCEPTED)
+        # recalculate_status only commits internally when status actually changes.
+        # If status doesn't change (e.g. application is already ACCEPTED, or strategy
+        # keeps it IN_REVIEW), it returns without committing — the flush above is dangling.
+        application = approval_calculator.recalculate_status(session, application)
+
+        # 8. Commit unconditionally: guarantees scholarship fields are persisted
+        # regardless of whether recalculate_status committed or not.
+        session.commit()
+        session.refresh(application)
+
+        return application
 
     def delete(self, session: Session, db_obj: Applications) -> None:
         """Delete an application, checking for payment history."""

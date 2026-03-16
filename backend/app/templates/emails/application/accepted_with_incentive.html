@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}Your Scholarship Award — {{ popup_name }}{% endblock %}
+
+{% block content %}
+<h1>Congratulations — Scholarship Awarded!</h1>
+
+<p>Hi {{ first_name }},</p>
+
+<p>
+    We are thrilled to share some wonderful news regarding your scholarship application
+    to <strong>{{ popup_name }}</strong>.
+</p>
+
+<p>
+    Furthermore, we are excited to inform you that you have been awarded a
+    <strong>{{ incentive_amount }} {{ incentive_currency }}</strong> scholarship!
+</p>
+
+<div style="background-color: #d4edda; border-radius: 8px; padding: 20px; margin: 20px 0; border-left: 4px solid #28a745;">
+    <h2 style="margin-top: 0; color: #155724;">Your Award Package</h2>
+    <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+            <td style="padding: 10px 0; color: #155724; vertical-align: top; width: 40%;">
+                <strong>{{ incentive_amount }} {{ incentive_currency }} Grant</strong>
+            </td>
+            <td style="padding: 10px 0; color: #155724;">
+                To support your travel and stay. Please note that these funds will be
+                dispersed to you a month after <strong>{{ popup_name }}</strong> concludes.
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 10px 0; color: #155724; vertical-align: top; border-top: 1px solid #c3e6cb;">
+                <strong>
+                    Co-Creator Ticket
+                    {% if discount_percentage >= 100 %}Waiver{% else %}Discount{% endif %}
+                </strong>
+            </td>
+            <td style="padding: 10px 0; color: #155724; border-top: 1px solid #c3e6cb;">
+                {% if discount_percentage >= 100 %}
+                We are fully waiving your Co-Creator ticket fee (100% discount).
+                {% else %}
+                We are providing a <strong>{{ discount_percentage }}%</strong> discount for your ticket.
+                {% endif %}
+            </td>
+        </tr>
+    </table>
+</div>
+
+<div style="background-color: #f8f9fa; border-radius: 8px; padding: 20px; margin: 20px 0;">
+    <h2 style="margin-top: 0;">Application Details</h2>
+    <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+            <td style="padding: 8px 0; color: #666;">Event</td>
+            <td style="padding: 8px 0; font-weight: 600;">{{ popup_name }}</td>
+        </tr>
+        <tr>
+            <td style="padding: 8px 0; color: #666;">Name</td>
+            <td style="padding: 8px 0;">{{ first_name }} {{ last_name }}</td>
+        </tr>
+        <tr>
+            <td style="padding: 8px 0; color: #666;">Application Status</td>
+            <td style="padding: 8px 0;">
+                <span style="background-color: #28a745; color: #ffffff; padding: 4px 12px; border-radius: 4px; font-size: 14px;">
+                    Accepted
+                </span>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 8px 0; color: #666;">Cash Grant</td>
+            <td style="padding: 8px 0; color: #28a745; font-weight: 600;">
+                {{ incentive_amount }} {{ incentive_currency }}
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 8px 0; color: #666;">Ticket Discount</td>
+            <td style="padding: 8px 0; color: #28a745; font-weight: 600;">
+                {{ discount_percentage }}%
+                {% if discount_percentage >= 100 %}(Full Waiver){% endif %}
+            </td>
+        </tr>
+    </table>
+</div>
+
+{% if portal_url %}
+<div style="text-align: center; margin: 30px 0;">
+    <a href="{{ portal_url }}" class="button" style="background-color: #28a745;">
+        Proceed to Portal
+    </a>
+</div>
+{% endif %}
+
+<div class="spacer"></div>
+
+<p>
+    We look forward to welcoming you to {{ popup_name }}!
+</p>
+
+<p>
+    Best regards,<br>
+    The {{ project_name }} Team
+</p>
+{% endblock %}
