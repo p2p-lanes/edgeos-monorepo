@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { useIsAuthenticated } from "@/hooks/useIsAuthenticated"
 import type { FormDataProps } from "../types"
 
 interface UseUserFormProps {
@@ -6,20 +7,28 @@ interface UseUserFormProps {
   applicationData?: Partial<FormDataProps> | null
 }
 
+const defaultFormData: FormDataProps = {
+  first_name: "",
+  last_name: "",
+  email: "",
+  telegram: "",
+  gender: "",
+  email_verified: false,
+  local_resident: "",
+}
+
 export const useUserForm = ({
   initialData = {},
   applicationData,
 }: UseUserFormProps = {}) => {
-  const [formData, setFormData] = useState<FormDataProps>({
-    first_name: "",
-    last_name: "",
-    email: "",
-    telegram: "",
-    gender: "",
-    email_verified: false,
-    local_resident: "",
+  const isAuthenticated = useIsAuthenticated()
+
+  const [formData, setFormData] = useState<FormDataProps>(() => ({
+    ...defaultFormData,
     ...initialData,
-  })
+    ...(applicationData ?? {}),
+    email_verified: applicationData?.email_verified ?? isAuthenticated ?? false,
+  }))
 
   const [errors, setErrors] = useState<Record<string, string>>({})
 

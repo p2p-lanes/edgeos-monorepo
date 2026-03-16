@@ -414,10 +414,11 @@ async def update_my_application(
             detail="Application not found",
         )
 
-    # Only allow updates for draft or in_review
+    # Only allow updates for draft, in_review, or accepted
     if application.status not in [
         ApplicationStatus.DRAFT.value,
         ApplicationStatus.IN_REVIEW.value,
+        ApplicationStatus.ACCEPTED.value,
     ]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
