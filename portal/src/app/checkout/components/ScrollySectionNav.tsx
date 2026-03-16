@@ -1,12 +1,14 @@
 "use client"
 
-import { Check, Heart, Home, Shield, ShoppingBag, Ticket } from "lucide-react"
+import { Heart, Home, Shield, ShoppingBag, Ticket } from "lucide-react"
 import { Fragment } from "react"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
 import type { CheckoutStep } from "@/types/checkout"
 
 export type NavDesign = "pills" | "progress" | "underline"
+export type FooterDesign = "pill" | "stripe" | "dock"
+export type WatermarkStyle = "none" | "ghost" | "stroke" | "bold"
 
 const SECTION_ICONS: Record<string, typeof Ticket> = {
   passes: Ticket,
@@ -111,7 +113,6 @@ function PillsNav({
             <span className="hidden sm:inline">
               {SHORT_LABELS[section.id] ?? section.label}
             </span>
-            
           </button>
         )
       })}
@@ -129,18 +130,13 @@ function ProgressNav({
       {sections.map((section, i) => {
         const Icon = SECTION_ICONS[section.id] ?? Ticket
         const { isActive, isComplete } = getSectionState(section)
-        const prevComplete =
+        const _prevComplete =
           i > 0 && getSectionState(sections[i - 1]).isComplete
 
         return (
           <Fragment key={section.id}>
             {i > 0 && (
-              <div
-                className={cn(
-                  "flex-1 h-0.5 mx-1",
-                   "bg-gray-300",
-                )}
-              />
+              <div className={cn("flex-1 h-0.5 mx-1", "bg-gray-300")} />
             )}
             <button
               type="button"
@@ -151,17 +147,16 @@ function ProgressNav({
                 className={cn(
                   "flex items-center justify-center size-8 rounded-full border-2 transition-all duration-200",
                   isActive && "border-gray-900 bg-gray-900 text-white",
-                  !isActive &&
-                    "border-gray-300 bg-white text-gray-400",
+                  !isActive && "border-gray-300 bg-white text-gray-400",
                 )}
               >
-                  <Icon className="size-4" />
+                <Icon className="size-4" />
               </div>
               <span
                 className={cn(
                   "hidden sm:block text-[10px] font-medium whitespace-nowrap",
                   isActive && "text-gray-900",
-                  !isActive &&  "text-gray-400",
+                  !isActive && "text-gray-400",
                 )}
               >
                 {SHORT_LABELS[section.id] ?? section.label}

@@ -3,13 +3,10 @@
 import gsap from "gsap"
 import { ScrollToPlugin } from "gsap/ScrollToPlugin"
 import {
-  AlignJustify,
   ArrowLeft,
   ArrowRight,
-  BookOpen,
   Heart,
   Home,
-  Layers,
   Loader2,
   Shield,
   ShoppingBag,
@@ -33,8 +30,13 @@ import { useCityProvider } from "@/providers/cityProvider"
 import type { AttendeeCategory } from "@/types/Attendee"
 import { formatCurrency } from "@/types/checkout"
 import CartFooter from "./CartFooter"
+import DesignVariantPanel from "./DesignVariantPanel"
 import ScrollySection from "./ScrollySection"
-import ScrollySectionNav, { type NavDesign } from "./ScrollySectionNav"
+import ScrollySectionNav, {
+  type FooterDesign,
+  type NavDesign,
+  type WatermarkStyle,
+} from "./ScrollySectionNav"
 import ConfirmStep from "./steps/ConfirmStep"
 import HousingStep from "./steps/HousingStep"
 import MerchSection from "./steps/MerchSection"
@@ -50,133 +52,43 @@ interface ScrollyCheckoutFlowProps {
   onBack?: () => void
 }
 
-const VARIANT_ICONS = {
-  scrolly: AlignJustify,
-  snap: BookOpen,
-}
-
 const FOOTER_MODE_STORAGE_KEY = "passes-footer-mode"
 const FOOTER_DESIGN_STORAGE_KEY = "passes-footer-design"
 const NAV_DESIGN_STORAGE_KEY = "passes-nav-design"
-
-type FooterDesign = "pill" | "stripe" | "dock"
-
-function DesignToggle() {
-  const { variant, cycleVariant } = useDesignVariant()
-  const Icon = VARIANT_ICONS[variant]
-  return (
-    <div className="fixed bottom-24 right-4 z-50 group">
-      <button
-        type="button"
-        onClick={cycleVariant}
-        className="flex items-center justify-center w-10 h-10 rounded-full bg-white/90 backdrop-blur-sm shadow-lg border border-gray-200 hover:scale-110 transition-transform"
-        aria-label={`Switch design variant (current: ${variant})`}
-      >
-        <Icon className="w-5 h-5 text-gray-700" />
-      </button>
-      <div className="absolute bottom-full right-0 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-        {variant}
-      </div>
-    </div>
-  )
-}
-
-function _FooterModeToggle({
-  footerMode,
-  onToggle,
-}: {
-  footerMode: "guided"
-  onToggle: () => void
-}) {
-  const Icon = Layers
-  const label = "guided"
-  return (
-    <div className="fixed bottom-36 right-4 z-50 group">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="flex items-center justify-center w-10 h-10 rounded-full bg-white/90 backdrop-blur-sm shadow-lg border border-gray-200 hover:scale-110 transition-transform"
-        aria-label={`Switch footer mode (current: ${label})`}
-      >
-        <Icon className="w-5 h-5 text-gray-700" />
-      </button>
-      <div className="absolute bottom-full right-0 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-        {label}
-      </div>
-    </div>
-  )
-}
-
-function FooterDesignToggle({
-  footerDesign,
-  onCycle,
-}: {
-  footerDesign: FooterDesign
-  onCycle: () => void
-}) {
-  return (
-    <div className="fixed bottom-48 right-4 z-50 group">
-      <button
-        type="button"
-        onClick={onCycle}
-        className="flex items-center justify-center w-10 h-10 rounded-full bg-white/90 backdrop-blur-sm shadow-lg border border-gray-200 hover:scale-110 transition-transform"
-        aria-label={`Switch footer design (current: ${footerDesign})`}
-      >
-        <span className="text-[10px] font-bold text-gray-700 uppercase">
-          {footerDesign[0]}
-        </span>
-      </button>
-      <div className="absolute bottom-full right-0 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-        {footerDesign}
-      </div>
-    </div>
-  )
-}
-
-function NavDesignToggle({
-  navDesign,
-  onCycle,
-}: {
-  navDesign: NavDesign
-  onCycle: () => void
-}) {
-  return (
-    <div className="fixed bottom-60 right-4 z-50 group">
-      <button
-        type="button"
-        onClick={onCycle}
-        className="flex items-center justify-center w-10 h-10 rounded-full bg-white/90 backdrop-blur-sm shadow-lg border border-gray-200 hover:scale-110 transition-transform"
-        aria-label={`Switch nav design (current: ${navDesign})`}
-      >
-        <span className="text-[10px] font-bold text-gray-700 uppercase">
-          {navDesign[0]}
-        </span>
-      </button>
-      <div className="absolute bottom-full right-0 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-        nav: {navDesign}
-      </div>
-    </div>
-  )
-}
+const WATERMARK_STYLE_STORAGE_KEY = "passes-watermark-style"
 
 function SectionHeader({
   title,
   subtitle,
   variant,
   watermark,
+  watermarkStyle = "none",
 }: {
   title: string
   subtitle?: string
   variant?: string
   watermark?: string
+  watermarkStyle?: WatermarkStyle
 }) {
   if (variant === "snap") {
     const watermarkText = watermark ?? title
+    const watermarkClassName = cn(
+      "absolute sm:-top-8 left-0 sm:text-[7rem] -top-4 text-[5rem] font-black leading-none select-none pointer-events-none truncate whitespace-nowrap",
+      watermarkStyle === "none" && "text-white",
+      watermarkStyle === "ghost" && "text-gray-100",
+      watermarkStyle === "stroke" && "text-white",
+      watermarkStyle === "bold" && "text-gray-200",
+    )
+    const watermarkInlineStyle =
+      watermarkStyle === "stroke"
+        ? { WebkitTextStroke: "1px #d1d5db" }
+        : undefined
     return (
       <div className="mb-4 relative">
         <p
           aria-hidden="true"
-          className="absolute sm:-top-8 left-0 sm:text-[7rem] -top-4 text-[5rem] font-black text-gray-100 leading-none select-none pointer-events-none truncate whitespace-nowrap"
+          className={watermarkClassName}
+          style={watermarkInlineStyle}
         >
           {watermarkText.split("").map((char, i) => (
             <span
@@ -984,6 +896,7 @@ function ScrollyCheckoutFlowInner({
   const [footerMode, setFooterMode] = useState<"guided" | "quickpay">("guided")
   const [footerDesign, setFooterDesign] = useState<FooterDesign>("stripe")
   const [navDesign, setNavDesign] = useState<NavDesign>("pills")
+  const [watermarkStyle, setWatermarkStyle] = useState<WatermarkStyle>("none")
 
   useEffect(() => {
     const storedMode = localStorage.getItem(FOOTER_MODE_STORAGE_KEY) as
@@ -1013,6 +926,17 @@ function ScrollyCheckoutFlowInner({
     ) {
       setNavDesign(storedNavDesign)
     }
+    const storedWatermark = localStorage.getItem(
+      WATERMARK_STYLE_STORAGE_KEY,
+    ) as WatermarkStyle | null
+    if (
+      storedWatermark === "none" ||
+      storedWatermark === "ghost" ||
+      storedWatermark === "stroke" ||
+      storedWatermark === "bold"
+    ) {
+      setWatermarkStyle(storedWatermark)
+    }
   }, [])
 
   const _toggleFooterMode = () => {
@@ -1021,18 +945,19 @@ function ScrollyCheckoutFlowInner({
     localStorage.setItem(FOOTER_MODE_STORAGE_KEY, next)
   }
 
-  const cycleFooterDesign = () => {
-    const order: FooterDesign[] = ["pill", "stripe", "dock"]
-    const next = order[(order.indexOf(footerDesign) + 1) % order.length]
-    setFooterDesign(next)
-    localStorage.setItem(FOOTER_DESIGN_STORAGE_KEY, next)
+  const setFooterDesignPersisted = (v: FooterDesign) => {
+    setFooterDesign(v)
+    localStorage.setItem(FOOTER_DESIGN_STORAGE_KEY, v)
   }
 
-  const cycleNavDesign = () => {
-    const order: NavDesign[] = ["pills", "progress", "underline"]
-    const next = order[(order.indexOf(navDesign) + 1) % order.length]
-    setNavDesign(next)
-    localStorage.setItem(NAV_DESIGN_STORAGE_KEY, next)
+  const setNavDesignPersisted = (v: NavDesign) => {
+    setNavDesign(v)
+    localStorage.setItem(NAV_DESIGN_STORAGE_KEY, v)
+  }
+
+  const setWatermarkStylePersisted = (v: WatermarkStyle) => {
+    setWatermarkStyle(v)
+    localStorage.setItem(WATERMARK_STYLE_STORAGE_KEY, v)
   }
 
   // Build sections list (respects available products)
@@ -1259,7 +1184,7 @@ function ScrollyCheckoutFlowInner({
   // --- SNAP VARIANT ---
   if (variant === "snap") {
     return (
-      <div className="relative font-sans bg-white">
+      <div className="relative font-sans">
         <ScrollySectionNav
           sections={allSections}
           activeSection={activeSection}
@@ -1276,6 +1201,7 @@ function ScrollyCheckoutFlowInner({
             subtitle="Choose passes for yourself and family members"
             variant="snap"
             watermark="Passes"
+            watermarkStyle={watermarkStyle}
           />
           <PassSelectionSection onAddAttendee={onAddAttendee} />
         </SnapSection>
@@ -1287,6 +1213,7 @@ function ScrollyCheckoutFlowInner({
               subtitle="Optional: Book accommodation for your stay"
               variant="snap"
               watermark="Housing"
+              watermarkStyle={watermarkStyle}
             />
             <HousingStep onSkip={() => {}} />
           </SnapSection>
@@ -1299,6 +1226,7 @@ function ScrollyCheckoutFlowInner({
               subtitle="Optional: Pick up exclusive merch at the event"
               variant="snap"
               watermark="Merch"
+              watermarkStyle={watermarkStyle}
             />
             <MerchSection onSkip={() => {}} />
           </SnapSection>
@@ -1311,6 +1239,7 @@ function ScrollyCheckoutFlowInner({
               subtitle="Optional: Support the community with a contribution"
               variant="snap"
               watermark="Patron"
+              watermarkStyle={watermarkStyle}
             />
             <PatronSection onSkip={() => {}} />
           </SnapSection>
@@ -1322,15 +1251,18 @@ function ScrollyCheckoutFlowInner({
             subtitle="Review your order before payment"
             variant="snap"
             watermark="Confirm"
+            watermarkStyle={watermarkStyle}
           />
           <ConfirmStep />
         </SnapSection>
 
-        <DesignToggle />
-        <NavDesignToggle navDesign={navDesign} onCycle={cycleNavDesign} />
-        <FooterDesignToggle
+        <DesignVariantPanel
+          navDesign={navDesign}
+          onNavDesignChange={setNavDesignPersisted}
           footerDesign={footerDesign}
-          onCycle={cycleFooterDesign}
+          onFooterDesignChange={setFooterDesignPersisted}
+          watermarkStyle={watermarkStyle}
+          onWatermarkStyleChange={setWatermarkStylePersisted}
         />
         <SnapDotNav
           sections={allSections}
@@ -1410,8 +1342,14 @@ function ScrollyCheckoutFlowInner({
         </ScrollySection>
       </main>
 
-      <DesignToggle />
-      <NavDesignToggle navDesign={navDesign} onCycle={cycleNavDesign} />
+      <DesignVariantPanel
+        navDesign={navDesign}
+        onNavDesignChange={setNavDesignPersisted}
+        footerDesign={footerDesign}
+        onFooterDesignChange={setFooterDesignPersisted}
+        watermarkStyle={watermarkStyle}
+        onWatermarkStyleChange={setWatermarkStylePersisted}
+      />
 
       <div className="sticky bottom-0 z-30">
         <div className="max-w-2xl mx-auto px-4">

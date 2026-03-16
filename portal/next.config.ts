@@ -4,7 +4,12 @@ import type { NextConfig } from "next"
 const isVercel = process.env.VERCEL === "1"
 
 const nextConfig: NextConfig = {
-  ...(isVercel ? {} : { output: "standalone", outputFileTracingRoot: path.resolve(__dirname, "..") }),
+  ...(isVercel
+    ? {}
+    : {
+        output: "standalone",
+        outputFileTracingRoot: path.resolve(__dirname, ".."),
+      }),
   transpilePackages: ["@edgeos/shared-form-ui"],
   env: {
     NEXT_PUBLIC_API_URL:
