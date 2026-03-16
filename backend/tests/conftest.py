@@ -73,6 +73,7 @@ def client(
         patch("app.core.tenant_db.settings.POSTGRES_SERVER", host),
         patch("app.core.tenant_db.settings.POSTGRES_PORT", port),
         patch("app.core.tenant_db.settings.POSTGRES_DB", "test_db"),
+        patch("app.core.tenant_db.settings.POSTGRES_SSL_MODE", "disable"),
         patch("app.core.dependencies.users.engine", test_engine),
     ):
         with TestClient(application) as c:
