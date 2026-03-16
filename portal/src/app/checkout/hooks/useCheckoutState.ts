@@ -3,7 +3,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useParams, useSearchParams } from "next/navigation"
 import { useState } from "react"
-import { ApiError, ApplicationsService } from "@/client"
+import { ApiError, type ApplicationPublic, ApplicationsService } from "@/client"
 import { queryKeys } from "@/lib/query-keys"
 import type { CheckoutState, FormDataProps } from "../types"
 import useCookies from "./useCookies"
@@ -38,17 +38,40 @@ const useCheckoutState = () => {
         }),
       )
 
-      const application = await ApplicationsService.createMyApplication({
-        requestBody: {
-          popup_id: groupData.popup_id,
-          group_id: groupData.id,
-          first_name: formData.first_name,
-          last_name: formData.last_name,
-          email: formData.email,
-          telegram: formData.telegram,
-          gender: formData.gender || undefined,
-        },
-      })
+      // Check if an application already exists (e.g. user navigated back)
+      const existingApps = queryClient.getQueryData<ApplicationPublic[]>(
+        queryKeys.applications.mine(),
+      )
+      const existingApp = existingApps?.find(
+        (app) => app.popup_id === groupData.popup_id,
+      )
+
+      let application: ApplicationPublic
+      if (existingApp) {
+        // UPDATE existing application
+        application = await ApplicationsService.updateMyApplication({
+          popupId: groupData.popup_id,
+          requestBody: {
+            first_name: formData.first_name,
+            last_name: formData.last_name,
+            telegram: formData.telegram,
+            gender: formData.gender || undefined,
+          },
+        })
+      } else {
+        // CREATE new application
+        application = await ApplicationsService.createMyApplication({
+          requestBody: {
+            popup_id: groupData.popup_id,
+            group_id: groupData.id,
+            first_name: formData.first_name,
+            last_name: formData.last_name,
+            email: formData.email,
+            telegram: formData.telegram,
+            gender: formData.gender || undefined,
+          },
+        })
+      }
 
       return { matchingApp: application, groupData }
     },
@@ -56,9 +79,21 @@ const useCheckoutState = () => {
       setCheckoutState("processing")
       setErrorMessage(null)
     },
-    onSuccess: ({ matchingApp }) => {
+    onSuccess: ({ matchingApp, groupData }) => {
       if (matchingApp) {
         queryClient.setQueryData(queryKeys.applications.mine(), [matchingApp])
+        // Also invalidate the checkout-specific query used by useApplicationData
+        // so it refetches with fresh data on back navigation
+        if (groupData?.popup_id) {
+          queryClient.invalidateQueries({
+            queryKey: [
+              ...queryKeys.applications.mine(),
+              "checkout",
+              groupData.popup_id,
+            ],
+            refetchType: "none",
+          })
+        }
       }
       setCheckoutState("passes")
       setErrorMessage(null)

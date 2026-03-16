@@ -4,18 +4,18 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useParams, useRouter } from "next/navigation"
 import { useCallback } from "react"
 import { HumansService } from "@/client"
+import {
+  dispatchAuthChange,
+  useIsAuthenticated,
+} from "@/hooks/useIsAuthenticated"
 import { queryKeys } from "@/lib/query-keys"
-
-const isLoggedIn = () => {
-  if (typeof window === "undefined") return false
-  return localStorage.getItem("token") !== null
-}
 
 const useAuth = () => {
   const router = useRouter()
   const queryClient = useQueryClient()
   const params = useParams()
   const popupSlug = params.popupSlug as string | undefined
+  const isAuthenticated = useIsAuthenticated()
 
   const {
     data: user = null,
@@ -24,11 +24,12 @@ const useAuth = () => {
   } = useQuery({
     queryKey: queryKeys.profile.current,
     queryFn: async () => HumansService.getCurrentHumanInfo(),
-    enabled: isLoggedIn(),
+    enabled: isAuthenticated,
   })
 
   const logout = useCallback(() => {
     localStorage.removeItem("token")
+    dispatchAuthChange()
     queryClient.clear()
 
     if (popupSlug) {
@@ -47,5 +48,4 @@ const useAuth = () => {
   }
 }
 
-export { isLoggedIn }
 export default useAuth

@@ -8,7 +8,7 @@ import PassesProvider from "@/providers/passesProvider"
 
 const layout = ({ children }: { children: React.ReactNode }) => {
   return (
-    <CityProvider>
+    <CityProvider public>
       <ApplicationProvider>
         <DiscountProvider>
           <PassesProvider restoreFromCart>

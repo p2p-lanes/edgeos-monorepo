@@ -3,11 +3,11 @@
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
 import { Loader } from "@/components/ui/Loader"
-import { isLoggedIn } from "@/hooks/useAuth"
+import { useIsAuthenticated } from "@/hooks/useIsAuthenticated"
 
 const Page = () => {
   const router = useRouter()
-  const loggedIn = isLoggedIn()
+  const loggedIn = useIsAuthenticated()
 
   useEffect(() => {
     router.push(loggedIn ? "/portal" : "/auth")

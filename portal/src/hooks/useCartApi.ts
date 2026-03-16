@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useCallback, useRef } from "react"
 import { OpenAPI } from "@/client"
 import { request } from "@/client/core/request"
+import { useIsAuthenticated } from "@/hooks/useIsAuthenticated"
 import { queryKeys } from "@/lib/query-keys"
 
 export interface CartItemPass {
@@ -57,6 +58,7 @@ const EMPTY_CART: CartState = {
 }
 
 export function useCart(popupId: string | null) {
+  const isAuthenticated = useIsAuthenticated()
   return useQuery({
     queryKey: queryKeys.cart.byPopup(popupId ?? ""),
     queryFn: async (): Promise<CartState> => {
@@ -67,7 +69,7 @@ export function useCart(popupId: string | null) {
       })
       return result?.items ?? EMPTY_CART
     },
-    enabled: !!popupId,
+    enabled: !!popupId && isAuthenticated,
     staleTime: 30_000,
   })
 }

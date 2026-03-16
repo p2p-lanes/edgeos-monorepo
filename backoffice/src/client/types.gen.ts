@@ -14,6 +14,15 @@ export type AbandonedCartPublic = {
 };
 
 /**
+ * Response when human is the main applicant.
+ */
+export type ApplicantParticipation = {
+    type?: "applicant";
+    application_id: string;
+    status: string;
+};
+
+/**
  * Application schema for admin creation.
  *
  * Admins can create applications on behalf of users and set any status.
@@ -243,6 +252,16 @@ export type AttendeeCreate = {
 };
 
 /**
+ * Minimal attendee information for participation responses.
+ */
+export type AttendeeInfo = {
+    id: string;
+    name: string;
+    category: string;
+    check_in_code?: (string | null);
+};
+
+/**
  * Attendee schema for API responses.
  */
 export type AttendeePublic = {
@@ -464,6 +483,15 @@ export type CompanionCreate = {
     category: string;
     email?: (string | null);
     gender?: (string | null);
+};
+
+/**
+ * Response when human is a companion on someone else's application.
+ */
+export type CompanionParticipation = {
+    type?: "companion";
+    attendee: AttendeeInfo;
+    application_status: string;
 };
 
 /**
@@ -941,8 +969,8 @@ export type ListModel_PaymentPublic_ = {
     paging: Paging;
 };
 
-export type ListModel_PopupPublic_ = {
-    results: Array<PopupPublic>;
+export type ListModel_PopupAdmin_ = {
+    results: Array<PopupAdmin>;
     paging: Paging;
 };
 
@@ -964,6 +992,13 @@ export type ListModel_TenantPublic_ = {
 export type ListModel_UserPublic_ = {
     results: Array<UserPublic>;
     paging: Paging;
+};
+
+/**
+ * Response when human has no participation in the popup.
+ */
+export type NoParticipation = {
+    type?: "none";
 };
 
 export type Paging = {
@@ -1101,6 +1136,37 @@ export type PaymentUpdate = {
     currency?: (string | null);
 };
 
+/**
+ * Admin popup schema — all fields including sensitive ones.
+ */
+export type PopupAdmin = {
+    name: string;
+    tagline?: (string | null);
+    location?: (string | null);
+    slug: string;
+    tenant_id: string;
+    start_date?: (string | null);
+    end_date?: (string | null);
+    status?: PopupStatus;
+    allows_spouse?: (boolean | null);
+    allows_children?: (boolean | null);
+    allows_coupons?: (boolean | null);
+    allows_scholarship?: boolean;
+    allows_incentive?: boolean;
+    image_url?: (string | null);
+    icon_url?: (string | null);
+    express_checkout_background?: (string | null);
+    web_url?: (string | null);
+    blog_url?: (string | null);
+    twitter_url?: (string | null);
+    simplefi_api_key?: (string | null);
+    terms_and_conditions_url?: (string | null);
+    invoice_company_name?: (string | null);
+    invoice_company_address?: (string | null);
+    invoice_company_email?: (string | null);
+    id: string;
+};
+
 export type PopupCreate = {
     tenant_id?: (string | null);
     name: string;
@@ -1128,32 +1194,30 @@ export type PopupCreate = {
     invoice_company_email?: (string | null);
 };
 
+/**
+ * Public popup schema — excludes sensitive/internal fields.
+ */
 export type PopupPublic = {
+    id: string;
     name: string;
     tagline?: (string | null);
     location?: (string | null);
     slug: string;
-    tenant_id: string;
+    status?: PopupStatus;
     start_date?: (string | null);
     end_date?: (string | null);
-    status?: PopupStatus;
-    allows_spouse?: (boolean | null);
-    allows_children?: (boolean | null);
-    allows_coupons?: (boolean | null);
-    allows_scholarship?: boolean;
-    allows_incentive?: boolean;
     image_url?: (string | null);
     icon_url?: (string | null);
     express_checkout_background?: (string | null);
     web_url?: (string | null);
     blog_url?: (string | null);
     twitter_url?: (string | null);
-    simplefi_api_key?: (string | null);
+    allows_spouse?: (boolean | null);
+    allows_children?: (boolean | null);
+    allows_coupons?: (boolean | null);
+    allows_scholarship?: boolean;
     terms_and_conditions_url?: (string | null);
     invoice_company_name?: (string | null);
-    invoice_company_address?: (string | null);
-    invoice_company_email?: (string | null);
-    id: string;
 };
 
 /**
@@ -1705,6 +1769,12 @@ export type ApplicationsListMyApplicationsData = {
 export type ApplicationsListMyApplicationsResponse = (ListModel_ApplicationPublic_);
 
 export type ApplicationsListMyTicketsResponse = (Array<AttendeeWithTickets>);
+
+export type ApplicationsGetMyParticipationData = {
+    popupId: string;
+};
+
+export type ApplicationsGetMyParticipationResponse = ((ApplicantParticipation | CompanionParticipation | NoParticipation));
 
 export type ApplicationsGetMyPurchasesData = {
     popupId: string;
@@ -2478,21 +2548,27 @@ export type PopupsListPopupsData = {
     xTenantId?: (string | null);
 };
 
-export type PopupsListPopupsResponse = (ListModel_PopupPublic_);
+export type PopupsListPopupsResponse = (ListModel_PopupAdmin_);
 
 export type PopupsCreatePopupData = {
     requestBody: PopupCreate;
     xTenantId?: (string | null);
 };
 
-export type PopupsCreatePopupResponse = (PopupPublic);
+export type PopupsCreatePopupResponse = (PopupAdmin);
+
+export type PopupsListPublicPopupsData = {
+    xTenantId: string;
+};
+
+export type PopupsListPublicPopupsResponse = (Array<PopupPublic>);
 
 export type PopupsGetPopupData = {
     popupId: string;
     xTenantId?: (string | null);
 };
 
-export type PopupsGetPopupResponse = (PopupPublic);
+export type PopupsGetPopupResponse = (PopupAdmin);
 
 export type PopupsUpdatePopupData = {
     popupId: string;
@@ -2500,7 +2576,7 @@ export type PopupsUpdatePopupData = {
     xTenantId?: (string | null);
 };
 
-export type PopupsUpdatePopupResponse = (PopupPublic);
+export type PopupsUpdatePopupResponse = (PopupAdmin);
 
 export type PopupsDeletePopupData = {
     popupId: string;

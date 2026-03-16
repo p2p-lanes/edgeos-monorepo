@@ -20,7 +20,7 @@ import {
   ApplicationsService,
   ApprovalStrategiesService,
   FormFieldsService,
-  type PopupPublic,
+  type PopupAdmin,
   PopupsService,
   type ReviewDecision,
   type ScholarshipDecisionRequest,
@@ -349,7 +349,7 @@ function ScholarshipPanel({
   onSuccess,
 }: {
   application: ApplicationPublic
-  popup: PopupPublic
+  popup: PopupAdmin
   onSuccess: () => void
 }) {
   const { showSuccessToast, showErrorToast } = useCustomToast()

@@ -1,9 +1,11 @@
 import { useQuery } from "@tanstack/react-query"
 import { ProductsService } from "@/client"
+import { useIsAuthenticated } from "@/hooks/useIsAuthenticated"
 import { queryKeys } from "@/lib/query-keys"
 import type { ProductsPass } from "@/types/Products"
 
 export function useProductsQuery(popupId: string | null) {
+  const isAuthenticated = useIsAuthenticated()
   return useQuery({
     queryKey: queryKeys.products.byPopup(popupId ?? ""),
     queryFn: async (): Promise<ProductsPass[]> => {
@@ -17,7 +19,7 @@ export function useProductsQuery(popupId: string | null) {
         category: p.category ?? "other",
       }))
     },
-    enabled: !!popupId,
+    enabled: !!popupId && isAuthenticated,
     staleTime: 0,
     refetchInterval: 30_000,
   })

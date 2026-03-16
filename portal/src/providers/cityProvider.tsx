@@ -10,7 +10,7 @@ import {
   useState,
 } from "react"
 import type { PopupPublic } from "@/client"
-import { usePopupsQuery } from "@/hooks/useGetPopups"
+import { usePopupsQuery, usePublicPopupsQuery } from "@/hooks/useGetPopups"
 
 interface CityContext_interface {
   getCity: () => PopupPublic | null
@@ -21,8 +21,18 @@ interface CityContext_interface {
 
 export const CityContext = createContext<CityContext_interface | null>(null)
 
-const CityProvider = ({ children }: { children: ReactNode }) => {
-  const { data: popups = [], isFetched } = usePopupsQuery()
+const CityProvider = ({
+  children,
+  public: isPublic = false,
+}: {
+  children: ReactNode
+  public?: boolean
+}) => {
+  const authenticatedQuery = usePopupsQuery(!isPublic)
+  const publicQuery = usePublicPopupsQuery(isPublic)
+  const { data: popups = [], isFetched } = isPublic
+    ? publicQuery
+    : authenticatedQuery
   const [cityPreselected, setCityPreselected] = useState<string | null>(null)
   const [lastValidCity, setLastValidCity] = useState<PopupPublic | null>(null)
   const params = useParams()

@@ -2,11 +2,11 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum, StrEnum
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, field_validator
-from sqlalchemy import Numeric, String, Text
+from sqlalchemy import Boolean, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
-from sqlalchemy import Boolean
 from sqlmodel import Column, DateTime, Field, SQLModel
 
 from app.api.attendee.schemas import AttendeePublic, CompanionCreate
@@ -107,9 +107,7 @@ class ApplicationBase(SQLModel):
         default=None,
         sa_column=Column(Numeric(12, 2), nullable=True),
     )
-    incentive_currency: str | None = Field(
-        default=None, max_length=10, nullable=True
-    )
+    incentive_currency: str | None = Field(default=None, max_length=10, nullable=True)
 
 
 class ApplicationPublic(BaseModel):
@@ -346,6 +344,42 @@ class ApplicationSnapshotPublic(BaseModel):
     status: str
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class AttendeeInfo(BaseModel):
+    """Minimal attendee information for participation responses."""
+
+    id: uuid.UUID
+    name: str
+    category: str
+    check_in_code: str | None = None
+
+
+class ApplicantParticipation(BaseModel):
+    """Response when human is the main applicant."""
+
+    type: Literal["applicant"] = "applicant"
+    application_id: uuid.UUID
+    status: str  # ApplicationStatus value
+
+
+class CompanionParticipation(BaseModel):
+    """Response when human is a companion on someone else's application."""
+
+    type: Literal["companion"] = "companion"
+    attendee: AttendeeInfo
+    application_status: str  # Parent application status
+
+
+class NoParticipation(BaseModel):
+    """Response when human has no participation in the popup."""
+
+    type: Literal["none"] = "none"
+
+
+ParticipationResponse = (
+    ApplicantParticipation | CompanionParticipation | NoParticipation
+)
 
 
 class AttendeeDirectoryEntry(BaseModel):

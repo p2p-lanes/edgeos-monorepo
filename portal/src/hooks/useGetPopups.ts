@@ -2,17 +2,34 @@ import { useQuery } from "@tanstack/react-query"
 import { useParams, usePathname, useRouter } from "next/navigation"
 import { useEffect } from "react"
 import { PopupsService } from "@/client"
-import { isLoggedIn } from "@/hooks/useAuth"
+import { useIsAuthenticated } from "@/hooks/useIsAuthenticated"
 import { queryKeys } from "@/lib/query-keys"
 
-export function usePopupsQuery() {
+/** Authenticated query — uses HumanTenantSession (RLS-scoped) on the backend. */
+export function usePopupsQuery(enabled = true) {
+  const isAuthenticated = useIsAuthenticated()
   return useQuery({
     queryKey: queryKeys.popups.portal(),
     queryFn: async () => {
       const result = await PopupsService.listPortalPopups()
       return result.filter((p) => p.status === "active").reverse()
     },
-    enabled: isLoggedIn(),
+    enabled: enabled && isAuthenticated,
+  })
+}
+
+/** Public query — uses X-Tenant-Id header, no auth required. */
+export function usePublicPopupsQuery(enabled = true) {
+  return useQuery({
+    queryKey: [...queryKeys.popups.portal(), "public"],
+    queryFn: async () => {
+      const tenantId = localStorage.getItem("portal_tenant_id") ?? ""
+      const result = await PopupsService.listPublicPopups({
+        xTenantId: tenantId,
+      })
+      return result.reverse()
+    },
+    enabled,
   })
 }
 

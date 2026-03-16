@@ -55,6 +55,30 @@ export const AbandonedCartPublicSchema = {
     description: 'Abandoned cart with enriched info for backoffice.'
 } as const;
 
+export const ApplicantParticipationSchema = {
+    properties: {
+        type: {
+            type: 'string',
+            const: 'applicant',
+            title: 'Type',
+            default: 'applicant'
+        },
+        application_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Application Id'
+        },
+        status: {
+            type: 'string',
+            title: 'Status'
+        }
+    },
+    type: 'object',
+    required: ['application_id', 'status'],
+    title: 'ApplicantParticipation',
+    description: 'Response when human is the main applicant.'
+} as const;
+
 export const ApplicationAdminCreateSchema = {
     properties: {
         popup_id: {
@@ -1268,6 +1292,39 @@ export const AttendeeCreateSchema = {
     description: 'Attendee schema for creation (by user).'
 } as const;
 
+export const AttendeeInfoSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        category: {
+            type: 'string',
+            title: 'Category'
+        },
+        check_in_code: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Check In Code'
+        }
+    },
+    type: 'object',
+    required: ['id', 'name', 'category'],
+    title: 'AttendeeInfo',
+    description: 'Minimal attendee information for participation responses.'
+} as const;
+
 export const AttendeePublicSchema = {
     properties: {
         tenant_id: {
@@ -2243,6 +2300,28 @@ export const CompanionCreateSchema = {
 
 Used when submitting an application with family members.
 Category is restricted to spouse/kid (main is auto-created from applicant).`
+} as const;
+
+export const CompanionParticipationSchema = {
+    properties: {
+        type: {
+            type: 'string',
+            const: 'companion',
+            title: 'Type',
+            default: 'companion'
+        },
+        attendee: {
+            '$ref': '#/components/schemas/AttendeeInfo'
+        },
+        application_status: {
+            type: 'string',
+            title: 'Application Status'
+        }
+    },
+    type: 'object',
+    required: ['attendee', 'application_status'],
+    title: 'CompanionParticipation',
+    description: "Response when human is a companion on someone else's application."
 } as const;
 
 export const CouponCreateSchema = {
@@ -4726,11 +4805,11 @@ export const ListModel_PaymentPublic_Schema = {
     title: 'ListModel[PaymentPublic]'
 } as const;
 
-export const ListModel_PopupPublic_Schema = {
+export const ListModel_PopupAdmin_Schema = {
     properties: {
         results: {
             items: {
-                '$ref': '#/components/schemas/PopupPublic'
+                '$ref': '#/components/schemas/PopupAdmin'
             },
             type: 'array',
             title: 'Results'
@@ -4741,7 +4820,7 @@ export const ListModel_PopupPublic_Schema = {
     },
     type: 'object',
     required: ['results', 'paging'],
-    title: 'ListModel[PopupPublic]'
+    title: 'ListModel[PopupAdmin]'
 } as const;
 
 export const ListModel_PopupReviewerPublic_Schema = {
@@ -4814,6 +4893,20 @@ export const ListModel_UserPublic_Schema = {
     type: 'object',
     required: ['results', 'paging'],
     title: 'ListModel[UserPublic]'
+} as const;
+
+export const NoParticipationSchema = {
+    properties: {
+        type: {
+            type: 'string',
+            const: 'none',
+            title: 'Type',
+            default: 'none'
+        }
+    },
+    type: 'object',
+    title: 'NoParticipation',
+    description: 'Response when human has no participation in the popup.'
 } as const;
 
 export const PagingSchema = {
@@ -5458,6 +5551,250 @@ export const PaymentUpdateSchema = {
     description: 'Schema for updating a payment (mainly status updates).'
 } as const;
 
+export const PopupAdminSchema = {
+    properties: {
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        tagline: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Tagline'
+        },
+        location: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Location'
+        },
+        slug: {
+            type: 'string',
+            title: 'Slug'
+        },
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        start_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Start Date'
+        },
+        end_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'End Date'
+        },
+        status: {
+            '$ref': '#/components/schemas/PopupStatus',
+            default: 'draft'
+        },
+        allows_spouse: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Allows Spouse',
+            default: false
+        },
+        allows_children: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Allows Children',
+            default: false
+        },
+        allows_coupons: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Allows Coupons',
+            default: false
+        },
+        allows_scholarship: {
+            type: 'boolean',
+            title: 'Allows Scholarship',
+            default: false
+        },
+        allows_incentive: {
+            type: 'boolean',
+            title: 'Allows Incentive',
+            default: false
+        },
+        image_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Image Url'
+        },
+        icon_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Icon Url'
+        },
+        express_checkout_background: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Express Checkout Background'
+        },
+        web_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Web Url'
+        },
+        blog_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Blog Url'
+        },
+        twitter_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Twitter Url'
+        },
+        simplefi_api_key: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Simplefi Api Key'
+        },
+        terms_and_conditions_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Terms And Conditions Url'
+        },
+        invoice_company_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Invoice Company Name'
+        },
+        invoice_company_address: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Invoice Company Address'
+        },
+        invoice_company_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Invoice Company Email'
+        },
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        }
+    },
+    type: 'object',
+    required: ['name', 'slug', 'tenant_id', 'id'],
+    title: 'PopupAdmin',
+    description: 'Admin popup schema — all fields including sensitive ones.'
+} as const;
+
 export const PopupCreateSchema = {
     properties: {
         tenant_id: {
@@ -5721,6 +6058,11 @@ export const PopupCreateSchema = {
 
 export const PopupPublicSchema = {
     properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
         name: {
             type: 'string',
             title: 'Name'
@@ -5751,10 +6093,9 @@ export const PopupPublicSchema = {
             type: 'string',
             title: 'Slug'
         },
-        tenant_id: {
-            type: 'string',
-            format: 'uuid',
-            title: 'Tenant Id'
+        status: {
+            '$ref': '#/components/schemas/PopupStatus',
+            default: 'draft'
         },
         start_date: {
             anyOf: [
@@ -5779,56 +6120,6 @@ export const PopupPublicSchema = {
                 }
             ],
             title: 'End Date'
-        },
-        status: {
-            '$ref': '#/components/schemas/PopupStatus',
-            default: 'draft'
-        },
-        allows_spouse: {
-            anyOf: [
-                {
-                    type: 'boolean'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Allows Spouse',
-            default: false
-        },
-        allows_children: {
-            anyOf: [
-                {
-                    type: 'boolean'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Allows Children',
-            default: false
-        },
-        allows_coupons: {
-            anyOf: [
-                {
-                    type: 'boolean'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Allows Coupons',
-            default: false
-        },
-        allows_scholarship: {
-            type: 'boolean',
-            title: 'Allows Scholarship',
-            default: false
-        },
-        allows_incentive: {
-            type: 'boolean',
-            title: 'Allows Incentive',
-            default: false
         },
         image_url: {
             anyOf: [
@@ -5896,16 +6187,46 @@ export const PopupPublicSchema = {
             ],
             title: 'Twitter Url'
         },
-        simplefi_api_key: {
+        allows_spouse: {
             anyOf: [
                 {
-                    type: 'string'
+                    type: 'boolean'
                 },
                 {
                     type: 'null'
                 }
             ],
-            title: 'Simplefi Api Key'
+            title: 'Allows Spouse',
+            default: false
+        },
+        allows_children: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Allows Children',
+            default: false
+        },
+        allows_coupons: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Allows Coupons',
+            default: false
+        },
+        allows_scholarship: {
+            type: 'boolean',
+            title: 'Allows Scholarship',
+            default: false
         },
         terms_and_conditions_url: {
             anyOf: [
@@ -5928,38 +6249,12 @@ export const PopupPublicSchema = {
                 }
             ],
             title: 'Invoice Company Name'
-        },
-        invoice_company_address: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Invoice Company Address'
-        },
-        invoice_company_email: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Invoice Company Email'
-        },
-        id: {
-            type: 'string',
-            format: 'uuid',
-            title: 'Id'
         }
     },
     type: 'object',
-    required: ['name', 'slug', 'tenant_id', 'id'],
-    title: 'PopupPublic'
+    required: ['id', 'name', 'slug'],
+    title: 'PopupPublic',
+    description: 'Public popup schema — excludes sensitive/internal fields.'
 } as const;
 
 export const PopupReviewerCreateSchema = {

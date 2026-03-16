@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { ApiError, AuthService } from "@/client"
+import { dispatchAuthChange } from "@/hooks/useIsAuthenticated"
 import { configureApiClient } from "@/lib/api-client"
 import { useTenant } from "@/providers/tenantProvider"
 
@@ -106,6 +107,7 @@ export const useEmailVerification = ({
       const token = result.access_token
       configureApiClient(token)
       window?.localStorage?.setItem("token", token)
+      dispatchAuthChange()
 
       setVerificationError(null)
       if (timerRef.current) {

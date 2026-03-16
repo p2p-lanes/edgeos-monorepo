@@ -18,6 +18,9 @@ export const queryKeys = {
   cart: {
     byPopup: (popupId: string) => ["cart", popupId] as const,
   },
+  participation: {
+    byPopup: (popupId: string) => ["participation", popupId] as const,
+  },
   payments: {
     all: ["payments"] as const,
     byApp: (applicationId: string) => ["payments", applicationId] as const,
