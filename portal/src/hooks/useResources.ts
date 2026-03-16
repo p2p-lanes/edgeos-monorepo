@@ -5,11 +5,39 @@ import type { Resource } from "@/types/resources"
 
 const useResources = () => {
   const { getCity } = useCityProvider()
-  const { getRelevantApplication } = useApplication()
+  const { getRelevantApplication, participation } = useApplication()
   const application = getRelevantApplication()
   const city = getCity()
 
+  const isCompanion = participation?.type === "companion"
   const canSeeAttendees = application?.status === "accepted"
+  const companionCanSeePasses = isCompanion
+
+  if (isCompanion) {
+    const resources: Resource[] = [
+      {
+        name: "Companion",
+        icon: Users,
+        status: "active",
+        path: `/portal/${city?.slug}`,
+        children: [
+          {
+            name: "Status",
+            status: "inactive",
+            value: "companion",
+          },
+        ],
+      },
+      {
+        name: "Passes",
+        icon: Ticket,
+        status: companionCanSeePasses ? "active" : "hidden",
+        path: `/portal/${city?.slug}/passes`,
+      },
+    ]
+
+    return { resources }
+  }
 
   const resources: Resource[] = [
     {
