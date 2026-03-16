@@ -55,6 +55,30 @@ export const AbandonedCartPublicSchema = {
     description: 'Abandoned cart with enriched info for backoffice.'
 } as const;
 
+export const ApplicantParticipationSchema = {
+    properties: {
+        type: {
+            type: 'string',
+            const: 'applicant',
+            title: 'Type',
+            default: 'applicant'
+        },
+        application_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Application Id'
+        },
+        status: {
+            type: 'string',
+            title: 'Status'
+        }
+    },
+    type: 'object',
+    required: ['application_id', 'status'],
+    title: 'ApplicantParticipation',
+    description: 'Response when human is the main applicant.'
+} as const;
+
 export const ApplicationAdminCreateSchema = {
     properties: {
         popup_id: {
@@ -1268,6 +1292,39 @@ export const AttendeeCreateSchema = {
     description: 'Attendee schema for creation (by user).'
 } as const;
 
+export const AttendeeInfoSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        category: {
+            type: 'string',
+            title: 'Category'
+        },
+        check_in_code: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Check In Code'
+        }
+    },
+    type: 'object',
+    required: ['id', 'name', 'category'],
+    title: 'AttendeeInfo',
+    description: 'Minimal attendee information for participation responses.'
+} as const;
+
 export const AttendeePublicSchema = {
     properties: {
         tenant_id: {
@@ -2243,6 +2300,28 @@ export const CompanionCreateSchema = {
 
 Used when submitting an application with family members.
 Category is restricted to spouse/kid (main is auto-created from applicant).`
+} as const;
+
+export const CompanionParticipationSchema = {
+    properties: {
+        type: {
+            type: 'string',
+            const: 'companion',
+            title: 'Type',
+            default: 'companion'
+        },
+        attendee: {
+            '$ref': '#/components/schemas/AttendeeInfo'
+        },
+        application_status: {
+            type: 'string',
+            title: 'Application Status'
+        }
+    },
+    type: 'object',
+    required: ['attendee', 'application_status'],
+    title: 'CompanionParticipation',
+    description: "Response when human is a companion on someone else's application."
 } as const;
 
 export const CouponCreateSchema = {
@@ -4814,6 +4893,20 @@ export const ListModel_UserPublic_Schema = {
     type: 'object',
     required: ['results', 'paging'],
     title: 'ListModel[UserPublic]'
+} as const;
+
+export const NoParticipationSchema = {
+    properties: {
+        type: {
+            type: 'string',
+            const: 'none',
+            title: 'Type',
+            default: 'none'
+        }
+    },
+    type: 'object',
+    title: 'NoParticipation',
+    description: 'Response when human has no participation in the popup.'
 } as const;
 
 export const PagingSchema = {

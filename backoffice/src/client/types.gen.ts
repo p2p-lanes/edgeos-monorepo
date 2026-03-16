@@ -14,6 +14,15 @@ export type AbandonedCartPublic = {
 };
 
 /**
+ * Response when human is the main applicant.
+ */
+export type ApplicantParticipation = {
+    type?: "applicant";
+    application_id: string;
+    status: string;
+};
+
+/**
  * Application schema for admin creation.
  *
  * Admins can create applications on behalf of users and set any status.
@@ -243,6 +252,16 @@ export type AttendeeCreate = {
 };
 
 /**
+ * Minimal attendee information for participation responses.
+ */
+export type AttendeeInfo = {
+    id: string;
+    name: string;
+    category: string;
+    check_in_code?: (string | null);
+};
+
+/**
  * Attendee schema for API responses.
  */
 export type AttendeePublic = {
@@ -464,6 +483,15 @@ export type CompanionCreate = {
     category: string;
     email?: (string | null);
     gender?: (string | null);
+};
+
+/**
+ * Response when human is a companion on someone else's application.
+ */
+export type CompanionParticipation = {
+    type?: "companion";
+    attendee: AttendeeInfo;
+    application_status: string;
 };
 
 /**
@@ -964,6 +992,13 @@ export type ListModel_TenantPublic_ = {
 export type ListModel_UserPublic_ = {
     results: Array<UserPublic>;
     paging: Paging;
+};
+
+/**
+ * Response when human has no participation in the popup.
+ */
+export type NoParticipation = {
+    type?: "none";
 };
 
 export type Paging = {
@@ -1705,6 +1740,12 @@ export type ApplicationsListMyApplicationsData = {
 export type ApplicationsListMyApplicationsResponse = (ListModel_ApplicationPublic_);
 
 export type ApplicationsListMyTicketsResponse = (Array<AttendeeWithTickets>);
+
+export type ApplicationsGetMyParticipationData = {
+    popupId: string;
+};
+
+export type ApplicationsGetMyParticipationResponse = ((ApplicantParticipation | CompanionParticipation | NoParticipation));
 
 export type ApplicationsGetMyPurchasesData = {
     popupId: string;
