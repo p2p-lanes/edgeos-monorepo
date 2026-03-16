@@ -12,7 +12,13 @@ from app.api.base_field_config.constants import DEFAULT_SECTIONS
 from app.api.base_field_config.crud import base_field_configs_crud
 from app.api.form_section.models import FormSections
 from app.api.popup import crud
-from app.api.popup.schemas import PopupCreate, PopupPublic, PopupStatus, PopupUpdate
+from app.api.popup.schemas import (
+    PopupAdmin,
+    PopupCreate,
+    PopupPublic,
+    PopupStatus,
+    PopupUpdate,
+)
 from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
@@ -20,26 +26,27 @@ from app.core.dependencies.users import (
     CurrentUser,
     CurrentWriter,
     HumanTenantSession,
+    SessionDep,
     TenantSession,
 )
 
 router = APIRouter(prefix="/popups", tags=["popups"])
 
 
-@router.get("", response_model=ListModel[PopupPublic])
+@router.get("", response_model=ListModel[PopupAdmin])
 async def list_popups(
     db: TenantSession,
     _: CurrentUser,
     search: str | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
-) -> ListModel[PopupPublic]:
+) -> ListModel[PopupAdmin]:
     popups, total = crud.find(
         db, skip=skip, limit=limit, search=search, search_fields=["name"]
     )
 
-    return ListModel[PopupPublic](
-        results=[PopupPublic.model_validate(p) for p in popups],
+    return ListModel[PopupAdmin](
+        results=[PopupAdmin.model_validate(p) for p in popups],
         paging=Paging(
             offset=skip,
             limit=limit,
@@ -48,12 +55,23 @@ async def list_popups(
     )
 
 
-@router.get("/{popup_id}", response_model=PopupPublic)
+@router.get("/public/list", response_model=list[PopupPublic])
+async def list_public_popups(
+    session: SessionDep,
+    x_tenant_id: Annotated[str, Header(alias="X-Tenant-Id")],
+) -> list[PopupPublic]:
+    """List active popups for a tenant (public, no auth required). Used by checkout flow."""
+    tenant_id = uuid.UUID(x_tenant_id)
+    popups, _ = crud.find(session, status=PopupStatus.active, tenant_id=tenant_id)
+    return [PopupPublic.model_validate(p) for p in popups]
+
+
+@router.get("/{popup_id}", response_model=PopupAdmin)
 async def get_popup(
     popup_id: uuid.UUID,
     db: TenantSession,
     _: CurrentUser,
-) -> PopupPublic:
+) -> PopupAdmin:
     popup = crud.get(db, popup_id)
 
     if not popup:
@@ -62,16 +80,16 @@ async def get_popup(
             detail="Popup not found",
         )
 
-    return PopupPublic.model_validate(popup)
+    return PopupAdmin.model_validate(popup)
 
 
-@router.post("", response_model=PopupPublic, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=PopupAdmin, status_code=status.HTTP_201_CREATED)
 async def create_popup(
     popup_in: PopupCreate,
     db: TenantSession,
     current_user: CurrentWriter,
     x_tenant_id: Annotated[str | None, Header(alias="X-Tenant-Id")] = None,
-) -> PopupPublic:
+) -> PopupAdmin:
     if current_user.role == UserRole.SUPERADMIN:
         if x_tenant_id:
             popup_in.tenant_id = uuid.UUID(x_tenant_id)
@@ -108,7 +126,11 @@ async def create_popup(
     for key, section_def in DEFAULT_SECTIONS.items():
         if key == "scholarship" and not popup.allows_scholarship:
             continue
-        if key == "companions" and not popup.allows_spouse and not popup.allows_children:
+        if (
+            key == "companions"
+            and not popup.allows_spouse
+            and not popup.allows_children
+        ):
             continue
         section = FormSections(
             tenant_id=popup.tenant_id,
@@ -129,16 +151,16 @@ async def create_popup(
         section_map=section_map,
     )
 
-    return PopupPublic.model_validate(popup)
+    return PopupAdmin.model_validate(popup)
 
 
-@router.patch("/{popup_id}", response_model=PopupPublic)
+@router.patch("/{popup_id}", response_model=PopupAdmin)
 async def update_popup(
     popup_id: uuid.UUID,
     popup_in: PopupUpdate,
     db: TenantSession,
     _current_user: CurrentWriter,
-) -> PopupPublic:
+) -> PopupAdmin:
     popup = crud.get(db, popup_id)
 
     if not popup:
@@ -196,7 +218,7 @@ async def update_popup(
             section_map=section_map,
         )
 
-    return PopupPublic.model_validate(updated)
+    return PopupAdmin.model_validate(updated)
 
 
 @router.delete("/{popup_id}", status_code=status.HTTP_204_NO_CONTENT)

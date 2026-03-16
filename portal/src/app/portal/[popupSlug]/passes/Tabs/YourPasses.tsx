@@ -119,18 +119,16 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
               <span className="text-gray-300">|</span>
             </>
           )}
-          {city?.invoice_company_name &&
-            city?.invoice_company_address &&
-            city?.invoice_company_email && (
-              <button
-                type="button"
-                className="flex items-center gap-1.5 text-gray-500 hover:text-gray-900 transition-colors whitespace-nowrap"
-                onClick={() => setIsInvoiceModalOpen(true)}
-              >
-                <FileText className="w-3.5 h-3.5" />
-                <span>View invoices</span>
-              </button>
-            )}
+          {city?.invoice_company_name && (
+            <button
+              type="button"
+              className="flex items-center gap-1.5 text-gray-500 hover:text-gray-900 transition-colors whitespace-nowrap"
+              onClick={() => setIsInvoiceModalOpen(true)}
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>View invoices</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -290,14 +288,12 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
           editingAttendee={modal.editingAttendee}
         />
       )}
-      {city?.invoice_company_name &&
-        city?.invoice_company_address &&
-        city?.invoice_company_email && (
-          <InvoiceModal
-            isOpen={isInvoiceModalOpen}
-            onClose={() => setIsInvoiceModalOpen(false)}
-          />
-        )}
+      {city?.invoice_company_name && (
+        <InvoiceModal
+          isOpen={isInvoiceModalOpen}
+          onClose={() => setIsInvoiceModalOpen(false)}
+        />
+      )}
     </div>
   )
 }

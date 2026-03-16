@@ -108,5 +108,32 @@ class PopupUpdate(SQLModel):
     invoice_company_email: str | None = None
 
 
-class PopupPublic(PopupBase):
+class PopupPublic(SQLModel):
+    """Public popup schema — excludes sensitive/internal fields."""
+
+    id: uuid.UUID
+    name: str
+    tagline: str | None = None
+    location: str | None = None
+    slug: str
+    status: PopupStatus = PopupStatus.draft
+    start_date: datetime | None = None
+    end_date: datetime | None = None
+    image_url: str | None = None
+    icon_url: str | None = None
+    express_checkout_background: str | None = None
+    web_url: str | None = None
+    blog_url: str | None = None
+    twitter_url: str | None = None
+    allows_spouse: bool | None = False
+    allows_children: bool | None = False
+    allows_coupons: bool | None = False
+    allows_scholarship: bool = False
+    terms_and_conditions_url: str | None = None
+    invoice_company_name: str | None = None
+
+
+class PopupAdmin(PopupBase):
+    """Admin popup schema — all fields including sensitive ones."""
+
     id: uuid.UUID

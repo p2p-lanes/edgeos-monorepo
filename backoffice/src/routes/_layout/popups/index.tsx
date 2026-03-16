@@ -18,7 +18,7 @@ import {
 } from "lucide-react"
 import { Suspense, useState } from "react"
 
-import { type PopupPublic, PopupsService } from "@/client"
+import { type PopupAdmin, PopupsService } from "@/client"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
@@ -89,7 +89,7 @@ function DeletePopup({
   popup,
   onSuccess,
 }: {
-  popup: PopupPublic
+  popup: PopupAdmin
   onSuccess: () => void
 }) {
   const [isOpen, setIsOpen] = useState(false)
@@ -142,7 +142,7 @@ function DeletePopup({
   )
 }
 
-function PopupActionsMenu({ popup }: { popup: PopupPublic }) {
+function PopupActionsMenu({ popup }: { popup: PopupAdmin }) {
   const [open, setOpen] = useState(false)
   const { isAdmin } = useAuth()
 
@@ -186,7 +186,7 @@ function formatDate(dateStr: string | null | undefined): string {
   }
 }
 
-const columns: ColumnDef<PopupPublic>[] = [
+const columns: ColumnDef<PopupAdmin>[] = [
   {
     accessorKey: "name",
     header: ({ column }) => <SortableHeader label="Name" column={column} />,

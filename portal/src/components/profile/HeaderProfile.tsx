@@ -15,10 +15,7 @@ const HeaderProfile = () => {
   const { tenant } = useTenant()
   const { getCity } = useCityProvider()
   const city = getCity()
-  const hasInvoiceFields =
-    !!city?.invoice_company_name &&
-    !!city?.invoice_company_address &&
-    !!city?.invoice_company_email
+  const hasInvoiceFields = !!city?.invoice_company_name
 
   return (
     <div className="p-4 md:p-6 border-b border-gray-200 bg-white">

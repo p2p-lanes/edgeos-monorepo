@@ -68,7 +68,7 @@ from app.api.human.schemas import HumanCreate, HumanPublic, HumanUpdate
 from app.api.payment.models import PaymentProducts, Payments
 from app.api.payment.schemas import PaymentCreate, PaymentPublic, PaymentUpdate
 from app.api.popup.models import Popups
-from app.api.popup.schemas import PopupCreate, PopupPublic, PopupUpdate
+from app.api.popup.schemas import PopupAdmin, PopupCreate, PopupPublic, PopupUpdate
 from app.api.popup_reviewer.models import PopupReviewers
 from app.api.popup_reviewer.schemas import (
     PopupReviewerCreate,
@@ -93,6 +93,7 @@ __all__ = [
     "HumanPublic",
     "HumanUpdate",
     "Popups",
+    "PopupAdmin",
     "PopupCreate",
     "PopupPublic",
     "PopupUpdate",

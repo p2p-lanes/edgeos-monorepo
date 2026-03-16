@@ -20,8 +20,8 @@ import {
 } from "lucide-react"
 import {
   ApprovalStrategiesService,
+  type PopupAdmin,
   type PopupCreate,
-  type PopupPublic,
   PopupsService,
   type PopupUpdate,
 } from "@/client"
@@ -60,7 +60,7 @@ import {
 import { createErrorHandler } from "@/utils"
 
 interface PopupFormProps {
-  defaultValues?: PopupPublic
+  defaultValues?: PopupAdmin
   onSuccess: () => void
 }
 
