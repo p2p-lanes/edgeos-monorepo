@@ -2,8 +2,12 @@
 
 import { useQueryClient } from "@tanstack/react-query"
 import { createContext, type ReactNode, useCallback, useContext } from "react"
-import type { ApplicationPublic } from "@/client"
+import type {
+  ApplicationPublic,
+  ApplicationsGetMyParticipationResponse,
+} from "@/client"
 import { useApplicationsQuery } from "@/hooks/useGetApplications"
+import { useParticipationQuery } from "@/hooks/useParticipationQuery"
 import { queryKeys } from "@/lib/query-keys"
 import type { AttendeePassState } from "@/types/Attendee"
 import type { ProductsPass } from "@/types/Products"
@@ -11,6 +15,7 @@ import { useCityProvider } from "./cityProvider"
 
 interface ApplicationContextProps {
   applications: ApplicationPublic[] | null
+  participation: ApplicationsGetMyParticipationResponse | null
   getRelevantApplication: () => ApplicationPublic | null
   getAttendees: () => AttendeePassState[]
   updateApplication: (application: ApplicationPublic) => void
@@ -24,6 +29,10 @@ const ApplicationProvider = ({ children }: { children: ReactNode }) => {
   const { data: applications = null } = useApplicationsQuery()
   const { getCity } = useCityProvider()
   const queryClient = useQueryClient()
+  const city = getCity()
+  const { data: participation = null } = useParticipationQuery(
+    city?.id ? String(city.id) : null,
+  )
 
   const updateApplication = useCallback(
     (application: ApplicationPublic): void => {
@@ -64,6 +73,7 @@ const ApplicationProvider = ({ children }: { children: ReactNode }) => {
     <ApplicationContext.Provider
       value={{
         applications,
+        participation,
         getRelevantApplication,
         getAttendees,
         updateApplication,
