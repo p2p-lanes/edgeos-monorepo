@@ -16,7 +16,8 @@ const FALLBACK_DESCRIPTION =
 export async function generateMetadata(): Promise<Metadata> {
   const headersList = await headers()
   const host = headersList.get("host") ?? ""
-  const slug = extractSubdomain(host)
+  const searchParams = headersList.get("x-invoke-query") ?? null
+  const slug = extractSubdomain(host, searchParams)
 
   const tenant = slug ? await fetchTenantBySlug(slug) : null
   const name = tenant?.name ? `${tenant.name} Portal` : FALLBACK_NAME

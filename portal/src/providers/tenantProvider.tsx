@@ -34,7 +34,7 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
     if (typeof window === "undefined") return
 
     const hostname = window.location.hostname
-    const extracted = extractSubdomain(hostname)
+    const extracted = extractSubdomain(hostname, window.location.search)
     setSlug(extracted)
 
     if (!extracted) {
