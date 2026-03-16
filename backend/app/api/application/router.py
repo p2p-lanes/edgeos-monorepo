@@ -8,20 +8,25 @@ from fastapi.responses import Response
 
 from app.api.application import crud
 from app.api.application.schemas import (
+    ApplicantParticipation,
     ApplicationAdminCreate,
     ApplicationCreate,
     ApplicationPublic,
     ApplicationStatus,
     ApplicationUpdate,
     AssociatedAttendee,
+    AttendeeInfo,
     AttendeesDirectoryEntry,
+    CompanionParticipation,
     DirectoryProduct,
+    NoParticipation,
+    ParticipationResponse,
     ScholarshipDecisionRequest,
 )
 from app.api.attendee.schemas import (
     AttendeeCreate,
-    AttendeePurchases,
     AttendeePublic,
+    AttendeePurchases,
     AttendeeUpdate,
     AttendeeWithTickets,
 )
@@ -162,7 +167,6 @@ async def get_application(
     return _build_application_public(application)
 
 
-
 @router.get("/my/applications", response_model=ListModel[ApplicationPublic])
 async def list_my_applications(
     db: HumanTenantSession,
@@ -238,6 +242,50 @@ async def list_my_tickets(
     return results
 
 
+@router.get("/my/participation/{popup_id}", response_model=ParticipationResponse)
+async def get_my_participation(
+    popup_id: uuid.UUID,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+) -> ParticipationResponse:
+    """Get participation status for the current human in a popup (Portal).
+
+    Returns a discriminated union:
+    - "applicant" if the human has an application for this popup
+    - "companion" if the human is an attendee on someone else's application
+    - "none" if the human has no participation
+    """
+    # 1. Check if human is the main applicant
+    application = crud.applications_crud.get_by_human_popup(
+        db, human_id=current_human.id, popup_id=popup_id
+    )
+    if application:
+        return ApplicantParticipation(
+            application_id=application.id,
+            status=application.status,
+        )
+
+    # 2. Check if human is a companion on someone else's application
+    from app.api.attendee.crud import attendees_crud
+
+    attendee = attendees_crud.find_companion_for_popup(
+        db, human_id=current_human.id, popup_id=popup_id
+    )
+    if attendee:
+        return CompanionParticipation(
+            attendee=AttendeeInfo(
+                id=attendee.id,
+                name=attendee.name,
+                category=attendee.category,
+                check_in_code=attendee.check_in_code,
+            ),
+            application_status=attendee.application.status,
+        )
+
+    # 3. No participation
+    return NoParticipation()
+
+
 @router.get("/my/{popup_id}/purchases", response_model=list[AttendeePurchases])
 async def get_my_purchases(
     popup_id: uuid.UUID,
@@ -309,6 +357,18 @@ async def create_my_application(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="You already have an application for this popup",
+        )
+
+    # Check if human is already a companion on someone else's application
+    from app.api.attendee.crud import attendees_crud
+
+    companion = attendees_crud.find_companion_for_popup(
+        db, human_id=current_human.id, popup_id=app_in.popup_id
+    )
+    if companion:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="You are already participating as a companion in this popup",
         )
 
     # Validate scholarship request against popup settings
@@ -401,15 +461,22 @@ async def update_my_application(
     status_before_str = application.status
 
     # Apply approval strategy when transitioning draft → IN_REVIEW
-    if app_update.get("status") == ApplicationStatus.IN_REVIEW.value and application.human:
-        crud.applications_crud._apply_approval_strategy(db, application, application.human)
+    if (
+        app_update.get("status") == ApplicationStatus.IN_REVIEW.value
+        and application.human
+    ):
+        crud.applications_crud._apply_approval_strategy(
+            db, application, application.human
+        )
 
     db.add(application)
     db.commit()
     db.refresh(application)
 
     # Send appropriate email based on final application status
-    await send_application_status_email(application, current_human, db, status_before=status_before_str)
+    await send_application_status_email(
+        application, current_human, db, status_before=status_before_str
+    )
 
     return _build_application_public(application)
 
