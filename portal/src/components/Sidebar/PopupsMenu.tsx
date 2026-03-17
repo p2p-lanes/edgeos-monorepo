@@ -117,8 +117,9 @@ const PopupsMenu = () => {
             <DropdownMenuContent
               side="bottom"
               align="start"
+              alignOffset={-4}
               sideOffset={4}
-              className="w-[--radix-dropdown-menu-trigger-width]"
+              className="w-[calc(var(--radix-dropdown-menu-trigger-width)+0.5rem)]"
             >
               {popups.map((popup: PopupPublic) => (
                 <DropdownMenuItem
