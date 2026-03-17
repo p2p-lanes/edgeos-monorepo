@@ -7,6 +7,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
 } from "react"
 import type { PopupPublic } from "@/client"
@@ -66,17 +67,13 @@ const CityProvider = ({
     return popups
   }, [popups])
 
+  const contextValue = useMemo(
+    () => ({ getCity, getPopups, setCityPreselected, popupsLoaded }),
+    [getCity, getPopups, popupsLoaded],
+  )
+
   return (
-    <CityContext.Provider
-      value={{
-        getCity,
-        getPopups,
-        setCityPreselected,
-        popupsLoaded,
-      }}
-    >
-      {children}
-    </CityContext.Provider>
+    <CityContext.Provider value={contextValue}>{children}</CityContext.Provider>
   )
 }
 

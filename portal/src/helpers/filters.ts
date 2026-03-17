@@ -1,7 +1,7 @@
 import type { AttendeePassState } from "@/types/Attendee"
 
 export const sortAttendees = (attendees: AttendeePassState[]) => {
-  return attendees.sort((a, b) => {
+  return [...attendees].sort((a, b) => {
     if (a.category === "main") return -1
     if (b.category === "main") return 1
     if (a.category === "spouse") return -1

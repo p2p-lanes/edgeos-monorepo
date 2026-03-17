@@ -1,7 +1,13 @@
 "use client"
 
 import { useQueryClient } from "@tanstack/react-query"
-import { createContext, type ReactNode, useCallback, useContext } from "react"
+import {
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useMemo,
+} from "react"
 import type {
   ApplicationPublic,
   ApplicationsGetMyParticipationResponse,
@@ -69,16 +75,25 @@ const ApplicationProvider = ({ children }: { children: ReactNode }) => {
     }))
   }, [getRelevantApplication])
 
+  const contextValue = useMemo(
+    () => ({
+      applications,
+      participation,
+      getRelevantApplication,
+      getAttendees,
+      updateApplication,
+    }),
+    [
+      applications,
+      participation,
+      getRelevantApplication,
+      getAttendees,
+      updateApplication,
+    ],
+  )
+
   return (
-    <ApplicationContext.Provider
-      value={{
-        applications,
-        participation,
-        getRelevantApplication,
-        getAttendees,
-        updateApplication,
-      }}
-    >
+    <ApplicationContext.Provider value={contextValue}>
       {children}
     </ApplicationContext.Provider>
   )

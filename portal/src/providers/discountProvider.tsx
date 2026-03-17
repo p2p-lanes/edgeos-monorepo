@@ -6,6 +6,8 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
+  useRef,
   useState,
 } from "react"
 import { useGroupsQuery } from "@/components/Sidebar/hooks/useGetGroups"
@@ -57,13 +59,13 @@ const DiscountProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [application?.group_id, groups, discountApplied.discount_value])
 
-  const setDiscount = useCallback(
-    (discount: DiscountProps) => {
-      if (discount.discount_value <= discountApplied.discount_value) return
-      setDiscountApplied(discount)
-    },
-    [discountApplied.discount_value],
-  )
+  const discountRef = useRef(discountApplied)
+  discountRef.current = discountApplied
+
+  const setDiscount = useCallback((discount: DiscountProps) => {
+    if (discount.discount_value <= discountRef.current.discount_value) return
+    setDiscountApplied(discount)
+  }, [])
 
   const resetDiscount = useCallback(() => {
     setDiscountApplied({
@@ -73,10 +75,13 @@ const DiscountProvider = ({ children }: { children: ReactNode }) => {
     })
   }, [])
 
+  const contextValue = useMemo(
+    () => ({ discountApplied, setDiscount, resetDiscount }),
+    [discountApplied, setDiscount, resetDiscount],
+  )
+
   return (
-    <DiscountContext.Provider
-      value={{ discountApplied, setDiscount, resetDiscount }}
-    >
+    <DiscountContext.Provider value={contextValue}>
       {children}
     </DiscountContext.Provider>
   )
