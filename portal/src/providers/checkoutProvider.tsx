@@ -300,21 +300,43 @@ export function CheckoutProvider({
   const isLoading = promoIsLoading
   const error = promoError
 
-  // Restore current step from saved cart (after availableSteps is ready)
+  // Restore current step from saved cart (after availableSteps is ready).
+  // Uses a ref to capture the initial cart step — ignores subsequent saveCart() updates
+  // that would otherwise revert user navigation.
   const hasRestoredStepRef = useRef(false)
+  const initialCartStepRef = useRef<string | null | undefined>(undefined)
+
+  // Capture the initial cart step exactly once when cart data first loads
+  if (
+    initialCartStepRef.current === undefined &&
+    hasRestoredCheckoutRef.current &&
+    savedCart
+  ) {
+    initialCartStepRef.current = savedCart.current_step ?? null
+  }
+
   useEffect(() => {
-    if (hasRestoredStepRef.current || !hasRestoredCheckoutRef.current) return
+    if (hasRestoredStepRef.current) return
     if (initialStep === "success") return
-    if (!savedCart?.current_step) return
+
+    const stepToRestore = initialCartStepRef.current
+    if (!stepToRestore) {
+      // No saved step to restore — mark as done so future saveCart() updates are ignored
+      if (hasRestoredCheckoutRef.current) {
+        hasRestoredStepRef.current = true
+      }
+      return
+    }
+
     if (
       availableSteps.length <= 1 ||
-      !availableSteps.includes(savedCart.current_step as CheckoutStep)
+      !availableSteps.includes(stepToRestore as CheckoutStep)
     )
       return
 
     hasRestoredStepRef.current = true
-    setCurrentStep(savedCart.current_step as CheckoutStep)
-  }, [availableSteps, savedCart, initialStep, setCurrentStep])
+    setCurrentStep(stepToRestore as CheckoutStep)
+  }, [availableSteps, initialStep, setCurrentStep])
 
   // Build cart state
   const cart = useMemo<CheckoutCartState>(

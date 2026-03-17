@@ -4,6 +4,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react"
@@ -193,7 +194,11 @@ const PassesProvider = ({
   const { discountApplied } = useDiscount()
   const [attendeePasses, setAttendeePasses] = useState<AttendeePassState[]>([])
 
-  const attendees = sortAttendees(getAttendees())
+  const attendees = useMemo(
+    () => sortAttendees(getAttendees()),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [getAttendees],
+  )
 
   const [isEditing, setIsEditing] = useState(false)
   const { products } = useGetPassesData()
@@ -207,12 +212,22 @@ const PassesProvider = ({
 
   // Dedicated purchases query — granular invalidation after payment
   const { data: purchasesData } = usePurchasesQuery(cityId)
-  const purchasesMap = buildPurchasesMap(purchasesData)
+  const purchasesMap = useMemo(
+    () => buildPurchasesMap(purchasesData),
+    [purchasesData],
+  )
 
-  // Track attendee/product counts to detect structural changes
-  const prevAttendeeCountRef = useRef(0)
-  const prevProductCountRef = useRef(0)
-  const prevPurchasesDataRef = useRef(purchasesData)
+  // Refs for stable callback closures — avoids recreating toggleProduct on every discount/editing change
+  const discountRef = useRef(discountApplied)
+  discountRef.current = discountApplied
+  const isEditingRef = useRef(isEditing)
+  isEditingRef.current = isEditing
+
+  // Track previous values for change detection
+  const prevDiscountValueRef = useRef(discountApplied.discount_value)
+  const prevAttendeesRef = useRef(attendees)
+  const prevProductsRef = useRef(products)
+  const prevPurchasesMapRef = useRef(purchasesMap)
 
   // Reset when city changes so stale data doesn't persist
   useEffect(() => {
@@ -224,68 +239,112 @@ const PassesProvider = ({
     setIsEditing(false)
   }, [cityId])
 
+  // Stable toggleProduct — reads discount & editing from refs, never recreated
   const toggleProduct = useCallback(
     (attendeeId: string, product: ProductsPass) => {
       if (!product) return
-      const strategy = getProductStrategy(product, isEditing)
-      const updatedAttendees = strategy.handleSelection(
-        attendeePasses,
-        attendeeId,
-        product,
-        discountApplied,
+      const strategy = getProductStrategy(product, isEditingRef.current)
+      setAttendeePasses((current) =>
+        strategy.handleSelection(
+          current,
+          attendeeId,
+          product,
+          discountRef.current,
+        ),
       )
-      setAttendeePasses(updatedAttendees)
     },
-    [attendeePasses, isEditing, discountApplied],
+    [],
   )
 
-  // Step 1: Initialize attendeePasses from server data (one-time)
-  // Re-runs when attendee/product counts or purchases data changes
+  // Ref to read savedCartPasses inside init effect without it being a dep
+  const savedCartPassesRef = useRef(savedCartPasses)
+  savedCartPassesRef.current = savedCartPasses
+
+  // Main effect: handles initialization, structural changes, and discount-only price recalculation.
+  // savedCartPasses is read from ref (not a dep) to avoid re-running when cart is saved during checkout.
   useEffect(() => {
     if (attendees.length === 0 || products.length === 0) return
 
-    const attendeeCountChanged =
-      attendees.length !== prevAttendeeCountRef.current
-    const productCountChanged = products.length !== prevProductCountRef.current
-    const purchasesChanged = purchasesData !== prevPurchasesDataRef.current
+    const discountValue = discountApplied.discount_value
+    const discountChanged = discountValue !== prevDiscountValueRef.current
     const structuralChange =
-      attendeeCountChanged || productCountChanged || purchasesChanged
+      attendees !== prevAttendeesRef.current ||
+      products !== prevProductsRef.current ||
+      purchasesMap !== prevPurchasesMapRef.current
 
-    prevAttendeeCountRef.current = attendees.length
-    prevProductCountRef.current = products.length
-    prevPurchasesDataRef.current = purchasesData
+    prevDiscountValueRef.current = discountValue
+    prevAttendeesRef.current = attendees
+    prevProductsRef.current = products
+    prevPurchasesMapRef.current = purchasesMap
 
     if (!hasInitializedRef.current) {
-      // First initialization
-      const basePasses = buildBaseAttendeePasses(
+      // First initialization — build base passes with prices
+      let basePasses = buildBaseAttendeePasses(
         attendees,
         products,
-        discountApplied.discount_value,
+        discountValue,
         purchasesMap,
       )
+
+      // Apply cart selections in the same tick if already available (avoids extra render cycle)
+      const cart = savedCartPassesRef.current
+      if (
+        restoreFromCart &&
+        !hasRestoredCartRef.current &&
+        cart?.passes?.length
+      ) {
+        hasRestoredCartRef.current = true
+        basePasses = applyCartSelections(basePasses, cart.passes)
+      }
+
       hasInitializedRef.current = true
       setAttendeePasses(basePasses)
-    } else if (structuralChange) {
-      // Structural change (new attendee, product change, or purchase completed)
-      // Rebuild but preserve existing selections
+      return
+    }
+
+    // Structural change (attendees/products/purchases changed) — rebuild with current discount
+    if (structuralChange) {
       const basePasses = buildBaseAttendeePasses(
         attendees,
         products,
-        discountApplied.discount_value,
+        discountValue,
         purchasesMap,
       )
       setAttendeePasses((current) => preserveSelections(basePasses, current))
+      return
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
+    // Discount-only change — recalculate prices without rebuilding structure
+    if (discountChanged) {
+      const priceStrategy = getPriceStrategy()
+      setAttendeePasses((current) =>
+        current.map((attendee) => {
+          const hasPatreonPurchased = attendee.products.some(
+            (p) => p.category === "patreon" && p.purchased,
+          )
+          return {
+            ...attendee,
+            products: attendee.products.map((product) => ({
+              ...product,
+              price: priceStrategy.calculatePrice(
+                { ...product, price: product.original_price ?? product.price },
+                hasPatreonPurchased,
+                discountValue,
+              ),
+            })),
+          }
+        }),
+      )
+    }
   }, [
     attendees,
     products,
-    discountApplied.discount_value,
-    purchasesData,
     purchasesMap,
+    discountApplied.discount_value,
+    restoreFromCart,
   ])
 
-  // Step 2: Apply cart selections (one-time, after initialization)
+  // Cart restoration for late-arriving cart data (cart loads after initialization)
   useEffect(() => {
     if (!restoreFromCart) return
     if (hasRestoredCartRef.current) return
@@ -299,64 +358,35 @@ const PassesProvider = ({
     )
   }, [restoreFromCart, attendeePasses.length, savedCartPasses])
 
-  // Step 3: Recalculate prices when discount changes (without losing selections)
-  useEffect(() => {
-    if (!hasInitializedRef.current) return
-    if (attendeePasses.length === 0) return
-
-    const priceStrategy = getPriceStrategy()
+  const toggleEditing = useCallback((editing?: boolean) => {
     setAttendeePasses((current) =>
-      current.map((attendee) => {
-        const hasPatreonPurchased = attendee.products.some(
-          (p) => p.category === "patreon" && p.purchased,
-        )
-        return {
-          ...attendee,
-          products: attendee.products.map((product) => ({
-            ...product,
-            price: priceStrategy.calculatePrice(
-              { ...product, price: product.original_price ?? product.price },
-              hasPatreonPurchased,
-              discountApplied.discount_value,
-            ),
-          })),
-        }
-      }),
-    )
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [discountApplied, attendeePasses.length])
-
-  const toggleEditing = useCallback(
-    (editing?: boolean) => {
-      setAttendeePasses(
-        attendeePasses.map((attendee) => ({
-          ...attendee,
-          products: attendee.products.map((product) => ({
-            ...product,
-            edit: false,
-            selected: false,
-            disabled: false,
-          })),
+      current.map((attendee) => ({
+        ...attendee,
+        products: attendee.products.map((product) => ({
+          ...product,
+          edit: false,
+          selected: false,
+          disabled: false,
         })),
-      )
+      })),
+    )
 
-      setIsEditing(editing !== undefined ? editing : !isEditing)
-    },
-    [attendeePasses, isEditing],
+    setIsEditing((prev) => (editing !== undefined ? editing : !prev))
+  }, [])
+
+  const contextValue = useMemo(
+    () => ({
+      attendeePasses,
+      toggleProduct,
+      products,
+      isEditing,
+      toggleEditing,
+    }),
+    [attendeePasses, toggleProduct, products, isEditing, toggleEditing],
   )
 
-  // LEGACY: discount_assigned removed from ApplicationPublic
-
   return (
-    <PassesContext.Provider
-      value={{
-        attendeePasses,
-        toggleProduct,
-        products,
-        isEditing,
-        toggleEditing,
-      }}
-    >
+    <PassesContext.Provider value={contextValue}>
       {children}
     </PassesContext.Provider>
   )
