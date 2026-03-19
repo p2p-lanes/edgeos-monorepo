@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
+import useAuth from "@/hooks/useAuth"
 
 export const Route = createFileRoute("/_layout/email-templates/")({
   component: EmailTemplatesPage,
@@ -95,6 +96,18 @@ function TemplateList() {
 
 function EmailTemplatesPage() {
   const { isContextReady } = useWorkspace()
+  const { isAdmin } = useAuth()
+
+  if (!isAdmin) {
+    return (
+      <div className="flex flex-col gap-6 p-6">
+        <h1 className="text-2xl font-bold tracking-tight">Email Templates</h1>
+        <p className="text-muted-foreground">
+          You need admin permissions to manage email templates.
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-6">
