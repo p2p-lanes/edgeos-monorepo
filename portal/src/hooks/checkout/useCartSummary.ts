@@ -72,6 +72,7 @@ export function useCartSummary({
       merchSubtotal,
       patronSubtotal,
       insuranceSubtotal,
+      dynamicSubtotal: 0,
       subtotal: originalSubtotal,
       discount,
       credit,

@@ -16,6 +16,7 @@ import { Route as LayoutSettingsRouteImport } from './routes/_layout/settings'
 import { Route as LayoutPaymentsRouteImport } from './routes/_layout/payments'
 import { Route as LayoutAttendeesRouteImport } from './routes/_layout/attendees'
 import { Route as LayoutAbandonedCartsRouteImport } from './routes/_layout/abandoned-carts'
+import { Route as LayoutTicketingStepsIndexRouteImport } from './routes/_layout/ticketing-steps/index'
 import { Route as LayoutTenantsIndexRouteImport } from './routes/_layout/tenants/index'
 import { Route as LayoutProductsIndexRouteImport } from './routes/_layout/products/index'
 import { Route as LayoutPopupsIndexRouteImport } from './routes/_layout/popups/index'
@@ -83,6 +84,12 @@ const LayoutAbandonedCartsRoute = LayoutAbandonedCartsRouteImport.update({
   path: '/abandoned-carts',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutTicketingStepsIndexRoute =
+  LayoutTicketingStepsIndexRouteImport.update({
+    id: '/ticketing-steps/',
+    path: '/ticketing-steps/',
+    getParentRoute: () => LayoutRoute,
+  } as any)
 const LayoutTenantsIndexRoute = LayoutTenantsIndexRouteImport.update({
   id: '/tenants/',
   path: '/tenants/',
@@ -277,6 +284,7 @@ export interface FileRoutesByFullPath {
   '/popups/': typeof LayoutPopupsIndexRoute
   '/products/': typeof LayoutProductsIndexRoute
   '/tenants/': typeof LayoutTenantsIndexRoute
+  '/ticketing-steps/': typeof LayoutTicketingStepsIndexRoute
   '/admin/$id/edit': typeof LayoutAdminIdEditRoute
   '/coupons/$id/edit': typeof LayoutCouponsIdEditRoute
   '/email-templates/$type/edit': typeof LayoutEmailTemplatesTypeEditRoute
@@ -317,6 +325,7 @@ export interface FileRoutesByTo {
   '/popups': typeof LayoutPopupsIndexRoute
   '/products': typeof LayoutProductsIndexRoute
   '/tenants': typeof LayoutTenantsIndexRoute
+  '/ticketing-steps': typeof LayoutTicketingStepsIndexRoute
   '/admin/$id/edit': typeof LayoutAdminIdEditRoute
   '/coupons/$id/edit': typeof LayoutCouponsIdEditRoute
   '/email-templates/$type/edit': typeof LayoutEmailTemplatesTypeEditRoute
@@ -359,6 +368,7 @@ export interface FileRoutesById {
   '/_layout/popups/': typeof LayoutPopupsIndexRoute
   '/_layout/products/': typeof LayoutProductsIndexRoute
   '/_layout/tenants/': typeof LayoutTenantsIndexRoute
+  '/_layout/ticketing-steps/': typeof LayoutTicketingStepsIndexRoute
   '/_layout/admin/$id/edit': typeof LayoutAdminIdEditRoute
   '/_layout/coupons/$id/edit': typeof LayoutCouponsIdEditRoute
   '/_layout/email-templates/$type/edit': typeof LayoutEmailTemplatesTypeEditRoute
@@ -401,6 +411,7 @@ export interface FileRouteTypes {
     | '/popups/'
     | '/products/'
     | '/tenants/'
+    | '/ticketing-steps/'
     | '/admin/$id/edit'
     | '/coupons/$id/edit'
     | '/email-templates/$type/edit'
@@ -441,6 +452,7 @@ export interface FileRouteTypes {
     | '/popups'
     | '/products'
     | '/tenants'
+    | '/ticketing-steps'
     | '/admin/$id/edit'
     | '/coupons/$id/edit'
     | '/email-templates/$type/edit'
@@ -482,6 +494,7 @@ export interface FileRouteTypes {
     | '/_layout/popups/'
     | '/_layout/products/'
     | '/_layout/tenants/'
+    | '/_layout/ticketing-steps/'
     | '/_layout/admin/$id/edit'
     | '/_layout/coupons/$id/edit'
     | '/_layout/email-templates/$type/edit'
@@ -549,6 +562,13 @@ declare module '@tanstack/react-router' {
       path: '/abandoned-carts'
       fullPath: '/abandoned-carts'
       preLoaderRoute: typeof LayoutAbandonedCartsRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/ticketing-steps/': {
+      id: '/_layout/ticketing-steps/'
+      path: '/ticketing-steps'
+      fullPath: '/ticketing-steps/'
+      preLoaderRoute: typeof LayoutTicketingStepsIndexRouteImport
       parentRoute: typeof LayoutRoute
     }
     '/_layout/tenants/': {
@@ -805,6 +825,7 @@ interface LayoutRouteChildren {
   LayoutPopupsIndexRoute: typeof LayoutPopupsIndexRoute
   LayoutProductsIndexRoute: typeof LayoutProductsIndexRoute
   LayoutTenantsIndexRoute: typeof LayoutTenantsIndexRoute
+  LayoutTicketingStepsIndexRoute: typeof LayoutTicketingStepsIndexRoute
   LayoutAdminIdEditRoute: typeof LayoutAdminIdEditRoute
   LayoutCouponsIdEditRoute: typeof LayoutCouponsIdEditRoute
   LayoutEmailTemplatesTypeEditRoute: typeof LayoutEmailTemplatesTypeEditRoute
@@ -845,6 +866,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutPopupsIndexRoute: LayoutPopupsIndexRoute,
   LayoutProductsIndexRoute: LayoutProductsIndexRoute,
   LayoutTenantsIndexRoute: LayoutTenantsIndexRoute,
+  LayoutTicketingStepsIndexRoute: LayoutTicketingStepsIndexRoute,
   LayoutAdminIdEditRoute: LayoutAdminIdEditRoute,
   LayoutCouponsIdEditRoute: LayoutCouponsIdEditRoute,
   LayoutEmailTemplatesTypeEditRoute: LayoutEmailTemplatesTypeEditRoute,

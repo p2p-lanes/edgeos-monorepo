@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from app.api.popup.models import Popups
     from app.api.product.models import Products
     from app.api.tenant.credential_models import TenantCredentials
+    from app.api.ticketing_step.models import TicketingSteps
     from app.api.user.models import Users
 
 
@@ -74,5 +75,8 @@ class Tenants(TenantBase, table=True):
         back_populates="tenant", cascade_delete=True
     )
     base_field_configs: list["BaseFieldConfigs"] = Relationship(
+        back_populates="tenant", cascade_delete=True
+    )
+    ticketing_steps: list["TicketingSteps"] = Relationship(
         back_populates="tenant", cascade_delete=True
     )

@@ -1384,9 +1384,9 @@ export type ProductBatchResult = {
 };
 
 /**
- * Product categories determining which fields are relevant.
+ * Product category — free-form string; known built-ins: ticket, housing, merch, other, patreon.
  */
-export type ProductCategory = 'ticket' | 'housing' | 'merch' | 'other' | 'patreon';
+export type ProductCategory = string;
 
 /**
  * Product schema for creation.
@@ -2593,6 +2593,12 @@ export type PopupsGetPortalPopupData = {
 
 export type PopupsGetPortalPopupResponse = (PopupPublic);
 
+export type ProductsListProductCategoriesData = {
+    popupId: string;
+};
+
+export type ProductsListProductCategoriesResponse = (Array<string>);
+
 export type ProductsListProductsData = {
     category?: (ProductCategory | null);
     isActive?: (boolean | null);
@@ -2770,3 +2776,86 @@ export type UsersDeleteUserData = {
 };
 
 export type UsersDeleteUserResponse = (void);
+
+export type TicketingStepPublic = {
+    id: string;
+    tenant_id: string;
+    popup_id: string;
+    step_type: string;
+    title: string;
+    description?: (string | null);
+    order?: number;
+    is_enabled?: boolean;
+    protected?: boolean;
+    product_category?: (string | null);
+    display_variant?: (string | null);
+};
+
+export type TicketingStepCreate = {
+    popup_id: string;
+    step_type: string;
+    title: string;
+    description?: (string | null);
+    order?: number;
+    is_enabled?: boolean;
+    product_category?: (string | null);
+    display_variant?: (string | null);
+};
+
+export type TicketingStepUpdate = {
+    title?: (string | null);
+    description?: (string | null);
+    order?: (number | null);
+    is_enabled?: (boolean | null);
+    product_category?: (string | null);
+    display_variant?: (string | null);
+};
+
+export type ListModel_TicketingStepPublic_ = {
+    results: Array<TicketingStepPublic>;
+    paging: Paging;
+};
+
+export type TicketingStepsListTicketingStepsData = {
+    limit?: number;
+    popupId?: (string | null);
+    skip?: number;
+    xTenantId?: (string | null);
+};
+
+export type TicketingStepsListTicketingStepsResponse = (ListModel_TicketingStepPublic_);
+
+export type TicketingStepsCreateTicketingStepData = {
+    requestBody: TicketingStepCreate;
+    xTenantId?: (string | null);
+};
+
+export type TicketingStepsCreateTicketingStepResponse = (TicketingStepPublic);
+
+export type TicketingStepsGetTicketingStepData = {
+    stepId: string;
+    xTenantId?: (string | null);
+};
+
+export type TicketingStepsGetTicketingStepResponse = (TicketingStepPublic);
+
+export type TicketingStepsUpdateTicketingStepData = {
+    requestBody: TicketingStepUpdate;
+    stepId: string;
+    xTenantId?: (string | null);
+};
+
+export type TicketingStepsUpdateTicketingStepResponse = (TicketingStepPublic);
+
+export type TicketingStepsDeleteTicketingStepData = {
+    stepId: string;
+    xTenantId?: (string | null);
+};
+
+export type TicketingStepsDeleteTicketingStepResponse = (void);
+
+export type TicketingStepsListPortalTicketingStepsData = {
+    popupId: string;
+};
+
+export type TicketingStepsListPortalTicketingStepsResponse = (ListModel_TicketingStepPublic_);

@@ -6,6 +6,7 @@ import {
   FileText,
   FormInput,
   Home,
+  LayoutList,
   Mail,
   Package,
   ShoppingCart,
@@ -56,6 +57,7 @@ const popupItems: Item[] = [
   { icon: Tag, title: "Coupons", path: "/coupons" },
   { icon: UsersRound, title: "Groups", path: "/groups" },
   { icon: FormInput, title: "Form Builder", path: "/form-builder" },
+  { icon: LayoutList, title: "Ticketing Steps", path: "/ticketing-steps" },
   { icon: Mail, title: "Email Templates", path: "/email-templates" },
 ]
 

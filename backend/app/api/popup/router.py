@@ -11,6 +11,7 @@ from app.api.approval_strategy.schemas import (
 from app.api.base_field_config.constants import DEFAULT_SECTIONS
 from app.api.base_field_config.crud import base_field_configs_crud
 from app.api.form_section.models import FormSections
+from app.api.ticketing_step.constants import seed_ticketing_steps_for_popup
 from app.api.popup import crud
 from app.api.popup.schemas import (
     PopupAdmin,
@@ -150,6 +151,8 @@ async def create_popup(
         tenant_id=popup.tenant_id,
         section_map=section_map,
     )
+
+    seed_ticketing_steps_for_popup(db, popup_id=popup.id, tenant_id=popup.tenant_id)
 
     return PopupAdmin.model_validate(popup)
 

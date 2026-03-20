@@ -3,7 +3,7 @@ import uuid
 from sqlmodel import Session, col, select
 
 from app.api.product.models import Products
-from app.api.product.schemas import ProductCategory, ProductCreate, ProductUpdate
+from app.api.product.schemas import ProductCreate, ProductUpdate
 from app.api.shared.crud import BaseCRUD
 
 SORT_FIELDS = {"name", "price", "attendee_category", "is_active"}
@@ -45,7 +45,7 @@ class ProductsCRUD(BaseCRUD[Products, ProductCreate, ProductUpdate]):
         skip: int = 0,
         limit: int = 100,
         is_active: bool | None = None,
-        category: ProductCategory | None = None,
+        category: str | None = None,
         search: str | None = None,
         sort_by: str | None = None,
         sort_order: str = "desc",

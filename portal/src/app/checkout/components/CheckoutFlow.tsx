@@ -10,16 +10,16 @@ import type { AttendeeCategory } from "@/types/Attendee"
 import type { CheckoutStep } from "@/types/checkout"
 import CartFooter from "./CartFooter"
 import CheckoutSkeleton from "./CheckoutSkeleton"
-import ConfirmStep from "./steps/ConfirmStep"
-import HousingStep from "./steps/HousingStep"
-import MerchSection from "./steps/MerchSection"
+import DynamicProductStep from "./DynamicProductStep"
 import PassSelectionSection from "./steps/PassSelectionSection"
-import PatronSection from "./steps/PatronSection"
 import SuccessStep from "./steps/SuccessStep"
+import { STEP_COMPONENT_REGISTRY } from "./stepRegistry"
 
-function getStepTitle(step: CheckoutStep): string {
+// Fallback titles/subtitles when stepConfigs aren't loaded yet
+function getDefaultStepTitle(step: CheckoutStep): string {
   switch (step) {
     case "passes":
+    case "tickets":
       return "Select Your Passes"
     case "housing":
       return "Choose Housing"
@@ -27,6 +27,8 @@ function getStepTitle(step: CheckoutStep): string {
       return "Event Merchandise"
     case "patron":
       return "Become a Patron"
+    case "insurance_checkout":
+      return "Insurance"
     case "confirm":
       return "Review & Confirm"
     case "success":
@@ -36,9 +38,10 @@ function getStepTitle(step: CheckoutStep): string {
   }
 }
 
-function getStepSubtitle(step: CheckoutStep): string {
+function getDefaultStepSubtitle(step: CheckoutStep): string {
   switch (step) {
     case "passes":
+    case "tickets":
       return "Choose passes for yourself and family members"
     case "housing":
       return "Optional: Book accommodation for your stay"
@@ -46,6 +49,8 @@ function getStepSubtitle(step: CheckoutStep): string {
       return "Optional: Pick up exclusive merch at the event"
     case "patron":
       return "Optional: Support the community with a contribution"
+    case "insurance_checkout":
+      return "Optional: Protect your purchase"
     case "confirm":
       return "Review your order before payment"
     case "success":
@@ -71,6 +76,7 @@ export default function CheckoutFlow({
   const {
     currentStep,
     availableSteps,
+    stepConfigs,
     goToNextStep,
     goToPreviousStep,
     goToStep,
@@ -127,44 +133,62 @@ export default function CheckoutFlow({
     }
   }
 
+  // Lookup API-driven title/subtitle for current step.
+  // API step_type "tickets" corresponds to internal "passes".
+  const stepConfig = stepConfigs.find(
+    (s) =>
+      s.step_type === currentStep ||
+      (s.step_type === "tickets" && currentStep === "passes"),
+  )
+
+  const stepTitle = stepConfig?.title ?? getDefaultStepTitle(currentStep)
+  const stepSubtitle = stepConfig?.description ?? getDefaultStepSubtitle(currentStep)
+
   const renderStepContent = () => {
-    switch (currentStep) {
-      case "passes":
-        return (
-          <AnimatePresence mode="wait">
-            {isLoading ? (
-              <CheckoutSkeleton key="skeleton" />
-            ) : (
-              <PassSelectionSection
-                key="passes"
-                onAddAttendee={onAddAttendee}
-              />
-            )}
-          </AnimatePresence>
-        )
-      case "housing":
-        return housingProducts.length > 0 ? (
-          <HousingStep onSkip={handleSkip} />
-        ) : null
-      case "merch":
-        return merchProducts.length > 0 ? (
-          <MerchSection onSkip={handleSkip} />
-        ) : null
-      case "patron":
-        return patronProducts.length > 0 ? (
-          <PatronSection onSkip={handleSkip} />
-        ) : null
-      case "confirm":
-        return <ConfirmStep />
-      case "success":
-        return (
-          <SuccessStep
-            paymentStatus={isSimpleFIReturn ? paymentStatus : "approved"}
-          />
-        )
-      default:
-        return null
+    // Passes step has special loading / onAddAttendee handling
+    if (currentStep === "passes" || currentStep === "tickets") {
+      return (
+        <AnimatePresence mode="wait">
+          {isLoading ? (
+            <CheckoutSkeleton key="skeleton" />
+          ) : (
+            <PassSelectionSection
+              key="passes"
+              onAddAttendee={onAddAttendee}
+            />
+          )}
+        </AnimatePresence>
+      )
     }
+
+    // Success step has special paymentStatus prop
+    if (currentStep === "success") {
+      return (
+        <SuccessStep
+          paymentStatus={isSimpleFIReturn ? paymentStatus : "approved"}
+        />
+      )
+    }
+
+    // Product-availability guards for optional steps
+    if (currentStep === "housing" && housingProducts.length === 0) return null
+    if (currentStep === "merch" && merchProducts.length === 0) return null
+    if (currentStep === "patron" && patronProducts.length === 0) return null
+
+    // Registry lookup — covers housing, merch, patron, insurance_checkout,
+    // and any future step types added to STEP_COMPONENT_REGISTRY
+    const StepComponent = STEP_COMPONENT_REGISTRY[currentStep]
+    if (StepComponent) {
+      return <StepComponent onSkip={handleSkip} />
+    }
+
+    // Custom step — render dynamically based on step config
+    const currentStepConfig = stepConfigs.find((s) => s.step_type === currentStep)
+    if (currentStepConfig) {
+      return <DynamicProductStep stepConfig={currentStepConfig} onSkip={handleSkip} />
+    }
+
+    return null
   }
 
   const showHeader = currentStep !== "success"
@@ -176,9 +200,9 @@ export default function CheckoutFlow({
         {showHeader && (
           <div className="mb-6">
             <h1 className="text-2xl font-bold tracking-tight text-gray-900">
-              {getStepTitle(currentStep)}
+              {stepTitle}
             </h1>
-            <p className="text-gray-500 mt-1">{getStepSubtitle(currentStep)}</p>
+            <p className="text-gray-500 mt-1">{stepSubtitle}</p>
           </div>
         )}
 
