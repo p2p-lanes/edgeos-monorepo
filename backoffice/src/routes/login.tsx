@@ -144,6 +144,13 @@ function Login() {
               name="email"
               validators={{
                 onBlur: ({ value }) => {
+                  if (!value) return undefined
+                  const result = emailSchema.safeParse(value)
+                  return result.success
+                    ? undefined
+                    : result.error.issues[0].message
+                },
+                onSubmit: ({ value }) => {
                   const result = emailSchema.safeParse(value)
                   return result.success
                     ? undefined
@@ -202,6 +209,13 @@ function Login() {
               name="code"
               validators={{
                 onBlur: ({ value }) => {
+                  if (!value) return undefined
+                  const result = codeSchema.safeParse(value)
+                  return result.success
+                    ? undefined
+                    : result.error.issues[0].message
+                },
+                onSubmit: ({ value }) => {
                   const result = codeSchema.safeParse(value)
                   return result.success
                     ? undefined
