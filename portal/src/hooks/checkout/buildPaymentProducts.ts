@@ -1,6 +1,7 @@
 import type { PaymentProductRequest } from "@/client"
 import type { AttendeePassState } from "@/types/Attendee"
 import type {
+  SelectedDynamicItem,
   SelectedHousingItem,
   SelectedMerchItem,
   SelectedPassItem,
@@ -13,6 +14,7 @@ interface BuildPaymentProductsParams {
   housing: SelectedHousingItem | null
   merch: SelectedMerchItem[]
   patron: SelectedPatronItem | null
+  dynamicItems: Record<string, SelectedDynamicItem[]>
   isEditing: boolean
   appCredit: string | number | null | undefined
 }
@@ -61,6 +63,7 @@ export function buildPaymentProducts({
   housing,
   merch,
   patron,
+  dynamicItems,
   isEditing,
   appCredit,
 }: BuildPaymentProductsParams): BuildPaymentProductsResult {
@@ -163,6 +166,20 @@ export function buildPaymentProducts({
         attendee_id: firstAttendeeId,
         quantity: 1,
       })
+    }
+
+    // Add dynamic step items
+    const firstAttendeeId = selectedPasses[0]?.attendeeId ?? ""
+    for (const items of Object.values(dynamicItems)) {
+      for (const item of items) {
+        if (item.quantity > 0) {
+          products.push({
+            product_id: item.productId,
+            attendee_id: firstAttendeeId,
+            quantity: item.quantity,
+          })
+        }
+      }
     }
   }
 

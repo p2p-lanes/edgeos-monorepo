@@ -9,6 +9,7 @@ import { queryKeys } from "@/lib/query-keys"
 import type { AttendeePassState } from "@/types/Attendee"
 import type {
   CheckoutStep,
+  SelectedDynamicItem,
   SelectedHousingItem,
   SelectedMerchItem,
   SelectedPassItem,
@@ -25,6 +26,7 @@ interface UsePaymentSubmitParams {
   housing: SelectedHousingItem | null
   merch: SelectedMerchItem[]
   patron: SelectedPatronItem | null
+  dynamicItems: Record<string, SelectedDynamicItem[]>
   promoCode: string
   promoCodeValid: boolean
   insurance: boolean
@@ -50,6 +52,7 @@ export function usePaymentSubmit({
   housing,
   merch,
   patron,
+  dynamicItems,
   promoCode,
   promoCodeValid,
   insurance,
@@ -100,6 +103,7 @@ export function usePaymentSubmit({
           housing,
           merch,
           patron,
+          dynamicItems,
           isEditing,
           appCredit,
         },
@@ -173,6 +177,7 @@ export function usePaymentSubmit({
     merch,
     housing,
     patron,
+    dynamicItems,
     promoCodeValid,
     promoCode,
     insurance,

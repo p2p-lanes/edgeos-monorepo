@@ -509,6 +509,7 @@ export function CheckoutProvider({
     housing,
     merch,
     patron,
+    dynamicItems,
     promoCode,
     promoCodeValid,
     insurance,

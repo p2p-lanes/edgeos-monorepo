@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import useCustomToast from "@/hooks/useCustomToast"
 import { createErrorHandler } from "@/utils"
-import { getStepTypeDefinition } from "./constants"
+import { DISPLAY_VARIANT_DEFINITIONS, getStepTypeDefinition } from "./constants"
 
 interface SortableStepCardProps {
   step: TicketingStepPublic
@@ -55,6 +55,7 @@ export function SortableStepCard({ step, onEdit }: SortableStepCardProps) {
 
   const stepDef = getStepTypeDefinition(step.step_type)
   const Icon = stepDef?.icon
+  const variantDef = DISPLAY_VARIANT_DEFINITIONS.find((v) => v.key === step.display_variant)
 
   const handleTitleClick = () => {
     setTitleDraft(step.title)
@@ -120,6 +121,9 @@ export function SortableStepCard({ step, onEdit }: SortableStepCardProps) {
           </button>
         )}
         <p className="text-xs text-muted-foreground">{step.step_type}</p>
+        {variantDef && (
+          <p className="text-xs text-muted-foreground/70">{variantDef.label}</p>
+        )}
       </div>
 
       {/* Protected badge */}

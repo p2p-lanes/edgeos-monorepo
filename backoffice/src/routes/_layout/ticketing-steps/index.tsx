@@ -2,17 +2,15 @@ import {
   closestCenter,
   DndContext,
   type DragEndEvent,
-  type DragOverEvent,
-  KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
 } from "@dnd-kit/core"
-import { arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable"
+import { arrayMove } from "@dnd-kit/sortable"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
 import { Loader2 } from "lucide-react"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 
 import { type TicketingStepPublic, TicketingStepsService } from "@/client"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
@@ -20,7 +18,6 @@ import { AddStepDialog } from "@/components/ticketing-step-builder/AddStepDialog
 import { StepCanvas } from "@/components/ticketing-step-builder/StepCanvas"
 import { StepConfigPanel } from "@/components/ticketing-step-builder/StepConfigPanel"
 import { Button } from "@/components/ui/button"
-import { Sheet } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
@@ -68,7 +65,7 @@ function TicketingStepsContent({ popupId }: { popupId: string }) {
     null,
   )
   const [addDialogOpen, setAddDialogOpen] = useState(false)
-  const [liveOrder, setLiveOrder] = useState<string[] | null>(null)
+  const [displayOrder, setDisplayOrder] = useState<string[]>([])
 
   const { data: stepsData, isLoading } = useQuery({
     queryKey: ["ticketing-steps", popupId],
@@ -84,18 +81,19 @@ function TicketingStepsContent({ popupId }: { popupId: string }) {
     return [...stepsData.results].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
   }, [stepsData])
 
+  useEffect(() => {
+    setDisplayOrder(steps.map((s) => s.id))
+  }, [steps])
+
   const orderedSteps = useMemo(() => {
-    if (!liveOrder) return steps
-    return liveOrder
+    if (!displayOrder.length) return steps
+    return displayOrder
       .map((id) => steps.find((s) => s.id === id))
       .filter(Boolean) as TicketingStepPublic[]
-  }, [steps, liveOrder])
+  }, [steps, displayOrder])
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    }),
   )
 
   const updateStepMutation = useMutation({
@@ -121,35 +119,15 @@ function TicketingStepsContent({ popupId }: { popupId: string }) {
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
-    if (!over || active.id === over.id) {
-      setLiveOrder(null)
-      return
-    }
-
-    const currentOrder = liveOrder ?? steps.map((s) => s.id)
-    const oldIndex = currentOrder.indexOf(String(active.id))
-    const newIndex = currentOrder.indexOf(String(over.id))
-
-    if (oldIndex === -1 || newIndex === -1) {
-      setLiveOrder(null)
-      return
-    }
-
-    const reordered = arrayMove(currentOrder, oldIndex, newIndex)
-    setLiveOrder(null)
-    persistStepOrder(reordered)
-  }
-
-  const handleDragOver = (event: DragOverEvent) => {
-    const { active, over } = event
     if (!over || active.id === over.id) return
 
-    const currentOrder = liveOrder ?? steps.map((s) => s.id)
-    const oldIndex = currentOrder.indexOf(String(active.id))
-    const newIndex = currentOrder.indexOf(String(over.id))
-
+    const oldIndex = displayOrder.indexOf(String(active.id))
+    const newIndex = displayOrder.indexOf(String(over.id))
     if (oldIndex === -1 || newIndex === -1) return
-    setLiveOrder(arrayMove(currentOrder, oldIndex, newIndex))
+
+    const newOrder = arrayMove(displayOrder, oldIndex, newIndex)
+    setDisplayOrder(newOrder)
+    persistStepOrder(newOrder)
   }
 
   if (isLoading) {
@@ -183,7 +161,6 @@ function TicketingStepsContent({ popupId }: { popupId: string }) {
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
-          onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
         >
           <StepCanvas steps={orderedSteps} onEdit={setSelectedStep} />
@@ -197,19 +174,14 @@ function TicketingStepsContent({ popupId }: { popupId: string }) {
         </div>
       )}
 
-      <Sheet
-        open={!!selectedStep}
-        onOpenChange={(open) => {
-          if (!open) setSelectedStep(null)
-        }}
-      >
-        {selectedStep && (
-          <StepConfigPanel
-            step={selectedStep}
-            onClose={() => setSelectedStep(null)}
-          />
-        )}
-      </Sheet>
+      {selectedStep && (
+        <StepConfigPanel
+          step={selectedStep}
+          open={!!selectedStep}
+          onOpenChange={(open) => { if (!open) setSelectedStep(null) }}
+          onClose={() => setSelectedStep(null)}
+        />
+      )}
 
       <AddStepDialog
         open={addDialogOpen}

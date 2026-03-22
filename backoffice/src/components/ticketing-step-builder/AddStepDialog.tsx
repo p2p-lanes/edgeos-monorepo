@@ -13,6 +13,13 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { LoadingButton } from "@/components/ui/loading-button"
 import { cn } from "@/lib/utils"
 import useCustomToast from "@/hooks/useCustomToast"
@@ -39,11 +46,8 @@ export function AddStepDialog({ open, onOpenChange, popupId, nextOrder }: AddSte
 
   const [title, setTitle] = useState("")
   const [stepType, setStepType] = useState("")
-  const [stepTypeEdited, setStepTypeEdited] = useState(false)
   const [productCategory, setProductCategory] = useState("")
-  const [categoryInput, setCategoryInput] = useState("")
   const [displayVariant, setDisplayVariant] = useState("")
-  const [showSuggestions, setShowSuggestions] = useState(false)
 
   const { data: categorySuggestions } = useQuery({
     queryKey: ["product-categories", popupId],
@@ -51,23 +55,15 @@ export function AddStepDialog({ open, onOpenChange, popupId, nextOrder }: AddSte
     enabled: !!popupId && open,
   })
 
-  const filteredSuggestions = (categorySuggestions ?? []).filter(
-    (c) => c.toLowerCase().includes(categoryInput.toLowerCase()) && c !== categoryInput
-  )
-
   const handleTitleChange = (value: string) => {
     setTitle(value)
-    if (!stepTypeEdited) {
-      setStepType(toKebabCase(value))
-    }
+    setStepType(toKebabCase((productCategory ? productCategory + "-" : "") + value))
   }
 
   const reset = () => {
     setTitle("")
     setStepType("")
-    setStepTypeEdited(false)
     setProductCategory("")
-    setCategoryInput("")
     setDisplayVariant("")
   }
 
@@ -115,52 +111,26 @@ export function AddStepDialog({ open, onOpenChange, popupId, nextOrder }: AddSte
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="add-step-type">Step Type (slug)</Label>
-            <Input
-              id="add-step-type"
-              value={stepType}
-              onChange={(e) => { setStepType(e.target.value); setStepTypeEdited(true) }}
-              placeholder="e.g. ticket-fly"
-            />
-            <p className="text-xs text-muted-foreground">
-              Unique identifier. Auto-generated from title.
-            </p>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
             <Label htmlFor="add-product-category">Product Category</Label>
-            <div className="relative">
-              <Input
-                id="add-product-category"
-                value={categoryInput}
-                onChange={(e) => {
-                  setCategoryInput(e.target.value)
-                  setProductCategory(e.target.value)
-                  setShowSuggestions(true)
-                }}
-                onFocus={() => setShowSuggestions(true)}
-                onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-                placeholder="e.g. ticket-fly"
-              />
-              {showSuggestions && filteredSuggestions.length > 0 && (
-                <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md">
-                  {filteredSuggestions.map((cat) => (
-                    <button
-                      key={cat}
-                      type="button"
-                      className="w-full px-3 py-2 text-left text-sm hover:bg-accent"
-                      onMouseDown={() => {
-                        setCategoryInput(cat)
-                        setProductCategory(cat)
-                        setShowSuggestions(false)
-                      }}
-                    >
-                      {cat}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <Select
+              value={productCategory}
+              onValueChange={(val) => {
+                setProductCategory(val)
+                setStepType(toKebabCase((val ? val + "-" : "") + title))
+              }}
+            >
+              <SelectTrigger id="add-product-category">
+                <SelectValue placeholder="None" />
+              </SelectTrigger>
+              <SelectContent>
+                {productCategory && !(categorySuggestions ?? []).includes(productCategory) && (
+                  <SelectItem value={productCategory}>{productCategory}</SelectItem>
+                )}
+                {(categorySuggestions ?? []).map((cat) => (
+                  <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <p className="text-xs text-muted-foreground">
               Products with this category will appear in this step.
             </p>
