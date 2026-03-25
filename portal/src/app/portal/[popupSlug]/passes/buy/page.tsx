@@ -1,13 +1,12 @@
 "use client"
 
-import { useParams, useRouter, useSearchParams } from "next/navigation"
-import CheckoutFlow from "@/app/checkout/components/CheckoutFlow"
+import { useParams, useRouter } from "next/navigation"
+import ScrollyCheckoutFlow from "@/app/checkout/components/ScrollyCheckoutFlow"
 import { Loader } from "@/components/ui/Loader"
 import useAttendee from "@/hooks/useAttendee"
 import { CheckoutProvider } from "@/providers/checkoutProvider"
 import PassesProvider, { usePassesProvider } from "@/providers/passesProvider"
 import type { AttendeeCategory, AttendeePassState } from "@/types/Attendee"
-import type { CheckoutStep } from "@/types/checkout"
 import { AttendeeModal } from "../components/AttendeeModal"
 import useModal from "../hooks/useModal"
 import usePermission from "../hooks/usePermission"
@@ -17,13 +16,9 @@ export default function BuyPassesPage() {
 
   const params = useParams()
   const router = useRouter()
-  const searchParams = useSearchParams()
   const { attendeePasses: attendees, products } = usePassesProvider()
   const { handleOpenModal, handleCloseModal, modal } = useModal()
   const { addAttendee } = useAttendee()
-
-  const isCheckoutSuccess = searchParams.has("checkout", "success")
-  const initialStep: CheckoutStep = isCheckoutSuccess ? "success" : "passes"
 
   const handleBack = () => {
     router.push(`/portal/${params.popupSlug}/passes`)
@@ -48,10 +43,10 @@ export default function BuyPassesPage() {
   if (!attendees.length || !products.length) return <Loader />
 
   return (
-    <div className="w-full md:mt-0 mx-auto items-center max-w-3xl bg-[#F5F5F7]">
+    <div className="w-full md:mt-0 mx-auto items-center max-w-3xl ">
       <PassesProvider restoreFromCart>
-        <CheckoutProvider initialStep={initialStep}>
-          <CheckoutFlow
+        <CheckoutProvider initialStep="passes">
+          <ScrollyCheckoutFlow
             onBack={handleBack}
             onAddAttendee={handleAddAttendee}
             onPaymentComplete={() => {}}
