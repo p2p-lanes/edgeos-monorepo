@@ -40,15 +40,17 @@ export function StepConfigPanel({ step, open, onOpenChange, onClose }: StepConfi
 
   const [title, setTitle] = useState(step.title)
   const [description, setDescription] = useState(step.description ?? "")
+  const [watermark, setWatermark] = useState(step.watermark ?? "")
   const [productCategory, setProductCategory] = useState(step.product_category ?? "")
   const [displayVariant, setDisplayVariant] = useState(step.display_variant ?? "")
 
   useEffect(() => {
     setTitle(step.title)
     setDescription(step.description ?? "")
+    setWatermark(step.watermark ?? "")
     setProductCategory(step.product_category ?? "")
     setDisplayVariant(step.display_variant ?? "")
-  }, [step.id, step.title, step.description, step.product_category, step.display_variant])
+  }, [step.id, step.title, step.description, step.watermark, step.product_category, step.display_variant])
 
   const { data: categorySuggestions } = useQuery({
     queryKey: ["product-categories", step.popup_id],
@@ -73,6 +75,7 @@ export function StepConfigPanel({ step, open, onOpenChange, onClose }: StepConfi
         requestBody: {
           title,
           description: description || null,
+          watermark: watermark || null,
           product_category: productCategory || null,
           display_variant: displayVariant || null,
         },
@@ -112,6 +115,19 @@ export function StepConfigPanel({ step, open, onOpenChange, onClose }: StepConfi
               placeholder="Optional description shown to customers"
               rows={3}
             />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="step-watermark">Watermark Text</Label>
+            <Input
+              id="step-watermark"
+              value={watermark}
+              onChange={(e) => setWatermark(e.target.value)}
+              placeholder="Short text shown as background watermark (e.g., Passes)"
+            />
+            <p className="text-xs text-muted-foreground">
+              Large decorative text shown behind the section header in snap layout.
+            </p>
           </div>
 
           <div className="flex flex-col gap-1.5">

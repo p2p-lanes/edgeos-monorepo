@@ -121,6 +121,9 @@ export function SortableStepCard({ step, onEdit }: SortableStepCardProps) {
           </button>
         )}
         <p className="text-xs text-muted-foreground">{step.step_type}</p>
+        {step.description && (
+          <p className="text-xs text-muted-foreground truncate">{step.description}</p>
+        )}
         {variantDef && (
           <p className="text-xs text-muted-foreground/70">{variantDef.label}</p>
         )}

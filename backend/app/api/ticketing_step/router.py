@@ -10,17 +10,18 @@ from app.api.ticketing_step.schemas import (
 )
 from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
-from app.core.dependencies.users import CurrentUser, CurrentWriter, SessionDep, TenantSession
+from app.core.dependencies.users import CurrentHuman, CurrentUser, CurrentWriter, HumanTenantSession, SessionDep, TenantSession
 
 router = APIRouter(prefix="/ticketing-steps", tags=["ticketing-steps"])
 
 
 @router.get("/portal", response_model=ListModel[TicketingStepPublic])
 async def list_portal_ticketing_steps(
-    db: SessionDep,
+    db: HumanTenantSession,
+    _: CurrentHuman,
     popup_id: uuid.UUID,
 ) -> ListModel[TicketingStepPublic]:
-    """List enabled ticketing steps for a popup (no auth required, portal-facing)."""
+    """List enabled ticketing steps for a popup (portal-facing)."""
     steps = crud.ticketing_steps_crud.find_portal_by_popup(db, popup_id=popup_id)
     return ListModel[TicketingStepPublic](
         results=[TicketingStepPublic.model_validate(s) for s in steps],

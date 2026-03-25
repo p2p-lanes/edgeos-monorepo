@@ -2789,6 +2789,7 @@ export type TicketingStepPublic = {
     protected?: boolean;
     product_category?: (string | null);
     display_variant?: (string | null);
+    watermark?: (string | null);
 };
 
 export type TicketingStepCreate = {
@@ -2800,6 +2801,7 @@ export type TicketingStepCreate = {
     is_enabled?: boolean;
     product_category?: (string | null);
     display_variant?: (string | null);
+    watermark?: (string | null);
 };
 
 export type TicketingStepUpdate = {
@@ -2809,6 +2811,7 @@ export type TicketingStepUpdate = {
     is_enabled?: (boolean | null);
     product_category?: (string | null);
     display_variant?: (string | null);
+    watermark?: (string | null);
 };
 
 export type ListModel_TicketingStepPublic_ = {

@@ -15,6 +15,7 @@ class TicketingStepBase(SQLModel):
     protected: bool = Field(default=False)
     product_category: str | None = Field(default=None, nullable=True)
     display_variant: str | None = Field(default=None, nullable=True)
+    watermark: str | None = Field(default=None, nullable=True)
 
 
 class TicketingStepPublic(BaseModel):
@@ -29,6 +30,7 @@ class TicketingStepPublic(BaseModel):
     protected: bool = False
     product_category: str | None = None
     display_variant: str | None = None
+    watermark: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -42,6 +44,7 @@ class TicketingStepCreate(BaseModel):
     is_enabled: bool = True
     product_category: str | None = None
     display_variant: str | None = None
+    watermark: str | None = None
 
 
 class TicketingStepUpdate(BaseModel):
@@ -51,3 +54,4 @@ class TicketingStepUpdate(BaseModel):
     is_enabled: bool | None = None
     product_category: str | None = None
     display_variant: str | None = None
+    watermark: str | None = None

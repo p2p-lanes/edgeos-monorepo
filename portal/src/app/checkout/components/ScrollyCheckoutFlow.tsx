@@ -38,6 +38,7 @@ import ScrollySectionNav, {
   type WatermarkStyle,
 } from "./ScrollySectionNav"
 import ConfirmStep from "./steps/ConfirmStep"
+import DynamicProductStep from "./DynamicProductStep"
 import HousingStep from "./steps/HousingStep"
 import MerchSection from "./steps/MerchSection"
 import PassSelectionSection from "./steps/PassSelectionSection"
@@ -864,8 +865,13 @@ function ScrollyCheckoutFlowInner({
   onBack,
 }: ScrollyCheckoutFlowProps) {
   const { variant } = useDesignVariant()
-  const { housingProducts, merchProducts, patronProducts, submitPayment } =
+  const { availableSteps, submitPayment, stepConfigs } =
     useCheckout()
+
+  const getStepConfig = (stepType: string) =>
+    stepConfigs.find(
+      (s) => s.step_type === stepType || (s.step_type === "tickets" && stepType === "passes"),
+    )
 
   const searchParams = useSearchParams()
   const { getRelevantApplication } = useApplication()
@@ -960,20 +966,29 @@ function ScrollyCheckoutFlowInner({
     localStorage.setItem(WATERMARK_STYLE_STORAGE_KEY, v)
   }
 
-  // Build sections list (respects available products)
+  // Build sections list from availableSteps (respects is_enabled + order + product availability)
   const allSections = useMemo(() => {
-    const list: { id: string; label: string }[] = [
-      { id: "passes", label: "Select Your Passes" },
-    ]
-    if (housingProducts.length > 0)
-      list.push({ id: "housing", label: "Choose Housing" })
-    if (merchProducts.length > 0)
-      list.push({ id: "merch", label: "Event Merchandise" })
-    if (patronProducts.length > 0)
-      list.push({ id: "patron", label: "Become a Patron" })
-    list.push({ id: "confirm", label: "Review & Confirm" })
-    return list
-  }, [housingProducts, merchProducts, patronProducts])
+    return availableSteps
+      .filter((s) => s !== "success")
+      .map((step) => {
+        const config = stepConfigs.find(
+          (c) => c.step_type === step || (c.step_type === "tickets" && step === "passes"),
+        )
+        const defaultLabels: Record<string, string> = {
+          passes: "Select Your Passes",
+          tickets: "Select Your Passes",
+          housing: "Choose Housing",
+          merch: "Event Merchandise",
+          patron: "Become a Patron",
+          insurance_checkout: "Insurance",
+          confirm: "Review & Confirm",
+        }
+        return {
+          id: step,
+          label: config?.title ?? defaultLabels[step] ?? step,
+        }
+      })
+  }, [availableSteps, stepConfigs])
 
   const goToConfirm = useCallback(() => {
     const idx = allSections.findIndex((s) => s.id === "confirm")
@@ -1173,6 +1188,27 @@ function ScrollyCheckoutFlowInner({
     }
   }, [variant, allSections])
 
+  const renderSectionContent = (stepId: string) => {
+    switch (stepId) {
+      case "passes":
+      case "tickets":
+        return <PassSelectionSection onAddAttendee={onAddAttendee} />
+      case "housing":
+        return <HousingStep onSkip={() => {}} />
+      case "merch":
+        return <MerchSection onSkip={() => {}} />
+      case "patron":
+        return <PatronSection onSkip={() => {}} />
+      case "confirm":
+        return <ConfirmStep />
+      default: {
+        const config = getStepConfig(stepId)
+        if (config) return <DynamicProductStep stepConfig={config} onSkip={() => {}} />
+        return null
+      }
+    }
+  }
+
   if (isSimpleFIReturn) {
     return (
       <div className="min-h-screen">
@@ -1195,66 +1231,21 @@ function ScrollyCheckoutFlowInner({
           variant={navDesign}
         />
         {/* Sections — overflow/scroll is applied to <main> via useEffect */}
-        <SnapSection id="passes">
-          <SectionHeader
-            title="Select Your Passes"
-            subtitle="Choose passes for yourself and family members"
-            variant="snap"
-            watermark="Passes"
-            watermarkStyle={watermarkStyle}
-          />
-          <PassSelectionSection onAddAttendee={onAddAttendee} />
-        </SnapSection>
-
-        {housingProducts.length > 0 && (
-          <SnapSection id="housing">
-            <SectionHeader
-              title="Choose Housing"
-              subtitle="Optional: Book accommodation for your stay"
-              variant="snap"
-              watermark="Housing"
-              watermarkStyle={watermarkStyle}
-            />
-            <HousingStep onSkip={() => {}} />
-          </SnapSection>
-        )}
-
-        {merchProducts.length > 0 && (
-          <SnapSection id="merch">
-            <SectionHeader
-              title="Event Merchandise"
-              subtitle="Optional: Pick up exclusive merch at the event"
-              variant="snap"
-              watermark="Merch"
-              watermarkStyle={watermarkStyle}
-            />
-            <MerchSection onSkip={() => {}} />
-          </SnapSection>
-        )}
-
-        {patronProducts.length > 0 && (
-          <SnapSection id="patron">
-            <SectionHeader
-              title="Become a Patron"
-              subtitle="Optional: Support the community with a contribution"
-              variant="snap"
-              watermark="Patron"
-              watermarkStyle={watermarkStyle}
-            />
-            <PatronSection onSkip={() => {}} />
-          </SnapSection>
-        )}
-
-        <SnapSection id="confirm">
-          <SectionHeader
-            title="Review & Confirm"
-            subtitle="Review your order before payment"
-            variant="snap"
-            watermark="Confirm"
-            watermarkStyle={watermarkStyle}
-          />
-          <ConfirmStep />
-        </SnapSection>
+        {allSections.map((section) => {
+          const config = getStepConfig(section.id)
+          return (
+            <SnapSection key={section.id} id={section.id}>
+              <SectionHeader
+                title={config?.title ?? section.label}
+                subtitle={config?.description ?? undefined}
+                variant="snap"
+                watermark={config?.watermark ?? section.label}
+                watermarkStyle={watermarkStyle}
+              />
+              {renderSectionContent(section.id)}
+            </SnapSection>
+          )
+        })}
 
         <DesignVariantPanel
           navDesign={navDesign}
@@ -1295,51 +1286,18 @@ function ScrollyCheckoutFlowInner({
         variant={navDesign}
       />
       <main className="max-w-2xl mx-auto px-4 pt-6 pb-32">
-        <ScrollySection id="passes">
-          <SectionHeader
-            title="Select Your Passes"
-            subtitle="Choose passes for yourself and family members"
-          />
-          <PassSelectionSection onAddAttendee={onAddAttendee} />
-        </ScrollySection>
-
-        {housingProducts.length > 0 && (
-          <ScrollySection id="housing">
-            <SectionHeader
-              title="Choose Housing"
-              subtitle="Optional: Book accommodation for your stay"
-            />
-            <HousingStep onSkip={() => {}} />
-          </ScrollySection>
-        )}
-
-        {merchProducts.length > 0 && (
-          <ScrollySection id="merch">
-            <SectionHeader
-              title="Event Merchandise"
-              subtitle="Optional: Pick up exclusive merch at the event"
-            />
-            <MerchSection onSkip={() => {}} />
-          </ScrollySection>
-        )}
-
-        {patronProducts.length > 0 && (
-          <ScrollySection id="patron">
-            <SectionHeader
-              title="Become a Patron"
-              subtitle="Optional: Support the community with a contribution"
-            />
-            <PatronSection onSkip={() => {}} />
-          </ScrollySection>
-        )}
-
-        <ScrollySection id="confirm">
-          <SectionHeader
-            title="Review & Confirm"
-            subtitle="Review your order before payment"
-          />
-          <ConfirmStep />
-        </ScrollySection>
+        {allSections.map((section) => {
+          const config = getStepConfig(section.id)
+          return (
+            <ScrollySection key={section.id} id={section.id}>
+              <SectionHeader
+                title={config?.title ?? section.label}
+                subtitle={config?.description ?? undefined}
+              />
+              {renderSectionContent(section.id)}
+            </ScrollySection>
+          )
+        })}
       </main>
 
       <DesignVariantPanel
