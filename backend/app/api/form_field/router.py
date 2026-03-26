@@ -42,7 +42,7 @@ def _base_config_to_public(config: BaseFieldConfigs) -> FormFieldPublic:
         tenant_id=config.tenant_id,
         popup_id=config.popup_id,
         name=config.field_name,
-        label=definition["label"],
+        label=(config.label.strip() if config.label else "") or definition["label"],
         field_type=definition["type"],
         section_id=config.section_id,
         section_label=section_label,
@@ -176,7 +176,7 @@ async def update_form_field(
     base_config = base_field_configs_crud.get(db, field_id)
     if base_config:
         # Only forward fields that were actually sent and are configurable
-        configurable = {"section_id", "position", "placeholder", "help_text", "options"}
+        configurable = {"section_id", "position", "label", "placeholder", "help_text", "options"}
         update_data = {
             k: getattr(field_in, k) for k in field_in.model_fields_set & configurable
         }

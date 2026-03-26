@@ -76,6 +76,7 @@ export function FieldConfigPanel({
       updateMutation.mutate({
         fieldId: field.id,
         requestBody: {
+          label: localValues.label || undefined,
           placeholder: localValues.placeholder || undefined,
           help_text: localValues.help_text || undefined,
         },
@@ -113,7 +114,8 @@ export function FieldConfigPanel({
     <div className="space-y-5 px-4 pb-6">
       {isProtected && (
         <p className="text-sm text-muted-foreground rounded-md bg-muted/30 px-3 py-2">
-          Protected field – only placeholder and help text can be edited.
+          Protected field – label, placeholder, and help text can be edited.
+          Type and identity are fixed.
         </p>
       )}
       <div className="space-y-2">
@@ -123,7 +125,6 @@ export function FieldConfigPanel({
           value={localValues.label}
           onChange={(e) => handleChange("label", e.target.value)}
           placeholder="Field label"
-          disabled={isProtected}
         />
       </div>
 

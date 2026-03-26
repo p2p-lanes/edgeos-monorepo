@@ -1835,6 +1835,17 @@ export const BaseFieldConfigPublicSchema = {
             title: 'Position',
             default: 0
         },
+        label: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Label'
+        },
         placeholder: {
             anyOf: [
                 {
@@ -1901,6 +1912,17 @@ export const BaseFieldConfigUpdateSchema = {
                 }
             ],
             title: 'Position'
+        },
+        label: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Label'
         },
         placeholder: {
             anyOf: [

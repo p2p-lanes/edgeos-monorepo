@@ -14,6 +14,7 @@ class BaseFieldConfigBase(SQLModel):
         default=None, nullable=True, foreign_key="formsections.id"
     )
     position: int = Field(default=0)
+    label: str | None = Field(default=None, nullable=True)
     placeholder: str | None = Field(default=None, nullable=True)
     help_text: str | None = Field(default=None, nullable=True)
     options: list[str] | None = Field(
@@ -28,6 +29,7 @@ class BaseFieldConfigPublic(BaseModel):
     field_name: str
     section_id: uuid.UUID | None = None
     position: int = 0
+    label: str | None = None
     placeholder: str | None = None
     help_text: str | None = None
     options: list[str] | None = None
@@ -38,6 +40,7 @@ class BaseFieldConfigPublic(BaseModel):
 class BaseFieldConfigUpdate(BaseModel):
     section_id: uuid.UUID | None = None
     position: int | None = None
+    label: str | None = None
     placeholder: str | None = None
     help_text: str | None = None
     options: list[str] | None = None
