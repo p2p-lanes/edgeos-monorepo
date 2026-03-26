@@ -1,7 +1,7 @@
 """Source of truth for base field definitions.
 
-Non-configurable attributes (type, label, required, target) are hardcoded here.
-Configurable attributes (section, position, placeholder, help_text, options) have
+Non-configurable attributes (type, required, target) are hardcoded here.
+Configurable attributes (label, section, position, placeholder, help_text, options) have
 defaults here but can be overridden per popup via BaseFieldConfigs records.
 """
 
@@ -17,8 +17,8 @@ DEFAULT_SECTIONS: dict[str, dict[str, Any]] = {
 }
 
 # Each entry defines:
-#   - Hardcoded (never changes): type, label, required, target
-#   - Defaults (configurable per popup): default_section_key, default_position,
+#   - Hardcoded (never changes): type, required, target
+#   - Defaults (configurable per popup): label, default_section_key, default_position,
 #     default_placeholder, default_help_text, default_options
 #
 # help_text supports {popup_name} template interpolation at render time.

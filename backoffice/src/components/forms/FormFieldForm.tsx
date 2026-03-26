@@ -175,6 +175,7 @@ export function FormFieldForm({
       if (isEdit) {
         if (isProtectedField) {
           updateMutation.mutate({
+            label: value.label,
             placeholder: value.placeholder || undefined,
             help_text: value.help_text || undefined,
           })
@@ -257,7 +258,7 @@ export function FormFieldForm({
                 </CardTitle>
                 <CardDescription>
                   {isProtectedField
-                    ? "Protected field – only placeholder and help text can be edited."
+                    ? "Protected field – label, placeholder, and help text can be edited. Type and identity are fixed."
                     : readOnly
                       ? "View form field configuration (read-only)"
                       : isEdit
@@ -287,7 +288,7 @@ export function FormFieldForm({
                         value={field.state.value}
                         onBlur={field.handleBlur}
                         onChange={(e) => field.handleChange(e.target.value)}
-                        disabled={readOnly || isProtectedField}
+                        disabled={readOnly}
                       />
                       <p className="text-sm text-muted-foreground">
                         Label shown to users

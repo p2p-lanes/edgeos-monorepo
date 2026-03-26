@@ -362,6 +362,7 @@ export type BaseFieldConfigPublic = {
     field_name: string;
     section_id?: (string | null);
     position?: number;
+    label?: (string | null);
     placeholder?: (string | null);
     help_text?: (string | null);
     options?: (Array<(string)> | null);
@@ -370,6 +371,7 @@ export type BaseFieldConfigPublic = {
 export type BaseFieldConfigUpdate = {
     section_id?: (string | null);
     position?: (number | null);
+    label?: (string | null);
     placeholder?: (string | null);
     help_text?: (string | null);
     options?: (Array<(string)> | null);
