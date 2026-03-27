@@ -224,7 +224,7 @@ class GroupsCRUD(BaseCRUD[Groups, GroupCreate, GroupUpdate]):
         # Generate unique slug using popup slug as prefix
         slug = f"{popup_slug}-{generate_random_slug()}"
         while self.get_by_slug(session, slug, popup_id):
-            logger.info("Ambassador group slug already exists: %s", slug)
+            logger.info("Ambassador group slug already exists: {}", slug)
             slug = f"{popup_slug}-{generate_random_slug()}"
 
         description = (
@@ -256,7 +256,7 @@ class GroupsCRUD(BaseCRUD[Groups, GroupCreate, GroupUpdate]):
         )
         session.add(leader)
 
-        logger.info("Ambassador group created: %s %s", group.id, group.slug)
+        logger.info("Ambassador group created: {} {}", group.id, group.slug)
 
         return group
 

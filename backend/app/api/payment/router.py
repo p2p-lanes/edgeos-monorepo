@@ -490,7 +490,7 @@ async def simplefi_webhook(
 
     raw_body = await request.json()
     event_type = raw_body.get("event_type")
-    logger.info("SimpleFI webhook received, event_type: %s", event_type)
+    logger.info("SimpleFI webhook received, event_type: {}", event_type)
 
     if event_type == "installment_plan_completed":
         return await _handle_installment_plan_completed(raw_body, db, webhook_cache)
@@ -502,7 +502,7 @@ async def simplefi_webhook(
         return await _handle_installment_plan_cancelled(raw_body, db, webhook_cache)
 
     if event_type not in ("new_payment", "new_card_payment"):
-        logger.info("Unhandled event type: %s. Ignoring.", event_type)
+        logger.info("Unhandled event type: {}. Ignoring.", event_type)
         return {"message": f"Event type {event_type} not handled"}
 
     # Parse the full payload for payment events
@@ -544,7 +544,7 @@ async def _handle_regular_payment(
 
     payment = payments_crud.get_by_external_id(db, payment_request_id)
     if not payment:
-        logger.warning("Payment not found for external_id: %s", payment_request_id)
+        logger.warning("Payment not found for external_id: {}", payment_request_id)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Payment not found",
@@ -573,7 +573,7 @@ async def _handle_regular_payment(
             db, payment.id, currency=currency, rate=rate
         )
         await _send_payment_confirmed_email(payment, db_session=db)
-        logger.info("Payment %s approved via SimpleFI webhook", payment.id)
+        logger.info("Payment {} approved via SimpleFI webhook", payment.id)
     else:
         payments_crud.update(db, payment, PaymentUpdate(status=PaymentStatus.EXPIRED))
         logger.info(
@@ -617,7 +617,7 @@ async def _handle_installment_payment(
     # Look up Payment by installment_plan_id (stored in external_id)
     payment = payments_crud.get_by_external_id(db, installment_plan_id)
     if not payment:
-        logger.warning("Payment not found for installment plan %s", installment_plan_id)
+        logger.warning("Payment not found for installment plan {}", installment_plan_id)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Payment not found",
@@ -650,7 +650,7 @@ async def _handle_installment_payment(
     is_first_installment = (payment.installments_paid or 0) == 0
     if is_first_installment and payment.status != "approved":
         payment = payments_crud.approve_payment(db, payment.id, currency=currency)
-        logger.info("First installment received - payment %s approved", payment.id)
+        logger.info("First installment received - payment {} approved", payment.id)
 
     # Increment installments_paid
     payment.installments_paid = (payment.installments_paid or 0) + 1
@@ -684,11 +684,11 @@ async def _handle_installment_plan_completed(
         logger.info("Webhook already processed. Skipping...")
         return {"message": "Webhook already processed"}
 
-    logger.info("Installment plan completed: %s", entity_id)
+    logger.info("Installment plan completed: {}", entity_id)
 
     payment = payments_crud.get_by_external_id(db, entity_id)
     if not payment:
-        logger.warning("Payment not found for installment plan %s", entity_id)
+        logger.warning("Payment not found for installment plan {}", entity_id)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Payment not found",
@@ -741,11 +741,11 @@ async def _handle_installment_plan_activated(
         logger.info("Webhook already processed. Skipping...")
         return {"message": "Webhook already processed"}
 
-    logger.info("Installment plan activated: %s", entity_id)
+    logger.info("Installment plan activated: {}", entity_id)
 
     payment = payments_crud.get_by_external_id(db, entity_id)
     if not payment:
-        logger.warning("Payment not found for installment plan %s", entity_id)
+        logger.warning("Payment not found for installment plan {}", entity_id)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Payment not found",
@@ -781,11 +781,11 @@ async def _handle_installment_plan_cancelled(
         logger.info("Webhook already processed. Skipping...")
         return {"message": "Webhook already processed"}
 
-    logger.info("Installment plan cancelled: %s", entity_id)
+    logger.info("Installment plan cancelled: {}", entity_id)
 
     payment = payments_crud.get_by_external_id(db, entity_id)
     if not payment:
-        logger.warning("Payment not found for installment plan %s", entity_id)
+        logger.warning("Payment not found for installment plan {}", entity_id)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Payment not found",
@@ -793,16 +793,16 @@ async def _handle_installment_plan_cancelled(
 
     # Idempotent: skip if already cancelled
     if payment.status == "cancelled":
-        logger.info("Payment %s already cancelled. Skipping...", payment.id)
+        logger.info("Payment {} already cancelled. Skipping...", payment.id)
         return {"message": "Payment already cancelled"}
 
     # If payment was approved, revoke products
     if payment.status == "approved":
-        logger.info("Revoking products for cancelled payment %s", payment.id)
+        logger.info("Revoking products for cancelled payment {}", payment.id)
         payments_crud._remove_products_from_attendees(db, payment)
 
     payment.status = "cancelled"
     db.commit()
 
-    logger.info("Payment %s cancelled", payment.id)
+    logger.info("Payment {} cancelled", payment.id)
     return {"message": "Installment plan cancelled successfully"}

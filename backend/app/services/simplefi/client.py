@@ -73,7 +73,7 @@ class SimpleFIClient:
 
         with httpx.Client(timeout=self.timeout) as client:
             response = client.request(method, url, json=json, headers=headers)
-            logger.info("SimpleFI API response status: %s, body: %s", response.status_code, response.text)
+            logger.info("SimpleFI API response status: {}, body: {}", response.status_code, response.text)
             response.raise_for_status()
             return response.json()
 
@@ -117,7 +117,7 @@ class SimpleFIClient:
             },
         }
 
-        logger.info("Creating SimpleFI payment for amount: %s", amount)
+        logger.info("Creating SimpleFI payment for amount: {}", amount)
         data = self._make_request("POST", "/payment_requests", json=body)
 
         return SimpleFIPaymentResponse(
