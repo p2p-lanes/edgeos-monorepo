@@ -73,6 +73,7 @@ class SimpleFIClient:
 
         with httpx.Client(timeout=self.timeout) as client:
             response = client.request(method, url, json=json, headers=headers)
+            logger.info("SimpleFI API response status: %s, body: %s", response.status_code, response.text)
             response.raise_for_status()
             return response.json()
 
