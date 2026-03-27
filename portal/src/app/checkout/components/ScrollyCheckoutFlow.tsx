@@ -980,7 +980,6 @@ function ScrollyCheckoutFlowInner({
           housing: "Choose Housing",
           merch: "Event Merchandise",
           patron: "Become a Patron",
-          insurance_checkout: "Insurance",
           confirm: "Review & Confirm",
         }
         return {

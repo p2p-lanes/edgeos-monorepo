@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Check } from "lucide-react"
+import { Check, Trash2 } from "lucide-react"
 import { useEffect, useState } from "react"
 
 import { type TicketingStepPublic, ProductsService, TicketingStepsService } from "@/client"
@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select"
 import { LoadingButton } from "@/components/ui/loading-button"
 import { Textarea } from "@/components/ui/textarea"
+import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
 import useCustomToast from "@/hooks/useCustomToast"
 import { createErrorHandler } from "@/utils"
@@ -29,12 +30,13 @@ import { DISPLAY_VARIANT_DEFINITIONS } from "./constants"
 
 interface StepConfigPanelProps {
   step: TicketingStepPublic
+  insuranceStep?: TicketingStepPublic
   open: boolean
   onOpenChange: (open: boolean) => void
   onClose: () => void
 }
 
-export function StepConfigPanel({ step, open, onOpenChange, onClose }: StepConfigPanelProps) {
+export function StepConfigPanel({ step, insuranceStep, open, onOpenChange, onClose }: StepConfigPanelProps) {
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
 
@@ -43,6 +45,7 @@ export function StepConfigPanel({ step, open, onOpenChange, onClose }: StepConfi
   const [watermark, setWatermark] = useState(step.watermark ?? "")
   const [productCategory, setProductCategory] = useState(step.product_category ?? "")
   const [displayVariant, setDisplayVariant] = useState(step.display_variant ?? "")
+  const [insuranceEnabled, setInsuranceEnabled] = useState(insuranceStep?.is_enabled ?? false)
 
   useEffect(() => {
     setTitle(step.title)
@@ -51,6 +54,10 @@ export function StepConfigPanel({ step, open, onOpenChange, onClose }: StepConfi
     setProductCategory(step.product_category ?? "")
     setDisplayVariant(step.display_variant ?? "")
   }, [step.id, step.title, step.description, step.watermark, step.product_category, step.display_variant])
+
+  useEffect(() => {
+    setInsuranceEnabled(insuranceStep?.is_enabled ?? false)
+  }, [insuranceStep?.is_enabled])
 
   const { data: categorySuggestions } = useQuery({
     queryKey: ["product-categories", step.popup_id],
@@ -69,8 +76,8 @@ export function StepConfigPanel({ step, open, onOpenChange, onClose }: StepConfi
   }, [categorySuggestions])
 
   const updateMutation = useMutation({
-    mutationFn: () =>
-      TicketingStepsService.updateTicketingStep({
+    mutationFn: async () => {
+      await TicketingStepsService.updateTicketingStep({
         stepId: step.id,
         requestBody: {
           title,
@@ -79,9 +86,27 @@ export function StepConfigPanel({ step, open, onOpenChange, onClose }: StepConfi
           product_category: productCategory || null,
           display_variant: displayVariant || null,
         },
-      }),
+      })
+      if (insuranceStep && insuranceEnabled !== insuranceStep.is_enabled) {
+        await TicketingStepsService.updateTicketingStep({
+          stepId: insuranceStep.id,
+          requestBody: { is_enabled: insuranceEnabled },
+        })
+      }
+    },
     onSuccess: () => {
       showSuccessToast("Step updated")
+      queryClient.invalidateQueries({ queryKey: ["ticketing-steps"] })
+      onClose()
+    },
+    onError: createErrorHandler(showErrorToast),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: () =>
+      TicketingStepsService.deleteTicketingStep({ stepId: step.id }),
+    onSuccess: () => {
+      showSuccessToast("Step deleted")
       queryClient.invalidateQueries({ queryKey: ["ticketing-steps"] })
       onClose()
     },
@@ -153,6 +178,22 @@ export function StepConfigPanel({ step, open, onOpenChange, onClose }: StepConfi
             </p>
           </div>
 
+          {step.step_type === "confirm" && insuranceStep && (
+            <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+              <div className="flex flex-col gap-0.5">
+                <Label>Enable Insurance</Label>
+                <p className="text-xs text-muted-foreground">
+                  Show the insurance card on the Review &amp; Confirm page
+                </p>
+              </div>
+              <Switch
+                checked={insuranceEnabled}
+                onCheckedChange={setInsuranceEnabled}
+                aria-label="Toggle insurance"
+              />
+            </div>
+          )}
+
           <div className="flex flex-col gap-1.5">
             <Label>Display Variant</Label>
             <div className="grid grid-cols-2 gap-2">
@@ -183,7 +224,19 @@ export function StepConfigPanel({ step, open, onOpenChange, onClose }: StepConfi
             </div>
           </div>
 
-          <div className="flex justify-end gap-2 mt-2">
+          <div className="flex items-center gap-2 mt-2">
+            {!step.protected && (
+              <LoadingButton
+                variant="destructive"
+                size="icon"
+                loading={deleteMutation.isPending}
+                onClick={() => deleteMutation.mutate()}
+                className="h-9 w-9 shrink-0"
+              >
+                <Trash2 className="h-4 w-4" />
+              </LoadingButton>
+            )}
+            <div className="flex-1" />
             <Button variant="outline" onClick={onClose}>
               Cancel
             </Button>

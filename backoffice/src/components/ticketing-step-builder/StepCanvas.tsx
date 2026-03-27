@@ -9,12 +9,13 @@ interface StepCanvasProps {
 }
 
 export function StepCanvas({ steps, onEdit }: StepCanvasProps) {
-  const stepIds = steps.map((s) => s.id)
+  const visibleSteps = steps.filter((s) => s.step_type !== "insurance_checkout")
+  const stepIds = visibleSteps.map((s) => s.id)
 
   return (
     <SortableContext items={stepIds} strategy={verticalListSortingStrategy}>
       <div className="flex flex-col gap-2">
-        {steps.map((step) => (
+        {visibleSteps.map((step) => (
           <SortableStepCard key={step.id} step={step} onEdit={onEdit} />
         ))}
         {steps.length === 0 && (

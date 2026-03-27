@@ -38,9 +38,10 @@ interface AddStepDialogProps {
   onOpenChange: (open: boolean) => void
   popupId: string
   nextOrder: number
+  confirmStepId?: string
 }
 
-export function AddStepDialog({ open, onOpenChange, popupId, nextOrder }: AddStepDialogProps) {
+export function AddStepDialog({ open, onOpenChange, popupId, nextOrder, confirmStepId }: AddStepDialogProps) {
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
 
@@ -68,18 +69,28 @@ export function AddStepDialog({ open, onOpenChange, popupId, nextOrder }: AddSte
   }
 
   const createMutation = useMutation({
-    mutationFn: () =>
-      TicketingStepsService.createTicketingStep({
+    mutationFn: async () => {
+      // Insert before confirm: use confirmStep's current order, then bump confirm
+      const insertOrder = confirmStepId ? nextOrder - 1 : nextOrder
+      await TicketingStepsService.createTicketingStep({
         requestBody: {
           popup_id: popupId,
           step_type: stepType,
           title,
-          order: nextOrder,
+          order: insertOrder,
           is_enabled: true,
           product_category: productCategory || null,
           display_variant: displayVariant || null,
         },
-      }),
+      })
+      // Push confirm step to the end
+      if (confirmStepId) {
+        await TicketingStepsService.updateTicketingStep({
+          stepId: confirmStepId,
+          requestBody: { order: nextOrder },
+        })
+      }
+    },
     onSuccess: () => {
       showSuccessToast("Step created")
       queryClient.invalidateQueries({ queryKey: ["ticketing-steps"] })

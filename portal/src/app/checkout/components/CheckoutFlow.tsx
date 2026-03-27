@@ -27,8 +27,6 @@ function getDefaultStepTitle(step: CheckoutStep): string {
       return "Event Merchandise"
     case "patron":
       return "Become a Patron"
-    case "insurance_checkout":
-      return "Insurance"
     case "confirm":
       return "Review & Confirm"
     case "success":
@@ -49,8 +47,6 @@ function getDefaultStepSubtitle(step: CheckoutStep): string {
       return "Optional: Pick up exclusive merch at the event"
     case "patron":
       return "Optional: Support the community with a contribution"
-    case "insurance_checkout":
-      return "Optional: Protect your purchase"
     case "confirm":
       return "Review your order before payment"
     case "success":
@@ -175,7 +171,7 @@ export default function CheckoutFlow({
     if (currentStep === "merch" && merchProducts.length === 0) return null
     if (currentStep === "patron" && patronProducts.length === 0) return null
 
-    // Registry lookup — covers housing, merch, patron, insurance_checkout,
+    // Registry lookup — covers housing, merch, patron,
     // and any future step types added to STEP_COMPONENT_REGISTRY
     const StepComponent = STEP_COMPONENT_REGISTRY[currentStep]
     if (StepComponent) {

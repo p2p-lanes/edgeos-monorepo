@@ -20,6 +20,5 @@ export const STEP_COMPONENT_REGISTRY: Record<string, ComponentType<{ onSkip?: ()
   housing: HousingStep,
   merch: MerchSection,
   patron: PatronSection,
-  insurance_checkout: ConfirmStep, // placeholder — split out when insurance product ships
   confirm: ConfirmStep,
 }

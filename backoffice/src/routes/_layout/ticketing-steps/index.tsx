@@ -177,6 +177,7 @@ function TicketingStepsContent({ popupId }: { popupId: string }) {
       {selectedStep && (
         <StepConfigPanel
           step={selectedStep}
+          insuranceStep={steps.find((s) => s.step_type === "insurance_checkout")}
           open={!!selectedStep}
           onOpenChange={(open) => { if (!open) setSelectedStep(null) }}
           onClose={() => setSelectedStep(null)}
@@ -188,6 +189,7 @@ function TicketingStepsContent({ popupId }: { popupId: string }) {
         onOpenChange={setAddDialogOpen}
         popupId={popupId}
         nextOrder={orderedSteps.length}
+        confirmStepId={steps.find((s) => s.step_type === "confirm")?.id}
       />
     </div>
   )

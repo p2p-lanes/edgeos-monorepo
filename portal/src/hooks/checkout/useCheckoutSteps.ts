@@ -14,7 +14,7 @@ interface UseCheckoutStepsParams {
   allProducts?: ProductsPass[]
 }
 
-const KNOWN_STEPS = new Set(["tickets", "housing", "merch", "patron", "insurance_checkout", "confirm"])
+const KNOWN_STEPS = new Set(["tickets", "housing", "merch", "patron", "confirm"])
 
 /**
  * Maps API step_type values to internal CheckoutStep values.
@@ -30,8 +30,6 @@ function toCheckoutStep(stepType: string): CheckoutStep | null {
       return "merch"
     case "patron":
       return "patron"
-    case "insurance_checkout":
-      return "insurance_checkout"
     case "confirm":
       return "confirm"
     default:
@@ -131,8 +129,6 @@ export function useCheckoutSteps({
         case "housing":
         case "merch":
         case "patron":
-        case "insurance_checkout":
-          return true
         case "confirm":
           return false
         default:

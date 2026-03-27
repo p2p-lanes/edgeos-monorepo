@@ -3,14 +3,12 @@ import type { ProductsPass } from "./Products"
 
 // --- Step Types ---
 // "tickets" is the API/DB step_type; "passes" is the legacy internal name (kept for compat)
-// "insurance_checkout" is disabled by default until an insurance product exists
 export type CheckoutStep =
   | "passes"
   | "tickets"
   | "housing"
   | "merch"
   | "patron"
-  | "insurance_checkout"
   | "confirm"
   | "success"
 

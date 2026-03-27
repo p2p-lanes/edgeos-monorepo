@@ -34,6 +34,7 @@ export default function ConfirmStep() {
     monthUpgradeCredit,
     termsAccepted,
     setTermsAccepted,
+    stepConfigs,
   } = useCheckout()
   const { getCity } = useCityProvider()
   const popup = getCity()
@@ -98,7 +99,9 @@ export default function ConfirmStep() {
     hasEditChanges
 
   // Insurance available if any product has insurance potential and total is not zero
+  const isInsuranceEnabled = stepConfigs.some((s) => s.step_type === "insurance_checkout")
   const hasInsurableProducts =
+    isInsuranceEnabled &&
     cart.insurancePotentialPrice > 0 &&
     summary.grandTotal - summary.insuranceSubtotal > 0
 
