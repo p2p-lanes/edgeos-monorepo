@@ -410,3 +410,55 @@ class WebhookCache:
 
 # Webhook deduplication cache
 webhook_cache = WebhookCache(ttl_seconds=3600)
+
+
+class DomainCache:
+    """Cache for tenant-by-domain lookups.
+
+    Stores serialized TenantPublic JSON (or the sentinel string ``"null"``
+    for non-existent / inactive domains) with a 5-minute TTL.
+
+    All methods are silent no-ops when Redis is unavailable so that the
+    absence of Redis never breaks the request path.
+    """
+
+    PREFIX = "tenant:by-domain"
+    TTL = 300  # 5 minutes
+
+    def _key(self, domain: str) -> str:
+        return f"{self.PREFIX}:{domain}"
+
+    def get(self, domain: str) -> str | None:
+        """Return cached JSON string, the sentinel ``"null"``, or ``None`` on miss."""
+        client = get_redis()
+        if client is None:
+            return None
+        try:
+            return client.get(self._key(domain))  # type: ignore[return-value]
+        except redis.RedisError as e:
+            logger.warning(f"DomainCache.get error for {domain}: {e}")
+            return None
+
+    def set(self, domain: str, value: str) -> None:
+        """Cache a JSON string or the sentinel ``"null"`` for 404 responses."""
+        client = get_redis()
+        if client is None:
+            return
+        try:
+            client.setex(self._key(domain), self.TTL, value)
+        except redis.RedisError as e:
+            logger.warning(f"DomainCache.set error for {domain}: {e}")
+
+    def invalidate(self, domain: str) -> None:
+        """Remove the cached entry for a domain."""
+        client = get_redis()
+        if client is None:
+            return
+        try:
+            client.delete(self._key(domain))
+        except redis.RedisError as e:
+            logger.warning(f"DomainCache.invalidate error for {domain}: {e}")
+
+
+# Singleton — used by tenant router and PATCH handler
+domain_cache = DomainCache()

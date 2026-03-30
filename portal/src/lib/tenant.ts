@@ -20,3 +20,22 @@ export async function fetchTenantBySlug(
   if (!res.ok) return null
   return res.json()
 }
+
+/**
+ * Resolve a tenant by its custom domain.
+ *
+ * Used by SSR layout (`generateMetadata`) and the client-side TenantProvider
+ * when `resolveHostname` returns `isCustomDomain: true`.
+ *
+ * No Next.js cache is used here — backend Redis caches the result (TTL 5 min).
+ */
+export async function fetchTenantByDomain(
+  domain: string,
+): Promise<TenantPublic | null> {
+  const res = await fetch(
+    `${API_BASE}/api/v1/tenants/public/by-domain/${domain}`,
+    { cache: "no-store" },
+  )
+  if (!res.ok) return null
+  return res.json()
+}

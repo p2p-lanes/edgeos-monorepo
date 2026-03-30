@@ -18,7 +18,6 @@ from app.api.payment.schemas import (
     SimpleFIWebhookPayload,
 )
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
-from app.core.config import settings
 from app.core.dependencies.users import (
     CurrentHuman,
     CurrentUser,
@@ -115,8 +114,9 @@ async def _send_payment_confirmed_email(payment, db_session=None) -> None:
 
     email_service = get_email_service()
 
-    portal_host = settings.PORTAL_URL.replace("https://", "").replace("http://", "")
-    portal_url = f"https://{tenant.slug}.{portal_host}"
+    from app.api.tenant.utils import get_portal_url
+
+    portal_url = get_portal_url(tenant)
 
     await email_service.send_payment_confirmed(
         to=human.email,

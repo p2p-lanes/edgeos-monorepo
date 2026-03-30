@@ -8233,6 +8233,22 @@ export const TenantPublicSchema = {
             ],
             title: 'Logo Url'
         },
+        custom_domain: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 253
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Custom Domain'
+        },
+        custom_domain_active: {
+            type: 'boolean',
+            title: 'Custom Domain Active'
+        },
         id: {
             type: 'string',
             format: 'uuid',
@@ -8240,7 +8256,7 @@ export const TenantPublicSchema = {
         }
     },
     type: 'object',
-    required: ['name', 'slug', 'id'],
+    required: ['name', 'slug', 'custom_domain_active', 'id'],
     title: 'TenantPublic'
 } as const;
 
@@ -8323,6 +8339,28 @@ export const TenantUpdateSchema = {
                 }
             ],
             title: 'Logo Url'
+        },
+        custom_domain: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Custom Domain'
+        },
+        custom_domain_active: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Custom Domain Active'
         }
     },
     type: 'object',

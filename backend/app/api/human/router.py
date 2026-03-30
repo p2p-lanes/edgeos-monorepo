@@ -12,7 +12,6 @@ from app.api.human.schemas import (
 )
 from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
-from app.services.email_helpers import send_application_status_email
 from app.core.dependencies.users import (
     CurrentHuman,
     CurrentUser,
@@ -20,6 +19,7 @@ from app.core.dependencies.users import (
     HumanTenantSession,
     TenantSession,
 )
+from app.services.email_helpers import send_application_status_email
 
 if TYPE_CHECKING:
     from app.api.user.schemas import UserPublic
@@ -40,16 +40,32 @@ async def list_humans(
     db: TenantSession,
     _: CurrentUser,
     search: str | None = None,
+    popup_id: uuid.UUID | None = None,
+    incomplete_application: bool = False,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[HumanPublic]:
-    humans, total = crud.find(
-        db,
-        skip=skip,
-        limit=limit,
-        search=search,
-        search_fields=["first_name", "last_name", "email"],
-    )
+    if incomplete_application:
+        if popup_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="popup_id is required when filtering incomplete applications",
+            )
+        humans, total = crud.find_with_incomplete_application(
+            db,
+            skip=skip,
+            limit=limit,
+            search=search,
+            popup_id=popup_id,
+        )
+    else:
+        humans, total = crud.find(
+            db,
+            skip=skip,
+            limit=limit,
+            search=search,
+            search_fields=["first_name", "last_name", "email"],
+        )
 
     return ListModel[HumanPublic](
         results=[HumanPublic.model_validate(h) for h in humans],

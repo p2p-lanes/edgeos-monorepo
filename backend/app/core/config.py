@@ -104,6 +104,12 @@ class Settings(BaseSettings):
 
     @computed_field
     @property
+    def PORTAL_DOMAIN(self) -> str:
+        from urllib.parse import urlparse
+        return urlparse(self.PORTAL_URL).hostname or ""
+
+    @computed_field
+    @property
     def SIMPLEFI_API_URL(self) -> str:
         if self.ENVIRONMENT == Environment.PRODUCTION:
             return "https://api.simplefi.tech"

@@ -1570,6 +1570,8 @@ export type TenantPublic = {
     image_url?: (string | null);
     icon_url?: (string | null);
     logo_url?: (string | null);
+    custom_domain?: (string | null);
+    custom_domain_active: boolean;
     id: string;
 };
 
@@ -1581,6 +1583,8 @@ export type TenantUpdate = {
     image_url?: (string | null);
     icon_url?: (string | null);
     logo_url?: (string | null);
+    custom_domain?: (string | null);
+    custom_domain_active?: (boolean | null);
 };
 
 /**
@@ -2364,10 +2368,12 @@ export type GroupsGetGroupPublicData = {
 export type GroupsGetGroupPublicResponse = (GroupPublic);
 
 export type HumansListHumansData = {
+    incompleteApplication?: boolean;
     /**
      * Maximum number of items to return
      */
     limit?: number;
+    popupId?: (string | null);
     search?: (string | null);
     /**
      * Number of items to skip
@@ -2666,6 +2672,12 @@ export type ProductsListPortalProductsData = {
 };
 
 export type ProductsListPortalProductsResponse = (ListModel_ProductPublic_);
+
+export type TenantsGetTenantByDomainData = {
+    domain: string;
+};
+
+export type TenantsGetTenantByDomainResponse = (TenantPublic);
 
 export type TenantsGetTenantBySlugData = {
     slug: string;

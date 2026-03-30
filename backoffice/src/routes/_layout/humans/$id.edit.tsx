@@ -7,6 +7,7 @@ import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { HumanForm } from "@/components/forms/HumanForm"
 import { Skeleton } from "@/components/ui/skeleton"
+import { getHumansNavigationTarget } from "@/routes/_layout/humans/navigation"
 
 export const Route = createFileRoute("/_layout/humans/$id/edit")({
   component: EditHumanPage,
@@ -29,12 +30,13 @@ function EditHumanContent({ humanId }: { humanId: string }) {
   return (
     <HumanForm
       defaultValues={human}
-      onSuccess={() => navigate({ to: "/humans" })}
+      onSuccess={() => navigate(getHumansNavigationTarget())}
     />
   )
 }
 
 function EditHumanPage() {
+  const navigate = useNavigate()
   const { id } = Route.useParams()
 
   return (
@@ -42,6 +44,7 @@ function EditHumanPage() {
       title="Edit Human"
       description="Update human profile information"
       backTo="/humans"
+      onBack={() => navigate(getHumansNavigationTarget())}
     >
       <QueryErrorBoundary>
         <Suspense fallback={<Skeleton className="h-96 w-full" />}>

@@ -724,12 +724,15 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         }
 
         try:
+            from app.api.tenant.utils import get_portal_url
+
             simplefi_response = simplefi_client.create_payment(
                 amount=preview.amount,
                 popup_slug=application.popup.slug,
                 tenant_slug=application.popup.tenant.slug,
                 reference=reference,
                 memo=application.popup.tenant.name,
+                portal_base_override=get_portal_url(application.popup.tenant),
             )
         except Exception as e:
             logger.error(f"Failed to create SimpleFI payment: {e}")
