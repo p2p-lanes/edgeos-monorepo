@@ -157,7 +157,6 @@ function Dashboard() {
       {isContextReady && isAdmin && (
         <NeedsAttention
           inReview={applications?.in_review ?? 0}
-          pendingPayments={payments?.pending ?? 0}
           selectedPopupId={selectedPopupId}
           isSuperadmin={isSuperadmin}
           selectedTenantId={selectedTenantId}
@@ -193,7 +192,6 @@ function Dashboard() {
         <StatCard
           title="Total Revenue"
           value={formatCurrency(payments?.approved_revenue)}
-          subtitle={`${formatCurrency(payments?.pending_revenue)} pending`}
           icon={DollarSign}
           isLoading={isLoading}
           variant="success"
@@ -335,12 +333,6 @@ function Dashboard() {
                     {formatCurrency(payments?.approved_revenue)}
                   </span>
                 </div>
-                <div className="flex items-center justify-between p-2 rounded-md bg-yellow-500/10">
-                  <span className="text-sm">Pending Revenue</span>
-                  <span className="text-sm font-bold text-yellow-600">
-                    {formatCurrency(payments?.pending_revenue)}
-                  </span>
-                </div>
                 <div className="flex items-center justify-between p-2 rounded-md bg-muted/50">
                   <span className="text-sm">Total Discounts</span>
                   <span className="text-sm font-bold">
@@ -348,21 +340,13 @@ function Dashboard() {
                   </span>
                 </div>
                 <div className="pt-2 border-t">
-                  <div className="grid grid-cols-4 gap-2 text-center">
+                  <div className="grid grid-cols-3 gap-2 text-center">
                     <div>
                       <div className="text-lg font-bold">
                         {payments?.approved ?? 0}
                       </div>
                       <div className="text-xs text-muted-foreground">
                         Approved
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-lg font-bold text-yellow-600">
-                        {payments?.pending ?? 0}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        Pending
                       </div>
                     </div>
                     <div>
@@ -432,13 +416,11 @@ function Dashboard() {
 
 function NeedsAttention({
   inReview,
-  pendingPayments,
   selectedPopupId,
   isSuperadmin,
   selectedTenantId,
 }: {
   inReview: number
-  pendingPayments: number
   selectedPopupId: string | null
   isSuperadmin: boolean
   selectedTenantId: string | null | undefined
@@ -470,13 +452,6 @@ function NeedsAttention({
       label: `${inReview} application${inReview !== 1 ? "s" : ""} in review`,
       href: "/applications",
       variant: "default" as const,
-    },
-    {
-      show: pendingPayments > 0,
-      icon: CreditCard,
-      label: `${pendingPayments} pending payment${pendingPayments !== 1 ? "s" : ""} to approve`,
-      href: "/payments",
-      variant: "warning" as const,
     },
   ].filter((item) => item.show)
 

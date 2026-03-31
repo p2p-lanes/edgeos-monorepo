@@ -1,6 +1,7 @@
 import uuid
 from typing import TYPE_CHECKING
 
+import sqlalchemy as sa
 from sqlalchemy import Index, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlmodel import Column, Field, Relationship

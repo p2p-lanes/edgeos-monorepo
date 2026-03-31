@@ -73,7 +73,7 @@ class SimpleFIClient:
 
         with httpx.Client(timeout=self.timeout) as client:
             response = client.request(method, url, json=json, headers=headers)
-            logger.info("SimpleFI API response status: %s, body: %s", response.status_code, response.text)
+            logger.info("SimpleFI API response status: {}, body: {}", response.status_code, response.text)
             response.raise_for_status()
             return response.json()
 
@@ -84,6 +84,7 @@ class SimpleFIClient:
         tenant_slug: str,
         reference: dict[str, Any] | None = None,
         memo: str = "EdgeOS Payment",
+        portal_base_override: str | None = None,
     ) -> SimpleFIPaymentResponse:
         """
         Create a payment request in SimpleFI.
@@ -91,8 +92,13 @@ class SimpleFIClient:
         Args:
             amount: The payment amount in USD
             popup_slug: The popup slug for building portal redirect URLs
-            tenant_slug: The tenant slug for the portal subdomain
+            tenant_slug: The tenant slug for the portal subdomain (used as
+                fallback when ``portal_base_override`` is not provided)
             reference: Optional reference data (application_id, email, products)
+            portal_base_override: If provided, used as the portal base URL
+                instead of the default subdomain derivation.  Pass
+                ``get_portal_url(tenant)`` from callers that have a Tenant
+                object to respect active custom domains.
 
         Returns:
             SimpleFIPaymentResponse with id, status, and checkout_url
@@ -101,7 +107,7 @@ class SimpleFIClient:
             settings.BACKEND_URL, "/api/v1/payments/webhook/simplefi"
         )
 
-        portal_base = self._build_tenant_portal_url(tenant_slug)
+        portal_base = portal_base_override or self._build_tenant_portal_url(tenant_slug)
         success_url = f"{portal_base}/portal/{popup_slug}/passes/buy?checkout=success"
         cancel_url = f"{portal_base}/portal/{popup_slug}/passes/buy"
 
@@ -117,7 +123,7 @@ class SimpleFIClient:
             },
         }
 
-        logger.info("Creating SimpleFI payment for amount: %s", amount)
+        logger.info("Creating SimpleFI payment for amount: {}", amount)
         data = self._make_request("POST", "/payment_requests", json=body)
 
         return SimpleFIPaymentResponse(

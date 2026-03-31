@@ -91,16 +91,14 @@ def _enrich_with_popup_data(
         else None,
     }
 
-    # Build portal_url from tenant slug + PORTAL_URL setting
+    # Build portal_url from tenant (respects active custom domain)
     if "portal_url" not in enriched:
         from app.api.tenant.models import Tenants
+        from app.api.tenant.utils import get_portal_url
 
         tenant = db_session.get(Tenants, popup.tenant_id)
         if tenant:
-            portal_host = settings.PORTAL_URL.replace("https://", "").replace(
-                "http://", ""
-            )
-            popup_fields["portal_url"] = f"https://{tenant.slug}.{portal_host}"
+            popup_fields["portal_url"] = get_portal_url(tenant)
 
     for key, value in popup_fields.items():
         if key not in enriched:

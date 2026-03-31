@@ -1,6 +1,7 @@
 import uuid
 
 from fastapi import APIRouter, HTTPException, status
+from sqlalchemy.exc import IntegrityError
 
 from app.api.shared.enums import CredentialType, UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
@@ -9,9 +10,43 @@ from app.api.tenant.credential_schemas import CredentialInfo, TenantCredentialRe
 from app.api.tenant.schemas import TenantCreate, TenantPublic, TenantUpdate
 from app.core.config import settings
 from app.core.dependencies.users import CurrentAdmin, CurrentSuperadmin, SessionDep
+from app.core.redis import domain_cache
 from app.core.tenant_db import get_tenant_credential, revoke_tenant_credentials
 
 router = APIRouter(prefix="/tenants", tags=["tenants"])
+
+
+@router.get("/public/by-domain/{domain}", response_model=TenantPublic)
+async def get_tenant_by_domain(
+    domain: str,
+    db: SessionDep,
+) -> TenantPublic:
+    """Resolve an active tenant by host — custom domain or platform subdomain.
+
+    Resolution order (see TenantsCRUD.resolve_by_host):
+    1. custom_domain field (active, not deleted)
+    2. slug extracted from *.{PORTAL_DOMAIN} subdomain (not deleted)
+
+    Returns the same HTTP 404 for both unknown and inactive hosts to
+    avoid leaking which domains are registered (spec NFR2).
+    No authentication required — used by portal middleware on every request.
+    """
+    # Cache-first: hit returns JSON or the "null" sentinel (cached 404)
+    cached = domain_cache.get(domain)
+    if cached is not None:
+        if cached == "null":
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+        return TenantPublic.model_validate_json(cached)
+
+    # DB lookup — resolves custom domains AND *.PORTAL_DOMAIN subdomains
+    tenant = crud.resolve_by_host(db, domain, settings.PORTAL_DOMAIN)
+    if tenant is None:
+        domain_cache.set(domain, "null")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+
+    result = TenantPublic.model_validate(tenant)
+    domain_cache.set(domain, result.model_dump_json())
+    return result
 
 
 @router.get("/public/{slug}", response_model=TenantPublic)
@@ -100,21 +135,40 @@ async def update_tenant(
     db: SessionDep,
     current_user: CurrentAdmin,
 ) -> TenantPublic:
-    # Admins can only update their own tenant
+    # 1. Ownership check — admins can only update their own tenant
     if current_user.role == UserRole.ADMIN and current_user.tenant_id != tenant_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Cannot update other tenants",
         )
 
+    # 2. Tenant exists check
     tenant = crud.get(db, tenant_id)
-
     if tenant is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Tenant not found",
         )
 
+    # 3. ADMIN cannot set custom_domain_active (only SUPERADMIN may)
+    if current_user.role == UserRole.ADMIN and tenant_in.custom_domain_active is not None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only superadmin can modify custom_domain_active",
+        )
+
+    # 4. ADMIN cannot change custom_domain while it is active
+    if (
+        current_user.role == UserRole.ADMIN
+        and tenant_in.custom_domain is not None
+        and tenant.custom_domain_active
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cannot change custom domain while it is active. Deactivate first.",
+        )
+
+    # 5. Slug uniqueness check
     if tenant_in.slug and tenant_in.slug != tenant.slug:
         existing = crud.get_by_slug(db, tenant_in.slug)
         if existing:
@@ -123,7 +177,34 @@ async def update_tenant(
                 detail="A tenant with this slug already exists",
             )
 
-    updated = crud.update(db, tenant, tenant_in)
+    # 6. Custom domain uniqueness check (don't reveal owner)
+    if tenant_in.custom_domain is not None and tenant_in.custom_domain != tenant.custom_domain:
+        existing_domain = crud.get_by_field(db, "custom_domain", tenant_in.custom_domain)
+        if existing_domain and existing_domain.id != tenant_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="This domain is already in use",
+            )
+
+    # 7. Snapshot old domain for cache invalidation after update
+    old_domain = tenant.custom_domain
+
+    # 8. Perform update (IntegrityError → unique constraint race condition)
+    try:
+        updated = crud.update(db, tenant, tenant_in)
+    except IntegrityError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This domain is already in use",
+        )
+
+    # 9. Invalidate domain cache for old and new domain values
+    new_domain = updated.custom_domain
+    if old_domain:
+        domain_cache.invalidate(old_domain)
+    if new_domain and new_domain != old_domain:
+        domain_cache.invalidate(new_domain)
+
     return TenantPublic.model_validate(updated)
 
 

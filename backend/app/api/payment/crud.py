@@ -108,7 +108,7 @@ def _calculate_amounts(
     patreon_amount = sum((a["patreon"] for a in attendees.values()), Decimal("0"))
 
     logger.info(
-        "Amounts calculated - Standard: %s, Supporter: %s, Patreon: %s",
+        "Amounts calculated - Standard: {}, Supporter: {}, Patreon: {}",
         standard_amount,
         supporter_amount,
         patreon_amount,
@@ -127,7 +127,7 @@ def _calculate_price(
 ) -> Decimal:
     """Calculate final price with discounts and credits."""
     credit = _get_credit(application, discount_value) if edit_passes else Decimal("0")
-    logger.info("Credit applied: %s", credit)
+    logger.info("Credit applied: {}", credit)
 
     discounted_standard = standard_amount
     if standard_amount > 0:
@@ -724,12 +724,15 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         }
 
         try:
+            from app.api.tenant.utils import get_portal_url
+
             simplefi_response = simplefi_client.create_payment(
                 amount=preview.amount,
                 popup_slug=application.popup.slug,
                 tenant_slug=application.popup.tenant.slug,
                 reference=reference,
                 memo=application.popup.tenant.name,
+                portal_base_override=get_portal_url(application.popup.tenant),
             )
         except Exception as e:
             logger.error(f"Failed to create SimpleFI payment: {e}")
@@ -868,7 +871,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             raise
         except Exception:
             session.rollback()
-            logger.exception("Failed to approve payment %s", payment_id)
+            logger.exception("Failed to approve payment {}", payment_id)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to approve payment",
@@ -974,7 +977,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         if not payment.products_snapshot:
             return
 
-        logger.info("Removing products from attendees for payment %s", payment.id)
+        logger.info("Removing products from attendees for payment {}", payment.id)
         for product_snapshot in payment.products_snapshot:
             statement = select(AttendeeProducts).where(
                 AttendeeProducts.attendee_id == product_snapshot.attendee_id,

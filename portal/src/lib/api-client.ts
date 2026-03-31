@@ -1,6 +1,10 @@
 import { OpenAPI } from "@/client"
 
-OpenAPI.BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
+if (!process.env.NEXT_PUBLIC_API_URL) {
+  throw new Error("NEXT_PUBLIC_API_URL is not configured")
+}
+
+OpenAPI.BASE = process.env.NEXT_PUBLIC_API_URL
 
 OpenAPI.TOKEN = async () => {
   if (typeof window !== "undefined") {

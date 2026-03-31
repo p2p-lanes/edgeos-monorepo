@@ -3,7 +3,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import { TenantForm } from "@/components/forms/TenantForm"
 
-export const Route = createFileRoute("/_layout/tenants/new")({
+export const Route = createFileRoute("/_layout/organizations/new")({
   component: NewTenant,
   head: () => ({
     meta: [{ title: "New Organization - EdgeOS" }],
@@ -17,9 +17,9 @@ function NewTenant() {
     <FormPageLayout
       title="Create Organization"
       description="Add a new organization to the platform"
-      backTo="/tenants"
+      backTo="/organizations"
     >
-      <TenantForm onSuccess={() => navigate({ to: "/tenants" })} />
+      <TenantForm onSuccess={() => navigate({ to: "/organizations" })} />
     </FormPageLayout>
   )
 }
