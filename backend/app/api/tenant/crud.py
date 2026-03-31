@@ -31,32 +31,42 @@ class TenantsCRUD(BaseCRUD[Tenants, TenantCreate, TenantUpdate]):
         """Resolve a tenant from any host — custom domain or platform subdomain.
 
         Resolution order:
-        1. Custom domain: ``custom_domain == host AND custom_domain_active AND NOT deleted``
-        2. Platform subdomain: if ``host`` ends with ``.{portal_domain}``, extract the
-           leftmost label as slug and look up by ``slug AND NOT deleted``.
+        1. Full custom domain: ``custom_domain == host`` (e.g. ``events.myclient.com``)
+        2. Platform subdomain as custom domain: if ``host`` is ``X.{portal_domain}``,
+           try ``custom_domain == X`` (e.g. ``de-mo`` stored as custom_domain,
+           accessed via ``de-mo.dev.edgeos.world``)
+        3. Platform subdomain as slug: same ``X`` looked up by ``slug``
 
-        Returns ``None`` if neither path matches.
+        Returns ``None`` if no path matches.
         """
         # Normalize: strip port for all lookups — port is infrastructure, not domain identity.
         host_no_port = host.split(":")[0] if ":" in host else host
 
-        # 1. Custom domain lookup
+        # 1. Full custom domain lookup (e.g. events.myclient.com)
         tenant = self.get_by_domain(session, host_no_port)
         if tenant is not None:
             return tenant
 
-        # 2. Platform subdomain fallback
+        # Extract subdomain from platform host
         suffix = f".{portal_domain}"
-        if portal_domain and host_no_port.endswith(suffix):
-            slug = host_no_port[: -len(suffix)].split(".")[0]
-            if slug:
-                statement = select(Tenants).where(
-                    Tenants.slug == slug,
-                    Tenants.deleted == False,  # noqa: E712
-                )
-                return session.exec(statement).first()
+        if not (portal_domain and host_no_port.endswith(suffix)):
+            return None
 
-        return None
+        subdomain = host_no_port[: -len(suffix)].split(".")[0]
+        if not subdomain:
+            return None
+
+        # 2. Subdomain as custom_domain (e.g. custom_domain="de-mo" via de-mo.dev.edgeos.world)
+        tenant = self.get_by_domain(session, subdomain)
+        if tenant is not None:
+            return tenant
+
+        # 3. Subdomain as slug (e.g. slug="demo" via demo.dev.edgeos.world)
+        statement = select(Tenants).where(
+            Tenants.slug == subdomain,
+            Tenants.deleted == False,  # noqa: E712
+        )
+        return session.exec(statement).first()
 
     def create(self, session: Session, obj_in: TenantCreate) -> Tenants:
         from app.core.tenant_db import ensure_tenant_credentials
