@@ -1,8 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { resolveHostname } from "./lib/tenant-resolution"
 
-const INTERNAL_API_URL =
-  process.env.INTERNAL_API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? ""
+if (!process.env.NEXT_PUBLIC_API_URL) {
+  throw new Error("NEXT_PUBLIC_API_URL is not configured")
+}
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL
 
 export async function proxy(request: NextRequest): Promise<NextResponse> {
   const host = request.headers.get("host") ?? ""
@@ -21,7 +24,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 
   try {
     const res = await fetch(
-      `${INTERNAL_API_URL}/api/v1/tenants/public/by-domain/${encodeURIComponent(domain)}`,
+      `${API_URL}/api/v1/tenants/public/by-domain/${encodeURIComponent(domain)}`,
       // No Next.js cache — backend Redis is the single cache layer.
       { cache: "no-store" },
     )

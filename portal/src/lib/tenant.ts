@@ -8,8 +8,11 @@ export function extractSubdomain(hostname: string): string | null {
   return null
 }
 
-const API_BASE =
-  process.env.INTERNAL_API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? ""
+if (!process.env.NEXT_PUBLIC_API_URL) {
+  throw new Error("NEXT_PUBLIC_API_URL is not configured")
+}
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL
 
 export async function fetchTenantBySlug(
   slug: string,
