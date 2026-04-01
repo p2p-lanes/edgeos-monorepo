@@ -3,7 +3,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import { Check, Copy, Globe, Image, Info, Lock, Mail, User } from "lucide-react"
 import { useState } from "react"
-import useAuth from "@/hooks/useAuth"
 import {
   type TenantCreate,
   type TenantPublic,
@@ -24,6 +23,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { LoadingButton } from "@/components/ui/loading-button"
 import { Separator } from "@/components/ui/separator"
+import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
 import {
   UnsavedChangesDialog,
@@ -53,9 +53,10 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
   const { isSuperadmin } = useAuth()
   const [copied, setCopied] = useState(false)
 
-  const cnameTarget = defaultValues?.slug && PORTAL_DOMAIN
-    ? `${defaultValues.slug}.${PORTAL_DOMAIN}`
-    : null
+  const cnameTarget =
+    defaultValues?.slug && PORTAL_DOMAIN
+      ? `${defaultValues.slug}.${PORTAL_DOMAIN}`
+      : null
 
   function copyToClipboard() {
     if (!cnameTarget) return
@@ -374,7 +375,9 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
                             variant={isActive ? "outline" : "default"}
                             size="sm"
                             loading={toggleActivationMutation.isPending}
-                            onClick={() => toggleActivationMutation.mutate(!isActive)}
+                            onClick={() =>
+                              toggleActivationMutation.mutate(!isActive)
+                            }
                           >
                             {isActive ? "Deactivate" : "Activate"}
                           </LoadingButton>
@@ -398,7 +401,9 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
                 </p>
                 {cnameTarget && (
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-yellow-700">CNAME target:</span>
+                    <span className="text-xs text-yellow-700">
+                      CNAME target:
+                    </span>
                     <code className="rounded bg-yellow-100 px-2 py-0.5 text-xs font-mono text-yellow-900 border border-yellow-200">
                       {cnameTarget}
                     </code>
@@ -409,10 +414,11 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
                       className="h-6 w-6 text-yellow-700 hover:text-yellow-900 hover:bg-yellow-100"
                       onClick={copyToClipboard}
                     >
-                      {copied
-                        ? <Check className="h-3 w-3" />
-                        : <Copy className="h-3 w-3" />
-                      }
+                      {copied ? (
+                        <Check className="h-3 w-3" />
+                      ) : (
+                        <Copy className="h-3 w-3" />
+                      )}
                     </Button>
                   </div>
                 )}

@@ -753,14 +753,39 @@ function Applications() {
         { key: "human.residence", label: "Residence" },
       ]
 
-      const customColumns = formSchema?.custom_fields
-        ? Object.entries(formSchema.custom_fields)
-            .sort(([, a], [, b]) => (a.position ?? 0) - (b.position ?? 0))
-            .map(([name, field]) => ({
-              key: `custom_fields.${name}`,
-              label: field.label,
-            }))
-        : []
+      // Build custom columns from the ACTUAL data keys across all
+      // applications, not from the current schema. Field names are
+      // immutable identifiers — but if a field was renamed in the
+      // past, old applications still reference the previous key.
+      // Using data keys guarantees every value is exported.
+      const schemaLookup = formSchema?.custom_fields ?? {}
+      const seenKeys = new Set<string>()
+      for (const r of results) {
+        const cf = (r as Record<string, unknown>).custom_fields as
+          | Record<string, unknown>
+          | undefined
+        if (cf) {
+          for (const k of Object.keys(cf)) seenKeys.add(k)
+        }
+      }
+
+      // Try to match each data key to the current schema for label
+      // and position; fall back to a formatted version of the key.
+      const customColumns = [...seenKeys]
+        .map((name) => {
+          const schemaDef = schemaLookup[name] as
+            | { label?: string; position?: number }
+            | undefined
+          return {
+            key: `custom_fields.${name}`,
+            label:
+              schemaDef?.label ??
+              name.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+            position: schemaDef?.position ?? Number.MAX_SAFE_INTEGER,
+          }
+        })
+        .sort((a, b) => a.position - b.position)
+        .map(({ key, label }) => ({ key, label }))
 
       exportToCsv(
         "applications",

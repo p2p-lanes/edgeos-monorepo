@@ -162,13 +162,10 @@ async def update_form_field(
     field = crud.form_fields_crud.get(db, field_id)
 
     if field:
-        # Regenerate internal name when label changes
-        if field_in.label and field_in.label != field.label:
-            new_name = crud.form_fields_crud.generate_field_name(
-                db, field_in.label, field.popup_id
-            )
-            field.name = new_name
-
+        # NOTE: field.name is a stable internal key generated once at creation.
+        # It MUST NOT change when the label is edited — existing application
+        # custom_fields reference this key and renaming it would silently break
+        # the link to all previously submitted data.
         updated = crud.form_fields_crud.update(db, field, field_in)
         return _to_public(updated)
 
