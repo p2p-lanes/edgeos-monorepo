@@ -394,6 +394,11 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         if data.get("status") and hasattr(data["status"], "value"):
             data["status"] = data["status"].value
 
+        # Capture the custom fields schema at submission time
+        data["custom_fields_schema"] = form_fields_crud.build_schema_for_popup(
+            session, app_data.popup_id
+        )
+
         application = Applications(**data)
         session.add(application)
         session.flush()
