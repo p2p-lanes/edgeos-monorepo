@@ -2,12 +2,20 @@ import { Badge } from "@/components/ui/badge"
 
 type StatusVariant = "default" | "secondary" | "destructive" | "outline"
 
-const statusMap: Record<string, { variant: StatusVariant; label?: string }> = {
+const statusMap: Record<
+  string,
+  { variant: StatusVariant; label?: string; className?: string }
+> = {
   accepted: { variant: "default" },
   approved: { variant: "default" },
   active: { variant: "default" },
   "in review": { variant: "secondary" },
   pending: { variant: "secondary" },
+  pending_fee: {
+    variant: "outline",
+    label: "Pending Fee",
+    className: "border-amber-300 bg-amber-100 text-amber-800",
+  },
   inactive: { variant: "secondary" },
   draft: { variant: "outline" },
   none: { variant: "outline", label: "None" },
@@ -38,7 +46,14 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
   const label = config.label ?? status
 
   return (
-    <Badge variant={config.variant} className={className}>
+    <Badge
+      variant={config.variant}
+      className={
+        config.className
+          ? `${config.className} ${className ?? ""}`.trim()
+          : className
+      }
+    >
       {label}
     </Badge>
   )

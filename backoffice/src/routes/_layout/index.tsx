@@ -168,7 +168,7 @@ function Dashboard() {
         <StatCard
           title="Total Applications"
           value={applications?.total}
-          subtitle={`${applications?.accepted ?? 0} accepted`}
+          subtitle={`${applications?.accepted ?? 0} accepted, ${applications?.pending_fee ?? 0} pending fee`}
           icon={FileText}
           href="/applications"
           isLoading={isLoading}
@@ -218,6 +218,15 @@ function Dashboard() {
               </div>
             ) : (
               <div className="space-y-3">
+                <div className="flex items-center justify-between p-2 rounded-md bg-muted/50">
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="h-4 w-4 text-amber-500" />
+                    <span className="text-sm">Pending Fee</span>
+                  </div>
+                  <span className="text-sm font-bold text-amber-600">
+                    {applications?.pending_fee ?? 0}
+                  </span>
+                </div>
                 <div className="flex items-center justify-between p-2 rounded-md bg-muted/50">
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4 text-yellow-500" />
