@@ -8,6 +8,7 @@ class ApplicationStats(BaseModel):
 
     total: int = 0
     draft: int = 0
+    pending_fee: int = 0
     in_review: int = 0
     accepted: int = 0
     rejected: int = 0
