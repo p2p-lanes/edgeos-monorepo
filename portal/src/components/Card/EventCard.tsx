@@ -11,6 +11,7 @@ import { EventProgressBar, type EventStatus } from "./EventProgressBar"
 const CTA_LABELS: Record<EventStatus, string> = {
   not_started: "Apply",
   draft: "Continue Application",
+  pending_fee: "Complete Payment",
   "in review": "Edit Application",
   accepted: "Go to Passes",
   rejected: "",
