@@ -1,6 +1,6 @@
 "use client"
 
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import type { ApplicationPublic } from "@/client"
@@ -10,6 +10,7 @@ import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import { DynamicApplicationForm } from "./components/dynamic-application-form"
 import { ExistingApplicationCard } from "./components/existing-application-card"
+import { FeePaymentBanner } from "./components/fee-payment-banner"
 import { FormHeader } from "./components/form-header"
 import { SectionSeparator } from "./components/section-separator"
 
@@ -59,6 +60,8 @@ export default function FormPage() {
   const city = getCity()
   const application = getRelevantApplication()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const isReturnFromCheckout = searchParams.has("checkout", "success")
 
   const {
     data: schema,
@@ -79,7 +82,7 @@ export default function FormPage() {
     }
   }, [importSource, existingApp])
 
-  // Redirect if already accepted/rejected
+  // Redirect if already accepted/rejected (not for pending_fee — that stays editable)
   useEffect(() => {
     if (
       application &&
@@ -88,6 +91,16 @@ export default function FormPage() {
       router.push(`/portal/${city?.slug}`)
     }
   }, [application, city, router])
+
+  // Clean up ?checkout=success from the URL after the banner mounts,
+  // so stale polling doesn't re-trigger on subsequent navigations.
+  // isReturnFromCheckout is computed synchronously above, so the banner
+  // already received the initial `true` value before this replace runs.
+  useEffect(() => {
+    if (isReturnFromCheckout) {
+      router.replace(`/portal/${city?.slug}/application`, { scroll: false })
+    }
+  }, [isReturnFromCheckout, city?.slug, router])
 
   const handleImport = () => {
     if (importSource) {
@@ -136,7 +149,14 @@ export default function FormPage() {
         <FormHeader />
         <SectionSeparator />
       </div>
+      {application?.status === "pending_fee" && isReturnFromCheckout && (
+        <FeePaymentBanner
+          application={application}
+          isReturnFromCheckout={isReturnFromCheckout}
+        />
+      )}
       <DynamicApplicationForm
+        key={existingApp?.id ?? importedData?.id ?? "new"}
         schema={schema}
         existingApplication={prefillData}
         popup={city}
