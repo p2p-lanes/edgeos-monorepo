@@ -4877,6 +4877,24 @@ export const ListModel_TenantPublic_Schema = {
     title: 'ListModel[TenantPublic]'
 } as const;
 
+export const ListModel_TicketingStepPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/TicketingStepPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[TicketingStepPublic]'
+} as const;
+
 export const ListModel_UserPublic_Schema = {
     properties: {
         results: {
@@ -6856,7 +6874,8 @@ export const ProductBatchItemSchema = {
             title: 'Image Url'
         },
         category: {
-            '$ref': '#/components/schemas/ProductCategory',
+            type: 'string',
+            title: 'Category',
             default: 'ticket'
         },
         attendee_category: {
@@ -7006,7 +7025,8 @@ export const ProductBatchResultSchema = {
             title: 'Image Url'
         },
         category: {
-            '$ref': '#/components/schemas/ProductCategory',
+            type: 'string',
+            title: 'Category',
             default: 'ticket'
         },
         attendee_category: {
@@ -7117,13 +7137,6 @@ export const ProductBatchResultSchema = {
     description: 'Schema for batch product result.'
 } as const;
 
-export const ProductCategorySchema = {
-    type: 'string',
-    enum: ['ticket', 'housing', 'merch', 'other', 'patreon'],
-    title: 'ProductCategory',
-    description: 'Product categories determining which fields are relevant.'
-} as const;
-
 export const ProductCreateSchema = {
     properties: {
         popup_id: {
@@ -7198,7 +7211,8 @@ export const ProductCreateSchema = {
             title: 'Image Url'
         },
         category: {
-            '$ref': '#/components/schemas/ProductCategory',
+            type: 'string',
+            title: 'Category',
             default: 'ticket'
         },
         attendee_category: {
@@ -7348,7 +7362,8 @@ export const ProductPublicSchema = {
             title: 'Image Url'
         },
         category: {
-            '$ref': '#/components/schemas/ProductCategory',
+            type: 'string',
+            title: 'Category',
             default: 'ticket'
         },
         attendee_category: {
@@ -7521,12 +7536,13 @@ export const ProductUpdateSchema = {
         category: {
             anyOf: [
                 {
-                    '$ref': '#/components/schemas/ProductCategory'
+                    type: 'string'
                 },
                 {
                     type: 'null'
                 }
-            ]
+            ],
+            title: 'Category'
         },
         attendee_category: {
             anyOf: [
@@ -7686,7 +7702,8 @@ export const ProductWithQuantitySchema = {
             title: 'Image Url'
         },
         category: {
-            '$ref': '#/components/schemas/ProductCategory',
+            type: 'string',
+            title: 'Category',
             default: 'ticket'
         },
         attendee_category: {
@@ -8372,6 +8389,291 @@ export const TicketProductSchema = {
     required: ['name'],
     title: 'TicketProduct',
     description: 'Minimal product data for tickets.'
+} as const;
+
+export const TicketingStepCreateSchema = {
+    properties: {
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        step_type: {
+            type: 'string',
+            title: 'Step Type'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        order: {
+            type: 'integer',
+            title: 'Order',
+            default: 0
+        },
+        is_enabled: {
+            type: 'boolean',
+            title: 'Is Enabled',
+            default: true
+        },
+        product_category: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Product Category'
+        },
+        template: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Template'
+        },
+        template_config: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Template Config'
+        },
+        watermark: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Watermark'
+        }
+    },
+    type: 'object',
+    required: ['popup_id', 'step_type', 'title'],
+    title: 'TicketingStepCreate'
+} as const;
+
+export const TicketingStepPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        step_type: {
+            type: 'string',
+            title: 'Step Type'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        order: {
+            type: 'integer',
+            title: 'Order',
+            default: 0
+        },
+        is_enabled: {
+            type: 'boolean',
+            title: 'Is Enabled',
+            default: true
+        },
+        protected: {
+            type: 'boolean',
+            title: 'Protected',
+            default: false
+        },
+        product_category: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Product Category'
+        },
+        template: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Template'
+        },
+        template_config: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Template Config'
+        },
+        watermark: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Watermark'
+        }
+    },
+    type: 'object',
+    required: ['id', 'tenant_id', 'popup_id', 'step_type', 'title'],
+    title: 'TicketingStepPublic'
+} as const;
+
+export const TicketingStepUpdateSchema = {
+    properties: {
+        title: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Title'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        order: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Order'
+        },
+        is_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Is Enabled'
+        },
+        product_category: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Product Category'
+        },
+        template: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Template'
+        },
+        template_config: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Template Config'
+        },
+        watermark: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Watermark'
+        }
+    },
+    type: 'object',
+    title: 'TicketingStepUpdate'
 } as const;
 
 export const TokenSchema = {

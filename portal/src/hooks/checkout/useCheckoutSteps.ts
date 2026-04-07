@@ -14,7 +14,13 @@ interface UseCheckoutStepsParams {
   allProducts?: ProductsPass[]
 }
 
-const KNOWN_STEPS = new Set(["tickets", "housing", "merch", "patron", "confirm"])
+const KNOWN_STEPS = new Set([
+  "tickets",
+  "housing",
+  "merch",
+  "patron",
+  "confirm",
+])
 
 /**
  * Maps API step_type values to internal CheckoutStep values.
@@ -72,9 +78,12 @@ export function useCheckoutSteps({
       if (step === "patron" && patronCount === 0) continue
 
       // For custom (non-built-in) steps, skip if no products match the category
-      if (!KNOWN_STEPS.has(stepConfig.step_type) && stepConfig.product_category) {
+      if (
+        !KNOWN_STEPS.has(stepConfig.step_type) &&
+        stepConfig.product_category
+      ) {
         const hasProducts = allProducts.some(
-          (p) => p.category === stepConfig.product_category && p.is_active
+          (p) => p.category === stepConfig.product_category && p.is_active,
         )
         if (!hasProducts) continue
       }

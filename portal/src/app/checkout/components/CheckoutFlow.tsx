@@ -11,9 +11,9 @@ import type { CheckoutStep } from "@/types/checkout"
 import CartFooter from "./CartFooter"
 import CheckoutSkeleton from "./CheckoutSkeleton"
 import DynamicProductStep from "./DynamicProductStep"
+import { STEP_COMPONENT_REGISTRY } from "./stepRegistry"
 import PassSelectionSection from "./steps/PassSelectionSection"
 import SuccessStep from "./steps/SuccessStep"
-import { STEP_COMPONENT_REGISTRY } from "./stepRegistry"
 
 // Fallback titles/subtitles when stepConfigs aren't loaded yet
 function getDefaultStepTitle(step: CheckoutStep): string {
@@ -138,20 +138,39 @@ export default function CheckoutFlow({
   )
 
   const stepTitle = stepConfig?.title ?? getDefaultStepTitle(currentStep)
-  const stepSubtitle = stepConfig?.description ?? getDefaultStepSubtitle(currentStep)
+  const stepSubtitle =
+    stepConfig?.description ?? getDefaultStepSubtitle(currentStep)
 
   const renderStepContent = () => {
-    // Passes step has special loading / onAddAttendee handling
+    // Passes/tickets step — use DynamicProductStep if template_config exists,
+    // otherwise fall back to PassSelectionSection
     if (currentStep === "passes" || currentStep === "tickets") {
+      const ticketStepConfig = stepConfigs.find(
+        (s) =>
+          s.step_type === currentStep ||
+          (s.step_type === "tickets" && currentStep === "passes"),
+      )
+      if (ticketStepConfig?.template_config) {
+        return (
+          <AnimatePresence mode="wait">
+            {isLoading ? (
+              <CheckoutSkeleton key="skeleton" />
+            ) : (
+              <DynamicProductStep
+                key="passes"
+                stepConfig={ticketStepConfig}
+                onSkip={handleSkip}
+              />
+            )}
+          </AnimatePresence>
+        )
+      }
       return (
         <AnimatePresence mode="wait">
           {isLoading ? (
             <CheckoutSkeleton key="skeleton" />
           ) : (
-            <PassSelectionSection
-              key="passes"
-              onAddAttendee={onAddAttendee}
-            />
+            <PassSelectionSection key="passes" onAddAttendee={onAddAttendee} />
           )}
         </AnimatePresence>
       )
@@ -171,6 +190,36 @@ export default function CheckoutFlow({
     if (currentStep === "merch" && merchProducts.length === 0) return null
     if (currentStep === "patron" && patronProducts.length === 0) return null
 
+    // If the step has a template_config, use DynamicProductStep
+    // instead of the legacy hardcoded component
+    const dynamicStepConfig = stepConfigs.find(
+      (s) => s.step_type === currentStep,
+    )
+    const dynamicConfig = dynamicStepConfig?.template_config as
+      | Record<string, unknown>
+      | undefined
+    const housingNonDefault =
+      currentStep === "housing" &&
+      dynamicConfig?.variant &&
+      dynamicConfig.variant !== "default"
+    const hasTemplateConfig =
+      currentStep !== "housing" && dynamicStepConfig?.template_config
+    if (dynamicStepConfig && (housingNonDefault || hasTemplateConfig)) {
+      return (
+        <AnimatePresence mode="wait">
+          {isLoading ? (
+            <CheckoutSkeleton key="skeleton" />
+          ) : (
+            <DynamicProductStep
+              key={currentStep}
+              stepConfig={dynamicStepConfig}
+              onSkip={handleSkip}
+            />
+          )}
+        </AnimatePresence>
+      )
+    }
+
     // Registry lookup — covers housing, merch, patron,
     // and any future step types added to STEP_COMPONENT_REGISTRY
     const StepComponent = STEP_COMPONENT_REGISTRY[currentStep]
@@ -179,9 +228,16 @@ export default function CheckoutFlow({
     }
 
     // Custom step — render dynamically based on step config
-    const currentStepConfig = stepConfigs.find((s) => s.step_type === currentStep)
+    const currentStepConfig = stepConfigs.find(
+      (s) => s.step_type === currentStep,
+    )
     if (currentStepConfig) {
-      return <DynamicProductStep stepConfig={currentStepConfig} onSkip={handleSkip} />
+      return (
+        <DynamicProductStep
+          stepConfig={currentStepConfig}
+          onSkip={handleSkip}
+        />
+      )
     }
 
     return null

@@ -8,7 +8,7 @@ import {
 } from "@dnd-kit/core"
 import { arrayMove } from "@dnd-kit/sortable"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { createFileRoute } from "@tanstack/react-router"
+import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { Loader2 } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 
@@ -16,7 +16,6 @@ import { type TicketingStepPublic, TicketingStepsService } from "@/client"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { AddStepDialog } from "@/components/ticketing-step-builder/AddStepDialog"
 import { StepCanvas } from "@/components/ticketing-step-builder/StepCanvas"
-import { StepConfigPanel } from "@/components/ticketing-step-builder/StepConfigPanel"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
@@ -59,11 +58,9 @@ function TicketingStepsPage() {
 
 function TicketingStepsContent({ popupId }: { popupId: string }) {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const { showErrorToast } = useCustomToast()
 
-  const [selectedStep, setSelectedStep] = useState<TicketingStepPublic | null>(
-    null,
-  )
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [displayOrder, setDisplayOrder] = useState<string[]>([])
 
@@ -78,7 +75,9 @@ function TicketingStepsContent({ popupId }: { popupId: string }) {
 
   const steps = useMemo(() => {
     if (!stepsData?.results) return []
-    return [...stepsData.results].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+    return [...stepsData.results].sort(
+      (a, b) => (a.order ?? 0) - (b.order ?? 0),
+    )
   }, [stepsData])
 
   useEffect(() => {
@@ -130,6 +129,13 @@ function TicketingStepsContent({ popupId }: { popupId: string }) {
     persistStepOrder(newOrder)
   }
 
+  const handleEdit = (step: TicketingStepPublic) => {
+    navigate({
+      to: "/ticketing-steps/$stepId",
+      params: { stepId: step.id },
+    })
+  }
+
   if (isLoading) {
     return (
       <div className="flex flex-col gap-6">
@@ -163,7 +169,7 @@ function TicketingStepsContent({ popupId }: { popupId: string }) {
           collisionDetection={closestCenter}
           onDragEnd={handleDragEnd}
         >
-          <StepCanvas steps={orderedSteps} onEdit={setSelectedStep} />
+          <StepCanvas steps={orderedSteps} onEdit={handleEdit} />
         </DndContext>
       </div>
 
@@ -172,16 +178,6 @@ function TicketingStepsContent({ popupId }: { popupId: string }) {
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
           Saving...
         </div>
-      )}
-
-      {selectedStep && (
-        <StepConfigPanel
-          step={selectedStep}
-          insuranceStep={steps.find((s) => s.step_type === "insurance_checkout")}
-          open={!!selectedStep}
-          onOpenChange={(open) => { if (!open) setSelectedStep(null) }}
-          onClose={() => setSelectedStep(null)}
-        />
       )}
 
       <AddStepDialog

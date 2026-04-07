@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import useCustomToast from "@/hooks/useCustomToast"
 import { createErrorHandler } from "@/utils"
-import { DISPLAY_VARIANT_DEFINITIONS, getStepTypeDefinition } from "./constants"
+import { getStepTypeDefinition, TEMPLATE_DEFINITIONS } from "./constants"
 
 interface SortableStepCardProps {
   step: TicketingStepPublic
@@ -55,7 +55,7 @@ export function SortableStepCard({ step, onEdit }: SortableStepCardProps) {
 
   const stepDef = getStepTypeDefinition(step.step_type)
   const Icon = stepDef?.icon
-  const variantDef = DISPLAY_VARIANT_DEFINITIONS.find((v) => v.key === step.display_variant)
+  const templateDef = TEMPLATE_DEFINITIONS.find((v) => v.key === step.template)
 
   const handleTitleClick = () => {
     setTitleDraft(step.title)
@@ -122,10 +122,14 @@ export function SortableStepCard({ step, onEdit }: SortableStepCardProps) {
         )}
         <p className="text-xs text-muted-foreground">{step.step_type}</p>
         {step.description && (
-          <p className="text-xs text-muted-foreground truncate">{step.description}</p>
+          <p className="text-xs text-muted-foreground truncate">
+            {step.description}
+          </p>
         )}
-        {variantDef && (
-          <p className="text-xs text-muted-foreground/70">{variantDef.label}</p>
+        {templateDef && (
+          <p className="text-xs text-muted-foreground/70">
+            {templateDef.label}
+          </p>
         )}
       </div>
 

@@ -14,7 +14,6 @@ import {
 } from "lucide-react"
 import { useMemo, useState } from "react"
 import {
-  type ProductCategory,
   type ProductCreate,
   type ProductPublic,
   ProductsService,
@@ -22,6 +21,14 @@ import {
   type TicketAttendeeCategory,
   type TicketDuration,
 } from "@/client"
+
+type ProductCategory = string
+
+import { DangerZone } from "@/components/Common/DangerZone"
+import { FieldError } from "@/components/Common/FieldError"
+import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
@@ -29,11 +36,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { DangerZone } from "@/components/Common/DangerZone"
-import { FieldError } from "@/components/Common/FieldError"
-import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { ImageUpload } from "@/components/ui/image-upload"
 import {
   HeroInput,
@@ -304,7 +306,9 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
                   </SelectTrigger>
                   <SelectContent>
                     {allCategories.map((cat) => {
-                      const known = PRODUCT_CATEGORIES.find((c) => c.value === cat)
+                      const known = PRODUCT_CATEGORIES.find(
+                        (c) => c.value === cat,
+                      )
                       return (
                         <SelectItem key={cat} value={cat}>
                           {known?.label ?? cat}
@@ -648,7 +652,8 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
           <DialogHeader>
             <DialogTitle>Create New Category</DialogTitle>
             <DialogDescription>
-              Give your category a name. Products with this category can be grouped into their own checkout step.
+              Give your category a name. Products with this category can be
+              grouped into their own checkout step.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-4 mt-2">
@@ -671,7 +676,10 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
               }}
             />
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setAddCategoryOpen(false)}>
+              <Button
+                variant="outline"
+                onClick={() => setAddCategoryOpen(false)}
+              >
                 Cancel
               </Button>
               <Button

@@ -989,6 +989,11 @@ export type ListModel_TenantPublic_ = {
     paging: Paging;
 };
 
+export type ListModel_TicketingStepPublic_ = {
+    results: Array<TicketingStepPublic>;
+    paging: Paging;
+};
+
 export type ListModel_UserPublic_ = {
     results: Array<UserPublic>;
     paging: Paging;
@@ -1345,7 +1350,7 @@ export type ProductBatchItem = {
     compare_price?: (number | string | null);
     description?: (string | null);
     image_url?: (string | null);
-    category?: ProductCategory;
+    category?: string;
     attendee_category?: (TicketAttendeeCategory | null);
     duration_type?: (TicketDuration | null);
     start_date?: (string | null);
@@ -1368,7 +1373,7 @@ export type ProductBatchResult = {
     compare_price?: (string | null);
     description?: (string | null);
     image_url?: (string | null);
-    category?: ProductCategory;
+    category?: string;
     attendee_category?: (TicketAttendeeCategory | null);
     duration_type?: (TicketDuration | null);
     start_date?: (string | null);
@@ -1384,11 +1389,6 @@ export type ProductBatchResult = {
 };
 
 /**
- * Product category — free-form string; known built-ins: ticket, housing, merch, other, patreon.
- */
-export type ProductCategory = string;
-
-/**
  * Product schema for creation.
  */
 export type ProductCreate = {
@@ -1399,7 +1399,7 @@ export type ProductCreate = {
     compare_price?: (number | string | null);
     description?: (string | null);
     image_url?: (string | null);
-    category?: ProductCategory;
+    category?: string;
     attendee_category?: (TicketAttendeeCategory | null);
     duration_type?: (TicketDuration | null);
     start_date?: (string | null);
@@ -1422,7 +1422,7 @@ export type ProductPublic = {
     compare_price?: (string | null);
     description?: (string | null);
     image_url?: (string | null);
-    category?: ProductCategory;
+    category?: string;
     attendee_category?: (TicketAttendeeCategory | null);
     duration_type?: (TicketDuration | null);
     start_date?: (string | null);
@@ -1444,7 +1444,7 @@ export type ProductUpdate = {
     compare_price?: (number | string | null);
     description?: (string | null);
     image_url?: (string | null);
-    category?: (ProductCategory | null);
+    category?: (string | null);
     attendee_category?: (TicketAttendeeCategory | null);
     duration_type?: (TicketDuration | null);
     start_date?: (string | null);
@@ -1467,7 +1467,7 @@ export type ProductWithQuantity = {
     compare_price?: (string | null);
     description?: (string | null);
     image_url?: (string | null);
-    category?: ProductCategory;
+    category?: string;
     attendee_category?: (TicketAttendeeCategory | null);
     duration_type?: (TicketDuration | null);
     start_date?: (string | null);
@@ -1590,6 +1590,52 @@ export type TicketAttendeeCategory = 'main' | 'spouse' | 'kid';
  * Duration types for ticket products.
  */
 export type TicketDuration = 'day' | 'week' | 'month' | 'full';
+
+export type TicketingStepCreate = {
+    popup_id: string;
+    step_type: string;
+    title: string;
+    description?: (string | null);
+    order?: number;
+    is_enabled?: boolean;
+    product_category?: (string | null);
+    template?: (string | null);
+    template_config?: ({
+    [key: string]: unknown;
+} | null);
+    watermark?: (string | null);
+};
+
+export type TicketingStepPublic = {
+    id: string;
+    tenant_id: string;
+    popup_id: string;
+    step_type: string;
+    title: string;
+    description?: (string | null);
+    order?: number;
+    is_enabled?: boolean;
+    protected?: boolean;
+    product_category?: (string | null);
+    template?: (string | null);
+    template_config?: ({
+    [key: string]: unknown;
+} | null);
+    watermark?: (string | null);
+};
+
+export type TicketingStepUpdate = {
+    title?: (string | null);
+    description?: (string | null);
+    order?: (number | null);
+    is_enabled?: (boolean | null);
+    product_category?: (string | null);
+    template?: (string | null);
+    template_config?: ({
+    [key: string]: unknown;
+} | null);
+    watermark?: (string | null);
+};
 
 /**
  * Minimal product data for tickets.
@@ -2597,10 +2643,10 @@ export type ProductsListProductCategoriesData = {
     popupId: string;
 };
 
-export type ProductsListProductCategoriesResponse = (Array<string>);
+export type ProductsListProductCategoriesResponse = (Array<(string)>);
 
 export type ProductsListProductsData = {
-    category?: (ProductCategory | null);
+    category?: (string | null);
     isActive?: (boolean | null);
     /**
      * Maximum number of items to return
@@ -2656,7 +2702,7 @@ export type ProductsDeleteProductData = {
 export type ProductsDeleteProductResponse = (void);
 
 export type ProductsListPortalProductsData = {
-    category?: (ProductCategory | null);
+    category?: (string | null);
     isActive?: (boolean | null);
     /**
      * Maximum number of items to return
@@ -2728,6 +2774,56 @@ export type TenantsDeleteCredentialsData = {
 
 export type TenantsDeleteCredentialsResponse = (void);
 
+export type TicketingStepsListPortalTicketingStepsData = {
+    popupId: string;
+};
+
+export type TicketingStepsListPortalTicketingStepsResponse = (ListModel_TicketingStepPublic_);
+
+export type TicketingStepsListTicketingStepsData = {
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    popupId?: (string | null);
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+    xTenantId?: (string | null);
+};
+
+export type TicketingStepsListTicketingStepsResponse = (ListModel_TicketingStepPublic_);
+
+export type TicketingStepsCreateTicketingStepData = {
+    requestBody: TicketingStepCreate;
+    xTenantId?: (string | null);
+};
+
+export type TicketingStepsCreateTicketingStepResponse = (TicketingStepPublic);
+
+export type TicketingStepsGetTicketingStepData = {
+    stepId: string;
+    xTenantId?: (string | null);
+};
+
+export type TicketingStepsGetTicketingStepResponse = (TicketingStepPublic);
+
+export type TicketingStepsUpdateTicketingStepData = {
+    requestBody: TicketingStepUpdate;
+    stepId: string;
+    xTenantId?: (string | null);
+};
+
+export type TicketingStepsUpdateTicketingStepResponse = (TicketingStepPublic);
+
+export type TicketingStepsDeleteTicketingStepData = {
+    stepId: string;
+    xTenantId?: (string | null);
+};
+
+export type TicketingStepsDeleteTicketingStepResponse = (void);
+
 export type UploadsGetPresignedUploadUrlData = {
     requestBody: PresignedUrlRequest;
 };
@@ -2776,68 +2872,3 @@ export type UsersDeleteUserData = {
 };
 
 export type UsersDeleteUserResponse = (void);
-
-export type TicketingStepPublic = {
-    id: string;
-    tenant_id: string;
-    popup_id: string;
-    step_type: string;
-    title: string;
-    description?: (string | null);
-    order?: number;
-    is_enabled?: boolean;
-    protected?: boolean;
-    product_category?: (string | null);
-    display_variant?: (string | null);
-    watermark?: (string | null);
-};
-
-export type TicketingStepCreate = {
-    popup_id: string;
-    step_type: string;
-    title: string;
-    description?: (string | null);
-    order?: number;
-    is_enabled?: boolean;
-    product_category?: (string | null);
-    display_variant?: (string | null);
-    watermark?: (string | null);
-};
-
-export type TicketingStepUpdate = {
-    title?: (string | null);
-    description?: (string | null);
-    order?: (number | null);
-    is_enabled?: (boolean | null);
-    product_category?: (string | null);
-    display_variant?: (string | null);
-    watermark?: (string | null);
-};
-
-export type ListModel_TicketingStepPublic_ = {
-    results: Array<TicketingStepPublic>;
-    paging: Paging;
-};
-
-export type TicketingStepsListPortalTicketingStepsData = {
-    popupId: string;
-};
-
-export type TicketingStepsListPortalTicketingStepsResponse = (ListModel_TicketingStepPublic_);
-
-export type TicketingStepsListTicketingStepsData = {
-    limit?: number;
-    popupId?: (string | null);
-    skip?: number;
-    xTenantId?: (string | null);
-};
-
-export type TicketingStepsListTicketingStepsResponse = (ListModel_TicketingStepPublic_);
-
-export type TicketingStepsUpdateTicketingStepData = {
-    requestBody: TicketingStepUpdate;
-    stepId: string;
-    xTenantId?: (string | null);
-};
-
-export type TicketingStepsUpdateTicketingStepResponse = (TicketingStepPublic);

@@ -1,6 +1,8 @@
 import uuid
 
 from pydantic import BaseModel, ConfigDict
+from sqlalchemy import Column
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, SQLModel
 
 
@@ -14,7 +16,10 @@ class TicketingStepBase(SQLModel):
     is_enabled: bool = Field(default=True)
     protected: bool = Field(default=False)
     product_category: str | None = Field(default=None, nullable=True)
-    display_variant: str | None = Field(default=None, nullable=True)
+    template: str | None = Field(default=None, nullable=True)
+    template_config: dict | None = Field(
+        default=None, sa_column=Column(JSONB, nullable=True)
+    )
     watermark: str | None = Field(default=None, nullable=True)
 
 
@@ -29,7 +34,8 @@ class TicketingStepPublic(BaseModel):
     is_enabled: bool = True
     protected: bool = False
     product_category: str | None = None
-    display_variant: str | None = None
+    template: str | None = None
+    template_config: dict | None = None
     watermark: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
@@ -43,7 +49,8 @@ class TicketingStepCreate(BaseModel):
     order: int = 0
     is_enabled: bool = True
     product_category: str | None = None
-    display_variant: str | None = None
+    template: str | None = None
+    template_config: dict | None = None
     watermark: str | None = None
 
 
@@ -53,5 +60,6 @@ class TicketingStepUpdate(BaseModel):
     order: int | None = None
     is_enabled: bool | None = None
     product_category: str | None = None
-    display_variant: str | None = None
+    template: str | None = None
+    template_config: dict | None = None
     watermark: str | None = None

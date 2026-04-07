@@ -99,7 +99,9 @@ export default function ConfirmStep() {
     hasEditChanges
 
   // Insurance available if any product has insurance potential and total is not zero
-  const isInsuranceEnabled = stepConfigs.some((s) => s.step_type === "insurance_checkout")
+  const isInsuranceEnabled = stepConfigs.some(
+    (s) => s.step_type === "insurance_checkout",
+  )
   const hasInsurableProducts =
     isInsuranceEnabled &&
     cart.insurancePotentialPrice > 0 &&

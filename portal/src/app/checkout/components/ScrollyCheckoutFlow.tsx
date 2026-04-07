@@ -31,6 +31,7 @@ import type { AttendeeCategory } from "@/types/Attendee"
 import { formatCurrency } from "@/types/checkout"
 import CartFooter from "./CartFooter"
 import DesignVariantPanel from "./DesignVariantPanel"
+import DynamicProductStep from "./DynamicProductStep"
 import ScrollySection from "./ScrollySection"
 import ScrollySectionNav, {
   type FooterDesign,
@@ -38,7 +39,6 @@ import ScrollySectionNav, {
   type WatermarkStyle,
 } from "./ScrollySectionNav"
 import ConfirmStep from "./steps/ConfirmStep"
-import DynamicProductStep from "./DynamicProductStep"
 import HousingStep from "./steps/HousingStep"
 import MerchSection from "./steps/MerchSection"
 import PassSelectionSection from "./steps/PassSelectionSection"
@@ -865,12 +865,13 @@ function ScrollyCheckoutFlowInner({
   onBack,
 }: ScrollyCheckoutFlowProps) {
   const { variant } = useDesignVariant()
-  const { availableSteps, submitPayment, stepConfigs } =
-    useCheckout()
+  const { availableSteps, submitPayment, stepConfigs } = useCheckout()
 
   const getStepConfig = (stepType: string) =>
     stepConfigs.find(
-      (s) => s.step_type === stepType || (s.step_type === "tickets" && stepType === "passes"),
+      (s) =>
+        s.step_type === stepType ||
+        (s.step_type === "tickets" && stepType === "passes"),
     )
 
   const searchParams = useSearchParams()
@@ -972,7 +973,9 @@ function ScrollyCheckoutFlowInner({
       .filter((s) => s !== "success")
       .map((step) => {
         const config = stepConfigs.find(
-          (c) => c.step_type === step || (c.step_type === "tickets" && step === "passes"),
+          (c) =>
+            c.step_type === step ||
+            (c.step_type === "tickets" && step === "passes"),
         )
         const defaultLabels: Record<string, string> = {
           passes: "Select Your Passes",
@@ -1190,19 +1193,56 @@ function ScrollyCheckoutFlowInner({
   const renderSectionContent = (stepId: string) => {
     switch (stepId) {
       case "passes":
-      case "tickets":
+      case "tickets": {
+        const ticketConfig = getStepConfig("tickets") ?? getStepConfig("passes")
+        if (ticketConfig?.template_config) {
+          return (
+            <DynamicProductStep stepConfig={ticketConfig} onSkip={() => {}} />
+          )
+        }
         return <PassSelectionSection onAddAttendee={onAddAttendee} />
-      case "housing":
+      }
+      case "housing": {
+        const housingConfig = getStepConfig("housing")
+        if (
+          housingConfig?.template_config &&
+          (housingConfig.template_config as Record<string, unknown>).variant &&
+          (housingConfig.template_config as Record<string, unknown>).variant !==
+            "default"
+        )
+          return (
+            <DynamicProductStep stepConfig={housingConfig} onSkip={() => {}} />
+          )
         return <HousingStep onSkip={() => {}} />
-      case "merch":
+      }
+      case "merch": {
+        const merchConfig = getStepConfig("merch")
+        if (
+          merchConfig?.template_config &&
+          (merchConfig.template_config as Record<string, unknown>).variant &&
+          (merchConfig.template_config as Record<string, unknown>).variant !==
+            "default"
+        )
+          return (
+            <DynamicProductStep stepConfig={merchConfig} onSkip={() => {}} />
+          )
         return <MerchSection onSkip={() => {}} />
-      case "patron":
+      }
+      case "patron": {
+        const patronConfig = getStepConfig("patron")
+        if (patronConfig?.template_config) {
+          return (
+            <DynamicProductStep stepConfig={patronConfig} onSkip={() => {}} />
+          )
+        }
         return <PatronSection onSkip={() => {}} />
+      }
       case "confirm":
         return <ConfirmStep />
       default: {
         const config = getStepConfig(stepId)
-        if (config) return <DynamicProductStep stepConfig={config} onSkip={() => {}} />
+        if (config)
+          return <DynamicProductStep stepConfig={config} onSkip={() => {}} />
         return null
       }
     }

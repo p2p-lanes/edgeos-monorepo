@@ -16,7 +16,10 @@ import PatronSection from "./steps/PatronSection"
  *   2. Add one import + one entry here
  *   3. Add the step_type to CheckoutStep in types/checkout.ts
  */
-export const STEP_COMPONENT_REGISTRY: Record<string, ComponentType<{ onSkip?: () => void }>> = {
+export const STEP_COMPONENT_REGISTRY: Record<
+  string,
+  ComponentType<{ onSkip?: () => void }>
+> = {
   housing: HousingStep,
   merch: MerchSection,
   patron: PatronSection,

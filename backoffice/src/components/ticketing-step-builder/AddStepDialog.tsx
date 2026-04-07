@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { LoadingButton } from "@/components/ui/loading-button"
 import {
   Select,
   SelectContent,
@@ -20,11 +21,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { LoadingButton } from "@/components/ui/loading-button"
-import { cn } from "@/lib/utils"
 import useCustomToast from "@/hooks/useCustomToast"
+import { cn } from "@/lib/utils"
 import { createErrorHandler } from "@/utils"
-import { DISPLAY_VARIANT_DEFINITIONS } from "./constants"
+import { TEMPLATE_DEFINITIONS } from "./constants"
 
 function toKebabCase(str: string): string {
   return str
@@ -41,14 +41,20 @@ interface AddStepDialogProps {
   confirmStepId?: string
 }
 
-export function AddStepDialog({ open, onOpenChange, popupId, nextOrder, confirmStepId }: AddStepDialogProps) {
+export function AddStepDialog({
+  open,
+  onOpenChange,
+  popupId,
+  nextOrder,
+  confirmStepId,
+}: AddStepDialogProps) {
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
 
   const [title, setTitle] = useState("")
   const [stepType, setStepType] = useState("")
   const [productCategory, setProductCategory] = useState("")
-  const [displayVariant, setDisplayVariant] = useState("")
+  const [template, setTemplate] = useState("")
 
   const { data: categorySuggestions } = useQuery({
     queryKey: ["product-categories", popupId],
@@ -58,14 +64,16 @@ export function AddStepDialog({ open, onOpenChange, popupId, nextOrder, confirmS
 
   const handleTitleChange = (value: string) => {
     setTitle(value)
-    setStepType(toKebabCase((productCategory ? productCategory + "-" : "") + value))
+    setStepType(
+      toKebabCase((productCategory ? `${productCategory}-` : "") + value),
+    )
   }
 
   const reset = () => {
     setTitle("")
     setStepType("")
     setProductCategory("")
-    setDisplayVariant("")
+    setTemplate("")
   }
 
   const createMutation = useMutation({
@@ -80,7 +88,7 @@ export function AddStepDialog({ open, onOpenChange, popupId, nextOrder, confirmS
           order: insertOrder,
           is_enabled: true,
           product_category: productCategory || null,
-          display_variant: displayVariant || null,
+          template: template || null,
         },
       })
       // Push confirm step to the end
@@ -103,11 +111,19 @@ export function AddStepDialog({ open, onOpenChange, popupId, nextOrder, confirmS
   const canSubmit = title.trim().length > 0 && stepType.trim().length > 0
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) reset() }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        onOpenChange(v)
+        if (!v) reset()
+      }}
+    >
       <DialogContent className="sm:max-w-lg overflow-y-auto max-h-[90vh]">
         <DialogHeader>
           <DialogTitle>Add Step</DialogTitle>
-          <DialogDescription>Create a new custom checkout step</DialogDescription>
+          <DialogDescription>
+            Create a new custom checkout step
+          </DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-4 mt-2">
@@ -127,18 +143,23 @@ export function AddStepDialog({ open, onOpenChange, popupId, nextOrder, confirmS
               value={productCategory}
               onValueChange={(val) => {
                 setProductCategory(val)
-                setStepType(toKebabCase((val ? val + "-" : "") + title))
+                setStepType(toKebabCase((val ? `${val}-` : "") + title))
               }}
             >
               <SelectTrigger id="add-product-category">
                 <SelectValue placeholder="None" />
               </SelectTrigger>
               <SelectContent>
-                {productCategory && !(categorySuggestions ?? []).includes(productCategory) && (
-                  <SelectItem value={productCategory}>{productCategory}</SelectItem>
-                )}
+                {productCategory &&
+                  !(categorySuggestions ?? []).includes(productCategory) && (
+                    <SelectItem value={productCategory}>
+                      {productCategory}
+                    </SelectItem>
+                  )}
                 {(categorySuggestions ?? []).map((cat) => (
-                  <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                  <SelectItem key={cat} value={cat}>
+                    {cat}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -148,29 +169,33 @@ export function AddStepDialog({ open, onOpenChange, popupId, nextOrder, confirmS
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label>Display Variant</Label>
+            <Label>Template</Label>
             <div className="grid grid-cols-2 gap-2">
-              {DISPLAY_VARIANT_DEFINITIONS.map((variant) => {
+              {TEMPLATE_DEFINITIONS.map((variant) => {
                 const Icon = variant.icon
-                const isSelected = displayVariant === variant.key
+                const isSelected = template === variant.key
                 return (
                   <button
                     key={variant.key}
                     type="button"
-                    onClick={() => setDisplayVariant(isSelected ? "" : variant.key)}
+                    onClick={() => setTemplate(isSelected ? "" : variant.key)}
                     className={cn(
                       "relative flex flex-col gap-1 rounded-lg border p-3 text-left text-sm transition-all",
                       isSelected
                         ? "border-primary bg-primary/5 ring-1 ring-primary"
-                        : "border-border hover:border-primary/50 hover:bg-accent/50"
+                        : "border-border hover:border-primary/50 hover:bg-accent/50",
                     )}
                   >
                     {isSelected && (
                       <Check className="absolute top-2 right-2 h-3.5 w-3.5 text-primary" />
                     )}
                     <Icon className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium leading-tight">{variant.label}</span>
-                    <span className="text-xs text-muted-foreground leading-tight">{variant.description}</span>
+                    <span className="font-medium leading-tight">
+                      {variant.label}
+                    </span>
+                    <span className="text-xs text-muted-foreground leading-tight">
+                      {variant.description}
+                    </span>
                   </button>
                 )
               })}
@@ -178,7 +203,13 @@ export function AddStepDialog({ open, onOpenChange, popupId, nextOrder, confirmS
           </div>
 
           <div className="flex justify-end gap-2 mt-2">
-            <Button variant="outline" onClick={() => { onOpenChange(false); reset() }}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                onOpenChange(false)
+                reset()
+              }}
+            >
               Cancel
             </Button>
             <LoadingButton

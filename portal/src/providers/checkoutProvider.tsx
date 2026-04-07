@@ -86,7 +86,11 @@ interface CheckoutContextValue {
   setTermsAccepted: (accepted: boolean) => void
   addDynamicItem: (stepType: string, item: SelectedDynamicItem) => void
   removeDynamicItem: (stepType: string, productId: string) => void
-  updateDynamicQuantity: (stepType: string, productId: string, qty: number) => void
+  updateDynamicQuantity: (
+    stepType: string,
+    productId: string,
+    qty: number,
+  ) => void
 }
 
 const CheckoutContext = createContext<CheckoutContextValue | null>(null)
@@ -142,7 +146,9 @@ export function CheckoutProvider({
 
   const [insurance, setInsurance] = useState(false)
   const [termsAccepted, setTermsAccepted] = useState(false)
-  const [dynamicItems, setDynamicItems] = useState<Record<string, SelectedDynamicItem[]>>({})
+  const [dynamicItems, setDynamicItems] = useState<
+    Record<string, SelectedDynamicItem[]>
+  >({})
 
   // Build selected passes from attendeePasses
   const selectedPasses = useMemo<SelectedPassItem[]>(() => {
@@ -401,38 +407,51 @@ export function CheckoutProvider({
   )
 
   // Dynamic item actions
-  const addDynamicItem = useCallback((stepType: string, item: SelectedDynamicItem) => {
-    setDynamicItems((prev) => {
-      const existing = prev[stepType] ?? []
-      const idx = existing.findIndex((i) => i.productId === item.productId)
-      if (idx >= 0) {
-        const updated = [...existing]
-        updated[idx] = item
-        return { ...prev, [stepType]: updated }
+  const addDynamicItem = useCallback(
+    (stepType: string, item: SelectedDynamicItem) => {
+      setDynamicItems((prev) => {
+        const existing = prev[stepType] ?? []
+        const idx = existing.findIndex((i) => i.productId === item.productId)
+        if (idx >= 0) {
+          const updated = [...existing]
+          updated[idx] = item
+          return { ...prev, [stepType]: updated }
+        }
+        return { ...prev, [stepType]: [...existing, item] }
+      })
+    },
+    [],
+  )
+
+  const removeDynamicItem = useCallback(
+    (stepType: string, productId: string) => {
+      setDynamicItems((prev) => ({
+        ...prev,
+        [stepType]: (prev[stepType] ?? []).filter(
+          (i) => i.productId !== productId,
+        ),
+      }))
+    },
+    [],
+  )
+
+  const updateDynamicQuantity = useCallback(
+    (stepType: string, productId: string, qty: number) => {
+      if (qty <= 0) {
+        removeDynamicItem(stepType, productId)
+        return
       }
-      return { ...prev, [stepType]: [...existing, item] }
-    })
-  }, [])
-
-  const removeDynamicItem = useCallback((stepType: string, productId: string) => {
-    setDynamicItems((prev) => ({
-      ...prev,
-      [stepType]: (prev[stepType] ?? []).filter((i) => i.productId !== productId),
-    }))
-  }, [])
-
-  const updateDynamicQuantity = useCallback((stepType: string, productId: string, qty: number) => {
-    if (qty <= 0) {
-      removeDynamicItem(stepType, productId)
-      return
-    }
-    setDynamicItems((prev) => ({
-      ...prev,
-      [stepType]: (prev[stepType] ?? []).map((i) =>
-        i.productId === productId ? { ...i, quantity: qty, price: i.product.price * qty } : i
-      ),
-    }))
-  }, [removeDynamicItem])
+      setDynamicItems((prev) => ({
+        ...prev,
+        [stepType]: (prev[stepType] ?? []).map((i) =>
+          i.productId === productId
+            ? { ...i, quantity: qty, price: i.product.price * qty }
+            : i,
+        ),
+      }))
+    },
+    [removeDynamicItem],
+  )
 
   // Navigation (wrap hook navigation to save cart and clear error)
   const goToStep = useCallback(

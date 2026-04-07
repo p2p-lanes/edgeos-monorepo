@@ -27,6 +27,7 @@ import { Route as LayoutEmailTemplatesIndexRouteImport } from './routes/_layout/
 import { Route as LayoutCouponsIndexRouteImport } from './routes/_layout/coupons/index'
 import { Route as LayoutApplicationsIndexRouteImport } from './routes/_layout/applications/index'
 import { Route as LayoutAdminIndexRouteImport } from './routes/_layout/admin/index'
+import { Route as LayoutTicketingStepsStepIdRouteImport } from './routes/_layout/ticketing-steps/$stepId'
 import { Route as LayoutTenantsNewRouteImport } from './routes/_layout/tenants/new'
 import { Route as LayoutProductsNewRouteImport } from './routes/_layout/products/new'
 import { Route as LayoutPopupsNewRouteImport } from './routes/_layout/popups/new'
@@ -141,6 +142,12 @@ const LayoutAdminIndexRoute = LayoutAdminIndexRouteImport.update({
   path: '/admin/',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutTicketingStepsStepIdRoute =
+  LayoutTicketingStepsStepIdRouteImport.update({
+    id: '/ticketing-steps/$stepId',
+    path: '/ticketing-steps/$stepId',
+    getParentRoute: () => LayoutRoute,
+  } as any)
 const LayoutTenantsNewRoute = LayoutTenantsNewRouteImport.update({
   id: '/tenants/new',
   path: '/tenants/new',
@@ -274,6 +281,7 @@ export interface FileRoutesByFullPath {
   '/popups/new': typeof LayoutPopupsNewRoute
   '/products/new': typeof LayoutProductsNewRoute
   '/tenants/new': typeof LayoutTenantsNewRoute
+  '/ticketing-steps/$stepId': typeof LayoutTicketingStepsStepIdRoute
   '/admin/': typeof LayoutAdminIndexRoute
   '/applications/': typeof LayoutApplicationsIndexRoute
   '/coupons/': typeof LayoutCouponsIndexRoute
@@ -315,6 +323,7 @@ export interface FileRoutesByTo {
   '/popups/new': typeof LayoutPopupsNewRoute
   '/products/new': typeof LayoutProductsNewRoute
   '/tenants/new': typeof LayoutTenantsNewRoute
+  '/ticketing-steps/$stepId': typeof LayoutTicketingStepsStepIdRoute
   '/admin': typeof LayoutAdminIndexRoute
   '/applications': typeof LayoutApplicationsIndexRoute
   '/coupons': typeof LayoutCouponsIndexRoute
@@ -358,6 +367,7 @@ export interface FileRoutesById {
   '/_layout/popups/new': typeof LayoutPopupsNewRoute
   '/_layout/products/new': typeof LayoutProductsNewRoute
   '/_layout/tenants/new': typeof LayoutTenantsNewRoute
+  '/_layout/ticketing-steps/$stepId': typeof LayoutTicketingStepsStepIdRoute
   '/_layout/admin/': typeof LayoutAdminIndexRoute
   '/_layout/applications/': typeof LayoutApplicationsIndexRoute
   '/_layout/coupons/': typeof LayoutCouponsIndexRoute
@@ -401,6 +411,7 @@ export interface FileRouteTypes {
     | '/popups/new'
     | '/products/new'
     | '/tenants/new'
+    | '/ticketing-steps/$stepId'
     | '/admin/'
     | '/applications/'
     | '/coupons/'
@@ -442,6 +453,7 @@ export interface FileRouteTypes {
     | '/popups/new'
     | '/products/new'
     | '/tenants/new'
+    | '/ticketing-steps/$stepId'
     | '/admin'
     | '/applications'
     | '/coupons'
@@ -484,6 +496,7 @@ export interface FileRouteTypes {
     | '/_layout/popups/new'
     | '/_layout/products/new'
     | '/_layout/tenants/new'
+    | '/_layout/ticketing-steps/$stepId'
     | '/_layout/admin/'
     | '/_layout/applications/'
     | '/_layout/coupons/'
@@ -639,6 +652,13 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin/'
       preLoaderRoute: typeof LayoutAdminIndexRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/ticketing-steps/$stepId': {
+      id: '/_layout/ticketing-steps/$stepId'
+      path: '/ticketing-steps/$stepId'
+      fullPath: '/ticketing-steps/$stepId'
+      preLoaderRoute: typeof LayoutTicketingStepsStepIdRouteImport
       parentRoute: typeof LayoutRoute
     }
     '/_layout/tenants/new': {
@@ -815,6 +835,7 @@ interface LayoutRouteChildren {
   LayoutPopupsNewRoute: typeof LayoutPopupsNewRoute
   LayoutProductsNewRoute: typeof LayoutProductsNewRoute
   LayoutTenantsNewRoute: typeof LayoutTenantsNewRoute
+  LayoutTicketingStepsStepIdRoute: typeof LayoutTicketingStepsStepIdRoute
   LayoutAdminIndexRoute: typeof LayoutAdminIndexRoute
   LayoutApplicationsIndexRoute: typeof LayoutApplicationsIndexRoute
   LayoutCouponsIndexRoute: typeof LayoutCouponsIndexRoute
@@ -856,6 +877,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutPopupsNewRoute: LayoutPopupsNewRoute,
   LayoutProductsNewRoute: LayoutProductsNewRoute,
   LayoutTenantsNewRoute: LayoutTenantsNewRoute,
+  LayoutTicketingStepsStepIdRoute: LayoutTicketingStepsStepIdRoute,
   LayoutAdminIndexRoute: LayoutAdminIndexRoute,
   LayoutApplicationsIndexRoute: LayoutApplicationsIndexRoute,
   LayoutCouponsIndexRoute: LayoutCouponsIndexRoute,
