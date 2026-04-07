@@ -414,9 +414,10 @@ async def update_my_application(
             detail="Application not found",
         )
 
-    # Only allow updates for draft, in_review, or accepted
+    # Only allow updates for draft, pending_fee, in_review, or accepted
     if application.status not in [
         ApplicationStatus.DRAFT.value,
+        ApplicationStatus.PENDING_FEE.value,
         ApplicationStatus.IN_REVIEW.value,
         ApplicationStatus.ACCEPTED.value,
     ]:
@@ -451,6 +452,13 @@ async def update_my_application(
         if hasattr(app_update["status"], "value"):
             app_update["status"] = app_update["status"].value
 
+        # When application is pending fee payment, silently block status change to in_review
+        if (
+            application.status == ApplicationStatus.PENDING_FEE.value
+            and app_update["status"] == ApplicationStatus.IN_REVIEW.value
+        ):
+            app_update["status"] = ApplicationStatus.PENDING_FEE.value
+
         if app_update["status"] == ApplicationStatus.IN_REVIEW.value:
             if not application.submitted_at:
                 app_update["submitted_at"] = datetime.now(UTC)
@@ -466,9 +474,19 @@ async def update_my_application(
         app_update.get("status") == ApplicationStatus.IN_REVIEW.value
         and application.human
     ):
-        crud.applications_crud._apply_approval_strategy(
-            db, application, application.human
-        )
+        # Intercept: if popup requires application fee, gate on PENDING_FEE
+        from app.api.popup.crud import popups_crud
+
+        popup = popups_crud.get(db, application.popup_id)
+        if popup and popup.requires_application_fee:
+            application.status = ApplicationStatus.PENDING_FEE.value
+            crud.applications_crud.create_snapshot(
+                db, application, "pending_fee"
+            )
+        else:
+            crud.applications_crud._apply_approval_strategy(
+                db, application, application.human
+            )
 
     db.add(application)
     db.commit()
