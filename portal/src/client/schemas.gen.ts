@@ -426,6 +426,20 @@ Profile fields can be provided here and will update the Human record.
 Companions (spouse/kids) can be added during initial submission.`
 } as const;
 
+export const ApplicationFeeCreateSchema = {
+    properties: {
+        application_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Application Id'
+        }
+    },
+    type: 'object',
+    required: ['application_id'],
+    title: 'ApplicationFeeCreate',
+    description: 'Schema for creating an application fee payment.'
+} as const;
+
 export const ApplicationPublicSchema = {
     properties: {
         id: {
@@ -797,6 +811,11 @@ export const ApplicationStatsSchema = {
             title: 'Draft',
             default: 0
         },
+        pending_fee: {
+            type: 'integer',
+            title: 'Pending Fee',
+            default: 0
+        },
         in_review: {
             type: 'integer',
             title: 'In Review',
@@ -825,7 +844,7 @@ export const ApplicationStatsSchema = {
 
 export const ApplicationStatusSchema = {
     type: 'string',
-    enum: ['draft', 'in review', 'rejected', 'accepted', 'withdrawn'],
+    enum: ['draft', 'pending_fee', 'in review', 'rejected', 'accepted', 'withdrawn'],
     title: 'ApplicationStatus',
     description: 'Status for applications.'
 } as const;
@@ -5371,6 +5390,11 @@ export const PaymentPublicSchema = {
             ],
             title: 'Group Id'
         },
+        payment_type: {
+            type: 'string',
+            title: 'Payment Type',
+            default: 'pass_purchase'
+        },
         id: {
             type: 'string',
             format: 'uuid',
@@ -5805,6 +5829,23 @@ export const PopupAdminSchema = {
             ],
             title: 'Invoice Company Email'
         },
+        requires_application_fee: {
+            type: 'boolean',
+            title: 'Requires Application Fee',
+            default: false
+        },
+        application_fee_amount: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Application Fee Amount'
+        },
         id: {
             type: 'string',
             format: 'uuid',
@@ -6071,6 +6112,26 @@ export const PopupCreateSchema = {
                 }
             ],
             title: 'Invoice Company Email'
+        },
+        requires_application_fee: {
+            type: 'boolean',
+            title: 'Requires Application Fee',
+            default: false
+        },
+        application_fee_amount: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Application Fee Amount'
         }
     },
     type: 'object',
@@ -6271,6 +6332,23 @@ export const PopupPublicSchema = {
                 }
             ],
             title: 'Invoice Company Name'
+        },
+        requires_application_fee: {
+            type: 'boolean',
+            title: 'Requires Application Fee',
+            default: false
+        },
+        application_fee_amount: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Application Fee Amount'
         }
     },
     type: 'object',
@@ -6665,6 +6743,32 @@ export const PopupUpdateSchema = {
                 }
             ],
             title: 'Invoice Company Email'
+        },
+        requires_application_fee: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Requires Application Fee'
+        },
+        application_fee_amount: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Application Fee Amount'
         }
     },
     type: 'object',
