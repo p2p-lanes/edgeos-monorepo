@@ -44,12 +44,17 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     return NextResponse.next()
   }
 
-  // Forward tenant info to downstream SSR via headers.
-  const response = NextResponse.next()
-  response.headers.set("x-tenant-id", tenantData.id)
-  response.headers.set("x-tenant-slug", tenantData.slug)
-  response.headers.set("x-custom-domain", "true")
-  return response
+  // Forward tenant info to downstream SSR via request headers.
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set("x-tenant-id", tenantData.id)
+  requestHeaders.set("x-tenant-slug", tenantData.slug)
+  requestHeaders.set("x-custom-domain", "true")
+
+  return NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  })
 }
 
 export const config = {
