@@ -25,6 +25,13 @@ class SimpleFIPaymentResponse(BaseModel):
     checkout_url: str
 
 
+class SimpleFIPaymentRequestStatus(BaseModel):
+    """Minimal payment request status payload."""
+
+    id: str
+    status: str
+
+
 class SimpleFIClient:
     """Client for interacting with SimpleFI payment API."""
 
@@ -85,6 +92,8 @@ class SimpleFIClient:
         reference: dict[str, Any] | None = None,
         memo: str = "EdgeOS Payment",
         portal_base_override: str | None = None,
+        success_path: str | None = None,
+        cancel_path: str | None = None,
     ) -> SimpleFIPaymentResponse:
         """
         Create a payment request in SimpleFI.
@@ -99,6 +108,10 @@ class SimpleFIClient:
                 instead of the default subdomain derivation.  Pass
                 ``get_portal_url(tenant)`` from callers that have a Tenant
                 object to respect active custom domains.
+            success_path: Full URL override for the success redirect. When
+                provided, overrides the default passes/buy?checkout=success path.
+            cancel_path: Full URL override for the cancel redirect. When
+                provided, overrides the default passes/buy path.
 
         Returns:
             SimpleFIPaymentResponse with id, status, and checkout_url
@@ -108,8 +121,8 @@ class SimpleFIClient:
         )
 
         portal_base = portal_base_override or self._build_tenant_portal_url(tenant_slug)
-        success_url = f"{portal_base}/portal/{popup_slug}/passes/buy?checkout=success"
-        cancel_url = f"{portal_base}/portal/{popup_slug}/passes/buy"
+        success_url = success_path or f"{portal_base}/portal/{popup_slug}/passes/buy?checkout=success"
+        cancel_url = cancel_path or f"{portal_base}/portal/{popup_slug}/passes/buy"
 
         body = {
             "amount": float(amount),
@@ -130,6 +143,17 @@ class SimpleFIClient:
             id=data["id"],
             status=data["status"],
             checkout_url=data["checkout_v2_url"],
+        )
+
+    def get_payment_request_status(self, payment_request_id: str) -> SimpleFIPaymentRequestStatus:
+        """Fetch the latest status for an existing SimpleFI payment request."""
+
+        data = self._make_request("GET", f"/payment_requests/{payment_request_id}")
+
+        payload = data.get("payment_request", data)
+        return SimpleFIPaymentRequestStatus(
+            id=payload["id"],
+            status=payload["status"],
         )
 
 

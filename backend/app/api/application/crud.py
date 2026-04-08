@@ -437,7 +437,12 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
 
         # Apply approval strategy for non-group applications still in review
         if not data.get("group_id") and application.status == ApplicationStatus.IN_REVIEW.value:
-            self._apply_approval_strategy(session, application, human)
+            # Intercept: if popup requires application fee, gate on PENDING_FEE
+            if popup.requires_application_fee:
+                application.status = ApplicationStatus.PENDING_FEE.value
+                self.create_snapshot(session, application, "pending_fee")
+            else:
+                self._apply_approval_strategy(session, application, human)
 
         # Create snapshot for group auto-accept/reject
         if data.get("group_id"):

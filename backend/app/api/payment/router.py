@@ -6,6 +6,7 @@ from sqlmodel import Session
 from app.api.payment.crud import payments_crud
 from app.api.payment.models import Payments
 from app.api.payment.schemas import (
+    ApplicationFeeCreate,
     PaymentCreate,
     PaymentFilter,
     PaymentPreview,
@@ -33,6 +34,7 @@ from app.services.email import (
     PaymentProductItem,
     get_email_service,
 )
+from app.services.email_helpers import send_application_status_email
 
 router = APIRouter(prefix="/payments", tags=["payments"])
 
@@ -279,19 +281,28 @@ async def update_payment(
     return PaymentPublic.model_validate(payment)
 
 
-@router.post("/{payment_id}/approve", response_model=PaymentPublic)
-async def approve_payment(
-    payment_id: uuid.UUID,
-    db: TenantSession,
-    _current_user: CurrentWriter,
+@router.post("/my/application-fee", response_model=PaymentPublic, status_code=status.HTTP_201_CREATED)
+async def create_my_application_fee(
+    fee_in: ApplicationFeeCreate,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
 ) -> PaymentPublic:
-    """Manually approve a payment (BO only)."""
+    """Create an application fee payment for current human's application (Portal).
 
-    payment = payments_crud.approve_payment(db, payment_id)
+    The application must be in PENDING_FEE status. Returns PaymentPublic with
+    checkout URL to redirect the user to the payment provider.
+    """
+    from app.api.application.crud import applications_crud
 
-    # Send payment confirmed email
-    await _send_payment_confirmed_email(payment, db_session=db)
+    application = applications_crud.get(db, fee_in.application_id)
+    if not application or application.human_id != current_human.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Application not found",
+        )
 
+    popup = application.popup
+    payment = payments_crud.create_fee_payment(db, application, popup)
     return PaymentPublic.model_validate(payment)
 
 
@@ -569,10 +580,15 @@ async def _handle_regular_payment(
                 break
 
     if payment_request_status == "approved":
-        payment = payments_crud.approve_payment(
-            db, payment.id, currency=currency, rate=rate
-        )
-        await _send_payment_confirmed_email(payment, db_session=db)
+        from app.api.payment.schemas import PaymentType
+
+        if payment.payment_type == PaymentType.APPLICATION_FEE.value:
+            await _handle_fee_payment_approved(db, payment, currency=currency, rate=rate)
+        else:
+            payment = payments_crud.approve_payment(
+                db, payment.id, currency=currency, rate=rate
+            )
+            await _send_payment_confirmed_email(payment, db_session=db)
         logger.info("Payment {} approved via SimpleFI webhook", payment.id)
     else:
         payments_crud.update(db, payment, PaymentUpdate(status=PaymentStatus.EXPIRED))
@@ -583,6 +599,83 @@ async def _handle_regular_payment(
         )
 
     return {"message": "Payment status updated successfully"}
+
+
+async def _handle_fee_payment_approved(
+    db: Session,
+    payment: Payments,
+    *,
+    currency: str = "USD",
+    rate: object = None,
+) -> None:
+    """Handle approval of an application fee payment.
+
+    Approves the payment record, then transitions the application from
+    PENDING_FEE → IN_REVIEW and applies the popup approval strategy.
+    Idempotent: no-op if application is no longer in PENDING_FEE.
+    """
+    from loguru import logger
+
+    from app.api.application.crud import applications_crud
+    from app.api.application.schemas import ApplicationStatus
+    from app.api.payment.schemas import PaymentSource, PaymentStatus
+
+    status_before = ApplicationStatus.PENDING_FEE.value
+
+    # Approve the payment record first
+    payment.status = PaymentStatus.APPROVED.value
+    payment.currency = currency
+    if rate is not None:
+        payment.rate = rate
+    payment.source = PaymentSource.SIMPLEFI.value
+    db.add(payment)
+    db.flush()
+
+    # Load application
+    application = applications_crud.get(db, payment.application_id)
+    if not application:
+        logger.warning(
+            "Fee payment {} has no associated application", payment.id
+        )
+        db.commit()
+        return
+
+    # Idempotent guard
+    if application.status != ApplicationStatus.PENDING_FEE.value:
+        logger.warning(
+            "Fee payment {} approved but application {} is in status '{}' (expected pending_fee). Skipping.",
+            payment.id,
+            application.id,
+            application.status,
+        )
+        db.commit()
+        return
+
+    # Transition to IN_REVIEW and apply approval strategy
+    application.status = ApplicationStatus.IN_REVIEW.value
+    db.add(application)
+    db.flush()
+
+    human = application.human
+    if human:
+        applications_crud._apply_approval_strategy(db, application, human)
+
+    db.commit()
+    db.refresh(application)
+
+    if human:
+        await send_application_status_email(
+            application,
+            human,
+            db,
+            status_before=status_before,
+        )
+
+    logger.info(
+        "Fee payment {} approved — application {} transitioned from pending_fee",
+        payment.id,
+        application.id,
+    )
 
 
 async def _handle_installment_payment(

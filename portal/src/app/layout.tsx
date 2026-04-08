@@ -25,12 +25,25 @@ export async function generateMetadata(): Promise<Metadata> {
     ? (headersList.get("x-tenant-slug") ?? null)
     : null
 
-  const tenant =
-    middlewareSlug != null
-      ? await fetchTenantBySlug(middlewareSlug)
-      : slug
-        ? await fetchTenantBySlug(slug)
-        : null
+  let tenant = null
+
+  try {
+    tenant =
+      middlewareSlug != null
+        ? await fetchTenantBySlug(middlewareSlug)
+        : slug
+          ? await fetchTenantBySlug(slug)
+          : null
+  } catch (error) {
+    console.error("Failed to resolve tenant metadata", {
+      host,
+      slug,
+      middlewareSlug,
+      isCustomDomain,
+      error,
+    })
+  }
+
   const name = tenant?.name ? `${tenant.name} Portal` : FALLBACK_NAME
   const description = tenant?.name
     ? `Welcome to the ${tenant.name} Portal. Log in or sign up to access ${tenant.name} events.`

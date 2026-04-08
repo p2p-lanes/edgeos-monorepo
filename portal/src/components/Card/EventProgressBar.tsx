@@ -3,6 +3,7 @@ import { useIsMobile } from "@/hooks/useIsMobile"
 export type EventStatus =
   | "not_started"
   | "draft"
+  | "pending_fee"
   | "in review"
   | "accepted"
   | "rejected"
@@ -17,6 +18,7 @@ const statusColor = (status: string) => {
   if (status === "accepted") return "bg-green-100 text-green-800"
   if (status === "withdrawn") return "bg-red-100 text-red-800"
   if (status === "rejected") return "bg-red-100 text-red-800"
+  if (status === "pending_fee") return "bg-amber-100 text-amber-800"
   return "bg-gray-100 text-gray-800"
 }
 
@@ -24,11 +26,13 @@ export function EventProgressBar({ status }: EventProgressBarProps) {
   const stages = [
     "not_started",
     "draft",
+    status === "pending_fee" ? "pending_fee" : null,
     "in review",
     status === "not_started" ||
     status === "accepted" ||
     status === "in review" ||
-    status === "draft"
+    status === "draft" ||
+    status === "pending_fee"
       ? "accepted"
       : status === "rejected"
         ? "rejected"
@@ -44,6 +48,7 @@ export function EventProgressBar({ status }: EventProgressBarProps) {
   const stageLabels = {
     not_started: "",
     draft: "Draft",
+    pending_fee: "Payment required",
     "in review": "Application submitted",
     accepted: "Application accepted",
     rejected: status === "rejected" ? "Application rejected" : null,
@@ -51,7 +56,11 @@ export function EventProgressBar({ status }: EventProgressBarProps) {
   }
 
   const statusLabel =
-    status === "not_started" ? "Not started" : stageLabels[status]
+    status === "not_started"
+      ? "Not started"
+      : status === "pending_fee"
+        ? "Payment required"
+        : stageLabels[status]
 
   if (isMobile)
     return (
@@ -91,7 +100,9 @@ export function EventProgressBar({ status }: EventProgressBarProps) {
                     ? (status === "rejected" && index === stages.length - 1) ||
                       (status === "withdrawn" && index === stages.length - 1)
                       ? "bg-red-500"
-                      : "bg-green-500"
+                      : status === "pending_fee"
+                        ? "bg-amber-400"
+                        : "bg-green-500"
                     : "bg-gray-200"
               }`}
             />

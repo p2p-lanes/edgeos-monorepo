@@ -104,7 +104,7 @@ export const TenantProvider = ({
       .finally(() => {
         setIsLoading(false)
       })
-  }, [])
+  }, [initialTenantId, initialTenantSlug])
 
   if (isLoading) {
     return (

@@ -138,6 +138,9 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
       allows_coupons: defaultValues?.allows_coupons ?? false,
       allows_scholarship: defaultValues?.allows_scholarship ?? false,
       allows_incentive: defaultValues?.allows_incentive ?? false,
+      requires_application_fee:
+        defaultValues?.requires_application_fee ?? false,
+      application_fee_amount: defaultValues?.application_fee_amount ?? "",
       image_url: defaultValues?.image_url ?? "",
       icon_url: defaultValues?.icon_url ?? "",
       express_checkout_background:
@@ -169,6 +172,10 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         allows_coupons: value.allows_coupons,
         allows_scholarship: value.allows_scholarship,
         allows_incentive: value.allows_incentive,
+        requires_application_fee: value.requires_application_fee,
+        application_fee_amount: value.requires_application_fee
+          ? value.application_fee_amount || null
+          : null,
         image_url: value.image_url || null,
         icon_url: value.icon_url || null,
         express_checkout_background: value.express_checkout_background || null,
@@ -530,6 +537,55 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                           field.handleChange(checked)
                         }
                         disabled={readOnly}
+                      />
+                    </InlineRow>
+                  )}
+                </form.Field>
+              ) : null
+            }
+          </form.Subscribe>
+
+          <form.Field name="requires_application_fee">
+            {(field) => (
+              <InlineRow
+                icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
+                label="Require Application Fee"
+                description="Applicants must pay a fee before their application is reviewed"
+              >
+                <Switch
+                  id="requires_application_fee"
+                  checked={!!field.state.value}
+                  onCheckedChange={(checked) => field.handleChange(checked)}
+                  disabled={readOnly}
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+
+          <form.Subscribe
+            selector={(state) => state.values.requires_application_fee}
+          >
+            {(requiresFee) =>
+              requiresFee ? (
+                <form.Field name="application_fee_amount">
+                  {(field) => (
+                    <InlineRow
+                      icon={
+                        <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      }
+                      label="Fee Amount (USD)"
+                      description="Amount in USD that applicants must pay"
+                    >
+                      <Input
+                        id="application_fee_amount"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={field.state.value}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                        disabled={readOnly}
+                        className="max-w-[120px] text-sm"
                       />
                     </InlineRow>
                   )}

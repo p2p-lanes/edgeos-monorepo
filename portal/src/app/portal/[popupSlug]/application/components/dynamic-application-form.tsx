@@ -2,14 +2,16 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { AnimatePresence, motion } from "framer-motion"
+import { Info } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { memo, useCallback, useEffect, useMemo, useState } from "react"
+import { memo, useCallback, useMemo, useState } from "react"
 import { toast } from "sonner"
 import type { ApplicationPublic, PopupPublic } from "@/client"
 import { ApplicationsService } from "@/client"
 import { ButtonAnimated } from "@/components/ui/button"
 import InputForm, { AddonInputForm } from "@/components/ui/Form/Input"
 import SelectForm from "@/components/ui/Form/Select"
+import { useApplicationFee } from "@/hooks/useApplicationFee"
 import { splitForCreate, splitForUpdate } from "@/lib/form-data-splitter"
 import { queryKeys } from "@/lib/query-keys"
 import { useApplication } from "@/providers/applicationProvider"
@@ -140,45 +142,48 @@ export function DynamicApplicationForm({
   const router = useRouter()
   const queryClient = useQueryClient()
   const { getRelevantApplication, updateApplication } = useApplication()
+  const { createOrResume, isPending: isFeePaymentPending } = useApplicationFee()
   const application = getRelevantApplication()
 
-  const {
-    values,
-    errors,
-    handleChange,
-    validate,
-    populateFromApplication,
-    setErrors,
-    progress,
-  } = useApplicationForm(schema)
+  const { values, errors, handleChange, validate, setErrors, progress } =
+    useApplicationForm(schema, existingApplication, popup.id)
 
-  const [companions, setCompanions] = useState<CompanionWithId[]>([])
+  // Companions are initialized from attendees. The form remounts via key
+  // whenever existingApplication changes, so useState initial value is correct.
+  const [companions, setCompanions] = useState<CompanionWithId[]>(() => {
+    if (!existingApplication?.attendees?.length) return []
+    return existingApplication.attendees
+      .filter((a) => a.category === "spouse" || a.category === "kid")
+      .map((a) => ({
+        _id: a.id,
+        name: a.name,
+        category: a.category,
+        email: a.email ?? undefined,
+        gender: a.gender ?? undefined,
+      }))
+  })
   const [statusBtn, setStatusBtn] = useState({
     loadingDraft: false,
     loadingSubmit: false,
   })
-
-  // Populate form if editing existing application
-  useEffect(() => {
-    if (existingApplication) {
-      populateFromApplication(existingApplication)
-
-      // Populate companions from attendees
-      if (existingApplication.attendees) {
-        const existingCompanions: CompanionWithId[] =
-          existingApplication.attendees
-            .filter((a) => a.category === "spouse" || a.category === "kid")
-            .map((a) => ({
-              _id: a.id,
-              name: a.name,
-              category: a.category,
-              email: a.email ?? undefined,
-              gender: a.gender ?? undefined,
-            }))
-        setCompanions(existingCompanions)
-      }
+  const feeAlreadyPaid = Boolean(
+    existingApplication &&
+      popup.requires_application_fee &&
+      existingApplication.status !== "draft" &&
+      existingApplication.status !== "pending_fee",
+  )
+  const showFeeNotice = popup.requires_application_fee && !feeAlreadyPaid
+  const formattedApplicationFee = useMemo(() => {
+    const amount = Number(popup.application_fee_amount ?? 0)
+    if (Number.isNaN(amount) || amount <= 0) {
+      return null
     }
-  }, [existingApplication, populateFromApplication])
+
+    return amount.toFixed(2)
+  }, [popup.application_fee_amount])
+  const submitLabel = showFeeNotice
+    ? `Pay & Submit (${formattedApplicationFee ? `$${formattedApplicationFee}` : "$0.00"})`
+    : "Submit"
 
   const submitMutation = useMutation({
     mutationFn: async (status: "draft" | "in review") => {
@@ -211,6 +216,7 @@ export function DynamicApplicationForm({
     e: Parameters<NonNullable<React.ComponentProps<"form">["onSubmit"]>>[0],
   ) => {
     e.preventDefault()
+    if (statusBtn.loadingSubmit || isFeePaymentPending) return
     setStatusBtn({ loadingDraft: false, loadingSubmit: true })
 
     const { isValid, errors: validationErrors } = validate(false)
@@ -240,7 +246,19 @@ export function DynamicApplicationForm({
     }
 
     try {
-      await submitMutation.mutateAsync("in review")
+      const result = await submitMutation.mutateAsync("in review")
+
+      if (result.status === "pending_fee") {
+        const feePayment = await createOrResume(result.id)
+
+        if (!feePayment.checkoutUrl) {
+          throw new Error("Missing checkout URL for application fee payment")
+        }
+
+        window.location.href = feePayment.checkoutUrl
+        return
+      }
+
       toast.success("Application Submitted", {
         description: "Your application has been successfully submitted.",
       })
@@ -518,25 +536,40 @@ export function DynamicApplicationForm({
         )} */}
 
         {/* Submit buttons */}
-        <div className="flex flex-col w-full gap-6 md:flex-row justify-between items-center pt-6">
-          <ButtonAnimated
-            loading={statusBtn.loadingDraft}
-            disabled={statusBtn.loadingSubmit}
-            variant="outline"
-            type="button"
-            onClick={handleDraft}
-            className="w-full md:w-auto"
-          >
-            Save as draft
-          </ButtonAnimated>
-          <ButtonAnimated
-            loading={statusBtn.loadingSubmit}
-            disabled={statusBtn.loadingDraft}
-            type="submit"
-            className="w-full md:w-auto"
-          >
-            Submit
-          </ButtonAnimated>
+        <div className="flex w-full flex-col gap-6 pt-6">
+          {showFeeNotice && formattedApplicationFee && (
+            <div className="flex w-full items-start gap-3 rounded-lg border border-border bg-muted/40 p-4 text-sm text-foreground">
+              <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+              <div>
+                <p className="font-semibold">Application fee required</p>
+                <p className="mt-1 text-muted-foreground">
+                  A non-refundable fee of ${formattedApplicationFee} USD is
+                  required to submit your application. You will be redirected to
+                  a secure payment page.
+                </p>
+              </div>
+            </div>
+          )}
+          <div className="flex w-full flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <ButtonAnimated
+              loading={statusBtn.loadingDraft}
+              disabled={statusBtn.loadingSubmit}
+              variant="outline"
+              type="button"
+              onClick={handleDraft}
+              className="w-full md:w-auto"
+            >
+              Save as draft
+            </ButtonAnimated>
+            <ButtonAnimated
+              loading={statusBtn.loadingSubmit}
+              disabled={statusBtn.loadingDraft || isFeePaymentPending}
+              type="submit"
+              className="w-full md:min-w-[11rem] md:w-auto"
+            >
+              {submitLabel}
+            </ButtonAnimated>
+          </div>
         </div>
       </form>
       <ProgressBar progress={progress} />

@@ -63,6 +63,8 @@ def _get_application_stats(db: TenantSession, popup_id: uuid.UUID) -> Applicatio
         stats.total += count
         if status_value == ApplicationStatus.DRAFT.value:
             stats.draft = count
+        elif status_value == ApplicationStatus.PENDING_FEE.value:
+            stats.pending_fee = count
         elif status_value == ApplicationStatus.IN_REVIEW.value:
             stats.in_review = count
         elif status_value == ApplicationStatus.ACCEPTED.value:

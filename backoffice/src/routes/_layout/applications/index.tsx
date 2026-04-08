@@ -86,6 +86,7 @@ const APPLICATION_STATUS_OPTIONS: {
   label: string
 }[] = [
   { value: "draft", label: "Draft" },
+  { value: "pending_fee", label: "Pending Fee" },
   { value: "in review", label: "In Review" },
   { value: "accepted", label: "Accepted" },
   { value: "rejected", label: "Rejected" },
@@ -127,6 +128,7 @@ function useStatusCounts(popupId: string | null) {
   if (stats?.applications) {
     const a = stats.applications
     counts.draft = a.draft ?? 0
+    counts.pending_fee = a.pending_fee ?? 0
     counts["in review"] = a.in_review ?? 0
     counts.accepted = a.accepted ?? 0
     counts.rejected = a.rejected ?? 0
@@ -196,6 +198,7 @@ function StatusDropdownFilter({
 
 const VALID_STATUSES: Set<string> = new Set([
   "draft",
+  "pending_fee",
   "in review",
   "accepted",
   "rejected",
