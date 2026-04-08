@@ -198,13 +198,15 @@ export default function CheckoutFlow({
     const dynamicConfig = dynamicStepConfig?.template_config as
       | Record<string, unknown>
       | undefined
-    const housingNonDefault =
+    const housingUseDynamic =
       currentStep === "housing" &&
-      dynamicConfig?.variant &&
-      dynamicConfig.variant !== "default"
+      dynamicConfig &&
+      ((dynamicConfig.variant && dynamicConfig.variant !== "default") ||
+        (Array.isArray(dynamicConfig.sections) &&
+          dynamicConfig.sections.length > 0))
     const hasTemplateConfig =
       currentStep !== "housing" && dynamicStepConfig?.template_config
-    if (dynamicStepConfig && (housingNonDefault || hasTemplateConfig)) {
+    if (dynamicStepConfig && (housingUseDynamic || hasTemplateConfig)) {
       return (
         <AnimatePresence mode="wait">
           {isLoading ? (

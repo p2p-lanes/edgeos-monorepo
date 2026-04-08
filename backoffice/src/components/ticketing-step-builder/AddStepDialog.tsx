@@ -24,7 +24,7 @@ import {
 import useCustomToast from "@/hooks/useCustomToast"
 import { cn } from "@/lib/utils"
 import { createErrorHandler } from "@/utils"
-import { TEMPLATE_DEFINITIONS } from "./constants"
+import { CONTENT_ONLY_TEMPLATES, TEMPLATE_DEFINITIONS } from "./constants"
 
 function toKebabCase(str: string): string {
   return str
@@ -137,36 +137,38 @@ export function AddStepDialog({
             />
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="add-product-category">Product Category</Label>
-            <Select
-              value={productCategory}
-              onValueChange={(val) => {
-                setProductCategory(val)
-                setStepType(toKebabCase((val ? `${val}-` : "") + title))
-              }}
-            >
-              <SelectTrigger id="add-product-category">
-                <SelectValue placeholder="None" />
-              </SelectTrigger>
-              <SelectContent>
-                {productCategory &&
-                  !(categorySuggestions ?? []).includes(productCategory) && (
-                    <SelectItem value={productCategory}>
-                      {productCategory}
+          {!CONTENT_ONLY_TEMPLATES.has(template) && (
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="add-product-category">Product Category</Label>
+              <Select
+                value={productCategory}
+                onValueChange={(val) => {
+                  setProductCategory(val)
+                  setStepType(toKebabCase((val ? `${val}-` : "") + title))
+                }}
+              >
+                <SelectTrigger id="add-product-category">
+                  <SelectValue placeholder="None" />
+                </SelectTrigger>
+                <SelectContent>
+                  {productCategory &&
+                    !(categorySuggestions ?? []).includes(productCategory) && (
+                      <SelectItem value={productCategory}>
+                        {productCategory}
+                      </SelectItem>
+                    )}
+                  {(categorySuggestions ?? []).map((cat) => (
+                    <SelectItem key={cat} value={cat}>
+                      {cat}
                     </SelectItem>
-                  )}
-                {(categorySuggestions ?? []).map((cat) => (
-                  <SelectItem key={cat} value={cat}>
-                    {cat}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Products with this category will appear in this step.
-            </p>
-          </div>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Products with this category will appear in this step.
+              </p>
+            </div>
+          )}
 
           <div className="flex flex-col gap-1.5">
             <Label>Template</Label>

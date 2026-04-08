@@ -54,8 +54,8 @@ export function SortableStepCard({ step, onEdit }: SortableStepCardProps) {
   })
 
   const stepDef = getStepTypeDefinition(step.step_type)
-  const Icon = stepDef?.icon
   const templateDef = TEMPLATE_DEFINITIONS.find((v) => v.key === step.template)
+  const Icon = stepDef?.icon ?? templateDef?.icon
 
   const handleTitleClick = () => {
     setTitleDraft(step.title)

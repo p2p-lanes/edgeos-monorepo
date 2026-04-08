@@ -9,6 +9,7 @@ import VariantHousingDate from "./variants/VariantHousingDate"
 import VariantMerchImage from "./variants/VariantMerchImage"
 import VariantPatronPreset from "./variants/VariantPatronPreset"
 import VariantTicketSelect from "./variants/VariantTicketSelect"
+import VariantYouTubeVideo from "./variants/VariantYouTubeVideo"
 
 export interface VariantProps {
   products: ProductsPass[]
@@ -22,7 +23,10 @@ const VARIANT_REGISTRY: Record<string, ComponentType<VariantProps>> = {
   "patron-preset": VariantPatronPreset,
   "housing-date": VariantHousingDate,
   "merch-image": VariantMerchImage,
+  "youtube-video": VariantYouTubeVideo,
 }
+
+const CONTENT_ONLY_TEMPLATES = new Set(["youtube-video"])
 
 interface DynamicProductStepProps {
   stepConfig: TicketingStepPublic
@@ -43,7 +47,11 @@ export default function DynamicProductStep({
     ? VARIANT_REGISTRY[stepConfig.template]
     : VARIANT_REGISTRY["ticket-select"]
 
-  if (!VariantComponent || filtered.length === 0) {
+  const isContentOnly = stepConfig.template
+    ? CONTENT_ONLY_TEMPLATES.has(stepConfig.template)
+    : false
+
+  if (!VariantComponent || (!isContentOnly && filtered.length === 0)) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <p className="text-gray-500 mb-6">

@@ -1264,12 +1264,14 @@ function ScrollyCheckoutFlowInner({
       }
       case "housing": {
         const housingConfig = getStepConfig("housing")
-        if (
-          housingConfig?.template_config &&
-          (housingConfig.template_config as Record<string, unknown>).variant &&
-          (housingConfig.template_config as Record<string, unknown>).variant !==
-            "default"
-        )
+        const hCfg = housingConfig?.template_config as
+          | Record<string, unknown>
+          | undefined
+        const housingUseDynamic =
+          hCfg &&
+          ((hCfg.variant && hCfg.variant !== "default") ||
+            (Array.isArray(hCfg.sections) && hCfg.sections.length > 0))
+        if (housingConfig && housingUseDynamic)
           return (
             <DynamicProductStep stepConfig={housingConfig} onSkip={() => {}} />
           )

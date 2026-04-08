@@ -11,7 +11,10 @@ import { Suspense, useEffect, useState } from "react"
 import { ProductsService, TicketingStepsService } from "@/client"
 import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
-import { TEMPLATE_DEFINITIONS } from "@/components/ticketing-step-builder/constants"
+import {
+  CONTENT_ONLY_TEMPLATES,
+  TEMPLATE_DEFINITIONS,
+} from "@/components/ticketing-step-builder/constants"
 import { TEMPLATE_CONFIG_REGISTRY } from "@/components/ticketing-step-builder/template-configs"
 import { Button } from "@/components/ui/button"
 import {
@@ -235,34 +238,39 @@ function StepConfigContent({ stepId }: { stepId: string }) {
             </p>
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="step-product-category">Product Category</Label>
-            <Select
-              value={productCategory}
-              onValueChange={(val) => setProductCategory(val)}
-            >
-              <SelectTrigger id="step-product-category">
-                <SelectValue placeholder="None" />
-              </SelectTrigger>
-              <SelectContent>
-                {productCategory &&
-                  !(categorySuggestions ?? []).includes(productCategory) && (
-                    <SelectItem value={productCategory}>
-                      {productCategory}
-                    </SelectItem>
-                  )}
-                {(categorySuggestions ?? []).map((cat) => (
-                  <SelectItem key={cat} value={cat}>
-                    {cat}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Which product category this step displays. Must match a product's
-              category field.
-            </p>
-          </div>
+          {!CONTENT_ONLY_TEMPLATES.has(template) &&
+            step.step_type !== "confirm" && (
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="step-product-category">Product Category</Label>
+                <Select
+                  value={productCategory}
+                  onValueChange={(val) => setProductCategory(val)}
+                >
+                  <SelectTrigger id="step-product-category">
+                    <SelectValue placeholder="None" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {productCategory &&
+                      !(categorySuggestions ?? []).includes(
+                        productCategory,
+                      ) && (
+                        <SelectItem value={productCategory}>
+                          {productCategory}
+                        </SelectItem>
+                      )}
+                    {(categorySuggestions ?? []).map((cat) => (
+                      <SelectItem key={cat} value={cat}>
+                        {cat}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Which product category this step displays. Must match a
+                  product's category field.
+                </p>
+              </div>
+            )}
 
           {step.step_type === "confirm" && insuranceStep && (
             <div className="flex items-center justify-between gap-4 rounded-lg border p-3">

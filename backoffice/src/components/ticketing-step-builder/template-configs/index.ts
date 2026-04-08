@@ -4,6 +4,7 @@ import { MerchImageConfig } from "./MerchImageConfig"
 import { PatronPresetConfig } from "./PatronPresetConfig"
 import { TicketSelectConfig } from "./TicketSelectConfig"
 import type { TemplateConfigProps } from "./types"
+import { YouTubeVideoConfig } from "./YouTubeVideoConfig"
 
 export type { TemplateConfigProps }
 
@@ -15,4 +16,5 @@ export const TEMPLATE_CONFIG_REGISTRY: Record<
   "patron-preset": PatronPresetConfig,
   "housing-date": HousingDateConfig,
   "merch-image": MerchImageConfig,
+  "youtube-video": YouTubeVideoConfig,
 }

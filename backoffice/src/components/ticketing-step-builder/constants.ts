@@ -8,6 +8,7 @@ import {
   Shield,
   ShoppingBag,
   Ticket,
+  Youtube,
 } from "lucide-react"
 
 export interface StepTypeDefinition {
@@ -48,7 +49,16 @@ export const TEMPLATE_DEFINITIONS: TemplateDefinition[] = [
     description: "Image cards with quantity",
     icon: ShoppingBag,
   },
+  {
+    key: "youtube-video",
+    label: "YouTube Video",
+    description: "Embedded YouTube video",
+    icon: Youtube,
+  },
 ]
+
+/** Templates that don't display products and therefore don't need a product category. */
+export const CONTENT_ONLY_TEMPLATES = new Set(["youtube-video"])
 
 export const STEP_TYPE_DEFINITIONS: StepTypeDefinition[] = [
   { step_type: "tickets", defaultTitle: "Tickets", icon: Ticket },
