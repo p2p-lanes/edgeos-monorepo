@@ -474,15 +474,29 @@ async def update_my_application(
         app_update.get("status") == ApplicationStatus.IN_REVIEW.value
         and application.human
     ):
-        # Intercept: if popup requires application fee, gate on PENDING_FEE
+        # Intercept: if popup requires application fee AND not already paid
         from app.api.popup.crud import popups_crud
 
         popup = popups_crud.get(db, application.popup_id)
         if popup and popup.requires_application_fee:
-            application.status = ApplicationStatus.PENDING_FEE.value
-            crud.applications_crud.create_snapshot(
-                db, application, "pending_fee"
+            from app.api.payment.crud import payments_crud
+            from app.api.payment.schemas import PaymentStatus as PmtStatus
+
+            existing_fee = payments_crud.get_latest_fee_payment(db, application.id)
+            fee_already_paid = (
+                existing_fee is not None
+                and existing_fee.status == PmtStatus.APPROVED.value
             )
+
+            if fee_already_paid:
+                crud.applications_crud._apply_approval_strategy(
+                    db, application, application.human
+                )
+            else:
+                application.status = ApplicationStatus.PENDING_FEE.value
+                crud.applications_crud.create_snapshot(
+                    db, application, "pending_fee"
+                )
         else:
             crud.applications_crud._apply_approval_strategy(
                 db, application, application.human

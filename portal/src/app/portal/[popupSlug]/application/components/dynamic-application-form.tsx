@@ -166,6 +166,13 @@ export function DynamicApplicationForm({
     loadingDraft: false,
     loadingSubmit: false,
   })
+  const feeAlreadyPaid = Boolean(
+    existingApplication &&
+      popup.requires_application_fee &&
+      existingApplication.status !== "draft" &&
+      existingApplication.status !== "pending_fee",
+  )
+  const showFeeNotice = popup.requires_application_fee && !feeAlreadyPaid
   const formattedApplicationFee = useMemo(() => {
     const amount = Number(popup.application_fee_amount ?? 0)
     if (Number.isNaN(amount) || amount <= 0) {
@@ -174,7 +181,7 @@ export function DynamicApplicationForm({
 
     return amount.toFixed(2)
   }, [popup.application_fee_amount])
-  const submitLabel = popup.requires_application_fee
+  const submitLabel = showFeeNotice
     ? `Pay & Submit (${formattedApplicationFee ? `$${formattedApplicationFee}` : "$0.00"})`
     : "Submit"
 
@@ -530,7 +537,7 @@ export function DynamicApplicationForm({
 
         {/* Submit buttons */}
         <div className="flex w-full flex-col gap-6 pt-6">
-          {popup.requires_application_fee && formattedApplicationFee && (
+          {showFeeNotice && formattedApplicationFee && (
             <div className="flex w-full items-start gap-3 rounded-lg border border-border bg-muted/40 p-4 text-sm text-foreground">
               <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
               <div>
