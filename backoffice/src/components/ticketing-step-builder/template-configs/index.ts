@@ -1,5 +1,6 @@
 import type { ComponentType } from "react"
 import { HousingDateConfig } from "./HousingDateConfig"
+import { ImageGalleryConfig } from "./ImageGalleryConfig"
 import { MerchImageConfig } from "./MerchImageConfig"
 import { PatronPresetConfig } from "./PatronPresetConfig"
 import { TicketSelectConfig } from "./TicketSelectConfig"
@@ -17,4 +18,5 @@ export const TEMPLATE_CONFIG_REGISTRY: Record<
   "housing-date": HousingDateConfig,
   "merch-image": MerchImageConfig,
   "youtube-video": YouTubeVideoConfig,
+  "image-gallery": ImageGalleryConfig,
 }

@@ -4,6 +4,7 @@ import {
   Heart,
   Home,
   HomeIcon,
+  Images,
   type LucideIcon,
   Shield,
   ShoppingBag,
@@ -55,10 +56,19 @@ export const TEMPLATE_DEFINITIONS: TemplateDefinition[] = [
     description: "Embedded YouTube video",
     icon: Youtube,
   },
+  {
+    key: "image-gallery",
+    label: "Image Gallery",
+    description: "Configurable image gallery",
+    icon: Images,
+  },
 ]
 
 /** Templates that don't display products and therefore don't need a product category. */
-export const CONTENT_ONLY_TEMPLATES = new Set(["youtube-video"])
+export const CONTENT_ONLY_TEMPLATES = new Set([
+  "youtube-video",
+  "image-gallery",
+])
 
 export const STEP_TYPE_DEFINITIONS: StepTypeDefinition[] = [
   { step_type: "tickets", defaultTitle: "Tickets", icon: Ticket },

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { useCheckout } from "@/providers/checkoutProvider"
 import type { ProductsPass } from "@/types/Products"
 import VariantHousingDate from "./variants/VariantHousingDate"
+import VariantImageGallery from "./variants/VariantImageGallery"
 import VariantMerchImage from "./variants/VariantMerchImage"
 import VariantPatronPreset from "./variants/VariantPatronPreset"
 import VariantTicketSelect from "./variants/VariantTicketSelect"
@@ -24,9 +25,10 @@ const VARIANT_REGISTRY: Record<string, ComponentType<VariantProps>> = {
   "housing-date": VariantHousingDate,
   "merch-image": VariantMerchImage,
   "youtube-video": VariantYouTubeVideo,
+  "image-gallery": VariantImageGallery,
 }
 
-const CONTENT_ONLY_TEMPLATES = new Set(["youtube-video"])
+const CONTENT_ONLY_TEMPLATES = new Set(["youtube-video", "image-gallery"])
 
 interface DynamicProductStepProps {
   stepConfig: TicketingStepPublic
