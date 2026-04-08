@@ -1,12 +1,6 @@
 import { FormInputWrapper } from "../form-input-wrapper"
 import { LabelRequired } from "../label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../select"
+import { Select, SelectContent, SelectItem, SelectTrigger } from "../select"
 
 interface SelectFormProps {
   label: string
@@ -37,10 +31,13 @@ const SelectForm = ({
         </LabelRequired>
         <Select onValueChange={onChange} value={value}>
           <SelectTrigger id={id} className={error ? "border-red-500" : ""}>
-            <SelectValue
-              placeholder={placeholder}
-              className="text-sm text-muted-foreground"
-            />
+            <span className="flex-1 truncate text-left text-sm">
+              {value ? (
+                (options.find((o) => o.value === value)?.label ?? value)
+              ) : (
+                <span className="text-muted-foreground">{placeholder}</span>
+              )}
+            </span>
           </SelectTrigger>
           <SelectContent>
             {options.map((option) => (

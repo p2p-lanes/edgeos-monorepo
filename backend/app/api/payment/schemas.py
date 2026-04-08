@@ -8,6 +8,13 @@ from sqlalchemy import Integer, Numeric, Text
 from sqlmodel import Column, Field, SQLModel
 
 
+class PaymentType(str, Enum):
+    """Payment type — distinguishes pass purchases from application fees."""
+
+    PASS_PURCHASE = "pass_purchase"
+    APPLICATION_FEE = "application_fee"
+
+
 class PaymentSource(str, Enum):
     """Payment source/provider."""
 
@@ -89,6 +96,9 @@ class PaymentBase(SQLModel):
     group_id: uuid.UUID | None = Field(
         default=None, foreign_key="groups.id", nullable=True, index=True
     )
+
+    # Payment type
+    payment_type: str = Field(default=PaymentType.PASS_PURCHASE.value)
 
 
 class PaymentProductRequest(BaseModel):
@@ -195,6 +205,12 @@ class PaymentStatusCheck(BaseModel):
     status: PaymentStatus
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ApplicationFeeCreate(BaseModel):
+    """Schema for creating an application fee payment."""
+
+    application_id: uuid.UUID
 
 
 class SimpleFICardPayment(BaseModel):

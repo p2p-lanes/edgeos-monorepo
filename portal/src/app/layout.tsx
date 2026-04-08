@@ -5,7 +5,8 @@ import { headers } from "next/headers"
 import "./globals.css"
 import { Toaster } from "sonner"
 import GoogleAnalytics from "@/components/utils/GoogleAnalytics"
-import { extractSubdomain, fetchTenantBySlug } from "@/lib/tenant"
+import { fetchTenantBySlug } from "@/lib/tenant"
+import { resolveHostname } from "@/lib/tenant-resolution"
 import QueryProvider from "@/providers/queryProvider"
 import { TenantProvider } from "@/providers/tenantProvider"
 
@@ -16,10 +17,33 @@ const FALLBACK_DESCRIPTION =
 export async function generateMetadata(): Promise<Metadata> {
   const headersList = await headers()
   const host = headersList.get("host") ?? ""
-  const searchParams = headersList.get("x-invoke-query") ?? null
-  const slug = extractSubdomain(host, searchParams)
+  const { slug, isCustomDomain } = resolveHostname(host)
 
-  const tenant = slug ? await fetchTenantBySlug(slug) : null
+  // For custom domains, the middleware already resolved the tenant and set
+  // x-tenant-slug — read it directly instead of making a redundant API call.
+  const middlewareSlug = isCustomDomain
+    ? (headersList.get("x-tenant-slug") ?? null)
+    : null
+
+  let tenant = null
+
+  try {
+    tenant =
+      middlewareSlug != null
+        ? await fetchTenantBySlug(middlewareSlug)
+        : slug
+          ? await fetchTenantBySlug(slug)
+          : null
+  } catch (error) {
+    console.error("Failed to resolve tenant metadata", {
+      host,
+      slug,
+      middlewareSlug,
+      isCustomDomain,
+      error,
+    })
+  }
+
   const name = tenant?.name ? `${tenant.name} Portal` : FALLBACK_NAME
   const description = tenant?.name
     ? `Welcome to the ${tenant.name} Portal. Log in or sign up to access ${tenant.name} events.`
@@ -55,9 +79,18 @@ export const viewport: Viewport = {
   userScalable: false,
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  const headersList = await headers()
+  const isCustomDomain = headersList.get("x-custom-domain") === "true"
+  const middlewareTenantId = isCustomDomain
+    ? (headersList.get("x-tenant-id") ?? null)
+    : null
+  const middlewareTenantSlug = isCustomDomain
+    ? (headersList.get("x-tenant-slug") ?? null)
+    : null
+
   return (
     <html lang="en">
       <body
@@ -66,7 +99,10 @@ export default function RootLayout({
       >
         <GoogleAnalytics />
         <QueryProvider>
-          <TenantProvider>
+          <TenantProvider
+            initialTenantId={middlewareTenantId}
+            initialTenantSlug={middlewareTenantSlug}
+          >
             <div className="w-full bg-neutral-100">{children}</div>
           </TenantProvider>
         </QueryProvider>

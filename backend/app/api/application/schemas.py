@@ -17,6 +17,7 @@ class ApplicationStatus(str, Enum):
     """Status for applications."""
 
     DRAFT = "draft"
+    PENDING_FEE = "pending_fee"
     IN_REVIEW = "in review"
     REJECTED = "rejected"
     ACCEPTED = "accepted"

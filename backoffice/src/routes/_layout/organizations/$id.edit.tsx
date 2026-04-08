@@ -9,7 +9,7 @@ import { TenantForm } from "@/components/forms/TenantForm"
 import { Skeleton } from "@/components/ui/skeleton"
 import useAuth from "@/hooks/useAuth"
 
-export const Route = createFileRoute("/_layout/tenants/$id/edit")({
+export const Route = createFileRoute("/_layout/organizations/$id/edit")({
   component: EditTenantPage,
   head: () => ({
     meta: [{ title: "Edit Organization - EdgeOS" }],
@@ -30,7 +30,7 @@ function EditTenantContent({ tenantId }: { tenantId: string }) {
 
   const handleSuccess = () => {
     if (isSuperadmin) {
-      navigate({ to: "/tenants" })
+      navigate({ to: "/organizations" })
     } else {
       navigate({ to: "/" })
     }
@@ -47,7 +47,7 @@ function EditTenantPage() {
     <FormPageLayout
       title="Edit Organization"
       description="Update organization settings and configuration"
-      backTo={isSuperadmin ? "/tenants" : "/"}
+      backTo={isSuperadmin ? "/organizations" : "/"}
     >
       <QueryErrorBoundary>
         <Suspense fallback={<Skeleton className="h-96 w-full" />}>

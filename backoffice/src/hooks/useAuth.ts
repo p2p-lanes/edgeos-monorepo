@@ -69,6 +69,7 @@ const useAuth = () => {
       return response
     },
     onSuccess: () => {
+      queryClient.clear()
       queryClient.invalidateQueries({ queryKey: ["currentUser"] })
       navigate({ to: "/" })
     },
@@ -77,7 +78,6 @@ const useAuth = () => {
 
   const logout = () => {
     localStorage.removeItem("access_token")
-    queryClient.clear()
     navigate({ to: "/login" })
   }
 

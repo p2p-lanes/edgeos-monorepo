@@ -224,6 +224,9 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
             # Merge configurable attrs from DB config or fall back to defaults
             config = config_map.get(field_name)
             if config:
+                custom_label = (config.label.strip() if config.label else "") or ""
+                if custom_label:
+                    entry["label"] = custom_label
                 entry["section_id"] = (
                     str(config.section_id) if config.section_id else None
                 )

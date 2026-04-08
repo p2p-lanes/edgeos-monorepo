@@ -86,6 +86,7 @@ const APPLICATION_STATUS_OPTIONS: {
   label: string
 }[] = [
   { value: "draft", label: "Draft" },
+  { value: "pending_fee", label: "Pending Fee" },
   { value: "in review", label: "In Review" },
   { value: "accepted", label: "Accepted" },
   { value: "rejected", label: "Rejected" },
@@ -127,6 +128,7 @@ function useStatusCounts(popupId: string | null) {
   if (stats?.applications) {
     const a = stats.applications
     counts.draft = a.draft ?? 0
+    counts.pending_fee = a.pending_fee ?? 0
     counts["in review"] = a.in_review ?? 0
     counts.accepted = a.accepted ?? 0
     counts.rejected = a.rejected ?? 0
@@ -196,6 +198,7 @@ function StatusDropdownFilter({
 
 const VALID_STATUSES: Set<string> = new Set([
   "draft",
+  "pending_fee",
   "in review",
   "accepted",
   "rejected",
@@ -753,14 +756,39 @@ function Applications() {
         { key: "human.residence", label: "Residence" },
       ]
 
-      const customColumns = formSchema?.custom_fields
-        ? Object.entries(formSchema.custom_fields)
-            .sort(([, a], [, b]) => (a.position ?? 0) - (b.position ?? 0))
-            .map(([name, field]) => ({
-              key: `custom_fields.${name}`,
-              label: field.label,
-            }))
-        : []
+      // Build custom columns from the ACTUAL data keys across all
+      // applications, not from the current schema. Field names are
+      // immutable identifiers — but if a field was renamed in the
+      // past, old applications still reference the previous key.
+      // Using data keys guarantees every value is exported.
+      const schemaLookup = formSchema?.custom_fields ?? {}
+      const seenKeys = new Set<string>()
+      for (const r of results) {
+        const cf = (r as Record<string, unknown>).custom_fields as
+          | Record<string, unknown>
+          | undefined
+        if (cf) {
+          for (const k of Object.keys(cf)) seenKeys.add(k)
+        }
+      }
+
+      // Try to match each data key to the current schema for label
+      // and position; fall back to a formatted version of the key.
+      const customColumns = [...seenKeys]
+        .map((name) => {
+          const schemaDef = schemaLookup[name] as
+            | { label?: string; position?: number }
+            | undefined
+          return {
+            key: `custom_fields.${name}`,
+            label:
+              schemaDef?.label ??
+              name.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+            position: schemaDef?.position ?? Number.MAX_SAFE_INTEGER,
+          }
+        })
+        .sort((a, b) => a.position - b.position)
+        .map(({ key, label }) => ({ key, label }))
 
       exportToCsv(
         "applications",

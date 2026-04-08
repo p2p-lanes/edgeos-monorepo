@@ -59,7 +59,7 @@ const routeLabels: Record<string, string> = {
   attendees: "Attendees",
   humans: "Humans",
   payments: "Payments",
-  tenants: "Organizations",
+  organizations: "Organizations",
   settings: "Settings",
   new: "New",
   edit: "Edit",
@@ -128,7 +128,7 @@ const entityResolvers: Record<
       (d.email as string) ||
       "Human",
   },
-  tenants: {
+  organizations: {
     queryKey: "tenants",
     queryFn: (id) => TenantsService.getTenant({ tenantId: id }) as never,
     getName: (d) => (d.name as string) || "Organization",

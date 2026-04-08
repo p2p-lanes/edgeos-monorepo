@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import { ArrowLeft } from "lucide-react"
-import { Suspense } from "react"
+import { Suspense, useEffect } from "react"
 
 import { EmailTemplatesService, type EmailTemplateType } from "@/client"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
@@ -10,6 +10,7 @@ import { EmailTemplateEditor } from "@/components/EmailTemplateEditor"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
+import useAuth from "@/hooks/useAuth"
 
 export const Route = createFileRoute("/_layout/email-templates/$type/edit")({
   component: EditEmailTemplate,
@@ -74,6 +75,18 @@ function EditorContent({ templateType }: { templateType: string }) {
 function EditEmailTemplate() {
   const { type } = Route.useParams()
   const { isContextReady } = useWorkspace()
+  const { isAdmin, isUserLoading } = useAuth()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    if (!isUserLoading && !isAdmin) {
+      navigate({ to: "/email-templates" })
+    }
+  }, [isAdmin, isUserLoading, navigate])
+
+  if (isUserLoading || !isAdmin) {
+    return null
+  }
 
   if (!isContextReady) {
     return (

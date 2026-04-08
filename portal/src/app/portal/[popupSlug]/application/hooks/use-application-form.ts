@@ -6,6 +6,15 @@ import type {
   FormFieldSchema,
 } from "@/types/form-schema"
 
+const HUMAN_FIELD_KEYS = new Set([
+  "first_name",
+  "last_name",
+  "telegram",
+  "gender",
+  "age",
+  "residence",
+])
+
 interface FormState {
   values: Record<string, unknown>
   errors: Record<string, string>
@@ -48,10 +57,12 @@ function getDefaultValue(field: FormFieldSchema): unknown {
 
 function getInitialValues(
   schema: ApplicationFormSchema,
+  app?: ApplicationPublic | null,
+  popupId?: string,
 ): Record<string, unknown> {
   const values: Record<string, unknown> = {}
 
-  // Initialize ALL base fields from schema
+  // Initialize ALL base fields from schema with defaults
   for (const [name, field] of Object.entries(schema.base_fields)) {
     values[name] = getDefaultValue(field)
   }
@@ -62,6 +73,46 @@ function getInitialValues(
   // Custom fields
   for (const [name, field] of Object.entries(schema.custom_fields)) {
     values[`custom_${name}`] = getDefaultValue(field)
+  }
+
+  if (!app) return values
+
+  const isExistingApplication = app.popup_id === popupId
+
+  if (isExistingApplication) {
+    // Full populate: human fields, application-scoped fields, custom fields
+    for (const [name, field] of Object.entries(schema.base_fields)) {
+      if (
+        (field.target === "human" || HUMAN_FIELD_KEYS.has(name)) &&
+        app.human
+      ) {
+        const v = (app.human as Record<string, unknown>)[name]
+        values[name] = v ?? getDefaultValue(field)
+      } else {
+        const v = (app as Record<string, unknown>)[name]
+        values[name] = v ?? getDefaultValue(field)
+      }
+    }
+    for (const [name, field] of Object.entries(schema.custom_fields)) {
+      values[`custom_${name}`] =
+        app.custom_fields?.[name] ?? getDefaultValue(field)
+    }
+  } else {
+    // Import: only human profile fields from another popup's application
+    for (const [name, field] of Object.entries(schema.base_fields)) {
+      if (field.target === "human" && app.human) {
+        const v = (app.human as Record<string, unknown>)[name]
+        values[name] = v ?? getDefaultValue(field)
+      }
+    }
+  }
+
+  // Resolve gender "Specify" virtual field
+  const genderOptions = schema.base_fields.gender?.options ?? []
+  const g = values.gender as string
+  if (g && !genderOptions.includes(g)) {
+    values.gender_specify = g
+    values.gender = "Specify"
   }
 
   return values
@@ -99,8 +150,11 @@ function getFieldsReplacedByScholarshipSection(
   )
 }
 
-export function useApplicationForm(schema: ApplicationFormSchema) {
-  const initialValues = useMemo(() => getInitialValues(schema), [schema])
+export function useApplicationForm(
+  schema: ApplicationFormSchema,
+  initialApplication?: ApplicationPublic | null,
+  popupId?: string,
+) {
   const fieldsReplacedByChildrenSection = useMemo(
     () => getFieldsReplacedByChildrenSection(schema),
     [schema],
@@ -110,11 +164,11 @@ export function useApplicationForm(schema: ApplicationFormSchema) {
     [schema],
   )
 
-  const [state, dispatch] = useReducer(formReducer, {
-    values: initialValues,
-    errors: {},
+  const [state, dispatch] = useReducer(formReducer, undefined, () => ({
+    values: getInitialValues(schema, initialApplication, popupId),
+    errors: {} as Record<string, string>,
     touched: new Set<string>(),
-  })
+  }))
 
   const handleChange = useCallback((name: string, value: unknown) => {
     dispatch({ type: "SET_FIELD", name, value })
@@ -159,34 +213,6 @@ export function useApplicationForm(schema: ApplicationFormSchema) {
     [schema, state.values, fieldsReplacedByCustomSection],
   )
 
-  const populateFromApplication = useCallback(
-    (app: ApplicationPublic) => {
-      const values: Record<string, unknown> = {}
-
-      // Only populate human profile fields (target === "human") from the
-      // previous application. Application-scoped fields (referral, scholarship,
-      // companions, etc.) and custom fields are popup-specific and should NOT
-      // be carried over between different popups.
-      for (const [name, field] of Object.entries(schema.base_fields)) {
-        if (field.target === "human" && app.human) {
-          values[name] =
-            (app.human as Record<string, unknown>)[name] ??
-            getDefaultValue(field)
-        }
-      }
-
-      // Virtual field: resolve gender_specify from gender value
-      const genderOptions = schema.base_fields.gender?.options ?? []
-      if (values.gender && !genderOptions.includes(values.gender as string)) {
-        values.gender_specify = values.gender
-        values.gender = "Specify"
-      }
-
-      dispatch({ type: "SET_VALUES", values })
-    },
-    [schema],
-  )
-
   const progress = useMemo(() => {
     const allFields = { ...schema.base_fields, ...schema.custom_fields }
     const requiredFields = Object.entries(allFields).filter(
@@ -219,7 +245,6 @@ export function useApplicationForm(schema: ApplicationFormSchema) {
     errors: state.errors,
     handleChange,
     validate,
-    populateFromApplication,
     setValues: (values: Record<string, unknown>) =>
       dispatch({ type: "SET_VALUES", values }),
     setErrors: (errors: Record<string, string>) =>

@@ -1,7 +1,7 @@
 """Add watermark column to ticketing steps; backfill descriptions and display variants.
 
-Revision ID: 0023_add_watermark_to_ticketing_steps
-Revises: 0022_custom_ticketing_steps
+Revision ID: 0026_add_watermark_to_ticketing_steps
+Revises: 0025_custom_ticketing_steps
 Create Date: 2026-03-25
 
 """
@@ -9,8 +9,8 @@ Create Date: 2026-03-25
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0023_add_step_watermark"
-down_revision = "0022_custom_ticketing_steps"
+revision = "0026_add_step_watermark"
+down_revision = "0025_custom_ticketing_steps"
 branch_labels = None
 depends_on = None
 

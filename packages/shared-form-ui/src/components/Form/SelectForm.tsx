@@ -3,7 +3,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "../Select"
 import { FormInputWrapper } from "../FormInputWrapper"
 import { LabelRequired } from "../Label"
@@ -39,10 +38,13 @@ export const SelectForm = ({
         )}
         <Select onValueChange={onChange} value={value}>
           <SelectTrigger id={id} className={error ? "border-red-500" : ""}>
-            <SelectValue
-              placeholder={placeholder}
-              className="text-sm text-muted-foreground"
-            />
+            <span className="flex-1 truncate text-left text-sm">
+              {value ? (
+                (options.find((o) => o.value === value)?.label ?? value)
+              ) : (
+                <span className="text-muted-foreground">{placeholder}</span>
+              )}
+            </span>
           </SelectTrigger>
           <SelectContent>
             {options.map((option) => (

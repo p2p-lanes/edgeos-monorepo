@@ -9,8 +9,14 @@ import { LabelRequired } from "./Label"
 import { MultiSelect } from "./MultiSelect"
 import { RadioGroup, RadioGroupItem } from "./RadioGroup"
 
-function mapOptions(options?: string[]) {
-  return (options ?? []).map((opt) => ({ value: opt, label: opt }))
+function mapOptions(options?: string[], currentValue?: string) {
+  const values = [...(options ?? [])]
+
+  if (currentValue && !values.includes(currentValue)) {
+    values.push(currentValue)
+  }
+
+  return values.map((opt) => ({ value: opt, label: opt }))
 }
 
 export interface SchemaFieldProps {
@@ -135,7 +141,7 @@ export function SchemaField({
           id={name}
           value={(value as string) ?? ""}
           onChange={(v) => handleChange(name, v)}
-          options={mapOptions(field.options)}
+          options={mapOptions(field.options, (value as string) ?? "")}
           error={error}
           isRequired={showRequiredIndicator}
           placeholder={field.placeholder ?? "Select an option"}

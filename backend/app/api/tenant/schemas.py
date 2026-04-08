@@ -1,3 +1,4 @@
+import re
 import uuid
 from typing import Self
 
@@ -16,6 +17,8 @@ class TenantBase(SQLModel):
     image_url: str | None = None
     icon_url: str | None = None
     logo_url: str | None = None
+    custom_domain: str | None = Field(default=None, max_length=253)
+    custom_domain_active: bool = False
 
 
 class TenantCreate(SQLModel):
@@ -47,6 +50,8 @@ class TenantUpdate(SQLModel):
     image_url: str | None = None
     icon_url: str | None = None
     logo_url: str | None = None
+    custom_domain: str | None = None
+    custom_domain_active: bool | None = None
 
     @model_validator(mode="after")
     def regenerate_slug(self) -> Self:
@@ -54,6 +59,22 @@ class TenantUpdate(SQLModel):
             self.slug = slugify(self.name)
         return self
 
+    @model_validator(mode="after")
+    def validate_custom_domain(self) -> Self:
+        if self.custom_domain is not None:
+            domain = self.custom_domain
+            if "://" in domain or "/" in domain or ":" in domain:
+                raise ValueError(
+                    "custom_domain must be a plain hostname (no scheme, path, or port)"
+                )
+            if not re.match(
+                r"^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$",
+                domain,
+            ):
+                raise ValueError("custom_domain must be a valid hostname")
+        return self
+
 
 class TenantPublic(TenantBase):
     id: uuid.UUID
+    custom_domain_active: bool  # required, no default — forces non-optional in OpenAPI

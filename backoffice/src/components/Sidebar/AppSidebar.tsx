@@ -42,7 +42,7 @@ function getAdminItems(tenantId: string | null | undefined): Item[] {
     items.push({
       icon: Building2,
       title: "Organization",
-      path: `/tenants/${tenantId}/edit`,
+      path: `/organizations/${tenantId}/edit`,
     })
   }
   return items
@@ -64,9 +64,9 @@ const popupItems: Item[] = [
 // Admin items (admins and superadmins)
 const adminItems: Item[] = [{ icon: Users, title: "Users", path: "/admin" }]
 
-// Superadmin only items - Tenants list view
+// Superadmin only items - organizations list view
 const superadminItems: Item[] = [
-  { icon: Building2, title: "Organizations", path: "/tenants" },
+  { icon: Building2, title: "Organizations", path: "/organizations" },
 ]
 
 export function AppSidebar() {

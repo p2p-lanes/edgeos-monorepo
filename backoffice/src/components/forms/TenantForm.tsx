@@ -1,7 +1,8 @@
 import { useForm } from "@tanstack/react-form"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
-import { Image, Mail, User } from "lucide-react"
+import { Check, Copy, Globe, Image, Info, Lock, Mail, User } from "lucide-react"
+import { useState } from "react"
 import {
   type TenantCreate,
   type TenantPublic,
@@ -10,6 +11,8 @@ import {
 } from "@/client"
 import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ImageUpload } from "@/components/ui/image-upload"
 import {
@@ -20,6 +23,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { LoadingButton } from "@/components/ui/loading-button"
 import { Separator } from "@/components/ui/separator"
+import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
 import {
   UnsavedChangesDialog,
@@ -27,14 +31,39 @@ import {
 } from "@/hooks/useUnsavedChanges"
 import { createErrorHandler } from "@/utils"
 
+/** Reject hostnames that contain a scheme, path, or port — mirrors backend validator. */
+function validateHostname(value: string): string | undefined {
+  if (!value) return undefined
+  if (value.includes("://") || value.includes("/") || value.includes(":")) {
+    return "Enter a plain hostname (no scheme, path, or port). Example: checkout.example.com"
+  }
+  return undefined
+}
+
 interface TenantFormProps {
   defaultValues?: TenantPublic
   onSuccess: () => void
 }
 
+const PORTAL_DOMAIN = import.meta.env.VITE_PORTAL_DOMAIN ?? ""
+
 export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { isSuperadmin } = useAuth()
+  const [copied, setCopied] = useState(false)
+
+  const cnameTarget =
+    defaultValues?.slug && PORTAL_DOMAIN
+      ? `${defaultValues.slug}.${PORTAL_DOMAIN}`
+      : null
+
+  function copyToClipboard() {
+    if (!cnameTarget) return
+    navigator.clipboard.writeText(cnameTarget)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
   const { showSuccessToast, showErrorToast } = useCustomToast()
   const isEdit = !!defaultValues
 
@@ -65,13 +94,26 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
     onError: createErrorHandler(showErrorToast),
   })
 
+  const toggleActivationMutation = useMutation({
+    mutationFn: (active: boolean) =>
+      TenantsService.updateTenant({
+        tenantId: defaultValues!.id,
+        requestBody: { custom_domain_active: active },
+      }),
+    onSuccess: (_, active) => {
+      showSuccessToast(active ? "Domain activated" : "Domain deactivated")
+      queryClient.invalidateQueries({ queryKey: ["tenants"] })
+    },
+    onError: createErrorHandler(showErrorToast),
+  })
+
   const deleteMutation = useMutation({
     mutationFn: () =>
       TenantsService.deleteTenant({ tenantId: defaultValues!.id }),
     onSuccess: () => {
       showSuccessToast("Organization deleted successfully")
       queryClient.invalidateQueries({ queryKey: ["tenants"] })
-      navigate({ to: "/tenants" })
+      navigate({ to: "/organizations" })
     },
     onError: createErrorHandler(showErrorToast),
   })
@@ -84,6 +126,7 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
       image_url: defaultValues?.image_url ?? "",
       icon_url: defaultValues?.icon_url ?? "",
       logo_url: defaultValues?.logo_url ?? "",
+      custom_domain: defaultValues?.custom_domain ?? "",
     },
     onSubmit: ({ value }) => {
       if (isEdit) {
@@ -94,6 +137,8 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
           image_url: value.image_url || null,
           icon_url: value.icon_url || null,
           logo_url: value.logo_url || null,
+          // Map empty string to null for domain; never send custom_domain_active
+          custom_domain: value.custom_domain || null,
         })
       } else {
         createMutation.mutate({
@@ -273,12 +318,123 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
 
         <Separator />
 
+        {/* Custom Domain */}
+        {isEdit && (
+          <InlineSection title="Custom Domain">
+            {/* Domain input */}
+            <form.Field
+              name="custom_domain"
+              validators={{
+                onBlur: ({ value }) => validateHostname(value),
+                onChange: ({ value }) => validateHostname(value),
+              }}
+            >
+              {(field) => {
+                const isActive = !!defaultValues?.custom_domain_active
+                return (
+                  <div>
+                    <InlineRow
+                      icon={
+                        isActive ? (
+                          <Lock className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <Globe className="h-4 w-4 text-muted-foreground" />
+                        )
+                      }
+                      label="Custom Domain"
+                      description={
+                        isActive
+                          ? "Deactivate the domain before making changes"
+                          : "Hostname only — no scheme, path, or port"
+                      }
+                    >
+                      <div className="flex items-center gap-2">
+                        <Input
+                          placeholder="checkout.example.com"
+                          value={field.state.value}
+                          onBlur={field.handleBlur}
+                          onChange={(e) => field.handleChange(e.target.value)}
+                          disabled={isActive}
+                          className="max-w-xs text-sm"
+                        />
+                        {field.state.value && (
+                          <Badge
+                            className={
+                              isActive
+                                ? "bg-green-100 text-green-800 border-green-200"
+                                : "bg-yellow-100 text-yellow-800 border-yellow-200"
+                            }
+                            variant="outline"
+                          >
+                            {isActive ? "Active" : "Pending Activation"}
+                          </Badge>
+                        )}
+                        {isSuperadmin && field.state.value && (
+                          <LoadingButton
+                            type="button"
+                            variant={isActive ? "outline" : "default"}
+                            size="sm"
+                            loading={toggleActivationMutation.isPending}
+                            onClick={() =>
+                              toggleActivationMutation.mutate(!isActive)
+                            }
+                          >
+                            {isActive ? "Deactivate" : "Activate"}
+                          </LoadingButton>
+                        )}
+                      </div>
+                    </InlineRow>
+                    <FieldError errors={field.state.meta.errors} />
+                  </div>
+                )
+              }}
+            </form.Field>
+
+            {/* Persistent SSL / DNS warning */}
+            <Alert className="border-yellow-200 bg-yellow-50 text-yellow-900 mt-2">
+              <Info className="h-4 w-4 text-yellow-600" />
+              <AlertDescription className="text-yellow-800 space-y-2">
+                <p>
+                  This domain requires SSL and DNS configuration before it
+                  becomes active. Contact support to activate once DNS is
+                  configured.
+                </p>
+                {cnameTarget && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-yellow-700">
+                      CNAME target:
+                    </span>
+                    <code className="rounded bg-yellow-100 px-2 py-0.5 text-xs font-mono text-yellow-900 border border-yellow-200">
+                      {cnameTarget}
+                    </code>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 text-yellow-700 hover:text-yellow-900 hover:bg-yellow-100"
+                      onClick={copyToClipboard}
+                    >
+                      {copied ? (
+                        <Check className="h-3 w-3" />
+                      ) : (
+                        <Copy className="h-3 w-3" />
+                      )}
+                    </Button>
+                  </div>
+                )}
+              </AlertDescription>
+            </Alert>
+          </InlineSection>
+        )}
+
+        <Separator />
+
         {/* Form Actions */}
         <div className="flex gap-4">
           <Button
             type="button"
             variant="outline"
-            onClick={() => navigate({ to: "/tenants" })}
+            onClick={() => navigate({ to: "/organizations" })}
           >
             Cancel
           </Button>

@@ -7,6 +7,7 @@ interface FormPageLayoutProps {
   title: string
   description: string
   backTo: string
+  onBack?: () => void
   children: React.ReactNode
 }
 
@@ -14,6 +15,7 @@ export function FormPageLayout({
   title,
   description,
   backTo,
+  onBack,
   children,
 }: FormPageLayoutProps) {
   const navigate = useNavigate()
@@ -25,7 +27,7 @@ export function FormPageLayout({
           variant="ghost"
           size="icon"
           aria-label="Go back"
-          onClick={() => navigate({ to: backTo })}
+          onClick={onBack ?? (() => navigate({ to: backTo }))}
         >
           <ArrowLeft className="h-4 w-4" />
         </Button>

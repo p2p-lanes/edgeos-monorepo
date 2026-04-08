@@ -1,7 +1,7 @@
 """Add product_category and display_variant to ticketing steps; convert products.category to varchar.
 
-Revision ID: 0022_custom_ticketing_steps
-Revises: 0021_add_ticketing_steps
+Revision ID: 0025_custom_ticketing_steps
+Revises: 0024_add_ticketing_steps
 Create Date: 2026-03-19
 
 """
@@ -9,8 +9,8 @@ Create Date: 2026-03-19
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0022_custom_ticketing_steps"
-down_revision = "0021_add_ticketing_steps"
+revision = "0025_custom_ticketing_steps"
+down_revision = "0024_add_ticketing_steps"
 branch_labels = None
 depends_on = None
 

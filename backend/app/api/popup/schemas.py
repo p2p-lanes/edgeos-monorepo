@@ -1,10 +1,11 @@
 import uuid
 from datetime import datetime
+from decimal import Decimal
 from enum import StrEnum
 from typing import Self
 
 from pydantic import model_validator
-from sqlalchemy import Boolean
+from sqlalchemy import Boolean, Numeric
 from sqlmodel import Column, Field, SQLModel
 
 from app.utils.utils import slugify
@@ -48,6 +49,14 @@ class PopupBase(SQLModel):
     invoice_company_name: str | None = None
     invoice_company_address: str | None = None
     invoice_company_email: str | None = None
+    requires_application_fee: bool = Field(
+        default=False,
+        sa_column=Column(Boolean, nullable=False, server_default="false"),
+    )
+    application_fee_amount: Decimal | None = Field(
+        default=None,
+        sa_column=Column(Numeric(10, 2), nullable=True),
+    )
 
 
 class PopupCreate(SQLModel):
@@ -75,10 +84,18 @@ class PopupCreate(SQLModel):
     invoice_company_name: str | None = None
     invoice_company_address: str | None = None
     invoice_company_email: str | None = None
+    requires_application_fee: bool = False
+    application_fee_amount: Decimal | None = None
 
     @model_validator(mode="after")
     def generate_slug(self) -> Self:
         self.slug = slugify(self.name)
+        if self.requires_application_fee and (
+            not self.application_fee_amount or self.application_fee_amount <= 0
+        ):
+            raise ValueError(
+                "application_fee_amount must be greater than 0 when requires_application_fee is True"
+            )
         return self
 
 
@@ -106,6 +123,18 @@ class PopupUpdate(SQLModel):
     invoice_company_name: str | None = None
     invoice_company_address: str | None = None
     invoice_company_email: str | None = None
+    requires_application_fee: bool | None = None
+    application_fee_amount: Decimal | None = None
+
+    @model_validator(mode="after")
+    def validate_fee_config(self) -> Self:
+        if self.requires_application_fee is True and (
+            not self.application_fee_amount or self.application_fee_amount <= 0
+        ):
+            raise ValueError(
+                "application_fee_amount must be greater than 0 when requires_application_fee is True"
+            )
+        return self
 
 
 class PopupPublic(SQLModel):
@@ -131,6 +160,8 @@ class PopupPublic(SQLModel):
     allows_scholarship: bool = False
     terms_and_conditions_url: str | None = None
     invoice_company_name: str | None = None
+    requires_application_fee: bool = False
+    application_fee_amount: Decimal | None = None
 
 
 class PopupAdmin(PopupBase):

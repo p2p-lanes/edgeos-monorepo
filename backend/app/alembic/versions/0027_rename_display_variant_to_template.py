@@ -1,7 +1,7 @@
 """Rename display_variant to template; add template_config JSONB column.
 
-Revision ID: 0024_rename_display_variant_to_template
-Revises: 0023_add_step_watermark
+Revision ID: 0027_rename_display_variant_to_template
+Revises: 0026_add_step_watermark
 Create Date: 2026-03-31
 
 """
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import JSONB
 
-revision = "0024_rename_to_template"
-down_revision = "0023_add_step_watermark"
+revision = "0027_rename_to_template"
+down_revision = "0026_add_step_watermark"
 branch_labels = None
 depends_on = None
 

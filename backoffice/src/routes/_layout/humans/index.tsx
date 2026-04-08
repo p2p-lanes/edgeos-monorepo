@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
-import { createFileRoute, Link } from "@tanstack/react-router"
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
 import {
   AlertCircle,
@@ -16,6 +16,7 @@ import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { StatusBadge } from "@/components/Common/StatusBadge"
+import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import {
@@ -24,6 +25,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
@@ -31,11 +39,22 @@ import {
   useTableSearchParams,
   validateTableSearch,
 } from "@/hooks/useTableSearchParams"
+import {
+  HUMAN_APPLICATION_FILTER,
+  type HumansApplicationFilter,
+} from "@/routes/_layout/humans/navigation"
+
+const VALID_APPLICATION_FILTERS = new Set<HumansApplicationFilter>([
+  HUMAN_APPLICATION_FILTER.ALL,
+  HUMAN_APPLICATION_FILTER.INCOMPLETE,
+])
 
 function getHumansQueryOptions(
+  popupId: string | null,
   page: number,
   pageSize: number,
   search?: string,
+  applicationFilter: HumansApplicationFilter = HUMAN_APPLICATION_FILTER.ALL,
 ) {
   return {
     queryFn: () =>
@@ -43,18 +62,65 @@ function getHumansQueryOptions(
         skip: page * pageSize,
         limit: pageSize,
         search: search || undefined,
+        incompleteApplication:
+          applicationFilter === HUMAN_APPLICATION_FILTER.INCOMPLETE
+            ? true
+            : undefined,
+        popupId:
+          applicationFilter === HUMAN_APPLICATION_FILTER.INCOMPLETE
+            ? (popupId ?? undefined)
+            : undefined,
       }),
-    queryKey: ["humans", { page, pageSize, search }],
+    queryKey: [
+      "humans",
+      { popupId, page, pageSize, search, applicationFilter },
+    ],
   }
 }
 
 export const Route = createFileRoute("/_layout/humans/")({
   component: Humans,
-  validateSearch: validateTableSearch,
+  validateSearch: (raw) => ({
+    ...validateTableSearch(raw),
+    applicationFilter:
+      typeof raw.applicationFilter === "string" &&
+      VALID_APPLICATION_FILTERS.has(
+        raw.applicationFilter as HumansApplicationFilter,
+      )
+        ? (raw.applicationFilter as HumansApplicationFilter)
+        : HUMAN_APPLICATION_FILTER.ALL,
+  }),
   head: () => ({
     meta: [{ title: "Humans - EdgeOS" }],
   }),
 })
+
+function HumansApplicationFilterSelect({
+  value,
+  onValueChange,
+}: {
+  value: HumansApplicationFilter
+  onValueChange: (value: HumansApplicationFilter) => void
+}) {
+  return (
+    <Select
+      value={value}
+      onValueChange={(nextValue) =>
+        onValueChange(nextValue as HumansApplicationFilter)
+      }
+    >
+      <SelectTrigger className="w-[240px]">
+        <SelectValue placeholder="Filter humans" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={HUMAN_APPLICATION_FILTER.ALL}>All humans</SelectItem>
+        <SelectItem value={HUMAN_APPLICATION_FILTER.INCOMPLETE}>
+          Incomplete application
+        </SelectItem>
+      </SelectContent>
+    </Select>
+  )
+}
 
 function HumanActionsMenu({ human }: { human: HumanPublic }) {
   const [open, setOpen] = useState(false)
@@ -127,16 +193,50 @@ const columns: ColumnDef<HumanPublic>[] = [
 ]
 
 function HumansTableContent() {
+  const navigate = useNavigate({ from: "/humans/" })
   const searchParams = Route.useSearch()
+  const { selectedPopupId } = useWorkspace()
   const { search, pagination, setSearch, setPagination } = useTableSearchParams(
     searchParams,
     "/humans",
   )
+  const applicationFilter =
+    searchParams.applicationFilter ?? HUMAN_APPLICATION_FILTER.ALL
+  const requiresPopupForFilter =
+    applicationFilter === HUMAN_APPLICATION_FILTER.INCOMPLETE &&
+    !selectedPopupId
+
+  const setApplicationFilter = (value: HumansApplicationFilter) => {
+    navigate({
+      to: "/humans",
+      search: (prev) => ({
+        ...prev,
+        applicationFilter: value,
+        page: 0,
+      }),
+      replace: true,
+    })
+  }
 
   const { data: humans } = useQuery({
-    ...getHumansQueryOptions(pagination.pageIndex, pagination.pageSize, search),
+    ...getHumansQueryOptions(
+      selectedPopupId,
+      pagination.pageIndex,
+      pagination.pageSize,
+      search,
+      applicationFilter,
+    ),
+    enabled: !requiresPopupForFilter,
     placeholderData: keepPreviousData,
   })
+
+  if (requiresPopupForFilter) {
+    return (
+      <div className="flex flex-col gap-4">
+        <WorkspaceAlert resource="humans with incomplete applications" />
+      </div>
+    )
+  }
 
   if (!humans) return <Skeleton className="h-64 w-full" />
 
@@ -148,6 +248,12 @@ function HumansTableContent() {
       hiddenOnMobile={["red_flag"]}
       searchValue={search}
       onSearchChange={setSearch}
+      filterBar={
+        <HumansApplicationFilterSelect
+          value={applicationFilter}
+          onValueChange={setApplicationFilter}
+        />
+      }
       serverPagination={{
         total: humans.paging.total,
         pagination: pagination,

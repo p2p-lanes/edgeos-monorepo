@@ -78,6 +78,13 @@ export type ApplicationCreate = {
 };
 
 /**
+ * Schema for creating an application fee payment.
+ */
+export type ApplicationFeeCreate = {
+    application_id: string;
+};
+
+/**
  * Application schema for API responses.
  */
 export type ApplicationPublic = {
@@ -145,6 +152,7 @@ export type ApplicationReviewPublic = {
 export type ApplicationStats = {
     total?: number;
     draft?: number;
+    pending_fee?: number;
     in_review?: number;
     accepted?: number;
     rejected?: number;
@@ -154,7 +162,7 @@ export type ApplicationStats = {
 /**
  * Status for applications.
  */
-export type ApplicationStatus = 'draft' | 'in review' | 'rejected' | 'accepted' | 'withdrawn';
+export type ApplicationStatus = 'draft' | 'pending_fee' | 'in review' | 'rejected' | 'accepted' | 'withdrawn';
 
 /**
  * Application schema for updates by the applicant.
@@ -362,6 +370,7 @@ export type BaseFieldConfigPublic = {
     field_name: string;
     section_id?: (string | null);
     position?: number;
+    label?: (string | null);
     placeholder?: (string | null);
     help_text?: (string | null);
     options?: (Array<(string)> | null);
@@ -370,6 +379,7 @@ export type BaseFieldConfigPublic = {
 export type BaseFieldConfigUpdate = {
     section_id?: (string | null);
     position?: (number | null);
+    label?: (string | null);
     placeholder?: (string | null);
     help_text?: (string | null);
     options?: (Array<(string)> | null);
@@ -1090,6 +1100,7 @@ export type PaymentPublic = {
     installments_total?: (number | null);
     installments_paid?: (number | null);
     group_id?: (string | null);
+    payment_type?: string;
     id: string;
     products_snapshot?: Array<PaymentProductResponse>;
     created_at?: (string | null);
@@ -1169,6 +1180,8 @@ export type PopupAdmin = {
     invoice_company_name?: (string | null);
     invoice_company_address?: (string | null);
     invoice_company_email?: (string | null);
+    requires_application_fee?: boolean;
+    application_fee_amount?: (string | null);
     id: string;
 };
 
@@ -1197,6 +1210,8 @@ export type PopupCreate = {
     invoice_company_name?: (string | null);
     invoice_company_address?: (string | null);
     invoice_company_email?: (string | null);
+    requires_application_fee?: boolean;
+    application_fee_amount?: (number | string | null);
 };
 
 /**
@@ -1223,6 +1238,8 @@ export type PopupPublic = {
     allows_scholarship?: boolean;
     terms_and_conditions_url?: (string | null);
     invoice_company_name?: (string | null);
+    requires_application_fee?: boolean;
+    application_fee_amount?: (string | null);
 };
 
 /**
@@ -1283,6 +1300,8 @@ export type PopupUpdate = {
     invoice_company_name?: (string | null);
     invoice_company_address?: (string | null);
     invoice_company_email?: (string | null);
+    requires_application_fee?: (boolean | null);
+    application_fee_amount?: (number | string | null);
 };
 
 /**
@@ -1568,6 +1587,8 @@ export type TenantPublic = {
     image_url?: (string | null);
     icon_url?: (string | null);
     logo_url?: (string | null);
+    custom_domain?: (string | null);
+    custom_domain_active: boolean;
     id: string;
 };
 
@@ -1579,6 +1600,8 @@ export type TenantUpdate = {
     image_url?: (string | null);
     icon_url?: (string | null);
     logo_url?: (string | null);
+    custom_domain?: (string | null);
+    custom_domain_active?: (boolean | null);
 };
 
 /**
@@ -2408,10 +2431,12 @@ export type GroupsGetGroupPublicData = {
 export type GroupsGetGroupPublicResponse = (GroupPublic);
 
 export type HumansListHumansData = {
+    incompleteApplication?: boolean;
     /**
      * Maximum number of items to return
      */
     limit?: number;
+    popupId?: (string | null);
     search?: (string | null);
     /**
      * Number of items to skip
@@ -2492,12 +2517,11 @@ export type PaymentsGetPaymentInvoiceData = {
 
 export type PaymentsGetPaymentInvoiceResponse = (unknown);
 
-export type PaymentsApprovePaymentData = {
-    paymentId: string;
-    xTenantId?: (string | null);
+export type PaymentsCreateMyApplicationFeeData = {
+    requestBody: ApplicationFeeCreate;
 };
 
-export type PaymentsApprovePaymentResponse = (PaymentPublic);
+export type PaymentsCreateMyApplicationFeeResponse = (PaymentPublic);
 
 export type PaymentsGetMyLatestPaymentData = {
     applicationId: string;
@@ -2716,6 +2740,12 @@ export type ProductsListPortalProductsData = {
 };
 
 export type ProductsListPortalProductsResponse = (ListModel_ProductPublic_);
+
+export type TenantsGetTenantByDomainData = {
+    domain: string;
+};
+
+export type TenantsGetTenantByDomainResponse = (TenantPublic);
 
 export type TenantsGetTenantBySlugData = {
     slug: string;

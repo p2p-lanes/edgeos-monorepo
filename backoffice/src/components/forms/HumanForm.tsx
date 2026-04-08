@@ -36,6 +36,7 @@ import {
   UnsavedChangesDialog,
   useUnsavedChanges,
 } from "@/hooks/useUnsavedChanges"
+import { getHumansNavigationTarget } from "@/routes/_layout/humans/navigation"
 import { createErrorHandler } from "@/utils"
 
 const GENDER_OPTIONS = [
@@ -383,7 +384,7 @@ export function HumanForm({ defaultValues, onSuccess }: HumanFormProps) {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => navigate({ to: "/humans" })}
+                  onClick={() => navigate(getHumansNavigationTarget())}
                 >
                   Cancel
                 </Button>

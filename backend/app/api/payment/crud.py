@@ -108,7 +108,7 @@ def _calculate_amounts(
     patreon_amount = sum((a["patreon"] for a in attendees.values()), Decimal("0"))
 
     logger.info(
-        "Amounts calculated - Standard: %s, Supporter: %s, Patreon: %s",
+        "Amounts calculated - Standard: {}, Supporter: {}, Patreon: {}",
         standard_amount,
         supporter_amount,
         patreon_amount,
@@ -127,7 +127,7 @@ def _calculate_price(
 ) -> Decimal:
     """Calculate final price with discounts and credits."""
     credit = _get_credit(application, discount_value) if edit_passes else Decimal("0")
-    logger.info("Credit applied: %s", credit)
+    logger.info("Credit applied: {}", credit)
 
     discounted_standard = standard_amount
     if standard_amount > 0:
@@ -180,6 +180,167 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             .limit(1)
         )
         return session.exec(statement).first()
+
+    def get_latest_fee_payment(
+        self,
+        session: Session,
+        application_id: uuid.UUID,
+    ) -> Payments | None:
+        """Get the most recent application_fee payment for an application."""
+        from app.api.payment.schemas import PaymentType
+
+        statement = (
+            select(Payments)
+            .where(
+                Payments.application_id == application_id,
+                Payments.payment_type == PaymentType.APPLICATION_FEE.value,
+            )
+            .order_by(desc(Payments.created_at))  # type: ignore[arg-type]
+            .limit(1)
+        )
+        return session.exec(statement).first()
+
+    def create_fee_payment(
+        self,
+        session: Session,
+        application: "Applications",
+        popup: object,
+    ) -> Payments:
+        """Create an application fee payment for an application in PENDING_FEE status.
+
+        Validates application status, popup configuration, and absence of an existing
+        pending fee payment before creating a new one via SimpleFI.
+        """
+        from app.api.application.schemas import ApplicationStatus
+        from app.api.payment.schemas import PaymentStatus, PaymentType
+        from app.api.tenant.utils import get_portal_url
+
+        # 1. Validate application is pending fee
+        if application.status != ApplicationStatus.PENDING_FEE.value:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Application is not awaiting fee payment",
+            )
+
+        # 2. Validate popup is configured for fee
+        if not getattr(popup, "requires_application_fee", False) or not getattr(popup, "application_fee_amount", None) or popup.application_fee_amount <= 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Popup is not configured to require an application fee",
+            )
+
+        # 3. Check for existing pending fee payment
+        existing = self.get_latest_fee_payment(session, application.id)
+        if existing and existing.status == PaymentStatus.PENDING.value:
+            if not getattr(popup, "simplefi_api_key", None):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Payment provider not configured for this popup",
+                )
+
+            from app.services.simplefi import get_simplefi_client
+
+            simplefi_client = get_simplefi_client(popup.simplefi_api_key)
+
+            if existing.external_id:
+                try:
+                    remote_payment = simplefi_client.get_payment_request_status(
+                        existing.external_id
+                    )
+                    remote_status = (remote_payment.status or "").lower()
+
+                    if remote_status == PaymentStatus.PENDING.value:
+                        raise HTTPException(
+                            status_code=status.HTTP_409_CONFLICT,
+                            detail=f"A pending fee payment already exists. Checkout URL: {existing.checkout_url}",
+                        )
+
+                    status_map = {
+                        "approved": PaymentStatus.APPROVED.value,
+                        "rejected": PaymentStatus.REJECTED.value,
+                        "expired": PaymentStatus.EXPIRED.value,
+                        "cancelled": PaymentStatus.CANCELLED.value,
+                        "canceled": PaymentStatus.CANCELLED.value,
+                    }
+                    existing.status = status_map.get(
+                        remote_status, PaymentStatus.EXPIRED.value
+                    )
+                    session.add(existing)
+                    session.commit()
+                    session.refresh(existing)
+                except HTTPException:
+                    raise
+                except Exception as exc:
+                    logger.warning(
+                        "Failed to sync existing fee payment {} with SimpleFI: {}. Creating a new fee payment instead.",
+                        existing.id,
+                        exc,
+                    )
+                    existing.status = PaymentStatus.EXPIRED.value
+                    session.add(existing)
+                    session.commit()
+                    session.refresh(existing)
+
+        # 4. Snapshot fee amount from popup
+        fee_amount = Decimal(str(popup.application_fee_amount))
+
+        # 5. Validate SimpleFI is configured
+        if not getattr(popup, "simplefi_api_key", None):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Payment provider not configured for this popup",
+            )
+
+        from app.services.simplefi import get_simplefi_client
+
+        simplefi_client = get_simplefi_client(popup.simplefi_api_key)
+
+        # Build success/cancel paths for fee flow
+        portal_base = get_portal_url(popup.tenant)
+        success_path = f"{portal_base}/portal/{popup.slug}/application?checkout=success"
+        cancel_path = f"{portal_base}/portal/{popup.slug}/application"
+
+        reference = {
+            "email": application.human.email if application.human else "",
+            "application_id": str(application.id),
+            "type": "application_fee",
+        }
+
+        try:
+            simplefi_response = simplefi_client.create_payment(
+                amount=fee_amount,
+                popup_slug=popup.slug,
+                tenant_slug=popup.tenant.slug,
+                reference=reference,
+                memo=f"Application fee – {popup.name}",
+                portal_base_override=portal_base,
+                success_path=success_path,
+                cancel_path=cancel_path,
+            )
+        except Exception as e:
+            logger.error(f"Failed to create SimpleFI fee payment: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Failed to create payment with payment provider",
+            ) from e
+
+        # 6. Create Payment with payment_type=APPLICATION_FEE, no PaymentProducts
+        payment = Payments(
+            tenant_id=application.tenant_id,
+            application_id=application.id,
+            status=simplefi_response.status,
+            amount=fee_amount,
+            currency="USD",
+            external_id=simplefi_response.id,
+            checkout_url=simplefi_response.checkout_url,
+            source=PaymentSource.SIMPLEFI.value,
+            payment_type=PaymentType.APPLICATION_FEE.value,
+        )
+        session.add(payment)
+        session.commit()
+        session.refresh(payment)
+
+        return payment
 
     def find_by_popup(
         self,
@@ -724,12 +885,15 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         }
 
         try:
+            from app.api.tenant.utils import get_portal_url
+
             simplefi_response = simplefi_client.create_payment(
                 amount=preview.amount,
                 popup_slug=application.popup.slug,
                 tenant_slug=application.popup.tenant.slug,
                 reference=reference,
                 memo=application.popup.tenant.name,
+                portal_base_override=get_portal_url(application.popup.tenant),
             )
         except Exception as e:
             logger.error(f"Failed to create SimpleFI payment: {e}")
@@ -868,7 +1032,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             raise
         except Exception:
             session.rollback()
-            logger.exception("Failed to approve payment %s", payment_id)
+            logger.exception("Failed to approve payment {}", payment_id)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to approve payment",
@@ -974,7 +1138,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         if not payment.products_snapshot:
             return
 
-        logger.info("Removing products from attendees for payment %s", payment.id)
+        logger.info("Removing products from attendees for payment {}", payment.id)
         for product_snapshot in payment.products_snapshot:
             statement = select(AttendeeProducts).where(
                 AttendeeProducts.attendee_id == product_snapshot.attendee_id,

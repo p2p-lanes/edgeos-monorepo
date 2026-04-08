@@ -11,6 +11,7 @@ import type { TenantPublic } from "@/client"
 import { ApiError, TenantsService } from "@/client"
 import "@/lib/api-client"
 import { extractSubdomain } from "@/lib/tenant"
+import { resolveHostname } from "@/lib/tenant-resolution"
 
 const TENANT_STORAGE_KEY = "portal_tenant_id"
 
@@ -24,7 +25,26 @@ interface TenantContextValue {
 
 const TenantContext = createContext<TenantContextValue | null>(null)
 
-export const TenantProvider = ({ children }: { children: ReactNode }) => {
+interface TenantProviderProps {
+  children: ReactNode
+  /**
+   * Pre-resolved tenant ID from the middleware (custom domain path only).
+   * When provided, the client-side by-domain API call is skipped.
+   */
+  initialTenantId?: string | null
+  /**
+   * Pre-resolved tenant slug from the middleware (custom domain path only).
+   * When provided alongside `initialTenantId`, the client-side by-domain
+   * API call is skipped and a cheaper by-slug call is made instead.
+   */
+  initialTenantSlug?: string | null
+}
+
+export const TenantProvider = ({
+  children,
+  initialTenantId = null,
+  initialTenantSlug = null,
+}: TenantProviderProps) => {
   const [tenant, setTenant] = useState<TenantPublic | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -33,8 +53,33 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (typeof window === "undefined") return
 
+    // If the proxy already resolved the tenant server-side, use those headers
+    // directly — no custom domain logic needed on the client.
+    if (initialTenantId && initialTenantSlug) {
+      localStorage.setItem(TENANT_STORAGE_KEY, initialTenantId)
+      TenantsService.getTenantBySlug({ slug: initialTenantSlug })
+        .then((result) => {
+          setTenant(result)
+          setSlug(result.slug)
+        })
+        .catch((err) => {
+          if (err instanceof ApiError && err.status === 404) {
+            setError("Site not found")
+          } else {
+            setError("Failed to resolve tenant")
+          }
+          localStorage.removeItem(TENANT_STORAGE_KEY)
+        })
+        .finally(() => {
+          setIsLoading(false)
+        })
+      return
+    }
+
+    // Subdomain path: extract slug from hostname.
     const hostname = window.location.hostname
-    const extracted = extractSubdomain(hostname, window.location.search)
+    const { slug: resolvedSlug } = resolveHostname(hostname)
+    const extracted = resolvedSlug ?? extractSubdomain(hostname)
     setSlug(extracted)
 
     if (!extracted) {
@@ -59,7 +104,7 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
       .finally(() => {
         setIsLoading(false)
       })
-  }, [])
+  }, [initialTenantId, initialTenantSlug])
 
   if (isLoading) {
     return (

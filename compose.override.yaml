@@ -93,7 +93,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - INTERNAL_API_URL=http://backend:8000
+      - NEXT_PUBLIC_API_URL=http://backend:8000
     build:
       context: .
       dockerfile: portal/Dockerfile

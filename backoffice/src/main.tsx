@@ -34,7 +34,9 @@ OpenAPI.interceptors.request.use((config) => {
 const handleApiError = (error: Error) => {
   if (error instanceof ApiError && error.status === 401) {
     localStorage.removeItem("access_token")
-    window.location.href = "/login"
+    if (window.location.pathname !== "/login") {
+      router.navigate({ to: "/login" })
+    }
   }
   // Don't redirect on 403 - it could mean tenant not selected (superadmin)
   // Let the UI handle showing the tenant selector

@@ -1,4 +1,4 @@
-import { useSuspenseQuery } from "@tanstack/react-query"
+import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
 import { Check, Circle } from "lucide-react"
 import { Suspense } from "react"
@@ -110,14 +110,29 @@ function ApplicationStatusStepper({
 }
 
 function ViewApplicationContent({ applicationId }: { applicationId: string }) {
+  const queryClient = useQueryClient()
   const { data: application, refetch } = useSuspenseQuery(
     getApplicationQueryOptions(applicationId),
   )
 
+  const handleReviewSuccess = () => {
+    refetch()
+    queryClient.invalidateQueries({ queryKey: ["applications"] })
+    queryClient.invalidateQueries({
+      queryKey: ["pending-reviews"],
+    })
+    queryClient.invalidateQueries({
+      queryKey: ["pending-reviews-count"],
+    })
+    queryClient.invalidateQueries({
+      queryKey: ["dashboard", "stats"],
+    })
+  }
+
   return (
     <ApplicationDetail
       application={application}
-      onReviewSuccess={() => refetch()}
+      onReviewSuccess={handleReviewSuccess}
       headerExtra={
         <>
           {/* Metadata */}

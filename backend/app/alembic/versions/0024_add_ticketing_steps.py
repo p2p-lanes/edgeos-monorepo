@@ -1,7 +1,7 @@
 """Add ticketing_steps table and seed default steps for existing popups.
 
-Revision ID: 0021_add_ticketing_steps
-Revises: 0020_scholarship_section
+Revision ID: 0024_add_ticketing_steps
+Revises: 0023_application_fee
 Create Date: 2026-03-19
 
 """
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
 
-revision = "0021_add_ticketing_steps"
-down_revision = "0020_scholarship_section"
+revision = "0024_add_ticketing_steps"
+down_revision = "0023_application_fee"
 branch_labels = None
 depends_on = None
 

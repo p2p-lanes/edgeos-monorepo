@@ -47,20 +47,20 @@ function getTenantsQueryOptions(
   }
 }
 
-export const Route = createFileRoute("/_layout/tenants/")({
+export const Route = createFileRoute("/_layout/organizations/")({
   component: Tenants,
   validateSearch: validateTableSearch,
   head: () => ({
-    meta: [{ title: "Tenants - EdgeOS" }],
+    meta: [{ title: "Organizations - EdgeOS" }],
   }),
 })
 
 function AddTenantButton() {
   return (
     <Button asChild>
-      <Link to="/tenants/new">
+      <Link to="/organizations/new">
         <Plus className="mr-2 h-4 w-4" />
-        Add Tenant
+        Add Organization
       </Link>
     </Button>
   )
@@ -74,7 +74,7 @@ function TenantActionsMenu({ tenant }: { tenant: TenantPublic }) {
   const deleteMutation = useMutation({
     mutationFn: () => TenantsService.deleteTenant({ tenantId: tenant.id }),
     onSuccess: () => {
-      showSuccessToast("Tenant deleted")
+      showSuccessToast("Organization deleted")
       setOpen(false)
     },
     onError: createErrorHandler(showErrorToast),
@@ -84,13 +84,13 @@ function TenantActionsMenu({ tenant }: { tenant: TenantPublic }) {
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="Tenant actions">
+        <Button variant="ghost" size="icon" aria-label="Organization actions">
           <EllipsisVertical className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem asChild>
-          <Link to="/tenants/$id/edit" params={{ id: tenant.id }}>
+          <Link to="/organizations/$id/edit" params={{ id: tenant.id }}>
             <Pencil className="mr-2 h-4 w-4" />
             Edit
           </Link>
@@ -143,7 +143,7 @@ function TenantsTableContent() {
   const searchParams = Route.useSearch()
   const { search, pagination, setSearch, setPagination } = useTableSearchParams(
     searchParams,
-    "/tenants",
+    "/organizations",
   )
 
   const { data: tenants } = useQuery({
@@ -174,13 +174,13 @@ function TenantsTableContent() {
         !search ? (
           <EmptyState
             icon={Building}
-            title="No tenants yet"
-            description="Create your first tenant to start managing organizations."
+            title="No organizations yet"
+            description="Create your first organization to start managing the platform."
             action={
               <Button asChild>
-                <Link to="/tenants/new">
+                <Link to="/organizations/new">
                   <Plus className="mr-2 h-4 w-4" />
-                  Add Tenant
+                  Add Organization
                 </Link>
               </Button>
             }
@@ -196,10 +196,8 @@ function Tenants() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Tenants</h1>
-          <p className="text-muted-foreground">
-            Manage platform tenants and organizations
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight">Organizations</h1>
+          <p className="text-muted-foreground">Manage organizations</p>
         </div>
         <AddTenantButton />
       </div>

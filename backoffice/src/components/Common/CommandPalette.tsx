@@ -43,7 +43,7 @@ const pages = [
 const adminPages = [{ label: "Users", to: "/admin", icon: Users }]
 
 const superadminPages = [
-  { label: "Organizations", to: "/tenants", icon: Users },
+  { label: "Organizations", to: "/organizations", icon: Users },
 ]
 
 const createActions = Object.values(CREATE_ROUTES).map((route) => ({

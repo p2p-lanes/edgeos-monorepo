@@ -6,6 +6,7 @@ from sqlmodel import Session
 from app.api.payment.crud import payments_crud
 from app.api.payment.models import Payments
 from app.api.payment.schemas import (
+    ApplicationFeeCreate,
     PaymentCreate,
     PaymentFilter,
     PaymentPreview,
@@ -18,7 +19,6 @@ from app.api.payment.schemas import (
     SimpleFIWebhookPayload,
 )
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
-from app.core.config import settings
 from app.core.dependencies.users import (
     CurrentHuman,
     CurrentUser,
@@ -34,6 +34,7 @@ from app.services.email import (
     PaymentProductItem,
     get_email_service,
 )
+from app.services.email_helpers import send_application_status_email
 
 router = APIRouter(prefix="/payments", tags=["payments"])
 
@@ -115,8 +116,9 @@ async def _send_payment_confirmed_email(payment, db_session=None) -> None:
 
     email_service = get_email_service()
 
-    portal_host = settings.PORTAL_URL.replace("https://", "").replace("http://", "")
-    portal_url = f"https://{tenant.slug}.{portal_host}"
+    from app.api.tenant.utils import get_portal_url
+
+    portal_url = get_portal_url(tenant)
 
     await email_service.send_payment_confirmed(
         to=human.email,
@@ -279,19 +281,28 @@ async def update_payment(
     return PaymentPublic.model_validate(payment)
 
 
-@router.post("/{payment_id}/approve", response_model=PaymentPublic)
-async def approve_payment(
-    payment_id: uuid.UUID,
-    db: TenantSession,
-    _current_user: CurrentWriter,
+@router.post("/my/application-fee", response_model=PaymentPublic, status_code=status.HTTP_201_CREATED)
+async def create_my_application_fee(
+    fee_in: ApplicationFeeCreate,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
 ) -> PaymentPublic:
-    """Manually approve a payment (BO only)."""
+    """Create an application fee payment for current human's application (Portal).
 
-    payment = payments_crud.approve_payment(db, payment_id)
+    The application must be in PENDING_FEE status. Returns PaymentPublic with
+    checkout URL to redirect the user to the payment provider.
+    """
+    from app.api.application.crud import applications_crud
 
-    # Send payment confirmed email
-    await _send_payment_confirmed_email(payment, db_session=db)
+    application = applications_crud.get(db, fee_in.application_id)
+    if not application or application.human_id != current_human.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Application not found",
+        )
 
+    popup = application.popup
+    payment = payments_crud.create_fee_payment(db, application, popup)
     return PaymentPublic.model_validate(payment)
 
 
@@ -490,7 +501,7 @@ async def simplefi_webhook(
 
     raw_body = await request.json()
     event_type = raw_body.get("event_type")
-    logger.info("SimpleFI webhook received, event_type: %s", event_type)
+    logger.info("SimpleFI webhook received, event_type: {}", event_type)
 
     if event_type == "installment_plan_completed":
         return await _handle_installment_plan_completed(raw_body, db, webhook_cache)
@@ -502,7 +513,7 @@ async def simplefi_webhook(
         return await _handle_installment_plan_cancelled(raw_body, db, webhook_cache)
 
     if event_type not in ("new_payment", "new_card_payment"):
-        logger.info("Unhandled event type: %s. Ignoring.", event_type)
+        logger.info("Unhandled event type: {}. Ignoring.", event_type)
         return {"message": f"Event type {event_type} not handled"}
 
     # Parse the full payload for payment events
@@ -544,7 +555,7 @@ async def _handle_regular_payment(
 
     payment = payments_crud.get_by_external_id(db, payment_request_id)
     if not payment:
-        logger.warning("Payment not found for external_id: %s", payment_request_id)
+        logger.warning("Payment not found for external_id: {}", payment_request_id)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Payment not found",
@@ -569,11 +580,16 @@ async def _handle_regular_payment(
                 break
 
     if payment_request_status == "approved":
-        payment = payments_crud.approve_payment(
-            db, payment.id, currency=currency, rate=rate
-        )
-        await _send_payment_confirmed_email(payment, db_session=db)
-        logger.info("Payment %s approved via SimpleFI webhook", payment.id)
+        from app.api.payment.schemas import PaymentType
+
+        if payment.payment_type == PaymentType.APPLICATION_FEE.value:
+            await _handle_fee_payment_approved(db, payment, currency=currency, rate=rate)
+        else:
+            payment = payments_crud.approve_payment(
+                db, payment.id, currency=currency, rate=rate
+            )
+            await _send_payment_confirmed_email(payment, db_session=db)
+        logger.info("Payment {} approved via SimpleFI webhook", payment.id)
     else:
         payments_crud.update(db, payment, PaymentUpdate(status=PaymentStatus.EXPIRED))
         logger.info(
@@ -583,6 +599,83 @@ async def _handle_regular_payment(
         )
 
     return {"message": "Payment status updated successfully"}
+
+
+async def _handle_fee_payment_approved(
+    db: Session,
+    payment: Payments,
+    *,
+    currency: str = "USD",
+    rate: object = None,
+) -> None:
+    """Handle approval of an application fee payment.
+
+    Approves the payment record, then transitions the application from
+    PENDING_FEE → IN_REVIEW and applies the popup approval strategy.
+    Idempotent: no-op if application is no longer in PENDING_FEE.
+    """
+    from loguru import logger
+
+    from app.api.application.crud import applications_crud
+    from app.api.application.schemas import ApplicationStatus
+    from app.api.payment.schemas import PaymentSource, PaymentStatus
+
+    status_before = ApplicationStatus.PENDING_FEE.value
+
+    # Approve the payment record first
+    payment.status = PaymentStatus.APPROVED.value
+    payment.currency = currency
+    if rate is not None:
+        payment.rate = rate
+    payment.source = PaymentSource.SIMPLEFI.value
+    db.add(payment)
+    db.flush()
+
+    # Load application
+    application = applications_crud.get(db, payment.application_id)
+    if not application:
+        logger.warning(
+            "Fee payment {} has no associated application", payment.id
+        )
+        db.commit()
+        return
+
+    # Idempotent guard
+    if application.status != ApplicationStatus.PENDING_FEE.value:
+        logger.warning(
+            "Fee payment {} approved but application {} is in status '{}' (expected pending_fee). Skipping.",
+            payment.id,
+            application.id,
+            application.status,
+        )
+        db.commit()
+        return
+
+    # Transition to IN_REVIEW and apply approval strategy
+    application.status = ApplicationStatus.IN_REVIEW.value
+    db.add(application)
+    db.flush()
+
+    human = application.human
+    if human:
+        applications_crud._apply_approval_strategy(db, application, human)
+
+    db.commit()
+    db.refresh(application)
+
+    if human:
+        await send_application_status_email(
+            application,
+            human,
+            db,
+            status_before=status_before,
+        )
+
+    logger.info(
+        "Fee payment {} approved — application {} transitioned from pending_fee",
+        payment.id,
+        application.id,
+    )
 
 
 async def _handle_installment_payment(
@@ -617,7 +710,7 @@ async def _handle_installment_payment(
     # Look up Payment by installment_plan_id (stored in external_id)
     payment = payments_crud.get_by_external_id(db, installment_plan_id)
     if not payment:
-        logger.warning("Payment not found for installment plan %s", installment_plan_id)
+        logger.warning("Payment not found for installment plan {}", installment_plan_id)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Payment not found",
@@ -650,7 +743,7 @@ async def _handle_installment_payment(
     is_first_installment = (payment.installments_paid or 0) == 0
     if is_first_installment and payment.status != "approved":
         payment = payments_crud.approve_payment(db, payment.id, currency=currency)
-        logger.info("First installment received - payment %s approved", payment.id)
+        logger.info("First installment received - payment {} approved", payment.id)
 
     # Increment installments_paid
     payment.installments_paid = (payment.installments_paid or 0) + 1
@@ -684,11 +777,11 @@ async def _handle_installment_plan_completed(
         logger.info("Webhook already processed. Skipping...")
         return {"message": "Webhook already processed"}
 
-    logger.info("Installment plan completed: %s", entity_id)
+    logger.info("Installment plan completed: {}", entity_id)
 
     payment = payments_crud.get_by_external_id(db, entity_id)
     if not payment:
-        logger.warning("Payment not found for installment plan %s", entity_id)
+        logger.warning("Payment not found for installment plan {}", entity_id)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Payment not found",
@@ -741,11 +834,11 @@ async def _handle_installment_plan_activated(
         logger.info("Webhook already processed. Skipping...")
         return {"message": "Webhook already processed"}
 
-    logger.info("Installment plan activated: %s", entity_id)
+    logger.info("Installment plan activated: {}", entity_id)
 
     payment = payments_crud.get_by_external_id(db, entity_id)
     if not payment:
-        logger.warning("Payment not found for installment plan %s", entity_id)
+        logger.warning("Payment not found for installment plan {}", entity_id)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Payment not found",
@@ -781,11 +874,11 @@ async def _handle_installment_plan_cancelled(
         logger.info("Webhook already processed. Skipping...")
         return {"message": "Webhook already processed"}
 
-    logger.info("Installment plan cancelled: %s", entity_id)
+    logger.info("Installment plan cancelled: {}", entity_id)
 
     payment = payments_crud.get_by_external_id(db, entity_id)
     if not payment:
-        logger.warning("Payment not found for installment plan %s", entity_id)
+        logger.warning("Payment not found for installment plan {}", entity_id)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Payment not found",
@@ -793,16 +886,16 @@ async def _handle_installment_plan_cancelled(
 
     # Idempotent: skip if already cancelled
     if payment.status == "cancelled":
-        logger.info("Payment %s already cancelled. Skipping...", payment.id)
+        logger.info("Payment {} already cancelled. Skipping...", payment.id)
         return {"message": "Payment already cancelled"}
 
     # If payment was approved, revoke products
     if payment.status == "approved":
-        logger.info("Revoking products for cancelled payment %s", payment.id)
+        logger.info("Revoking products for cancelled payment {}", payment.id)
         payments_crud._remove_products_from_attendees(db, payment)
 
     payment.status = "cancelled"
     db.commit()
 
-    logger.info("Payment %s cancelled", payment.id)
+    logger.info("Payment {} cancelled", payment.id)
     return {"message": "Installment plan cancelled successfully"}
