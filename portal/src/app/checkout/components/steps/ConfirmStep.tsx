@@ -96,6 +96,7 @@ export default function ConfirmStep() {
     cart.housing ||
     cart.merch.length > 0 ||
     cart.patron ||
+    Object.values(cart.dynamicItems).some((items) => items.length > 0) ||
     hasEditChanges
 
   // Insurance available if any product has insurance potential and total is not zero
@@ -172,6 +173,52 @@ export default function ConfirmStep() {
               ))}
             </div>
           </div>
+        )}
+
+        {/* Dynamic Items Sections (tickets/passes added via templated steps) */}
+        {Object.entries(cart.dynamicItems).map(
+          ([stepType, items], groupIdx) => {
+            if (items.length === 0) return null
+            const stepConfig = stepConfigs.find((s) => s.step_type === stepType)
+            const label = stepConfig?.title ?? stepType
+            const isFirstSection = cart.passes.length === 0 && groupIdx === 0
+            return (
+              <div key={stepType}>
+                {!isFirstSection && (
+                  <div className="border-t border-gray-100" />
+                )}
+                <div className="px-5 py-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Ticket className="w-4 h-4 text-gray-500" />
+                    <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                      {label}
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    {items.map((item) => (
+                      <div
+                        key={item.productId}
+                        className="flex items-center justify-between text-sm"
+                      >
+                        <span className="text-gray-600">
+                          {item.product.name}
+                          {item.quantity > 1 && (
+                            <span className="text-gray-400">
+                              {" "}
+                              ×{item.quantity}
+                            </span>
+                          )}
+                        </span>
+                        <span className="font-medium text-gray-900">
+                          {formatCurrency(item.price)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )
+          },
         )}
 
         {/* Housing Section */}

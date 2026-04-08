@@ -254,6 +254,7 @@ export function CheckoutProvider({
     housingCount: housingProducts.length,
     merchCount: merchProducts.length,
     selectedPassesCount: selectedPasses.length,
+    dynamicItemsCount: Object.values(dynamicItems).flat().length,
     isEditing,
     allProducts: products,
   })

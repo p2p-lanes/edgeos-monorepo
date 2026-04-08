@@ -3,19 +3,25 @@
 import { createContext, useContext, useEffect, useState } from "react"
 
 export type DesignVariant = "scrolly" | "snap"
+export type PassesVariant = "stacked" | "tabs" | "compact" | "accordion"
 
 const STORAGE_KEY = "passes-design-variant"
+const PASSES_STORAGE_KEY = "passes-layout-variant"
 
 interface DesignVariantContextValue {
   variant: DesignVariant
   setVariant: (v: DesignVariant) => void
   cycleVariant: () => void
+  passesVariant: PassesVariant
+  setPassesVariant: (v: PassesVariant) => void
 }
 
 const DesignVariantContext = createContext<DesignVariantContextValue>({
   variant: "scrolly",
   setVariant: () => {},
   cycleVariant: () => {},
+  passesVariant: "stacked",
+  setPassesVariant: () => {},
 })
 
 export function useDesignVariant() {
@@ -23,6 +29,12 @@ export function useDesignVariant() {
 }
 
 const VARIANTS: DesignVariant[] = ["scrolly", "snap"]
+const PASSES_VARIANTS: PassesVariant[] = [
+  "stacked",
+  "tabs",
+  "compact",
+  "accordion",
+]
 
 export function DesignVariantProvider({
   children,
@@ -30,11 +42,19 @@ export function DesignVariantProvider({
   children: React.ReactNode
 }) {
   const [variant, setVariantState] = useState<DesignVariant>("scrolly")
+  const [passesVariant, setPassesVariantState] =
+    useState<PassesVariant>("stacked")
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY) as DesignVariant | null
     if (stored && VARIANTS.includes(stored)) {
       setVariantState(stored)
+    }
+    const storedPasses = localStorage.getItem(
+      PASSES_STORAGE_KEY,
+    ) as PassesVariant | null
+    if (storedPasses && PASSES_VARIANTS.includes(storedPasses)) {
+      setPassesVariantState(storedPasses)
     }
   }, [])
 
@@ -49,9 +69,20 @@ export function DesignVariantProvider({
     setVariant(VARIANTS[nextIndex])
   }
 
+  const setPassesVariant = (v: PassesVariant) => {
+    setPassesVariantState(v)
+    localStorage.setItem(PASSES_STORAGE_KEY, v)
+  }
+
   return (
     <DesignVariantContext.Provider
-      value={{ variant, setVariant, cycleVariant }}
+      value={{
+        variant,
+        setVariant,
+        cycleVariant,
+        passesVariant,
+        setPassesVariant,
+      }}
     >
       {children}
     </DesignVariantContext.Provider>

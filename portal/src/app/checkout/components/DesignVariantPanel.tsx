@@ -2,7 +2,11 @@
 
 import { Settings2, X } from "lucide-react"
 import { useEffect, useState } from "react"
-import { type DesignVariant, useDesignVariant } from "@/context/designVariant"
+import {
+  type DesignVariant,
+  type PassesVariant,
+  useDesignVariant,
+} from "@/context/designVariant"
 import { cn } from "@/lib/utils"
 import type {
   FooterDesign,
@@ -66,7 +70,8 @@ export default function DesignVariantPanel({
   watermarkStyle,
   onWatermarkStyleChange,
 }: DesignVariantPanelProps) {
-  const { variant, setVariant } = useDesignVariant()
+  const { variant, setVariant, passesVariant, setPassesVariant } =
+    useDesignVariant()
   const [isOpen, setIsOpen] = useState(false)
 
   useEffect(() => {
@@ -120,6 +125,18 @@ export default function DesignVariantPanel({
             { value: "snap", label: "Snap" },
           ]}
           onChange={setVariant}
+        />
+
+        <SegmentedControl<PassesVariant>
+          label="Passes"
+          value={passesVariant}
+          options={[
+            { value: "stacked", label: "Stacked" },
+            { value: "tabs", label: "Tabs" },
+            { value: "compact", label: "Compact" },
+            { value: "accordion", label: "Accordion" },
+          ]}
+          onChange={setPassesVariant}
         />
 
         <SegmentedControl<NavDesign>

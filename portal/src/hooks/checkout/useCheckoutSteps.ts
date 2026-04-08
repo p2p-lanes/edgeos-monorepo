@@ -10,6 +10,7 @@ interface UseCheckoutStepsParams {
   housingCount: number
   merchCount: number
   selectedPassesCount: number
+  dynamicItemsCount: number
   isEditing: boolean
   allProducts?: ProductsPass[]
 }
@@ -50,6 +51,7 @@ export function useCheckoutSteps({
   housingCount,
   merchCount,
   selectedPassesCount,
+  dynamicItemsCount,
   isEditing,
   allProducts = [],
 }: UseCheckoutStepsParams) {
@@ -120,13 +122,17 @@ export function useCheckoutSteps({
         return selectedPassesCount > 0
       }
 
-      if (targetIndex > 0 && selectedPassesCount === 0) {
+      if (
+        targetIndex > 0 &&
+        selectedPassesCount === 0 &&
+        dynamicItemsCount === 0
+      ) {
         return false
       }
 
       return true
     },
-    [selectedPassesCount, availableSteps, isEditing],
+    [selectedPassesCount, dynamicItemsCount, availableSteps, isEditing],
   )
 
   const isStepComplete = useCallback(
