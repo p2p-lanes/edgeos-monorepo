@@ -42,8 +42,8 @@ const FooterMenu = () => {
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
               <a href={REPO_URL} target="_blank" rel="noopener noreferrer">
-                <Github className="size-4 text-muted-foreground" />
-                <span className="ml-3 text-xs font-semibold text-muted-foreground group-data-[collapsible=icon]:hidden">
+                <Github className="size-4 text-nav-text-secondary" />
+                <span className="ml-3 text-xs font-semibold text-nav-text-secondary group-data-[collapsible=icon]:hidden">
                   EdgeOS
                 </span>
                 <div className="ml-auto flex items-center gap-1 group-data-[collapsible=icon]:hidden">
@@ -58,7 +58,7 @@ const FooterMenu = () => {
           <SidebarMenuButton asChild>
             <Link
               href="/portal/profile"
-              className="mb-4 mt-4 text-muted-foreground"
+              className="mb-4 mt-4 text-nav-text-secondary"
             >
               <User className="size-4" />
               <span className="text-sm font-medium">My Profile</span>

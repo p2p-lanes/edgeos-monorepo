@@ -106,6 +106,10 @@ function StepConfigContent({ stepId }: { stepId: string }) {
     string,
     unknown
   > | null>((step.template_config as Record<string, unknown>) ?? null)
+  const [showTitle, setShowTitle] = useState(step.show_title ?? true)
+  const [showWatermark, setShowWatermark] = useState(
+    step.show_watermark ?? true,
+  )
   const [insuranceEnabled, setInsuranceEnabled] = useState(
     insuranceStep?.is_enabled ?? false,
   )
@@ -118,6 +122,8 @@ function StepConfigContent({ stepId }: { stepId: string }) {
     setProductCategory(step.product_category ?? "")
     setTemplate(step.template ?? "")
     setTemplateConfig((step.template_config as Record<string, unknown>) ?? null)
+    setShowTitle(step.show_title ?? true)
+    setShowWatermark(step.show_watermark ?? true)
   }, [
     step.title,
     step.description,
@@ -125,6 +131,8 @@ function StepConfigContent({ stepId }: { stepId: string }) {
     step.product_category,
     step.template,
     step.template_config,
+    step.show_title,
+    step.show_watermark,
   ])
 
   useEffect(() => {
@@ -161,6 +169,8 @@ function StepConfigContent({ stepId }: { stepId: string }) {
           product_category: productCategory || null,
           template: template || null,
           template_config: templateConfig,
+          show_title: showTitle,
+          show_watermark: showWatermark,
         },
       })
       if (insuranceStep && insuranceEnabled !== insuranceStep.is_enabled) {
@@ -236,6 +246,34 @@ function StepConfigContent({ stepId }: { stepId: string }) {
               Large decorative text shown behind the section header in snap
               layout.
             </p>
+          </div>
+
+          <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+            <div className="flex flex-col gap-0.5">
+              <Label>Show Title</Label>
+              <p className="text-xs text-muted-foreground">
+                Display the section title in the checkout
+              </p>
+            </div>
+            <Switch
+              checked={showTitle}
+              onCheckedChange={setShowTitle}
+              aria-label="Toggle title visibility"
+            />
+          </div>
+
+          <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+            <div className="flex flex-col gap-0.5">
+              <Label>Show Watermark</Label>
+              <p className="text-xs text-muted-foreground">
+                Display the decorative watermark text behind the header
+              </p>
+            </div>
+            <Switch
+              checked={showWatermark}
+              onCheckedChange={setShowWatermark}
+              aria-label="Toggle watermark visibility"
+            />
           </div>
 
           {!CONTENT_ONLY_TEMPLATES.has(template) &&

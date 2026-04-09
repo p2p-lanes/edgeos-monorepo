@@ -154,7 +154,7 @@ export function buildPaymentProducts({
       products.push({
         product_id: housing.productId,
         attendee_id: firstAttendeeId,
-        quantity: housing.nights,
+        quantity: housing.pricePerDay ? housing.nights : 1,
       })
     }
 

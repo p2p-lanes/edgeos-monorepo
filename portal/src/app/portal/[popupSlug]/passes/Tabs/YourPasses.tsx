@@ -65,10 +65,12 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
       {/* Heading with Ticket Icon */}
       <div className="flex flex-col gap-2 max-w-3xl">
         <div className="flex items-center gap-3">
-          <Ticket className="w-6 h-6 text-gray-700" />
-          <h1 className="text-3xl font-bold tracking-tight">Your Passes</h1>
+          <Ticket className="w-6 h-6 text-pass-text" />
+          <h1 className="text-3xl font-bold tracking-tight text-pass-title">
+            Your Passes
+          </h1>
         </div>
-        <p className="text-muted-foreground/75">
+        <p className="text-pass-text">
           View and manage your passes here. Need to make changes? You can switch
           your week closer to the event to match your plans!
         </p>
@@ -83,7 +85,7 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
                   "flex items-center gap-1.5 transition-colors whitespace-nowrap group",
                   hasSpouse
                     ? "text-gray-300 cursor-not-allowed"
-                    : "text-gray-500 hover:text-gray-900",
+                    : "text-pass-text hover:text-pass-title",
                 )}
                 onClick={() => !hasSpouse && handleOpenModal("spouse")}
                 disabled={!applicationAttendees.length || hasSpouse}
@@ -107,7 +109,7 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
             <>
               <button
                 type="button"
-                className="flex items-center gap-1.5 text-gray-500 hover:text-gray-900 transition-colors whitespace-nowrap group"
+                className="flex items-center gap-1.5 text-pass-text hover:text-pass-title transition-colors whitespace-nowrap group"
                 onClick={() => handleOpenModal("kid")}
                 disabled={!applicationAttendees.length}
               >
@@ -122,7 +124,7 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
           {city?.invoice_company_name && (
             <button
               type="button"
-              className="flex items-center gap-1.5 text-gray-500 hover:text-gray-900 transition-colors whitespace-nowrap"
+              className="flex items-center gap-1.5 text-pass-text hover:text-pass-title transition-colors whitespace-nowrap"
               onClick={() => setIsInvoiceModalOpen(true)}
             >
               <FileText className="w-3.5 h-3.5" />
@@ -213,8 +215,8 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-900 font-medium">Need more passes?</p>
-                <p className="text-gray-500 text-xs mt-0.5">
+                <p className="text-pass-title font-medium">Need more passes?</p>
+                <p className="text-pass-text text-xs mt-0.5">
                   Add family members or more weeks
                 </p>
               </div>
@@ -259,10 +261,10 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
           <div className="bg-white border-t border-gray-200 px-4 py-3">
             <div className="flex items-center justify-between gap-3">
               <div className="flex-1 min-w-0">
-                <p className="text-gray-900 font-semibold text-sm">
+                <p className="text-pass-title font-semibold text-sm">
                   Need more passes?
                 </p>
-                <p className="text-gray-500 text-xs mt-0.5">
+                <p className="text-pass-text text-xs mt-0.5">
                   Add family members or more weeks
                 </p>
               </div>

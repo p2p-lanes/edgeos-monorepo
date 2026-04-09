@@ -50,7 +50,7 @@ export default function ScrollySectionNav({
   return (
     <div
       data-snap-nav
-      className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm border-b border-gray-200/60"
+      className="sticky top-0 z-20 bg-checkout-nav-bg/95 backdrop-blur-sm border-b border-gray-200/60"
     >
       <div className="max-w-2xl mx-auto px-4 py-2">
         {variant === "pills" && (
@@ -94,7 +94,7 @@ function PillsNav({
   onSectionClick,
 }: InnerNavProps) {
   return (
-    <div className="flex items-center gap-1.5 overflow-x-auto">
+    <div className="flex items-center gap-1.5 flex-wrap">
       {sections.map((section) => {
         const Icon = SECTION_ICONS[section.id] ?? Ticket
         const { isActive, isComplete } = getSectionState(section)
@@ -107,9 +107,11 @@ function PillsNav({
             className={cn(
               "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-200",
               isActive &&
-                "bg-white shadow-sm text-gray-900 ring-1 ring-gray-200/80",
-              !isActive && !isComplete && "text-gray-500 hover:bg-gray-200/60",
-              !isActive && isComplete && "text-gray-600",
+                "bg-white shadow-sm text-checkout-nav-text ring-1 ring-gray-200/80",
+              !isActive &&
+                !isComplete &&
+                "text-checkout-nav-text/50 hover:bg-gray-200/60",
+              !isActive && isComplete && "text-checkout-nav-text/60",
             )}
           >
             <Icon className="size-4 shrink-0" />
@@ -129,7 +131,7 @@ function ProgressNav({
   onSectionClick,
 }: InnerNavProps) {
   return (
-    <div className="flex items-center justify-between overflow-x-auto">
+    <div className="flex items-center justify-between flex-wrap gap-y-2">
       {sections.map((section, i) => {
         const Icon = SECTION_ICONS[section.id] ?? Ticket
         const { isActive, isComplete } = getSectionState(section)
@@ -149,7 +151,8 @@ function ProgressNav({
               <div
                 className={cn(
                   "flex items-center justify-center size-8 rounded-full border-2 transition-all duration-200",
-                  isActive && "border-gray-900 bg-gray-900 text-white",
+                  isActive &&
+                    "border-checkout-nav-text bg-checkout-nav-text text-checkout-nav-bg",
                   !isActive && "border-gray-300 bg-white text-gray-400",
                 )}
               >
@@ -158,8 +161,8 @@ function ProgressNav({
               <span
                 className={cn(
                   "hidden sm:block text-[10px] font-medium whitespace-nowrap",
-                  isActive && "text-gray-900",
-                  !isActive && "text-gray-400",
+                  isActive && "text-checkout-nav-text",
+                  !isActive && "text-checkout-nav-text/40",
                 )}
               >
                 {SHORT_LABELS[section.id] ?? section.label}
@@ -178,7 +181,7 @@ function UnderlineNav({
   onSectionClick,
 }: InnerNavProps) {
   return (
-    <div className="flex items-center gap-4 overflow-x-auto relative">
+    <div className="flex items-center gap-4 flex-wrap relative">
       {sections.map((section) => {
         const { isActive, isComplete } = getSectionState(section)
 
@@ -189,14 +192,16 @@ function UnderlineNav({
             onClick={() => onSectionClick(section.id)}
             className={cn(
               "relative pb-2 text-sm font-medium whitespace-nowrap transition-colors duration-200 flex items-center gap-1",
-              isActive && "text-gray-900",
-              isComplete && !isActive && "text-gray-600",
-              !isActive && !isComplete && "text-gray-400 hover:text-gray-600",
+              isActive && "text-checkout-nav-text",
+              isComplete && !isActive && "text-checkout-nav-text/60",
+              !isActive &&
+                !isComplete &&
+                "text-checkout-nav-text/40 hover:text-checkout-nav-text/60",
             )}
           >
             {SHORT_LABELS[section.id] ?? section.label}
             {isActive && (
-              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-gray-900 rounded-full" />
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-checkout-nav-text rounded-full" />
             )}
           </button>
         )

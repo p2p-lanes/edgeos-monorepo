@@ -37,6 +37,15 @@
   --radius-4xl: calc(var(--radius) + 16px);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-heading: var(--heading);
+  --color-heading-secondary: var(--heading-secondary);
+  --color-body: var(--body);
+  --color-nav-text: var(--nav-text);
+  --color-nav-text-secondary: var(--nav-text-secondary);
+  --color-pass-title: var(--pass-title);
+  --color-pass-text: var(--pass-text);
+  --color-checkout-nav-bg: var(--checkout-nav-bg);
+  --color-checkout-nav-text: var(--checkout-nav-text);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
@@ -87,6 +96,15 @@
   --radius: 0.5rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
+  --heading: oklch(0.145 0 0);
+  --heading-secondary: oklch(0.556 0.01 260);
+  --body: oklch(0.145 0 0);
+  --nav-text: oklch(0.145 0 0);
+  --nav-text-secondary: oklch(0.556 0.01 260);
+  --pass-title: oklch(0.145 0 0);
+  --pass-text: oklch(0.556 0.01 260);
+  --checkout-nav-bg: oklch(1 0 0);
+  --checkout-nav-text: oklch(0.145 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.205 0.015 285);
   --popover: oklch(1 0 0);
@@ -122,6 +140,15 @@
 .dark {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
+  --heading: oklch(0.985 0 0);
+  --heading-secondary: oklch(0.7 0.02 260);
+  --body: oklch(0.985 0 0);
+  --nav-text: oklch(0.985 0 0);
+  --nav-text-secondary: oklch(0.7 0.02 260);
+  --pass-title: oklch(0.985 0 0);
+  --pass-text: oklch(0.7 0.02 260);
+  --checkout-nav-bg: oklch(0.205 0.015 285);
+  --checkout-nav-text: oklch(0.985 0 0);
   --card: oklch(0.205 0.015 285);
   --card-foreground: oklch(0.975 0.005 285);
   --popover: oklch(0.205 0.015 285);

@@ -2,7 +2,10 @@ import { useCallback, useState } from "react"
 import type { SelectedHousingItem } from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
 
-export function useHousingSelection(housingProducts: ProductsPass[]) {
+export function useHousingSelection(
+  housingProducts: ProductsPass[],
+  pricePerDay = true,
+) {
   const [housing, setHousing] = useState<SelectedHousingItem | null>(null)
 
   const selectHousing = useCallback(
@@ -24,10 +27,11 @@ export function useHousingSelection(housingProducts: ProductsPass[]) {
         checkOut,
         nights,
         pricePerNight: product.price,
-        totalPrice: product.price * nights,
+        totalPrice: pricePerDay ? product.price * nights : product.price,
+        pricePerDay,
       })
     },
-    [housingProducts],
+    [housingProducts, pricePerDay],
   )
 
   const clearHousing = useCallback(() => {

@@ -92,7 +92,7 @@ const QRcode = ({
               </div>
               <div className="text-center space-y-2">
                 <p className="text-lg font-mono">{check_in_code}</p>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-pass-text">
                   Use this code to check in
                 </p>
               </div>
@@ -107,7 +107,7 @@ const QRcode = ({
               </Button>
             </div>
           ) : (
-            <p className="text-lg text-gray-500 text-center">
+            <p className="text-lg text-pass-text text-center">
               No code available
             </p>
           )}

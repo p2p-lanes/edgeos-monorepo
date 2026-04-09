@@ -79,6 +79,7 @@ function DatePickerSection({
   popupStart,
   popupEnd,
   nights,
+  pricePerDay,
   onCheckInChange,
   onCheckOutChange,
 }: {
@@ -87,6 +88,7 @@ function DatePickerSection({
   popupStart: Date
   popupEnd: Date
   nights: number
+  pricePerDay: boolean
   onCheckInChange: (date: Date) => void
   onCheckOutChange: (date: Date) => void
 }) {
@@ -95,7 +97,9 @@ function DatePickerSection({
       <div className="flex items-center gap-2 mb-3">
         <Calendar className="w-4 h-4 text-gray-500 shrink-0" />
         <span className="text-sm font-medium text-gray-900">
-          {nights} night{nights !== 1 ? "s" : ""}:{" "}
+          {pricePerDay
+            ? `${nights} night${nights !== 1 ? "s" : ""}: `
+            : ""}
           {formatCheckoutDate(formatDateInput(checkIn))} -{" "}
           {formatCheckoutDate(formatDateInput(checkOut))}
         </span>
@@ -162,6 +166,7 @@ function SkipLink({ onSkip }: { onSkip?: () => void }) {
 interface CardListProps {
   groups: SectionGroup[]
   nights: number
+  pricePerDay: boolean
   selectedProductId: string | null
   onProductSelect: (productId: string) => void
   onSkip?: () => void
@@ -183,17 +188,21 @@ function SectionHeader({ label }: { label: string }) {
 function CompactCard({
   product,
   nights,
+  pricePerDay,
   isSelected,
   onSelect,
 }: {
   product: ProductsPass
   nights: number
+  pricePerDay: boolean
   isSelected: boolean
   onSelect: () => void
 }) {
-  const totalPrice = product.price * nights
+  const totalPrice = pricePerDay ? product.price * nights : product.price
   const compareTotal = product.compare_price
-    ? product.compare_price * nights
+    ? pricePerDay
+      ? product.compare_price * nights
+      : product.compare_price
     : null
 
   return (
@@ -237,9 +246,11 @@ function CompactCard({
         <p className="font-medium text-sm text-gray-900 truncate">
           {product.name}
         </p>
-        <p className="text-xs text-gray-500">
-          {formatCurrency(product.price)}/night
-        </p>
+        {pricePerDay && (
+          <p className="text-xs text-gray-500">
+            {formatCurrency(product.price)}/night
+          </p>
+        )}
       </div>
 
       <div className="text-right shrink-0">
@@ -267,17 +278,21 @@ function CompactCard({
 function GridCard({
   product,
   nights,
+  pricePerDay,
   isSelected,
   onSelect,
 }: {
   product: ProductsPass
   nights: number
+  pricePerDay: boolean
   isSelected: boolean
   onSelect: () => void
 }) {
-  const totalPrice = product.price * nights
+  const totalPrice = pricePerDay ? product.price * nights : product.price
   const compareTotal = product.compare_price
-    ? product.compare_price * nights
+    ? pricePerDay
+      ? product.compare_price * nights
+      : product.compare_price
     : null
 
   return (
@@ -321,9 +336,11 @@ function GridCard({
             {product.description}
           </p>
         )}
-        <p className="text-xs text-gray-500 mt-1">
-          {formatCurrency(product.price)}/night
-        </p>
+        {pricePerDay && (
+          <p className="text-xs text-gray-500 mt-1">
+            {formatCurrency(product.price)}/night
+          </p>
+        )}
         <div className="flex items-center justify-between mt-2">
           {compareTotal && compareTotal > totalPrice ? (
             <div className="flex items-center gap-1.5">
@@ -366,12 +383,14 @@ function DefaultSectionCard({
   section,
   products,
   nights,
+  pricePerDay,
   selectedProductId,
   onProductSelect,
 }: {
   section: TemplateSection
   products: ProductsPass[]
   nights: number
+  pricePerDay: boolean
   selectedProductId: string | null
   onProductSelect: (id: string) => void
 }) {
@@ -404,9 +423,13 @@ function DefaultSectionCard({
       <div className="p-3 sm:p-4 space-y-2">
         {products.map((product) => {
           const isSelected = selectedProductId === product.id
-          const totalPrice = product.price * nights
+          const totalPrice = pricePerDay
+            ? product.price * nights
+            : product.price
           const compareTotal = product.compare_price
-            ? product.compare_price * nights
+            ? pricePerDay
+              ? product.compare_price * nights
+              : product.compare_price
             : null
 
           return (
@@ -436,9 +459,11 @@ function DefaultSectionCard({
                   <p className="font-medium text-gray-900 text-sm truncate">
                     {product.name}
                   </p>
-                  <p className="text-xs text-gray-500">
-                    {formatCurrency(product.price)}/night
-                  </p>
+                  {pricePerDay && (
+                    <p className="text-xs text-gray-500">
+                      {formatCurrency(product.price)}/night
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="text-right shrink-0 ml-2">
@@ -470,6 +495,7 @@ function DefaultSectionCard({
 function HousingDefault({
   groups,
   nights,
+  pricePerDay,
   selectedProductId,
   onProductSelect,
   onSkip,
@@ -482,6 +508,7 @@ function HousingDefault({
           section={section}
           products={products}
           nights={nights}
+          pricePerDay={pricePerDay}
           selectedProductId={selectedProductId}
           onProductSelect={onProductSelect}
         />
@@ -497,12 +524,14 @@ function ShowcaseSectionCard({
   section,
   products,
   nights,
+  pricePerDay,
   selectedProductId,
   onProductSelect,
 }: {
   section: TemplateSection
   products: ProductsPass[]
   nights: number
+  pricePerDay: boolean
   selectedProductId: string | null
   onProductSelect: (id: string) => void
 }) {
@@ -546,9 +575,13 @@ function ShowcaseSectionCard({
         <div className="space-y-3">
           {products.map((product) => {
             const isSelected = selectedProductId === product.id
-            const totalPrice = product.price * nights
+            const totalPrice = pricePerDay
+              ? product.price * nights
+              : product.price
             const compareTotal = product.compare_price
-              ? product.compare_price * nights
+              ? pricePerDay
+                ? product.compare_price * nights
+                : product.compare_price
               : null
 
             return (
@@ -583,9 +616,11 @@ function ShowcaseSectionCard({
                       {product.description}
                     </p>
                   )}
-                  <p className="text-xs text-gray-400 mt-1">
-                    {formatCurrency(product.price)}/night
-                  </p>
+                  {pricePerDay && (
+                    <p className="text-xs text-gray-400 mt-1">
+                      {formatCurrency(product.price)}/night
+                    </p>
+                  )}
                 </div>
 
                 <div className="text-right shrink-0">
@@ -629,6 +664,7 @@ function ShowcaseSectionCard({
 function HousingShowcase({
   groups,
   nights,
+  pricePerDay,
   selectedProductId,
   onProductSelect,
   onSkip,
@@ -641,6 +677,7 @@ function HousingShowcase({
           section={section}
           products={products}
           nights={nights}
+          pricePerDay={pricePerDay}
           selectedProductId={selectedProductId}
           onProductSelect={onProductSelect}
         />
@@ -655,6 +692,7 @@ function HousingShowcase({
 function HousingCompact({
   groups,
   nights,
+  pricePerDay,
   selectedProductId,
   onProductSelect,
   onSkip,
@@ -669,6 +707,7 @@ function HousingCompact({
               key={product.id}
               product={product}
               nights={nights}
+              pricePerDay={pricePerDay}
               isSelected={selectedProductId === product.id}
               onSelect={() => onProductSelect(product.id)}
             />
@@ -685,6 +724,7 @@ function HousingCompact({
 function HousingGrid({
   groups,
   nights,
+  pricePerDay,
   selectedProductId,
   onProductSelect,
   onSkip,
@@ -700,6 +740,7 @@ function HousingGrid({
                 key={product.id}
                 product={product}
                 nights={nights}
+                pricePerDay={pricePerDay}
                 isSelected={selectedProductId === product.id}
                 onSelect={() => onProductSelect(product.id)}
               />
@@ -803,10 +844,12 @@ export default function VariantHousingDate({
   }
 
   const variant = (templateConfig?.variant as string) || "default"
+  const pricePerDay = templateConfig?.price_per_day !== false
 
   const cardProps: CardListProps = {
     groups,
     nights,
+    pricePerDay,
     selectedProductId,
     onProductSelect: handleProductSelect,
     onSkip: handleSkip,
@@ -828,6 +871,7 @@ export default function VariantHousingDate({
         popupStart={popupStart}
         popupEnd={popupEnd}
         nights={nights}
+        pricePerDay={pricePerDay}
         onCheckInChange={setCheckIn}
         onCheckOutChange={setCheckOut}
       />

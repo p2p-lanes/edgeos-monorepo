@@ -21,6 +21,8 @@ class TicketingStepBase(SQLModel):
         default=None, sa_column=Column(JSONB, nullable=True)
     )
     watermark: str | None = Field(default=None, nullable=True)
+    show_title: bool = Field(default=True)
+    show_watermark: bool = Field(default=True)
 
 
 class TicketingStepPublic(BaseModel):
@@ -37,6 +39,8 @@ class TicketingStepPublic(BaseModel):
     template: str | None = None
     template_config: dict | None = None
     watermark: str | None = None
+    show_title: bool = True
+    show_watermark: bool = True
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -52,6 +56,8 @@ class TicketingStepCreate(BaseModel):
     template: str | None = None
     template_config: dict | None = None
     watermark: str | None = None
+    show_title: bool = True
+    show_watermark: bool = True
 
 
 class TicketingStepUpdate(BaseModel):
@@ -63,3 +69,5 @@ class TicketingStepUpdate(BaseModel):
     template: str | None = None
     template_config: dict | None = None
     watermark: str | None = None
+    show_title: bool | None = None
+    show_watermark: bool | None = None

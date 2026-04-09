@@ -135,8 +135,15 @@ export function CheckoutProvider({
     useProductCategories(products)
 
   // Item selection hooks
+  const housingPricePerDay = useMemo(() => {
+    const step = configuredSteps.find((s) => s.step_type === "housing")
+    if (!step?.template_config) return true
+    const cfg = step.template_config as Record<string, unknown>
+    return cfg.price_per_day !== false
+  }, [configuredSteps])
+
   const { housing, setHousing, selectHousing, clearHousing } =
-    useHousingSelection(housingProducts)
+    useHousingSelection(housingProducts, housingPricePerDay)
 
   const { merch, setMerch, updateMerchQuantity } =
     useMerchSelection(merchProducts)
@@ -204,6 +211,7 @@ export function CheckoutProvider({
     cityId,
     initialStep,
     products,
+    housingPricePerDay,
     selectionStateRef,
     restorationSetters: {
       setHousing,

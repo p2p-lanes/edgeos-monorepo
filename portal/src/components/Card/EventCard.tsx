@@ -92,18 +92,18 @@ function Content({ children }: { children: React.ReactNode }) {
 
 function Title() {
   const { popup } = useEventCard()
-  return <h3 className="text-2xl font-bold mb-2">{popup.name}</h3>
+  return <h3 className="text-2xl font-bold mb-2 text-heading">{popup.name}</h3>
 }
 
 function Tagline() {
   const { popup } = useEventCard()
-  return <p className="text-sm text-muted-foreground mb-4">{popup.tagline}</p>
+  return <p className="text-sm text-heading-secondary mb-4">{popup.tagline}</p>
 }
 
 function Location() {
   const { popup } = useEventCard()
   return (
-    <div className="flex items-center text-sm text-muted-foreground mb-2">
+    <div className="flex items-center text-sm text-heading-secondary mb-2">
       <MapPin className="mr-2 h-4 w-4" />
       {popup.location}
     </div>
@@ -117,7 +117,7 @@ function DateRange() {
   if (!start && !end) return null
 
   return (
-    <div className="flex items-center text-sm text-muted-foreground mb-4">
+    <div className="flex items-center text-sm text-heading-secondary mb-4">
       <CalendarDays className="mr-2 h-4 w-4" />
       {start} - {end}
     </div>

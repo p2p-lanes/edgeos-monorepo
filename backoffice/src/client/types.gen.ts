@@ -1639,6 +1639,8 @@ export type TicketingStepCreate = {
     [key: string]: unknown;
 } | null);
     watermark?: (string | null);
+    show_title?: boolean;
+    show_watermark?: boolean;
 };
 
 export type TicketingStepPublic = {
@@ -1657,6 +1659,8 @@ export type TicketingStepPublic = {
     [key: string]: unknown;
 } | null);
     watermark?: (string | null);
+    show_title?: boolean;
+    show_watermark?: boolean;
 };
 
 export type TicketingStepUpdate = {
@@ -1670,6 +1674,8 @@ export type TicketingStepUpdate = {
     [key: string]: unknown;
 } | null);
     watermark?: (string | null);
+    show_title?: (boolean | null);
+    show_watermark?: (boolean | null);
 };
 
 /**

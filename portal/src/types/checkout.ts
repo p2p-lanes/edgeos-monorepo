@@ -77,6 +77,7 @@ export interface SelectedHousingItem {
   nights: number
   pricePerNight: number
   totalPrice: number
+  pricePerDay: boolean
 }
 
 export interface SelectedMerchItem {

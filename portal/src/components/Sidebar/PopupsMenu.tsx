@@ -96,13 +96,13 @@ const PopupsMenu = () => {
                     </motion.div>
                     {!isCollapsed && (
                       <div className="flex flex-col gap-0.5 overflow-hidden text-sm">
-                        <span className="truncate font-semibold">
+                        <span className="truncate font-semibold text-nav-text">
                           {city.name}
                         </span>
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-xs text-nav-text-secondary">
                           {city.location}
                         </span>
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-xs text-nav-text-secondary">
                           {cityDate}
                         </span>
                       </div>

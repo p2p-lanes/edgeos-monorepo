@@ -64,17 +64,21 @@ function SectionHeader({
   variant,
   watermark,
   watermarkStyle = "none",
+  showTitle = true,
+  showWatermark = true,
 }: {
   title: string
   subtitle?: string
   variant?: string
   watermark?: string
   watermarkStyle?: WatermarkStyle
+  showTitle?: boolean
+  showWatermark?: boolean
 }) {
   if (variant === "snap") {
     const watermarkText = watermark ?? title
     const watermarkClassName = cn(
-      "absolute sm:-top-8 left-0 sm:text-[7rem] -top-4 text-[5rem] font-black leading-none select-none pointer-events-none truncate whitespace-nowrap",
+      "absolute sm:-top-8 left-0 sm:text-[7rem] -top-4 text-[5rem] font-black leading-none select-none pointer-events-none truncate whitespace-nowrap z-[5]",
       watermarkStyle === "none" && "text-white",
       watermarkStyle === "ghost" && "text-gray-100",
       watermarkStyle === "stroke" && "text-white",
@@ -85,47 +89,59 @@ function SectionHeader({
         ? { WebkitTextStroke: "1px #d1d5db" }
         : undefined
     return (
-      <div className="mb-4 relative">
-        <p
-          aria-hidden="true"
-          className={watermarkClassName}
-          style={watermarkInlineStyle}
-        >
-          {watermarkText.split("").map((char, i) => (
-            <span
-              // biome-ignore lint/suspicious/noArrayIndexKey: static decorative chars
-              key={i}
-              data-watermark-char
-              style={{ display: "inline-block" }}
-            >
-              {char === " " ? "\u00A0" : char}
-            </span>
-          ))}
-        </p>
-        <h2
-          data-section-title
-          className="relative text-2xl font-bold tracking-tight text-gray-900 z-10"
-        >
-          {title}
-        </h2>
+      <>
+        <div className="mb-8">
+          <div className="relative min-h-[2rem] sm:min-h-[3rem]">
+            {showWatermark && (
+              <p
+                aria-hidden="true"
+                className={watermarkClassName}
+                style={watermarkInlineStyle}
+              >
+                {watermarkText.split("").map((char, i) => (
+                  <span
+                    // biome-ignore lint/suspicious/noArrayIndexKey: static decorative chars
+                    key={i}
+                    data-watermark-char
+                    style={{ display: "inline-block" }}
+                  >
+                    {char === " " ? "\u00A0" : char}
+                  </span>
+                ))}
+              </p>
+            )}
+            {showTitle && (
+              <h2
+                data-section-title
+                className="relative text-2xl sm:text-4xl font-bold tracking-tight text-heading z-10 drop-shadow-[0_0_12px_rgba(255,255,255,0.9)]"
+              >
+                {title}
+              </h2>
+            )}
+          </div>
+        </div>
         {subtitle && (
           <p
             data-section-subtitle
-            className="relative text-sm text-gray-500 mt-0.5 z-10"
+            className="text-base sm:text-lg text-heading-secondary my-2 bg-black/5 rounded px-1 w-fit"
           >
             {subtitle}
           </p>
         )}
-      </div>
+      </>
     )
   }
 
   return (
     <div className="mb-4">
-      <h2 className="text-xl font-bold tracking-tight text-gray-900">
-        {title}
-      </h2>
-      {subtitle && <p className="text-sm text-gray-500 mt-0.5">{subtitle}</p>}
+      {showTitle && (
+        <h2 className="text-xl font-bold tracking-tight text-heading">
+          {title}
+        </h2>
+      )}
+      {subtitle && (
+        <p className="text-sm text-heading-secondary mt-0.5">{subtitle}</p>
+      )}
     </div>
   )
 }
@@ -350,8 +366,9 @@ function CartDrawerContent() {
                     {cart.housing.product.name}
                   </p>
                   <p className="text-xs text-gray-500">
-                    {cart.housing.nights} night
-                    {cart.housing.nights !== 1 ? "s" : ""}
+                    {cart.housing.pricePerDay !== false
+                      ? `${cart.housing.nights} night${cart.housing.nights !== 1 ? "s" : ""}`
+                      : "Full stay"}
                   </p>
                 </div>
               </div>
@@ -1314,6 +1331,8 @@ function ScrollyCheckoutFlowInner({
                 variant="snap"
                 watermark={config?.watermark ?? section.label}
                 watermarkStyle={watermarkStyle}
+                showTitle={config?.show_title ?? true}
+                showWatermark={config?.show_watermark ?? true}
               />
               {renderSectionContent(section.id)}
             </SnapSection>
@@ -1348,10 +1367,7 @@ function ScrollyCheckoutFlowInner({
 
   // --- SCROLLY VARIANT (default) ---
   return (
-    <div
-      data-variant={variant}
-      className="relative min-h-screen font-sans"
-    >
+    <div data-variant={variant} className="relative min-h-screen font-sans">
       <ScrollySectionNav
         sections={allSections}
         activeSection={activeSection}
@@ -1366,6 +1382,7 @@ function ScrollyCheckoutFlowInner({
               <SectionHeader
                 title={config?.title ?? section.label}
                 subtitle={config?.description ?? undefined}
+                showTitle={config?.show_title ?? true}
               />
               {renderSectionContent(section.id)}
             </ScrollySection>

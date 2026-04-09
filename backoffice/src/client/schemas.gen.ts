@@ -8683,6 +8683,16 @@ export const TicketingStepCreateSchema = {
                 }
             ],
             title: 'Watermark'
+        },
+        show_title: {
+            type: 'boolean',
+            title: 'Show Title',
+            default: true
+        },
+        show_watermark: {
+            type: 'boolean',
+            title: 'Show Watermark',
+            default: true
         }
     },
     type: 'object',
@@ -8785,6 +8795,16 @@ export const TicketingStepPublicSchema = {
                 }
             ],
             title: 'Watermark'
+        },
+        show_title: {
+            type: 'boolean',
+            title: 'Show Title',
+            default: true
+        },
+        show_watermark: {
+            type: 'boolean',
+            title: 'Show Watermark',
+            default: true
         }
     },
     type: 'object',
@@ -8882,6 +8902,28 @@ export const TicketingStepUpdateSchema = {
                 }
             ],
             title: 'Watermark'
+        },
+        show_title: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Show Title'
+        },
+        show_watermark: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Show Watermark'
         }
     },
     type: 'object',

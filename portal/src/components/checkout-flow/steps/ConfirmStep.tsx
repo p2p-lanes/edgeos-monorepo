@@ -238,8 +238,9 @@ export default function ConfirmStep() {
                     {cart.housing.product.name}
                   </p>
                   <p className="text-xs text-gray-500">
-                    {cart.housing.nights} night
-                    {cart.housing.nights !== 1 ? "s" : ""}
+                    {cart.housing.pricePerDay !== false
+                      ? `${cart.housing.nights} night${cart.housing.nights !== 1 ? "s" : ""}`
+                      : "Full stay"}
                   </p>
                   <p className="text-xs text-gray-400">
                     {formatCheckoutDate(cart.housing.checkIn)} –{" "}

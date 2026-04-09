@@ -8,13 +8,19 @@ import {
   Square,
   Type,
 } from "lucide-react"
-import { useState } from "react"
+import { useCallback, useState } from "react"
+import { RgbaColorPicker } from "react-colorful"
 import { PopupsService, type PopupUpdate } from "@/client"
 import { Button } from "@/components/ui/button"
 import { InlineSection } from "@/components/ui/inline-form"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { LoadingButton } from "@/components/ui/loading-button"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import { Separator } from "@/components/ui/separator"
 import useCustomToast from "@/hooks/useCustomToast"
 import { cn } from "@/lib/utils"
@@ -63,6 +69,15 @@ const DEFAULT_COLORS: Record<string, string> = {
   sidebar_accent_foreground: "#333355",
   sidebar_border: "#e5e5ee",
   sidebar_ring: "#4f46e5",
+  heading: "#1a1a1a",
+  heading_secondary: "#6b6b8a",
+  body: "#1a1a1a",
+  nav_text: "#1a1a1a",
+  nav_text_secondary: "#6b6b8a",
+  pass_title: "#1a1a1a",
+  pass_text: "#6b6b8a",
+  checkout_nav_bg: "#ffffff",
+  checkout_nav_text: "#1a1a1a",
 }
 
 const COLOR_SECTIONS = [
@@ -71,6 +86,30 @@ const COLOR_SECTIONS = [
     title: "General",
     icon: Layout,
     keys: ["background", "foreground", "border", "input", "ring"],
+  },
+  {
+    id: "typography_colors",
+    title: "Typography Colors",
+    icon: Type,
+    keys: ["heading", "heading_secondary", "body"],
+  },
+  {
+    id: "nav_colors",
+    title: "Navigation Colors",
+    icon: PanelLeft,
+    keys: ["nav_text", "nav_text_secondary"],
+  },
+  {
+    id: "pass_colors",
+    title: "Passes Colors",
+    icon: Layout,
+    keys: ["pass_title", "pass_text"],
+  },
+  {
+    id: "checkout_nav",
+    title: "Checkout Navigation",
+    icon: Layout,
+    keys: ["checkout_nav_bg", "checkout_nav_text"],
   },
   {
     id: "primary",
@@ -384,6 +423,56 @@ export function ThemeConfigForm({
   )
 }
 
+interface ParsedColor {
+  hex: string
+  alpha: number
+  rgba: { r: number; g: number; b: number; a: number }
+}
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  return {
+    r: Number.parseInt(hex.slice(1, 3), 16),
+    g: Number.parseInt(hex.slice(3, 5), 16),
+    b: Number.parseInt(hex.slice(5, 7), 16),
+  }
+}
+
+function rgbToHex(r: number, g: number, b: number): string {
+  return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`
+}
+
+function parseColor(color: string): ParsedColor {
+  const rgbaMatch = color.match(
+    /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+))?\s*\)$/,
+  )
+  if (rgbaMatch) {
+    const r = Number.parseInt(rgbaMatch[1], 10)
+    const g = Number.parseInt(rgbaMatch[2], 10)
+    const b = Number.parseInt(rgbaMatch[3], 10)
+    const a = rgbaMatch[4] !== undefined ? Number.parseFloat(rgbaMatch[4]) : 1
+    return { hex: rgbToHex(r, g, b), alpha: a, rgba: { r, g, b, a } }
+  }
+  if (/^#[0-9a-fA-F]{8}$/.test(color)) {
+    const a =
+      Math.round((Number.parseInt(color.slice(7, 9), 16) / 255) * 100) / 100
+    const { r, g, b } = hexToRgb(color.slice(0, 7))
+    return { hex: color.slice(0, 7), alpha: a, rgba: { r, g, b, a } }
+  }
+  if (/^#[0-9a-fA-F]{6}$/.test(color)) {
+    const { r, g, b } = hexToRgb(color)
+    return { hex: color, alpha: 1, rgba: { r, g, b, a: 1 } }
+  }
+  return { hex: "#000000", alpha: 1, rgba: { r: 0, g: 0, b: 0, a: 1 } }
+}
+
+function buildColorString(hex: string, alpha: number): string {
+  if (alpha >= 1) return hex
+  const r = Number.parseInt(hex.slice(1, 3), 16)
+  const g = Number.parseInt(hex.slice(3, 5), 16)
+  const b = Number.parseInt(hex.slice(5, 7), 16)
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
+
 function ColorField({
   label,
   value,
@@ -401,6 +490,16 @@ function ColorField({
 }) {
   const displayValue = value || defaultValue
   const isCustom = !!value
+  const parsed = parseColor(displayValue)
+  const [open, setOpen] = useState(false)
+
+  const handleRgbaChange = useCallback(
+    (rgba: { r: number; g: number; b: number; a: number }) => {
+      const hex = rgbToHex(rgba.r, rgba.g, rgba.b)
+      onChange(buildColorString(hex, rgba.a))
+    },
+    [onChange],
+  )
 
   return (
     <div className="flex items-center gap-2">
@@ -408,20 +507,60 @@ function ColorField({
         {label}
       </Label>
       <div className="flex items-center gap-1.5">
-        <input
-          type="color"
-          value={displayValue}
-          onChange={(e) => onChange(e.target.value)}
-          disabled={disabled}
-          className="h-8 w-8 shrink-0 cursor-pointer rounded border bg-transparent p-0.5"
-        />
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild disabled={disabled}>
+            <button
+              type="button"
+              className="relative h-8 w-8 shrink-0 rounded border cursor-pointer"
+            >
+              <div
+                className="absolute inset-0.5 rounded"
+                style={{
+                  backgroundImage:
+                    "repeating-conic-gradient(#d4d4d4 0% 25%, transparent 0% 50%)",
+                  backgroundSize: "8px 8px",
+                }}
+              />
+              <div
+                className="absolute inset-0.5 rounded"
+                style={{ backgroundColor: displayValue }}
+              />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-3" align="start">
+            <div className="flex flex-col gap-3">
+              <RgbaColorPicker
+                color={parsed.rgba}
+                onChange={handleRgbaChange}
+                style={{ width: "220px" }}
+              />
+              <div className="flex items-center gap-2">
+                <Input
+                  value={parsed.hex}
+                  onChange={(e) => {
+                    const hex = e.target.value
+                    if (/^#[0-9a-fA-F]{6}$/.test(hex)) {
+                      onChange(buildColorString(hex, parsed.alpha))
+                    }
+                  }}
+                  className="h-7 flex-1 font-mono text-xs"
+                  placeholder="#000000"
+                  maxLength={7}
+                />
+                <span className="text-xs font-mono text-muted-foreground whitespace-nowrap">
+                  {Math.round(parsed.alpha * 100)}%
+                </span>
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
         <Input
           value={value}
           placeholder={defaultValue}
           onChange={(e) => onChange(e.target.value)}
           disabled={disabled}
           className={cn(
-            "h-8 w-[100px] font-mono text-xs",
+            "h-8 w-[150px] font-mono text-xs",
             !isCustom && "text-muted-foreground",
           )}
         />

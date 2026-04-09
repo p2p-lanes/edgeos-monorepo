@@ -24,7 +24,7 @@ const InvoiceModal = ({
         <DialogHeader className="px-6 pt-6 pb-0">
           <div className="flex items-center gap-2">
             <FileText className="h-5 w-5 text-primary" />
-            <DialogTitle className="text-lg font-semibold text-gray-900 leading-none tracking-tight">
+            <DialogTitle className="text-lg font-semibold text-pass-title leading-none tracking-tight">
               Invoices
             </DialogTitle>
           </div>

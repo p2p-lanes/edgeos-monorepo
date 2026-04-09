@@ -43,7 +43,8 @@ export function shouldUseDynamicStep(
   if (stepConfig.step_type === "housing") {
     return (
       (cfg.variant != null && cfg.variant !== "default") ||
-      (Array.isArray(cfg.sections) && cfg.sections.length > 0)
+      (Array.isArray(cfg.sections) && cfg.sections.length > 0) ||
+      cfg.price_per_day === false
     )
   }
 

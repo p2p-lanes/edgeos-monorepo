@@ -29,7 +29,7 @@ const HeaderBar = () => {
     pathSegments.length > 0 ? pathSegments : ["application"]
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-4 border-b bg-white px-6">
+    <header className="flex h-14 shrink-0 items-center gap-4 border-b bg-white px-6 text-nav-text">
       <SidebarTrigger />
       <Breadcrumb>
         <BreadcrumbList>

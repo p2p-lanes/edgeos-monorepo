@@ -18,6 +18,7 @@ import { ProductsService } from "@/client"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
+import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
 import {
   type ProductSection,
@@ -270,6 +271,25 @@ export function HousingDateConfig({
             )
           })}
         </div>
+      </div>
+
+      <Separator />
+
+      {/* Pricing Mode */}
+      <div className="flex items-center justify-between">
+        <div>
+          <Label className="text-sm font-medium">Price per night</Label>
+          <p className="text-xs text-muted-foreground">
+            When enabled, the price is multiplied by the number of nights. When
+            disabled, the price is the total for the full stay.
+          </p>
+        </div>
+        <Switch
+          checked={config?.price_per_day !== false}
+          onCheckedChange={(checked) =>
+            onChange({ ...config, price_per_day: checked })
+          }
+        />
       </div>
 
       <Separator />
