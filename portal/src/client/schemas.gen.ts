@@ -5864,6 +5864,18 @@ export const PopupAdminSchema = {
             ],
             title: 'Application Fee Amount'
         },
+        theme_config: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Theme Config'
+        },
         id: {
             type: 'string',
             format: 'uuid',
@@ -6150,6 +6162,18 @@ export const PopupCreateSchema = {
                 }
             ],
             title: 'Application Fee Amount'
+        },
+        theme_config: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Theme Config'
         }
     },
     type: 'object',
@@ -6367,6 +6391,18 @@ export const PopupPublicSchema = {
                 }
             ],
             title: 'Application Fee Amount'
+        },
+        theme_config: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Theme Config'
         }
     },
     type: 'object',
@@ -6787,6 +6823,18 @@ export const PopupUpdateSchema = {
                 }
             ],
             title: 'Application Fee Amount'
+        },
+        theme_config: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Theme Config'
         }
     },
     type: 'object',

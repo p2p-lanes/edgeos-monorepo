@@ -6,6 +6,7 @@ from typing import Self
 
 from pydantic import model_validator
 from sqlalchemy import Boolean, Numeric
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Column, Field, SQLModel
 
 from app.utils.utils import slugify
@@ -57,6 +58,10 @@ class PopupBase(SQLModel):
         default=None,
         sa_column=Column(Numeric(10, 2), nullable=True),
     )
+    theme_config: dict | None = Field(
+        default=None,
+        sa_column=Column(JSONB, nullable=True),
+    )
 
 
 class PopupCreate(SQLModel):
@@ -86,6 +91,7 @@ class PopupCreate(SQLModel):
     invoice_company_email: str | None = None
     requires_application_fee: bool = False
     application_fee_amount: Decimal | None = None
+    theme_config: dict | None = None
 
     @model_validator(mode="after")
     def generate_slug(self) -> Self:
@@ -125,6 +131,7 @@ class PopupUpdate(SQLModel):
     invoice_company_email: str | None = None
     requires_application_fee: bool | None = None
     application_fee_amount: Decimal | None = None
+    theme_config: dict | None = None
 
     @model_validator(mode="after")
     def validate_fee_config(self) -> Self:
@@ -162,6 +169,7 @@ class PopupPublic(SQLModel):
     invoice_company_name: str | None = None
     requires_application_fee: bool = False
     application_fee_amount: Decimal | None = None
+    theme_config: dict | None = None
 
 
 class PopupAdmin(PopupBase):

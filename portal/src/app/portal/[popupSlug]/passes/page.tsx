@@ -21,7 +21,7 @@ export default function HomePasses() {
   // Show companion-specific passes view instead.
   if (participation?.type === "companion") {
     return (
-      <div className="w-full md:mt-0 mx-auto items-center max-w-3xl p-6 bg-[#F5F5F7]">
+      <div className="w-full md:mt-0 mx-auto items-center max-w-3xl p-6 bg-transparent">
         <CompanionPasses
           participation={participation as CompanionParticipation}
         />
@@ -32,7 +32,7 @@ export default function HomePasses() {
   if (!attendees.length || !products.length) return <Loader />
 
   return (
-    <div className="w-full md:mt-0 mx-auto items-center max-w-3xl p-6 bg-[#F5F5F7]">
+    <div className="w-full md:mt-0 mx-auto items-center max-w-3xl p-6 bg-transparent">
       <YourPasses
         onSwitchToBuy={() =>
           router.push(`/portal/${params.popupSlug}/passes/buy`)

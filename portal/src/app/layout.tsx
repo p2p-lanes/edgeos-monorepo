@@ -103,7 +103,7 @@ export default async function RootLayout({
             initialTenantId={middlewareTenantId}
             initialTenantSlug={middlewareTenantSlug}
           >
-            <div className="w-full bg-neutral-100">{children}</div>
+            <div className="w-full">{children}</div>
           </TenantProvider>
         </QueryProvider>
         <Toaster position="bottom-center" richColors />

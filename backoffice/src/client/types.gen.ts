@@ -1182,6 +1182,9 @@ export type PopupAdmin = {
     invoice_company_email?: (string | null);
     requires_application_fee?: boolean;
     application_fee_amount?: (string | null);
+    theme_config?: ({
+    [key: string]: unknown;
+} | null);
     id: string;
 };
 
@@ -1212,6 +1215,9 @@ export type PopupCreate = {
     invoice_company_email?: (string | null);
     requires_application_fee?: boolean;
     application_fee_amount?: (number | string | null);
+    theme_config?: ({
+    [key: string]: unknown;
+} | null);
 };
 
 /**
@@ -1240,6 +1246,9 @@ export type PopupPublic = {
     invoice_company_name?: (string | null);
     requires_application_fee?: boolean;
     application_fee_amount?: (string | null);
+    theme_config?: ({
+    [key: string]: unknown;
+} | null);
 };
 
 /**
@@ -1302,6 +1311,9 @@ export type PopupUpdate = {
     invoice_company_email?: (string | null);
     requires_application_fee?: (boolean | null);
     application_fee_amount?: (number | string | null);
+    theme_config?: ({
+    [key: string]: unknown;
+} | null);
 };
 
 /**

@@ -1350,7 +1350,7 @@ function ScrollyCheckoutFlowInner({
   return (
     <div
       data-variant={variant}
-      className="relative min-h-screen font-sans bg-[#F5F5F7]"
+      className="relative min-h-screen font-sans"
     >
       <ScrollySectionNav
         sections={allSections}

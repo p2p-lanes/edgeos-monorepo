@@ -168,8 +168,8 @@ const AttendeeTicket = ({
 
           {/* Desktop vertical divider with hole punches */}
           <div className="hidden lg:block border-r-2 border-dashed border-gray-200 self-stretch relative">
-            <div className="absolute -top-[23px] -left-[23px] w-[48px] h-[46px] bg-[#F5F5F7] rounded-full" />
-            <div className="absolute -bottom-[23px] -left-[23px] w-[48px] h-[46px] bg-[#F5F5F7] rounded-full" />
+            <div className="absolute -top-[23px] -left-[23px] w-[48px] h-[46px] bg-background rounded-full" />
+            <div className="absolute -bottom-[23px] -left-[23px] w-[48px] h-[46px] bg-background rounded-full" />
           </div>
 
           {/* Right panel */}

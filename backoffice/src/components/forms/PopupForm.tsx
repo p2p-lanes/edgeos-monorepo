@@ -30,6 +30,7 @@ import { FieldError } from "@/components/Common/FieldError"
 import { FormErrorSummary } from "@/components/Common/FormErrorSummary"
 import { ApprovalStrategyForm } from "@/components/forms/ApprovalStrategyForm"
 import { ReviewersManager } from "@/components/forms/ReviewersManager"
+import { ThemeConfigForm } from "@/components/forms/ThemeConfigForm"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { DatePicker } from "@/components/ui/date-picker"
@@ -646,6 +647,20 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
             )}
           </form.Field>
         </InlineSection>
+
+        {/* Portal Theme (edit only) */}
+        {isEdit && (
+          <>
+            <Separator />
+            <ThemeConfigForm
+              popupId={defaultValues!.id}
+              themeConfig={
+                defaultValues!.theme_config as Record<string, unknown> | null
+              }
+              readOnly={readOnly}
+            />
+          </>
+        )}
 
         <Separator />
 
