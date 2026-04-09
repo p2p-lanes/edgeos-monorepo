@@ -32,17 +32,17 @@ import { formatCurrency } from "@/types/checkout"
 import CartFooter from "./CartFooter"
 import DesignVariantPanel from "./DesignVariantPanel"
 import DynamicProductStep from "./DynamicProductStep"
+import {
+  STEP_COMPONENT_REGISTRY,
+  shouldUseDynamicStep,
+} from "./registries/stepRegistry"
 import ScrollySection from "./ScrollySection"
 import ScrollySectionNav, {
   type FooterDesign,
   type NavDesign,
   type WatermarkStyle,
 } from "./ScrollySectionNav"
-import ConfirmStep from "./steps/ConfirmStep"
-import HousingStep from "./steps/HousingStep"
-import MerchSection from "./steps/MerchSection"
 import PassSelectionSection from "./steps/PassSelectionSection"
-import PatronSection from "./steps/PatronSection"
 import SuccessStep from "./steps/SuccessStep"
 
 gsap.registerPlugin(ScrollToPlugin)
@@ -1251,63 +1251,35 @@ function ScrollyCheckoutFlowInner({
   }, [variant, allSections])
 
   const renderSectionContent = (stepId: string) => {
-    switch (stepId) {
-      case "passes":
-      case "tickets": {
-        const ticketConfig = getStepConfig("tickets") ?? getStepConfig("passes")
-        if (ticketConfig?.template_config) {
-          return (
-            <DynamicProductStep stepConfig={ticketConfig} onSkip={() => {}} />
-          )
-        }
-        return <PassSelectionSection onAddAttendee={onAddAttendee} />
-      }
-      case "housing": {
-        const housingConfig = getStepConfig("housing")
-        const hCfg = housingConfig?.template_config as
-          | Record<string, unknown>
-          | undefined
-        const housingUseDynamic =
-          hCfg &&
-          ((hCfg.variant && hCfg.variant !== "default") ||
-            (Array.isArray(hCfg.sections) && hCfg.sections.length > 0))
-        if (housingConfig && housingUseDynamic)
-          return (
-            <DynamicProductStep stepConfig={housingConfig} onSkip={() => {}} />
-          )
-        return <HousingStep onSkip={() => {}} />
-      }
-      case "merch": {
-        const merchConfig = getStepConfig("merch")
-        if (
-          merchConfig?.template_config &&
-          (merchConfig.template_config as Record<string, unknown>).variant &&
-          (merchConfig.template_config as Record<string, unknown>).variant !==
-            "default"
+    // Passes/tickets: special case — PassSelectionSection needs onAddAttendee
+    if (stepId === "passes" || stepId === "tickets") {
+      const ticketConfig = getStepConfig("tickets") ?? getStepConfig("passes")
+      if (shouldUseDynamicStep(ticketConfig)) {
+        return (
+          <DynamicProductStep stepConfig={ticketConfig!} onSkip={() => {}} />
         )
-          return (
-            <DynamicProductStep stepConfig={merchConfig} onSkip={() => {}} />
-          )
-        return <MerchSection onSkip={() => {}} />
       }
-      case "patron": {
-        const patronConfig = getStepConfig("patron")
-        if (patronConfig?.template_config) {
-          return (
-            <DynamicProductStep stepConfig={patronConfig} onSkip={() => {}} />
-          )
-        }
-        return <PatronSection onSkip={() => {}} />
-      }
-      case "confirm":
-        return <ConfirmStep />
-      default: {
-        const config = getStepConfig(stepId)
-        if (config)
-          return <DynamicProductStep stepConfig={config} onSkip={() => {}} />
-        return null
-      }
+      return <PassSelectionSection onAddAttendee={onAddAttendee} />
     }
+
+    // All other steps: check dynamic template first, then fallback registry
+    const config = getStepConfig(stepId)
+
+    if (shouldUseDynamicStep(config)) {
+      return <DynamicProductStep stepConfig={config!} onSkip={() => {}} />
+    }
+
+    const FallbackComponent = STEP_COMPONENT_REGISTRY[stepId]
+    if (FallbackComponent) {
+      return <FallbackComponent onSkip={() => {}} />
+    }
+
+    // Unknown step with config: try dynamic as last resort
+    if (config) {
+      return <DynamicProductStep stepConfig={config} onSkip={() => {}} />
+    }
+
+    return null
   }
 
   if (isSimpleFIReturn) {

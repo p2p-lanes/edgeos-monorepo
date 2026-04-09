@@ -3,17 +3,20 @@
 import { AnimatePresence } from "framer-motion"
 import { useSearchParams } from "next/navigation"
 import { useEffect, useMemo } from "react"
+import CartFooter from "@/components/checkout-flow/CartFooter"
+import DynamicProductStep from "@/components/checkout-flow/DynamicProductStep"
+import {
+  STEP_COMPONENT_REGISTRY,
+  shouldUseDynamicStep,
+} from "@/components/checkout-flow/registries/stepRegistry"
+import PassSelectionSection from "@/components/checkout-flow/steps/PassSelectionSection"
+import SuccessStep from "@/components/checkout-flow/steps/SuccessStep"
 import { usePaymentVerification } from "@/hooks/checkout"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCheckout } from "@/providers/checkoutProvider"
 import type { AttendeeCategory } from "@/types/Attendee"
 import type { CheckoutStep } from "@/types/checkout"
-import CartFooter from "./CartFooter"
 import CheckoutSkeleton from "./CheckoutSkeleton"
-import DynamicProductStep from "./DynamicProductStep"
-import { STEP_COMPONENT_REGISTRY } from "./stepRegistry"
-import PassSelectionSection from "./steps/PassSelectionSection"
-import SuccessStep from "./steps/SuccessStep"
 
 // Fallback titles/subtitles when stepConfigs aren't loaded yet
 function getDefaultStepTitle(step: CheckoutStep): string {
@@ -142,15 +145,14 @@ export default function CheckoutFlow({
     stepConfig?.description ?? getDefaultStepSubtitle(currentStep)
 
   const renderStepContent = () => {
-    // Passes/tickets step — use DynamicProductStep if template_config exists,
-    // otherwise fall back to PassSelectionSection
+    // Passes/tickets: special case — PassSelectionSection needs onAddAttendee
     if (currentStep === "passes" || currentStep === "tickets") {
       const ticketStepConfig = stepConfigs.find(
         (s) =>
           s.step_type === currentStep ||
           (s.step_type === "tickets" && currentStep === "passes"),
       )
-      if (ticketStepConfig?.template_config) {
+      if (shouldUseDynamicStep(ticketStepConfig)) {
         return (
           <AnimatePresence mode="wait">
             {isLoading ? (
@@ -158,7 +160,7 @@ export default function CheckoutFlow({
             ) : (
               <DynamicProductStep
                 key="passes"
-                stepConfig={ticketStepConfig}
+                stepConfig={ticketStepConfig!}
                 onSkip={handleSkip}
               />
             )}
@@ -190,23 +192,11 @@ export default function CheckoutFlow({
     if (currentStep === "merch" && merchProducts.length === 0) return null
     if (currentStep === "patron" && patronProducts.length === 0) return null
 
-    // If the step has a template_config, use DynamicProductStep
-    // instead of the legacy hardcoded component
+    // Check if the step should use a dynamic template
     const dynamicStepConfig = stepConfigs.find(
       (s) => s.step_type === currentStep,
     )
-    const dynamicConfig = dynamicStepConfig?.template_config as
-      | Record<string, unknown>
-      | undefined
-    const housingUseDynamic =
-      currentStep === "housing" &&
-      dynamicConfig &&
-      ((dynamicConfig.variant && dynamicConfig.variant !== "default") ||
-        (Array.isArray(dynamicConfig.sections) &&
-          dynamicConfig.sections.length > 0))
-    const hasTemplateConfig =
-      currentStep !== "housing" && dynamicStepConfig?.template_config
-    if (dynamicStepConfig && (housingUseDynamic || hasTemplateConfig)) {
+    if (shouldUseDynamicStep(dynamicStepConfig)) {
       return (
         <AnimatePresence mode="wait">
           {isLoading ? (
@@ -214,7 +204,7 @@ export default function CheckoutFlow({
           ) : (
             <DynamicProductStep
               key={currentStep}
-              stepConfig={dynamicStepConfig}
+              stepConfig={dynamicStepConfig!}
               onSkip={handleSkip}
             />
           )}
@@ -222,21 +212,17 @@ export default function CheckoutFlow({
       )
     }
 
-    // Registry lookup — covers housing, merch, patron,
-    // and any future step types added to STEP_COMPONENT_REGISTRY
+    // Fallback: registry lookup for hardcoded components
     const StepComponent = STEP_COMPONENT_REGISTRY[currentStep]
     if (StepComponent) {
       return <StepComponent onSkip={handleSkip} />
     }
 
-    // Custom step — render dynamically based on step config
-    const currentStepConfig = stepConfigs.find(
-      (s) => s.step_type === currentStep,
-    )
-    if (currentStepConfig) {
+    // Unknown step with config: try dynamic as last resort
+    if (dynamicStepConfig) {
       return (
         <DynamicProductStep
-          stepConfig={currentStepConfig}
+          stepConfig={dynamicStepConfig}
           onSkip={handleSkip}
         />
       )

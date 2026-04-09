@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion"
 import { useRouter } from "next/navigation"
 import { useEffect, useRef } from "react"
 import type { PopupPublic } from "@/client"
+import ScrollyCheckoutFlow from "@/components/checkout-flow/ScrollyCheckoutFlow"
 import { SidebarProvider } from "@/components/Sidebar/SidebarComponents"
 import { useApplication } from "@/providers/applicationProvider"
 import { CheckoutProvider } from "@/providers/checkoutProvider"
@@ -11,7 +12,6 @@ import { useCityProvider } from "@/providers/cityProvider"
 import PassesProvider from "@/providers/passesProvider"
 import useCheckoutState from "../hooks/useCheckoutState"
 import type { FormDataProps } from "../types"
-import ScrollyCheckoutFlow from "./ScrollyCheckoutFlow"
 import TransitionScreen from "./TransitionScreen"
 import UserInfoForm from "./UserInfoForm"
 
@@ -69,10 +69,12 @@ export const PopupCheckoutContent = ({
       <SidebarProvider
         defaultOpen={false}
         className="block min-h-0"
-        style={{
-          "--sidebar-width": "0px",
-          "--sidebar-width-icon": "0px",
-        } as React.CSSProperties}
+        style={
+          {
+            "--sidebar-width": "0px",
+            "--sidebar-width-icon": "0px",
+          } as React.CSSProperties
+        }
       >
         <PassesProvider restoreFromCart>
           <CheckoutProvider initialStep="passes">

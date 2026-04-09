@@ -2,7 +2,7 @@
 
 import { Play } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import type { VariantProps } from "../DynamicProductStep"
+import type { VariantProps } from "../registries/variantRegistry"
 
 function extractVideoId(url: string): string | null {
   const match = url.match(

@@ -12,7 +12,7 @@ import Image from "next/image"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import type { VariantProps } from "../DynamicProductStep"
+import type { VariantProps } from "../registries/variantRegistry"
 
 // ---------------------------------------------------------------------------
 // Types & helpers

@@ -13,7 +13,7 @@ import {
   formatCurrency,
 } from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
-import type { VariantProps } from "../DynamicProductStep"
+import type { VariantProps } from "../registries/variantRegistry"
 
 /* ── Section types & helpers ─────────────────────────────── */
 

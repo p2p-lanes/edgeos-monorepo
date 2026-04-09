@@ -1,7 +1,7 @@
 "use client"
 
 import { useParams, useRouter } from "next/navigation"
-import ScrollyCheckoutFlow from "@/app/checkout/components/ScrollyCheckoutFlow"
+import ScrollyCheckoutFlow from "@/components/checkout-flow/ScrollyCheckoutFlow"
 import { Loader } from "@/components/ui/Loader"
 import useAttendee from "@/hooks/useAttendee"
 import { CheckoutProvider } from "@/providers/checkoutProvider"

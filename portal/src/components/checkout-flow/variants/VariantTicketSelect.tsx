@@ -10,7 +10,7 @@ import { usePassesProvider } from "@/providers/passesProvider"
 import type { AttendeePassState } from "@/types/Attendee"
 import { formatCheckoutDate, formatCurrency } from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
-import type { VariantProps } from "../DynamicProductStep"
+import type { VariantProps } from "../registries/variantRegistry"
 
 // ---------------------------------------------------------------------------
 // Types & constants

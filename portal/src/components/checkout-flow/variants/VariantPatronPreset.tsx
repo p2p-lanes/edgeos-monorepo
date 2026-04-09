@@ -11,7 +11,7 @@ import {
   PATRON_PRESETS,
 } from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
-import type { VariantProps } from "../DynamicProductStep"
+import type { VariantProps } from "../registries/variantRegistry"
 
 function parseTemplateConfig(templateConfig?: Record<string, unknown> | null) {
   const presets =
