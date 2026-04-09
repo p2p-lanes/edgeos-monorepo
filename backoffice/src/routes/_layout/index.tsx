@@ -1,18 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { createFileRoute, Link } from "@tanstack/react-router"
-import {
-  AlertTriangle,
-  ArrowRight,
-  CheckCircle,
-  Clock,
-  CreditCard,
-  DollarSign,
-  FileText,
-  ListChecks,
-  TrendingUp,
-  Users,
-  XCircle,
-} from "lucide-react"
+import { AlertTriangle, ArrowRight, Clock, ListChecks } from "lucide-react"
 
 import {
   type ApplicationPublic,
@@ -24,12 +12,13 @@ import {
 import { StatusBadge } from "@/components/Common/StatusBadge"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+  ApplicationFunnelChart,
+  CumulativeTrendsCharts,
+  DistributionCharts,
+  KeyMetricsCards,
+  RevenueBreakdownCharts,
+} from "@/components/Dashboard"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
@@ -37,99 +26,28 @@ import useAuth from "@/hooks/useAuth"
 export const Route = createFileRoute("/_layout/")({
   component: Dashboard,
   head: () => ({
-    meta: [
-      {
-        title: "Dashboard - EdgeOS",
-      },
-    ],
+    meta: [{ title: "Dashboard - EdgeOS" }],
   }),
 })
-
-function StatCard({
-  title,
-  value,
-  subtitle,
-  icon: Icon,
-  href,
-  isLoading,
-  variant = "default",
-}: {
-  title: string
-  value: number | string | undefined
-  subtitle?: string
-  icon: React.ComponentType<{ className?: string }>
-  href?: string
-  isLoading: boolean
-  variant?: "default" | "success" | "warning" | "danger"
-}) {
-  const variantStyles = {
-    default: "text-muted-foreground",
-    success: "text-green-500",
-    warning: "text-yellow-500",
-    danger: "text-red-500",
-  }
-
-  const content = (
-    <Card
-      className={`transition-colors ${href ? "hover:bg-muted/50 cursor-pointer" : ""}`}
-    >
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <Icon className={`h-4 w-4 ${variantStyles[variant]}`} />
-      </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <Skeleton className="h-8 w-20" />
-        ) : (
-          <>
-            <div className="text-2xl font-bold">{value ?? 0}</div>
-            {subtitle && (
-              <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
-            )}
-          </>
-        )}
-      </CardContent>
-    </Card>
-  )
-
-  if (href) {
-    return <Link to={href}>{content}</Link>
-  }
-  return content
-}
-
-function formatCurrency(value: string | undefined): string {
-  if (!value) return "$0.00"
-  const num = parseFloat(value)
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(num)
-}
 
 function Dashboard() {
   const { user: currentUser, isAdmin, isSuperadmin } = useAuth()
   const { selectedPopupId, selectedTenantId, isContextReady } = useWorkspace()
 
-  // Fetch dashboard stats from dedicated endpoint
   const {
-    data: stats,
+    data: enriched,
     isLoading,
     isError,
     error,
   } = useQuery({
-    queryKey: ["dashboard", "stats", selectedPopupId, selectedTenantId],
+    queryKey: ["dashboard", "enriched", selectedPopupId, selectedTenantId],
     queryFn: () =>
-      DashboardService.getDashboardStats({
+      DashboardService.getEnrichedDashboard({
         popupId: selectedPopupId!,
         xTenantId: isSuperadmin ? selectedTenantId : undefined,
       }),
     enabled: isContextReady && !!selectedPopupId,
   })
-
-  const applications = stats?.applications
-  const attendees = stats?.attendees
-  const payments = stats?.payments
 
   return (
     <div className="flex flex-col gap-6">
@@ -137,289 +55,95 @@ function Dashboard() {
 
       {isError && (
         <div className="rounded-lg border border-destructive bg-destructive/10 p-4 text-destructive">
-          Failed to load dashboard stats: {error?.message || "Unknown error"}
+          Failed to load dashboard: {error?.message || "Unknown error"}
         </div>
       )}
 
-      {/* Welcome header */}
-      <div className="flex items-center justify-between">
+      {/* Welcome + Needs Attention */}
+      <div className="flex flex-col gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight truncate max-w-md">
+          <h1 className="text-2xl font-bold tracking-tight">
             Welcome back, {currentUser?.full_name || currentUser?.email}
           </h1>
-          <p className="text-muted-foreground">
-            Registration statistics overview
+          <p className="text-muted-foreground text-sm">
+            Event performance overview
           </p>
         </div>
+
+        {isContextReady && isAdmin && (
+          <NeedsAttention
+            inReview={enriched?.applications.in_review ?? 0}
+            selectedPopupId={selectedPopupId}
+            isSuperadmin={isSuperadmin}
+            selectedTenantId={selectedTenantId}
+          />
+        )}
       </div>
 
-      {/* Needs Attention */}
-      {isContextReady && isAdmin && (
-        <NeedsAttention
-          inReview={applications?.in_review ?? 0}
-          selectedPopupId={selectedPopupId}
-          isSuperadmin={isSuperadmin}
-          selectedTenantId={selectedTenantId}
-        />
-      )}
+      {/* Key Metrics */}
+      <section>
+        <SectionTitle>Key Metrics</SectionTitle>
+        <KeyMetricsCards data={enriched?.key_metrics} isLoading={isLoading} />
+      </section>
 
-      {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          title="Total Applications"
-          value={applications?.total}
-          subtitle={`${applications?.accepted ?? 0} accepted, ${applications?.pending_fee ?? 0} pending fee`}
-          icon={FileText}
-          href="/applications"
+      {/* Cumulative Trends */}
+      <section>
+        <SectionTitle>Trends</SectionTitle>
+        <CumulativeTrendsCharts
+          data={enriched?.cumulative_trends}
           isLoading={isLoading}
+          currency={enriched?.key_metrics?.currency}
         />
-        <StatCard
-          title="Total Attendees"
-          value={attendees?.total}
-          subtitle={`${attendees?.main ?? 0} main, ${attendees?.spouse ?? 0} spouse, ${attendees?.kid ?? 0} kids`}
-          icon={Users}
-          href="/attendees"
-          isLoading={isLoading}
-        />
-        <StatCard
-          title="Total Payments"
-          value={payments?.total}
-          subtitle={`${payments?.approved ?? 0} approved`}
-          icon={CreditCard}
-          href="/payments"
-          isLoading={isLoading}
-        />
-        <StatCard
-          title="Total Revenue"
-          value={formatCurrency(payments?.approved_revenue)}
-          icon={DollarSign}
-          isLoading={isLoading}
-          variant="success"
-        />
-      </div>
+      </section>
 
-      {/* Detailed Breakdowns */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {/* Application Status Breakdown */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              Applications by Status
-            </CardTitle>
-            <CardDescription>Current application pipeline</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="space-y-3">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <Skeleton key={i} className="h-8 w-full" />
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-2 rounded-md bg-muted/50">
-                  <div className="flex items-center gap-2">
-                    <DollarSign className="h-4 w-4 text-amber-500" />
-                    <span className="text-sm">Pending Fee</span>
-                  </div>
-                  <span className="text-sm font-bold text-amber-600">
-                    {applications?.pending_fee ?? 0}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between p-2 rounded-md bg-muted/50">
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-yellow-500" />
-                    <span className="text-sm">In Review</span>
-                  </div>
-                  <span className="text-sm font-bold">
-                    {applications?.in_review ?? 0}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between p-2 rounded-md bg-muted/50">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span className="text-sm">Accepted</span>
-                  </div>
-                  <span className="text-sm font-bold text-green-600">
-                    {applications?.accepted ?? 0}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between p-2 rounded-md bg-muted/50">
-                  <div className="flex items-center gap-2">
-                    <XCircle className="h-4 w-4 text-red-500" />
-                    <span className="text-sm">Rejected</span>
-                  </div>
-                  <span className="text-sm font-bold text-red-600">
-                    {applications?.rejected ?? 0}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between p-2 rounded-md bg-muted/50">
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm">Draft</span>
-                  </div>
-                  <span className="text-sm font-bold">
-                    {applications?.draft ?? 0}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between p-2 rounded-md bg-muted/50">
-                  <div className="flex items-center gap-2">
-                    <XCircle className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm">Withdrawn</span>
-                  </div>
-                  <span className="text-sm font-bold">
-                    {applications?.withdrawn ?? 0}
-                  </span>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Attendee Breakdown */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              Attendees by Category
-            </CardTitle>
-            <CardDescription>Registration breakdown</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="space-y-3">
-                {[1, 2, 3].map((i) => (
-                  <Skeleton key={i} className="h-8 w-full" />
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-2 rounded-md bg-muted/50">
-                  <span className="text-sm">Main Attendees</span>
-                  <span className="text-sm font-bold">
-                    {attendees?.main ?? 0}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between p-2 rounded-md bg-muted/50">
-                  <span className="text-sm">Spouses</span>
-                  <span className="text-sm font-bold">
-                    {attendees?.spouse ?? 0}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between p-2 rounded-md bg-muted/50">
-                  <span className="text-sm">Kids</span>
-                  <span className="text-sm font-bold">
-                    {attendees?.kid ?? 0}
-                  </span>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Payment Status & Revenue */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
-              Payment Overview
-            </CardTitle>
-            <CardDescription>Revenue and payment status</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="space-y-3">
-                {[1, 2, 3, 4].map((i) => (
-                  <Skeleton key={i} className="h-8 w-full" />
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-2 rounded-md bg-green-500/10">
-                  <span className="text-sm">Approved Revenue</span>
-                  <span className="text-sm font-bold text-green-600">
-                    {formatCurrency(payments?.approved_revenue)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between p-2 rounded-md bg-muted/50">
-                  <span className="text-sm">Total Discounts</span>
-                  <span className="text-sm font-bold">
-                    {formatCurrency(payments?.total_discounts)}
-                  </span>
-                </div>
-                <div className="pt-2 border-t">
-                  <div className="grid grid-cols-3 gap-2 text-center">
-                    <div>
-                      <div className="text-lg font-bold">
-                        {payments?.approved ?? 0}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        Approved
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-lg font-bold text-red-600">
-                        {payments?.rejected ?? 0}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        Rejected
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-lg font-bold text-muted-foreground">
-                        {(payments?.expired ?? 0) + (payments?.cancelled ?? 0)}
-                      </div>
-                      <div className="text-xs text-muted-foreground">Other</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Recent Activity */}
-      {isContextReady && isAdmin && selectedPopupId && (
-        <RecentActivity
-          selectedPopupId={selectedPopupId}
-          isSuperadmin={isSuperadmin}
-          selectedTenantId={selectedTenantId}
-        />
-      )}
-
-      {/* Quick Actions for Admins */}
-      {isAdmin && (
-        <div>
-          <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
-          <div className="flex flex-wrap gap-2">
-            <Link
-              to="/applications"
-              search={{}}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-            >
-              <FileText className="h-4 w-4" />
-              Review Applications
-            </Link>
-            <Link
-              to="/attendees"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-md border hover:bg-muted transition-colors"
-            >
-              <Users className="h-4 w-4" />
-              View Attendees
-            </Link>
-            <Link
-              to="/payments"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-md border hover:bg-muted transition-colors"
-            >
-              <CreditCard className="h-4 w-4" />
-              Manage Payments
-            </Link>
-          </div>
+      {/* Revenue Breakdown + Distribution */}
+      <section>
+        <SectionTitle>Revenue & Distribution</SectionTitle>
+        <div className="flex flex-col gap-4">
+          <RevenueBreakdownCharts
+            data={enriched?.revenue_breakdown}
+            isLoading={isLoading}
+            currency={enriched?.key_metrics?.currency}
+          />
+          <DistributionCharts
+            data={enriched?.distribution}
+            isLoading={isLoading}
+          />
         </div>
-      )}
+      </section>
+
+      {/* Application Pipeline + Recent Activity — side by side */}
+      <section className="grid gap-4 lg:grid-cols-2">
+        <div>
+          <SectionTitle>Pipeline</SectionTitle>
+          <ApplicationFunnelChart
+            data={enriched?.application_funnel}
+            isLoading={isLoading}
+          />
+        </div>
+
+        {isContextReady && isAdmin && selectedPopupId && (
+          <div>
+            <SectionTitle>Recent Activity</SectionTitle>
+            <RecentActivity
+              selectedPopupId={selectedPopupId}
+              isSuperadmin={isSuperadmin}
+              selectedTenantId={selectedTenantId}
+            />
+          </div>
+        )}
+      </section>
     </div>
+  )
+}
+
+// --- Helper components ---
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 className="text-sm font-semibold mb-2 tracking-tight text-muted-foreground uppercase">
+      {children}
+    </h2>
   )
 }
 
@@ -468,20 +192,20 @@ function NeedsAttention({
 
   return (
     <div>
-      <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
-        <AlertTriangle className="h-4 w-4 text-yellow-500" />
+      <h2 className="text-sm font-semibold mb-2 flex items-center gap-2 text-yellow-600 dark:text-yellow-400">
+        <AlertTriangle className="h-3.5 w-3.5" />
         Needs Attention
       </h2>
-      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
         {items.map((item) => (
           <Link key={item.href} to={item.href}>
-            <Card className="transition-colors hover:bg-muted/50 cursor-pointer">
-              <CardContent className="flex items-center gap-3 p-4">
+            <Card className="transition-colors hover:bg-muted/50 cursor-pointer py-0">
+              <CardContent className="flex items-center gap-3 p-3">
                 <item.icon
-                  className={`h-5 w-5 shrink-0 ${item.variant === "warning" ? "text-yellow-500" : "text-muted-foreground"}`}
+                  className={`h-4 w-4 shrink-0 ${item.variant === "warning" ? "text-yellow-500" : "text-muted-foreground"}`}
                 />
                 <span className="text-sm font-medium flex-1">{item.label}</span>
-                <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
               </CardContent>
             </Card>
           </Link>
@@ -490,6 +214,22 @@ function NeedsAttention({
     </div>
   )
 }
+
+function timeAgo(dateStr: string): string {
+  const now = Date.now()
+  const then = new Date(dateStr).getTime()
+  const diffMs = now - then
+  const diffMin = Math.floor(diffMs / 60_000)
+  if (diffMin < 1) return "just now"
+  if (diffMin < 60) return `${diffMin}m ago`
+  const diffHr = Math.floor(diffMin / 60)
+  if (diffHr < 24) return `${diffHr}h ago`
+  const diffDay = Math.floor(diffHr / 24)
+  if (diffDay < 30) return `${diffDay}d ago`
+  return new Date(dateStr).toLocaleDateString()
+}
+
+const EXCLUDED_STATUSES = new Set(["expired", "cancelled"])
 
 function RecentActivity({
   selectedPopupId,
@@ -502,7 +242,7 @@ function RecentActivity({
 }) {
   const tenantHeader = isSuperadmin ? selectedTenantId : undefined
 
-  const { data: recentApps } = useQuery({
+  const { data: recentApps, isLoading: appsLoading } = useQuery({
     queryKey: ["recent-applications", selectedPopupId],
     queryFn: () =>
       ApplicationReviewsService.listPendingReviews({
@@ -513,11 +253,13 @@ function RecentActivity({
       }),
   })
 
-  const { data: recentPayments } = useQuery({
-    queryKey: ["recent-payments", selectedPopupId],
+  // Fetch only approved + pending payments (the ones that matter)
+  const { data: recentPayments, isLoading: paymentsLoading } = useQuery({
+    queryKey: ["recent-payments-approved", selectedPopupId],
     queryFn: () =>
       PaymentsService.listPayments({
         popupId: selectedPopupId,
+        paymentStatus: "approved",
         skip: 0,
         limit: 5,
         xTenantId: tenantHeader,
@@ -525,92 +267,82 @@ function RecentActivity({
   })
 
   const apps = (recentApps?.results ?? []) as unknown as ApplicationPublic[]
-  const payments = (recentPayments?.results ?? []) as PaymentPublic[]
+  // Filter out expired/cancelled and $0 payments
+  const payments = ((recentPayments?.results ?? []) as PaymentPublic[]).filter(
+    (p) => !EXCLUDED_STATUSES.has(p.status ?? "") && Number(p.amount ?? 0) > 0,
+  )
+  const isLoading = appsLoading || paymentsLoading
 
-  if (apps.length === 0 && payments.length === 0) return null
+  if (!isLoading && apps.length === 0 && payments.length === 0) {
+    return (
+      <Card>
+        <CardContent className="flex items-center justify-center h-[220px] text-muted-foreground text-sm">
+          No recent activity
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
-    <div>
-      <h2 className="text-lg font-semibold mb-3">Recent Activity</h2>
-      <div className="grid gap-4 md:grid-cols-2">
-        {apps.length > 0 && (
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <FileText className="h-4 w-4" />
-                Pending Applications
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {apps.map((app) => (
-                <Link
-                  key={app.id}
-                  to="/applications/$id"
-                  params={{ id: app.id }}
-                  className="flex items-center justify-between rounded-md border p-2.5 hover:bg-muted/50 transition-colors"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium truncate">
-                      {app.human?.first_name} {app.human?.last_name}
-                    </p>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {app.human?.email}
-                    </p>
-                  </div>
-                  <StatusBadge status={app.status} className="ml-2 shrink-0" />
-                </Link>
-              ))}
-              {(recentApps?.paging?.total ?? 0) > 5 && (
-                <Link
-                  to="/applications/review-queue"
-                  className="text-xs text-primary hover:underline flex items-center gap-1 pt-1"
-                >
-                  View all {recentApps?.paging?.total} pending
-                  <ArrowRight className="h-3 w-3" />
-                </Link>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {payments.length > 0 && (
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <CreditCard className="h-4 w-4" />
-                Recent Payments
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {payments.map((payment) => (
-                <div
-                  key={payment.id}
-                  className="flex items-center justify-between rounded-md border p-2.5"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium font-mono">
-                      ${payment.amount} {payment.currency}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {payment.source || "—"}
-                      {payment.created_at && (
-                        <>
-                          {" "}
-                          • {new Date(payment.created_at).toLocaleDateString()}
-                        </>
-                      )}
-                    </p>
-                  </div>
-                  <StatusBadge
-                    status={payment.status ?? ""}
-                    className="ml-2 shrink-0"
-                  />
+    <Card className="h-fit">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-sm font-medium">Latest Activity</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {isLoading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton
+                key={`activity-skeleton-${i.toString()}`}
+                className="h-12 w-full"
+              />
+            ))}
+          </div>
+        ) : (
+          <>
+            {apps.map((app) => (
+              <Link
+                key={app.id}
+                to="/applications/$id"
+                params={{ id: app.id }}
+                className="flex items-center justify-between rounded-md border p-2.5 hover:bg-muted/50 transition-colors"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">
+                    {app.human?.first_name} {app.human?.last_name}
+                  </p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {app.human?.email}
+                  </p>
                 </div>
-              ))}
-            </CardContent>
-          </Card>
+                <StatusBadge status={app.status} className="ml-2 shrink-0" />
+              </Link>
+            ))}
+            {payments.map((payment) => (
+              <div
+                key={payment.id}
+                className="flex items-center justify-between rounded-md border p-2.5"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium font-mono">
+                    ${payment.amount} {payment.currency}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {payment.source || "—"}
+                    {payment.created_at && (
+                      <> • {timeAgo(payment.created_at)}</>
+                    )}
+                  </p>
+                </div>
+                <StatusBadge
+                  status={payment.status ?? ""}
+                  className="ml-2 shrink-0"
+                />
+              </div>
+            ))}
+          </>
         )}
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   )
 }
