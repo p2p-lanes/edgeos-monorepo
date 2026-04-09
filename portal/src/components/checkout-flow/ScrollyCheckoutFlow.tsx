@@ -1335,6 +1335,12 @@ function ScrollyCheckoutFlowInner({
                 showWatermark={config?.show_watermark ?? true}
               />
               {renderSectionContent(section.id)}
+              {(() => {
+                const ft = (config?.template_config as Record<string, unknown> | undefined)?.footer_text
+                return typeof ft === "string" && ft ? (
+                  <p className="text-xs text-gray-400 leading-relaxed px-1 pt-4 text-center">{ft}</p>
+                ) : null
+              })()}
             </SnapSection>
           )
         })}
@@ -1385,6 +1391,12 @@ function ScrollyCheckoutFlowInner({
                 showTitle={config?.show_title ?? true}
               />
               {renderSectionContent(section.id)}
+              {(() => {
+                const ft = (config?.template_config as Record<string, unknown> | undefined)?.footer_text
+                return typeof ft === "string" && ft ? (
+                  <p className="text-xs text-gray-400 leading-relaxed px-1 pt-4 text-center">{ft}</p>
+                ) : null
+              })()}
             </ScrollySection>
           )
         })}

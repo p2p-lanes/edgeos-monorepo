@@ -310,6 +310,27 @@ function StepConfigContent({ stepId }: { stepId: string }) {
               </div>
             )}
 
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="step-footer">Footer Note</Label>
+            <Textarea
+              id="step-footer"
+              value={
+                (templateConfig?.footer_text as string) ?? ""
+              }
+              onChange={(e) =>
+                setTemplateConfig({
+                  ...templateConfig,
+                  footer_text: e.target.value || undefined,
+                })
+              }
+              placeholder="Optional note shown below this step's content (e.g., pricing clarifications, terms)"
+              rows={2}
+            />
+            <p className="text-xs text-muted-foreground">
+              Small text displayed at the bottom of this section in the checkout.
+            </p>
+          </div>
+
           {step.step_type === "confirm" && insuranceStep && (
             <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
               <div className="flex flex-col gap-0.5">
