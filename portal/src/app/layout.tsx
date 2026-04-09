@@ -5,6 +5,7 @@ import { headers } from "next/headers"
 import "./globals.css"
 import { Toaster } from "sonner"
 import GoogleAnalytics from "@/components/utils/GoogleAnalytics"
+import SegmentAnalytics from "@/components/utils/SegmentAnalytics"
 import { fetchTenantBySlug } from "@/lib/tenant"
 import { resolveHostname } from "@/lib/tenant-resolution"
 import QueryProvider from "@/providers/queryProvider"
@@ -85,6 +86,7 @@ export default async function RootLayout({
         suppressHydrationWarning
       >
         <GoogleAnalytics />
+        <SegmentAnalytics />
         <QueryProvider>
           <TenantProvider
             initialTenantId={middlewareTenantId}
