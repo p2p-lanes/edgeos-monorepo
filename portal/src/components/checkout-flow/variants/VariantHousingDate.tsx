@@ -97,9 +97,7 @@ function DatePickerSection({
       <div className="flex items-center gap-2 mb-3">
         <Calendar className="w-4 h-4 text-gray-500 shrink-0" />
         <span className="text-sm font-medium text-gray-900">
-          {pricePerDay
-            ? `${nights} night${nights !== 1 ? "s" : ""}: `
-            : ""}
+          {pricePerDay ? `${nights} night${nights !== 1 ? "s" : ""}: ` : ""}
           {formatCheckoutDate(formatDateInput(checkIn))} -{" "}
           {formatCheckoutDate(formatDateInput(checkOut))}
         </span>

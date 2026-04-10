@@ -2,6 +2,7 @@ import {
   CheckCircle,
   CheckSquare,
   Heart,
+  HelpCircle,
   Home,
   HomeIcon,
   Images,
@@ -62,12 +63,19 @@ export const TEMPLATE_DEFINITIONS: TemplateDefinition[] = [
     description: "Configurable image gallery",
     icon: Images,
   },
+  {
+    key: "faqs",
+    label: "FAQs",
+    description: "Expandable list of questions and answers",
+    icon: HelpCircle,
+  },
 ]
 
 /** Templates that don't display products and therefore don't need a product category. */
 export const CONTENT_ONLY_TEMPLATES = new Set([
   "youtube-video",
   "image-gallery",
+  "faqs",
 ])
 
 export const STEP_TYPE_DEFINITIONS: StepTypeDefinition[] = [

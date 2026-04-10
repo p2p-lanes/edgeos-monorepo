@@ -314,9 +314,7 @@ function StepConfigContent({ stepId }: { stepId: string }) {
             <Label htmlFor="step-footer">Footer Note</Label>
             <Textarea
               id="step-footer"
-              value={
-                (templateConfig?.footer_text as string) ?? ""
-              }
+              value={(templateConfig?.footer_text as string) ?? ""}
               onChange={(e) =>
                 setTemplateConfig({
                   ...templateConfig,
@@ -327,7 +325,8 @@ function StepConfigContent({ stepId }: { stepId: string }) {
               rows={2}
             />
             <p className="text-xs text-muted-foreground">
-              Small text displayed at the bottom of this section in the checkout.
+              Small text displayed at the bottom of this section in the
+              checkout.
             </p>
           </div>
 

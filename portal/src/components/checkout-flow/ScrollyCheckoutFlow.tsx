@@ -123,7 +123,7 @@ function SectionHeader({
         {subtitle && (
           <p
             data-section-subtitle
-            className="text-base sm:text-lg text-heading-secondary my-2 bg-black/5 rounded px-1 w-fit"
+            className="text-base sm:text-lg text-heading-secondary my-2 rounded px-1 w-fit"
           >
             {subtitle}
           </p>
@@ -1336,9 +1336,13 @@ function ScrollyCheckoutFlowInner({
               />
               {renderSectionContent(section.id)}
               {(() => {
-                const ft = (config?.template_config as Record<string, unknown> | undefined)?.footer_text
+                const ft = (
+                  config?.template_config as Record<string, unknown> | undefined
+                )?.footer_text
                 return typeof ft === "string" && ft ? (
-                  <p className="text-xs text-gray-400 leading-relaxed px-1 pt-4 text-center">{ft}</p>
+                  <p className="text-xs text-gray-400 leading-relaxed px-1 pt-4 text-center">
+                    {ft}
+                  </p>
                 ) : null
               })()}
             </SnapSection>
@@ -1392,9 +1396,13 @@ function ScrollyCheckoutFlowInner({
               />
               {renderSectionContent(section.id)}
               {(() => {
-                const ft = (config?.template_config as Record<string, unknown> | undefined)?.footer_text
+                const ft = (
+                  config?.template_config as Record<string, unknown> | undefined
+                )?.footer_text
                 return typeof ft === "string" && ft ? (
-                  <p className="text-xs text-gray-400 leading-relaxed px-1 pt-4 text-center">{ft}</p>
+                  <p className="text-xs text-gray-400 leading-relaxed px-1 pt-4 text-center">
+                    {ft}
+                  </p>
                 ) : null
               })()}
             </ScrollySection>

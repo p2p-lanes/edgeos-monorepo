@@ -182,7 +182,9 @@ export function useCartPersistence({
           checkOut: savedCart.housing.check_out,
           nights,
           pricePerNight: product.price,
-          totalPrice: housingPricePerDay ? product.price * nights : product.price,
+          totalPrice: housingPricePerDay
+            ? product.price * nights
+            : product.price,
           pricePerDay: housingPricePerDay,
         })
       }
@@ -244,6 +246,7 @@ export function useCartPersistence({
     queryClient.invalidateQueries,
     queryClient.setQueryData,
     restorationSetters,
+    housingPricePerDay,
   ])
 
   // --- Save on page visibility change (tab switch / minimize) ---
