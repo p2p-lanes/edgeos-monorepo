@@ -85,6 +85,17 @@ export type ApplicationFeeCreate = {
 };
 
 /**
+ * Application pipeline as a funnel.
+ */
+export type ApplicationFunnel = {
+    draft?: number;
+    pending_fee?: number;
+    in_review?: number;
+    accepted?: number;
+    paid?: number;
+};
+
+/**
  * Application schema for API responses.
  */
 export type ApplicationPublic = {
@@ -247,6 +258,16 @@ export type AssociatedAttendee = {
     category: string;
     gender?: (string | null);
     email?: (string | null);
+};
+
+/**
+ * Accommodation attach rate per ticket type.
+ */
+export type AttachRateItem = {
+    ticket_type: string;
+    total_attendees?: number;
+    with_accommodation?: number;
+    rate?: string;
 };
 
 /**
@@ -483,6 +504,16 @@ export type CartUpdate = {
 };
 
 /**
+ * Aggregated breakdown by product category.
+ */
+export type CategoryBreakdown = {
+    category: string;
+    label: string;
+    quantity?: number;
+    revenue?: string;
+};
+
+/**
  * Schema for creating companion attendees (spouse/kids) during application.
  *
  * Used when submitting an application with family members.
@@ -562,6 +593,14 @@ export type CredentialInfo = {
 export type CredentialType = 'crud' | 'readonly';
 
 /**
+ * Time series for cumulative charts.
+ */
+export type CumulativeTrends = {
+    tickets?: Array<TimelinePoint>;
+    revenue?: Array<RevenueTimelinePoint>;
+};
+
+/**
  * Complete dashboard statistics.
  */
 export type DashboardStats = {
@@ -581,6 +620,25 @@ export type DirectoryProduct = {
     duration_type?: (string | null);
     start_date?: (string | null);
     end_date?: (string | null);
+};
+
+/**
+ * Ticket and accommodation distribution.
+ */
+export type Distribution = {
+    tickets_by_duration?: Array<DistributionItem>;
+    tickets_by_attendee_type?: Array<DistributionItem>;
+    accommodation_by_product?: Array<DistributionItem>;
+    accommodation_attach_rate?: Array<AttachRateItem>;
+};
+
+/**
+ * Single slice in a distribution chart.
+ */
+export type DistributionItem = {
+    label: string;
+    value?: number;
+    percentage?: string;
 };
 
 export type EmailTemplateCreate = {
@@ -609,6 +667,20 @@ export type EmailTemplateUpdate = {
     subject?: (string | null);
     html_content?: (string | null);
     is_active?: (boolean | null);
+};
+
+/**
+ * Full enriched dashboard response.
+ */
+export type EnrichedDashboardStats = {
+    key_metrics: KeyMetrics;
+    cumulative_trends: CumulativeTrends;
+    revenue_breakdown: RevenueBreakdown;
+    distribution: Distribution;
+    application_funnel: ApplicationFunnel;
+    applications: ApplicationStats;
+    attendees: AttendeeStats;
+    payments: PaymentStats;
 };
 
 export type FormFieldCreate = {
@@ -912,6 +984,19 @@ export type HumanVerify = {
     email: string;
     tenant_id: string;
     code: string;
+};
+
+/**
+ * Top-level KPI cards with derived metrics.
+ */
+export type KeyMetrics = {
+    people?: number;
+    total_revenue?: string;
+    currency?: string;
+    avg_ticket_price?: string;
+    avg_revenue_per_person?: string;
+    accommodation_percentage?: string;
+    conversion_rate?: string;
 };
 
 export type ListModel = {
@@ -1420,6 +1505,17 @@ export type ProductBatchResult = {
 };
 
 /**
+ * Revenue and quantity breakdown per product.
+ */
+export type ProductBreakdownItem = {
+    product_id: string;
+    product_name: string;
+    product_category: string;
+    quantity?: number;
+    revenue?: string;
+};
+
+/**
  * Product schema for creation.
  */
 export type ProductCreate = {
@@ -1509,6 +1605,23 @@ export type ProductWithQuantity = {
     insurance_percentage?: (string | null);
     id: string;
     quantity?: number;
+};
+
+/**
+ * Revenue split by product and category.
+ */
+export type RevenueBreakdown = {
+    by_product?: Array<ProductBreakdownItem>;
+    by_category?: Array<CategoryBreakdown>;
+};
+
+/**
+ * Single data point for revenue time series.
+ */
+export type RevenueTimelinePoint = {
+    date: string;
+    value?: string;
+    cumulative?: string;
 };
 
 /**
@@ -1687,6 +1800,15 @@ export type TicketProduct = {
     start_date?: (string | null);
     end_date?: (string | null);
     quantity?: number;
+};
+
+/**
+ * Single data point in a time series.
+ */
+export type TimelinePoint = {
+    date: string;
+    value?: number;
+    cumulative?: number;
 };
 
 export type Token = {
@@ -2165,6 +2287,16 @@ export type DashboardGetDashboardStatsData = {
 };
 
 export type DashboardGetDashboardStatsResponse = (DashboardStats);
+
+export type DashboardGetEnrichedDashboardData = {
+    /**
+     * Popup ID to get stats for
+     */
+    popupId: string;
+    xTenantId?: (string | null);
+};
+
+export type DashboardGetEnrichedDashboardResponse = (EnrichedDashboardStats);
 
 export type EmailTemplatesListTemplateTypesResponse = (Array<TemplateTypeInfo>);
 

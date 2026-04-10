@@ -440,6 +440,39 @@ export const ApplicationFeeCreateSchema = {
     description: 'Schema for creating an application fee payment.'
 } as const;
 
+export const ApplicationFunnelSchema = {
+    properties: {
+        draft: {
+            type: 'integer',
+            title: 'Draft',
+            default: 0
+        },
+        pending_fee: {
+            type: 'integer',
+            title: 'Pending Fee',
+            default: 0
+        },
+        in_review: {
+            type: 'integer',
+            title: 'In Review',
+            default: 0
+        },
+        accepted: {
+            type: 'integer',
+            title: 'Accepted',
+            default: 0
+        },
+        paid: {
+            type: 'integer',
+            title: 'Paid',
+            default: 0
+        }
+    },
+    type: 'object',
+    title: 'ApplicationFunnel',
+    description: 'Application pipeline as a funnel.'
+} as const;
+
 export const ApplicationPublicSchema = {
     properties: {
         id: {
@@ -1270,6 +1303,35 @@ export const AssociatedAttendeeSchema = {
     required: ['name', 'category'],
     title: 'AssociatedAttendee',
     description: 'Non-main attendee summary for directory.'
+} as const;
+
+export const AttachRateItemSchema = {
+    properties: {
+        ticket_type: {
+            type: 'string',
+            title: 'Ticket Type'
+        },
+        total_attendees: {
+            type: 'integer',
+            title: 'Total Attendees',
+            default: 0
+        },
+        with_accommodation: {
+            type: 'integer',
+            title: 'With Accommodation',
+            default: 0
+        },
+        rate: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Rate',
+            default: '0'
+        }
+    },
+    type: 'object',
+    required: ['ticket_type'],
+    title: 'AttachRateItem',
+    description: 'Accommodation attach rate per ticket type.'
 } as const;
 
 export const AttendeeCreateSchema = {
@@ -2301,6 +2363,34 @@ export const CartUpdateSchema = {
     description: 'Schema for updating cart items.'
 } as const;
 
+export const CategoryBreakdownSchema = {
+    properties: {
+        category: {
+            type: 'string',
+            title: 'Category'
+        },
+        label: {
+            type: 'string',
+            title: 'Label'
+        },
+        quantity: {
+            type: 'integer',
+            title: 'Quantity',
+            default: 0
+        },
+        revenue: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Revenue',
+            default: '0'
+        }
+    },
+    type: 'object',
+    required: ['category', 'label'],
+    title: 'CategoryBreakdown',
+    description: 'Aggregated breakdown by product category.'
+} as const;
+
 export const CompanionCreateSchema = {
     properties: {
         name: {
@@ -2624,6 +2714,30 @@ export const CredentialTypeSchema = {
     title: 'CredentialType'
 } as const;
 
+export const CumulativeTrendsSchema = {
+    properties: {
+        tickets: {
+            items: {
+                '$ref': '#/components/schemas/TimelinePoint'
+            },
+            type: 'array',
+            title: 'Tickets',
+            default: []
+        },
+        revenue: {
+            items: {
+                '$ref': '#/components/schemas/RevenueTimelinePoint'
+            },
+            type: 'array',
+            title: 'Revenue',
+            default: []
+        }
+    },
+    type: 'object',
+    title: 'CumulativeTrends',
+    description: 'Time series for cumulative charts.'
+} as const;
+
 export const DashboardStatsSchema = {
     properties: {
         applications: {
@@ -2708,6 +2822,70 @@ export const DirectoryProductSchema = {
     required: ['id', 'name', 'slug'],
     title: 'DirectoryProduct',
     description: 'Minimal product info for directory participation display.'
+} as const;
+
+export const DistributionSchema = {
+    properties: {
+        tickets_by_duration: {
+            items: {
+                '$ref': '#/components/schemas/DistributionItem'
+            },
+            type: 'array',
+            title: 'Tickets By Duration',
+            default: []
+        },
+        tickets_by_attendee_type: {
+            items: {
+                '$ref': '#/components/schemas/DistributionItem'
+            },
+            type: 'array',
+            title: 'Tickets By Attendee Type',
+            default: []
+        },
+        accommodation_by_product: {
+            items: {
+                '$ref': '#/components/schemas/DistributionItem'
+            },
+            type: 'array',
+            title: 'Accommodation By Product',
+            default: []
+        },
+        accommodation_attach_rate: {
+            items: {
+                '$ref': '#/components/schemas/AttachRateItem'
+            },
+            type: 'array',
+            title: 'Accommodation Attach Rate',
+            default: []
+        }
+    },
+    type: 'object',
+    title: 'Distribution',
+    description: 'Ticket and accommodation distribution.'
+} as const;
+
+export const DistributionItemSchema = {
+    properties: {
+        label: {
+            type: 'string',
+            title: 'Label'
+        },
+        value: {
+            type: 'integer',
+            title: 'Value',
+            default: 0
+        },
+        percentage: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Percentage',
+            default: '0'
+        }
+    },
+    type: 'object',
+    required: ['label'],
+    title: 'DistributionItem',
+    description: 'Single slice in a distribution chart.'
 } as const;
 
 export const EmailTemplateCreateSchema = {
@@ -2862,6 +3040,39 @@ export const EmailTemplateUpdateSchema = {
     },
     type: 'object',
     title: 'EmailTemplateUpdate'
+} as const;
+
+export const EnrichedDashboardStatsSchema = {
+    properties: {
+        key_metrics: {
+            '$ref': '#/components/schemas/KeyMetrics'
+        },
+        cumulative_trends: {
+            '$ref': '#/components/schemas/CumulativeTrends'
+        },
+        revenue_breakdown: {
+            '$ref': '#/components/schemas/RevenueBreakdown'
+        },
+        distribution: {
+            '$ref': '#/components/schemas/Distribution'
+        },
+        application_funnel: {
+            '$ref': '#/components/schemas/ApplicationFunnel'
+        },
+        applications: {
+            '$ref': '#/components/schemas/ApplicationStats'
+        },
+        attendees: {
+            '$ref': '#/components/schemas/AttendeeStats'
+        },
+        payments: {
+            '$ref': '#/components/schemas/PaymentStats'
+        }
+    },
+    type: 'object',
+    required: ['key_metrics', 'cumulative_trends', 'revenue_breakdown', 'distribution', 'application_funnel', 'applications', 'attendees', 'payments'],
+    title: 'EnrichedDashboardStats',
+    description: 'Full enriched dashboard response.'
 } as const;
 
 export const FormFieldCreateSchema = {
@@ -4612,6 +4823,54 @@ export const HumanVerifySchema = {
     required: ['email', 'tenant_id', 'code'],
     title: 'HumanVerify',
     description: 'Request to verify human authentication code.'
+} as const;
+
+export const KeyMetricsSchema = {
+    properties: {
+        people: {
+            type: 'integer',
+            title: 'People',
+            default: 0
+        },
+        total_revenue: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Total Revenue',
+            default: '0'
+        },
+        currency: {
+            type: 'string',
+            title: 'Currency',
+            default: 'USD'
+        },
+        avg_ticket_price: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Avg Ticket Price',
+            default: '0'
+        },
+        avg_revenue_per_person: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Avg Revenue Per Person',
+            default: '0'
+        },
+        accommodation_percentage: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Accommodation Percentage',
+            default: '0'
+        },
+        conversion_rate: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Conversion Rate',
+            default: '0'
+        }
+    },
+    type: 'object',
+    title: 'KeyMetrics',
+    description: 'Top-level KPI cards with derived metrics.'
 } as const;
 
 export const ListModelSchema = {
@@ -7311,6 +7570,38 @@ export const ProductBatchResultSchema = {
     description: 'Schema for batch product result.'
 } as const;
 
+export const ProductBreakdownItemSchema = {
+    properties: {
+        product_id: {
+            type: 'string',
+            title: 'Product Id'
+        },
+        product_name: {
+            type: 'string',
+            title: 'Product Name'
+        },
+        product_category: {
+            type: 'string',
+            title: 'Product Category'
+        },
+        quantity: {
+            type: 'integer',
+            title: 'Quantity',
+            default: 0
+        },
+        revenue: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Revenue',
+            default: '0'
+        }
+    },
+    type: 'object',
+    required: ['product_id', 'product_name', 'product_category'],
+    title: 'ProductBreakdownItem',
+    description: 'Revenue and quantity breakdown per product.'
+} as const;
+
 export const ProductCreateSchema = {
     properties: {
         popup_id: {
@@ -7972,6 +8263,55 @@ export const ProductWithQuantitySchema = {
     required: ['tenant_id', 'popup_id', 'name', 'slug', 'price', 'id'],
     title: 'ProductWithQuantity',
     description: 'Product with quantity for attendee products.'
+} as const;
+
+export const RevenueBreakdownSchema = {
+    properties: {
+        by_product: {
+            items: {
+                '$ref': '#/components/schemas/ProductBreakdownItem'
+            },
+            type: 'array',
+            title: 'By Product',
+            default: []
+        },
+        by_category: {
+            items: {
+                '$ref': '#/components/schemas/CategoryBreakdown'
+            },
+            type: 'array',
+            title: 'By Category',
+            default: []
+        }
+    },
+    type: 'object',
+    title: 'RevenueBreakdown',
+    description: 'Revenue split by product and category.'
+} as const;
+
+export const RevenueTimelinePointSchema = {
+    properties: {
+        date: {
+            type: 'string',
+            title: 'Date'
+        },
+        value: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Value',
+            default: '0'
+        },
+        cumulative: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Cumulative',
+            default: '0'
+        }
+    },
+    type: 'object',
+    required: ['date'],
+    title: 'RevenueTimelinePoint',
+    description: 'Single data point for revenue time series.'
 } as const;
 
 export const ReviewDecisionSchema = {
@@ -8928,6 +9268,29 @@ export const TicketingStepUpdateSchema = {
     },
     type: 'object',
     title: 'TicketingStepUpdate'
+} as const;
+
+export const TimelinePointSchema = {
+    properties: {
+        date: {
+            type: 'string',
+            title: 'Date'
+        },
+        value: {
+            type: 'integer',
+            title: 'Value',
+            default: 0
+        },
+        cumulative: {
+            type: 'integer',
+            title: 'Cumulative',
+            default: 0
+        }
+    },
+    type: 'object',
+    required: ['date'],
+    title: 'TimelinePoint',
+    description: 'Single data point in a time series.'
 } as const;
 
 export const TokenSchema = {
