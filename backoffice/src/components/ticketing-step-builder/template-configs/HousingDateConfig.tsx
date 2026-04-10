@@ -152,6 +152,7 @@ export function HousingDateConfig({
   productCategory,
 }: TemplateConfigProps) {
   const variant = (config?.variant as string) || "default"
+  const showDates = config?.show_dates !== false
   const parsed = parseConfigSections(config)
 
   const { data: productsData } = useQuery({
@@ -275,8 +276,33 @@ export function HousingDateConfig({
 
       <Separator />
 
-      {/* Pricing Mode */}
+      {/* Date picker visibility */}
       <div className="flex items-center justify-between">
+        <div>
+          <Label className="text-sm font-medium">Show date picker</Label>
+          <p className="text-xs text-muted-foreground">
+            When enabled, customers choose check-in/check-out dates and pricing
+            can be calculated per night. When disabled, housing options are
+            shown as flat-price tickets with no date selection.
+          </p>
+        </div>
+        <Switch
+          checked={showDates}
+          onCheckedChange={(checked) =>
+            onChange({ ...config, show_dates: checked })
+          }
+        />
+      </div>
+
+      <Separator />
+
+      {/* Pricing Mode — only meaningful when dates are shown */}
+      <div
+        className={cn(
+          "flex items-center justify-between",
+          !showDates && "opacity-50",
+        )}
+      >
         <div>
           <Label className="text-sm font-medium">Price per night</Label>
           <p className="text-xs text-muted-foreground">
@@ -285,7 +311,8 @@ export function HousingDateConfig({
           </p>
         </div>
         <Switch
-          checked={config?.price_per_day !== false}
+          checked={showDates && config?.price_per_day !== false}
+          disabled={!showDates}
           onCheckedChange={(checked) =>
             onChange({ ...config, price_per_day: checked })
           }

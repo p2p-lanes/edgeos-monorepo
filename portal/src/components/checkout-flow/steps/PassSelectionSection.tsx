@@ -13,19 +13,23 @@ import {
   User,
   Users,
 } from "lucide-react"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { badgeName } from "@/app/portal/[popupSlug]/passes/constants/multiuse"
+import AddAttendeeButtons from "@/components/checkout-flow/shared/AddAttendeeButtons"
 import { useDesignVariant } from "@/context/designVariant"
 import { formatDate } from "@/helpers/dates"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
-import { useCityProvider } from "@/providers/cityProvider"
 import { usePassesProvider } from "@/providers/passesProvider"
 import type { AttendeeCategory, AttendeePassState } from "@/types/Attendee"
 import type { ProductsPass } from "@/types/Products"
 
-interface PassSelectionSectionProps {
-  onAddAttendee?: (category: AttendeeCategory) => void
+/** Smooth-scroll to an attendee card. Defers one frame so layout settles first. */
+function scrollToAttendeeCard(attendeeId: string) {
+  requestAnimationFrame(() => {
+    const el = document.getElementById(`attendee-card-${attendeeId}`)
+    el?.scrollIntoView({ behavior: "smooth", block: "center" })
+  })
 }
 
 const CATEGORY_ORDER = ["main", "spouse", "kid", "teen", "baby"]
@@ -91,16 +95,13 @@ const stripedPatternStyle = {
     "repeating-linear-gradient(135deg, transparent, transparent 3px, rgba(0,0,0,0.07) 3px, rgba(0,0,0,0.07) 6px)",
 }
 
-export default function PassSelectionSection({
-  onAddAttendee,
-}: PassSelectionSectionProps) {
+export default function PassSelectionSection() {
   const { attendeePasses, toggleProduct, isEditing } = usePassesProvider()
   const { editCredit } = useCheckout()
-  const { getCity } = useCityProvider()
   const { passesVariant } = useDesignVariant()
-  const city = getCity()
-
-  const hasSpouse = attendeePasses.some((a) => a.category === "spouse")
+  const [focusedAttendeeId, setFocusedAttendeeId] = useState<string | null>(
+    null,
+  )
 
   const groupedByCategory = useMemo(() => {
     const map = new Map<string, AttendeePassState[]>()
@@ -144,30 +145,9 @@ export default function PassSelectionSection({
       )}
 
       {/* Toolbar: Add Family Members */}
-      <div className="flex flex-wrap items-center gap-3 justify-between">
-        <div className="flex items-center gap-2">
-          {!isEditing && !hasSpouse && city?.allows_spouse && (
-            <button
-              type="button"
-              onClick={() => onAddAttendee?.("spouse")}
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm"
-            >
-              <Plus className="w-4 h-4" />
-              Add spouse
-            </button>
-          )}
-          {!isEditing && city?.allows_children && (
-            <button
-              type="button"
-              onClick={() => onAddAttendee?.("kid")}
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm"
-            >
-              <Plus className="w-4 h-4" />
-              Add child
-            </button>
-          )}
-        </div>
-      </div>
+      {!isEditing && (
+        <AddAttendeeButtons onAttendeeAdded={setFocusedAttendeeId} />
+      )}
 
       {/* Variant Renderers */}
       {passesVariant === "stacked" && (
@@ -176,6 +156,7 @@ export default function PassSelectionSection({
           allAttendees={attendeePasses}
           toggleProduct={toggleProduct}
           isEditing={isEditing}
+          focusedAttendeeId={focusedAttendeeId}
         />
       )}
       {passesVariant === "tabs" && (
@@ -184,6 +165,7 @@ export default function PassSelectionSection({
           allAttendees={attendeePasses}
           toggleProduct={toggleProduct}
           isEditing={isEditing}
+          focusedAttendeeId={focusedAttendeeId}
         />
       )}
       {passesVariant === "compact" && (
@@ -192,6 +174,7 @@ export default function PassSelectionSection({
           allAttendees={attendeePasses}
           toggleProduct={toggleProduct}
           isEditing={isEditing}
+          focusedAttendeeId={focusedAttendeeId}
         />
       )}
       {passesVariant === "accordion" && (
@@ -200,6 +183,7 @@ export default function PassSelectionSection({
           allAttendees={attendeePasses}
           toggleProduct={toggleProduct}
           isEditing={isEditing}
+          focusedAttendeeId={focusedAttendeeId}
         />
       )}
     </motion.div>
@@ -215,6 +199,7 @@ interface VariantProps {
   allAttendees: AttendeePassState[]
   toggleProduct: (attendeeId: string, product: ProductsPass) => void
   isEditing: boolean
+  focusedAttendeeId?: string | null
 }
 
 // ---------------------------------------------------------------------------
@@ -226,7 +211,12 @@ function StackedVariant({
   allAttendees,
   toggleProduct,
   isEditing,
+  focusedAttendeeId,
 }: VariantProps) {
+  useEffect(() => {
+    if (focusedAttendeeId) scrollToAttendeeCard(focusedAttendeeId)
+  }, [focusedAttendeeId])
+
   return (
     <div className="space-y-3">
       {groupedByCategory.map(([category, attendees]) => {
@@ -254,7 +244,7 @@ function StackedVariant({
 
             {/* Attendees within this category */}
             {attendees.map((attendee, idx) => (
-              <div key={attendee.id}>
+              <div key={attendee.id} id={`attendee-card-${attendee.id}`}>
                 {attendees.length > 1 && (
                   <div className="px-5 py-2 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
                     <User className="w-3.5 h-3.5 text-gray-400" />
@@ -290,10 +280,22 @@ function TabsVariant({
   allAttendees,
   toggleProduct,
   isEditing,
+  focusedAttendeeId,
 }: VariantProps) {
   const [activeCategory, setActiveCategory] = useState(
     () => groupedByCategory[0]?.[0] ?? "main",
   )
+
+  useEffect(() => {
+    if (!focusedAttendeeId) return
+    const target = groupedByCategory.find(([, list]) =>
+      list.some((a) => a.id === focusedAttendeeId),
+    )
+    if (target) {
+      setActiveCategory(target[0])
+      scrollToAttendeeCard(focusedAttendeeId)
+    }
+  }, [focusedAttendeeId, groupedByCategory])
 
   const activeGroup =
     groupedByCategory.find(([cat]) => cat === activeCategory) ??
@@ -345,7 +347,7 @@ function TabsVariant({
           transition={{ duration: 0.18, ease: "easeOut" }}
         >
           {activeGroup[1].map((attendee, idx) => (
-            <div key={attendee.id}>
+            <div key={attendee.id} id={`attendee-card-${attendee.id}`}>
               {activeGroup[1].length > 1 && (
                 <div className="px-5 py-2 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
                   <User className="w-3.5 h-3.5 text-gray-400" />
@@ -380,7 +382,12 @@ function CompactVariant({
   allAttendees,
   toggleProduct,
   isEditing,
+  focusedAttendeeId,
 }: VariantProps) {
+  useEffect(() => {
+    if (focusedAttendeeId) scrollToAttendeeCard(focusedAttendeeId)
+  }, [focusedAttendeeId])
+
   return (
     <div className="space-y-4">
       {groupedByCategory.map(([category, attendees]) => {
@@ -447,6 +454,7 @@ function CompactVariant({
               return (
                 <div
                   key={attendee.id}
+                  id={`attendee-card-${attendee.id}`}
                   className={cn(
                     "bg-white rounded-xl border border-gray-100 p-3 shadow-sm",
                     `border-l-2 ${colors.accent}`,
@@ -670,6 +678,7 @@ function AccordionVariant({
   allAttendees,
   toggleProduct,
   isEditing,
+  focusedAttendeeId,
 }: VariantProps) {
   const [openCategories, setOpenCategories] = useState<Set<string>>(
     () => new Set(["main"]),
@@ -683,6 +692,22 @@ function AccordionVariant({
       return next
     })
   }
+
+  useEffect(() => {
+    if (!focusedAttendeeId) return
+    const target = groupedByCategory.find(([, list]) =>
+      list.some((a) => a.id === focusedAttendeeId),
+    )
+    if (target) {
+      setOpenCategories((prev) => {
+        if (prev.has(target[0])) return prev
+        const next = new Set(prev)
+        next.add(target[0])
+        return next
+      })
+      scrollToAttendeeCard(focusedAttendeeId)
+    }
+  }, [focusedAttendeeId, groupedByCategory])
 
   return (
     <div className="space-y-2">
@@ -753,7 +778,7 @@ function AccordionVariant({
                 className="border-t border-gray-100"
               >
                 {attendees.map((attendee, idx) => (
-                  <div key={attendee.id}>
+                  <div key={attendee.id} id={`attendee-card-${attendee.id}`}>
                     {attendees.length > 1 && (
                       <div className="px-5 py-2 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
                         <User className="w-3.5 h-3.5 text-gray-400" />

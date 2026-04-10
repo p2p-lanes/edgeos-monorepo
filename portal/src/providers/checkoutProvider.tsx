@@ -13,6 +13,7 @@ import {
 } from "react"
 import type { TicketingStepPublic } from "@/client"
 import { TicketingStepsService } from "@/client"
+import { supportsQuantitySelector } from "@/components/ui/QuantitySelector"
 import {
   type CartSelectionState,
   useCartPersistence,
@@ -63,6 +64,7 @@ interface CheckoutContextValue {
   togglePass: (attendeeId: string, productId: string) => void
   resetDayProduct: (attendeeId: string, productId: string) => void
   selectHousing: (productId: string, checkIn: string, checkOut: string) => void
+  updateHousingQuantity: (quantity: number) => void
   clearHousing: () => void
   updateMerchQuantity: (productId: string, quantity: number) => void
   setPatronAmount: (
@@ -139,11 +141,19 @@ export function CheckoutProvider({
     const step = configuredSteps.find((s) => s.step_type === "housing")
     if (!step?.template_config) return true
     const cfg = step.template_config as Record<string, unknown>
+    // When the housing step hides the date picker, the per-night multiplication
+    // is meaningless — force flat pricing so totals use product.price directly.
+    if (cfg.show_dates === false) return false
     return cfg.price_per_day !== false
   }, [configuredSteps])
 
-  const { housing, setHousing, selectHousing, clearHousing } =
-    useHousingSelection(housingProducts, housingPricePerDay)
+  const {
+    housing,
+    setHousing,
+    selectHousing,
+    updateHousingQuantity,
+    clearHousing,
+  } = useHousingSelection(housingProducts, housingPricePerDay)
 
   const { merch, setMerch, updateMerchQuantity } =
     useMerchSelection(merchProducts)
@@ -167,7 +177,9 @@ export function CheckoutProvider({
           const isDayPass = product.duration_type === "day"
           const quantity = isDayPass
             ? (product.quantity ?? 1) - (product.original_quantity ?? 0)
-            : 1
+            : supportsQuantitySelector(product.max_quantity)
+              ? (product.quantity ?? 1)
+              : 1
 
           if (quantity > 0) {
             passes.push({
@@ -580,6 +592,7 @@ export function CheckoutProvider({
     togglePass,
     resetDayProduct,
     selectHousing,
+    updateHousingQuantity,
     clearHousing,
     updateMerchQuantity,
     setPatronAmount,

@@ -4,6 +4,10 @@ import { Building2, Calendar, Check, Home } from "lucide-react"
 import Image from "next/image"
 import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
+import ExpandableDescription from "@/components/ui/ExpandableDescription"
+import QuantitySelector, {
+  supportsQuantitySelector,
+} from "@/components/ui/QuantitySelector"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
 import { useCityProvider } from "@/providers/cityProvider"
@@ -330,9 +334,11 @@ function GridCard({
           {product.name}
         </p>
         {product.description && (
-          <p className="text-xs text-gray-500 line-clamp-2 mt-1">
-            {product.description}
-          </p>
+          <ExpandableDescription
+            text={product.description}
+            clamp={2}
+            className="text-xs text-gray-500 mt-1"
+          />
         )}
         {pricePerDay && (
           <p className="text-xs text-gray-500 mt-1">
@@ -610,9 +616,11 @@ function ShowcaseSectionCard({
                     {product.name}
                   </p>
                   {product.description && (
-                    <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">
-                      {product.description}
-                    </p>
+                    <ExpandableDescription
+                      text={product.description}
+                      clamp={2}
+                      className="text-xs text-gray-500 mt-0.5"
+                    />
                   )}
                   {pricePerDay && (
                     <p className="text-xs text-gray-400 mt-1">
@@ -753,12 +761,50 @@ function HousingGrid({
 
 /* ── Main export ──────────────────────────────────────────── */
 
+/* ── Quantity summary (shown when a multi-unit housing is selected) ── */
+
+function HousingQuantitySummary({
+  product,
+  quantity,
+  totalPrice,
+  onQuantityChange,
+}: {
+  product: ProductsPass
+  quantity: number
+  totalPrice: number
+  onQuantityChange: (qty: number) => void
+}) {
+  const max = product.max_quantity ?? Number.POSITIVE_INFINITY
+  return (
+    <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex items-center justify-between gap-3">
+      <div className="min-w-0">
+        <p className="text-xs text-blue-700 uppercase font-semibold tracking-wide">
+          {product.name}
+        </p>
+        <p className="text-sm text-blue-900 font-medium mt-0.5">
+          {quantity} {quantity === 1 ? "unit" : "units"} ·{" "}
+          {formatCurrency(totalPrice)}
+        </p>
+      </div>
+      <QuantitySelector
+        size="md"
+        value={quantity}
+        min={1}
+        max={max}
+        onIncrement={() => onQuantityChange(quantity + 1)}
+        onDecrement={() => onQuantityChange(quantity - 1)}
+      />
+    </div>
+  )
+}
+
 export default function VariantHousingDate({
   products,
   onSkip,
   templateConfig,
 }: VariantProps) {
-  const { cart, selectHousing, clearHousing } = useCheckout()
+  const { cart, selectHousing, updateHousingQuantity, clearHousing } =
+    useCheckout()
   const { getCity } = useCityProvider()
   const city = getCity()
 
@@ -842,7 +888,10 @@ export default function VariantHousingDate({
   }
 
   const variant = (templateConfig?.variant as string) || "default"
-  const pricePerDay = templateConfig?.price_per_day !== false
+  const showDates = templateConfig?.show_dates !== false
+  // When dates are hidden, per-night pricing becomes meaningless — collapse
+  // the totals to flat product.price so all card components render consistently.
+  const pricePerDay = showDates && templateConfig?.price_per_day !== false
 
   const cardProps: CardListProps = {
     groups,
@@ -861,18 +910,43 @@ export default function VariantHousingDate({
   }
   const VariantLayout = VARIANT_MAP[variant] ?? HousingDefault
 
+  const selectedHousing =
+    selectedProductId && cart.housing?.productId === selectedProductId
+      ? cart.housing
+      : null
+  const canShowStepper =
+    selectedHousing != null &&
+    supportsQuantitySelector(selectedHousing.product.max_quantity)
+
   return (
     <div className="space-y-6">
-      <DatePickerSection
-        checkIn={checkIn}
-        checkOut={checkOut}
-        popupStart={popupStart}
-        popupEnd={popupEnd}
-        nights={nights}
-        pricePerDay={pricePerDay}
-        onCheckInChange={setCheckIn}
-        onCheckOutChange={setCheckOut}
-      />
+      {showDates && (
+        <DatePickerSection
+          checkIn={checkIn}
+          checkOut={checkOut}
+          popupStart={popupStart}
+          popupEnd={popupEnd}
+          nights={nights}
+          pricePerDay={pricePerDay}
+          onCheckInChange={setCheckIn}
+          onCheckOutChange={setCheckOut}
+        />
+      )}
+      {canShowStepper && selectedHousing && (
+        <HousingQuantitySummary
+          product={selectedHousing.product}
+          quantity={selectedHousing.quantity}
+          totalPrice={selectedHousing.totalPrice}
+          onQuantityChange={(qty) => {
+            if (qty <= 0) {
+              setSelectedProductId(null)
+              clearHousing()
+              return
+            }
+            updateHousingQuantity(qty)
+          }}
+        />
+      )}
       <VariantLayout {...cardProps} />
     </div>
   )

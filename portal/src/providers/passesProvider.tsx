@@ -9,6 +9,7 @@ import {
   useState,
 } from "react"
 import type { AttendeePurchases } from "@/client"
+import { supportsQuantitySelector } from "@/components/ui/QuantitySelector"
 import { sortAttendees } from "@/helpers/filters"
 import { useCart } from "@/hooks/useCartApi"
 import useGetPassesData from "@/hooks/useGetPassesData"
@@ -83,15 +84,22 @@ function buildBaseAttendeePasses(
           product.attendee_category === attendee.category && product.is_active,
       )
       .map((product: ProductsPass) => {
+        const isMultiUnit =
+          product.duration_type !== "day" &&
+          supportsQuantitySelector(product.max_quantity)
         const originalQuantity =
           product.duration_type === "day"
             ? (purchased.find((p) => p.id === product.id)?.quantity ?? 0)
             : 1
+        // Multi-unit non-day products start at 0 so the UI shows them as "empty";
+        // single-unit non-day keep the legacy init of 1 so existing toggle code paths
+        // multiply by 1 and downstream totals remain unchanged.
+        const initialQuantity = isMultiUnit ? 0 : originalQuantity
 
         return {
           ...product,
           original_quantity: originalQuantity,
-          quantity: originalQuantity,
+          quantity: initialQuantity,
           selected: false,
           attendee_id: attendee.id,
           original_price: product.price,
@@ -138,12 +146,20 @@ function applyCartSelections(
       if (cartQuantity === undefined) return product
 
       const isDayPass = product.duration_type === "day"
+      if (isDayPass) {
+        return {
+          ...product,
+          selected: true,
+          quantity: (product.original_quantity ?? 0) + cartQuantity,
+        }
+      }
+      // Non-day: multi-unit products restore the persisted quantity;
+      // single-unit products stay at the legacy quantity of 1.
+      const isMultiUnit = supportsQuantitySelector(product.max_quantity)
       return {
         ...product,
         selected: true,
-        quantity: isDayPass
-          ? (product.original_quantity ?? 0) + cartQuantity
-          : product.quantity,
+        quantity: isMultiUnit ? cartQuantity : product.quantity,
       }
     }),
   }))

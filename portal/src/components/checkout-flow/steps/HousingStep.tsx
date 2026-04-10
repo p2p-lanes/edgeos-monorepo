@@ -4,6 +4,10 @@ import { Calendar, Check, Home } from "lucide-react"
 import Image from "next/image"
 import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
+import ExpandableDescription from "@/components/ui/ExpandableDescription"
+import QuantitySelector, {
+  supportsQuantitySelector,
+} from "@/components/ui/QuantitySelector"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
 import { useCityProvider } from "@/providers/cityProvider"
@@ -28,7 +32,13 @@ function parseDate(dateStr: string): Date {
 }
 
 export default function HousingStep({ onSkip }: HousingStepProps) {
-  const { housingProducts, cart, selectHousing, clearHousing } = useCheckout()
+  const {
+    housingProducts,
+    cart,
+    selectHousing,
+    updateHousingQuantity,
+    clearHousing,
+  } = useCheckout()
   const { getCity } = useCityProvider()
   const city = getCity()
 
@@ -153,15 +163,33 @@ export default function HousingStep({ onSkip }: HousingStepProps) {
 
       {/* Property Cards */}
       <div className="space-y-4">
-        {housingProducts.map((product) => (
-          <PropertyCard
-            key={product.id}
-            product={product}
-            nights={nights}
-            isSelected={selectedProductId === product.id}
-            onSelect={() => handleProductSelect(product.id)}
-          />
-        ))}
+        {housingProducts.map((product) => {
+          const isSelected = selectedProductId === product.id
+          return (
+            <PropertyCard
+              key={product.id}
+              product={product}
+              nights={nights}
+              isSelected={isSelected}
+              quantity={
+                isSelected && cart.housing ? (cart.housing.quantity ?? 1) : 1
+              }
+              onSelect={() => handleProductSelect(product.id)}
+              onQuantityChange={
+                isSelected
+                  ? (qty) => {
+                      if (qty <= 0) {
+                        setSelectedProductId(null)
+                        clearHousing()
+                        return
+                      }
+                      updateHousingQuantity(qty)
+                    }
+                  : undefined
+              }
+            />
+          )
+        })}
       </div>
     </div>
   )
@@ -171,19 +199,30 @@ interface PropertyCardProps {
   product: ProductsPass
   nights: number
   isSelected: boolean
+  quantity: number
   onSelect: () => void
+  onQuantityChange?: (qty: number) => void
 }
 
 function PropertyCard({
   product,
   nights,
   isSelected,
+  quantity,
   onSelect,
+  onQuantityChange,
 }: PropertyCardProps) {
-  const totalPrice = product.price * nights
-  const compareTotal = product.compare_price
+  const showStepper =
+    isSelected &&
+    !!onQuantityChange &&
+    supportsQuantitySelector(product.max_quantity)
+  const maxQty = product.max_quantity ?? Number.POSITIVE_INFINITY
+  const basePrice = product.price * nights
+  const totalPrice = basePrice * quantity
+  const compareBase = product.compare_price
     ? product.compare_price * nights
     : null
+  const compareTotal = compareBase != null ? compareBase * quantity : null
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -203,14 +242,16 @@ function PropertyCard({
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
         <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4 text-white">
           <h3 className="font-bold text-base sm:text-lg">{product.name}</h3>
-          {product.description && (
-            <p className="text-xs sm:text-sm text-white/80 line-clamp-1">
-              {product.description}
-            </p>
-          )}
         </div>
       </div>
       <div className="p-3 sm:p-4">
+        {product.description && (
+          <ExpandableDescription
+            text={product.description}
+            clamp={2}
+            className="text-xs sm:text-sm text-gray-600 mb-3"
+          />
+        )}
         <button
           type="button"
           onClick={onSelect}
@@ -253,9 +294,25 @@ function PropertyCard({
             >
               {formatCurrency(totalPrice)}
             </p>
-            <p className="text-xs text-gray-500">total</p>
+            <p className="text-xs text-gray-500">
+              {quantity > 1 ? `${quantity} × total` : "total"}
+            </p>
           </div>
         </button>
+        {showStepper && onQuantityChange && (
+          <div className="mt-3 flex items-center justify-between px-3 sm:px-4">
+            <span className="text-xs text-gray-500">Units</span>
+            <QuantitySelector
+              size="md"
+              value={quantity}
+              min={0}
+              max={maxQty}
+              onIncrement={() => onQuantityChange(quantity + 1)}
+              onDecrement={() => onQuantityChange(quantity - 1)}
+              onAdd={() => onQuantityChange(1)}
+            />
+          </div>
+        )}
       </div>
     </div>
   )

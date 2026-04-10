@@ -27,7 +27,6 @@ import { cn } from "@/lib/utils"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCheckout } from "@/providers/checkoutProvider"
 import { useCityProvider } from "@/providers/cityProvider"
-import type { AttendeeCategory } from "@/types/Attendee"
 import { formatCurrency } from "@/types/checkout"
 import CartFooter from "./CartFooter"
 import DesignVariantPanel from "./DesignVariantPanel"
@@ -48,7 +47,6 @@ import SuccessStep from "./steps/SuccessStep"
 gsap.registerPlugin(ScrollToPlugin)
 
 interface ScrollyCheckoutFlowProps {
-  onAddAttendee?: (category: AttendeeCategory) => void
   onPaymentComplete?: () => void
   onBack?: () => void
 }
@@ -880,7 +878,6 @@ function SnapFooter({
 }
 
 function ScrollyCheckoutFlowInner({
-  onAddAttendee,
   onPaymentComplete,
   onBack,
 }: ScrollyCheckoutFlowProps) {
@@ -1268,7 +1265,7 @@ function ScrollyCheckoutFlowInner({
   }, [variant, allSections])
 
   const renderSectionContent = (stepId: string) => {
-    // Passes/tickets: special case — PassSelectionSection needs onAddAttendee
+    // Passes/tickets: dynamic step or fall-back legacy section
     if (stepId === "passes" || stepId === "tickets") {
       const ticketConfig = getStepConfig("tickets") ?? getStepConfig("passes")
       if (shouldUseDynamicStep(ticketConfig)) {
@@ -1276,7 +1273,7 @@ function ScrollyCheckoutFlowInner({
           <DynamicProductStep stepConfig={ticketConfig!} onSkip={() => {}} />
         )
       }
-      return <PassSelectionSection onAddAttendee={onAddAttendee} />
+      return <PassSelectionSection />
     }
 
     // All other steps: check dynamic template first, then fallback registry

@@ -14,7 +14,6 @@ import SuccessStep from "@/components/checkout-flow/steps/SuccessStep"
 import { usePaymentVerification } from "@/hooks/checkout"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCheckout } from "@/providers/checkoutProvider"
-import type { AttendeeCategory } from "@/types/Attendee"
 import type { CheckoutStep } from "@/types/checkout"
 import CheckoutSkeleton from "./CheckoutSkeleton"
 
@@ -60,14 +59,12 @@ function getDefaultStepSubtitle(step: CheckoutStep): string {
 }
 
 interface CheckoutFlowProps {
-  onAddAttendee?: (category: AttendeeCategory) => void
   onPaymentComplete?: () => void
   onBack?: () => void
   isLoading?: boolean
 }
 
 export default function CheckoutFlow({
-  onAddAttendee,
   onPaymentComplete,
   onBack,
   isLoading = false,
@@ -145,7 +142,7 @@ export default function CheckoutFlow({
     stepConfig?.description ?? getDefaultStepSubtitle(currentStep)
 
   const renderStepContent = () => {
-    // Passes/tickets: special case — PassSelectionSection needs onAddAttendee
+    // Passes/tickets: dynamic step or fall-back legacy section
     if (currentStep === "passes" || currentStep === "tickets") {
       const ticketStepConfig = stepConfigs.find(
         (s) =>
@@ -172,7 +169,7 @@ export default function CheckoutFlow({
           {isLoading ? (
             <CheckoutSkeleton key="skeleton" />
           ) : (
-            <PassSelectionSection key="passes" onAddAttendee={onAddAttendee} />
+            <PassSelectionSection key="passes" />
           )}
         </AnimatePresence>
       )

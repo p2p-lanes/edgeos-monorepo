@@ -1,7 +1,13 @@
 "use client"
 
-import { Check, ChevronDown, Minus, Plus, Ticket } from "lucide-react"
-import { useState } from "react"
+import { Check, ChevronDown, Ticket } from "lucide-react"
+import { useEffect, useState } from "react"
+import AddAttendeeButtons from "@/components/checkout-flow/shared/AddAttendeeButtons"
+import ExpandableDescription from "@/components/ui/ExpandableDescription"
+import QuantitySelector, {
+  resolveMaxQuantity,
+  supportsQuantitySelector,
+} from "@/components/ui/QuantitySelector"
 import { type PassesVariant, useDesignVariant } from "@/context/designVariant"
 import { formatDate } from "@/helpers/dates"
 import { cn } from "@/lib/utils"
@@ -127,6 +133,9 @@ export default function VariantTicketSelect({
   const passesVariant: PassesVariant =
     (templateConfig?.variant as PassesVariant) || devVariant || "stacked"
   const { attendeePasses, toggleProduct, isEditing } = usePassesProvider()
+  const [focusedAttendeeId, setFocusedAttendeeId] = useState<string | null>(
+    null,
+  )
 
   // If no attendee data, fall back to legacy section-based layout
   if (attendeePasses.length === 0) {
@@ -143,10 +152,21 @@ export default function VariantTicketSelect({
   const attendees = sortedAttendees(attendeePasses)
 
   const sections = parseSections(templateConfig)
-  const sharedProps = { attendees, toggleProduct, isEditing, sections }
+  const sharedProps = {
+    attendees,
+    toggleProduct,
+    isEditing,
+    sections,
+    focusedAttendeeId,
+  }
+
+  const handleAttendeeAdded = (attendeeId: string) => {
+    setFocusedAttendeeId(attendeeId)
+  }
 
   return (
     <div className="space-y-4">
+      <AddAttendeeButtons onAttendeeAdded={handleAttendeeAdded} />
       {passesVariant === "stacked" && <StackedLayout {...sharedProps} />}
       {passesVariant === "tabs" && <TabsLayout {...sharedProps} />}
       {passesVariant === "compact" && <CompactLayout {...sharedProps} />}
@@ -174,6 +194,15 @@ interface LayoutProps {
   toggleProduct: (attendeeId: string, product: ProductsPass) => void
   isEditing: boolean
   sections: TemplateSection[]
+  focusedAttendeeId?: string | null
+}
+
+/** Smooth-scroll to an attendee card. Defers one frame so layout updates settle first. */
+function scrollToAttendeeCard(attendeeId: string) {
+  requestAnimationFrame(() => {
+    const el = document.getElementById(`attendee-card-${attendeeId}`)
+    el?.scrollIntoView({ behavior: "smooth", block: "center" })
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -332,6 +361,9 @@ function AttendeePassRows({
                 key={p.id}
                 product={p}
                 onClick={() => toggleProduct(attendee.id, p)}
+                onQuantityChange={(qty) =>
+                  toggleProduct(attendee.id, { ...p, quantity: qty })
+                }
                 isEditing={isEditing}
               />
             ),
@@ -369,11 +401,13 @@ function PassSection({
 function PassRow({
   product,
   onClick,
+  onQuantityChange,
   disabled,
   isEditing,
 }: {
   product: ProductsPass
   onClick: () => void
+  onQuantityChange?: (qty: number) => void
   disabled?: boolean
   isEditing: boolean
 }) {
@@ -383,6 +417,14 @@ function PassRow({
   const hasDiscount = comparePrice && comparePrice > product.price
   const isSelected = selected && !purchased
   const isClickable = !disabled && (!purchased || isEditing)
+  // Multi-unit stepper mode — editing of purchased multi-unit passes is out
+  // of scope (plan decision), so we only show the stepper for non-purchased rows.
+  const showStepper =
+    !!onQuantityChange &&
+    supportsQuantitySelector(product.max_quantity) &&
+    !purchased
+  const currentQuantity = product.quantity ?? 0
+  const maxQuantity = resolveMaxQuantity(product)
 
   if (purchased && !isEditing) {
     return (
@@ -475,33 +517,60 @@ function PassRow({
     )
   }
 
+  const rowIsActive = showStepper ? currentQuantity > 0 : isSelected
+
+  const handleRowClick = () => {
+    if (!isClickable) return
+    if (showStepper && onQuantityChange) {
+      if (currentQuantity === 0 && currentQuantity < maxQuantity) {
+        onQuantityChange(1)
+      }
+      return
+    }
+    onClick()
+  }
+
   return (
     <button
       type="button"
-      onClick={isClickable ? onClick : undefined}
+      onClick={isClickable ? handleRowClick : undefined}
       disabled={!isClickable}
       className={cn(
         "w-full px-5 py-3 flex items-center justify-between gap-4 transition-all",
         disabled
           ? "opacity-40 cursor-not-allowed bg-gray-50"
-          : isSelected
+          : rowIsActive
             ? "bg-blue-50"
             : "hover:bg-gray-50",
       )}
     >
       <div className="flex items-center gap-3 flex-1 min-w-0">
-        <div
-          className={cn(
-            "w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all",
-            isSelected
-              ? "bg-blue-600 border-blue-600"
-              : disabled
-                ? "border-gray-200"
-                : "border-gray-300",
-          )}
-        >
-          {isSelected && <Check className="w-3 h-3 text-white" />}
-        </div>
+        {showStepper && onQuantityChange ? (
+          <QuantitySelector
+            size="sm"
+            value={currentQuantity}
+            min={0}
+            max={maxQuantity}
+            disabled={!!disabled}
+            onIncrement={() => onQuantityChange(currentQuantity + 1)}
+            onDecrement={() => onQuantityChange(currentQuantity - 1)}
+            onAdd={() => onQuantityChange(1)}
+            className="shrink-0"
+          />
+        ) : (
+          <div
+            className={cn(
+              "w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all",
+              isSelected
+                ? "bg-blue-600 border-blue-600"
+                : disabled
+                  ? "border-gray-200"
+                  : "border-gray-300",
+            )}
+          >
+            {isSelected && <Check className="w-3 h-3 text-white" />}
+          </div>
+        )}
         <div className="flex-1 min-w-0 text-left">
           <div className="flex items-center gap-2">
             <Ticket className="w-4 h-4 text-gray-400" />
@@ -517,6 +586,13 @@ function PassRow({
               {formatDate(product.end_date, { day: "numeric", month: "short" })}
             </p>
           )}
+          {product.description && (
+            <ExpandableDescription
+              text={product.description}
+              clamp={2}
+              className="text-xs text-gray-500 mt-1"
+            />
+          )}
         </div>
       </div>
       <div className="text-right shrink-0">
@@ -528,7 +604,7 @@ function PassRow({
         <p
           className={cn(
             "font-semibold",
-            isSelected ? "text-blue-600" : "text-gray-900",
+            rowIsActive ? "text-blue-600" : "text-gray-900",
           )}
         >
           ${product.price.toLocaleString()}
@@ -561,17 +637,11 @@ function DayPassRow({
   const hasDiscount = comparePrice != null && comparePrice > product.price
   const hasQuantity = quantity > 0
 
-  const maxQuantity = (() => {
-    if (!product.start_date || !product.end_date) return 30
-    const diff = Math.abs(
-      new Date(product.end_date).getTime() -
-        new Date(product.start_date).getTime(),
-    )
-    return Math.ceil(diff / (1000 * 60 * 60 * 24)) + 1
-  })()
+  const maxQuantity = resolveMaxQuantity(product, {
+    dayPassFallbackToDateRange: true,
+  })
 
-  const isMaxReached = quantity >= maxQuantity
-  const isMinReached = purchased && quantity <= originalQuantity && !isEditing
+  const minQuantity = purchased && !isEditing ? originalQuantity : 0
 
   if (purchased && isEditing) {
     const credit = product.price * (product.quantity ?? 1)
@@ -633,57 +703,30 @@ function DayPassRow({
       )}
     >
       <div className="flex items-center gap-3 flex-1 min-w-0">
-        <div className="flex items-center gap-0.5 shrink-0">
-          <button
-            type="button"
-            onClick={() =>
-              !disabled &&
-              !isMinReached &&
-              quantity > 0 &&
-              onQuantityChange(quantity - 1)
-            }
-            disabled={disabled || quantity === 0 || isMinReached}
-            aria-label="Decrease"
-            className={cn(
-              "w-5 h-5 rounded flex items-center justify-center transition-all",
-              disabled || quantity === 0 || isMinReached
-                ? "text-gray-300 cursor-not-allowed"
-                : "text-gray-500 hover:text-gray-700 hover:bg-gray-100",
-            )}
-          >
-            <Minus className="w-3.5 h-3.5" />
-          </button>
-          <span
-            className={cn(
-              "w-5 text-center font-semibold text-sm",
-              hasQuantity ? "text-blue-600" : "text-gray-400",
-            )}
-          >
-            {quantity}
-          </span>
-          <button
-            type="button"
-            onClick={() =>
-              !disabled && !isMaxReached && onQuantityChange(quantity + 1)
-            }
-            disabled={disabled || isMaxReached}
-            aria-label="Increase"
-            className={cn(
-              "w-5 h-5 rounded flex items-center justify-center transition-all",
-              disabled || isMaxReached
-                ? "text-gray-300 cursor-not-allowed"
-                : "text-gray-500 hover:text-gray-700 hover:bg-gray-100",
-            )}
-          >
-            <Plus className="w-3.5 h-3.5" />
-          </button>
-        </div>
+        <QuantitySelector
+          size="sm"
+          value={quantity}
+          min={minQuantity}
+          max={maxQuantity}
+          disabled={!!disabled}
+          onIncrement={() => onQuantityChange(quantity + 1)}
+          onDecrement={() => onQuantityChange(quantity - 1)}
+          onAdd={() => onQuantityChange(1)}
+          className="shrink-0"
+        />
         <div className="flex-1 min-w-0 text-left">
           <div className="flex items-center gap-2">
             <Ticket className="w-4 h-4 text-gray-400" />
             <span className="font-medium text-gray-900">{product.name}</span>
           </div>
           <p className="text-sm text-gray-500">per day</p>
+          {product.description && (
+            <ExpandableDescription
+              text={product.description}
+              clamp={2}
+              className="text-xs text-gray-500 mt-1"
+            />
+          )}
         </div>
       </div>
       <div className="text-right shrink-0">
@@ -757,22 +800,34 @@ function CompactAttendeeCard({
       ) : (
         <div className="flex flex-wrap gap-2">
           {visibleProducts.map((p) => {
-            if (p.duration_type === "day") {
+            const isDayPass = p.duration_type === "day"
+            const hasStepper =
+              isDayPass || supportsQuantitySelector(p.max_quantity)
+
+            if (hasStepper) {
               const qty = p.quantity ?? 0
-              const max = (() => {
-                if (!p.start_date || !p.end_date) return 30
-                return (
-                  Math.ceil(
-                    Math.abs(
-                      new Date(p.end_date).getTime() -
-                        new Date(p.start_date).getTime(),
-                    ) /
-                      (1000 * 60 * 60 * 24),
-                  ) + 1
-                )
-              })()
-              const isMinReached =
-                p.purchased && qty <= (p.original_quantity ?? 0) && !isEditing
+              const max = resolveMaxQuantity(p, {
+                dayPassFallbackToDateRange: isDayPass,
+              })
+              const minQty =
+                isDayPass && p.purchased && !isEditing
+                  ? (p.original_quantity ?? 0)
+                  : 0
+              // Mirror the pill-level disabling used by the non-day branch below.
+              const isChild =
+                attendee.category === "kid" ||
+                attendee.category === "teen" ||
+                attendee.category === "baby"
+              const tileDisabled =
+                !!p.disabled ||
+                (!isDayPass &&
+                  isChild &&
+                  (p.duration_type === "full" ||
+                    p.duration_type === "month")) ||
+                (p.duration_type === "week" && hasFullOrMonthSelected) ||
+                (p.duration_type === "day" && hasFullOrMonthSelected) ||
+                (p.purchased && !isEditing)
+
               return (
                 <div
                   key={p.id}
@@ -781,49 +836,25 @@ function CompactAttendeeCard({
                     qty > 0
                       ? "bg-blue-50 border-blue-300"
                       : "bg-white border-gray-200",
+                    tileDisabled && "opacity-40",
                   )}
                 >
-                  <button
-                    type="button"
-                    onClick={() =>
-                      !isMinReached &&
-                      qty > 0 &&
-                      toggleProduct(attendee.id, { ...p, quantity: qty - 1 })
-                    }
-                    disabled={qty === 0 || isMinReached}
-                    className={cn(
-                      "w-4 h-4 flex items-center justify-center rounded",
-                      qty === 0 || isMinReached
-                        ? "text-gray-300 cursor-not-allowed"
-                        : "text-gray-500 hover:bg-gray-100",
-                    )}
-                  >
-                    <Minus className="w-3 h-3" />
-                  </button>
-                  <span
-                    className={cn(
-                      "w-4 text-center font-semibold",
-                      qty > 0 ? "text-blue-600" : "text-gray-400",
-                    )}
-                  >
-                    {qty}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      qty < max &&
+                  <QuantitySelector
+                    size="sm"
+                    value={qty}
+                    min={minQty}
+                    max={max}
+                    disabled={tileDisabled}
+                    onIncrement={() =>
                       toggleProduct(attendee.id, { ...p, quantity: qty + 1 })
                     }
-                    disabled={qty >= max}
-                    className={cn(
-                      "w-4 h-4 flex items-center justify-center rounded",
-                      qty >= max
-                        ? "text-gray-300 cursor-not-allowed"
-                        : "text-gray-500 hover:bg-gray-100",
-                    )}
-                  >
-                    <Plus className="w-3 h-3" />
-                  </button>
+                    onDecrement={() =>
+                      toggleProduct(attendee.id, { ...p, quantity: qty - 1 })
+                    }
+                    onAdd={() =>
+                      toggleProduct(attendee.id, { ...p, quantity: 1 })
+                    }
+                  />
                   <Ticket
                     className={cn(
                       "w-3 h-3 ml-0.5",
@@ -911,12 +942,18 @@ function StackedLayout({
   toggleProduct,
   isEditing,
   sections,
+  focusedAttendeeId,
 }: LayoutProps) {
+  useEffect(() => {
+    if (focusedAttendeeId) scrollToAttendeeCard(focusedAttendeeId)
+  }, [focusedAttendeeId])
+
   return (
     <div className="space-y-3">
       {attendees.map((attendee) => (
         <div
           key={attendee.id}
+          id={`attendee-card-${attendee.id}`}
           className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden"
         >
           <AttendeeHeader attendee={attendee} />
@@ -941,9 +978,19 @@ function TabsLayout({
   toggleProduct,
   isEditing,
   sections,
+  focusedAttendeeId,
 }: LayoutProps) {
   const [activeIdx, setActiveIdx] = useState(0)
   const active = attendees[activeIdx]
+
+  useEffect(() => {
+    if (!focusedAttendeeId) return
+    const idx = attendees.findIndex((a) => a.id === focusedAttendeeId)
+    if (idx >= 0) {
+      setActiveIdx(idx)
+      scrollToAttendeeCard(focusedAttendeeId)
+    }
+  }, [focusedAttendeeId, attendees])
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -986,12 +1033,14 @@ function TabsLayout({
 
       {/* Content */}
       {active && (
-        <AttendeePassRows
-          attendee={active}
-          toggleProduct={toggleProduct}
-          isEditing={isEditing}
-          sections={sections}
-        />
+        <div id={`attendee-card-${active.id}`}>
+          <AttendeePassRows
+            attendee={active}
+            toggleProduct={toggleProduct}
+            isEditing={isEditing}
+            sections={sections}
+          />
+        </div>
       )}
     </div>
   )
@@ -1006,17 +1055,23 @@ function CompactLayout({
   toggleProduct,
   isEditing,
   sections,
+  focusedAttendeeId,
 }: LayoutProps) {
+  useEffect(() => {
+    if (focusedAttendeeId) scrollToAttendeeCard(focusedAttendeeId)
+  }, [focusedAttendeeId])
+
   return (
     <div className="space-y-3">
       {attendees.map((a) => (
-        <CompactAttendeeCard
-          key={a.id}
-          attendee={a}
-          toggleProduct={toggleProduct}
-          isEditing={isEditing}
-          sections={sections}
-        />
+        <div key={a.id} id={`attendee-card-${a.id}`}>
+          <CompactAttendeeCard
+            attendee={a}
+            toggleProduct={toggleProduct}
+            isEditing={isEditing}
+            sections={sections}
+          />
+        </div>
       ))}
     </div>
   )
@@ -1031,6 +1086,7 @@ function AccordionLayout({
   toggleProduct,
   isEditing,
   sections,
+  focusedAttendeeId,
 }: LayoutProps) {
   const [open, setOpen] = useState<Set<string>>(
     () => new Set(attendees[0] ? [attendees[0].id] : []),
@@ -1045,6 +1101,17 @@ function AccordionLayout({
     })
   }
 
+  useEffect(() => {
+    if (!focusedAttendeeId) return
+    setOpen((prev) => {
+      if (prev.has(focusedAttendeeId)) return prev
+      const next = new Set(prev)
+      next.add(focusedAttendeeId)
+      return next
+    })
+    scrollToAttendeeCard(focusedAttendeeId)
+  }, [focusedAttendeeId])
+
   return (
     <div className="space-y-2">
       {attendees.map((attendee) => {
@@ -1055,6 +1122,7 @@ function AccordionLayout({
         return (
           <div
             key={attendee.id}
+            id={`attendee-card-${attendee.id}`}
             className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
           >
             <button
@@ -1194,9 +1262,11 @@ function LegacySectionLayout({
         <div className="flex-1 min-w-0">
           <p className="font-medium text-gray-900 text-sm">{p.name}</p>
           {p.description && (
-            <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">
-              {p.description}
-            </p>
+            <ExpandableDescription
+              text={p.description}
+              clamp={2}
+              className="text-xs text-gray-500 mt-0.5"
+            />
           )}
           {(p.start_date || p.end_date) && (
             <p className="text-xs text-gray-400 mt-0.5">

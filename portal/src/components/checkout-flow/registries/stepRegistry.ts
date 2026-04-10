@@ -44,7 +44,8 @@ export function shouldUseDynamicStep(
     return (
       (cfg.variant != null && cfg.variant !== "default") ||
       (Array.isArray(cfg.sections) && cfg.sections.length > 0) ||
-      cfg.price_per_day === false
+      cfg.price_per_day === false ||
+      cfg.show_dates === false
     )
   }
 

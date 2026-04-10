@@ -151,10 +151,11 @@ export function buildPaymentProducts({
     // Add housing
     if (housing) {
       const firstAttendeeId = selectedPasses[0]?.attendeeId ?? ""
+      const baseQty = housing.pricePerDay ? housing.nights : 1
       products.push({
         product_id: housing.productId,
         attendee_id: firstAttendeeId,
-        quantity: housing.pricePerDay ? housing.nights : 1,
+        quantity: baseQty * (housing.quantity ?? 1),
       })
     }
 

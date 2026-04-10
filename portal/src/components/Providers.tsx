@@ -1,6 +1,7 @@
 "use client"
 
 import { SidebarProvider } from "@/components/Sidebar/SidebarComponents"
+import { TooltipProvider } from "@/components/ui/tooltip"
 import ApplicationProvider from "@/providers/applicationProvider"
 import CityProvider from "@/providers/cityProvider"
 import DiscountProvider from "@/providers/discountProvider"
@@ -11,13 +12,15 @@ const Providers = ({ children }: { children: React.ReactNode }) => {
   return (
     <CityProvider>
       <ThemeProvider>
-        <ApplicationProvider>
-          <DiscountProvider>
-            <PassesProvider>
-              <SidebarProvider>{children}</SidebarProvider>
-            </PassesProvider>
-          </DiscountProvider>
-        </ApplicationProvider>
+        <TooltipProvider>
+          <ApplicationProvider>
+            <DiscountProvider>
+              <PassesProvider>
+                <SidebarProvider>{children}</SidebarProvider>
+              </PassesProvider>
+            </DiscountProvider>
+          </ApplicationProvider>
+        </TooltipProvider>
       </ThemeProvider>
     </CityProvider>
   )
