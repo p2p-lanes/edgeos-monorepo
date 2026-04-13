@@ -95,11 +95,11 @@ export default function HousingStep({ onSkip }: HousingStepProps) {
   if (housingProducts.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
-        <Home className="w-12 h-12 text-gray-300 mb-4" />
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+        <Home className="w-12 h-12 text-muted-foreground/50 mb-4" />
+        <h3 className="text-lg font-semibold text-foreground mb-2">
           No Housing Available
         </h3>
-        <p className="text-gray-500 max-w-md mb-6">
+        <p className="text-muted-foreground max-w-md mb-6">
           Housing options are not currently available for this event. You can
           continue to the next step.
         </p>
@@ -113,10 +113,10 @@ export default function HousingStep({ onSkip }: HousingStepProps) {
   return (
     <div className="space-y-6">
       {/* Date Selection */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 overflow-hidden">
+      <div className="bg-card rounded-2xl shadow-sm border border-border p-4 overflow-hidden">
         <div className="flex items-center gap-2 mb-3">
-          <Calendar className="w-4 h-4 text-gray-500 shrink-0" />
-          <span className="text-sm font-medium text-gray-900">
+          <Calendar className="w-4 h-4 text-muted-foreground shrink-0" />
+          <span className="text-sm font-medium text-foreground">
             {nights} night{nights !== 1 ? "s" : ""}:{" "}
             {formatCheckoutDate(formatDateInput(checkIn))} -{" "}
             {formatCheckoutDate(formatDateInput(checkOut))}
@@ -126,7 +126,7 @@ export default function HousingStep({ onSkip }: HousingStepProps) {
           <div className="flex-1 min-w-0">
             <label
               htmlFor="checkin-date"
-              className="block text-xs text-gray-500 mb-1 sm:hidden"
+              className="block text-xs text-muted-foreground mb-1 sm:hidden"
             >
               Check-in
             </label>
@@ -137,14 +137,14 @@ export default function HousingStep({ onSkip }: HousingStepProps) {
               min={formatDateInput(popupStart)}
               max={formatDateInput(checkOut)}
               onChange={(e) => setCheckIn(parseDate(e.target.value))}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
-          <span className="hidden sm:block self-center text-gray-400">to</span>
+          <span className="hidden sm:block self-center text-muted-foreground">to</span>
           <div className="flex-1 min-w-0">
             <label
               htmlFor="checkout-date"
-              className="block text-xs text-gray-500 mb-1 sm:hidden"
+              className="block text-xs text-muted-foreground mb-1 sm:hidden"
             >
               Check-out
             </label>
@@ -155,7 +155,7 @@ export default function HousingStep({ onSkip }: HousingStepProps) {
               min={formatDateInput(checkIn)}
               max={formatDateInput(popupEnd)}
               onChange={(e) => setCheckOut(parseDate(e.target.value))}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
         </div>
@@ -225,8 +225,8 @@ function PropertyCard({
   const compareTotal = compareBase != null ? compareBase * quantity : null
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-      <div className="relative h-32 sm:h-40 bg-gradient-to-br from-gray-100 to-gray-200">
+    <div className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
+      <div className="relative h-32 sm:h-40 bg-gradient-to-br from-muted to-muted/60">
         {product.image_url ? (
           <Image
             src={product.image_url}
@@ -236,7 +236,7 @@ function PropertyCard({
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">
-            <Home className="w-12 h-12 text-gray-300" />
+            <Home className="w-12 h-12 text-muted-foreground/50" />
           </div>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
@@ -249,7 +249,7 @@ function PropertyCard({
           <ExpandableDescription
             text={product.description}
             clamp={2}
-            className="text-xs sm:text-sm text-gray-600 mb-3"
+            className="text-xs sm:text-sm text-muted-foreground mb-3"
           />
         )}
         <button
@@ -258,50 +258,50 @@ function PropertyCard({
           className={cn(
             "w-full flex items-center justify-between p-3 sm:p-4 rounded-xl border-2 transition-all",
             isSelected
-              ? "border-blue-500 bg-blue-50"
-              : "border-gray-100 bg-gray-50 hover:border-gray-200",
+              ? "border-primary bg-primary/10"
+              : "border-border bg-muted hover:border-muted-foreground/30",
           )}
         >
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <div
               className={cn(
                 "w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0",
-                isSelected ? "border-blue-500 bg-blue-500" : "border-gray-300",
+                isSelected ? "border-primary bg-primary" : "border-muted-foreground/40",
               )}
             >
               {isSelected && <Check className="w-3 h-3 text-white" />}
             </div>
             <div className="text-left min-w-0">
-              <p className="font-medium text-gray-900 text-sm sm:text-base truncate">
+              <p className="font-medium text-foreground text-sm sm:text-base truncate">
                 {product.name}
               </p>
-              <p className="text-xs sm:text-sm text-gray-500">
+              <p className="text-xs sm:text-sm text-muted-foreground">
                 {formatCurrency(product.price)}/night
               </p>
             </div>
           </div>
           <div className="text-right shrink-0 ml-2">
             {compareTotal && compareTotal > totalPrice && (
-              <p className="text-xs text-gray-400 line-through">
+              <p className="text-xs text-muted-foreground line-through">
                 {formatCurrency(compareTotal)}
               </p>
             )}
             <p
               className={cn(
                 "font-bold text-base sm:text-lg",
-                isSelected ? "text-blue-600" : "text-gray-900",
+                isSelected ? "text-primary" : "text-foreground",
               )}
             >
               {formatCurrency(totalPrice)}
             </p>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-muted-foreground">
               {quantity > 1 ? `${quantity} × total` : "total"}
             </p>
           </div>
         </button>
         {showStepper && onQuantityChange && (
           <div className="mt-3 flex items-center justify-between px-3 sm:px-4">
-            <span className="text-xs text-gray-500">Units</span>
+            <span className="text-xs text-muted-foreground">Units</span>
             <QuantitySelector
               size="md"
               value={quantity}

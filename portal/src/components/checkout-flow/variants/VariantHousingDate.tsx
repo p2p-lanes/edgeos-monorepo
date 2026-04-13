@@ -97,10 +97,10 @@ function DatePickerSection({
   onCheckOutChange: (date: Date) => void
 }) {
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 overflow-hidden">
+    <div className="bg-card rounded-2xl shadow-sm border border-border p-4 overflow-hidden">
       <div className="flex items-center gap-2 mb-3">
-        <Calendar className="w-4 h-4 text-gray-500 shrink-0" />
-        <span className="text-sm font-medium text-gray-900">
+        <Calendar className="w-4 h-4 text-muted-foreground shrink-0" />
+        <span className="text-sm font-medium text-foreground">
           {pricePerDay ? `${nights} night${nights !== 1 ? "s" : ""}: ` : ""}
           {formatCheckoutDate(formatDateInput(checkIn))} -{" "}
           {formatCheckoutDate(formatDateInput(checkOut))}
@@ -110,7 +110,7 @@ function DatePickerSection({
         <div className="flex-1 min-w-0">
           <label
             htmlFor="checkin-date"
-            className="block text-xs text-gray-500 mb-1 sm:hidden"
+            className="block text-xs text-muted-foreground mb-1 sm:hidden"
           >
             Check-in
           </label>
@@ -121,14 +121,14 @@ function DatePickerSection({
             min={formatDateInput(popupStart)}
             max={formatDateInput(checkOut)}
             onChange={(e) => onCheckInChange(parseDate(e.target.value))}
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           />
         </div>
-        <span className="hidden sm:block self-center text-gray-400">to</span>
+        <span className="hidden sm:block self-center text-muted-foreground">to</span>
         <div className="flex-1 min-w-0">
           <label
             htmlFor="checkout-date"
-            className="block text-xs text-gray-500 mb-1 sm:hidden"
+            className="block text-xs text-muted-foreground mb-1 sm:hidden"
           >
             Check-out
           </label>
@@ -139,7 +139,7 @@ function DatePickerSection({
             min={formatDateInput(checkIn)}
             max={formatDateInput(popupEnd)}
             onChange={(e) => onCheckOutChange(parseDate(e.target.value))}
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           />
         </div>
       </div>
@@ -155,7 +155,7 @@ function SkipLink({ onSkip }: { onSkip?: () => void }) {
       <button
         type="button"
         onClick={onSkip}
-        className="text-gray-500 hover:text-gray-700 underline text-sm transition-colors"
+        className="text-muted-foreground hover:text-foreground underline text-sm transition-colors"
       >
         Skip this step
       </button>
@@ -179,8 +179,8 @@ interface CardListProps {
 function SectionHeader({ label }: { label: string }) {
   return (
     <div className="flex items-center gap-2 pb-1">
-      <Building2 className="w-4 h-4 text-gray-400 shrink-0" />
-      <h3 className="text-sm font-semibold text-gray-900">{label}</h3>
+      <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />
+      <h3 className="text-sm font-semibold text-foreground">{label}</h3>
     </div>
   )
 }
@@ -214,22 +214,22 @@ function CompactCard({
       className={cn(
         "w-full flex items-center gap-3 rounded-xl border-l-4 px-3 py-3 text-left transition-all",
         isSelected
-          ? "border-l-blue-600 bg-blue-50/60"
-          : "border-l-gray-200 bg-white hover:bg-gray-50",
+          ? "border-l-primary bg-primary/10"
+          : "border-l-border bg-card hover:bg-muted",
       )}
     >
       <div
         className={cn(
           "w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors",
           isSelected
-            ? "bg-blue-600 border-blue-600"
-            : "bg-white border-gray-300",
+            ? "bg-primary border-primary"
+            : "bg-card border-muted-foreground/40",
         )}
       >
         {isSelected && <Check className="w-3 h-3 text-white" />}
       </div>
 
-      <div className="w-14 h-14 rounded-lg overflow-hidden bg-gray-100 shrink-0 relative">
+      <div className="w-14 h-14 rounded-lg overflow-hidden bg-muted shrink-0 relative">
         {product.image_url ? (
           <Image
             src={product.image_url}
@@ -239,17 +239,17 @@ function CompactCard({
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <Home className="w-5 h-5 text-gray-300" />
+            <Home className="w-5 h-5 text-muted-foreground/50" />
           </div>
         )}
       </div>
 
       <div className="flex-1 min-w-0">
-        <p className="font-medium text-sm text-gray-900 truncate">
+        <p className="font-medium text-sm text-foreground truncate">
           {product.name}
         </p>
         {pricePerDay && (
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-muted-foreground">
             {formatCurrency(product.price)}/night
           </p>
         )}
@@ -257,19 +257,19 @@ function CompactCard({
 
       <div className="text-right shrink-0">
         {compareTotal && compareTotal > totalPrice && (
-          <p className="text-xs text-gray-400 line-through">
+          <p className="text-xs text-muted-foreground line-through">
             {formatCurrency(compareTotal)}
           </p>
         )}
         <p
           className={cn(
             "font-bold text-sm",
-            isSelected ? "text-blue-600" : "text-gray-900",
+            isSelected ? "text-primary" : "text-foreground",
           )}
         >
           {formatCurrency(totalPrice)}
         </p>
-        <p className="text-xs text-gray-500">total</p>
+        <p className="text-xs text-muted-foreground">total</p>
       </div>
     </button>
   )
@@ -302,14 +302,14 @@ function GridCard({
       type="button"
       onClick={onSelect}
       className={cn(
-        "relative flex flex-col rounded-2xl border overflow-hidden text-left transition-all",
+        "relative flex flex-col rounded-2xl border overflow-hidden text-left transition-all bg-card",
         isSelected
-          ? "border-blue-600 ring-2 ring-blue-600/20"
-          : "border-gray-200 hover:border-gray-300",
+          ? "border-primary ring-2 ring-primary/20"
+          : "border-border hover:border-muted-foreground/30",
       )}
     >
       {product.image_url ? (
-        <div className="relative w-full aspect-[4/3] bg-gray-100">
+        <div className="relative w-full aspect-[4/3] bg-muted">
           <Image
             src={product.image_url}
             alt={product.name}
@@ -318,37 +318,37 @@ function GridCard({
           />
         </div>
       ) : (
-        <div className="w-full aspect-[4/3] bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
-          <Home className="w-8 h-8 text-gray-300" />
+        <div className="w-full aspect-[4/3] bg-gradient-to-br from-muted to-muted/60 flex items-center justify-center">
+          <Home className="w-8 h-8 text-muted-foreground/50" />
         </div>
       )}
 
       {isSelected && (
-        <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center">
+        <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-primary flex items-center justify-center">
           <Check className="w-3.5 h-3.5 text-white" />
         </div>
       )}
 
       <div className="p-3">
-        <p className="font-semibold text-gray-900 text-sm leading-tight">
+        <p className="font-semibold text-foreground text-sm leading-tight">
           {product.name}
         </p>
         {product.description && (
           <ExpandableDescription
             text={product.description}
             clamp={2}
-            className="text-xs text-gray-500 mt-1"
+            className="text-xs text-muted-foreground mt-1"
           />
         )}
         {pricePerDay && (
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-xs text-muted-foreground mt-1">
             {formatCurrency(product.price)}/night
           </p>
         )}
         <div className="flex items-center justify-between mt-2">
           {compareTotal && compareTotal > totalPrice ? (
             <div className="flex items-center gap-1.5">
-              <span className="text-xs text-gray-400 line-through">
+              <span className="text-xs text-muted-foreground line-through">
                 {formatCurrency(compareTotal)}
               </span>
               <span className="font-bold text-green-600 text-sm">
@@ -359,7 +359,7 @@ function GridCard({
             <span
               className={cn(
                 "font-bold text-sm",
-                isSelected ? "text-blue-600" : "text-gray-900",
+                isSelected ? "text-primary" : "text-foreground",
               )}
             >
               {formatCurrency(totalPrice)}
@@ -369,8 +369,8 @@ function GridCard({
             className={cn(
               "text-xs px-2 py-0.5 rounded-full font-medium",
               isSelected
-                ? "bg-blue-100 text-blue-700"
-                : "bg-gray-100 text-gray-500",
+                ? "bg-primary/15 text-primary"
+                : "bg-muted text-muted-foreground",
             )}
           >
             {isSelected ? "Selected" : "Select"}
@@ -401,9 +401,9 @@ function DefaultSectionCard({
   const heroImage = products.find((p) => p.image_url)?.image_url
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+    <div className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
       {section.label && (
-        <div className="relative h-28 sm:h-36 bg-gradient-to-br from-gray-100 to-gray-200">
+        <div className="relative h-28 sm:h-36 bg-gradient-to-br from-muted to-muted/60">
           {heroImage ? (
             <Image
               src={heroImage}
@@ -413,7 +413,7 @@ function DefaultSectionCard({
             />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center">
-              <Home className="w-10 h-10 text-gray-300" />
+              <Home className="w-10 h-10 text-muted-foreground/50" />
             </div>
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
@@ -444,8 +444,8 @@ function DefaultSectionCard({
               className={cn(
                 "w-full flex items-center justify-between p-3 rounded-xl border-2 transition-all text-left",
                 isSelected
-                  ? "border-blue-500 bg-blue-50"
-                  : "border-gray-100 bg-gray-50 hover:border-gray-200",
+                  ? "border-primary bg-primary/10"
+                  : "border-border bg-muted hover:border-muted-foreground/30",
               )}
             >
               <div className="flex items-center gap-3 min-w-0">
@@ -453,18 +453,18 @@ function DefaultSectionCard({
                   className={cn(
                     "w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0",
                     isSelected
-                      ? "border-blue-500 bg-blue-500"
-                      : "border-gray-300",
+                      ? "border-primary bg-primary"
+                      : "border-muted-foreground/40",
                   )}
                 >
                   {isSelected && <Check className="w-3 h-3 text-white" />}
                 </div>
                 <div className="min-w-0">
-                  <p className="font-medium text-gray-900 text-sm truncate">
+                  <p className="font-medium text-foreground text-sm truncate">
                     {product.name}
                   </p>
                   {pricePerDay && (
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-muted-foreground">
                       {formatCurrency(product.price)}/night
                     </p>
                   )}
@@ -472,19 +472,19 @@ function DefaultSectionCard({
               </div>
               <div className="text-right shrink-0 ml-2">
                 {compareTotal && compareTotal > totalPrice && (
-                  <p className="text-xs text-gray-400 line-through">
+                  <p className="text-xs text-muted-foreground line-through">
                     {formatCurrency(compareTotal)}
                   </p>
                 )}
                 <p
                   className={cn(
                     "font-bold text-sm",
-                    isSelected ? "text-blue-600" : "text-gray-900",
+                    isSelected ? "text-primary" : "text-foreground",
                   )}
                 >
                   {formatCurrency(totalPrice)}
                 </p>
-                <p className="text-xs text-gray-500">total</p>
+                <p className="text-xs text-muted-foreground">total</p>
               </div>
             </button>
           )
@@ -542,7 +542,7 @@ function ShowcaseSectionCard({
   const heroImage = products.find((p) => p.image_url)?.image_url
 
   return (
-    <div className="rounded-2xl overflow-hidden bg-white shadow-md border border-gray-100">
+    <div className="rounded-2xl overflow-hidden bg-card shadow-md border border-border">
       {heroImage ? (
         <div className="relative h-44 sm:h-56">
           <Image
@@ -567,8 +567,8 @@ function ShowcaseSectionCard({
         section.label && (
           <div className="px-5 pt-5 pb-2">
             <div className="flex items-center gap-2">
-              <div className="w-1 h-5 rounded-full bg-blue-500" />
-              <h3 className="font-semibold text-base text-gray-900">
+              <div className="w-1 h-5 rounded-full bg-primary" />
+              <h3 className="font-semibold text-base text-foreground">
                 {section.label}
               </h3>
             </div>
@@ -596,12 +596,12 @@ function ShowcaseSectionCard({
                 className={cn(
                   "w-full flex items-center gap-4 p-3.5 rounded-xl transition-all text-left",
                   isSelected
-                    ? "bg-blue-50 ring-2 ring-blue-500"
-                    : "bg-gray-50 hover:bg-gray-100 ring-1 ring-gray-200",
+                    ? "bg-primary/10 ring-2 ring-primary"
+                    : "bg-muted hover:bg-muted/80 ring-1 ring-border",
                 )}
               >
                 {product.image_url && (
-                  <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-200 shrink-0 relative">
+                  <div className="w-16 h-16 rounded-lg overflow-hidden bg-muted shrink-0 relative">
                     <Image
                       src={product.image_url}
                       alt={product.name}
@@ -612,18 +612,18 @@ function ShowcaseSectionCard({
                 )}
 
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm text-gray-900 truncate">
+                  <p className="font-semibold text-sm text-foreground truncate">
                     {product.name}
                   </p>
                   {product.description && (
                     <ExpandableDescription
                       text={product.description}
                       clamp={2}
-                      className="text-xs text-gray-500 mt-0.5"
+                      className="text-xs text-muted-foreground mt-0.5"
                     />
                   )}
                   {pricePerDay && (
-                    <p className="text-xs text-gray-400 mt-1">
+                    <p className="text-xs text-muted-foreground mt-1">
                       {formatCurrency(product.price)}/night
                     </p>
                   )}
@@ -631,27 +631,27 @@ function ShowcaseSectionCard({
 
                 <div className="text-right shrink-0">
                   {compareTotal && compareTotal > totalPrice && (
-                    <p className="text-xs text-gray-400 line-through">
+                    <p className="text-xs text-muted-foreground line-through">
                       {formatCurrency(compareTotal)}
                     </p>
                   )}
                   <p
                     className={cn(
                       "font-bold text-base",
-                      isSelected ? "text-blue-600" : "text-gray-900",
+                      isSelected ? "text-primary" : "text-foreground",
                     )}
                   >
                     {formatCurrency(totalPrice)}
                   </p>
-                  <p className="text-xs text-gray-500">total</p>
+                  <p className="text-xs text-muted-foreground">total</p>
                 </div>
 
                 <div
                   className={cn(
                     "w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0",
                     isSelected
-                      ? "border-blue-500 bg-blue-500"
-                      : "border-gray-300 bg-white",
+                      ? "border-primary bg-primary"
+                      : "border-muted-foreground/40 bg-card",
                   )}
                 >
                   {isSelected && <Check className="w-3 h-3 text-white" />}
@@ -776,12 +776,12 @@ function HousingQuantitySummary({
 }) {
   const max = product.max_quantity ?? Number.POSITIVE_INFINITY
   return (
-    <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex items-center justify-between gap-3">
+    <div className="bg-primary/10 border border-primary/20 rounded-2xl p-4 flex items-center justify-between gap-3">
       <div className="min-w-0">
-        <p className="text-xs text-blue-700 uppercase font-semibold tracking-wide">
+        <p className="text-xs text-primary uppercase font-semibold tracking-wide">
           {product.name}
         </p>
-        <p className="text-sm text-blue-900 font-medium mt-0.5">
+        <p className="text-sm text-foreground font-medium mt-0.5">
           {quantity} {quantity === 1 ? "unit" : "units"} ·{" "}
           {formatCurrency(totalPrice)}
         </p>
@@ -872,11 +872,11 @@ export default function VariantHousingDate({
   if (totalProducts === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
-        <Home className="w-12 h-12 text-gray-300 mb-4" />
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+        <Home className="w-12 h-12 text-muted-foreground/50 mb-4" />
+        <h3 className="text-lg font-semibold text-foreground mb-2">
           No Housing Available
         </h3>
-        <p className="text-gray-500 max-w-md mb-6">
+        <p className="text-muted-foreground max-w-md mb-6">
           Housing options are not currently available for this event. You can
           continue to the next step.
         </p>
