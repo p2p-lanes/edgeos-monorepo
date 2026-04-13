@@ -30,7 +30,7 @@ from app.api.dashboard.schemas import (
 from app.api.payment.models import PaymentProducts, Payments
 from app.api.payment.schemas import PaymentStatus, PaymentType
 from app.api.product.models import Products
-from app.api.product.schemas import ProductCategory
+from app.api.product.schemas import CATEGORY_HOUSING, CATEGORY_TICKET
 from app.core.dependencies.users import CurrentUser, TenantSession
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
@@ -262,7 +262,7 @@ def _get_accommodation_percentage(
             Applications.popup_id == popup_id,
             Payments.status == PaymentStatus.APPROVED.value,
             Payments.payment_type == PaymentType.PASS_PURCHASE.value,
-            PaymentProducts.product_category == ProductCategory.HOUSING.value,
+            PaymentProducts.product_category == CATEGORY_HOUSING,
         )
     ).one()
 
@@ -407,7 +407,7 @@ def _get_distribution(db: TenantSession, popup_id: uuid.UUID) -> Distribution:
             Applications.popup_id == popup_id,
             Payments.status == PaymentStatus.APPROVED.value,
             Payments.payment_type == PaymentType.PASS_PURCHASE.value,
-            Products.category == ProductCategory.TICKET.value,
+            Products.category == CATEGORY_TICKET,
         )
         .group_by(Products.duration_type)
     ).all()
@@ -449,7 +449,7 @@ def _get_distribution(db: TenantSession, popup_id: uuid.UUID) -> Distribution:
             Applications.popup_id == popup_id,
             Payments.status == PaymentStatus.APPROVED.value,
             Payments.payment_type == PaymentType.PASS_PURCHASE.value,
-            Products.category == ProductCategory.TICKET.value,
+            Products.category == CATEGORY_TICKET,
         )
         .group_by(Products.attendee_category)
     ).all()
@@ -489,7 +489,7 @@ def _get_distribution(db: TenantSession, popup_id: uuid.UUID) -> Distribution:
             Applications.popup_id == popup_id,
             Payments.status == PaymentStatus.APPROVED.value,
             Payments.payment_type == PaymentType.PASS_PURCHASE.value,
-            PaymentProducts.product_category == ProductCategory.HOUSING.value,
+            PaymentProducts.product_category == CATEGORY_HOUSING,
         )
         .group_by(PaymentProducts.product_name)
     ).all()
@@ -536,7 +536,7 @@ def _get_attach_rate(db: TenantSession, popup_id: uuid.UUID) -> list[AttachRateI
             Applications.popup_id == popup_id,
             Payments.status == PaymentStatus.APPROVED.value,
             Payments.payment_type == PaymentType.PASS_PURCHASE.value,
-            Products.category == ProductCategory.TICKET.value,
+            Products.category == CATEGORY_TICKET,
         )
         .group_by(Products.duration_type)
     ).all()
@@ -554,7 +554,7 @@ def _get_attach_rate(db: TenantSession, popup_id: uuid.UUID) -> list[AttachRateI
             Applications.popup_id == popup_id,
             Payments.status == PaymentStatus.APPROVED.value,
             Payments.payment_type == PaymentType.PASS_PURCHASE.value,
-            PaymentProducts.product_category == ProductCategory.HOUSING.value,
+            PaymentProducts.product_category == CATEGORY_HOUSING,
         )
     ).correlate(None)
 
@@ -570,7 +570,7 @@ def _get_attach_rate(db: TenantSession, popup_id: uuid.UUID) -> list[AttachRateI
             Applications.popup_id == popup_id,
             Payments.status == PaymentStatus.APPROVED.value,
             Payments.payment_type == PaymentType.PASS_PURCHASE.value,
-            Products.category == ProductCategory.TICKET.value,
+            Products.category == CATEGORY_TICKET,
             PaymentProducts.attendee_id.in_(housing_attendee_ids),  # type: ignore[union-attr]
         )
         .group_by(Products.duration_type)

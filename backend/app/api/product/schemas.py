@@ -11,7 +11,12 @@ from sqlmodel import Column, DateTime, Field, SQLModel
 # ProductCategory is now a free-form string so admins can create custom categories.
 # Known built-in values are listed below for reference.
 ProductCategory = str
-KNOWN_PRODUCT_CATEGORIES = ["ticket", "housing", "merch", "other", "patreon"]
+CATEGORY_TICKET: ProductCategory = "ticket"
+CATEGORY_HOUSING: ProductCategory = "housing"
+CATEGORY_MERCH: ProductCategory = "merch"
+CATEGORY_OTHER: ProductCategory = "other"
+CATEGORY_PATREON: ProductCategory = "patreon"
+KNOWN_PRODUCT_CATEGORIES = [CATEGORY_TICKET, CATEGORY_HOUSING, CATEGORY_MERCH, CATEGORY_OTHER, CATEGORY_PATREON]
 
 
 class TicketDuration(str, Enum):
