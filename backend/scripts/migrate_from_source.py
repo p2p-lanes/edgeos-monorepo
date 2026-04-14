@@ -12,7 +12,7 @@ Prerequisites:
 
 Usage:
     cd backend && uv run --with psycopg2-binary python scripts/migrate_from_source.py
-    cd backend && uv run --with psycopg2-binary python scripts/migrate_from_source.py --popup-name "Edge Esmeralda 2026"
+    cd backend && uv run --with psycopg2-binary python scripts/migrate_from_source.py --popup-name "Popup City"
     cd backend && uv run --with psycopg2-binary python scripts/migrate_from_source.py --popup-id 8
     cd backend && uv run --with psycopg2-binary python scripts/migrate_from_source.py --dry-run
 """
@@ -48,24 +48,9 @@ SOURCE_DB_URL = os.environ.get("SOURCE_DB_URL", "")
 # Reviewer mapping (all known reviewers across popups)
 # ---------------------------------------------------------------------------
 
-# Edge
-# REVIEWER_MAP = {
-#     "steph_review": {"email": "steph@edgecity.live", "full_name": "Steph"},
-#     "timour_review": {"email": "timour@edgecity.live", "full_name": "Timour"},
-#     "janine_review": {"email": "janine@edgecity.live", "full_name": "Janine"},
-#     "tela_review": {"email": "telamon@edgecity.live", "full_name": "Telamon"},
-#     "devon_review": {"email": "devon@esmeralda.org", "full_name": "Devon"},
-#     "lina_review": {"email": "lina@edgecity.live", "full_name": "Lina"},
-#     "katherine_review": {"email": "katherine@edgecity.live", "full_name": "Katherine"},
-#     "remy_review": {"email": "remy@edgecity.live", "full_name": "Remy"},
-# }
-
-# The Mu
-
+# ! Important: You MUST populate the email and full_name for each reviewer to ensure proper mapping to target User records.
 REVIEWER_MAP = {
-    "sun_review": {"email": "sun@the-mu.xyz", "full_name": "Sun"},
-    "xiaoyu_review": {"email": "xiaoyu@the-mu.xyz", "full_name": "Xiaoyu"},
-    "frank_review": {"email": "frank@the-mu.xyz", "full_name": "Frank"},
+    "name_review": {"email": "", "full_name": ""},
 }
 
 REVIEW_VALUE_MAP = {
@@ -97,16 +82,6 @@ CORE_APPLICATION_COLUMNS = {
     "updated_at",
     "created_by",
     "updated_by",
-    # Reviewer columns (handled separately)
-    "steph_review",
-    "timour_review",
-    "janine_review",
-    "tela_review",
-    "devon_review",
-    "lina_review",
-    "katherine_review",
-    "remy_review",
-    "ai_review",
     # Legacy/NocoDB metadata
     "organization_id",
     "credit",
@@ -458,6 +433,7 @@ def run_import(
     popup_name: str,
     source_db_url: str | None = None,
     dry_run: bool = False,
+    skip_tables: frozenset[str] | set[str] = frozenset(),
 ) -> None:
     from sqlalchemy import delete
     from sqlmodel import Session, select
@@ -677,7 +653,8 @@ def run_import(
             ("groups", delete(Groups).where(Groups.popup_id == popup_id)),
         ]
 
-        for name, stmt in cleanup_ops:
+        active_cleanup_ops = [(n, s) for n, s in cleanup_ops if n not in skip_tables]
+        for name, stmt in active_cleanup_ops:
             result = session.exec(stmt)  # type: ignore[call-overload]
             logger.info(f"  Deleted {result.rowcount} {name}")  # type: ignore[union-attr]
 
@@ -697,20 +674,19 @@ def run_import(
         }
         logger.info(f"  Existing humans in tenant: {len(existing_humans_by_email)}")
 
-        # Main humans: those who have applications for this popup
+        # Main humans: all humans with a validated email (cross-popup import)
         src_humans = fetch_all(
             source_conn,
             """
             SELECT DISTINCT h.*
             FROM humans h
-            JOIN applications a ON h.id = a.citizen_id
-            WHERE a.popup_city_id = %s
+            WHERE h.email_validated = true
         """,
-            (source_popup_id,),
+            (),
             label="humans",
         )
         stats.set_source("Humans", len(src_humans))
-        logger.info(f"  Source humans (applicants): {len(src_humans)}")
+        logger.info(f"  Source humans (email validated): {len(src_humans)}")
 
         # Also get spouse attendees with emails (create Human records for them)
         src_spouse_attendees = fetch_all(
@@ -761,7 +737,13 @@ def run_import(
         spouse_humans_created = 0
         for row in src_spouse_attendees:
             email = (row.get("email") or "").strip().lower()
+            # Guard against: (1) already mapped in main loop, (2) already in target DB
+            # but NOT mapped yet (pure-spouse humans from previous import runs).
             if not email or email in email_to_human_uuid:
+                continue
+            existing_spouse = existing_humans_by_email.get(email)
+            if existing_spouse:
+                email_to_human_uuid[email] = existing_spouse.id
                 continue
 
             name = parse_optional_str(row.get("name")) or ""
@@ -946,36 +928,39 @@ def run_import(
         # ===============================================================
         # Step 4: Import FormFields (auto-generated from detected fields)
         # ===============================================================
-        logger.info("Step 4: Importing form fields...")
+        if "form_fields" in skip_tables:
+            logger.info("Step 4: Skipping form fields (--skip-tables)")
+        else:
+            logger.info("Step 4: Importing form fields...")
 
-        existing_ffs = session.exec(
-            select(FormFields).where(FormFields.popup_id == popup_id)
-        ).all()
-        existing_ff_names: set[str] = {ff.name for ff in existing_ffs}
+            existing_ffs = session.exec(
+                select(FormFields).where(FormFields.popup_id == popup_id)
+            ).all()
+            existing_ff_names: set[str] = {ff.name for ff in existing_ffs}
 
-        new_ffs: list[FormFields] = []
-        for fdef in custom_field_defs:
-            if fdef["name"] in existing_ff_names:
-                stats.inc("FormFields", "skipped")
-                continue
-            ff = FormFields(
-                tenant_id=tenant_id,
-                popup_id=popup_id,
-                name=fdef["name"],
-                label=fdef["label"],
-                field_type=fdef["field_type"],
-                section_id=None,
-                position=fdef.get("position", 0),
-                required=False,
-            )
-            new_ffs.append(ff)
-            stats.inc("FormFields", "imported")
+            new_ffs: list[FormFields] = []
+            for fdef in custom_field_defs:
+                if fdef["name"] in existing_ff_names:
+                    stats.inc("FormFields", "skipped")
+                    continue
+                ff = FormFields(
+                    tenant_id=tenant_id,
+                    popup_id=popup_id,
+                    name=fdef["name"],
+                    label=fdef["label"],
+                    field_type=fdef["field_type"],
+                    section_id=None,
+                    position=fdef.get("position", 0),
+                    required=False,
+                )
+                new_ffs.append(ff)
+                stats.inc("FormFields", "imported")
 
-        stats.set_source("FormFields", len(custom_field_defs))
+            stats.set_source("FormFields", len(custom_field_defs))
 
-        if new_ffs:
-            session.add_all(new_ffs)
-        logger.info(f"  FormFields: {stats.data['FormFields']['imported']} imported")
+            if new_ffs:
+                session.add_all(new_ffs)
+            logger.info(f"  FormFields: {stats.data['FormFields']['imported']} imported")
 
         # ===============================================================
         # Step 5: Import Applications
@@ -1117,21 +1102,27 @@ def run_import(
         logger.info("Step 7: Creating approval strategy and reviewers...")
 
         # Approval strategy (check if one already exists for this popup)
-        existing_strategy = session.exec(
-            select(ApprovalStrategies).where(ApprovalStrategies.popup_id == popup_id)
-        ).first()
-        if existing_strategy:
-            strategy = existing_strategy
-            logger.info("  Approval strategy already exists, reusing")
+        if "approval_strategies" in skip_tables:
+            logger.info("  Skipping approval strategies (--skip-tables)")
+            strategy = session.exec(
+                select(ApprovalStrategies).where(ApprovalStrategies.popup_id == popup_id)
+            ).first()
         else:
-            strategy = ApprovalStrategies(
-                popup_id=popup_id,
-                tenant_id=tenant_id,
-                strategy_type=ApprovalStrategyType.WEIGHTED,
-            )
-            session.add(strategy)
-        stats.set_source("ApprovalStrategy", 1)
-        stats.inc("ApprovalStrategy", "imported")
+            existing_strategy = session.exec(
+                select(ApprovalStrategies).where(ApprovalStrategies.popup_id == popup_id)
+            ).first()
+            if existing_strategy:
+                strategy = existing_strategy
+                logger.info("  Approval strategy already exists, reusing")
+            else:
+                strategy = ApprovalStrategies(
+                    popup_id=popup_id,
+                    tenant_id=tenant_id,
+                    strategy_type=ApprovalStrategyType.WEIGHTED,
+                )
+                session.add(strategy)
+            stats.set_source("ApprovalStrategy", 1)
+            stats.inc("ApprovalStrategy", "imported")
 
         # Reviewer users (only for active reviewers)
         existing_users = session.exec(
@@ -1164,31 +1155,34 @@ def run_import(
             session.flush()
 
         # Popup reviewers (skip existing)
-        existing_popup_reviewers = session.exec(
-            select(PopupReviewers).where(PopupReviewers.popup_id == popup_id)
-        ).all()
-        existing_pr_user_ids: set[str] = {
-            str(pr.user_id) for pr in existing_popup_reviewers
-        }
+        if "popup_reviewers" in skip_tables:
+            logger.info("  Skipping popup reviewers (--skip-tables)")
+        else:
+            existing_popup_reviewers = session.exec(
+                select(PopupReviewers).where(PopupReviewers.popup_id == popup_id)
+            ).all()
+            existing_pr_user_ids: set[str] = {
+                str(pr.user_id) for pr in existing_popup_reviewers
+            }
 
-        stats.set_source("PopupReviewers", len(active_reviewers))
-        new_popup_reviewers: list[PopupReviewers] = []
-        for user in reviewer_user_map.values():
-            if str(user.id) in existing_pr_user_ids:
-                stats.inc("PopupReviewers", "skipped")
-                continue
-            pr = PopupReviewers(
-                popup_id=popup_id,
-                user_id=user.id,
-                tenant_id=tenant_id,
-                weight_multiplier=1.0,
-                is_required=False,
-            )
-            new_popup_reviewers.append(pr)
-            stats.inc("PopupReviewers", "imported")
+            stats.set_source("PopupReviewers", len(active_reviewers))
+            new_popup_reviewers: list[PopupReviewers] = []
+            for user in reviewer_user_map.values():
+                if str(user.id) in existing_pr_user_ids:
+                    stats.inc("PopupReviewers", "skipped")
+                    continue
+                pr = PopupReviewers(
+                    popup_id=popup_id,
+                    user_id=user.id,
+                    tenant_id=tenant_id,
+                    weight_multiplier=1.0,
+                    is_required=False,
+                )
+                new_popup_reviewers.append(pr)
+                stats.inc("PopupReviewers", "imported")
 
-        if new_popup_reviewers:
-            session.add_all(new_popup_reviewers)
+            if new_popup_reviewers:
+                session.add_all(new_popup_reviewers)
 
         # Application reviews from source (only active reviewer columns)
         logger.info("  Importing application reviews...")
@@ -1372,11 +1366,19 @@ def run_import(
         logger.info(f"  Source coupons: {len(src_coupons)}")
 
         new_coupons: list[Coupons] = []
+        seen_coupon_codes: set[str] = set()
         for row in src_coupons:
             code = (row.get("code") or "").strip().upper()
             if not code:
                 stats.inc("Coupons", "skipped")
                 continue
+
+            # Dedup by (code, popup_id) — source may have duplicates
+            if code in seen_coupon_codes:
+                logger.warning(f"  Duplicate coupon code '{code}', skipping")
+                stats.inc("Coupons", "skipped")
+                continue
+            seen_coupon_codes.add(code)
 
             # Discount value: round to nearest 10 for EdgeOS constraint
             raw_discount = (
@@ -1682,6 +1684,11 @@ if __name__ == "__main__":
         action="store_true",
         help="Only sync popup metadata from source, skip data import",
     )
+    parser.add_argument(
+        "--skip-tables",
+        default="",
+        help="Comma-separated list of tables to skip (cleanup + import). Valid values: form_fields, popup_reviewers, approval_strategies",
+    )
     args = parser.parse_args()
 
     # Connect to source, select popup
@@ -1691,6 +1698,8 @@ if __name__ == "__main__":
         conn, args.popup_name, args.popup_id
     )
     conn.close()
+
+    skip_tables = set(x.strip() for x in args.skip_tables.split(",") if x.strip())
 
     if args.sync_popup_only:
         sync_popup(
@@ -1704,4 +1713,5 @@ if __name__ == "__main__":
             popup_name=selected_popup_name,
             source_db_url=args.source_db_url,
             dry_run=args.dry_run,
+            skip_tables=skip_tables,
         )
