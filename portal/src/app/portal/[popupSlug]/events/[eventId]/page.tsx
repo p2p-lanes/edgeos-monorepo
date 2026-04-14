@@ -415,12 +415,12 @@ export default function EventDetailPage() {
       {/* RSVP */}
       {event.status === "published" && (
         <div className="rounded-xl border bg-card p-4">
-          {myParticipation ? (
+          {myParticipationActive ? (
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-green-600">
                 <CheckCircle className="h-4 w-4" />
                 <span className="text-sm font-medium">
-                  {myParticipation.status === "checked_in"
+                  {myParticipation?.status === "checked_in"
                     ? "Checked in"
                     : "Registered"}
                 </span>
@@ -431,7 +431,7 @@ export default function EventDetailPage() {
                   Synced to your Google Calendar
                 </p>
               )}
-              {myParticipation.status === "registered" && (
+              {myParticipation?.status === "registered" && (
                 <div className="flex gap-2">
                   {eventStarted ? (
                     <Button
