@@ -326,17 +326,17 @@ function PropertyPicker({ value, onChange }: PropertyPickerProps) {
             No property types yet. Create one below.
           </p>
         ) : (
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(96px,1fr))] gap-2">
+          <div className="flex flex-wrap gap-2">
             {propertyTypes.map((pt) => {
               const selected = value.includes(pt.id)
               return (
-                <div key={pt.id} className="group relative">
+                <div key={pt.id} className="group relative w-24">
                   <button
                     type="button"
                     onClick={() => toggle(pt.id)}
                     aria-pressed={selected}
                     className={
-                      "flex w-full flex-col items-center justify-center gap-1.5 rounded-lg border p-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring " +
+                      "flex h-24 w-full flex-col items-center justify-center gap-1.5 rounded-lg border p-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring " +
                       (selected
                         ? "bg-primary text-primary-foreground border-primary hover:bg-primary/90"
                         : "bg-card text-foreground hover:bg-muted/50")
@@ -344,9 +344,11 @@ function PropertyPicker({ value, onChange }: PropertyPickerProps) {
                   >
                     <LucideIconByName
                       name={pt.icon}
-                      className="h-6 w-6"
+                      className="h-6 w-6 shrink-0"
                     />
-                    <span className="line-clamp-1 break-all">{pt.name}</span>
+                    <span className="line-clamp-2 break-all text-center">
+                      {pt.name}
+                    </span>
                   </button>
                   <button
                     type="button"
@@ -355,9 +357,7 @@ function PropertyPicker({ value, onChange }: PropertyPickerProps) {
                       e.stopPropagation()
                       setPendingDelete(pt)
                     }}
-                    className={
-                      "absolute right-1 top-1 inline-flex h-5 w-5 items-center justify-center rounded-full border bg-background opacity-0 shadow-sm transition-opacity group-hover:opacity-100 focus:opacity-100 focus:outline-none hover:text-destructive hover:border-destructive/40"
-                    }
+                    className="absolute right-1 top-1 inline-flex h-5 w-5 items-center justify-center rounded-full border bg-background opacity-0 shadow-sm transition-opacity group-hover:opacity-100 focus:opacity-100 focus:outline-none hover:text-destructive hover:border-destructive/40"
                   >
                     <X className="h-3 w-3" />
                   </button>
