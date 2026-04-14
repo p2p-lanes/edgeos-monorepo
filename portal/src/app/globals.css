@@ -94,8 +94,8 @@
 
 :root {
   --radius: 0.5rem;
-  /* Page background: very subtle cool off-white so pure-white cards lift. */
-  --background: oklch(0.984 0.003 260);
+  /* Page background: cool light gray so pure-white cards read as elevated. */
+  --background: oklch(0.965 0.005 260);
   --foreground: oklch(0.145 0 0);
   --heading: oklch(0.145 0 0);
   --heading-secondary: oklch(0.556 0.01 260);
@@ -120,9 +120,9 @@
   --accent-foreground: oklch(0.279 0.041 260);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.975 0.005 285);
-  /* Slightly stronger border so cards read as contained even without shadow. */
-  --border: oklch(0.905 0.005 260);
-  --input: oklch(0.905 0.005 260);
+  /* Stronger border so card edges are clearly visible against the page. */
+  --border: oklch(0.88 0.008 260);
+  --input: oklch(0.9 0.005 260);
   --ring: oklch(0.205 0.015 285);
   --chart-1: oklch(0.646 0.222 41);
   --chart-2: oklch(0.6 0.118 185);
