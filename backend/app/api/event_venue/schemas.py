@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, time
 from enum import Enum
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 from sqlalchemy import Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Column, DateTime, Field, SQLModel
@@ -45,11 +45,31 @@ class EventVenueBase(SQLModel):
 
 
 class VenuePropertyRef(BaseModel):
+    """Flattened view of a venue property: carries the property_type fields
+    (id, name, icon) regardless of whether the ORM passes us a join row or a
+    direct VenuePropertyTypes row.
+    """
+
     id: uuid.UUID
     name: str
     icon: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _flatten_join(cls, data):
+        # Accept a VenueProperties join row and resolve through its
+        # property_type relationship. Leaves plain dicts / direct
+        # VenuePropertyTypes rows untouched.
+        if hasattr(data, "property_type") and data.property_type is not None:
+            pt = data.property_type
+            return {
+                "id": pt.id,
+                "name": pt.name,
+                "icon": pt.icon,
+            }
+        return data
 
 
 class VenuePhotoRef(BaseModel):
