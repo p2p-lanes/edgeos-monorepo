@@ -1,5 +1,6 @@
 import uuid
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import httpx
 from fastapi import APIRouter, HTTPException, Query, status
@@ -24,6 +25,7 @@ from app.api.event_venue.schemas import (
     VenueExceptionCreate,
     VenueExceptionPublic,
     VenueExceptionUpdate,
+    VenueOpenRange,
     VenuePhotoCreate,
     VenuePhotoPublic,
     VenuePhotoUpdate,
@@ -412,40 +414,63 @@ async def delete_photo(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/{venue_id}/availability", response_model=VenueAvailability)
-async def get_availability(
-    venue_id: uuid.UUID,
-    db: TenantSession,
-    _: CurrentUser,
-    start: datetime = Query(...),
-    end: datetime = Query(...),
+def _resolve_popup_timezone(db, popup_id: uuid.UUID) -> str:
+    """Read the configured timezone from event_settings, falling back to UTC."""
+    from app.api.event_settings.crud import event_settings_crud
+
+    settings = event_settings_crud.get_by_popup_id(db, popup_id)
+    if settings and settings.timezone:
+        try:
+            ZoneInfo(settings.timezone)
+            return settings.timezone
+        except ZoneInfoNotFoundError:
+            return "UTC"
+    return "UTC"
+
+
+def _compute_availability(
+    db, venue, start: datetime, end: datetime
 ) -> VenueAvailability:
-    """Return busy slots for a venue in a given window (from existing events
-    and exceptions). The caller can cross-reference against weekly hours.
+    """Return open ranges (derived from weekly_hours + open exceptions) and
+    busy slots (existing events with setup/teardown + closed exceptions).
+
+    Times in weekly_hours are interpreted in the popup's configured TZ so
+    that 'opens at 09:00' means 09:00 local in that TZ.
     """
     from app.api.event.models import Events
     from app.api.event.schemas import EventStatus
 
-    venue = _get_venue_or_404(db, venue_id)
-
     if end <= start:
         raise HTTPException(status_code=400, detail="end must be after start")
 
+    tz_name = _resolve_popup_timezone(db, venue.popup_id)
+    tz = ZoneInfo(tz_name)
+
+    # --- Busy from events (+ setup/teardown) and closed exceptions --------
     events = list(
         db.exec(
             select(Events)
-            .where(Events.venue_id == venue_id)
+            .where(Events.venue_id == venue.id)
             .where(Events.status != EventStatus.CANCELLED)
             .where(Events.start_time < end)
             .where(Events.end_time > start)
         ).all()
     )
 
-    exceptions = list(
+    closed_exceptions = list(
         db.exec(
             select(VenueExceptions)
-            .where(VenueExceptions.venue_id == venue_id)
+            .where(VenueExceptions.venue_id == venue.id)
             .where(VenueExceptions.is_closed == True)  # noqa: E712
+            .where(VenueExceptions.start_datetime < end)
+            .where(VenueExceptions.end_datetime > start)
+        ).all()
+    )
+    open_exceptions = list(
+        db.exec(
+            select(VenueExceptions)
+            .where(VenueExceptions.venue_id == venue.id)
+            .where(VenueExceptions.is_closed == False)  # noqa: E712
             .where(VenueExceptions.start_datetime < end)
             .where(VenueExceptions.end_datetime > start)
         ).all()
@@ -463,7 +488,7 @@ async def get_availability(
                 label=e.title,
             )
         )
-    for exc in exceptions:
+    for exc in closed_exceptions:
         busy.append(
             VenueBusySlot(
                 start=exc.start_datetime,
@@ -473,12 +498,99 @@ async def get_availability(
             )
         )
 
-    return VenueAvailability(venue_id=venue.id, open_ranges=[], busy=busy)
+    # --- Open ranges from weekly_hours + open exceptions ------------------
+    weekly_by_day = {
+        row.day_of_week: row
+        for row in db.exec(
+            select(VenueWeeklyHours).where(VenueWeeklyHours.venue_id == venue.id)
+        ).all()
+    }
+
+    raw_ranges: list[tuple[datetime, datetime]] = []
+    start_local = start.astimezone(tz)
+    end_local = end.astimezone(tz)
+    day_cursor: date = start_local.date()
+    last_day: date = end_local.date()
+    while day_cursor <= last_day:
+        dow = day_cursor.weekday()  # Mon=0 … Sun=6 (matches our schema)
+        hours = weekly_by_day.get(dow)
+        if (
+            hours
+            and not hours.is_closed
+            and hours.open_time is not None
+            and hours.close_time is not None
+        ):
+            open_local = datetime.combine(day_cursor, hours.open_time, tzinfo=tz)
+            close_local = datetime.combine(day_cursor, hours.close_time, tzinfo=tz)
+            # Handle overnight (close < open).
+            if close_local <= open_local:
+                close_local = close_local + timedelta(days=1)
+            clamped_start = max(open_local, start)
+            clamped_end = min(close_local, end)
+            if clamped_start < clamped_end:
+                raw_ranges.append((clamped_start, clamped_end))
+        day_cursor = day_cursor + timedelta(days=1)
+
+    # Open exceptions add windows even when weekly_hours is closed.
+    for exc in open_exceptions:
+        s = max(exc.start_datetime, start)
+        e_ = min(exc.end_datetime, end)
+        if s < e_:
+            raw_ranges.append((s, e_))
+
+    # Merge overlapping/adjacent ranges.
+    raw_ranges.sort(key=lambda r: r[0])
+    merged: list[tuple[datetime, datetime]] = []
+    for s, e_ in raw_ranges:
+        if merged and s <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], e_))
+        else:
+            merged.append((s, e_))
+
+    open_ranges = [VenueOpenRange(start=s, end=e_) for s, e_ in merged]
+
+    return VenueAvailability(
+        venue_id=venue.id,
+        timezone=tz_name,
+        open_ranges=open_ranges,
+        busy=busy,
+    )
+
+
+@router.get("/{venue_id}/availability", response_model=VenueAvailability)
+async def get_availability(
+    venue_id: uuid.UUID,
+    db: TenantSession,
+    _: CurrentUser,
+    start: datetime = Query(...),
+    end: datetime = Query(...),
+) -> VenueAvailability:
+    """Return open windows and busy slots for a venue in the given range."""
+    venue = _get_venue_or_404(db, venue_id)
+    return _compute_availability(db, venue, start, end)
 
 
 # ---------------------------------------------------------------------------
 # Portal endpoints
 # ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/portal/venues/{venue_id}/availability",
+    response_model=VenueAvailability,
+)
+async def get_portal_availability(
+    venue_id: uuid.UUID,
+    db: HumanTenantSession,
+    _: CurrentHuman,
+    start: datetime = Query(...),
+    end: datetime = Query(...),
+) -> VenueAvailability:
+    """Portal-side availability query — same shape as the backoffice one,
+    used by the event-creation form to show open/busy slots per day.
+    """
+    venue = _get_venue_or_404(db, venue_id)
+    return _compute_availability(db, venue, start, end)
 
 
 @router.get("/portal/venues", response_model=ListModel[EventVenuePublic])

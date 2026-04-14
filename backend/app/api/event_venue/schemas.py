@@ -266,7 +266,13 @@ class VenueBusySlot(BaseModel):
     label: str | None = None
 
 
+class VenueOpenRange(BaseModel):
+    start: datetime
+    end: datetime
+
+
 class VenueAvailability(BaseModel):
     venue_id: uuid.UUID
-    open_ranges: list[tuple[datetime, datetime]]
+    timezone: str
+    open_ranges: list[VenueOpenRange]
     busy: list[VenueBusySlot]

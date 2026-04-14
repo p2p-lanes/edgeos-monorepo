@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import {
   type EventCreate,
   type EventPublic,
+  EventSettingsService,
   EventsService,
   EventVenuesService,
   type RecurrenceRule,
@@ -34,6 +35,12 @@ import { Textarea } from "@/components/ui/textarea"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useCustomToast from "@/hooks/useCustomToast"
 import { cn } from "@/lib/utils"
+import {
+  availableEndOptions,
+  availableStartOptions,
+  dayBoundsInTz,
+  freeIntervalsForDay,
+} from "@/lib/venue-slots"
 import { createErrorHandler } from "@/utils"
 
 interface EventFormProps {
@@ -383,6 +390,72 @@ export function EventForm({ defaultValues, onSuccess }: EventFormProps) {
     return () => window.clearTimeout(handle)
   }, [venueIdValue, startTimeValue, endTimeValue, defaultValues?.id])
 
+  // --- Day-based slot picker (date + start/end Selects) -------------------
+  // Derived from the form's local-datetime strings.
+  const dateStr = startTimeValue ? startTimeValue.slice(0, 10) : ""
+
+  // Popup timezone (used to label slots and compute day bounds consistently
+  // with how the backend interprets weekly_hours).
+  const { data: popupSettings } = useQuery({
+    queryKey: ["event-settings", selectedPopupId],
+    queryFn: async () => {
+      if (!selectedPopupId) return null
+      try {
+        return await EventSettingsService.getEventSettings({
+          popupId: selectedPopupId,
+        })
+      } catch {
+        return null
+      }
+    },
+    enabled: !!selectedPopupId,
+  })
+  const popupTz = popupSettings?.timezone ?? "UTC"
+
+  const dayBounds = useMemo(() => {
+    if (!dateStr) return null
+    return dayBoundsInTz(dateStr, popupTz)
+  }, [dateStr, popupTz])
+
+  const { data: dayAvailability } = useQuery({
+    queryKey: [
+      "event-venue-availability",
+      venueIdValue,
+      dayBounds?.start.toISOString(),
+    ],
+    queryFn: () =>
+      EventVenuesService.getAvailability({
+        venueId: venueIdValue,
+        start: dayBounds!.start.toISOString(),
+        end: dayBounds!.end.toISOString(),
+      }),
+    enabled: !!venueIdValue && !!dayBounds,
+  })
+
+  const freeIntervals = useMemo(() => {
+    if (!dayAvailability || !dayBounds) return []
+    return freeIntervalsForDay(
+      dayAvailability.open_ranges,
+      dayAvailability.busy,
+      dayBounds.start,
+      dayBounds.end,
+    )
+  }, [dayAvailability, dayBounds])
+
+  const startSlotOptions = useMemo(
+    () => availableStartOptions(freeIntervals, 30, popupTz),
+    [freeIntervals, popupTz],
+  )
+  const endSlotOptions = useMemo(() => {
+    if (!startTimeValue) return []
+    return availableEndOptions(
+      freeIntervals,
+      new Date(startTimeValue).getTime(),
+      30,
+      popupTz,
+    )
+  }, [freeIntervals, startTimeValue, popupTz])
+
   // --- Max participant warning -------------------------------------------
   const venueCapacity = selectedVenue?.capacity ?? null
   const maxParticipantNumber = maxParticipantValue
@@ -564,34 +637,131 @@ export function EventForm({ defaultValues, onSuccess }: EventFormProps) {
           </form.Field>
         </InlineRow>
 
-        <InlineRow label="Start" description="When the event begins">
-          <form.Field name="start_time">
-            {(field) => (
-              <div className="flex flex-col items-end gap-1">
-                <DateTimePicker
-                  value={field.state.value}
-                  onChange={field.handleChange}
-                  placeholder="Select start date"
-                  disabled={isVenueUnbookable}
-                />
-                <AvailabilityIndicator availability={availability} />
-              </div>
-            )}
-          </form.Field>
+        <InlineRow label="Date" description="Day the event takes place">
+          <Input
+            type="date"
+            value={dateStr}
+            disabled={isVenueUnbookable}
+            onChange={(e) => {
+              const newDate = e.target.value
+              if (!newDate) return
+              const currentStartTime = startTimeValue?.slice(11, 16) || "09:00"
+              const currentEndTime = endTimeValue?.slice(11, 16) || "10:00"
+              form.setFieldValue(
+                "start_time",
+                `${newDate}T${currentStartTime}`,
+              )
+              form.setFieldValue("end_time", `${newDate}T${currentEndTime}`)
+            }}
+            className="w-[200px]"
+          />
         </InlineRow>
 
-        <InlineRow label="End" description="When the event ends">
-          <form.Field name="end_time">
-            {(field) => (
-              <DateTimePicker
-                value={field.state.value}
-                onChange={field.handleChange}
-                placeholder="Select end date"
-                disabled={isVenueUnbookable}
-              />
-            )}
-          </form.Field>
-        </InlineRow>
+        {venueIdValue ? (
+          <>
+            <InlineRow label="Start time" description="Pick an open slot">
+              <div className="flex flex-col items-end gap-1 w-[200px]">
+                <Select
+                  value={startTimeValue ? new Date(startTimeValue).toISOString() : ""}
+                  onValueChange={(iso) => {
+                    const d = new Date(iso)
+                    const hh = String(d.getHours()).padStart(2, "0")
+                    const mm = String(d.getMinutes()).padStart(2, "0")
+                    form.setFieldValue(
+                      "start_time",
+                      `${dateStr || d.toISOString().slice(0, 10)}T${hh}:${mm}`,
+                    )
+                  }}
+                  disabled={
+                    isVenueUnbookable || startSlotOptions.length === 0
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue
+                      placeholder={
+                        startSlotOptions.length === 0
+                          ? "No open hours"
+                          : "Pick a start"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {startSlotOptions.map((o) => (
+                      <SelectItem key={o.isoUtc} value={o.isoUtc}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <AvailabilityIndicator availability={availability} />
+              </div>
+            </InlineRow>
+
+            <InlineRow label="End time" description="Within the same open range">
+              <Select
+                value={endTimeValue ? new Date(endTimeValue).toISOString() : ""}
+                onValueChange={(iso) => {
+                  const d = new Date(iso)
+                  const hh = String(d.getHours()).padStart(2, "0")
+                  const mm = String(d.getMinutes()).padStart(2, "0")
+                  form.setFieldValue(
+                    "end_time",
+                    `${dateStr || d.toISOString().slice(0, 10)}T${hh}:${mm}`,
+                  )
+                }}
+                disabled={!startTimeValue || endSlotOptions.length === 0}
+              >
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue
+                    placeholder={
+                      !startTimeValue
+                        ? "Pick a start first"
+                        : endSlotOptions.length === 0
+                          ? "No valid ends"
+                          : "Pick an end"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent className="max-h-60">
+                  {endSlotOptions.map((o) => (
+                    <SelectItem key={o.isoUtc} value={o.isoUtc}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </InlineRow>
+          </>
+        ) : (
+          <>
+            <InlineRow label="Start" description="When the event begins">
+              <form.Field name="start_time">
+                {(field) => (
+                  <div className="flex flex-col items-end gap-1">
+                    <DateTimePicker
+                      value={field.state.value}
+                      onChange={field.handleChange}
+                      placeholder="Select start date"
+                    />
+                    <AvailabilityIndicator availability={availability} />
+                  </div>
+                )}
+              </form.Field>
+            </InlineRow>
+
+            <InlineRow label="End" description="When the event ends">
+              <form.Field name="end_time">
+                {(field) => (
+                  <DateTimePicker
+                    value={field.state.value}
+                    onChange={field.handleChange}
+                    placeholder="Select end date"
+                  />
+                )}
+              </form.Field>
+            </InlineRow>
+          </>
+        )}
 
         <InlineRow
           label="Repeats"

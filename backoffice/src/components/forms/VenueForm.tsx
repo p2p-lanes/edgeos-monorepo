@@ -271,6 +271,7 @@ interface PropertyPickerProps {
 function PropertyPicker({ value, onChange }: PropertyPickerProps) {
   const queryClient = useQueryClient()
   const { showErrorToast, showSuccessToast } = useCustomToast()
+  const { selectedTenantId } = useWorkspace()
   const [showNew, setShowNew] = useState(false)
   const [newName, setNewName] = useState("")
   const [newIcon, setNewIcon] = useState("")
@@ -285,6 +286,7 @@ function PropertyPicker({ value, onChange }: PropertyPickerProps) {
   const createMutation = useMutation({
     mutationFn: () =>
       VenuePropertyTypesService.createPropertyType({
+        xTenantId: selectedTenantId ?? "",
         requestBody: { name: newName.trim(), icon: newIcon.trim() || null },
       }),
     onSuccess: (created) => {

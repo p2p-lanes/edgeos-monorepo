@@ -40,17 +40,32 @@ import { useCityProvider } from "@/providers/cityProvider"
 import { toast } from "sonner"
 import { useEventTimezone } from "../lib/useEventTimezone"
 import { useFileUpload } from "../lib/useFileUpload"
+import {
+  availableEndOptions,
+  availableStartOptions,
+  dayBoundsInTz,
+  freeIntervalsForDay,
+} from "../lib/venue-slots"
 
-/** datetime-local expects "YYYY-MM-DDTHH:mm" (no seconds / no TZ). */
+/** "YYYY-MM-DD" of today in the given TZ (used as initial date picker value). */
+function todayInTz(tz: string): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date())
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? ""
+  return `${get("year")}-${get("month")}-${get("day")}`
+}
+
+/** "YYYY-MM-DDTHH:mm" local form expected by <input type="datetime-local">. */
 function toLocalInput(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0")
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
-function toIso(local: string): string {
-  // Browser input is naive local — interpret it in the user's local TZ and
-  // emit an absolute UTC instant. Matches how backoffice's DateTimePicker
-  // works.
+function localInputToIso(local: string): string {
   if (!local) return ""
   return new Date(local).toISOString()
 }
@@ -77,6 +92,7 @@ export default function NewPortalEventPage() {
   const canPublish = settings?.can_publish_event === "everyone"
 
   // ---- form state -----------------------------------------------------
+  const displayTz = timezone || "UTC"
   const now = useMemo(() => new Date(), [])
   const defaultStart = useMemo(() => {
     const d = new Date(now)
@@ -93,8 +109,13 @@ export default function NewPortalEventPage() {
   const [title, setTitle] = useState("")
   const [content, setContent] = useState("")
   const [venueId, setVenueId] = useState<string>("")
-  const [startTime, setStartTime] = useState(toLocalInput(defaultStart))
-  const [endTime, setEndTime] = useState(toLocalInput(defaultEnd))
+  // Date picked by the user, "YYYY-MM-DD" in the popup's configured TZ.
+  const [dateStr, setDateStr] = useState(() => todayInTz(displayTz))
+  // Times as absolute UTC ISO strings (chosen from slot dropdowns when a
+  // venue is selected, or derived from <input type="datetime-local"> when
+  // no venue is selected).
+  const [startIso, setStartIso] = useState<string>(defaultStart.toISOString())
+  const [endIso, setEndIso] = useState<string>(defaultEnd.toISOString())
   const [visibility, setVisibility] = useState<Visibility>("public")
   const [maxParticipants, setMaxParticipants] = useState("")
   const [meetingUrl, setMeetingUrl] = useState("")
@@ -123,7 +144,68 @@ export default function NewPortalEventPage() {
   })
   const tracks: TrackPublic[] = tracksData?.results ?? []
 
-  // ---- availability check ---------------------------------------------
+  // ---- venue availability for the selected date -----------------------
+  const dayBounds = useMemo(() => {
+    if (!dateStr) return null
+    return dayBoundsInTz(dateStr, displayTz)
+  }, [dateStr, displayTz])
+
+  const { data: availabilityData } = useQuery({
+    queryKey: [
+      "portal-venue-availability",
+      venueId,
+      dayBounds?.start.toISOString(),
+    ],
+    queryFn: () =>
+      EventVenuesService.getPortalAvailability({
+        venueId: venueId!,
+        start: dayBounds!.start.toISOString(),
+        end: dayBounds!.end.toISOString(),
+      }),
+    enabled: !!venueId && !!dayBounds,
+  })
+
+  const freeIntervals = useMemo(() => {
+    if (!availabilityData || !dayBounds) return []
+    return freeIntervalsForDay(
+      availabilityData.open_ranges,
+      availabilityData.busy,
+      dayBounds.start,
+      dayBounds.end,
+    )
+  }, [availabilityData, dayBounds])
+
+  const startOptions = useMemo(
+    () => availableStartOptions(freeIntervals, 30, displayTz),
+    [freeIntervals, displayTz],
+  )
+  const endOptions = useMemo(() => {
+    if (!startIso) return []
+    return availableEndOptions(
+      freeIntervals,
+      Date.parse(startIso),
+      30,
+      displayTz,
+    )
+  }, [freeIntervals, startIso, displayTz])
+
+  // If the chosen start is no longer valid after venue/date changes, clear.
+  useEffect(() => {
+    if (!venueId) return
+    if (!startIso) return
+    const still = startOptions.some((o) => o.isoUtc === startIso)
+    if (!still) {
+      setStartIso("")
+      setEndIso("")
+    }
+  }, [venueId, dateStr, startOptions, startIso])
+  useEffect(() => {
+    if (!venueId || !startIso || !endIso) return
+    const still = endOptions.some((o) => o.isoUtc === endIso)
+    if (!still) setEndIso("")
+  }, [venueId, dateStr, endOptions, startIso, endIso])
+
+  // ---- final availability check (used even when there's no venue) ----
   const [availability, setAvailability] = useState<
     | { state: "idle" | "checking" }
     | { state: "ok" }
@@ -131,7 +213,7 @@ export default function NewPortalEventPage() {
   >({ state: "idle" })
 
   useEffect(() => {
-    if (!venueId || !startTime || !endTime) {
+    if (!venueId || !startIso || !endIso) {
       setAvailability({ state: "idle" })
       return
     }
@@ -141,8 +223,8 @@ export default function NewPortalEventPage() {
         const res = await EventsService.checkAvailability({
           requestBody: {
             venue_id: venueId,
-            start_time: toIso(startTime),
-            end_time: toIso(endTime),
+            start_time: startIso,
+            end_time: endIso,
           },
         })
         if (res.available) {
@@ -158,7 +240,7 @@ export default function NewPortalEventPage() {
       }
     }, 500)
     return () => clearTimeout(handle)
-  }, [venueId, startTime, endTime])
+  }, [venueId, startIso, endIso])
 
   // ---- mutation -------------------------------------------------------
   const createMutation = useMutation({
@@ -169,8 +251,8 @@ export default function NewPortalEventPage() {
           popup_id: popupId,
           title,
           content: content || null,
-          start_time: toIso(startTime),
-          end_time: toIso(endTime),
+          start_time: startIso,
+          end_time: endIso,
           timezone: timezone || "UTC",
           venue_id: venueId || null,
           track_id: trackId || null,
@@ -262,7 +344,7 @@ export default function NewPortalEventPage() {
   }
 
   const canSubmit =
-    !!title.trim() && !!startTime && !!endTime && !createMutation.isPending
+    !!title.trim() && !!startIso && !!endIso && !createMutation.isPending
 
   return (
     <div className="flex flex-col max-w-2xl mx-auto p-4 sm:p-6 space-y-5">
@@ -342,31 +424,117 @@ export default function NewPortalEventPage() {
           />
         </div>
 
-        {/* Times */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="space-y-2">
-            <Label htmlFor="start">Start</Label>
-            <Input
-              id="start"
-              type="datetime-local"
-              value={startTime}
-              onChange={(e) => setStartTime(e.target.value)}
-              disabled={selectedVenue?.booking_mode === "unbookable"}
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="end">End</Label>
-            <Input
-              id="end"
-              type="datetime-local"
-              value={endTime}
-              onChange={(e) => setEndTime(e.target.value)}
-              disabled={selectedVenue?.booking_mode === "unbookable"}
-              required
-            />
-          </div>
+        {/* Date */}
+        <div className="space-y-2">
+          <Label htmlFor="date">Date</Label>
+          <Input
+            id="date"
+            type="date"
+            value={dateStr}
+            onChange={(e) => {
+              setDateStr(e.target.value)
+              setStartIso("")
+              setEndIso("")
+            }}
+            disabled={selectedVenue?.booking_mode === "unbookable"}
+            required
+          />
         </div>
+
+        {/* Times */}
+        {venueId ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="start">Start time</Label>
+              <Select
+                value={startIso || ""}
+                onValueChange={(v) => {
+                  setStartIso(v)
+                  setEndIso("")
+                }}
+                disabled={
+                  selectedVenue?.booking_mode === "unbookable" ||
+                  startOptions.length === 0
+                }
+              >
+                <SelectTrigger id="start" className="w-full">
+                  <SelectValue
+                    placeholder={
+                      startOptions.length === 0
+                        ? "No open hours"
+                        : "Pick a start"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {startOptions.map((o) => (
+                    <SelectItem key={o.isoUtc} value={o.isoUtc}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="end">End time</Label>
+              <Select
+                value={endIso || ""}
+                onValueChange={setEndIso}
+                disabled={!startIso || endOptions.length === 0}
+              >
+                <SelectTrigger id="end" className="w-full">
+                  <SelectValue
+                    placeholder={
+                      !startIso
+                        ? "Pick a start first"
+                        : endOptions.length === 0
+                          ? "No valid ends"
+                          : "Pick an end"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {endOptions.map((o) => (
+                    <SelectItem key={o.isoUtc} value={o.isoUtc}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="start">Start</Label>
+              <Input
+                id="start"
+                type="datetime-local"
+                value={startIso ? toLocalInput(new Date(startIso)) : ""}
+                onChange={(e) =>
+                  setStartIso(localInputToIso(e.target.value))
+                }
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="end">End</Label>
+              <Input
+                id="end"
+                type="datetime-local"
+                value={endIso ? toLocalInput(new Date(endIso)) : ""}
+                onChange={(e) => setEndIso(localInputToIso(e.target.value))}
+                required
+              />
+            </div>
+          </div>
+        )}
+        {venueId && startOptions.length === 0 && availabilityData && (
+          <p className="text-xs text-muted-foreground">
+            Venue has no open hours on this day (check weekly hours or
+            exceptions).
+          </p>
+        )}
         {availability.state === "checking" && (
           <p className="text-xs text-muted-foreground">
             Checking availability…

@@ -11546,21 +11546,13 @@ export const VenueAvailabilitySchema = {
             format: 'uuid',
             title: 'Venue Id'
         },
+        timezone: {
+            type: 'string',
+            title: 'Timezone'
+        },
         open_ranges: {
             items: {
-                prefixItems: [
-                    {
-                        type: 'string',
-                        format: 'date-time'
-                    },
-                    {
-                        type: 'string',
-                        format: 'date-time'
-                    }
-                ],
-                type: 'array',
-                maxItems: 2,
-                minItems: 2
+                '$ref': '#/components/schemas/VenueOpenRange'
             },
             type: 'array',
             title: 'Open Ranges'
@@ -11574,7 +11566,7 @@ export const VenueAvailabilitySchema = {
         }
     },
     type: 'object',
-    required: ['venue_id', 'open_ranges', 'busy'],
+    required: ['venue_id', 'timezone', 'open_ranges', 'busy'],
     title: 'VenueAvailability'
 } as const;
 
@@ -11795,6 +11787,24 @@ export const VenueExceptionUpdateSchema = {
     title: 'VenueExceptionUpdate'
 } as const;
 
+export const VenueOpenRangeSchema = {
+    properties: {
+        start: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Start'
+        },
+        end: {
+            type: 'string',
+            format: 'date-time',
+            title: 'End'
+        }
+    },
+    type: 'object',
+    required: ['start', 'end'],
+    title: 'VenueOpenRange'
+} as const;
+
 export const VenuePhotoCreateSchema = {
     properties: {
         image_url: {
@@ -11918,7 +11928,10 @@ export const VenuePropertyRefSchema = {
     },
     type: 'object',
     required: ['id', 'name'],
-    title: 'VenuePropertyRef'
+    title: 'VenuePropertyRef',
+    description: `Flattened view of a venue property: carries the property_type fields
+(id, name, icon) regardless of whether the ORM passes us a join row or a
+direct VenuePropertyTypes row.`
 } as const;
 
 export const VenuePropertyTypeCreateSchema = {

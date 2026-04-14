@@ -2242,10 +2242,8 @@ export type ValidationError = {
 
 export type VenueAvailability = {
     venue_id: string;
-    open_ranges: Array<[
-        string,
-        string
-    ]>;
+    timezone: string;
+    open_ranges: Array<VenueOpenRange>;
     busy: Array<VenueBusySlot>;
 };
 
@@ -2291,6 +2289,11 @@ export type VenueExceptionUpdate = {
     is_closed?: (boolean | null);
 };
 
+export type VenueOpenRange = {
+    start: string;
+    end: string;
+};
+
 export type VenuePhotoCreate = {
     image_url: string;
     position?: number;
@@ -2315,6 +2318,11 @@ export type VenuePhotoUpdate = {
     position?: (number | null);
 };
 
+/**
+ * Flattened view of a venue property: carries the property_type fields
+ * (id, name, icon) regardless of whether the ORM passes us a join row or a
+ * direct VenuePropertyTypes row.
+ */
 export type VenuePropertyRef = {
     id: string;
     name: string;
@@ -3247,6 +3255,14 @@ export type EventVenuesGetAvailabilityData = {
 
 export type EventVenuesGetAvailabilityResponse = (VenueAvailability);
 
+export type EventVenuesGetPortalAvailabilityData = {
+    end: string;
+    start: string;
+    venueId: string;
+};
+
+export type EventVenuesGetPortalAvailabilityResponse = (VenueAvailability);
+
 export type EventVenuesListPortalVenuesData = {
     /**
      * Maximum number of items to return
@@ -4081,7 +4097,7 @@ export type VenuePropertyTypesListPropertyTypesResponse = (Array<VenuePropertyTy
 
 export type VenuePropertyTypesCreatePropertyTypeData = {
     requestBody: VenuePropertyTypeCreate;
-    xTenantId?: (string | null);
+    xTenantId: string;
 };
 
 export type VenuePropertyTypesCreatePropertyTypeResponse = (VenuePropertyTypePublic);
