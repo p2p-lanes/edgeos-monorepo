@@ -1,5 +1,6 @@
 import { useForm } from "@tanstack/react-form"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import * as LucideIcons from "lucide-react"
 import {
   Calendar,
   Clock,
@@ -9,6 +10,7 @@ import {
   Trash2,
   X,
 } from "lucide-react"
+import type { ComponentType } from "react"
 import { useEffect, useMemo, useRef, useState } from "react"
 
 import {
@@ -323,9 +325,7 @@ function PropertyPicker({ value, onChange }: PropertyPickerProps) {
                       : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground")
                   }
                 >
-                  {pt.icon && (
-                    <span className="text-xs opacity-80">{pt.icon}</span>
-                  )}
+                  <LucideIconByName name={pt.icon} className="h-3.5 w-3.5" />
                   <span>{pt.name}</span>
                 </button>
               )
@@ -344,14 +344,34 @@ function PropertyPicker({ value, onChange }: PropertyPickerProps) {
                 placeholder="Projector, Wi-Fi, Parking..."
               />
             </div>
-            <div className="flex-1 min-w-[120px] space-y-1">
+            <div className="flex-1 min-w-[160px] space-y-1">
               <Label htmlFor="new-property-icon">Icon (optional)</Label>
-              <Input
-                id="new-property-icon"
-                value={newIcon}
-                onChange={(e) => setNewIcon(e.target.value)}
-                placeholder="lucide icon name"
-              />
+              <div className="relative">
+                <Input
+                  id="new-property-icon"
+                  value={newIcon}
+                  onChange={(e) => setNewIcon(e.target.value)}
+                  placeholder="Mic, Monitor, Armchair, Wifi..."
+                  className="pr-8"
+                />
+                {newIcon && (
+                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground">
+                    <LucideIconByName name={newIcon} className="h-4 w-4" />
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                PascalCase lucide name (see{" "}
+                <a
+                  href="https://lucide.dev/icons/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline hover:text-foreground"
+                >
+                  lucide.dev/icons
+                </a>
+                ).
+              </p>
             </div>
             <div className="flex gap-2">
               <LoadingButton
@@ -1305,4 +1325,21 @@ function ChipsWithSuggestions({
       )}
     </div>
   )
+}
+
+type LucideIconProps = { className?: string }
+
+function LucideIconByName({
+  name,
+  className,
+}: {
+  name: string | null | undefined
+  className?: string
+}) {
+  if (!name) return null
+  const key = name.trim()
+  if (!key) return null
+  const Icon = (LucideIcons as unknown as Record<string, ComponentType<LucideIconProps>>)[key]
+  if (!Icon || typeof Icon !== "function") return null
+  return <Icon className={className} />
 }
