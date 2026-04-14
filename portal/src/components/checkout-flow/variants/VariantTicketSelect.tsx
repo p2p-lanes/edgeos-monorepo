@@ -171,16 +171,6 @@ export default function VariantTicketSelect({
       {passesVariant === "tabs" && <TabsLayout {...sharedProps} />}
       {passesVariant === "compact" && <CompactLayout {...sharedProps} />}
       {passesVariant === "accordion" && <AccordionLayout {...sharedProps} />}
-
-      <div className="text-center py-2">
-        <button
-          type="button"
-          onClick={onSkip}
-          className="text-gray-500 hover:text-gray-700 underline text-sm transition-colors"
-        >
-          Skip this step
-        </button>
-      </div>
     </div>
   )
 }
@@ -1323,15 +1313,6 @@ function LegacySectionLayout({
           {products.map(renderRow)}
         </div>
       )}
-      <div className="text-center py-2">
-        <button
-          type="button"
-          onClick={onSkip}
-          className="text-gray-500 hover:text-gray-700 underline text-sm transition-colors"
-        >
-          Skip this step
-        </button>
-      </div>
     </div>
   )
 }

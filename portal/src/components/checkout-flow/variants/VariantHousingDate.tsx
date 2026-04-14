@@ -151,22 +151,6 @@ function DatePickerSection({
   )
 }
 
-/* ── Shared skip link ─────────────────────────────────────── */
-
-function SkipLink({ onSkip }: { onSkip?: () => void }) {
-  return (
-    <div className="text-center py-2">
-      <button
-        type="button"
-        onClick={onSkip}
-        className="text-muted-foreground hover:text-foreground underline text-sm transition-colors"
-      >
-        Skip this step
-      </button>
-    </div>
-  )
-}
-
 /* ── Card props shared by both variants ───────────────────── */
 
 interface CardListProps {
@@ -644,7 +628,6 @@ function HousingDefault({
           onDecrement={onDecrement}
         />
       ))}
-      <SkipLink onSkip={onSkip} />
     </div>
   )
 }
@@ -858,7 +841,6 @@ function HousingShowcase({
           onDecrement={onDecrement}
         />
       ))}
-      <SkipLink onSkip={onSkip} />
     </div>
   )
 }
@@ -898,7 +880,6 @@ function HousingCompact({
           ))}
         </div>
       ))}
-      <SkipLink onSkip={onSkip} />
     </div>
   )
 }
@@ -940,7 +921,6 @@ function HousingGrid({
           </div>
         </div>
       ))}
-      <SkipLink onSkip={onSkip} />
     </div>
   )
 }

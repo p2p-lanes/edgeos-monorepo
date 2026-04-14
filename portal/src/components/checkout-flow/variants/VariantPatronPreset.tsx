@@ -233,15 +233,6 @@ function PatronDefault({
         )}
       </div>
 
-      <div className="text-center py-2">
-        <button
-          type="button"
-          onClick={onSkip}
-          className="text-gray-500 hover:text-gray-700 underline text-sm transition-colors"
-        >
-          Skip this step
-        </button>
-      </div>
     </div>
   )
 }
@@ -326,15 +317,6 @@ function PatronCompact({
         )}
       </div>
 
-      <div className="text-center py-1">
-        <button
-          type="button"
-          onClick={onSkip}
-          className="text-gray-500 hover:text-gray-700 underline text-xs transition-colors"
-        >
-          Skip this step
-        </button>
-      </div>
     </div>
   )
 }
@@ -431,15 +413,6 @@ function PatronGrid({
         </div>
       )}
 
-      <div className="text-center py-2">
-        <button
-          type="button"
-          onClick={onSkip}
-          className="text-gray-500 hover:text-gray-700 underline text-sm transition-colors"
-        >
-          Skip this step
-        </button>
-      </div>
     </div>
   )
 }

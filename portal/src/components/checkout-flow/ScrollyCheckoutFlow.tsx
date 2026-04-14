@@ -882,6 +882,7 @@ function ScrollyCheckoutFlowInner({
   onBack,
 }: ScrollyCheckoutFlowProps) {
   const { variant } = useDesignVariant()
+  const isMobile = useIsMobile()
   const { availableSteps, submitPayment, stepConfigs } = useCheckout()
 
   const getStepConfig = (stepType: string) =>
@@ -1103,7 +1104,9 @@ function ScrollyCheckoutFlowInner({
     return () => observer.disconnect()
   }, [variant, allSections])
 
-  // GSAP-powered snap scroll — blocks native scroll, animates between sections
+  // Snap scroll — GSAP-driven on desktop; native scroll + CSS scroll-snap on mobile.
+  // Mobile browsers (especially iOS WebKit / Brave) fight the custom touch handlers
+  // with their own momentum scroll, which produced visible jitter and stuck scrolls.
   useEffect(() => {
     if (variant !== "snap") return
 
@@ -1147,14 +1150,66 @@ function ScrollyCheckoutFlowInner({
     const navRo = new ResizeObserver(updateNavHeight)
     if (navEl) navRo.observe(navEl)
 
-    // Compute the scrollTop needed to align an element's top with the container top
+    const sectionsSnapshot = allSections
+
     const getScrollTop = (el: HTMLElement): number =>
       mainEl.scrollTop +
       el.getBoundingClientRect().top -
       mainEl.getBoundingClientRect().top
 
-    // Snapshot sections at effect creation time
-    const sectionsSnapshot = allSections
+    // --- MOBILE: native scroll + CSS scroll-snap ---
+    if (isMobile) {
+      const prevSnapType = mainEl.style.scrollSnapType
+      mainEl.style.scrollSnapType = "y mandatory"
+
+      const sectionEls = sectionsSnapshot
+        .map((s) => document.getElementById(s.id))
+        .filter(Boolean) as HTMLElement[]
+      for (const el of sectionEls) {
+        el.style.scrollSnapAlign = "start"
+        el.style.scrollSnapStop = "always"
+      }
+
+      const observer = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
+              setActiveSection(entry.target.id)
+            }
+          }
+        },
+        { root: mainEl, threshold: [0.5] },
+      )
+      for (const el of sectionEls) observer.observe(el)
+
+      scrollToIndexRef.current = (index: number) => {
+        const clamped = Math.max(
+          0,
+          Math.min(index, sectionsSnapshot.length - 1),
+        )
+        const el = document.getElementById(sectionsSnapshot[clamped].id)
+        if (!el) return
+        mainEl.scrollTo({ top: getScrollTop(el), behavior: "smooth" })
+        setActiveSection(sectionsSnapshot[clamped].id)
+      }
+
+      return () => {
+        mainEl.style.overscrollBehaviorY = ""
+        mainEl.style.removeProperty("--snap-section-h")
+        mainEl.style.removeProperty("--snap-nav-h")
+        mainEl.style.scrollSnapType = prevSnapType
+        for (const el of sectionEls) {
+          el.style.scrollSnapAlign = ""
+          el.style.scrollSnapStop = ""
+        }
+        observer.disconnect()
+        ro.disconnect()
+        navRo.disconnect()
+        scrollToIndexRef.current = null
+      }
+    }
+
+    // --- DESKTOP: GSAP-driven snap (wheel-based) ---
     const currentSection = { current: 0 }
     const isAnimating = { current: false }
 
@@ -1177,16 +1232,8 @@ function ScrollyCheckoutFlowInner({
       })
     }
 
-    // Expose for dot nav
     scrollToIndexRef.current = scrollToIndex
 
-    // Returns the section's absolute top in scroll-space (independent of current scrollTop)
-    const getSectionScrollTop = (el: HTMLElement): number =>
-      mainEl.scrollTop +
-      el.getBoundingClientRect().top -
-      mainEl.getBoundingClientRect().top
-
-    // Update currentSection based on scroll position (used during free scrolling within a section)
     const updateCurrentSection = () => {
       if (isAnimating.current) return
       const scrollTop = mainEl.scrollTop
@@ -1194,7 +1241,7 @@ function ScrollyCheckoutFlowInner({
       for (let i = 0; i < sectionsSnapshot.length; i++) {
         const el = document.getElementById(sectionsSnapshot[i].id)
         if (!el) continue
-        if (scrollTop >= getSectionScrollTop(el) - 10) active = i
+        if (scrollTop >= getScrollTop(el) - 10) active = i
       }
       if (active !== currentSection.current) {
         currentSection.current = active
@@ -1202,13 +1249,12 @@ function ScrollyCheckoutFlowInner({
       }
     }
 
-    // Returns true if scrolling `dir` should snap (we're at a section boundary)
     const atBoundary = (dir: 1 | -1): boolean => {
       const el = document.getElementById(
         sectionsSnapshot[currentSection.current].id,
       )
       if (!el) return true
-      const sectionTop = getSectionScrollTop(el)
+      const sectionTop = getScrollTop(el)
       const sectionBottom = sectionTop + el.offsetHeight
       const scrollTop = mainEl.scrollTop
       const containerBottom = scrollTop + mainEl.clientHeight
@@ -1227,27 +1273,8 @@ function ScrollyCheckoutFlowInner({
       scrollToIndex(currentSection.current + dir)
     }
 
-    let touchStartY = 0
-    const handleTouchStart = (e: TouchEvent) => {
-      touchStartY = e.touches[0].clientY
-    }
-    const handleTouchMove = (e: TouchEvent) => {
-      // Only block native scroll while a snap animation is running
-      if (isAnimating.current) e.preventDefault()
-    }
-    const handleTouchEnd = (e: TouchEvent) => {
-      const dy = touchStartY - e.changedTouches[0].clientY
-      if (Math.abs(dy) < 30 || isAnimating.current) return
-      const dir = dy > 0 ? 1 : -1
-      if (!atBoundary(dir)) return
-      scrollToIndex(currentSection.current + dir)
-    }
-
     mainEl.addEventListener("scroll", updateCurrentSection)
     mainEl.addEventListener("wheel", handleWheel, { passive: false })
-    mainEl.addEventListener("touchstart", handleTouchStart)
-    mainEl.addEventListener("touchmove", handleTouchMove, { passive: false })
-    mainEl.addEventListener("touchend", handleTouchEnd)
 
     return () => {
       mainEl.style.overscrollBehaviorY = ""
@@ -1255,15 +1282,12 @@ function ScrollyCheckoutFlowInner({
       mainEl.style.removeProperty("--snap-nav-h")
       mainEl.removeEventListener("scroll", updateCurrentSection)
       mainEl.removeEventListener("wheel", handleWheel)
-      mainEl.removeEventListener("touchstart", handleTouchStart)
-      mainEl.removeEventListener("touchmove", handleTouchMove)
-      mainEl.removeEventListener("touchend", handleTouchEnd)
       gsap.killTweensOf(mainEl)
       ro.disconnect()
       navRo.disconnect()
       scrollToIndexRef.current = null
     }
-  }, [variant, allSections])
+  }, [variant, allSections, isMobile])
 
   const renderSectionContent = (stepId: string) => {
     // Passes/tickets: dynamic step or fall-back legacy section

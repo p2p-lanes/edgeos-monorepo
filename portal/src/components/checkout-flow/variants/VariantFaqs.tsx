@@ -27,20 +27,6 @@ function parseFaqs(templateConfig: VariantProps["templateConfig"]): FaqItem[] {
   return raw as FaqItem[]
 }
 
-function SkipLink({ onSkip }: { onSkip?: () => void }) {
-  return (
-    <div className="text-center pt-2">
-      <button
-        type="button"
-        onClick={onSkip}
-        className="text-gray-500 hover:text-gray-700 underline text-sm transition-colors"
-      >
-        Continue
-      </button>
-    </div>
-  )
-}
-
 function SectionTitle({ title }: { title?: string }) {
   if (!title) return null
   return (
@@ -107,7 +93,6 @@ function AccordionFaqs({
           )
         })}
       </div>
-      <SkipLink onSkip={onSkip} />
     </div>
   )
 }
@@ -140,7 +125,6 @@ function ListFaqs({
           </div>
         ))}
       </div>
-      <SkipLink onSkip={onSkip} />
     </div>
   )
 }
@@ -176,7 +160,6 @@ function TwoColumnFaqs({
           </div>
         ))}
       </div>
-      <SkipLink onSkip={onSkip} />
     </div>
   )
 }
@@ -217,7 +200,6 @@ function CardsFaqs({
           </div>
         ))}
       </div>
-      <SkipLink onSkip={onSkip} />
     </div>
   )
 }
