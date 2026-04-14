@@ -22,6 +22,7 @@ import { Route as LayoutOrganizationsIndexRouteImport } from './routes/_layout/o
 import { Route as LayoutHumansIndexRouteImport } from './routes/_layout/humans/index'
 import { Route as LayoutGroupsIndexRouteImport } from './routes/_layout/groups/index'
 import { Route as LayoutFormBuilderIndexRouteImport } from './routes/_layout/form-builder/index'
+import { Route as LayoutEventsIndexRouteImport } from './routes/_layout/events/index'
 import { Route as LayoutEmailTemplatesIndexRouteImport } from './routes/_layout/email-templates/index'
 import { Route as LayoutCouponsIndexRouteImport } from './routes/_layout/coupons/index'
 import { Route as LayoutApplicationsIndexRouteImport } from './routes/_layout/applications/index'
@@ -32,6 +33,11 @@ import { Route as LayoutOrganizationsNewRouteImport } from './routes/_layout/org
 import { Route as LayoutHumansNewRouteImport } from './routes/_layout/humans/new'
 import { Route as LayoutGroupsNewRouteImport } from './routes/_layout/groups/new'
 import { Route as LayoutFormBuilderNewRouteImport } from './routes/_layout/form-builder/new'
+import { Route as LayoutEventsVenuesNewRouteImport } from './routes/_layout/events/venues-new'
+import { Route as LayoutEventsVenuesEditRouteImport } from './routes/_layout/events/venues-edit'
+import { Route as LayoutEventsVenuesRouteImport } from './routes/_layout/events/venues'
+import { Route as LayoutEventsSettingsRouteImport } from './routes/_layout/events/settings'
+import { Route as LayoutEventsNewRouteImport } from './routes/_layout/events/new'
 import { Route as LayoutCouponsNewRouteImport } from './routes/_layout/coupons/new'
 import { Route as LayoutApplicationsReviewQueueRouteImport } from './routes/_layout/applications/review-queue'
 import { Route as LayoutApplicationsNewRouteImport } from './routes/_layout/applications/new'
@@ -44,6 +50,7 @@ import { Route as LayoutHumansIdEditRouteImport } from './routes/_layout/humans/
 import { Route as LayoutGroupsIdEditRouteImport } from './routes/_layout/groups/$id.edit'
 import { Route as LayoutFormBuilderSectionsNewRouteImport } from './routes/_layout/form-builder/sections/new'
 import { Route as LayoutFormBuilderIdEditRouteImport } from './routes/_layout/form-builder/$id.edit'
+import { Route as LayoutEventsEventIdEditRouteImport } from './routes/_layout/events/$eventId.edit'
 import { Route as LayoutEmailTemplatesTypeEditRouteImport } from './routes/_layout/email-templates/$type.edit'
 import { Route as LayoutCouponsIdEditRouteImport } from './routes/_layout/coupons/$id.edit'
 import { Route as LayoutAdminIdEditRouteImport } from './routes/_layout/admin/$id.edit'
@@ -114,6 +121,11 @@ const LayoutFormBuilderIndexRoute = LayoutFormBuilderIndexRouteImport.update({
   path: '/form-builder/',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutEventsIndexRoute = LayoutEventsIndexRouteImport.update({
+  id: '/events/',
+  path: '/events/',
+  getParentRoute: () => LayoutRoute,
+} as any)
 const LayoutEmailTemplatesIndexRoute =
   LayoutEmailTemplatesIndexRouteImport.update({
     id: '/email-templates/',
@@ -163,6 +175,31 @@ const LayoutGroupsNewRoute = LayoutGroupsNewRouteImport.update({
 const LayoutFormBuilderNewRoute = LayoutFormBuilderNewRouteImport.update({
   id: '/form-builder/new',
   path: '/form-builder/new',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutEventsVenuesNewRoute = LayoutEventsVenuesNewRouteImport.update({
+  id: '/events/venues-new',
+  path: '/events/venues-new',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutEventsVenuesEditRoute = LayoutEventsVenuesEditRouteImport.update({
+  id: '/events/venues-edit',
+  path: '/events/venues-edit',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutEventsVenuesRoute = LayoutEventsVenuesRouteImport.update({
+  id: '/events/venues',
+  path: '/events/venues',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutEventsSettingsRoute = LayoutEventsSettingsRouteImport.update({
+  id: '/events/settings',
+  path: '/events/settings',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutEventsNewRoute = LayoutEventsNewRouteImport.update({
+  id: '/events/new',
+  path: '/events/new',
   getParentRoute: () => LayoutRoute,
 } as any)
 const LayoutCouponsNewRoute = LayoutCouponsNewRouteImport.update({
@@ -228,6 +265,11 @@ const LayoutFormBuilderIdEditRoute = LayoutFormBuilderIdEditRouteImport.update({
   path: '/form-builder/$id/edit',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutEventsEventIdEditRoute = LayoutEventsEventIdEditRouteImport.update({
+  id: '/events/$eventId/edit',
+  path: '/events/$eventId/edit',
+  getParentRoute: () => LayoutRoute,
+} as any)
 const LayoutEmailTemplatesTypeEditRoute =
   LayoutEmailTemplatesTypeEditRouteImport.update({
     id: '/email-templates/$type/edit',
@@ -263,6 +305,11 @@ export interface FileRoutesByFullPath {
   '/applications/new': typeof LayoutApplicationsNewRoute
   '/applications/review-queue': typeof LayoutApplicationsReviewQueueRoute
   '/coupons/new': typeof LayoutCouponsNewRoute
+  '/events/new': typeof LayoutEventsNewRoute
+  '/events/settings': typeof LayoutEventsSettingsRoute
+  '/events/venues': typeof LayoutEventsVenuesRoute
+  '/events/venues-edit': typeof LayoutEventsVenuesEditRoute
+  '/events/venues-new': typeof LayoutEventsVenuesNewRoute
   '/form-builder/new': typeof LayoutFormBuilderNewRoute
   '/groups/new': typeof LayoutGroupsNewRoute
   '/humans/new': typeof LayoutHumansNewRoute
@@ -273,6 +320,7 @@ export interface FileRoutesByFullPath {
   '/applications/': typeof LayoutApplicationsIndexRoute
   '/coupons/': typeof LayoutCouponsIndexRoute
   '/email-templates/': typeof LayoutEmailTemplatesIndexRoute
+  '/events/': typeof LayoutEventsIndexRoute
   '/form-builder/': typeof LayoutFormBuilderIndexRoute
   '/groups/': typeof LayoutGroupsIndexRoute
   '/humans/': typeof LayoutHumansIndexRoute
@@ -282,6 +330,7 @@ export interface FileRoutesByFullPath {
   '/admin/$id/edit': typeof LayoutAdminIdEditRoute
   '/coupons/$id/edit': typeof LayoutCouponsIdEditRoute
   '/email-templates/$type/edit': typeof LayoutEmailTemplatesTypeEditRoute
+  '/events/$eventId/edit': typeof LayoutEventsEventIdEditRoute
   '/form-builder/$id/edit': typeof LayoutFormBuilderIdEditRoute
   '/form-builder/sections/new': typeof LayoutFormBuilderSectionsNewRoute
   '/groups/$id/edit': typeof LayoutGroupsIdEditRoute
@@ -303,6 +352,11 @@ export interface FileRoutesByTo {
   '/applications/new': typeof LayoutApplicationsNewRoute
   '/applications/review-queue': typeof LayoutApplicationsReviewQueueRoute
   '/coupons/new': typeof LayoutCouponsNewRoute
+  '/events/new': typeof LayoutEventsNewRoute
+  '/events/settings': typeof LayoutEventsSettingsRoute
+  '/events/venues': typeof LayoutEventsVenuesRoute
+  '/events/venues-edit': typeof LayoutEventsVenuesEditRoute
+  '/events/venues-new': typeof LayoutEventsVenuesNewRoute
   '/form-builder/new': typeof LayoutFormBuilderNewRoute
   '/groups/new': typeof LayoutGroupsNewRoute
   '/humans/new': typeof LayoutHumansNewRoute
@@ -313,6 +367,7 @@ export interface FileRoutesByTo {
   '/applications': typeof LayoutApplicationsIndexRoute
   '/coupons': typeof LayoutCouponsIndexRoute
   '/email-templates': typeof LayoutEmailTemplatesIndexRoute
+  '/events': typeof LayoutEventsIndexRoute
   '/form-builder': typeof LayoutFormBuilderIndexRoute
   '/groups': typeof LayoutGroupsIndexRoute
   '/humans': typeof LayoutHumansIndexRoute
@@ -322,6 +377,7 @@ export interface FileRoutesByTo {
   '/admin/$id/edit': typeof LayoutAdminIdEditRoute
   '/coupons/$id/edit': typeof LayoutCouponsIdEditRoute
   '/email-templates/$type/edit': typeof LayoutEmailTemplatesTypeEditRoute
+  '/events/$eventId/edit': typeof LayoutEventsEventIdEditRoute
   '/form-builder/$id/edit': typeof LayoutFormBuilderIdEditRoute
   '/form-builder/sections/new': typeof LayoutFormBuilderSectionsNewRoute
   '/groups/$id/edit': typeof LayoutGroupsIdEditRoute
@@ -345,6 +401,11 @@ export interface FileRoutesById {
   '/_layout/applications/new': typeof LayoutApplicationsNewRoute
   '/_layout/applications/review-queue': typeof LayoutApplicationsReviewQueueRoute
   '/_layout/coupons/new': typeof LayoutCouponsNewRoute
+  '/_layout/events/new': typeof LayoutEventsNewRoute
+  '/_layout/events/settings': typeof LayoutEventsSettingsRoute
+  '/_layout/events/venues': typeof LayoutEventsVenuesRoute
+  '/_layout/events/venues-edit': typeof LayoutEventsVenuesEditRoute
+  '/_layout/events/venues-new': typeof LayoutEventsVenuesNewRoute
   '/_layout/form-builder/new': typeof LayoutFormBuilderNewRoute
   '/_layout/groups/new': typeof LayoutGroupsNewRoute
   '/_layout/humans/new': typeof LayoutHumansNewRoute
@@ -355,6 +416,7 @@ export interface FileRoutesById {
   '/_layout/applications/': typeof LayoutApplicationsIndexRoute
   '/_layout/coupons/': typeof LayoutCouponsIndexRoute
   '/_layout/email-templates/': typeof LayoutEmailTemplatesIndexRoute
+  '/_layout/events/': typeof LayoutEventsIndexRoute
   '/_layout/form-builder/': typeof LayoutFormBuilderIndexRoute
   '/_layout/groups/': typeof LayoutGroupsIndexRoute
   '/_layout/humans/': typeof LayoutHumansIndexRoute
@@ -364,6 +426,7 @@ export interface FileRoutesById {
   '/_layout/admin/$id/edit': typeof LayoutAdminIdEditRoute
   '/_layout/coupons/$id/edit': typeof LayoutCouponsIdEditRoute
   '/_layout/email-templates/$type/edit': typeof LayoutEmailTemplatesTypeEditRoute
+  '/_layout/events/$eventId/edit': typeof LayoutEventsEventIdEditRoute
   '/_layout/form-builder/$id/edit': typeof LayoutFormBuilderIdEditRoute
   '/_layout/form-builder/sections/new': typeof LayoutFormBuilderSectionsNewRoute
   '/_layout/groups/$id/edit': typeof LayoutGroupsIdEditRoute
@@ -387,6 +450,11 @@ export interface FileRouteTypes {
     | '/applications/new'
     | '/applications/review-queue'
     | '/coupons/new'
+    | '/events/new'
+    | '/events/settings'
+    | '/events/venues'
+    | '/events/venues-edit'
+    | '/events/venues-new'
     | '/form-builder/new'
     | '/groups/new'
     | '/humans/new'
@@ -397,6 +465,7 @@ export interface FileRouteTypes {
     | '/applications/'
     | '/coupons/'
     | '/email-templates/'
+    | '/events/'
     | '/form-builder/'
     | '/groups/'
     | '/humans/'
@@ -406,6 +475,7 @@ export interface FileRouteTypes {
     | '/admin/$id/edit'
     | '/coupons/$id/edit'
     | '/email-templates/$type/edit'
+    | '/events/$eventId/edit'
     | '/form-builder/$id/edit'
     | '/form-builder/sections/new'
     | '/groups/$id/edit'
@@ -427,6 +497,11 @@ export interface FileRouteTypes {
     | '/applications/new'
     | '/applications/review-queue'
     | '/coupons/new'
+    | '/events/new'
+    | '/events/settings'
+    | '/events/venues'
+    | '/events/venues-edit'
+    | '/events/venues-new'
     | '/form-builder/new'
     | '/groups/new'
     | '/humans/new'
@@ -437,6 +512,7 @@ export interface FileRouteTypes {
     | '/applications'
     | '/coupons'
     | '/email-templates'
+    | '/events'
     | '/form-builder'
     | '/groups'
     | '/humans'
@@ -446,6 +522,7 @@ export interface FileRouteTypes {
     | '/admin/$id/edit'
     | '/coupons/$id/edit'
     | '/email-templates/$type/edit'
+    | '/events/$eventId/edit'
     | '/form-builder/$id/edit'
     | '/form-builder/sections/new'
     | '/groups/$id/edit'
@@ -468,6 +545,11 @@ export interface FileRouteTypes {
     | '/_layout/applications/new'
     | '/_layout/applications/review-queue'
     | '/_layout/coupons/new'
+    | '/_layout/events/new'
+    | '/_layout/events/settings'
+    | '/_layout/events/venues'
+    | '/_layout/events/venues-edit'
+    | '/_layout/events/venues-new'
     | '/_layout/form-builder/new'
     | '/_layout/groups/new'
     | '/_layout/humans/new'
@@ -478,6 +560,7 @@ export interface FileRouteTypes {
     | '/_layout/applications/'
     | '/_layout/coupons/'
     | '/_layout/email-templates/'
+    | '/_layout/events/'
     | '/_layout/form-builder/'
     | '/_layout/groups/'
     | '/_layout/humans/'
@@ -487,6 +570,7 @@ export interface FileRouteTypes {
     | '/_layout/admin/$id/edit'
     | '/_layout/coupons/$id/edit'
     | '/_layout/email-templates/$type/edit'
+    | '/_layout/events/$eventId/edit'
     | '/_layout/form-builder/$id/edit'
     | '/_layout/form-builder/sections/new'
     | '/_layout/groups/$id/edit'
@@ -595,6 +679,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutFormBuilderIndexRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/events/': {
+      id: '/_layout/events/'
+      path: '/events'
+      fullPath: '/events/'
+      preLoaderRoute: typeof LayoutEventsIndexRouteImport
+      parentRoute: typeof LayoutRoute
+    }
     '/_layout/email-templates/': {
       id: '/_layout/email-templates/'
       path: '/email-templates'
@@ -663,6 +754,41 @@ declare module '@tanstack/react-router' {
       path: '/form-builder/new'
       fullPath: '/form-builder/new'
       preLoaderRoute: typeof LayoutFormBuilderNewRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/events/venues-new': {
+      id: '/_layout/events/venues-new'
+      path: '/events/venues-new'
+      fullPath: '/events/venues-new'
+      preLoaderRoute: typeof LayoutEventsVenuesNewRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/events/venues-edit': {
+      id: '/_layout/events/venues-edit'
+      path: '/events/venues-edit'
+      fullPath: '/events/venues-edit'
+      preLoaderRoute: typeof LayoutEventsVenuesEditRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/events/venues': {
+      id: '/_layout/events/venues'
+      path: '/events/venues'
+      fullPath: '/events/venues'
+      preLoaderRoute: typeof LayoutEventsVenuesRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/events/settings': {
+      id: '/_layout/events/settings'
+      path: '/events/settings'
+      fullPath: '/events/settings'
+      preLoaderRoute: typeof LayoutEventsSettingsRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/events/new': {
+      id: '/_layout/events/new'
+      path: '/events/new'
+      fullPath: '/events/new'
+      preLoaderRoute: typeof LayoutEventsNewRouteImport
       parentRoute: typeof LayoutRoute
     }
     '/_layout/coupons/new': {
@@ -749,6 +875,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutFormBuilderIdEditRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/events/$eventId/edit': {
+      id: '/_layout/events/$eventId/edit'
+      path: '/events/$eventId/edit'
+      fullPath: '/events/$eventId/edit'
+      preLoaderRoute: typeof LayoutEventsEventIdEditRouteImport
+      parentRoute: typeof LayoutRoute
+    }
     '/_layout/email-templates/$type/edit': {
       id: '/_layout/email-templates/$type/edit'
       path: '/email-templates/$type/edit'
@@ -791,6 +924,11 @@ interface LayoutRouteChildren {
   LayoutApplicationsNewRoute: typeof LayoutApplicationsNewRoute
   LayoutApplicationsReviewQueueRoute: typeof LayoutApplicationsReviewQueueRoute
   LayoutCouponsNewRoute: typeof LayoutCouponsNewRoute
+  LayoutEventsNewRoute: typeof LayoutEventsNewRoute
+  LayoutEventsSettingsRoute: typeof LayoutEventsSettingsRoute
+  LayoutEventsVenuesRoute: typeof LayoutEventsVenuesRoute
+  LayoutEventsVenuesEditRoute: typeof LayoutEventsVenuesEditRoute
+  LayoutEventsVenuesNewRoute: typeof LayoutEventsVenuesNewRoute
   LayoutFormBuilderNewRoute: typeof LayoutFormBuilderNewRoute
   LayoutGroupsNewRoute: typeof LayoutGroupsNewRoute
   LayoutHumansNewRoute: typeof LayoutHumansNewRoute
@@ -801,6 +939,7 @@ interface LayoutRouteChildren {
   LayoutApplicationsIndexRoute: typeof LayoutApplicationsIndexRoute
   LayoutCouponsIndexRoute: typeof LayoutCouponsIndexRoute
   LayoutEmailTemplatesIndexRoute: typeof LayoutEmailTemplatesIndexRoute
+  LayoutEventsIndexRoute: typeof LayoutEventsIndexRoute
   LayoutFormBuilderIndexRoute: typeof LayoutFormBuilderIndexRoute
   LayoutGroupsIndexRoute: typeof LayoutGroupsIndexRoute
   LayoutHumansIndexRoute: typeof LayoutHumansIndexRoute
@@ -810,6 +949,7 @@ interface LayoutRouteChildren {
   LayoutAdminIdEditRoute: typeof LayoutAdminIdEditRoute
   LayoutCouponsIdEditRoute: typeof LayoutCouponsIdEditRoute
   LayoutEmailTemplatesTypeEditRoute: typeof LayoutEmailTemplatesTypeEditRoute
+  LayoutEventsEventIdEditRoute: typeof LayoutEventsEventIdEditRoute
   LayoutFormBuilderIdEditRoute: typeof LayoutFormBuilderIdEditRoute
   LayoutFormBuilderSectionsNewRoute: typeof LayoutFormBuilderSectionsNewRoute
   LayoutGroupsIdEditRoute: typeof LayoutGroupsIdEditRoute
@@ -831,6 +971,11 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutApplicationsNewRoute: LayoutApplicationsNewRoute,
   LayoutApplicationsReviewQueueRoute: LayoutApplicationsReviewQueueRoute,
   LayoutCouponsNewRoute: LayoutCouponsNewRoute,
+  LayoutEventsNewRoute: LayoutEventsNewRoute,
+  LayoutEventsSettingsRoute: LayoutEventsSettingsRoute,
+  LayoutEventsVenuesRoute: LayoutEventsVenuesRoute,
+  LayoutEventsVenuesEditRoute: LayoutEventsVenuesEditRoute,
+  LayoutEventsVenuesNewRoute: LayoutEventsVenuesNewRoute,
   LayoutFormBuilderNewRoute: LayoutFormBuilderNewRoute,
   LayoutGroupsNewRoute: LayoutGroupsNewRoute,
   LayoutHumansNewRoute: LayoutHumansNewRoute,
@@ -841,6 +986,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutApplicationsIndexRoute: LayoutApplicationsIndexRoute,
   LayoutCouponsIndexRoute: LayoutCouponsIndexRoute,
   LayoutEmailTemplatesIndexRoute: LayoutEmailTemplatesIndexRoute,
+  LayoutEventsIndexRoute: LayoutEventsIndexRoute,
   LayoutFormBuilderIndexRoute: LayoutFormBuilderIndexRoute,
   LayoutGroupsIndexRoute: LayoutGroupsIndexRoute,
   LayoutHumansIndexRoute: LayoutHumansIndexRoute,
@@ -850,6 +996,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutAdminIdEditRoute: LayoutAdminIdEditRoute,
   LayoutCouponsIdEditRoute: LayoutCouponsIdEditRoute,
   LayoutEmailTemplatesTypeEditRoute: LayoutEmailTemplatesTypeEditRoute,
+  LayoutEventsEventIdEditRoute: LayoutEventsEventIdEditRoute,
   LayoutFormBuilderIdEditRoute: LayoutFormBuilderIdEditRoute,
   LayoutFormBuilderSectionsNewRoute: LayoutFormBuilderSectionsNewRoute,
   LayoutGroupsIdEditRoute: LayoutGroupsIdEditRoute,

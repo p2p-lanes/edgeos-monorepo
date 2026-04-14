@@ -70,7 +70,7 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
         </div>
         <p className="text-muted-foreground/75">
           View and manage your passes here. Need to make changes? You can switch
-          your week closer to the event to match your plans!
+          your week closer to the pop-up to match your plans!
         </p>
 
         {/* Inline Text Links */}

@@ -91,7 +91,7 @@ const TooltipPatreon = ({
     </TooltipTrigger>
     <TooltipContent className="bg-white text-black max-w-[420px] border border-gray-200">
       {description ||
-        "A patron pass supports the community and gives you access to the full event."}
+        "A patron pass supports the community and gives you access to the full pop-up."}
     </TooltipContent>
   </Tooltip>
 )

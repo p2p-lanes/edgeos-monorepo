@@ -81,7 +81,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
     mutationFn: (data: PopupCreate) =>
       PopupsService.createPopup({ requestBody: data }),
     onSuccess: (data) => {
-      showSuccessToast("Event created successfully", {
+      showSuccessToast("Pop-up created successfully", {
         label: "View",
         onClick: () =>
           navigate({ to: "/popups/$id/edit", params: { id: data.id } }),
@@ -100,7 +100,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         requestBody: data,
       }),
     onSuccess: () => {
-      showSuccessToast("Event updated successfully")
+      showSuccessToast("Pop-up updated successfully")
       queryClient.invalidateQueries({ queryKey: ["popups"] })
       queryClient.invalidateQueries({ queryKey: ["form-fields"] })
       queryClient.invalidateQueries({ queryKey: ["form-sections"] })
@@ -113,7 +113,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
   const deleteMutation = useMutation({
     mutationFn: () => PopupsService.deletePopup({ popupId: defaultValues!.id }),
     onSuccess: () => {
-      showSuccessToast("Event deleted successfully")
+      showSuccessToast("Pop-up deleted successfully")
       queryClient.invalidateQueries({ queryKey: ["popups"] })
       navigate({ to: "/popups" })
     },
@@ -214,7 +214,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         <FormErrorSummary
           form={form}
           fieldLabels={{
-            name: "Event Name",
+            name: "Pop-up Name",
             tagline: "Tagline",
             location: "Location",
             slug: "Slug",
@@ -235,7 +235,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
             {(field) => (
               <div>
                 <HeroInput
-                  placeholder="Event Name"
+                  placeholder="Pop-up Name"
                   value={field.state.value}
                   onBlur={field.handleBlur}
                   onChange={(e) => field.handleChange(e.target.value)}
@@ -272,7 +272,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                   Location
                 </Label>
                 <Input
-                  placeholder="Event location or venue"
+                  placeholder="Pop-up location or venue"
                   value={field.state.value}
                   onBlur={field.handleBlur}
                   onChange={(e) => field.handleChange(e.target.value)}
@@ -351,7 +351,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         <Separator />
 
         {/* Event Details */}
-        <InlineSection title="Event Details">
+        <InlineSection title="Pop-up Details">
           <form.Field
             name="start_date"
             validators={{
@@ -447,7 +447,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         <Separator />
 
         {/* Event Options */}
-        <InlineSection title="Event Options">
+        <InlineSection title="Pop-up Options">
           <form.Field name="allows_spouse">
             {(field) => (
               <InlineRow
@@ -487,7 +487,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
               <InlineRow
                 icon={<Ticket className="h-4 w-4 text-muted-foreground" />}
                 label="Discount Coupons"
-                description="Enable discount coupons for this event"
+                description="Enable discount coupons for this pop-up"
               >
                 <Switch
                   id="allows_coupons"

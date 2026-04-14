@@ -24,7 +24,7 @@ function getStepTitle(step: CheckoutStep): string {
     case "housing":
       return "Choose Housing"
     case "merch":
-      return "Event Merchandise"
+      return "Pop-up Merchandise"
     case "patron":
       return "Become a Patron"
     case "confirm":
@@ -43,7 +43,7 @@ function getStepSubtitle(step: CheckoutStep): string {
     case "housing":
       return "Optional: Book accommodation for your stay"
     case "merch":
-      return "Optional: Pick up exclusive merch at the event"
+      return "Optional: Pick up exclusive merch at the pop-up"
     case "patron":
       return "Optional: Support the community with a contribution"
     case "confirm":

@@ -126,7 +126,7 @@ export const PATRON_MINIMUM = 1000
 
 // --- Insurance ---
 export const INSURANCE_BENEFITS = [
-  "Full refund up to 14 days before the event",
+  "Full refund up to 14 days before the pop-up",
   "50% refund up to 7 days before",
   "Free date change at no extra cost",
 ]

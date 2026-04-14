@@ -2864,6 +2864,1202 @@ export const EmailTemplateUpdateSchema = {
     title: 'EmailTemplateUpdate'
 } as const;
 
+export const EventCreateSchema = {
+    properties: {
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        content: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Content'
+        },
+        start_time: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Start Time'
+        },
+        end_time: {
+            type: 'string',
+            format: 'date-time',
+            title: 'End Time'
+        },
+        timezone: {
+            type: 'string',
+            title: 'Timezone',
+            default: 'UTC'
+        },
+        location: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Location'
+        },
+        geo_lat: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Geo Lat'
+        },
+        geo_lng: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Geo Lng'
+        },
+        cover_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Cover Url'
+        },
+        meeting_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Meeting Url'
+        },
+        max_participant: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Participant'
+        },
+        tags: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Tags',
+            default: []
+        },
+        venue_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Venue Id'
+        },
+        require_approval: {
+            type: 'boolean',
+            title: 'Require Approval',
+            default: false
+        },
+        kind: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Kind'
+        },
+        status: {
+            '$ref': '#/components/schemas/EventStatus',
+            default: 'draft'
+        }
+    },
+    type: 'object',
+    required: ['popup_id', 'title', 'start_time', 'end_time'],
+    title: 'EventCreate',
+    description: 'Event schema for creation.'
+} as const;
+
+export const EventParticipantCreateSchema = {
+    properties: {
+        event_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Event Id'
+        },
+        profile_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Profile Id'
+        },
+        role: {
+            '$ref': '#/components/schemas/ParticipantRole',
+            default: 'attendee'
+        },
+        message: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Message'
+        }
+    },
+    type: 'object',
+    required: ['event_id', 'profile_id'],
+    title: 'EventParticipantCreate',
+    description: 'Participant schema for creation (admin adding participant).'
+} as const;
+
+export const EventParticipantPublicSchema = {
+    properties: {
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        event_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Event Id'
+        },
+        profile_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Profile Id'
+        },
+        status: {
+            '$ref': '#/components/schemas/ParticipantStatus',
+            default: 'registered'
+        },
+        role: {
+            '$ref': '#/components/schemas/ParticipantRole',
+            default: 'attendee'
+        },
+        check_time: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Check Time'
+        },
+        message: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Message'
+        },
+        registered_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Registered At'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        updated_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Updated At'
+        },
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        }
+    },
+    type: 'object',
+    required: ['tenant_id', 'event_id', 'profile_id', 'id'],
+    title: 'EventParticipantPublic',
+    description: 'Participant schema for API responses.'
+} as const;
+
+export const EventParticipantUpdateSchema = {
+    properties: {
+        status: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/ParticipantStatus'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        role: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/ParticipantRole'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        message: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Message'
+        }
+    },
+    type: 'object',
+    title: 'EventParticipantUpdate',
+    description: 'Participant schema for updates.'
+} as const;
+
+export const EventPublicSchema = {
+    properties: {
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        owner_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Owner Id'
+        },
+        title: {
+            type: 'string',
+            maxLength: 255,
+            title: 'Title'
+        },
+        content: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Content'
+        },
+        start_time: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Start Time'
+        },
+        end_time: {
+            type: 'string',
+            format: 'date-time',
+            title: 'End Time'
+        },
+        timezone: {
+            type: 'string',
+            maxLength: 64,
+            title: 'Timezone',
+            default: 'UTC'
+        },
+        location: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Location'
+        },
+        geo_lat: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Geo Lat'
+        },
+        geo_lng: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Geo Lng'
+        },
+        cover_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Cover Url'
+        },
+        meeting_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Meeting Url'
+        },
+        max_participant: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Participant'
+        },
+        tags: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Tags'
+        },
+        venue_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Venue Id'
+        },
+        require_approval: {
+            type: 'boolean',
+            title: 'Require Approval',
+            default: false
+        },
+        kind: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 100
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Kind'
+        },
+        status: {
+            '$ref': '#/components/schemas/EventStatus',
+            default: 'draft'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        updated_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Updated At'
+        },
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        }
+    },
+    type: 'object',
+    required: ['tenant_id', 'popup_id', 'owner_id', 'title', 'start_time', 'end_time', 'id'],
+    title: 'EventPublic',
+    description: 'Event schema for API responses.'
+} as const;
+
+export const EventSettingsCreateSchema = {
+    properties: {
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        can_publish_event: {
+            '$ref': '#/components/schemas/PublishPermission',
+            default: 'everyone'
+        },
+        event_enabled: {
+            type: 'boolean',
+            title: 'Event Enabled',
+            default: true
+        },
+        timezone: {
+            type: 'string',
+            title: 'Timezone',
+            default: 'UTC'
+        }
+    },
+    type: 'object',
+    required: ['popup_id'],
+    title: 'EventSettingsCreate',
+    description: 'Event settings schema for creation.'
+} as const;
+
+export const EventSettingsPublicSchema = {
+    properties: {
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        can_publish_event: {
+            '$ref': '#/components/schemas/PublishPermission',
+            default: 'everyone'
+        },
+        event_enabled: {
+            type: 'boolean',
+            title: 'Event Enabled',
+            default: true
+        },
+        timezone: {
+            type: 'string',
+            maxLength: 64,
+            title: 'Timezone',
+            default: 'UTC'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        updated_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Updated At'
+        },
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        }
+    },
+    type: 'object',
+    required: ['tenant_id', 'popup_id', 'id'],
+    title: 'EventSettingsPublic',
+    description: 'Event settings schema for API responses.'
+} as const;
+
+export const EventSettingsUpdateSchema = {
+    properties: {
+        can_publish_event: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/PublishPermission'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        event_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Event Enabled'
+        },
+        timezone: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Timezone'
+        }
+    },
+    type: 'object',
+    title: 'EventSettingsUpdate',
+    description: 'Event settings schema for updates.'
+} as const;
+
+export const EventStatusSchema = {
+    type: 'string',
+    enum: ['draft', 'published', 'cancelled'],
+    title: 'EventStatus'
+} as const;
+
+export const EventUpdateSchema = {
+    properties: {
+        title: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Title'
+        },
+        content: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Content'
+        },
+        start_time: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Start Time'
+        },
+        end_time: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'End Time'
+        },
+        timezone: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Timezone'
+        },
+        location: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Location'
+        },
+        geo_lat: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Geo Lat'
+        },
+        geo_lng: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Geo Lng'
+        },
+        cover_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Cover Url'
+        },
+        meeting_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Meeting Url'
+        },
+        max_participant: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Participant'
+        },
+        tags: {
+            anyOf: [
+                {
+                    items: {
+                        type: 'string'
+                    },
+                    type: 'array'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Tags'
+        },
+        venue_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Venue Id'
+        },
+        require_approval: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Require Approval'
+        },
+        kind: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Kind'
+        },
+        status: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/EventStatus'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    type: 'object',
+    title: 'EventUpdate',
+    description: 'Event schema for updates.'
+} as const;
+
+export const EventVenueCreateSchema = {
+    properties: {
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        location: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Location'
+        },
+        formatted_address: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Formatted Address'
+        },
+        geo_lat: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Geo Lat'
+        },
+        geo_lng: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Geo Lng'
+        },
+        capacity: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Capacity'
+        },
+        start_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Start Date'
+        },
+        end_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'End Date'
+        },
+        amenities: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Amenities',
+            default: []
+        },
+        tags: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Tags',
+            default: []
+        },
+        image_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Image Url'
+        }
+    },
+    type: 'object',
+    required: ['popup_id', 'title'],
+    title: 'EventVenueCreate',
+    description: 'Venue schema for creation.'
+} as const;
+
+export const EventVenuePublicSchema = {
+    properties: {
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        owner_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Owner Id'
+        },
+        title: {
+            type: 'string',
+            maxLength: 255,
+            title: 'Title'
+        },
+        location: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Location'
+        },
+        formatted_address: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Formatted Address'
+        },
+        geo_lat: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Geo Lat'
+        },
+        geo_lng: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Geo Lng'
+        },
+        capacity: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Capacity'
+        },
+        start_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Start Date'
+        },
+        end_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'End Date'
+        },
+        amenities: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Amenities'
+        },
+        tags: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Tags'
+        },
+        image_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Image Url'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        updated_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Updated At'
+        },
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        }
+    },
+    type: 'object',
+    required: ['tenant_id', 'popup_id', 'owner_id', 'title', 'id'],
+    title: 'EventVenuePublic',
+    description: 'Venue schema for API responses.'
+} as const;
+
+export const EventVenueUpdateSchema = {
+    properties: {
+        title: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Title'
+        },
+        location: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Location'
+        },
+        formatted_address: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Formatted Address'
+        },
+        geo_lat: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Geo Lat'
+        },
+        geo_lng: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Geo Lng'
+        },
+        capacity: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Capacity'
+        },
+        start_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Start Date'
+        },
+        end_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'End Date'
+        },
+        amenities: {
+            anyOf: [
+                {
+                    items: {
+                        type: 'string'
+                    },
+                    type: 'array'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Amenities'
+        },
+        tags: {
+            anyOf: [
+                {
+                    items: {
+                        type: 'string'
+                    },
+                    type: 'array'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Tags'
+        },
+        image_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Image Url'
+        }
+    },
+    type: 'object',
+    title: 'EventVenueUpdate',
+    description: 'Venue schema for updates.'
+} as const;
+
 export const FormFieldCreateSchema = {
     properties: {
         popup_id: {
@@ -4756,6 +5952,60 @@ export const ListModel_EmailTemplatePublic_Schema = {
     title: 'ListModel[EmailTemplatePublic]'
 } as const;
 
+export const ListModel_EventParticipantPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/EventParticipantPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[EventParticipantPublic]'
+} as const;
+
+export const ListModel_EventPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/EventPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[EventPublic]'
+} as const;
+
+export const ListModel_EventVenuePublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/EventVenuePublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[EventVenuePublic]'
+} as const;
+
 export const ListModel_FormFieldPublic_Schema = {
     properties: {
         results: {
@@ -4968,6 +6218,18 @@ export const PagingSchema = {
     type: 'object',
     required: ['limit', 'offset', 'total'],
     title: 'Paging'
+} as const;
+
+export const ParticipantRoleSchema = {
+    type: 'string',
+    enum: ['host', 'speaker', 'attendee'],
+    title: 'ParticipantRole'
+} as const;
+
+export const ParticipantStatusSchema = {
+    type: 'string',
+    enum: ['registered', 'checked_in', 'cancelled'],
+    title: 'ParticipantStatus'
 } as const;
 
 export const PaymentCreateSchema = {
@@ -7907,6 +9169,35 @@ export const ProductWithQuantitySchema = {
     required: ['tenant_id', 'popup_id', 'name', 'slug', 'price', 'id'],
     title: 'ProductWithQuantity',
     description: 'Product with quantity for attendee products.'
+} as const;
+
+export const PublishPermissionSchema = {
+    type: 'string',
+    enum: ['admin_only', 'everyone'],
+    title: 'PublishPermission'
+} as const;
+
+export const RegisterRequestSchema = {
+    properties: {
+        role: {
+            '$ref': '#/components/schemas/ParticipantRole',
+            default: 'attendee'
+        },
+        message: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Message'
+        }
+    },
+    type: 'object',
+    title: 'RegisterRequest',
+    description: 'Request body for self-registration.'
 } as const;
 
 export const ReviewDecisionSchema = {

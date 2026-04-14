@@ -611,6 +611,208 @@ export type EmailTemplateUpdate = {
     is_active?: (boolean | null);
 };
 
+/**
+ * Event schema for creation.
+ */
+export type EventCreate = {
+    popup_id: string;
+    title: string;
+    content?: (string | null);
+    start_time: string;
+    end_time: string;
+    timezone?: string;
+    location?: (string | null);
+    geo_lat?: (number | null);
+    geo_lng?: (number | null);
+    cover_url?: (string | null);
+    meeting_url?: (string | null);
+    max_participant?: (number | null);
+    tags?: Array<(string)>;
+    venue_id?: (string | null);
+    require_approval?: boolean;
+    kind?: (string | null);
+    status?: EventStatus;
+};
+
+/**
+ * Participant schema for creation (admin adding participant).
+ */
+export type EventParticipantCreate = {
+    event_id: string;
+    profile_id: string;
+    role?: ParticipantRole;
+    message?: (string | null);
+};
+
+/**
+ * Participant schema for API responses.
+ */
+export type EventParticipantPublic = {
+    tenant_id: string;
+    event_id: string;
+    profile_id: string;
+    status?: ParticipantStatus;
+    role?: ParticipantRole;
+    check_time?: (string | null);
+    message?: (string | null);
+    registered_at?: string;
+    created_at?: string;
+    updated_at?: string;
+    id: string;
+};
+
+/**
+ * Participant schema for updates.
+ */
+export type EventParticipantUpdate = {
+    status?: (ParticipantStatus | null);
+    role?: (ParticipantRole | null);
+    message?: (string | null);
+};
+
+/**
+ * Event schema for API responses.
+ */
+export type EventPublic = {
+    tenant_id: string;
+    popup_id: string;
+    owner_id: string;
+    title: string;
+    content?: (string | null);
+    start_time: string;
+    end_time: string;
+    timezone?: string;
+    location?: (string | null);
+    geo_lat?: (number | null);
+    geo_lng?: (number | null);
+    cover_url?: (string | null);
+    meeting_url?: (string | null);
+    max_participant?: (number | null);
+    tags?: Array<(string)>;
+    venue_id?: (string | null);
+    require_approval?: boolean;
+    kind?: (string | null);
+    status?: EventStatus;
+    created_at?: string;
+    updated_at?: string;
+    id: string;
+};
+
+/**
+ * Event settings schema for creation.
+ */
+export type EventSettingsCreate = {
+    popup_id: string;
+    can_publish_event?: PublishPermission;
+    event_enabled?: boolean;
+    timezone?: string;
+};
+
+/**
+ * Event settings schema for API responses.
+ */
+export type EventSettingsPublic = {
+    tenant_id: string;
+    popup_id: string;
+    can_publish_event?: PublishPermission;
+    event_enabled?: boolean;
+    timezone?: string;
+    created_at?: string;
+    updated_at?: string;
+    id: string;
+};
+
+/**
+ * Event settings schema for updates.
+ */
+export type EventSettingsUpdate = {
+    can_publish_event?: (PublishPermission | null);
+    event_enabled?: (boolean | null);
+    timezone?: (string | null);
+};
+
+export type EventStatus = 'draft' | 'published' | 'cancelled';
+
+/**
+ * Event schema for updates.
+ */
+export type EventUpdate = {
+    title?: (string | null);
+    content?: (string | null);
+    start_time?: (string | null);
+    end_time?: (string | null);
+    timezone?: (string | null);
+    location?: (string | null);
+    geo_lat?: (number | null);
+    geo_lng?: (number | null);
+    cover_url?: (string | null);
+    meeting_url?: (string | null);
+    max_participant?: (number | null);
+    tags?: (Array<(string)> | null);
+    venue_id?: (string | null);
+    require_approval?: (boolean | null);
+    kind?: (string | null);
+    status?: (EventStatus | null);
+};
+
+/**
+ * Venue schema for creation.
+ */
+export type EventVenueCreate = {
+    popup_id: string;
+    title: string;
+    location?: (string | null);
+    formatted_address?: (string | null);
+    geo_lat?: (number | null);
+    geo_lng?: (number | null);
+    capacity?: (number | null);
+    start_date?: (string | null);
+    end_date?: (string | null);
+    amenities?: Array<(string)>;
+    tags?: Array<(string)>;
+    image_url?: (string | null);
+};
+
+/**
+ * Venue schema for API responses.
+ */
+export type EventVenuePublic = {
+    tenant_id: string;
+    popup_id: string;
+    owner_id: string;
+    title: string;
+    location?: (string | null);
+    formatted_address?: (string | null);
+    geo_lat?: (number | null);
+    geo_lng?: (number | null);
+    capacity?: (number | null);
+    start_date?: (string | null);
+    end_date?: (string | null);
+    amenities?: Array<(string)>;
+    tags?: Array<(string)>;
+    image_url?: (string | null);
+    created_at?: string;
+    updated_at?: string;
+    id: string;
+};
+
+/**
+ * Venue schema for updates.
+ */
+export type EventVenueUpdate = {
+    title?: (string | null);
+    location?: (string | null);
+    formatted_address?: (string | null);
+    geo_lat?: (number | null);
+    geo_lng?: (number | null);
+    capacity?: (number | null);
+    start_date?: (string | null);
+    end_date?: (string | null);
+    amenities?: (Array<(string)> | null);
+    tags?: (Array<(string)> | null);
+    image_url?: (string | null);
+};
+
 export type FormFieldCreate = {
     popup_id: string;
     label: string;
@@ -954,6 +1156,21 @@ export type ListModel_EmailTemplatePublic_ = {
     paging: Paging;
 };
 
+export type ListModel_EventParticipantPublic_ = {
+    results: Array<EventParticipantPublic>;
+    paging: Paging;
+};
+
+export type ListModel_EventPublic_ = {
+    results: Array<EventPublic>;
+    paging: Paging;
+};
+
+export type ListModel_EventVenuePublic_ = {
+    results: Array<EventVenuePublic>;
+    paging: Paging;
+};
+
 export type ListModel_FormFieldPublic_ = {
     results: Array<FormFieldPublic>;
     paging: Paging;
@@ -1016,6 +1233,10 @@ export type Paging = {
     offset: number;
     total: number;
 };
+
+export type ParticipantRole = 'host' | 'speaker' | 'attendee';
+
+export type ParticipantStatus = 'registered' | 'checked_in' | 'cancelled';
 
 /**
  * Schema for creating a payment.
@@ -1497,6 +1718,16 @@ export type ProductWithQuantity = {
     insurance_percentage?: (string | null);
     id: string;
     quantity?: number;
+};
+
+export type PublishPermission = 'admin_only' | 'everyone';
+
+/**
+ * Request body for self-registration.
+ */
+export type RegisterRequest = {
+    role?: ParticipantRole;
+    message?: (string | null);
 };
 
 /**
@@ -2171,6 +2402,265 @@ export type EmailTemplatesDeleteEmailTemplateData = {
 };
 
 export type EmailTemplatesDeleteEmailTemplateResponse = (void);
+
+export type EventParticipantsListParticipantsData = {
+    eventId?: (string | null);
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+    xTenantId?: (string | null);
+};
+
+export type EventParticipantsListParticipantsResponse = (ListModel_EventParticipantPublic_);
+
+export type EventParticipantsAdminAddParticipantData = {
+    requestBody: EventParticipantCreate;
+    xTenantId?: (string | null);
+};
+
+export type EventParticipantsAdminAddParticipantResponse = (EventParticipantPublic);
+
+export type EventParticipantsUpdateParticipantData = {
+    participantId: string;
+    requestBody: EventParticipantUpdate;
+    xTenantId?: (string | null);
+};
+
+export type EventParticipantsUpdateParticipantResponse = (EventParticipantPublic);
+
+export type EventParticipantsDeleteParticipantData = {
+    participantId: string;
+    xTenantId?: (string | null);
+};
+
+export type EventParticipantsDeleteParticipantResponse = (void);
+
+export type EventParticipantsListPortalParticipantsData = {
+    eventId: string;
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+};
+
+export type EventParticipantsListPortalParticipantsResponse = (ListModel_EventParticipantPublic_);
+
+export type EventParticipantsRegisterForEventData = {
+    eventId: string;
+    requestBody?: (RegisterRequest | null);
+};
+
+export type EventParticipantsRegisterForEventResponse = (EventParticipantPublic);
+
+export type EventParticipantsCancelRegistrationData = {
+    eventId: string;
+};
+
+export type EventParticipantsCancelRegistrationResponse = (EventParticipantPublic);
+
+export type EventParticipantsCheckInData = {
+    eventId: string;
+};
+
+export type EventParticipantsCheckInResponse = (EventParticipantPublic);
+
+export type EventsListEventsData = {
+    eventStatus?: (EventStatus | null);
+    kind?: (string | null);
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    popupId?: (string | null);
+    search?: (string | null);
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+    startAfter?: (string | null);
+    startBefore?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type EventsListEventsResponse = (ListModel_EventPublic_);
+
+export type EventsCreateEventData = {
+    requestBody: EventCreate;
+    xTenantId?: (string | null);
+};
+
+export type EventsCreateEventResponse = (EventPublic);
+
+export type EventsGetEventData = {
+    eventId: string;
+    xTenantId?: (string | null);
+};
+
+export type EventsGetEventResponse = (EventPublic);
+
+export type EventsUpdateEventData = {
+    eventId: string;
+    requestBody: EventUpdate;
+    xTenantId?: (string | null);
+};
+
+export type EventsUpdateEventResponse = (EventPublic);
+
+export type EventsDeleteEventData = {
+    eventId: string;
+    xTenantId?: (string | null);
+};
+
+export type EventsDeleteEventResponse = (void);
+
+export type EventsCancelEventData = {
+    eventId: string;
+    xTenantId?: (string | null);
+};
+
+export type EventsCancelEventResponse = (EventPublic);
+
+export type EventsListPortalEventsData = {
+    eventStatus?: (EventStatus | null);
+    kind?: (string | null);
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    popupId?: (string | null);
+    search?: (string | null);
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+    startAfter?: (string | null);
+    startBefore?: (string | null);
+};
+
+export type EventsListPortalEventsResponse = (ListModel_EventPublic_);
+
+export type EventsCreatePortalEventData = {
+    requestBody: EventCreate;
+};
+
+export type EventsCreatePortalEventResponse = (EventPublic);
+
+export type EventsGetPortalEventData = {
+    eventId: string;
+};
+
+export type EventsGetPortalEventResponse = (EventPublic);
+
+export type EventsUpdatePortalEventData = {
+    eventId: string;
+    requestBody: EventUpdate;
+};
+
+export type EventsUpdatePortalEventResponse = (EventPublic);
+
+export type EventSettingsGetEventSettingsData = {
+    popupId: string;
+    xTenantId?: (string | null);
+};
+
+export type EventSettingsGetEventSettingsResponse = (EventSettingsPublic);
+
+export type EventSettingsUpsertEventSettingsData = {
+    popupId: string;
+    requestBody: EventSettingsCreate;
+    xTenantId?: (string | null);
+};
+
+export type EventSettingsUpsertEventSettingsResponse = (EventSettingsPublic);
+
+export type EventSettingsUpdateEventSettingsData = {
+    popupId: string;
+    requestBody: EventSettingsUpdate;
+    xTenantId?: (string | null);
+};
+
+export type EventSettingsUpdateEventSettingsResponse = (EventSettingsPublic);
+
+export type EventSettingsGetPortalEventSettingsData = {
+    popupId: string;
+};
+
+export type EventSettingsGetPortalEventSettingsResponse = ((EventSettingsPublic | null));
+
+export type EventVenuesListVenuesData = {
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    popupId?: (string | null);
+    search?: (string | null);
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+    xTenantId?: (string | null);
+};
+
+export type EventVenuesListVenuesResponse = (ListModel_EventVenuePublic_);
+
+export type EventVenuesCreateVenueData = {
+    requestBody: EventVenueCreate;
+    xTenantId?: (string | null);
+};
+
+export type EventVenuesCreateVenueResponse = (EventVenuePublic);
+
+export type EventVenuesGetVenueData = {
+    venueId: string;
+    xTenantId?: (string | null);
+};
+
+export type EventVenuesGetVenueResponse = (EventVenuePublic);
+
+export type EventVenuesUpdateVenueData = {
+    requestBody: EventVenueUpdate;
+    venueId: string;
+    xTenantId?: (string | null);
+};
+
+export type EventVenuesUpdateVenueResponse = (EventVenuePublic);
+
+export type EventVenuesDeleteVenueData = {
+    venueId: string;
+    xTenantId?: (string | null);
+};
+
+export type EventVenuesDeleteVenueResponse = (void);
+
+export type EventVenuesListPortalVenuesData = {
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    popupId: string;
+    search?: (string | null);
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+};
+
+export type EventVenuesListPortalVenuesResponse = (ListModel_EventVenuePublic_);
+
+export type EventVenuesCreatePortalVenueData = {
+    requestBody: EventVenueCreate;
+};
+
+export type EventVenuesCreatePortalVenueResponse = (EventVenuePublic);
 
 export type FormFieldsListFormFieldsData = {
     /**

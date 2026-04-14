@@ -36,7 +36,7 @@ export default function MerchSection({ onSkip }: MerchSectionProps) {
           No Merchandise Available
         </h3>
         <p className="text-gray-500 max-w-md mb-6">
-          Merchandise is not currently available for this event. You can
+          Merchandise is not currently available for this pop-up. You can
           continue to the next step.
         </p>
         <Button variant="outline" onClick={handleSkip}>

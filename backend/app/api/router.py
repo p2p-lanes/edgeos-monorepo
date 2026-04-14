@@ -11,6 +11,10 @@ from app.api import (
     coupon,
     dashboard,
     email_template,
+    event,
+    event_participant,
+    event_settings,
+    event_venue,
     form_field,
     form_section,
     group,
@@ -56,6 +60,13 @@ api_router.include_router(cart.router)
 
 # Utility resources
 api_router.include_router(upload.router)
+
+# Events module
+api_router.include_router(event.router)
+api_router.include_router(event_participant.router)
+api_router.include_router(event_venue.router)
+api_router.include_router(event_venue.utils_router)
+api_router.include_router(event_settings.router)
 
 # Dashboard
 api_router.include_router(dashboard.router)

@@ -60,6 +60,24 @@ from app.api.group.models import (
 )
 from app.api.group.schemas import GroupCreate, GroupPublic, GroupUpdate
 
+# Events module
+from app.api.event.models import Events
+from app.api.event.schemas import EventCreate, EventPublic, EventUpdate
+from app.api.event_participant.models import EventParticipants
+from app.api.event_participant.schemas import (
+    EventParticipantCreate,
+    EventParticipantPublic,
+    EventParticipantUpdate,
+)
+from app.api.event_settings.models import EventSettings
+from app.api.event_settings.schemas import (
+    EventSettingsCreate,
+    EventSettingsPublic,
+    EventSettingsUpdate,
+)
+from app.api.event_venue.models import EventVenues
+from app.api.event_venue.schemas import EventVenueCreate, EventVenuePublic, EventVenueUpdate
+
 # Core models
 from app.api.human.models import Humans
 from app.api.human.schemas import HumanCreate, HumanPublic, HumanUpdate
@@ -176,4 +194,21 @@ __all__ = [
     "ApplicationReviewCreate",
     "ApplicationReviewPublic",
     "ReviewDecision",
+    # Events module
+    "Events",
+    "EventCreate",
+    "EventPublic",
+    "EventUpdate",
+    "EventParticipants",
+    "EventParticipantCreate",
+    "EventParticipantPublic",
+    "EventParticipantUpdate",
+    "EventVenues",
+    "EventVenueCreate",
+    "EventVenuePublic",
+    "EventVenueUpdate",
+    "EventSettings",
+    "EventSettingsCreate",
+    "EventSettingsPublic",
+    "EventSettingsUpdate",
 ]

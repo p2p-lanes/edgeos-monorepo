@@ -1,4 +1,4 @@
-import { FileText, Ticket, Users } from "lucide-react"
+import { CalendarDays, FileText, Ticket, Users } from "lucide-react"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import type { Resource } from "@/types/resources"
@@ -64,6 +64,12 @@ const useResources = () => {
       icon: Users,
       status: canSeeAttendees ? "active" : "hidden",
       path: `/portal/${city?.slug}/attendees`,
+    },
+    {
+      name: "Events",
+      icon: CalendarDays,
+      status: canSeeAttendees ? "active" : "hidden",
+      path: `/portal/${city?.slug}/events`,
     },
   ]
 

@@ -124,7 +124,7 @@ export default function FormPage() {
         <div className="text-center space-y-4 px-8">
           <h2 className="text-2xl font-bold">Application Unavailable</h2>
           <p className="text-muted-foreground">
-            The application form for this event is not yet configured.
+            The application form for this pop-up is not yet configured.
           </p>
         </div>
       </main>

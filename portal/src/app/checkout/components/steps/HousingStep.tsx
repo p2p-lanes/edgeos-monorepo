@@ -90,7 +90,7 @@ export default function HousingStep({ onSkip }: HousingStepProps) {
           No Housing Available
         </h3>
         <p className="text-gray-500 max-w-md mb-6">
-          Housing options are not currently available for this event. You can
+          Housing options are not currently available for this pop-up. You can
           continue to the next step.
         </p>
         <Button variant="outline" onClick={handleSkip}>

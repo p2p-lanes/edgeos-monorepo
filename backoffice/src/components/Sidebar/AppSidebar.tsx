@@ -2,12 +2,15 @@ import { useQuery } from "@tanstack/react-query"
 import {
   Building2,
   Calendar,
+  CalendarDays,
   CreditCard,
   FileText,
   FormInput,
   Home,
   Mail,
+  MapPin,
   Package,
+  Settings,
   ShoppingCart,
   Tag,
   User,
@@ -51,12 +54,18 @@ function getAdminItems(tenantId: string | null | undefined): Item[] {
 const coreItems: Item[] = [{ icon: Home, title: "Dashboard", path: "/" }]
 
 const popupItems: Item[] = [
-  { icon: Calendar, title: "Events", path: "/popups" },
+  { icon: Calendar, title: "Pop-ups", path: "/popups" },
   { icon: Package, title: "Products", path: "/products" },
   { icon: Tag, title: "Coupons", path: "/coupons" },
   { icon: UsersRound, title: "Groups", path: "/groups" },
   { icon: FormInput, title: "Form Builder", path: "/form-builder" },
   { icon: Mail, title: "Email Templates", path: "/email-templates" },
+]
+
+const eventItems: Item[] = [
+  { icon: CalendarDays, title: "Events", path: "/events" },
+  { icon: MapPin, title: "Venues", path: "/events/venues" },
+  { icon: Settings, title: "Event Settings", path: "/events/settings" },
 ]
 
 // Admin items (admins and superadmins)
@@ -145,8 +154,14 @@ export function AppSidebar() {
 
         {/* Popup management section */}
         <SidebarGroup>
-          <SidebarGroupLabel>Event Management</SidebarGroupLabel>
+          <SidebarGroupLabel>Pop-up Management</SidebarGroupLabel>
           <Main items={popupItems} />
+        </SidebarGroup>
+
+        {/* Events section */}
+        <SidebarGroup>
+          <SidebarGroupLabel>Events</SidebarGroupLabel>
+          <Main items={eventItems} />
         </SidebarGroup>
 
         {/* Registration section */}

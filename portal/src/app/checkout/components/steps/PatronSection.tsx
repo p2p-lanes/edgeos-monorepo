@@ -102,7 +102,7 @@ export default function PatronSection({ onSkip }: PatronSectionProps) {
           Patron Support Not Available
         </h3>
         <p className="text-gray-500 max-w-md mb-6">
-          Patron support options are not currently available for this event. You
+          Patron support options are not currently available for this pop-up. You
           can continue to the next step.
         </p>
         <Button variant="outline" onClick={handleSkip}>
