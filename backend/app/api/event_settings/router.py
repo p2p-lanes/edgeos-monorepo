@@ -52,6 +52,8 @@ async def upsert_event_settings(
         update = EventSettingsUpdate(
             can_publish_event=settings_in.can_publish_event,
             event_enabled=settings_in.event_enabled,
+            humans_can_create_venues=settings_in.humans_can_create_venues,
+            venues_require_approval=settings_in.venues_require_approval,
             timezone=settings_in.timezone,
         )
         updated = crud.event_settings_crud.update(db, existing, update)

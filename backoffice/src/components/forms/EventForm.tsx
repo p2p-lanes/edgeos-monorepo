@@ -490,7 +490,7 @@ export function EventForm({ defaultValues, onSuccess }: EventFormProps) {
                   <SelectItem value="__none__">No venue</SelectItem>
                   {venues?.results.map((v) => (
                     <SelectItem key={v.id} value={v.id}>
-                      {v.title}
+                      {v.title || "Untitled venue"}
                       {v.capacity ? ` (cap. ${v.capacity})` : ""}
                     </SelectItem>
                   ))}

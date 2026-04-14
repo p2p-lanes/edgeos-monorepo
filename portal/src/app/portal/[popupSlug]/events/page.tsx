@@ -14,6 +14,7 @@ import Link from "next/link"
 import { useState } from "react"
 
 import {
+  EventSettingsService,
   EventsService,
   EventVenuesService,
   type EventPublic,
@@ -52,6 +53,14 @@ export default function EventsPage() {
   const { timezone, formatTime, formatDateShort, formatDayKey } =
     useEventTimezone(city?.id)
 
+  const { data: eventSettings } = useQuery({
+    queryKey: ["portal-event-settings", city?.id],
+    queryFn: () =>
+      EventSettingsService.getPortalEventSettings({ popupId: city!.id }),
+    enabled: !!city?.id,
+  })
+  const eventsEnabled = eventSettings?.event_enabled ?? true
+
   const { data, isLoading } = useQuery({
     queryKey: ["portal-events", city?.id, search],
     queryFn: () =>
@@ -61,7 +70,7 @@ export default function EventsPage() {
         eventStatus: "published",
         limit: 200,
       }),
-    enabled: !!city?.id,
+    enabled: !!city?.id && eventsEnabled,
   })
 
   const events = data?.results ?? []
@@ -86,6 +95,20 @@ export default function EventsPage() {
   venueQueries.forEach((q, idx) => {
     if (q.data) venueMap.set(venueIds[idx], q.data)
   })
+
+  if (!eventsEnabled) {
+    return (
+      <div className="flex flex-col h-full max-w-3xl mx-auto p-4 sm:p-6">
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <CalendarDays className="h-10 w-10 text-muted-foreground/50 mb-3" />
+          <h1 className="text-xl font-semibold">Events are disabled</h1>
+          <p className="text-sm text-muted-foreground mt-2">
+            The organizer has turned off events for {city?.name}.
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col h-full max-w-3xl mx-auto p-4 sm:p-6">

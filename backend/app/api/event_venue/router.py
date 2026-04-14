@@ -36,6 +36,7 @@ from app.api.event_venue.schemas import (
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
     CurrentHuman,
+    CurrentTenant,
     CurrentUser,
     CurrentWriter,
     HumanTenantSession,
@@ -559,12 +560,13 @@ async def list_property_types(
 async def create_property_type(
     payload: VenuePropertyTypeCreate,
     db: TenantSession,
-    current_user: CurrentWriter,
+    current_tenant: CurrentTenant,
+    _: CurrentWriter,
 ) -> VenuePropertyTypePublic:
-    if not current_user.tenant_id:
-        raise HTTPException(status_code=400, detail="Tenant context required")
+    # Always write to the tenant in the request's workspace context so
+    # superadmins (no user.tenant_id) work too.
     pt = VenuePropertyTypes(
-        tenant_id=current_user.tenant_id,
+        tenant_id=current_tenant.id,
         name=payload.name,
         icon=payload.icon,
     )
