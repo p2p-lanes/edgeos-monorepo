@@ -1005,6 +1005,7 @@ function ScrollyCheckoutFlowInner({
         return {
           id: step,
           label: config?.title ?? defaultLabels[step] ?? step,
+          template: config?.template ?? null,
         }
       })
   }, [availableSteps, stepConfigs])

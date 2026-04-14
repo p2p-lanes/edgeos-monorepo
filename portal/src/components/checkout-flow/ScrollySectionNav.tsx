@@ -1,6 +1,15 @@
 "use client"
 
-import { Heart, Home, Shield, ShoppingBag, Ticket } from "lucide-react"
+import {
+  Heart,
+  HelpCircle,
+  Home,
+  ImageIcon,
+  Play,
+  Shield,
+  ShoppingBag,
+  Ticket,
+} from "lucide-react"
 import { Fragment } from "react"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
@@ -18,6 +27,23 @@ const SECTION_ICONS: Record<string, typeof Ticket> = {
   confirm: Shield,
 }
 
+const TEMPLATE_ICONS: Record<string, typeof Ticket> = {
+  "ticket-select": Ticket,
+  "patron-preset": Heart,
+  "housing-date": Home,
+  "merch-image": ShoppingBag,
+  "youtube-video": Play,
+  "image-gallery": ImageIcon,
+  faqs: HelpCircle,
+}
+
+function resolveIcon(section: { id: string; template?: string | null }) {
+  if (section.template && TEMPLATE_ICONS[section.template]) {
+    return TEMPLATE_ICONS[section.template]
+  }
+  return SECTION_ICONS[section.id] ?? Ticket
+}
+
 const SHORT_LABELS: Record<string, string> = {
   passes: "Passes",
   housing: "Housing",
@@ -27,7 +53,7 @@ const SHORT_LABELS: Record<string, string> = {
 }
 
 interface ScrollySectionNavProps {
-  sections: { id: string; label: string }[]
+  sections: { id: string; label: string; template?: string | null }[]
   activeSection: string
   onSectionClick: (sectionId: string) => void
   variant?: NavDesign
@@ -80,7 +106,7 @@ export default function ScrollySectionNav({
 }
 
 interface InnerNavProps {
-  sections: { id: string; label: string }[]
+  sections: { id: string; label: string; template?: string | null }[]
   getSectionState: (section: { id: string }) => {
     isActive: boolean
     isComplete: boolean
@@ -96,7 +122,7 @@ function PillsNav({
   return (
     <div className="flex items-center gap-1.5 flex-wrap">
       {sections.map((section) => {
-        const Icon = SECTION_ICONS[section.id] ?? Ticket
+        const Icon = resolveIcon(section)
         const { isActive, isComplete } = getSectionState(section)
 
         return (
@@ -133,7 +159,7 @@ function ProgressNav({
   return (
     <div className="flex items-center justify-between flex-wrap gap-y-2">
       {sections.map((section, i) => {
-        const Icon = SECTION_ICONS[section.id] ?? Ticket
+        const Icon = resolveIcon(section)
         const { isActive, isComplete } = getSectionState(section)
         const _prevComplete =
           i > 0 && getSectionState(sections[i - 1]).isComplete
