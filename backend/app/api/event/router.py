@@ -729,6 +729,167 @@ async def delete_invitation(
 
 
 # ---------------------------------------------------------------------------
+# Portal invitations — event owner only
+# ---------------------------------------------------------------------------
+
+
+def _ensure_portal_event_owner(
+    db, event_id: uuid.UUID, current_human
+):
+    event = crud.events_crud.get(db, event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    if event.owner_id != current_human.id:
+        raise HTTPException(
+            status_code=403,
+            detail="Only the event owner can manage invitations",
+        )
+    return event
+
+
+@router.get(
+    "/portal/events/{event_id}/invitations",
+    response_model=list[EventInvitationPublic],
+)
+async def list_portal_invitations(
+    event_id: uuid.UUID,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+) -> list[EventInvitationPublic]:
+    from sqlmodel import select
+
+    from app.api.event.models import EventInvitations
+    from app.api.human.models import Humans
+
+    _ensure_portal_event_owner(db, event_id, current_human)
+    rows = db.exec(
+        select(EventInvitations, Humans)
+        .where(EventInvitations.event_id == event_id)
+        .where(Humans.id == EventInvitations.human_id)
+    ).all()
+    return [
+        EventInvitationPublic(
+            id=inv.id,
+            event_id=inv.event_id,
+            human_id=inv.human_id,
+            email=human.email,
+            first_name=human.first_name,
+            last_name=human.last_name,
+            created_at=inv.created_at,
+        )
+        for inv, human in rows
+    ]
+
+
+@router.post(
+    "/portal/events/{event_id}/invitations",
+    response_model=EventInvitationBulkResult,
+    status_code=status.HTTP_201_CREATED,
+)
+async def bulk_invite_portal(
+    event_id: uuid.UUID,
+    payload: EventInvitationBulkCreate,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+) -> EventInvitationBulkResult:
+    from sqlmodel import select
+
+    from app.api.event.models import EventInvitations
+    from app.api.human.models import Humans
+
+    event = _ensure_portal_event_owner(db, event_id, current_human)
+
+    cleaned = {e.strip().lower() for e in payload.emails if e.strip()}
+    if not cleaned:
+        raise HTTPException(status_code=400, detail="No valid emails provided")
+
+    humans = list(
+        db.exec(
+            select(Humans)
+            .where(Humans.tenant_id == event.tenant_id)
+            .where(Humans.email.in_(cleaned))
+        ).all()
+    )
+    found_by_email = {h.email.lower(): h for h in humans}
+    not_found = sorted(e for e in cleaned if e not in found_by_email)
+
+    existing = list(
+        db.exec(
+            select(EventInvitations).where(EventInvitations.event_id == event_id)
+        ).all()
+    )
+    already_invited = {inv.human_id for inv in existing}
+
+    created: list[EventInvitations] = []
+    skipped_existing: list[str] = []
+    for email, human in found_by_email.items():
+        if human.id in already_invited:
+            skipped_existing.append(email)
+            continue
+        inv = EventInvitations(
+            tenant_id=event.tenant_id,
+            event_id=event.id,
+            human_id=human.id,
+            invited_by=current_human.id,
+        )
+        db.add(inv)
+        created.append(inv)
+
+    db.commit()
+    for inv in created:
+        db.refresh(inv)
+
+    invited_public = [
+        EventInvitationPublic(
+            id=inv.id,
+            event_id=inv.event_id,
+            human_id=inv.human_id,
+            email=next(
+                e for e, h in found_by_email.items() if h.id == inv.human_id
+            ),
+            first_name=next(
+                h.first_name
+                for h in found_by_email.values()
+                if h.id == inv.human_id
+            ),
+            last_name=next(
+                h.last_name
+                for h in found_by_email.values()
+                if h.id == inv.human_id
+            ),
+            created_at=inv.created_at,
+        )
+        for inv in created
+    ]
+
+    return EventInvitationBulkResult(
+        invited=invited_public,
+        skipped_existing=skipped_existing,
+        not_found=not_found,
+    )
+
+
+@router.delete(
+    "/portal/events/{event_id}/invitations/{invitation_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_portal_invitation(
+    event_id: uuid.UUID,
+    invitation_id: uuid.UUID,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+) -> None:
+    from app.api.event.models import EventInvitations
+
+    _ensure_portal_event_owner(db, event_id, current_human)
+    inv = db.get(EventInvitations, invitation_id)
+    if not inv or inv.event_id != event_id:
+        raise HTTPException(status_code=404, detail="Invitation not found")
+    db.delete(inv)
+    db.commit()
+
+
+# ---------------------------------------------------------------------------
 # iCal export
 # ---------------------------------------------------------------------------
 
@@ -806,6 +967,7 @@ async def list_portal_events(
     start_after: datetime | None = None,
     start_before: datetime | None = None,
     search: str | None = None,
+    rsvped_only: bool = False,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[EventPublic]:
@@ -829,6 +991,28 @@ async def list_portal_events(
         )
 
     visible = _portal_visibility_filter(db, events, current_human.id)
+
+    if rsvped_only:
+        from sqlmodel import select
+
+        from app.api.event_participant.models import EventParticipants
+        from app.api.event_participant.schemas import ParticipantStatus
+
+        event_ids = [e.id for e in visible]
+        if event_ids:
+            active = list(
+                db.exec(
+                    select(EventParticipants.event_id)
+                    .where(EventParticipants.profile_id == current_human.id)
+                    .where(EventParticipants.event_id.in_(event_ids))
+                    .where(EventParticipants.status != ParticipantStatus.CANCELLED)
+                ).all()
+            )
+            active_set = {eid for eid in active}
+            visible = [e for e in visible if e.id in active_set]
+        else:
+            visible = []
+
     return ListModel[EventPublic](
         results=[_to_public(e) for e in visible],
         paging=Paging(offset=skip, limit=limit, total=len(visible)),

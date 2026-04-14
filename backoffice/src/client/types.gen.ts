@@ -3045,6 +3045,26 @@ export type EventsDeleteInvitationData = {
 
 export type EventsDeleteInvitationResponse = (void);
 
+export type EventsListPortalInvitationsData = {
+    eventId: string;
+};
+
+export type EventsListPortalInvitationsResponse = (Array<EventInvitationPublic>);
+
+export type EventsBulkInvitePortalData = {
+    eventId: string;
+    requestBody: EventInvitationBulkCreate;
+};
+
+export type EventsBulkInvitePortalResponse = (EventInvitationBulkResult);
+
+export type EventsDeletePortalInvitationData = {
+    eventId: string;
+    invitationId: string;
+};
+
+export type EventsDeletePortalInvitationResponse = (void);
+
 export type EventsExportEventIcsData = {
     eventId: string;
     xTenantId?: (string | null);
@@ -3060,6 +3080,7 @@ export type EventsListPortalEventsData = {
      */
     limit?: number;
     popupId?: (string | null);
+    rsvpedOnly?: boolean;
     search?: (string | null);
     /**
      * Number of items to skip
@@ -4034,6 +4055,12 @@ export type UploadsGetPresignedUploadUrlData = {
 };
 
 export type UploadsGetPresignedUploadUrlResponse = (PresignedUrlResponse);
+
+export type UploadsGetPresignedUploadUrlPortalData = {
+    requestBody: PresignedUrlRequest;
+};
+
+export type UploadsGetPresignedUploadUrlPortalResponse = (PresignedUrlResponse);
 
 export type UsersListUsersData = {
     /**

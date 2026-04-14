@@ -43,6 +43,12 @@ services:
       - SMTP_TLS=False
       - SMTP_SSL=False
       - REDIS_URL=redis://redis:6379
+      # MinIO is published on the host; the docker bridge IP 172.17.0.1 is
+      # reachable from both the browser (host interface) and the backend
+      # container (default gateway). Same hostname → SigV4 signatures stay
+      # valid for PUTs from the browser.
+      - STORAGE_ENDPOINT_URL=http://172.17.0.1:9000
+      - STORAGE_PUBLIC_URL=http://172.17.0.1:9000/edgeos
     build:
       context: .
       dockerfile: backend/Dockerfile
@@ -78,7 +84,9 @@ services:
   backoffice:
     pull_policy: build
     restart: "no"
-    ports:
+    # !override replaces the "80:80" from compose.yaml so we only publish on
+    # 5173 locally (avoids colliding with whatever is already on :80).
+    ports: !override
       - "5173:80"
     build:
       context: .

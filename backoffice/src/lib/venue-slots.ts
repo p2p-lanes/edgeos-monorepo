@@ -86,14 +86,18 @@ export function freeIntervalsForDay(
 }
 
 /**
- * Enumerate timestamps on the interval `[iv.start, iv.end)` stepped by
- * `stepMinutes`, aligned to the top of the hour boundary within each
- * interval's start.
+ * Enumerate timestamps inside `[iv.start, iv.end)` stepped by
+ * `stepMinutes`, aligned to step boundaries (HH:00, HH:30 for a 30-min
+ * step) so the labels read as clock-friendly times. Any leading partial
+ * slot (e.g. when the interval starts at 9:10 because setup/teardown
+ * shifted the free window) is skipped — the venue lock still happens
+ * setup_time_minutes BEFORE the displayed start.
  */
 function stepThrough(iv: Interval, stepMinutes: number): number[] {
   const step = stepMinutes * 60 * 1000
+  const aligned = Math.ceil(iv.start / step) * step
   const out: number[] = []
-  for (let t = iv.start; t < iv.end; t += step) out.push(t)
+  for (let t = aligned; t < iv.end; t += step) out.push(t)
   return out
 }
 
@@ -136,6 +140,43 @@ export function availableStartOptions(
     }
   }
   return options.sort((a, b) => Date.parse(a.isoUtc) - Date.parse(b.isoUtc))
+}
+
+/**
+ * Same as availableStartOptions but filtered so that `start + duration`
+ * also fits inside the same free interval (i.e. the whole event fits).
+ */
+export function availableStartOptionsForDuration(
+  freeIntervals: Interval[],
+  durationMinutes: number,
+  stepMinutes: number,
+  timeZone: string,
+): SlotOption[] {
+  const durationMs = Math.max(1, durationMinutes) * 60 * 1000
+  const options: SlotOption[] = []
+  const seen = new Set<number>()
+  for (const iv of freeIntervals) {
+    for (const t of stepThrough(iv, stepMinutes)) {
+      if (t + durationMs > iv.end) break
+      if (seen.has(t)) continue
+      seen.add(t)
+      options.push({
+        label: formatInTz(t, timeZone),
+        isoUtc: new Date(t).toISOString(),
+      })
+    }
+  }
+  return options.sort((a, b) => Date.parse(a.isoUtc) - Date.parse(b.isoUtc))
+}
+
+/** Does `[startMs, startMs + durationMinutes)` fit inside a free interval? */
+export function durationFits(
+  freeIntervals: Interval[],
+  startMs: number,
+  durationMinutes: number,
+): boolean {
+  const end = startMs + durationMinutes * 60 * 1000
+  return freeIntervals.some((iv) => startMs >= iv.start && end <= iv.end)
 }
 
 /**
