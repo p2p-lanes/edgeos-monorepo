@@ -18,15 +18,16 @@ import Link from "next/link"
 import { useState } from "react"
 
 import {
+  EventSettingsService,
   EventsService,
   EventVenuesService,
   type EventPublic,
   type EventVenuePublic,
 } from "@/client"
 import { Button } from "@/components/ui/button"
-import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
 import { useCityProvider } from "@/providers/cityProvider"
+import { EventsToolbar } from "../lib/EventsToolbar"
 import { useEventTimezone } from "../lib/useEventTimezone"
 
 export default function CalendarPage() {
@@ -37,6 +38,13 @@ export default function CalendarPage() {
   const [rsvpedOnly, setRsvpedOnly] = useState(false)
   const { timezone, formatTime, formatDayKey, formatGridDayKey } =
     useEventTimezone(city?.id)
+
+  const { data: eventSettings } = useQuery({
+    queryKey: ["portal-event-settings", city?.id],
+    queryFn: () =>
+      EventSettingsService.getPortalEventSettings({ popupId: city!.id }),
+    enabled: !!city?.id,
+  })
 
   const { data } = useQuery({
     queryKey: [
@@ -109,22 +117,13 @@ export default function CalendarPage() {
             </p>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <label
-            htmlFor="rsvped-only-calendar"
-            className="inline-flex items-center gap-2 rounded-md border bg-card px-3 py-1.5 text-sm cursor-pointer select-none"
-          >
-            <Switch
-              id="rsvped-only-calendar"
-              checked={rsvpedOnly}
-              onCheckedChange={setRsvpedOnly}
-            />
-            <span className="text-xs font-medium">My RSVPs only</span>
-          </label>
-          <Button variant="outline" size="sm" asChild>
-            <Link href={`/portal/${city?.slug}/events`}>List View</Link>
-          </Button>
-        </div>
+        <EventsToolbar
+          slug={city?.slug}
+          view="calendar"
+          rsvpedOnly={rsvpedOnly}
+          onRsvpedOnlyChange={setRsvpedOnly}
+          canCreate={eventSettings?.can_publish_event === "everyone"}
+        />
       </div>
 
       <div className="grid lg:grid-cols-7 gap-5">

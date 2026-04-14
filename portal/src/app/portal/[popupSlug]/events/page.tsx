@@ -3,12 +3,9 @@
 import { useQueries, useQuery } from "@tanstack/react-query"
 import {
   CalendarDays,
-  CheckCircle,
   Clock,
   Filter,
-  Layers,
   MapPin,
-  Plus,
   Search,
   Tag,
 } from "lucide-react"
@@ -23,9 +20,9 @@ import {
   type EventVenuePublic,
 } from "@/client"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useCityProvider } from "@/providers/cityProvider"
+import { EventsToolbar } from "./lib/EventsToolbar"
 import { GoogleCalendarConnectionCard } from "./lib/GoogleCalendarConnectionCard"
 import { useEventTimezone } from "./lib/useEventTimezone"
 
@@ -138,35 +135,13 @@ export default function EventsPage() {
             className="pl-9"
           />
         </div>
-        <Button
-          variant={rsvpedOnly ? "default" : "outline"}
-          size="sm"
-          onClick={() => setRsvpedOnly((v) => !v)}
-          aria-pressed={rsvpedOnly}
-        >
-          <CheckCircle className="mr-2 h-4 w-4" />
-          My RSVPs
-        </Button>
-        <Button variant="outline" size="sm" asChild>
-          <Link href={`/portal/${city?.slug}/events/tracks`}>
-            <Layers className="mr-2 h-4 w-4" />
-            Tracks
-          </Link>
-        </Button>
-        <Button variant="outline" size="sm" asChild>
-          <Link href={`/portal/${city?.slug}/events/calendar`}>
-            <CalendarDays className="mr-2 h-4 w-4" />
-            Calendar
-          </Link>
-        </Button>
-        {eventSettings?.can_publish_event === "everyone" && (
-          <Button size="sm" asChild>
-            <Link href={`/portal/${city?.slug}/events/new`}>
-              <Plus className="mr-2 h-4 w-4" />
-              Create event
-            </Link>
-          </Button>
-        )}
+        <EventsToolbar
+          slug={city?.slug}
+          view="list"
+          rsvpedOnly={rsvpedOnly}
+          onRsvpedOnlyChange={setRsvpedOnly}
+          canCreate={eventSettings?.can_publish_event === "everyone"}
+        />
       </div>
 
       <div className="flex-1 overflow-y-auto">
