@@ -274,6 +274,8 @@ function PropertyPicker({ value, onChange }: PropertyPickerProps) {
   const [showNew, setShowNew] = useState(false)
   const [newName, setNewName] = useState("")
   const [newIcon, setNewIcon] = useState("")
+  const [pendingDelete, setPendingDelete] =
+    useState<VenuePropertyTypePublic | null>(null)
 
   const { data: propertyTypes = [] } = useQuery<VenuePropertyTypePublic[]>({
     queryKey: ["venue-property-types"],
@@ -292,6 +294,18 @@ function PropertyPicker({ value, onChange }: PropertyPickerProps) {
       setNewName("")
       setNewIcon("")
       setShowNew(false)
+    },
+    onError: createErrorHandler(showErrorToast),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (propertyTypeId: string) =>
+      VenuePropertyTypesService.deletePropertyType({ propertyTypeId }),
+    onSuccess: (_, propertyTypeId) => {
+      showSuccessToast("Property type deleted")
+      queryClient.invalidateQueries({ queryKey: ["venue-property-types"] })
+      onChange(value.filter((v) => v !== propertyTypeId))
+      setPendingDelete(null)
     },
     onError: createErrorHandler(showErrorToast),
   })
@@ -316,21 +330,44 @@ function PropertyPicker({ value, onChange }: PropertyPickerProps) {
             {propertyTypes.map((pt) => {
               const selected = value.includes(pt.id)
               return (
-                <button
-                  type="button"
+                <div
                   key={pt.id}
-                  onClick={() => toggle(pt.id)}
-                  aria-pressed={selected}
-                  className={
-                    "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring " +
-                    (selected
-                      ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                      : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground")
-                  }
+                  className="group relative inline-flex"
                 >
-                  <LucideIconByName name={pt.icon} className="h-3.5 w-3.5" />
-                  <span>{pt.name}</span>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => toggle(pt.id)}
+                    aria-pressed={selected}
+                    className={
+                      "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 pr-6 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring " +
+                      (selected
+                        ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                        : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground")
+                    }
+                  >
+                    <LucideIconByName
+                      name={pt.icon}
+                      className="h-3.5 w-3.5"
+                    />
+                    <span>{pt.name}</span>
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Delete ${pt.name}`}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setPendingDelete(pt)
+                    }}
+                    className={
+                      "absolute right-1 top-1/2 -translate-y-1/2 inline-flex h-4 w-4 items-center justify-center rounded-full opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100 focus:outline-none " +
+                      (selected
+                        ? "text-primary-foreground/80 hover:text-primary-foreground hover:bg-primary-foreground/20"
+                        : "text-muted-foreground hover:text-destructive hover:bg-destructive/10")
+                    }
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
               )
             })}
           </div>
@@ -418,6 +455,41 @@ function PropertyPicker({ value, onChange }: PropertyPickerProps) {
           </Button>
         )}
       </div>
+
+      <Dialog
+        open={!!pendingDelete}
+        onOpenChange={(open) => !open && setPendingDelete(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete property type</DialogTitle>
+            <DialogDescription>
+              {pendingDelete
+                ? `Remove "${pendingDelete.name}" from the tenant catalog? Any venue currently referencing it will lose this property. This cannot be undone.`
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setPendingDelete(null)}
+            >
+              Cancel
+            </Button>
+            <LoadingButton
+              type="button"
+              variant="destructive"
+              loading={deleteMutation.isPending}
+              onClick={() =>
+                pendingDelete && deleteMutation.mutate(pendingDelete.id)
+              }
+            >
+              Delete
+            </LoadingButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </InlineSection>
   )
 }
@@ -1330,6 +1402,14 @@ function ChipsWithSuggestions({
 
 type LucideIconProps = { className?: string }
 
+function toPascalCase(s: string): string {
+  return s
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase())
+    .join("")
+}
+
 function LucideIconByName({
   name,
   className,
@@ -1338,9 +1418,21 @@ function LucideIconByName({
   className?: string
 }) {
   if (!name) return null
-  const key = name.trim()
-  if (!key) return null
-  const Icon = (LucideIcons as unknown as Record<string, ComponentType<LucideIconProps>>)[key]
-  if (!Icon || typeof Icon !== "function") return null
-  return <Icon className={className} />
+  const raw = name.trim()
+  if (!raw) return null
+  const registry = LucideIcons as unknown as Record<
+    string,
+    ComponentType<LucideIconProps>
+  >
+  // Try as-is first (fast path for correct PascalCase), then normalize
+  // kebab-case / lowercase / snake_case (how lucide.dev lists them) to
+  // PascalCase.
+  const candidates = [raw, toPascalCase(raw)]
+  for (const key of candidates) {
+    const Icon = registry[key]
+    if (Icon && typeof Icon === "function") {
+      return <Icon className={className} />
+    }
+  }
+  return null
 }
