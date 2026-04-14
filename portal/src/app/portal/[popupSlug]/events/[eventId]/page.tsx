@@ -10,6 +10,7 @@ import {
   Mail,
   Send,
   Tag,
+  Trash2,
   UserPlus,
   Users,
   Video,
@@ -188,7 +189,7 @@ export default function EventDetailPage() {
   const { data: invitations = [] } = useQuery<EventInvitationPublic[]>({
     queryKey: ["portal-event-invitations", params.eventId],
     queryFn: () =>
-      EventsService.listInvitations({ eventId: params.eventId }),
+      EventsService.listPortalInvitations({ eventId: params.eventId }),
     enabled: !!params.eventId && isOwner,
   })
 
@@ -203,7 +204,7 @@ export default function EventDetailPage() {
       if (emails.length === 0) {
         throw new Error("Enter at least one email")
       }
-      return EventsService.bulkInvite({
+      return EventsService.bulkInvitePortal({
         eventId: params.eventId,
         requestBody: { emails },
       })
@@ -220,6 +221,22 @@ export default function EventDetailPage() {
     },
     onError: (err: unknown) => {
       toast.error(err instanceof Error ? err.message : "Failed to invite")
+    },
+  })
+
+  const deleteInvitationMutation = useMutation({
+    mutationFn: (invitationId: string) =>
+      EventsService.deletePortalInvitation({
+        eventId: params.eventId,
+        invitationId,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["portal-event-invitations", params.eventId],
+      })
+    },
+    onError: (err: unknown) => {
+      toast.error(err instanceof Error ? err.message : "Failed to remove")
     },
   })
 
@@ -510,16 +527,27 @@ export default function EventDetailPage() {
                 {invitations.map((inv) => (
                   <li
                     key={inv.id}
-                    className="flex items-center justify-between text-xs"
+                    className="flex items-center justify-between gap-2 text-xs"
                   >
                     <span className="truncate">
                       {inv.first_name || inv.last_name
                         ? `${inv.first_name ?? ""} ${inv.last_name ?? ""}`.trim()
                         : inv.email}
                     </span>
-                    <span className="text-muted-foreground truncate ml-2">
+                    <span className="text-muted-foreground truncate ml-auto">
                       {inv.email}
                     </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 shrink-0"
+                      aria-label={`Remove invitation for ${inv.email}`}
+                      disabled={deleteInvitationMutation.isPending}
+                      onClick={() => deleteInvitationMutation.mutate(inv.id)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
                   </li>
                 ))}
               </ul>

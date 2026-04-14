@@ -32,7 +32,7 @@ export function useFileUpload() {
     setUploading(true)
     try {
       const { upload_url, public_url, key } =
-        await UploadsService.getPresignedUploadUrl({
+        await UploadsService.getPresignedUploadUrlPortal({
           requestBody: { filename: file.name, content_type: file.type },
         })
 

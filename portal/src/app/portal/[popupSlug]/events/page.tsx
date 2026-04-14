@@ -24,6 +24,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Switch } from "@/components/ui/switch"
 import { useCityProvider } from "@/providers/cityProvider"
 import { GoogleCalendarConnectionCard } from "./lib/GoogleCalendarConnectionCard"
 import { useEventTimezone } from "./lib/useEventTimezone"
@@ -51,6 +52,7 @@ export default function EventsPage() {
   const { getCity } = useCityProvider()
   const city = getCity()
   const [search, setSearch] = useState("")
+  const [rsvpedOnly, setRsvpedOnly] = useState(false)
   const { timezone, formatTime, formatDateShort, formatDayKey } =
     useEventTimezone(city?.id)
 
@@ -63,12 +65,13 @@ export default function EventsPage() {
   const eventsEnabled = eventSettings?.event_enabled ?? true
 
   const { data, isLoading } = useQuery({
-    queryKey: ["portal-events", city?.id, search],
+    queryKey: ["portal-events", city?.id, search, rsvpedOnly],
     queryFn: () =>
       EventsService.listPortalEvents({
         popupId: city!.id,
         search: search || undefined,
         eventStatus: "published",
+        rsvpedOnly: rsvpedOnly || undefined,
         limit: 200,
       }),
     enabled: !!city?.id && eventsEnabled,
@@ -135,6 +138,17 @@ export default function EventsPage() {
             className="pl-9"
           />
         </div>
+        <label
+          htmlFor="rsvped-only"
+          className="inline-flex items-center gap-2 rounded-md border bg-card px-3 py-1.5 text-sm cursor-pointer select-none"
+        >
+          <Switch
+            id="rsvped-only"
+            checked={rsvpedOnly}
+            onCheckedChange={setRsvpedOnly}
+          />
+          <span className="text-xs font-medium">My RSVPs only</span>
+        </label>
         <Button variant="outline" size="sm" asChild>
           <Link href={`/portal/${city?.slug}/events/tracks`}>
             <Layers className="mr-2 h-4 w-4" />

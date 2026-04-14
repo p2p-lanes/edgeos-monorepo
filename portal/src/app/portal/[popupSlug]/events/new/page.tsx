@@ -29,6 +29,11 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -36,14 +41,15 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { cn } from "@/lib/utils"
 import { useCityProvider } from "@/providers/cityProvider"
 import { toast } from "sonner"
 import { useEventTimezone } from "../lib/useEventTimezone"
 import { useFileUpload } from "../lib/useFileUpload"
 import {
-  availableEndOptions,
-  availableStartOptions,
+  availableStartOptionsForDuration,
   dayBoundsInTz,
+  durationFits,
   freeIntervalsForDay,
 } from "../lib/venue-slots"
 
@@ -70,7 +76,46 @@ function localInputToIso(local: string): string {
   return new Date(local).toISOString()
 }
 
+/**
+ * Convert a "YYYY-MM-DD" date + "HH:mm" time (interpreted in `tz`) to a UTC
+ * instant (ms since epoch). Returns NaN if invalid.
+ */
+function combineDateTimeInTz(
+  dateStr: string,
+  hhmm: string,
+  tz: string,
+): number {
+  if (!dateStr || !hhmm) return Number.NaN
+  const [y, mo, d] = dateStr.split("-").map(Number)
+  const [h, mi] = hhmm.split(":").map(Number)
+  if ([y, mo, d, h, mi].some((n) => Number.isNaN(n))) return Number.NaN
+  // Build a UTC guess and subtract the tz offset at that moment.
+  const guess = Date.UTC(y, (mo ?? 1) - 1, d ?? 1, h ?? 0, mi ?? 0, 0)
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).formatToParts(new Date(guess))
+  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value)
+  const asUtc = Date.UTC(
+    get("year"),
+    get("month") - 1,
+    get("day"),
+    get("hour") === 24 ? 0 : get("hour"),
+    get("minute"),
+    get("second"),
+  )
+  const offsetMin = Math.round((asUtc - guess) / 60000)
+  return guess - offsetMin * 60_000
+}
+
 type Visibility = "public" | "private" | "unlisted"
+type DurationUnit = "minutes" | "hours"
 
 export default function NewPortalEventPage() {
   const router = useRouter()
@@ -100,22 +145,36 @@ export default function NewPortalEventPage() {
     d.setHours(d.getHours() + 2)
     return d
   }, [now])
-  const defaultEnd = useMemo(() => {
-    const d = new Date(defaultStart)
-    d.setHours(d.getHours() + 1)
-    return d
-  }, [defaultStart])
 
   const [title, setTitle] = useState("")
   const [content, setContent] = useState("")
   const [venueId, setVenueId] = useState<string>("")
   // Date picked by the user, "YYYY-MM-DD" in the popup's configured TZ.
   const [dateStr, setDateStr] = useState(() => todayInTz(displayTz))
-  // Times as absolute UTC ISO strings (chosen from slot dropdowns when a
-  // venue is selected, or derived from <input type="datetime-local"> when
-  // no venue is selected).
+  // Start time as an absolute UTC ISO string. When the user has a venue
+  // selected we derive this from the picked date + typed/suggested HH:mm;
+  // without a venue we fall back to a <datetime-local> input.
   const [startIso, setStartIso] = useState<string>(defaultStart.toISOString())
-  const [endIso, setEndIso] = useState<string>(defaultEnd.toISOString())
+  // Typed "HH:mm" (in displayTz) for the venue-backed time picker. Kept in
+  // sync with startIso but also allows custom values typed by the user.
+  const [timeStr, setTimeStr] = useState<string>(() => {
+    const parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone: displayTz,
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).formatToParts(defaultStart)
+    const get = (t: string) => parts.find((p) => p.type === t)?.value ?? ""
+    return `${get("hour")}:${get("minute")}`
+  })
+  const [durationValue, setDurationValue] = useState<number>(60)
+  const [durationUnit, setDurationUnit] = useState<DurationUnit>("minutes")
+  const durationMinutes = Math.max(
+    1,
+    Math.round(
+      durationUnit === "hours" ? durationValue * 60 : durationValue,
+    ),
+  )
   const [visibility, setVisibility] = useState<Visibility>("public")
   const [maxParticipants, setMaxParticipants] = useState("")
   const [meetingUrl, setMeetingUrl] = useState("")
@@ -176,34 +235,33 @@ export default function NewPortalEventPage() {
   }, [availabilityData, dayBounds])
 
   const startOptions = useMemo(
-    () => availableStartOptions(freeIntervals, 30, displayTz),
-    [freeIntervals, displayTz],
+    () =>
+      availableStartOptionsForDuration(
+        freeIntervals,
+        durationMinutes,
+        30,
+        displayTz,
+      ),
+    [freeIntervals, durationMinutes, displayTz],
   )
-  const endOptions = useMemo(() => {
-    if (!startIso) return []
-    return availableEndOptions(
-      freeIntervals,
-      Date.parse(startIso),
-      30,
-      displayTz,
-    )
-  }, [freeIntervals, startIso, displayTz])
 
-  // If the chosen start is no longer valid after venue/date changes, clear.
-  useEffect(() => {
-    if (!venueId) return
-    if (!startIso) return
-    const still = startOptions.some((o) => o.isoUtc === startIso)
-    if (!still) {
-      setStartIso("")
-      setEndIso("")
-    }
-  }, [venueId, dateStr, startOptions, startIso])
-  useEffect(() => {
-    if (!venueId || !startIso || !endIso) return
-    const still = endOptions.some((o) => o.isoUtc === endIso)
-    if (!still) setEndIso("")
-  }, [venueId, dateStr, endOptions, startIso, endIso])
+  // End ISO derived from startIso + duration.
+  const endIso = useMemo(() => {
+    if (!startIso) return ""
+    const start = Date.parse(startIso)
+    if (Number.isNaN(start)) return ""
+    return new Date(start + durationMinutes * 60_000).toISOString()
+  }, [startIso, durationMinutes])
+
+  // Does the typed start + duration fit in a free interval?
+  const startFits = useMemo(() => {
+    if (!venueId) return true
+    if (!startIso) return true
+    if (freeIntervals.length === 0) return true
+    const ms = Date.parse(startIso)
+    if (Number.isNaN(ms)) return true
+    return durationFits(freeIntervals, ms, durationMinutes)
+  }, [venueId, startIso, freeIntervals, durationMinutes])
 
   // ---- final availability check (used even when there's no venue) ----
   const [availability, setAvailability] = useState<
@@ -432,75 +490,55 @@ export default function NewPortalEventPage() {
             type="date"
             value={dateStr}
             onChange={(e) => {
-              setDateStr(e.target.value)
-              setStartIso("")
-              setEndIso("")
+              const newDate = e.target.value
+              setDateStr(newDate)
+              if (venueId && timeStr) {
+                const ms = combineDateTimeInTz(newDate, timeStr, displayTz)
+                setStartIso(Number.isNaN(ms) ? "" : new Date(ms).toISOString())
+              } else {
+                setStartIso("")
+              }
             }}
             disabled={selectedVenue?.booking_mode === "unbookable"}
             required
           />
         </div>
 
-        {/* Times */}
+        {/* Times + duration */}
         {venueId ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label htmlFor="start">Start time</Label>
-              <Select
-                value={startIso || ""}
-                onValueChange={(v) => {
-                  setStartIso(v)
-                  setEndIso("")
+              <StartTimeCombobox
+                id="start"
+                value={timeStr}
+                onChange={(hhmm) => {
+                  setTimeStr(hhmm)
+                  if (!hhmm) {
+                    setStartIso("")
+                    return
+                  }
+                  const ms = combineDateTimeInTz(dateStr, hhmm, displayTz)
+                  setStartIso(Number.isNaN(ms) ? "" : new Date(ms).toISOString())
                 }}
-                disabled={
-                  selectedVenue?.booking_mode === "unbookable" ||
-                  startOptions.length === 0
+                options={startOptions}
+                disabled={selectedVenue?.booking_mode === "unbookable"}
+                fits={startFits}
+                placeholder={
+                  startOptions.length === 0 ? "No open hours" : "HH:mm"
                 }
-              >
-                <SelectTrigger id="start" className="w-full">
-                  <SelectValue
-                    placeholder={
-                      startOptions.length === 0
-                        ? "No open hours"
-                        : "Pick a start"
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {startOptions.map((o) => (
-                    <SelectItem key={o.isoUtc} value={o.isoUtc}>
-                      {o.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="end">End time</Label>
-              <Select
-                value={endIso || ""}
-                onValueChange={setEndIso}
-                disabled={!startIso || endOptions.length === 0}
-              >
-                <SelectTrigger id="end" className="w-full">
-                  <SelectValue
-                    placeholder={
-                      !startIso
-                        ? "Pick a start first"
-                        : endOptions.length === 0
-                          ? "No valid ends"
-                          : "Pick an end"
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {endOptions.map((o) => (
-                    <SelectItem key={o.isoUtc} value={o.isoUtc}>
-                      {o.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Duration</Label>
+              <DurationPicker
+                value={durationValue}
+                unit={durationUnit}
+                onChange={(next) => {
+                  setDurationValue(next.value)
+                  setDurationUnit(next.unit)
+                }}
+              />
             </div>
           </div>
         ) : (
@@ -518,13 +556,14 @@ export default function NewPortalEventPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="end">End</Label>
-              <Input
-                id="end"
-                type="datetime-local"
-                value={endIso ? toLocalInput(new Date(endIso)) : ""}
-                onChange={(e) => setEndIso(localInputToIso(e.target.value))}
-                required
+              <Label>Duration</Label>
+              <DurationPicker
+                value={durationValue}
+                unit={durationUnit}
+                onChange={(next) => {
+                  setDurationValue(next.value)
+                  setDurationUnit(next.unit)
+                }}
               />
             </div>
           </div>
@@ -763,6 +802,139 @@ function GatedMessage({ title, message }: { title: string; message: string }) {
       <ImageIcon className="h-10 w-10 text-muted-foreground/50 mb-3" />
       <h1 className="text-xl font-semibold">{title}</h1>
       <p className="text-sm text-muted-foreground mt-2">{message}</p>
+    </div>
+  )
+}
+
+interface StartTimeComboboxProps {
+  id?: string
+  value: string // "HH:mm"
+  onChange: (hhmm: string) => void
+  options: { label: string; isoUtc: string }[]
+  disabled?: boolean
+  fits: boolean
+  placeholder?: string
+}
+
+function StartTimeCombobox({
+  id,
+  value,
+  onChange,
+  options,
+  disabled,
+  fits,
+  placeholder,
+}: StartTimeComboboxProps) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="w-full">
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Input
+            id={id}
+            type="time"
+            value={value}
+            placeholder={placeholder}
+            disabled={disabled}
+            onFocus={() => {
+              if (options.length > 0) setOpen(true)
+            }}
+            onChange={(e) => {
+              const raw = e.target.value
+              onChange(raw ? raw.slice(0, 5) : "")
+            }}
+            className={cn(
+              "w-full",
+              !fits && value
+                ? "border-destructive focus-visible:ring-destructive/40"
+                : "",
+            )}
+          />
+        </PopoverTrigger>
+        {options.length > 0 && (
+          <PopoverContent
+            align="start"
+            className="w-[220px] p-1"
+            onOpenAutoFocus={(e) => e.preventDefault()}
+          >
+            <p className="px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+              Suggested slots
+            </p>
+            <ul className="max-h-60 overflow-y-auto">
+              {options.map((o) => (
+                <li key={o.isoUtc}>
+                  <button
+                    type="button"
+                    className={cn(
+                      "flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground",
+                      value === o.label
+                        ? "bg-accent text-accent-foreground"
+                        : "",
+                    )}
+                    onClick={() => {
+                      onChange(o.label)
+                      setOpen(false)
+                    }}
+                  >
+                    <span>{o.label}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </PopoverContent>
+        )}
+      </Popover>
+      {!fits && value && (
+        <p className="mt-1 text-xs text-destructive">
+          Not available — overlaps busy
+        </p>
+      )}
+    </div>
+  )
+}
+
+interface DurationPickerProps {
+  value: number
+  unit: DurationUnit
+  onChange: (next: { value: number; unit: DurationUnit }) => void
+}
+
+function DurationPicker({ value, unit, onChange }: DurationPickerProps) {
+  return (
+    <div className="flex items-center gap-2">
+      <Input
+        type="number"
+        min={1}
+        value={value}
+        onChange={(e) => {
+          const n = parseInt(e.target.value, 10)
+          onChange({ value: Number.isNaN(n) ? 0 : n, unit })
+        }}
+        className="w-24"
+      />
+      <Select
+        value={unit}
+        onValueChange={(v) => {
+          const next = v as DurationUnit
+          if (next === unit) return
+          const totalMinutes = unit === "hours" ? value * 60 : value
+          onChange({
+            unit: next,
+            value:
+              next === "hours"
+                ? Math.max(1, Math.round(totalMinutes / 60))
+                : Math.max(1, Math.round(totalMinutes)),
+          })
+        }}
+      >
+        <SelectTrigger className="w-full">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="minutes">Minutes</SelectItem>
+          <SelectItem value="hours">Hours</SelectItem>
+        </SelectContent>
+      </Select>
     </div>
   )
 }

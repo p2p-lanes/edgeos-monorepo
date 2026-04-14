@@ -24,6 +24,11 @@ import {
 import { Input } from "@/components/ui/input"
 import { LoadingButton } from "@/components/ui/loading-button"
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -36,9 +41,9 @@ import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useCustomToast from "@/hooks/useCustomToast"
 import { cn } from "@/lib/utils"
 import {
-  availableEndOptions,
-  availableStartOptions,
+  availableStartOptionsForDuration,
   dayBoundsInTz,
+  durationFits,
   freeIntervalsForDay,
 } from "@/lib/venue-slots"
 import { createErrorHandler } from "@/utils"
@@ -253,13 +258,45 @@ export function EventForm({ defaultValues, onSuccess }: EventFormProps) {
     return dt.slice(0, 16)
   }
 
+  // Compute initial duration (in minutes) from the default values (edit mode).
+  const initialDurationMinutes = (() => {
+    if (!defaultValues?.start_time || !defaultValues?.end_time) return 60
+    const diff =
+      new Date(defaultValues.end_time).getTime() -
+      new Date(defaultValues.start_time).getTime()
+    const mins = Math.round(diff / 60000)
+    return mins > 0 ? mins : 60
+  })()
+
+  type DurationUnit = "minutes" | "hours"
+  const initialDurationUnit: DurationUnit =
+    initialDurationMinutes % 60 === 0 && initialDurationMinutes >= 60
+      ? "hours"
+      : "minutes"
+  const initialDurationValue =
+    initialDurationUnit === "hours"
+      ? initialDurationMinutes / 60
+      : initialDurationMinutes
+
+  const [durationUnit, setDurationUnit] = useState<DurationUnit>(
+    initialDurationUnit,
+  )
+  const [durationValue, setDurationValue] = useState<number>(
+    initialDurationValue,
+  )
+  const durationMinutes = Math.max(
+    1,
+    Math.round(
+      durationUnit === "hours" ? durationValue * 60 : durationValue,
+    ),
+  )
+
   const form = useForm({
     defaultValues: {
       title: defaultValues?.title ?? "",
       content: defaultValues?.content ?? "",
       kind: defaultValues?.kind ?? "",
       start_time: formatForInput(defaultValues?.start_time),
-      end_time: formatForInput(defaultValues?.end_time),
       timezone: defaultValues?.timezone ?? "UTC",
       cover_url: defaultValues?.cover_url ?? "",
       meeting_url: defaultValues?.meeting_url ?? "",
@@ -279,8 +316,12 @@ export function EventForm({ defaultValues, onSuccess }: EventFormProps) {
         showErrorToast("Title is required")
         return
       }
-      if (!value.start_time || !value.end_time) {
-        showErrorToast("Start and end times are required")
+      if (!value.start_time) {
+        showErrorToast("Start time is required")
+        return
+      }
+      if (!durationMinutes || durationMinutes <= 0) {
+        showErrorToast("Duration must be greater than zero")
         return
       }
       if (!selectedPopupId) {
@@ -292,13 +333,16 @@ export function EventForm({ defaultValues, onSuccess }: EventFormProps) {
         .map((t) => t.trim().toLowerCase())
         .filter(Boolean)
 
+      const startDate = new Date(value.start_time)
+      const endDate = new Date(startDate.getTime() + durationMinutes * 60_000)
+
       const payload: Record<string, unknown> = {
         popup_id: selectedPopupId,
         title: value.title,
         content: value.content || null,
         kind: value.kind || null,
-        start_time: new Date(value.start_time).toISOString(),
-        end_time: new Date(value.end_time).toISOString(),
+        start_time: startDate.toISOString(),
+        end_time: endDate.toISOString(),
         timezone: value.timezone,
         cover_url: value.cover_url || null,
         meeting_url: value.meeting_url || null,
@@ -328,12 +372,19 @@ export function EventForm({ defaultValues, onSuccess }: EventFormProps) {
   // Track selected values reactively for side effects / derived queries.
   const venueIdValue = useStore(form.store, (s) => s.values.venue_id)
   const startTimeValue = useStore(form.store, (s) => s.values.start_time)
-  const endTimeValue = useStore(form.store, (s) => s.values.end_time)
   const visibilityValue = useStore(form.store, (s) => s.values.visibility)
   const maxParticipantValue = useStore(
     form.store,
     (s) => s.values.max_participant,
   )
+
+  // End time derived from start + duration (used for backend checks).
+  const endTimeIso = useMemo(() => {
+    if (!startTimeValue) return ""
+    const start = new Date(startTimeValue)
+    if (Number.isNaN(start.getTime())) return ""
+    return new Date(start.getTime() + durationMinutes * 60_000).toISOString()
+  }, [startTimeValue, durationMinutes])
 
   // Fetch selected venue details for capacity / booking mode / setup & teardown
   const { data: selectedVenue } = useQuery({
@@ -352,11 +403,11 @@ export function EventForm({ defaultValues, onSuccess }: EventFormProps) {
   const lastCheckKey = useRef<string>("")
 
   useEffect(() => {
-    if (!venueIdValue || !startTimeValue || !endTimeValue) {
+    if (!venueIdValue || !startTimeValue || !endTimeIso) {
       setAvailability({ status: "idle" })
       return
     }
-    const key = `${venueIdValue}|${startTimeValue}|${endTimeValue}|${defaultValues?.id ?? ""}`
+    const key = `${venueIdValue}|${startTimeValue}|${endTimeIso}|${defaultValues?.id ?? ""}`
     if (lastCheckKey.current === key) return
 
     setAvailability({ status: "checking" })
@@ -367,7 +418,7 @@ export function EventForm({ defaultValues, onSuccess }: EventFormProps) {
           requestBody: {
             venue_id: venueIdValue,
             start_time: new Date(startTimeValue).toISOString(),
-            end_time: new Date(endTimeValue).toISOString(),
+            end_time: endTimeIso,
             exclude_event_id: defaultValues?.id ?? null,
           },
         })
@@ -388,7 +439,7 @@ export function EventForm({ defaultValues, onSuccess }: EventFormProps) {
     }, 500)
 
     return () => window.clearTimeout(handle)
-  }, [venueIdValue, startTimeValue, endTimeValue, defaultValues?.id])
+  }, [venueIdValue, startTimeValue, endTimeIso, defaultValues?.id])
 
   // --- Day-based slot picker (date + start/end Selects) -------------------
   // Derived from the form's local-datetime strings.
@@ -443,18 +494,24 @@ export function EventForm({ defaultValues, onSuccess }: EventFormProps) {
   }, [dayAvailability, dayBounds])
 
   const startSlotOptions = useMemo(
-    () => availableStartOptions(freeIntervals, 30, popupTz),
-    [freeIntervals, popupTz],
+    () =>
+      availableStartOptionsForDuration(
+        freeIntervals,
+        durationMinutes,
+        30,
+        popupTz,
+      ),
+    [freeIntervals, durationMinutes, popupTz],
   )
-  const endSlotOptions = useMemo(() => {
-    if (!startTimeValue) return []
-    return availableEndOptions(
-      freeIntervals,
-      new Date(startTimeValue).getTime(),
-      30,
-      popupTz,
-    )
-  }, [freeIntervals, startTimeValue, popupTz])
+
+  // Does the typed start + duration fit in a free window?
+  const startFits = useMemo(() => {
+    if (!startTimeValue) return true
+    if (freeIntervals.length === 0) return true // no venue / no day data yet
+    const ms = new Date(startTimeValue).getTime()
+    if (Number.isNaN(ms)) return true
+    return durationFits(freeIntervals, ms, durationMinutes)
+  }, [freeIntervals, startTimeValue, durationMinutes])
 
   // --- Max participant warning -------------------------------------------
   const venueCapacity = selectedVenue?.capacity ?? null
@@ -646,122 +703,103 @@ export function EventForm({ defaultValues, onSuccess }: EventFormProps) {
               const newDate = e.target.value
               if (!newDate) return
               const currentStartTime = startTimeValue?.slice(11, 16) || "09:00"
-              const currentEndTime = endTimeValue?.slice(11, 16) || "10:00"
               form.setFieldValue(
                 "start_time",
                 `${newDate}T${currentStartTime}`,
               )
-              form.setFieldValue("end_time", `${newDate}T${currentEndTime}`)
             }}
             className="w-[200px]"
           />
         </InlineRow>
 
         {venueIdValue ? (
-          <>
-            <InlineRow label="Start time" description="Pick an open slot">
-              <div className="flex flex-col items-end gap-1 w-[200px]">
-                <Select
-                  value={startTimeValue ? new Date(startTimeValue).toISOString() : ""}
-                  onValueChange={(iso) => {
-                    const d = new Date(iso)
-                    const hh = String(d.getHours()).padStart(2, "0")
-                    const mm = String(d.getMinutes()).padStart(2, "0")
-                    form.setFieldValue(
-                      "start_time",
-                      `${dateStr || d.toISOString().slice(0, 10)}T${hh}:${mm}`,
-                    )
-                  }}
-                  disabled={
-                    isVenueUnbookable || startSlotOptions.length === 0
+          <InlineRow label="Start time" description="Pick or type a time">
+            <div className="flex flex-col items-end gap-1 w-[240px]">
+              <StartTimeCombobox
+                dateStr={dateStr}
+                value={startTimeValue ? startTimeValue.slice(11, 16) : ""}
+                onChange={(hhmm) => {
+                  if (!hhmm) {
+                    form.setFieldValue("start_time", "")
+                    return
                   }
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue
-                      placeholder={
-                        startSlotOptions.length === 0
-                          ? "No open hours"
-                          : "Pick a start"
-                      }
-                    />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-60">
-                    {startSlotOptions.map((o) => (
-                      <SelectItem key={o.isoUtc} value={o.isoUtc}>
-                        {o.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <AvailabilityIndicator availability={availability} />
-              </div>
-            </InlineRow>
-
-            <InlineRow label="End time" description="Within the same open range">
-              <Select
-                value={endTimeValue ? new Date(endTimeValue).toISOString() : ""}
-                onValueChange={(iso) => {
-                  const d = new Date(iso)
-                  const hh = String(d.getHours()).padStart(2, "0")
-                  const mm = String(d.getMinutes()).padStart(2, "0")
-                  form.setFieldValue(
-                    "end_time",
-                    `${dateStr || d.toISOString().slice(0, 10)}T${hh}:${mm}`,
-                  )
+                  const date =
+                    dateStr || new Date().toISOString().slice(0, 10)
+                  form.setFieldValue("start_time", `${date}T${hhmm}`)
                 }}
-                disabled={!startTimeValue || endSlotOptions.length === 0}
-              >
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue
-                    placeholder={
-                      !startTimeValue
-                        ? "Pick a start first"
-                        : endSlotOptions.length === 0
-                          ? "No valid ends"
-                          : "Pick an end"
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent className="max-h-60">
-                  {endSlotOptions.map((o) => (
-                    <SelectItem key={o.isoUtc} value={o.isoUtc}>
-                      {o.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </InlineRow>
-          </>
+                options={startSlotOptions}
+                disabled={isVenueUnbookable}
+                fits={startFits}
+                placeholder={
+                  startSlotOptions.length === 0
+                    ? "No open hours"
+                    : "HH:mm"
+                }
+              />
+              <AvailabilityIndicator availability={availability} />
+            </div>
+          </InlineRow>
         ) : (
-          <>
-            <InlineRow label="Start" description="When the event begins">
-              <form.Field name="start_time">
-                {(field) => (
-                  <div className="flex flex-col items-end gap-1">
-                    <DateTimePicker
-                      value={field.state.value}
-                      onChange={field.handleChange}
-                      placeholder="Select start date"
-                    />
-                    <AvailabilityIndicator availability={availability} />
-                  </div>
-                )}
-              </form.Field>
-            </InlineRow>
-
-            <InlineRow label="End" description="When the event ends">
-              <form.Field name="end_time">
-                {(field) => (
+          <InlineRow label="Start" description="When the event begins">
+            <form.Field name="start_time">
+              {(field) => (
+                <div className="flex flex-col items-end gap-1">
                   <DateTimePicker
                     value={field.state.value}
                     onChange={field.handleChange}
-                    placeholder="Select end date"
+                    placeholder="Select start date"
                   />
-                )}
-              </form.Field>
-            </InlineRow>
-          </>
+                  <AvailabilityIndicator availability={availability} />
+                </div>
+              )}
+            </form.Field>
+          </InlineRow>
         )}
+
+        <InlineRow
+          label="Duration"
+          description="How long the event lasts"
+        >
+          <div className="flex items-center gap-2">
+            <Input
+              type="number"
+              min={1}
+              value={durationValue}
+              onChange={(e) => {
+                const n = parseInt(e.target.value, 10)
+                setDurationValue(Number.isNaN(n) ? 0 : n)
+              }}
+              className="w-24"
+            />
+            <Select
+              value={durationUnit}
+              onValueChange={(v) => {
+                const next = v as DurationUnit
+                // Preserve the real duration when switching units.
+                if (next !== durationUnit) {
+                  const totalMinutes =
+                    durationUnit === "hours"
+                      ? durationValue * 60
+                      : durationValue
+                  setDurationUnit(next)
+                  setDurationValue(
+                    next === "hours"
+                      ? Math.max(1, Math.round(totalMinutes / 60))
+                      : Math.max(1, Math.round(totalMinutes)),
+                  )
+                }
+              }}
+            >
+              <SelectTrigger className="w-28">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="minutes">Minutes</SelectItem>
+                <SelectItem value="hours">Hours</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </InlineRow>
 
         <InlineRow
           label="Repeats"
@@ -1076,6 +1114,97 @@ function AvailabilityIndicator({
   }
   return (
     <p className="text-xs text-muted-foreground">{availability.message}</p>
+  )
+}
+
+interface StartTimeComboboxProps {
+  /** "YYYY-MM-DD" — required only to contextualize the popover header. */
+  dateStr: string
+  /** "HH:mm" — the currently selected time (in browser-local for this form). */
+  value: string
+  onChange: (hhmm: string) => void
+  options: { label: string; isoUtc: string }[]
+  disabled?: boolean
+  fits: boolean
+  placeholder?: string
+}
+
+function StartTimeCombobox({
+  value,
+  onChange,
+  options,
+  disabled,
+  fits,
+  placeholder,
+}: StartTimeComboboxProps) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <div className="w-full">
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <div className="relative">
+            <Input
+              type="time"
+              value={value}
+              placeholder={placeholder}
+              disabled={disabled}
+              onFocus={() => {
+                if (options.length > 0) setOpen(true)
+              }}
+              onChange={(e) => {
+                const raw = e.target.value
+                // Drop seconds if the browser provided any.
+                onChange(raw ? raw.slice(0, 5) : "")
+              }}
+              className={cn(
+                "w-full",
+                !fits && value
+                  ? "border-destructive focus-visible:ring-destructive/40"
+                  : "",
+              )}
+            />
+          </div>
+        </PopoverTrigger>
+        {options.length > 0 && (
+          <PopoverContent
+            align="start"
+            className="w-[220px] p-1"
+            onOpenAutoFocus={(e) => e.preventDefault()}
+          >
+            <p className="px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+              Suggested slots
+            </p>
+            <ul className="max-h-60 overflow-y-auto">
+              {options.map((o) => (
+                <li key={o.isoUtc}>
+                  <button
+                    type="button"
+                    className={cn(
+                      "flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground",
+                      value === o.label
+                        ? "bg-accent text-accent-foreground"
+                        : "",
+                    )}
+                    onClick={() => {
+                      onChange(o.label)
+                      setOpen(false)
+                    }}
+                  >
+                    <span>{o.label}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </PopoverContent>
+        )}
+      </Popover>
+      {!fits && value && (
+        <p className="mt-1 text-xs text-destructive">
+          Not available — overlaps busy
+        </p>
+      )}
+    </div>
   )
 }
 
