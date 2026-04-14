@@ -7,6 +7,7 @@ import {
   Filter,
   Layers,
   MapPin,
+  Plus,
   Search,
   Tag,
 } from "lucide-react"
@@ -146,6 +147,14 @@ export default function EventsPage() {
             Calendar
           </Link>
         </Button>
+        {eventSettings?.can_publish_event === "everyone" && (
+          <Button size="sm" asChild>
+            <Link href={`/portal/${city?.slug}/events/new`}>
+              <Plus className="mr-2 h-4 w-4" />
+              Create event
+            </Link>
+          </Button>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto">
