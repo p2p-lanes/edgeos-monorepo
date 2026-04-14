@@ -4,6 +4,7 @@ import { Suspense } from "react"
 
 import { EventSettingsService, type EventSettingsCreate } from "@/client"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
+import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -244,7 +245,7 @@ function EventSettingsPage() {
           </Suspense>
         </QueryErrorBoundary>
       ) : (
-        <p className="text-muted-foreground">Select a pop-up from the sidebar to configure event settings.</p>
+        <WorkspaceAlert resource="event settings" />
       )}
     </div>
   )

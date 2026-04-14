@@ -1,20 +1,44 @@
-import { keepPreviousData, useQuery } from "@tanstack/react-query"
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query"
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
-import { MapPin, Pencil, Plus } from "lucide-react"
-import { Suspense } from "react"
+import { EllipsisVertical, MapPin, Pencil, Plus, Trash2 } from "lucide-react"
+import { Suspense, useState } from "react"
 
 import { EventVenuesService, type EventVenuePublic } from "@/client"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
+import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { LoadingButton } from "@/components/ui/loading-button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
+import useCustomToast from "@/hooks/useCustomToast"
 import {
   useTableSearchParams,
   validateTableSearch,
 } from "@/hooks/useTableSearchParams"
+import { createErrorHandler } from "@/utils"
 
 export const Route = createFileRoute("/_layout/events/venues")({
   component: VenuesPage,
@@ -28,7 +52,11 @@ const columns: ColumnDef<EventVenuePublic>[] = [
   {
     accessorKey: "title",
     header: ({ column }) => <SortableHeader label="Name" column={column} />,
-    cell: ({ row }) => <span className="font-medium">{row.original.title}</span>,
+    cell: ({ row }) => (
+      <span className="font-medium">
+        {row.original.title || "Untitled venue"}
+      </span>
+    ),
   },
   {
     accessorKey: "location",
@@ -49,25 +77,91 @@ const columns: ColumnDef<EventVenuePublic>[] = [
   {
     id: "actions",
     header: () => <span className="sr-only">Actions</span>,
-    cell: ({ row }) => <VenueEditButton venueId={row.original.id} />,
+    cell: ({ row }) => (
+      <div className="flex justify-end">
+        <VenueActionsMenu venue={row.original} />
+      </div>
+    ),
   },
 ]
 
-function VenueEditButton({ venueId }: { venueId: string }) {
+function VenueActionsMenu({ venue }: { venue: EventVenuePublic }) {
+  const [open, setOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const { showSuccessToast, showErrorToast } = useCustomToast()
+
+  const deleteMutation = useMutation({
+    mutationFn: () => EventVenuesService.deleteVenue({ venueId: venue.id }),
+    onSuccess: () => {
+      showSuccessToast("Venue deleted successfully")
+      setDeleteOpen(false)
+      setOpen(false)
+    },
+    onError: createErrorHandler(showErrorToast),
+    onSettled: () =>
+      queryClient.invalidateQueries({ queryKey: ["event-venues"] }),
+  })
+
   return (
-    <div className="flex justify-end">
-      <Button
-        variant="ghost"
-        size="icon"
-        aria-label="Edit venue"
-        onClick={() =>
-          navigate({ to: "/events/venues-edit", search: { venueId } })
-        }
-      >
-        <Pencil className="h-4 w-4" />
-      </Button>
-    </div>
+    <>
+      <DropdownMenu open={open} onOpenChange={setOpen}>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" aria-label="Venue actions">
+            <EllipsisVertical className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem
+            onSelect={(e) => {
+              e.preventDefault()
+              setOpen(false)
+              navigate({
+                to: "/events/venues-edit",
+                search: { venueId: venue.id },
+              })
+            }}
+          >
+            <Pencil className="mr-2 h-4 w-4" />
+            Edit
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            variant="destructive"
+            onSelect={(e) => e.preventDefault()}
+            onClick={() => setDeleteOpen(true)}
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Venue</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete "{venue.title || "Untitled venue"}
+              "? Events referencing this venue will lose the reference. This
+              action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
+            <LoadingButton
+              variant="destructive"
+              loading={deleteMutation.isPending}
+              onClick={() => deleteMutation.mutate()}
+            >
+              Delete
+            </LoadingButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 
@@ -150,7 +244,7 @@ function VenuesPage() {
           </Suspense>
         </QueryErrorBoundary>
       ) : (
-        <p className="text-muted-foreground">Select a pop-up from the sidebar to view venues.</p>
+        <WorkspaceAlert resource="venues" />
       )}
     </div>
   )

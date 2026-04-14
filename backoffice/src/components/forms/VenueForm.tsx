@@ -3,12 +3,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   Calendar,
   Clock,
-  Image as ImageIcon,
   Loader2,
   Pencil,
   Plus,
   Trash2,
-  Upload,
   X,
 } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
@@ -17,7 +15,6 @@ import {
   type EventVenueCreate,
   type EventVenuePublic,
   EventVenuesService,
-  UploadsService,
   type VenueBookingMode,
   type VenueExceptionPublic,
   type VenuePropertyTypePublic,
@@ -36,6 +33,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { ImageUpload } from "@/components/ui/image-upload"
 import { Input } from "@/components/ui/input"
 import {
   HeroInput,
@@ -55,6 +53,7 @@ import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useCustomToast from "@/hooks/useCustomToast"
+import { useFileUpload } from "@/hooks/useFileUpload"
 import { createErrorHandler } from "@/utils"
 
 interface VenueFormProps {
@@ -81,11 +80,6 @@ const DAYS_OF_WEEK: { value: number; label: string; short: string }[] = [
 ]
 
 const MAX_PHOTOS = 10
-const ALLOWED_IMAGE_TYPES = [
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-]
 
 /**
  * Extract latitude and longitude from a Google Maps URL.
@@ -139,108 +133,6 @@ async function resolveShortLink(url: string): Promise<string | null> {
   return null
 }
 
-/**
- * Upload a file via presigned URL flow.
- * Returns the public URL to store in the DB.
- */
-async function uploadImageViaPresigned(file: File): Promise<string> {
-  const { upload_url, public_url } = await UploadsService.getPresignedUploadUrl({
-    requestBody: { filename: file.name, content_type: file.type },
-  })
-
-  const res = await fetch(upload_url, {
-    method: "PUT",
-    headers: { "Content-Type": file.type },
-    body: file,
-  })
-  if (!res.ok) {
-    throw new Error(`Upload failed (status ${res.status})`)
-  }
-  return public_url
-}
-
-// ---- Main photo uploader ----
-
-interface MainPhotoUploaderProps {
-  value: string
-  onChange: (url: string) => void
-}
-
-function MainPhotoUploader({ value, onChange }: MainPhotoUploaderProps) {
-  const { showErrorToast } = useCustomToast()
-  const inputRef = useRef<HTMLInputElement>(null)
-  const [uploading, setUploading] = useState(false)
-
-  const handleFile = async (file: File) => {
-    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
-      showErrorToast("Only JPG, PNG or WebP images are allowed")
-      return
-    }
-    setUploading(true)
-    try {
-      const url = await uploadImageViaPresigned(file)
-      onChange(url)
-    } catch (err) {
-      showErrorToast(err instanceof Error ? err.message : "Upload failed")
-    } finally {
-      setUploading(false)
-    }
-  }
-
-  return (
-    <div className="flex items-center gap-4">
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/jpeg,image/png,image/webp"
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0]
-          if (file) void handleFile(file)
-          e.target.value = ""
-        }}
-      />
-      {value ? (
-        <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-md border">
-          <img
-            src={value}
-            alt="Main"
-            className="h-full w-full object-cover"
-          />
-          <Button
-            type="button"
-            variant="destructive"
-            size="icon"
-            aria-label="Remove main photo"
-            className="absolute -top-2 -right-2 h-6 w-6"
-            onClick={() => onChange("")}
-          >
-            <X className="h-3 w-3" />
-          </Button>
-        </div>
-      ) : (
-        <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-md border border-dashed text-muted-foreground">
-          <ImageIcon className="h-6 w-6" />
-        </div>
-      )}
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={() => inputRef.current?.click()}
-        disabled={uploading}
-      >
-        {uploading ? (
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-        ) : (
-          <Upload className="mr-2 h-4 w-4" />
-        )}
-        {value ? "Replace photo" : "Upload photo"}
-      </Button>
-    </div>
-  )
-}
-
 // ---- Gallery ----
 
 interface GallerySectionProps {
@@ -251,7 +143,7 @@ function GallerySection({ venueId }: GallerySectionProps) {
   const queryClient = useQueryClient()
   const { showErrorToast, showSuccessToast } = useCustomToast()
   const inputRef = useRef<HTMLInputElement>(null)
-  const [uploading, setUploading] = useState(false)
+  const { uploadFile, isUploading } = useFileUpload()
 
   const { data: photos = [] } = useQuery({
     queryKey: ["event-venues", venueId, "photos"],
@@ -286,18 +178,11 @@ function GallerySection({ venueId }: GallerySectionProps) {
   })
 
   const handleFile = async (file: File) => {
-    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
-      showErrorToast("Only JPG, PNG or WebP images are allowed")
-      return
-    }
-    setUploading(true)
     try {
-      const url = await uploadImageViaPresigned(file)
-      addPhotoMutation.mutate(url)
+      const { publicUrl } = await uploadFile(file)
+      addPhotoMutation.mutate(publicUrl)
     } catch (err) {
       showErrorToast(err instanceof Error ? err.message : "Upload failed")
-    } finally {
-      setUploading(false)
     }
   }
 
@@ -336,11 +221,11 @@ function GallerySection({ venueId }: GallerySectionProps) {
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
-            disabled={uploading || isAtMax}
+            disabled={isUploading || isAtMax}
             className="flex h-24 w-24 shrink-0 flex-col items-center justify-center gap-1 rounded-md border border-dashed text-muted-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
             aria-label="Add photo"
           >
-            {uploading ? (
+            {isUploading ? (
               <Loader2 className="h-5 w-5 animate-spin" />
             ) : (
               <>
@@ -352,7 +237,7 @@ function GallerySection({ venueId }: GallerySectionProps) {
           <input
             ref={inputRef}
             type="file"
-            accept="image/jpeg,image/png,image/webp"
+            accept="image/jpeg,image/png,image/gif,image/webp"
             className="hidden"
             onChange={(e) => {
               const file = e.target.files?.[0]
@@ -1163,9 +1048,9 @@ export function VenueForm({ defaultValues, onSuccess }: VenueFormProps) {
         <div className="py-3">
           <form.Field name="image_url">
             {(field) => (
-              <MainPhotoUploader
-                value={field.state.value}
-                onChange={field.handleChange}
+              <ImageUpload
+                value={field.state.value || null}
+                onChange={(url) => field.handleChange(url ?? "")}
               />
             )}
           </form.Field>

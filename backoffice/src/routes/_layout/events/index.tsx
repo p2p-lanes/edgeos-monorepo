@@ -21,6 +21,7 @@ import { EventsService, EventVenuesService, type EventPublic } from "@/client"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
+import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -443,7 +444,7 @@ function EventsPage() {
           </Suspense>
         </QueryErrorBoundary>
       ) : (
-        <p className="text-muted-foreground">Select a pop-up from the sidebar to view events.</p>
+        <WorkspaceAlert resource="events" />
       )}
     </div>
   )
