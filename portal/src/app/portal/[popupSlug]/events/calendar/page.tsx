@@ -36,6 +36,7 @@ export default function CalendarPage() {
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date())
   const [rsvpedOnly, setRsvpedOnly] = useState(false)
+  const [search, setSearch] = useState("")
   const { timezone, formatTime, formatDayKey, formatGridDayKey } =
     useEventTimezone(city?.id)
 
@@ -52,6 +53,7 @@ export default function CalendarPage() {
       city?.id,
       format(currentMonth, "yyyy-MM"),
       rsvpedOnly,
+      search,
     ],
     queryFn: () =>
       EventsService.listPortalEvents({
@@ -60,6 +62,7 @@ export default function CalendarPage() {
         startAfter: startOfMonth(currentMonth).toISOString(),
         startBefore: endOfMonth(currentMonth).toISOString(),
         rsvpedOnly: rsvpedOnly || undefined,
+        search: search || undefined,
         limit: 200,
       }),
     enabled: !!city?.id,
@@ -108,7 +111,7 @@ export default function CalendarPage() {
 
   return (
     <div className="max-w-4xl mx-auto p-4 sm:p-6">
-      <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+      <div className="flex flex-col gap-3 mb-4">
         <div>
           <h1 className="text-xl font-bold">Calendar</h1>
           {timezone && (
@@ -120,6 +123,8 @@ export default function CalendarPage() {
         <EventsToolbar
           slug={city?.slug}
           view="calendar"
+          search={search}
+          onSearchChange={setSearch}
           rsvpedOnly={rsvpedOnly}
           onRsvpedOnlyChange={setRsvpedOnly}
           canCreate={eventSettings?.can_publish_event === "everyone"}

@@ -6,14 +6,18 @@ import {
   Layers,
   List,
   Plus,
+  Search,
 } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 
 interface EventsToolbarProps {
   slug: string | undefined
   view: "list" | "calendar"
+  search: string
+  onSearchChange: (value: string) => void
   rsvpedOnly: boolean
   onRsvpedOnlyChange: (value: boolean) => void
   canCreate: boolean
@@ -21,18 +25,30 @@ interface EventsToolbarProps {
 
 /**
  * Shared action bar used by the events list and calendar pages. Keeps the
- * filter + navigation controls in the same visual position so swapping
- * between views feels stable.
+ * search input AND the actions in identical positions across views so
+ * only the body below changes when you switch.
  */
 export function EventsToolbar({
   slug,
   view,
+  search,
+  onSearchChange,
   rsvpedOnly,
   onRsvpedOnlyChange,
   canCreate,
 }: EventsToolbarProps) {
   return (
     <div className="flex flex-wrap items-center gap-2">
+      <div className="relative flex-1 min-w-[200px]">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          value={search}
+          onChange={(e) => onSearchChange(e.target.value)}
+          placeholder="Search events..."
+          className="pl-9"
+        />
+      </div>
+
       <Button
         variant={rsvpedOnly ? "default" : "outline"}
         size="sm"

@@ -6,7 +6,6 @@ import {
   Clock,
   Filter,
   MapPin,
-  Search,
   Tag,
 } from "lucide-react"
 import Link from "next/link"
@@ -20,7 +19,6 @@ import {
   type EventVenuePublic,
 } from "@/client"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
 import { useCityProvider } from "@/providers/cityProvider"
 import { EventsToolbar } from "./lib/EventsToolbar"
 import { GoogleCalendarConnectionCard } from "./lib/GoogleCalendarConnectionCard"
@@ -125,19 +123,12 @@ export default function EventsPage() {
         <GoogleCalendarConnectionCard />
       </div>
 
-      <div className="flex-none mb-4 flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search events..."
-            className="pl-9"
-          />
-        </div>
+      <div className="flex-none mb-4">
         <EventsToolbar
           slug={city?.slug}
           view="list"
+          search={search}
+          onSearchChange={setSearch}
           rsvpedOnly={rsvpedOnly}
           onRsvpedOnlyChange={setRsvpedOnly}
           canCreate={eventSettings?.can_publish_event === "everyone"}
