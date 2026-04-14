@@ -1,6 +1,5 @@
 import { useForm } from "@tanstack/react-form"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import * as LucideIcons from "lucide-react"
 import {
   Calendar,
   Clock,
@@ -11,7 +10,8 @@ import {
   Trash2,
   X,
 } from "lucide-react"
-import type { ComponentType } from "react"
+
+import { resolveLucideIcon } from "@/lib/lucide-icon-map"
 import { useEffect, useMemo, useRef, useState } from "react"
 
 import {
@@ -1394,16 +1394,6 @@ function ChipsWithSuggestions({
   )
 }
 
-type LucideIconProps = { className?: string }
-
-function toPascalCase(s: string): string {
-  return s
-    .split(/[-_\s]+/)
-    .filter(Boolean)
-    .map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase())
-    .join("")
-}
-
 function LucideIconByName({
   name,
   className,
@@ -1411,22 +1401,7 @@ function LucideIconByName({
   name: string | null | undefined
   className?: string
 }) {
-  if (!name) return null
-  const raw = name.trim()
-  if (!raw) return null
-  const registry = LucideIcons as unknown as Record<
-    string,
-    ComponentType<LucideIconProps>
-  >
-  // Try as-is first (fast path for correct PascalCase), then normalize
-  // kebab-case / lowercase / snake_case (how lucide.dev lists them) to
-  // PascalCase.
-  const candidates = [raw, toPascalCase(raw)]
-  for (const key of candidates) {
-    const Icon = registry[key]
-    if (Icon && typeof Icon === "function") {
-      return <Icon className={className} />
-    }
-  }
-  return null
+  const Icon = resolveLucideIcon(name)
+  if (!Icon) return null
+  return <Icon className={className} />
 }
