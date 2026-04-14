@@ -85,6 +85,17 @@ export type ApplicationFeeCreate = {
 };
 
 /**
+ * Application pipeline as a funnel.
+ */
+export type ApplicationFunnel = {
+    draft?: number;
+    pending_fee?: number;
+    in_review?: number;
+    accepted?: number;
+    paid?: number;
+};
+
+/**
  * Application schema for API responses.
  */
 export type ApplicationPublic = {
@@ -247,6 +258,16 @@ export type AssociatedAttendee = {
     category: string;
     gender?: (string | null);
     email?: (string | null);
+};
+
+/**
+ * Accommodation attach rate per ticket type.
+ */
+export type AttachRateItem = {
+    ticket_type: string;
+    total_attendees?: number;
+    with_accommodation?: number;
+    rate?: string;
 };
 
 /**
@@ -483,6 +504,16 @@ export type CartUpdate = {
 };
 
 /**
+ * Aggregated breakdown by product category.
+ */
+export type CategoryBreakdown = {
+    category: string;
+    label: string;
+    quantity?: number;
+    revenue?: string;
+};
+
+/**
  * Schema for creating companion attendees (spouse/kids) during application.
  *
  * Used when submitting an application with family members.
@@ -562,6 +593,14 @@ export type CredentialInfo = {
 export type CredentialType = 'crud' | 'readonly';
 
 /**
+ * Time series for cumulative charts.
+ */
+export type CumulativeTrends = {
+    tickets?: Array<TimelinePoint>;
+    revenue?: Array<RevenueTimelinePoint>;
+};
+
+/**
  * Complete dashboard statistics.
  */
 export type DashboardStats = {
@@ -581,6 +620,25 @@ export type DirectoryProduct = {
     duration_type?: (string | null);
     start_date?: (string | null);
     end_date?: (string | null);
+};
+
+/**
+ * Ticket and accommodation distribution.
+ */
+export type Distribution = {
+    tickets_by_duration?: Array<DistributionItem>;
+    tickets_by_attendee_type?: Array<DistributionItem>;
+    accommodation_by_product?: Array<DistributionItem>;
+    accommodation_attach_rate?: Array<AttachRateItem>;
+};
+
+/**
+ * Single slice in a distribution chart.
+ */
+export type DistributionItem = {
+    label: string;
+    value?: number;
+    percentage?: string;
 };
 
 export type EmailTemplateCreate = {
@@ -612,205 +670,17 @@ export type EmailTemplateUpdate = {
 };
 
 /**
- * Event schema for creation.
+ * Full enriched dashboard response.
  */
-export type EventCreate = {
-    popup_id: string;
-    title: string;
-    content?: (string | null);
-    start_time: string;
-    end_time: string;
-    timezone?: string;
-    location?: (string | null);
-    geo_lat?: (number | null);
-    geo_lng?: (number | null);
-    cover_url?: (string | null);
-    meeting_url?: (string | null);
-    max_participant?: (number | null);
-    tags?: Array<(string)>;
-    venue_id?: (string | null);
-    require_approval?: boolean;
-    kind?: (string | null);
-    status?: EventStatus;
-};
-
-/**
- * Participant schema for creation (admin adding participant).
- */
-export type EventParticipantCreate = {
-    event_id: string;
-    profile_id: string;
-    role?: ParticipantRole;
-    message?: (string | null);
-};
-
-/**
- * Participant schema for API responses.
- */
-export type EventParticipantPublic = {
-    tenant_id: string;
-    event_id: string;
-    profile_id: string;
-    status?: ParticipantStatus;
-    role?: ParticipantRole;
-    check_time?: (string | null);
-    message?: (string | null);
-    registered_at?: string;
-    created_at?: string;
-    updated_at?: string;
-    id: string;
-};
-
-/**
- * Participant schema for updates.
- */
-export type EventParticipantUpdate = {
-    status?: (ParticipantStatus | null);
-    role?: (ParticipantRole | null);
-    message?: (string | null);
-};
-
-/**
- * Event schema for API responses.
- */
-export type EventPublic = {
-    tenant_id: string;
-    popup_id: string;
-    owner_id: string;
-    title: string;
-    content?: (string | null);
-    start_time: string;
-    end_time: string;
-    timezone?: string;
-    location?: (string | null);
-    geo_lat?: (number | null);
-    geo_lng?: (number | null);
-    cover_url?: (string | null);
-    meeting_url?: (string | null);
-    max_participant?: (number | null);
-    tags?: Array<(string)>;
-    venue_id?: (string | null);
-    require_approval?: boolean;
-    kind?: (string | null);
-    status?: EventStatus;
-    created_at?: string;
-    updated_at?: string;
-    id: string;
-};
-
-/**
- * Event settings schema for creation.
- */
-export type EventSettingsCreate = {
-    popup_id: string;
-    can_publish_event?: PublishPermission;
-    event_enabled?: boolean;
-    timezone?: string;
-};
-
-/**
- * Event settings schema for API responses.
- */
-export type EventSettingsPublic = {
-    tenant_id: string;
-    popup_id: string;
-    can_publish_event?: PublishPermission;
-    event_enabled?: boolean;
-    timezone?: string;
-    created_at?: string;
-    updated_at?: string;
-    id: string;
-};
-
-/**
- * Event settings schema for updates.
- */
-export type EventSettingsUpdate = {
-    can_publish_event?: (PublishPermission | null);
-    event_enabled?: (boolean | null);
-    timezone?: (string | null);
-};
-
-export type EventStatus = 'draft' | 'published' | 'cancelled';
-
-/**
- * Event schema for updates.
- */
-export type EventUpdate = {
-    title?: (string | null);
-    content?: (string | null);
-    start_time?: (string | null);
-    end_time?: (string | null);
-    timezone?: (string | null);
-    location?: (string | null);
-    geo_lat?: (number | null);
-    geo_lng?: (number | null);
-    cover_url?: (string | null);
-    meeting_url?: (string | null);
-    max_participant?: (number | null);
-    tags?: (Array<(string)> | null);
-    venue_id?: (string | null);
-    require_approval?: (boolean | null);
-    kind?: (string | null);
-    status?: (EventStatus | null);
-};
-
-/**
- * Venue schema for creation.
- */
-export type EventVenueCreate = {
-    popup_id: string;
-    title: string;
-    location?: (string | null);
-    formatted_address?: (string | null);
-    geo_lat?: (number | null);
-    geo_lng?: (number | null);
-    capacity?: (number | null);
-    start_date?: (string | null);
-    end_date?: (string | null);
-    amenities?: Array<(string)>;
-    tags?: Array<(string)>;
-    image_url?: (string | null);
-};
-
-/**
- * Venue schema for API responses.
- */
-export type EventVenuePublic = {
-    tenant_id: string;
-    popup_id: string;
-    owner_id: string;
-    title: string;
-    location?: (string | null);
-    formatted_address?: (string | null);
-    geo_lat?: (number | null);
-    geo_lng?: (number | null);
-    capacity?: (number | null);
-    start_date?: (string | null);
-    end_date?: (string | null);
-    amenities?: Array<(string)>;
-    tags?: Array<(string)>;
-    image_url?: (string | null);
-    created_at?: string;
-    updated_at?: string;
-    id: string;
-};
-
-/**
- * Venue schema for updates.
- */
-export type EventVenueUpdate = {
-    title?: (string | null);
-    location?: (string | null);
-    formatted_address?: (string | null);
-    geo_lat?: (number | null);
-    geo_lng?: (number | null);
-    capacity?: (number | null);
-    start_date?: (string | null);
-    end_date?: (string | null);
-    amenities?: (Array<(string)> | null);
-    tags?: (Array<(string)> | null);
-    image_url?: (string | null);
+export type EnrichedDashboardStats = {
+    key_metrics: KeyMetrics;
+    cumulative_trends: CumulativeTrends;
+    revenue_breakdown: RevenueBreakdown;
+    distribution: Distribution;
+    application_funnel: ApplicationFunnel;
+    applications: ApplicationStats;
+    attendees: AttendeeStats;
+    payments: PaymentStats;
 };
 
 export type FormFieldCreate = {
@@ -1116,6 +986,19 @@ export type HumanVerify = {
     code: string;
 };
 
+/**
+ * Top-level KPI cards with derived metrics.
+ */
+export type KeyMetrics = {
+    people?: number;
+    total_revenue?: string;
+    currency?: string;
+    avg_ticket_price?: string;
+    avg_revenue_per_person?: string;
+    accommodation_percentage?: string;
+    conversion_rate?: string;
+};
+
 export type ListModel = {
     results: Array<unknown>;
     paging: Paging;
@@ -1153,21 +1036,6 @@ export type ListModel_CouponPublic_ = {
 
 export type ListModel_EmailTemplatePublic_ = {
     results: Array<EmailTemplatePublic>;
-    paging: Paging;
-};
-
-export type ListModel_EventParticipantPublic_ = {
-    results: Array<EventParticipantPublic>;
-    paging: Paging;
-};
-
-export type ListModel_EventPublic_ = {
-    results: Array<EventPublic>;
-    paging: Paging;
-};
-
-export type ListModel_EventVenuePublic_ = {
-    results: Array<EventVenuePublic>;
     paging: Paging;
 };
 
@@ -1216,6 +1084,11 @@ export type ListModel_TenantPublic_ = {
     paging: Paging;
 };
 
+export type ListModel_TicketingStepPublic_ = {
+    results: Array<TicketingStepPublic>;
+    paging: Paging;
+};
+
 export type ListModel_UserPublic_ = {
     results: Array<UserPublic>;
     paging: Paging;
@@ -1233,10 +1106,6 @@ export type Paging = {
     offset: number;
     total: number;
 };
-
-export type ParticipantRole = 'host' | 'speaker' | 'attendee';
-
-export type ParticipantStatus = 'registered' | 'checked_in' | 'cancelled';
 
 /**
  * Schema for creating a payment.
@@ -1398,6 +1267,9 @@ export type PopupAdmin = {
     invoice_company_email?: (string | null);
     requires_application_fee?: boolean;
     application_fee_amount?: (string | null);
+    theme_config?: ({
+    [key: string]: unknown;
+} | null);
     id: string;
 };
 
@@ -1428,6 +1300,9 @@ export type PopupCreate = {
     invoice_company_email?: (string | null);
     requires_application_fee?: boolean;
     application_fee_amount?: (number | string | null);
+    theme_config?: ({
+    [key: string]: unknown;
+} | null);
 };
 
 /**
@@ -1456,6 +1331,9 @@ export type PopupPublic = {
     invoice_company_name?: (string | null);
     requires_application_fee?: boolean;
     application_fee_amount?: (string | null);
+    theme_config?: ({
+    [key: string]: unknown;
+} | null);
 };
 
 /**
@@ -1518,6 +1396,9 @@ export type PopupUpdate = {
     invoice_company_email?: (string | null);
     requires_application_fee?: (boolean | null);
     application_fee_amount?: (number | string | null);
+    theme_config?: ({
+    [key: string]: unknown;
+} | null);
 };
 
 /**
@@ -1585,7 +1466,7 @@ export type ProductBatchItem = {
     compare_price?: (number | string | null);
     description?: (string | null);
     image_url?: (string | null);
-    category?: ProductCategory;
+    category?: string;
     attendee_category?: (TicketAttendeeCategory | null);
     duration_type?: (TicketDuration | null);
     start_date?: (string | null);
@@ -1608,7 +1489,7 @@ export type ProductBatchResult = {
     compare_price?: (string | null);
     description?: (string | null);
     image_url?: (string | null);
-    category?: ProductCategory;
+    category?: string;
     attendee_category?: (TicketAttendeeCategory | null);
     duration_type?: (TicketDuration | null);
     start_date?: (string | null);
@@ -1624,9 +1505,15 @@ export type ProductBatchResult = {
 };
 
 /**
- * Product categories determining which fields are relevant.
+ * Revenue and quantity breakdown per product.
  */
-export type ProductCategory = 'ticket' | 'housing' | 'merch' | 'other' | 'patreon';
+export type ProductBreakdownItem = {
+    product_id: string;
+    product_name: string;
+    product_category: string;
+    quantity?: number;
+    revenue?: string;
+};
 
 /**
  * Product schema for creation.
@@ -1639,7 +1526,7 @@ export type ProductCreate = {
     compare_price?: (number | string | null);
     description?: (string | null);
     image_url?: (string | null);
-    category?: ProductCategory;
+    category?: string;
     attendee_category?: (TicketAttendeeCategory | null);
     duration_type?: (TicketDuration | null);
     start_date?: (string | null);
@@ -1662,7 +1549,7 @@ export type ProductPublic = {
     compare_price?: (string | null);
     description?: (string | null);
     image_url?: (string | null);
-    category?: ProductCategory;
+    category?: string;
     attendee_category?: (TicketAttendeeCategory | null);
     duration_type?: (TicketDuration | null);
     start_date?: (string | null);
@@ -1684,7 +1571,7 @@ export type ProductUpdate = {
     compare_price?: (number | string | null);
     description?: (string | null);
     image_url?: (string | null);
-    category?: (ProductCategory | null);
+    category?: (string | null);
     attendee_category?: (TicketAttendeeCategory | null);
     duration_type?: (TicketDuration | null);
     start_date?: (string | null);
@@ -1707,7 +1594,7 @@ export type ProductWithQuantity = {
     compare_price?: (string | null);
     description?: (string | null);
     image_url?: (string | null);
-    category?: ProductCategory;
+    category?: string;
     attendee_category?: (TicketAttendeeCategory | null);
     duration_type?: (TicketDuration | null);
     start_date?: (string | null);
@@ -1720,14 +1607,21 @@ export type ProductWithQuantity = {
     quantity?: number;
 };
 
-export type PublishPermission = 'admin_only' | 'everyone';
+/**
+ * Revenue split by product and category.
+ */
+export type RevenueBreakdown = {
+    by_product?: Array<ProductBreakdownItem>;
+    by_category?: Array<CategoryBreakdown>;
+};
 
 /**
- * Request body for self-registration.
+ * Single data point for revenue time series.
  */
-export type RegisterRequest = {
-    role?: ParticipantRole;
-    message?: (string | null);
+export type RevenueTimelinePoint = {
+    date: string;
+    value?: string;
+    cumulative?: string;
 };
 
 /**
@@ -1845,6 +1739,58 @@ export type TicketAttendeeCategory = 'main' | 'spouse' | 'kid';
  */
 export type TicketDuration = 'day' | 'week' | 'month' | 'full';
 
+export type TicketingStepCreate = {
+    popup_id: string;
+    step_type: string;
+    title: string;
+    description?: (string | null);
+    order?: number;
+    is_enabled?: boolean;
+    product_category?: (string | null);
+    template?: (string | null);
+    template_config?: ({
+    [key: string]: unknown;
+} | null);
+    watermark?: (string | null);
+    show_title?: boolean;
+    show_watermark?: boolean;
+};
+
+export type TicketingStepPublic = {
+    id: string;
+    tenant_id: string;
+    popup_id: string;
+    step_type: string;
+    title: string;
+    description?: (string | null);
+    order?: number;
+    is_enabled?: boolean;
+    protected?: boolean;
+    product_category?: (string | null);
+    template?: (string | null);
+    template_config?: ({
+    [key: string]: unknown;
+} | null);
+    watermark?: (string | null);
+    show_title?: boolean;
+    show_watermark?: boolean;
+};
+
+export type TicketingStepUpdate = {
+    title?: (string | null);
+    description?: (string | null);
+    order?: (number | null);
+    is_enabled?: (boolean | null);
+    product_category?: (string | null);
+    template?: (string | null);
+    template_config?: ({
+    [key: string]: unknown;
+} | null);
+    watermark?: (string | null);
+    show_title?: (boolean | null);
+    show_watermark?: (boolean | null);
+};
+
 /**
  * Minimal product data for tickets.
  */
@@ -1854,6 +1800,15 @@ export type TicketProduct = {
     start_date?: (string | null);
     end_date?: (string | null);
     quantity?: number;
+};
+
+/**
+ * Single data point in a time series.
+ */
+export type TimelinePoint = {
+    date: string;
+    value?: number;
+    cumulative?: number;
 };
 
 export type Token = {
@@ -2333,6 +2288,16 @@ export type DashboardGetDashboardStatsData = {
 
 export type DashboardGetDashboardStatsResponse = (DashboardStats);
 
+export type DashboardGetEnrichedDashboardData = {
+    /**
+     * Popup ID to get stats for
+     */
+    popupId: string;
+    xTenantId?: (string | null);
+};
+
+export type DashboardGetEnrichedDashboardResponse = (EnrichedDashboardStats);
+
 export type EmailTemplatesListTemplateTypesResponse = (Array<TemplateTypeInfo>);
 
 export type EmailTemplatesGetDefaultTemplateData = {
@@ -2402,265 +2367,6 @@ export type EmailTemplatesDeleteEmailTemplateData = {
 };
 
 export type EmailTemplatesDeleteEmailTemplateResponse = (void);
-
-export type EventParticipantsListParticipantsData = {
-    eventId?: (string | null);
-    /**
-     * Maximum number of items to return
-     */
-    limit?: number;
-    /**
-     * Number of items to skip
-     */
-    skip?: number;
-    xTenantId?: (string | null);
-};
-
-export type EventParticipantsListParticipantsResponse = (ListModel_EventParticipantPublic_);
-
-export type EventParticipantsAdminAddParticipantData = {
-    requestBody: EventParticipantCreate;
-    xTenantId?: (string | null);
-};
-
-export type EventParticipantsAdminAddParticipantResponse = (EventParticipantPublic);
-
-export type EventParticipantsUpdateParticipantData = {
-    participantId: string;
-    requestBody: EventParticipantUpdate;
-    xTenantId?: (string | null);
-};
-
-export type EventParticipantsUpdateParticipantResponse = (EventParticipantPublic);
-
-export type EventParticipantsDeleteParticipantData = {
-    participantId: string;
-    xTenantId?: (string | null);
-};
-
-export type EventParticipantsDeleteParticipantResponse = (void);
-
-export type EventParticipantsListPortalParticipantsData = {
-    eventId: string;
-    /**
-     * Maximum number of items to return
-     */
-    limit?: number;
-    /**
-     * Number of items to skip
-     */
-    skip?: number;
-};
-
-export type EventParticipantsListPortalParticipantsResponse = (ListModel_EventParticipantPublic_);
-
-export type EventParticipantsRegisterForEventData = {
-    eventId: string;
-    requestBody?: (RegisterRequest | null);
-};
-
-export type EventParticipantsRegisterForEventResponse = (EventParticipantPublic);
-
-export type EventParticipantsCancelRegistrationData = {
-    eventId: string;
-};
-
-export type EventParticipantsCancelRegistrationResponse = (EventParticipantPublic);
-
-export type EventParticipantsCheckInData = {
-    eventId: string;
-};
-
-export type EventParticipantsCheckInResponse = (EventParticipantPublic);
-
-export type EventsListEventsData = {
-    eventStatus?: (EventStatus | null);
-    kind?: (string | null);
-    /**
-     * Maximum number of items to return
-     */
-    limit?: number;
-    popupId?: (string | null);
-    search?: (string | null);
-    /**
-     * Number of items to skip
-     */
-    skip?: number;
-    startAfter?: (string | null);
-    startBefore?: (string | null);
-    xTenantId?: (string | null);
-};
-
-export type EventsListEventsResponse = (ListModel_EventPublic_);
-
-export type EventsCreateEventData = {
-    requestBody: EventCreate;
-    xTenantId?: (string | null);
-};
-
-export type EventsCreateEventResponse = (EventPublic);
-
-export type EventsGetEventData = {
-    eventId: string;
-    xTenantId?: (string | null);
-};
-
-export type EventsGetEventResponse = (EventPublic);
-
-export type EventsUpdateEventData = {
-    eventId: string;
-    requestBody: EventUpdate;
-    xTenantId?: (string | null);
-};
-
-export type EventsUpdateEventResponse = (EventPublic);
-
-export type EventsDeleteEventData = {
-    eventId: string;
-    xTenantId?: (string | null);
-};
-
-export type EventsDeleteEventResponse = (void);
-
-export type EventsCancelEventData = {
-    eventId: string;
-    xTenantId?: (string | null);
-};
-
-export type EventsCancelEventResponse = (EventPublic);
-
-export type EventsListPortalEventsData = {
-    eventStatus?: (EventStatus | null);
-    kind?: (string | null);
-    /**
-     * Maximum number of items to return
-     */
-    limit?: number;
-    popupId?: (string | null);
-    search?: (string | null);
-    /**
-     * Number of items to skip
-     */
-    skip?: number;
-    startAfter?: (string | null);
-    startBefore?: (string | null);
-};
-
-export type EventsListPortalEventsResponse = (ListModel_EventPublic_);
-
-export type EventsCreatePortalEventData = {
-    requestBody: EventCreate;
-};
-
-export type EventsCreatePortalEventResponse = (EventPublic);
-
-export type EventsGetPortalEventData = {
-    eventId: string;
-};
-
-export type EventsGetPortalEventResponse = (EventPublic);
-
-export type EventsUpdatePortalEventData = {
-    eventId: string;
-    requestBody: EventUpdate;
-};
-
-export type EventsUpdatePortalEventResponse = (EventPublic);
-
-export type EventSettingsGetEventSettingsData = {
-    popupId: string;
-    xTenantId?: (string | null);
-};
-
-export type EventSettingsGetEventSettingsResponse = (EventSettingsPublic);
-
-export type EventSettingsUpsertEventSettingsData = {
-    popupId: string;
-    requestBody: EventSettingsCreate;
-    xTenantId?: (string | null);
-};
-
-export type EventSettingsUpsertEventSettingsResponse = (EventSettingsPublic);
-
-export type EventSettingsUpdateEventSettingsData = {
-    popupId: string;
-    requestBody: EventSettingsUpdate;
-    xTenantId?: (string | null);
-};
-
-export type EventSettingsUpdateEventSettingsResponse = (EventSettingsPublic);
-
-export type EventSettingsGetPortalEventSettingsData = {
-    popupId: string;
-};
-
-export type EventSettingsGetPortalEventSettingsResponse = ((EventSettingsPublic | null));
-
-export type EventVenuesListVenuesData = {
-    /**
-     * Maximum number of items to return
-     */
-    limit?: number;
-    popupId?: (string | null);
-    search?: (string | null);
-    /**
-     * Number of items to skip
-     */
-    skip?: number;
-    xTenantId?: (string | null);
-};
-
-export type EventVenuesListVenuesResponse = (ListModel_EventVenuePublic_);
-
-export type EventVenuesCreateVenueData = {
-    requestBody: EventVenueCreate;
-    xTenantId?: (string | null);
-};
-
-export type EventVenuesCreateVenueResponse = (EventVenuePublic);
-
-export type EventVenuesGetVenueData = {
-    venueId: string;
-    xTenantId?: (string | null);
-};
-
-export type EventVenuesGetVenueResponse = (EventVenuePublic);
-
-export type EventVenuesUpdateVenueData = {
-    requestBody: EventVenueUpdate;
-    venueId: string;
-    xTenantId?: (string | null);
-};
-
-export type EventVenuesUpdateVenueResponse = (EventVenuePublic);
-
-export type EventVenuesDeleteVenueData = {
-    venueId: string;
-    xTenantId?: (string | null);
-};
-
-export type EventVenuesDeleteVenueResponse = (void);
-
-export type EventVenuesListPortalVenuesData = {
-    /**
-     * Maximum number of items to return
-     */
-    limit?: number;
-    popupId: string;
-    search?: (string | null);
-    /**
-     * Number of items to skip
-     */
-    skip?: number;
-};
-
-export type EventVenuesListPortalVenuesResponse = (ListModel_EventVenuePublic_);
-
-export type EventVenuesCreatePortalVenueData = {
-    requestBody: EventVenueCreate;
-};
-
-export type EventVenuesCreatePortalVenueResponse = (EventVenuePublic);
 
 export type FormFieldsListFormFieldsData = {
     /**
@@ -3107,8 +2813,14 @@ export type PopupsGetPortalPopupData = {
 
 export type PopupsGetPortalPopupResponse = (PopupPublic);
 
+export type ProductsListProductCategoriesData = {
+    popupId: string;
+};
+
+export type ProductsListProductCategoriesResponse = (Array<(string)>);
+
 export type ProductsListProductsData = {
-    category?: (ProductCategory | null);
+    category?: (string | null);
     isActive?: (boolean | null);
     /**
      * Maximum number of items to return
@@ -3164,7 +2876,7 @@ export type ProductsDeleteProductData = {
 export type ProductsDeleteProductResponse = (void);
 
 export type ProductsListPortalProductsData = {
-    category?: (ProductCategory | null);
+    category?: (string | null);
     isActive?: (boolean | null);
     /**
      * Maximum number of items to return
@@ -3241,6 +2953,56 @@ export type TenantsDeleteCredentialsData = {
 };
 
 export type TenantsDeleteCredentialsResponse = (void);
+
+export type TicketingStepsListPortalTicketingStepsData = {
+    popupId: string;
+};
+
+export type TicketingStepsListPortalTicketingStepsResponse = (ListModel_TicketingStepPublic_);
+
+export type TicketingStepsListTicketingStepsData = {
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    popupId?: (string | null);
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+    xTenantId?: (string | null);
+};
+
+export type TicketingStepsListTicketingStepsResponse = (ListModel_TicketingStepPublic_);
+
+export type TicketingStepsCreateTicketingStepData = {
+    requestBody: TicketingStepCreate;
+    xTenantId?: (string | null);
+};
+
+export type TicketingStepsCreateTicketingStepResponse = (TicketingStepPublic);
+
+export type TicketingStepsGetTicketingStepData = {
+    stepId: string;
+    xTenantId?: (string | null);
+};
+
+export type TicketingStepsGetTicketingStepResponse = (TicketingStepPublic);
+
+export type TicketingStepsUpdateTicketingStepData = {
+    requestBody: TicketingStepUpdate;
+    stepId: string;
+    xTenantId?: (string | null);
+};
+
+export type TicketingStepsUpdateTicketingStepResponse = (TicketingStepPublic);
+
+export type TicketingStepsDeleteTicketingStepData = {
+    stepId: string;
+    xTenantId?: (string | null);
+};
+
+export type TicketingStepsDeleteTicketingStepResponse = (void);
 
 export type UploadsGetPresignedUploadUrlData = {
     requestBody: PresignedUrlRequest;

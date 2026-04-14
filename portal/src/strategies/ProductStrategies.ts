@@ -1,3 +1,4 @@
+import { supportsQuantitySelector } from "@/components/ui/QuantitySelector"
 import {
   getPriceStrategy,
   type PriceStrategy,
@@ -85,27 +86,42 @@ class MonthProductStrategy implements ProductStrategy {
     attendeeId: string,
     product: ProductsPass,
   ): AttendeePassState[] {
-    const isMonthSelected = product?.selected
-    const willSelectMonth = !isMonthSelected
+    const isMultiUnit = supportsQuantitySelector(product.max_quantity)
+    // For multi-unit products, the caller passes the NEW desired quantity in
+    // `product.quantity`. The selection is active when quantity > 0.
+    const willSelectMonth = isMultiUnit
+      ? (product.quantity ?? 0) > 0
+      : !product?.selected
 
     return attendees.map((attendee) => {
       if (attendee.id !== attendeeId) return attendee
 
       return {
         ...attendee,
-        products: attendee.products.map((p) => ({
-          ...p,
-          selected:
-            p.id === product.id
-              ? !p.selected
-              : p.duration_type === "week" && !p.purchased && willSelectMonth
+        products: attendee.products.map((p) => {
+          if (p.id === product.id) {
+            if (isMultiUnit) {
+              const nextQuantity = Math.max(0, product.quantity ?? 0)
+              return {
+                ...p,
+                quantity: nextQuantity,
+                selected: nextQuantity > 0,
+              }
+            }
+            return { ...p, selected: !p.selected }
+          }
+          return {
+            ...p,
+            selected:
+              p.duration_type === "week" && !p.purchased && willSelectMonth
                 ? false
                 : p.selected,
-          quantity:
-            p.duration_type === "day" && !p.purchased && willSelectMonth
-              ? 0
-              : p.quantity,
-        })),
+            quantity:
+              p.duration_type === "day" && !p.purchased && willSelectMonth
+                ? 0
+                : p.quantity,
+          }
+        }),
       }
     })
   }
@@ -138,20 +154,34 @@ class WeekProductStrategy implements ProductStrategy {
     attendeeId: string,
     product: ProductsPass,
   ): AttendeePassState[] {
+    const isMultiUnit = supportsQuantitySelector(product.max_quantity)
+
     return attendees.map((attendee) => {
       if (attendee.id !== attendeeId) return attendee
 
-      const willBeSelected = !product.selected
+      const willBeSelected = isMultiUnit
+        ? (product.quantity ?? 0) > 0
+        : !product.selected
       const monthProduct = attendee.products.find(
         (p) => p.duration_type === "month",
       )
 
-      const updatedProducts = attendee.products.map((p) => ({
-        ...p,
-        selected: p.id === product.id ? willBeSelected : p.selected,
-        edit:
-          p.id === product.id ? product.purchased && willBeSelected : p.edit,
-      }))
+      const updatedProducts = attendee.products.map((p) => {
+        if (p.id !== product.id) return p
+        if (isMultiUnit) {
+          const nextQuantity = Math.max(0, product.quantity ?? 0)
+          return {
+            ...p,
+            quantity: nextQuantity,
+            selected: nextQuantity > 0,
+          }
+        }
+        return {
+          ...p,
+          selected: willBeSelected,
+          edit: product.purchased && willBeSelected ? true : p.edit,
+        }
+      })
 
       const activeWeeks = this.countActiveWeeks(updatedProducts)
       const hasEdited = this.hasEditedWeeks(updatedProducts)
@@ -188,15 +218,25 @@ class FullProductStrategy implements ProductStrategy {
     attendeeId: string,
     product: ProductsPass,
   ): AttendeePassState[] {
+    const isMultiUnit = supportsQuantitySelector(product.max_quantity)
+
     return attendees.map((attendee) => {
       if (attendee.id !== attendeeId) return attendee
 
       return {
         ...attendee,
-        products: attendee.products.map((p) => ({
-          ...p,
-          selected: p.id === product.id ? !p.selected : p.selected,
-        })),
+        products: attendee.products.map((p) => {
+          if (p.id !== product.id) return p
+          if (isMultiUnit) {
+            const nextQuantity = Math.max(0, product.quantity ?? 0)
+            return {
+              ...p,
+              quantity: nextQuantity,
+              selected: nextQuantity > 0,
+            }
+          }
+          return { ...p, selected: !p.selected }
+        }),
       }
     })
   }

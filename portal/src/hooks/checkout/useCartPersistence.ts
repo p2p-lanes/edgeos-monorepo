@@ -39,6 +39,7 @@ interface UseCartPersistenceParams {
   cityId: string | null
   initialStep: CheckoutStep
   products: ProductsPass[]
+  housingPricePerDay: boolean
   /** Ref to the latest selection state — updated by the provider each render */
   selectionStateRef: MutableRefObject<CartSelectionState>
   restorationSetters: RestorationSetters
@@ -50,6 +51,7 @@ export function useCartPersistence({
   cityId,
   initialStep,
   products,
+  housingPricePerDay,
   selectionStateRef,
   restorationSetters,
   hasRestoredCheckoutRef,
@@ -76,6 +78,7 @@ export function useCartPersistence({
             product_id: s.housing.productId,
             check_in: s.housing.checkIn,
             check_out: s.housing.checkOut,
+            quantity: s.housing.quantity,
           }
         : null,
       merch: s.merch.map((m) => ({
@@ -173,6 +176,12 @@ export function useCartPersistence({
           1,
           Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)),
         )
+        const savedQuantity = savedCart.housing.quantity ?? 1
+        const maxQty = product.max_quantity ?? Number.POSITIVE_INFINITY
+        const quantity = Math.max(1, Math.min(savedQuantity, maxQty))
+        const basePrice = housingPricePerDay
+          ? product.price * nights
+          : product.price
         setHousing({
           productId: product.id,
           product,
@@ -180,7 +189,9 @@ export function useCartPersistence({
           checkOut: savedCart.housing.check_out,
           nights,
           pricePerNight: product.price,
-          totalPrice: product.price * nights,
+          totalPrice: basePrice * quantity,
+          pricePerDay: housingPricePerDay,
+          quantity,
         })
       }
     }
@@ -241,6 +252,7 @@ export function useCartPersistence({
     queryClient.invalidateQueries,
     queryClient.setQueryData,
     restorationSetters,
+    housingPricePerDay,
   ])
 
   // --- Save on page visibility change (tab switch / minimize) ---

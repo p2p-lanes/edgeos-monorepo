@@ -1,7 +1,7 @@
 """Add events module tables: events, event_participants, event_venues, event_settings.
 
-Revision ID: 0024_events_module
-Revises: 0023_application_fee
+Revision ID: 0030_events_module
+Revises: 0029_show_title_watermark
 Create Date: 2026-04-09
 
 """
@@ -13,8 +13,8 @@ from sqlalchemy.dialects import postgresql
 from app.alembic.utils import add_tenant_table_permissions, remove_tenant_table_permissions
 
 # revision identifiers, used by Alembic.
-revision = "0024_events_module"
-down_revision = "0023_application_fee"
+revision = "0030_events_module"
+down_revision = "0029_show_title_watermark"
 branch_labels = None
 depends_on = None
 

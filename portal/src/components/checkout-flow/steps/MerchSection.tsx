@@ -1,9 +1,12 @@
 "use client"
 
-import { Info, Minus, Plus, ShoppingBag, X } from "lucide-react"
+import { Check, Plus, ShoppingBag } from "lucide-react"
 import Image from "next/image"
-import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import ExpandableDescription from "@/components/ui/ExpandableDescription"
+import QuantitySelector, {
+  supportsQuantitySelector,
+} from "@/components/ui/QuantitySelector"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
 import { formatCurrency } from "@/types/checkout"
@@ -58,16 +61,6 @@ export default function MerchSection({ onSkip }: MerchSectionProps) {
           />
         ))}
       </div>
-
-      <div className="text-center py-2">
-        <button
-          type="button"
-          onClick={handleSkip}
-          className="text-gray-500 hover:text-gray-700 underline text-sm transition-colors"
-        >
-          Skip merchandise
-        </button>
-      </div>
     </div>
   )
 }
@@ -79,7 +72,6 @@ interface MerchItemProps {
 }
 
 function MerchItem({ product, quantity, onQuantityChange }: MerchItemProps) {
-  const [activeTooltip, setActiveTooltip] = useState(false)
   const hasQuantity = quantity > 0
   const hasDiscount =
     product.compare_price != null && product.compare_price > product.price
@@ -93,10 +85,10 @@ function MerchItem({ product, quantity, onQuantityChange }: MerchItemProps) {
     >
       {/* Desktop layout */}
       <div className="hidden md:flex items-center gap-3">
-        <QuantityControls
+        <MerchQtyControl
+          product={product}
           quantity={quantity}
-          onIncrement={() => onQuantityChange(quantity + 1)}
-          onDecrement={() => onQuantityChange(Math.max(0, quantity - 1))}
+          onQuantityChange={onQuantityChange}
         />
         <div className="relative w-14 h-14 shrink-0 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center">
           {product.image_url ? (
@@ -111,23 +103,13 @@ function MerchItem({ product, quantity, onQuantityChange }: MerchItemProps) {
           )}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1">
-            <h3 className="font-medium text-gray-900 text-sm">
-              {product.name}
-            </h3>
-            {product.description && (
-              <Tooltip
-                content={product.description}
-                isActive={activeTooltip}
-                onToggle={() => setActiveTooltip(!activeTooltip)}
-                onClose={() => setActiveTooltip(false)}
-              />
-            )}
-          </div>
+          <h3 className="font-medium text-gray-900 text-sm">{product.name}</h3>
           {product.description && (
-            <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">
-              {product.description}
-            </p>
+            <ExpandableDescription
+              text={product.description}
+              clamp={2}
+              className="text-xs text-gray-500 mt-0.5"
+            />
           )}
         </div>
         <PriceDisplay
@@ -155,22 +137,16 @@ function MerchItem({ product, quantity, onQuantityChange }: MerchItemProps) {
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1 mb-0.5">
-              <h3 className="font-semibold text-gray-900 text-sm">
-                {product.name}
-              </h3>
-              {product.description && (
-                <Tooltip
-                  content={product.description}
-                  isActive={activeTooltip}
-                  onToggle={() => setActiveTooltip(!activeTooltip)}
-                  onClose={() => setActiveTooltip(false)}
-                />
-              )}
-            </div>
-            <p className="text-xs text-gray-500 line-clamp-2">
-              {product.description}
-            </p>
+            <h3 className="font-semibold text-gray-900 text-sm mb-0.5">
+              {product.name}
+            </h3>
+            {product.description && (
+              <ExpandableDescription
+                text={product.description}
+                clamp={2}
+                className="text-xs text-gray-500"
+              />
+            )}
             {hasDiscount && product.compare_price != null && (
               <div className="flex items-center gap-1.5 mt-1">
                 <span className="text-xs text-gray-400 line-through">
@@ -184,10 +160,10 @@ function MerchItem({ product, quantity, onQuantityChange }: MerchItemProps) {
           </div>
         </div>
         <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-          <QuantityControls
+          <MerchQtyControl
+            product={product}
             quantity={quantity}
-            onIncrement={() => onQuantityChange(quantity + 1)}
-            onDecrement={() => onQuantityChange(Math.max(0, quantity - 1))}
+            onQuantityChange={onQuantityChange}
           />
           <div className="text-right">
             {hasQuantity && quantity > 1 && (
@@ -212,95 +188,59 @@ function MerchItem({ product, quantity, onQuantityChange }: MerchItemProps) {
   )
 }
 
-interface QuantityControlsProps {
+interface MerchQtyControlProps {
+  product: ProductsPass
   quantity: number
-  onIncrement: () => void
-  onDecrement: () => void
+  onQuantityChange: (qty: number) => void
 }
 
-function QuantityControls({
+function MerchQtyControl({
+  product,
   quantity,
-  onIncrement,
-  onDecrement,
-}: QuantityControlsProps) {
+  onQuantityChange,
+}: MerchQtyControlProps) {
+  const showStepper = supportsQuantitySelector(product.max_quantity)
+  const max = product.max_quantity ?? Number.POSITIVE_INFINITY
+
+  if (showStepper) {
+    return (
+      <QuantitySelector
+        size="md"
+        value={quantity}
+        min={0}
+        max={max}
+        onIncrement={() => onQuantityChange(quantity + 1)}
+        onDecrement={() => onQuantityChange(Math.max(0, quantity - 1))}
+        onAdd={() => onQuantityChange(1)}
+      />
+    )
+  }
+
+  const isAdded = quantity > 0
   return (
-    <div className="flex items-center gap-1">
-      <button
-        type="button"
-        onClick={onDecrement}
-        disabled={quantity === 0}
-        aria-label="Decrease quantity"
-        className={cn(
-          "w-7 h-7 rounded-lg flex items-center justify-center transition-all",
-          quantity === 0
-            ? "text-gray-300 cursor-not-allowed"
-            : "text-gray-500 hover:text-gray-700 hover:bg-gray-100",
-        )}
-      >
-        <Minus className="w-4 h-4" />
-      </button>
-      <span
-        className={cn(
-          "w-6 text-center font-semibold text-sm",
-          quantity > 0 ? "text-blue-600" : "text-gray-400",
-        )}
-      >
-        {quantity}
-      </span>
-      <button
-        type="button"
-        onClick={onIncrement}
-        aria-label="Increase quantity"
-        className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-all"
-      >
-        <Plus className="w-4 h-4" />
-      </button>
-    </div>
-  )
-}
-
-interface TooltipProps {
-  content: string
-  isActive: boolean
-  onToggle: () => void
-  onClose: () => void
-}
-
-function Tooltip({ content, isActive, onToggle, onClose }: TooltipProps) {
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
-        aria-label="More info"
-      >
-        <Info className="w-4 h-4" />
-      </button>
-
-      {isActive && (
+    <button
+      type="button"
+      onClick={() => onQuantityChange(isAdded ? 0 : 1)}
+      aria-label={isAdded ? "Remove from cart" : "Add to cart"}
+      className={cn(
+        "h-8 px-3 rounded-lg text-xs font-semibold transition-all flex items-center gap-1",
+        isAdded
+          ? "bg-blue-600 text-white hover:bg-blue-700"
+          : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50",
+      )}
+    >
+      {isAdded ? (
         <>
-          <button
-            type="button"
-            aria-label="Close tooltip"
-            className="fixed inset-0 z-40 sm:hidden cursor-default"
-            onClick={onClose}
-          />
-          <div className="absolute z-50 left-1/2 -translate-x-1/2 top-full mt-1 w-64 p-3 bg-gray-900 text-white text-xs rounded-lg shadow-xl">
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close tooltip"
-              className="absolute top-1 right-1 p-1 text-gray-400 hover:text-white sm:hidden"
-            >
-              <X className="w-3 h-3" />
-            </button>
-            <p className="leading-relaxed pr-4 sm:pr-0">{content}</p>
-            <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-gray-900 rotate-45" />
-          </div>
+          <Check className="w-3.5 h-3.5" />
+          Added
+        </>
+      ) : (
+        <>
+          <Plus className="w-3.5 h-3.5" />
+          Add
         </>
       )}
-    </div>
+    </button>
   )
 }
 

@@ -136,13 +136,13 @@ const AttendeeTicket = ({
             <div className="relative z-10 h-full flex flex-col justify-between">
               <div className="flex justify-between items-start">
                 <div>
-                  <h2 className="text-xl font-bold text-gray-900">
+                  <h2 className="text-xl font-bold text-pass-title">
                     {city?.name}
                   </h2>
-                  <p className="text-gray-500 text-sm mt-1 lg:mt-2">
+                  <p className="text-pass-text text-sm mt-1 lg:mt-2">
                     {attendee.name}
                   </p>
-                  <div className="flex items-center gap-2 mt-0.5 lg:mt-1 text-gray-500 text-sm">
+                  <div className="flex items-center gap-2 mt-0.5 lg:mt-1 text-pass-text text-sm">
                     <User className="w-3 h-3" />
                     <span>
                       {(badgeName as Record<string, string>)[
@@ -168,8 +168,8 @@ const AttendeeTicket = ({
 
           {/* Desktop vertical divider with hole punches */}
           <div className="hidden lg:block border-r-2 border-dashed border-gray-200 self-stretch relative">
-            <div className="absolute -top-[23px] -left-[23px] w-[48px] h-[46px] bg-[#F5F5F7] rounded-full" />
-            <div className="absolute -bottom-[23px] -left-[23px] w-[48px] h-[46px] bg-[#F5F5F7] rounded-full" />
+            <div className="absolute -top-[23px] -left-[23px] w-[48px] h-[46px] bg-background rounded-full" />
+            <div className="absolute -bottom-[23px] -left-[23px] w-[48px] h-[46px] bg-background rounded-full" />
           </div>
 
           {/* Right panel */}
@@ -196,12 +196,12 @@ const AttendeeTicket = ({
               </p>
             ) : !toggleProduct && !hasPurchased ? (
               /* View mode - no purchased passes */
-              <p className="text-gray-500 max-w-xs lg:max-w-sm leading-relaxed">
+              <p className="text-pass-text max-w-xs lg:max-w-sm leading-relaxed">
                 You do not yet have any passes for {city?.name}, please go to{" "}
                 <button
                   type="button"
                   onClick={onSwitchToBuy}
-                  className="font-bold text-gray-900 hover:underline cursor-pointer"
+                  className="font-bold text-pass-title hover:underline cursor-pointer"
                 >
                   Buy Passes
                 </button>{" "}
@@ -220,13 +220,13 @@ const AttendeeTicket = ({
                           "border-b border-dotted border-gray-300",
                       )}
                     >
-                      <Ticket className="w-4 h-4 lg:w-5 lg:h-5 text-gray-700 flex-shrink-0" />
+                      <Ticket className="w-4 h-4 lg:w-5 lg:h-5 text-pass-text flex-shrink-0" />
                       <div className="flex items-baseline gap-1.5 flex-1 min-w-0">
-                        <span className="font-bold text-gray-900 text-sm lg:text-base whitespace-nowrap">
+                        <span className="font-bold text-pass-title text-sm lg:text-base whitespace-nowrap">
                           {pass.name}
                         </span>
                         {pass.start_date && pass.end_date && (
-                          <span className="text-gray-500 text-xs lg:text-sm truncate">
+                          <span className="text-pass-text text-xs lg:text-sm truncate">
                             {new Date(pass.start_date).toLocaleDateString(
                               "en-US",
                               { month: "short", day: "numeric" },
@@ -246,7 +246,7 @@ const AttendeeTicket = ({
                 <button
                   type="button"
                   onClick={handleOpenQrModal}
-                  className="flex items-center gap-1.5 mt-3 justify-end lg:absolute lg:bottom-6 lg:right-6 lg:mt-0 text-xs font-medium text-gray-400 uppercase tracking-wider hover:text-gray-600 transition-colors cursor-pointer"
+                  className="flex items-center gap-1.5 mt-3 justify-end lg:absolute lg:bottom-6 lg:right-6 lg:mt-0 text-xs font-medium text-pass-text uppercase tracking-wider hover:text-pass-title transition-colors cursor-pointer"
                 >
                   <span>Check-in code</span>
                   <QrCode className="w-4 h-4" />

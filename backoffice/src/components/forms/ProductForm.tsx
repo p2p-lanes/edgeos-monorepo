@@ -1,5 +1,5 @@
 import { useForm } from "@tanstack/react-form"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import {
   Calendar,
@@ -7,12 +7,13 @@ import {
   CloudRain,
   DollarSign,
   Hash,
+  Plus,
   Power,
   Shield,
   Users,
 } from "lucide-react"
+import { useMemo, useState } from "react"
 import {
-  type ProductCategory,
   type ProductCreate,
   type ProductPublic,
   ProductsService,
@@ -20,11 +21,21 @@ import {
   type TicketAttendeeCategory,
   type TicketDuration,
 } from "@/client"
+
+type ProductCategory = string
+
 import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { ImageUpload } from "@/components/ui/image-upload"
 import {
   HeroInput,
@@ -96,6 +107,28 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
   const { isAdmin } = useAuth()
   const isEdit = !!defaultValues
   const readOnly = !isAdmin
+
+  const [addCategoryOpen, setAddCategoryOpen] = useState(false)
+  const [newCategoryName, setNewCategoryName] = useState("")
+  const [customCategories, setCustomCategories] = useState<string[]>([])
+
+  const popupId = defaultValues?.popup_id ?? selectedPopupId
+  const { data: apiCategories } = useQuery({
+    queryKey: ["product-categories", popupId],
+    queryFn: () => ProductsService.listProductCategories({ popupId: popupId! }),
+    enabled: !!popupId,
+  })
+
+  // Merge hardcoded defaults + API categories + locally added ones (deduplicated)
+  const allCategories = useMemo(() => {
+    const known = PRODUCT_CATEGORIES.map((c) => c.value)
+    const fromApi = apiCategories ?? []
+    const merged = [...known]
+    for (const cat of [...fromApi, ...customCategories]) {
+      if (!merged.includes(cat)) merged.push(cat)
+    }
+    return merged
+  }, [apiCategories, customCategories])
 
   const createMutation = useMutation({
     mutationFn: (data: ProductCreate) =>
@@ -256,9 +289,14 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
               <div className="flex items-center gap-2">
                 <Select
                   value={field.state.value}
-                  onValueChange={(val) =>
+                  onValueChange={(val) => {
+                    if (val === "__add_new__") {
+                      setNewCategoryName("")
+                      setAddCategoryOpen(true)
+                      return
+                    }
                     field.handleChange(val as ProductCategory)
-                  }
+                  }}
                   disabled={readOnly}
                 >
                   <SelectTrigger className="w-auto border-0 bg-transparent p-0 shadow-none focus:ring-0">
@@ -267,11 +305,22 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
                     </Badge>
                   </SelectTrigger>
                   <SelectContent>
-                    {PRODUCT_CATEGORIES.map((cat) => (
-                      <SelectItem key={cat.value} value={cat.value}>
-                        {cat.label}
-                      </SelectItem>
-                    ))}
+                    {allCategories.map((cat) => {
+                      const known = PRODUCT_CATEGORIES.find(
+                        (c) => c.value === cat,
+                      )
+                      return (
+                        <SelectItem key={cat} value={cat}>
+                          {known?.label ?? cat}
+                        </SelectItem>
+                      )
+                    })}
+                    <SelectItem value="__add_new__" className="text-primary">
+                      <span className="flex items-center gap-1.5">
+                        <Plus className="h-3.5 w-3.5" />
+                        Add category
+                      </span>
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -597,6 +646,61 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
         </div>
       )}
       <UnsavedChangesDialog blocker={blocker} />
+
+      <Dialog open={addCategoryOpen} onOpenChange={setAddCategoryOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create New Category</DialogTitle>
+            <DialogDescription>
+              Give your category a name. Products with this category can be
+              grouped into their own checkout step.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-4 mt-2">
+            <Input
+              placeholder="e.g. workshops, vip-extras"
+              value={newCategoryName}
+              onChange={(e) => setNewCategoryName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault()
+                  const trimmed = newCategoryName.trim().toLowerCase()
+                  if (trimmed) {
+                    if (!allCategories.includes(trimmed)) {
+                      setCustomCategories((prev) => [...prev, trimmed])
+                    }
+                    form.setFieldValue("category", trimmed as ProductCategory)
+                    setAddCategoryOpen(false)
+                  }
+                }
+              }}
+            />
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setAddCategoryOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                disabled={!newCategoryName.trim()}
+                onClick={() => {
+                  const trimmed = newCategoryName.trim().toLowerCase()
+                  if (trimmed) {
+                    if (!allCategories.includes(trimmed)) {
+                      setCustomCategories((prev) => [...prev, trimmed])
+                    }
+                    form.setFieldValue("category", trimmed as ProductCategory)
+                    setAddCategoryOpen(false)
+                  }
+                }}
+              >
+                Create
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

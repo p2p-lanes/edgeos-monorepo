@@ -45,16 +45,18 @@ export function FormHeader() {
         </div>
       )}
       <div className="space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight">{city.name}</h1>
-        <p className="text-md text-muted-foreground">{city.tagline}</p>
+        <h1 className="text-3xl font-bold tracking-tight text-heading">
+          {city.name}
+        </h1>
+        <p className="text-md text-heading-secondary">{city.tagline}</p>
         {city.location && (
-          <div className="flex items-center text-sm text-muted-foreground mb-2">
+          <div className="flex items-center text-sm text-heading-secondary mb-2">
             <MapPin className="mr-2 h-4 w-4" />
             {city.location}
           </div>
         )}
         {startDate && endDate && (
-          <div className="flex items-center text-sm text-muted-foreground mb-4">
+          <div className="flex items-center text-sm text-heading-secondary mb-4">
             <CalendarDays className="mr-2 h-4 w-4" />
             {`${startDate} - ${endDate}`}
           </div>

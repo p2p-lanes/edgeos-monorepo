@@ -178,6 +178,21 @@ def _seed_base_field_configs(session: Session, popup_map: dict, tenant_id) -> No
         logger.info(f"Base field configs created for {popup_key}")
 
 
+def _seed_ticketing_steps(session: Session, popup_map: dict, tenant_id) -> None:
+    from app.api.ticketing_step.constants import seed_ticketing_steps_for_popup
+    from app.models import TicketingSteps
+
+    for popup_key, popup in popup_map.items():
+        existing = session.exec(
+            select(TicketingSteps).where(TicketingSteps.popup_id == popup.id)
+        ).first()
+        if existing:
+            continue
+
+        seed_ticketing_steps_for_popup(session, popup_id=popup.id, tenant_id=tenant_id)
+        logger.info(f"Ticketing steps seeded for {popup_key}")
+
+
 def _seed_approval_strategies(session: Session, popup_map: dict, tenant_id) -> None:
     from app.api.approval_strategy.schemas import ApprovalStrategyType
     from app.models import ApprovalStrategies
@@ -777,6 +792,7 @@ def init_db(session: Session) -> None:
 
     popup_map = _seed_popups(session, seed_data, tenant_id)
     _seed_base_field_configs(session, popup_map, tenant_id)
+    _seed_ticketing_steps(session, popup_map, tenant_id)
     _seed_approval_strategies(session, popup_map, tenant_id)
 
     product_map = _seed_products(session, seed_data, popup_map, tenant_id)

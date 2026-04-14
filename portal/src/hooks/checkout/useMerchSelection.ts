@@ -10,7 +10,12 @@ export function useMerchSelection(merchProducts: ProductsPass[]) {
       const product = merchProducts.find((p) => p.id === productId)
       if (!product) return
 
-      if (quantity <= 0) {
+      const clamped =
+        product.max_quantity == null
+          ? Math.max(0, quantity)
+          : Math.max(0, Math.min(quantity, product.max_quantity))
+
+      if (clamped <= 0) {
         setMerch((prev) => prev.filter((m) => m.productId !== productId))
       } else {
         setMerch((prev) => {
@@ -18,7 +23,11 @@ export function useMerchSelection(merchProducts: ProductsPass[]) {
           if (existing) {
             return prev.map((m) =>
               m.productId === productId
-                ? { ...m, quantity, totalPrice: product.price * quantity }
+                ? {
+                    ...m,
+                    quantity: clamped,
+                    totalPrice: product.price * clamped,
+                  }
                 : m,
             )
           }
@@ -27,9 +36,9 @@ export function useMerchSelection(merchProducts: ProductsPass[]) {
             {
               productId,
               product,
-              quantity,
+              quantity: clamped,
               unitPrice: product.price,
-              totalPrice: product.price * quantity,
+              totalPrice: product.price * clamped,
             },
           ]
         })

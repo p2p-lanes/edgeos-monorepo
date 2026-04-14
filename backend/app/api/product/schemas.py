@@ -8,14 +8,15 @@ from sqlalchemy import Numeric, Text
 from sqlmodel import Column, DateTime, Field, SQLModel
 
 
-class ProductCategory(str, Enum):
-    """Product categories determining which fields are relevant."""
-
-    TICKET = "ticket"
-    HOUSING = "housing"
-    MERCH = "merch"
-    OTHER = "other"
-    PATREON = "patreon"
+# ProductCategory is now a free-form string so admins can create custom categories.
+# Known built-in values are listed below for reference.
+ProductCategory = str
+CATEGORY_TICKET: ProductCategory = "ticket"
+CATEGORY_HOUSING: ProductCategory = "housing"
+CATEGORY_MERCH: ProductCategory = "merch"
+CATEGORY_OTHER: ProductCategory = "other"
+CATEGORY_PATREON: ProductCategory = "patreon"
+KNOWN_PRODUCT_CATEGORIES = [CATEGORY_TICKET, CATEGORY_HOUSING, CATEGORY_MERCH, CATEGORY_OTHER, CATEGORY_PATREON]
 
 
 class TicketDuration(str, Enum):
@@ -48,7 +49,7 @@ class ProductBase(SQLModel):
     )
     description: str | None = Field(default=None, nullable=True, sa_type=Text())
     image_url: str | None = Field(default=None, nullable=True)
-    category: ProductCategory = Field(default=ProductCategory.TICKET, index=True)
+    category: str = Field(default="ticket", index=True)
     attendee_category: TicketAttendeeCategory | None = Field(
         default=None, nullable=True
     )
@@ -85,7 +86,7 @@ class ProductCreate(BaseModel):
     compare_price: Decimal | None = Field(default=None, ge=0)
     description: str | None = None
     image_url: str | None = None
-    category: ProductCategory = ProductCategory.TICKET
+    category: str = "ticket"
     attendee_category: TicketAttendeeCategory | None = None
     duration_type: TicketDuration | None = None
     start_date: datetime | None = None
@@ -100,7 +101,7 @@ class ProductCreate(BaseModel):
     @model_validator(mode="after")
     def validate_ticket_fields(self) -> "ProductCreate":
         """Validate that ticket-specific fields are only set for tickets."""
-        if self.category != ProductCategory.TICKET:
+        if self.category != "ticket":
             if self.attendee_category is not None:
                 raise ValueError(
                     "attendee_category can only be set for ticket products"
@@ -119,7 +120,7 @@ class ProductUpdate(BaseModel):
     compare_price: Decimal | None = Field(default=None, ge=0)
     description: str | None = None
     image_url: str | None = None
-    category: ProductCategory | None = None
+    category: str | None = None
     attendee_category: TicketAttendeeCategory | None = None
     duration_type: TicketDuration | None = None
     start_date: datetime | None = None
@@ -139,7 +140,7 @@ class ProductBatchItem(BaseModel):
     compare_price: Decimal | None = Field(default=None, ge=0)
     description: str | None = None
     image_url: str | None = None
-    category: ProductCategory = ProductCategory.TICKET
+    category: str = "ticket"
     attendee_category: TicketAttendeeCategory | None = None
     duration_type: TicketDuration | None = None
     start_date: datetime | None = None
@@ -154,7 +155,7 @@ class ProductBatchItem(BaseModel):
     @model_validator(mode="after")
     def validate_ticket_fields(self) -> "ProductBatchItem":
         """Validate that ticket-specific fields are only set for tickets."""
-        if self.category != ProductCategory.TICKET:
+        if self.category != "ticket":
             if self.attendee_category is not None:
                 raise ValueError(
                     "attendee_category can only be set for ticket products"

@@ -1,5 +1,6 @@
 "use client"
 
+import { useQuery } from "@tanstack/react-query"
 import {
   createContext,
   type ReactNode,
@@ -10,6 +11,9 @@ import {
   useRef,
   useState,
 } from "react"
+import type { TicketingStepPublic } from "@/client"
+import { TicketingStepsService } from "@/client"
+import { supportsQuantitySelector } from "@/components/ui/QuantitySelector"
 import {
   type CartSelectionState,
   useCartPersistence,
@@ -30,6 +34,7 @@ import type {
   CheckoutCartState,
   CheckoutCartSummary,
   CheckoutStep,
+  SelectedDynamicItem,
   SelectedPassItem,
 } from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
@@ -41,12 +46,14 @@ import { usePassesProvider } from "./passesProvider"
 interface CheckoutContextValue {
   currentStep: CheckoutStep
   availableSteps: CheckoutStep[]
+  stepConfigs: TicketingStepPublic[]
   cart: CheckoutCartState
   summary: CheckoutCartSummary
   passProducts: ProductsPass[]
   housingProducts: ProductsPass[]
   merchProducts: ProductsPass[]
   patronProducts: ProductsPass[]
+  allProducts: ProductsPass[]
   attendees: AttendeePassState[]
   isLoading: boolean
   isSubmitting: boolean
@@ -57,6 +64,7 @@ interface CheckoutContextValue {
   togglePass: (attendeeId: string, productId: string) => void
   resetDayProduct: (attendeeId: string, productId: string) => void
   selectHousing: (productId: string, checkIn: string, checkOut: string) => void
+  updateHousingQuantity: (quantity: number) => void
   clearHousing: () => void
   updateMerchQuantity: (productId: string, quantity: number) => void
   setPatronAmount: (
@@ -78,6 +86,13 @@ interface CheckoutContextValue {
   monthUpgradeCredit: number
   termsAccepted: boolean
   setTermsAccepted: (accepted: boolean) => void
+  addDynamicItem: (stepType: string, item: SelectedDynamicItem) => void
+  removeDynamicItem: (stepType: string, productId: string) => void
+  updateDynamicQuantity: (
+    stepType: string,
+    productId: string,
+    qty: number,
+  ) => void
 }
 
 const CheckoutContext = createContext<CheckoutContextValue | null>(null)
@@ -106,13 +121,39 @@ export function CheckoutProvider({
   const previousCityIdRef = useRef(cityId)
   const paymentCompleteRef = useRef(false)
 
+  // Ticketing step configuration from API
+  const { data: stepsData } = useQuery({
+    queryKey: ["ticketing-steps-portal", cityId],
+    queryFn: () =>
+      TicketingStepsService.listPortalTicketingSteps({
+        popupId: cityId!,
+      }),
+    enabled: !!cityId,
+  })
+  const configuredSteps = stepsData?.results ?? []
+
   // Product categories
   const { passProducts, housingProducts, merchProducts, patronProducts } =
     useProductCategories(products)
 
   // Item selection hooks
-  const { housing, setHousing, selectHousing, clearHousing } =
-    useHousingSelection(housingProducts)
+  const housingPricePerDay = useMemo(() => {
+    const step = configuredSteps.find((s) => s.step_type === "housing")
+    if (!step?.template_config) return true
+    const cfg = step.template_config as Record<string, unknown>
+    // When the housing step hides the date picker, the per-night multiplication
+    // is meaningless — force flat pricing so totals use product.price directly.
+    if (cfg.show_dates === false) return false
+    return cfg.price_per_day !== false
+  }, [configuredSteps])
+
+  const {
+    housing,
+    setHousing,
+    selectHousing,
+    updateHousingQuantity,
+    clearHousing,
+  } = useHousingSelection(housingProducts, housingPricePerDay)
 
   const { merch, setMerch, updateMerchQuantity } =
     useMerchSelection(merchProducts)
@@ -122,6 +163,9 @@ export function CheckoutProvider({
 
   const [insurance, setInsurance] = useState(false)
   const [termsAccepted, setTermsAccepted] = useState(false)
+  const [dynamicItems, setDynamicItems] = useState<
+    Record<string, SelectedDynamicItem[]>
+  >({})
 
   // Build selected passes from attendeePasses
   const selectedPasses = useMemo<SelectedPassItem[]>(() => {
@@ -133,7 +177,9 @@ export function CheckoutProvider({
           const isDayPass = product.duration_type === "day"
           const quantity = isDayPass
             ? (product.quantity ?? 1) - (product.original_quantity ?? 0)
-            : 1
+            : supportsQuantitySelector(product.max_quantity)
+              ? (product.quantity ?? 1)
+              : 1
 
           if (quantity > 0) {
             passes.push({
@@ -177,6 +223,7 @@ export function CheckoutProvider({
     cityId,
     initialStep,
     products,
+    housingPricePerDay,
     selectionStateRef,
     restorationSetters: {
       setHousing,
@@ -222,11 +269,14 @@ export function CheckoutProvider({
     isStepComplete: isStepCompleteFn,
   } = useCheckoutSteps({
     initialStep,
+    configuredSteps,
     patronCount: patronProducts.length,
     housingCount: housingProducts.length,
     merchCount: merchProducts.length,
     selectedPassesCount: selectedPasses.length,
+    dynamicItemsCount: Object.values(dynamicItems).flat().length,
     isEditing,
+    allProducts: products,
   })
 
   // Keep selection state ref in sync — promoCode, promoCodeValid, currentStep
@@ -338,6 +388,15 @@ export function CheckoutProvider({
     setCurrentStep(stepToRestore as CheckoutStep)
   }, [availableSteps, initialStep, setCurrentStep])
 
+  // Dynamic subtotal
+  const dynamicSubtotal = useMemo(
+    () =>
+      Object.values(dynamicItems)
+        .flat()
+        .reduce((sum, item) => sum + item.price, 0),
+    [dynamicItems],
+  )
+
   // Build cart state
   const cart = useMemo<CheckoutCartState>(
     () => ({
@@ -351,6 +410,7 @@ export function CheckoutProvider({
       insurance,
       insurancePrice: insuranceAmount,
       insurancePotentialPrice: insurancePotentialAmount,
+      dynamicItems,
     }),
     [
       selectedPasses,
@@ -363,7 +423,55 @@ export function CheckoutProvider({
       insurance,
       insuranceAmount,
       insurancePotentialAmount,
+      dynamicItems,
     ],
+  )
+
+  // Dynamic item actions
+  const addDynamicItem = useCallback(
+    (stepType: string, item: SelectedDynamicItem) => {
+      setDynamicItems((prev) => {
+        const existing = prev[stepType] ?? []
+        const idx = existing.findIndex((i) => i.productId === item.productId)
+        if (idx >= 0) {
+          const updated = [...existing]
+          updated[idx] = item
+          return { ...prev, [stepType]: updated }
+        }
+        return { ...prev, [stepType]: [...existing, item] }
+      })
+    },
+    [],
+  )
+
+  const removeDynamicItem = useCallback(
+    (stepType: string, productId: string) => {
+      setDynamicItems((prev) => ({
+        ...prev,
+        [stepType]: (prev[stepType] ?? []).filter(
+          (i) => i.productId !== productId,
+        ),
+      }))
+    },
+    [],
+  )
+
+  const updateDynamicQuantity = useCallback(
+    (stepType: string, productId: string, qty: number) => {
+      if (qty <= 0) {
+        removeDynamicItem(stepType, productId)
+        return
+      }
+      setDynamicItems((prev) => ({
+        ...prev,
+        [stepType]: (prev[stepType] ?? []).map((i) =>
+          i.productId === productId
+            ? { ...i, quantity: qty, price: i.product.price * qty }
+            : i,
+        ),
+      }))
+    },
+    [removeDynamicItem],
   )
 
   // Navigation (wrap hook navigation to save cart and clear error)
@@ -428,6 +536,7 @@ export function CheckoutProvider({
     clearPatron()
     clearPromoCode()
     setInsurance(false)
+    setDynamicItems({})
   }, [clearPersistedCart, clearHousing, setMerch, clearPatron, clearPromoCode])
 
   // Submit payment (consolidated via usePaymentSubmit)
@@ -440,6 +549,7 @@ export function CheckoutProvider({
     housing,
     merch,
     patron,
+    dynamicItems,
     promoCode,
     promoCodeValid,
     insurance,
@@ -451,15 +561,27 @@ export function CheckoutProvider({
     paymentCompleteRef,
   })
 
+  const finalSummary = useMemo(
+    () => ({
+      ...summary,
+      dynamicSubtotal,
+      subtotal: summary.subtotal + dynamicSubtotal,
+      grandTotal: summary.grandTotal + dynamicSubtotal,
+    }),
+    [summary, dynamicSubtotal],
+  )
+
   const value: CheckoutContextValue = {
     currentStep,
     availableSteps,
+    stepConfigs: configuredSteps,
     cart,
-    summary,
+    summary: finalSummary,
     passProducts,
     housingProducts,
     merchProducts,
     patronProducts,
+    allProducts: products,
     attendees: attendeePasses,
     isLoading,
     isSubmitting,
@@ -470,6 +592,7 @@ export function CheckoutProvider({
     togglePass,
     resetDayProduct,
     selectHousing,
+    updateHousingQuantity,
     clearHousing,
     updateMerchQuantity,
     setPatronAmount,
@@ -487,6 +610,9 @@ export function CheckoutProvider({
     monthUpgradeCredit,
     termsAccepted,
     setTermsAccepted,
+    addDynamicItem,
+    removeDynamicItem,
+    updateDynamicQuantity,
   }
 
   return (

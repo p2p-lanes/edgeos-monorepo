@@ -40,6 +40,7 @@ export default function CartFooter({ onPay, onBack }: CartFooterProps) {
     updateMerchQuantity,
     clearPatron,
     clearPromoCode,
+    removeDynamicItem,
     canProceedToStep,
     isSubmitting,
     isEditing,
@@ -63,17 +64,25 @@ export default function CartFooter({ onPay, onBack }: CartFooterProps) {
     isEditing && attendees.some((a) => a.products.some((p) => p.edit))
   const requiresTerms =
     isConfirmStep && !!popup?.terms_and_conditions_url && !termsAccepted
+  const hasDynamicItems = Object.values(cart.dynamicItems).some(
+    (items) => items.length > 0,
+  )
   const canContinue = requiresTerms
     ? false
     : isEditing
       ? cart.passes.length > 0
       : isConfirmStep
-        ? cart.passes.length > 0
+        ? cart.passes.length > 0 ||
+          !!cart.housing ||
+          cart.merch.length > 0 ||
+          !!cart.patron ||
+          hasDynamicItems
         : nextStepId
           ? canProceedToStep(nextStepId)
           : false
 
-  const hasItems = summary.itemCount > 0 || (isEditing && hasEditChanges)
+  const hasItems =
+    summary.itemCount > 0 || hasDynamicItems || (isEditing && hasEditChanges)
 
   const getAttendeeName = (attendeeId: string): string => {
     const attendee = attendees.find((a) => a.id === attendeeId)
@@ -181,8 +190,9 @@ export default function CartFooter({ onPay, onBack }: CartFooterProps) {
                       {cart.housing.product.name}
                     </p>
                     <p className="text-xs text-gray-500">
-                      {cart.housing.nights} night
-                      {cart.housing.nights !== 1 ? "s" : ""}
+                      {cart.housing.pricePerDay !== false
+                        ? `${cart.housing.nights} night${cart.housing.nights !== 1 ? "s" : ""}`
+                        : "Full stay"}
                     </p>
                   </div>
                 </div>
@@ -268,6 +278,53 @@ export default function CartFooter({ onPay, onBack }: CartFooterProps) {
                     <X className="w-4 h-4" />
                   </button>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Dynamic Items (e.g. ticket-category products from custom steps) */}
+          {hasDynamicItems && (
+            <div className="mb-4">
+              <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                Tickets
+              </h4>
+              <div className="space-y-2">
+                {Object.values(cart.dynamicItems)
+                  .flat()
+                  .map((item) => (
+                    <div
+                      key={item.productId}
+                      className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0"
+                    >
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <Ticket className="w-4 h-4 text-gray-400 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">
+                            {item.product.name}
+                          </p>
+                          {item.quantity > 1 && (
+                            <p className="text-xs text-gray-500">
+                              Qty: {item.quantity}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-gray-900">
+                          {formatCurrency(item.price)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            removeDynamicItem(item.stepType, item.productId)
+                          }
+                          className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
               </div>
             </div>
           )}

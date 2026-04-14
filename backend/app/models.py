@@ -50,6 +50,14 @@ from app.api.form_section.schemas import (
     FormSectionUpdate,
 )
 
+# Ticketing steps
+from app.api.ticketing_step.models import TicketingSteps
+from app.api.ticketing_step.schemas import (
+    TicketingStepCreate,
+    TicketingStepPublic,
+    TicketingStepUpdate,
+)
+
 # Group models
 from app.api.group.models import (
     GroupLeaders,
@@ -145,6 +153,11 @@ __all__ = [
     "FormSectionPublic",
     "FormSectionUpdate",
     "FormFields",
+    # Ticketing steps
+    "TicketingSteps",
+    "TicketingStepCreate",
+    "TicketingStepPublic",
+    "TicketingStepUpdate",
     "FormFieldCreate",
     "FormFieldPublic",
     "FormFieldUpdate",

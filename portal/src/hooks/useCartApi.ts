@@ -15,6 +15,7 @@ export interface CartItemHousing {
   product_id: string
   check_in: string
   check_out: string
+  quantity?: number
 }
 
 export interface CartItemMerch {

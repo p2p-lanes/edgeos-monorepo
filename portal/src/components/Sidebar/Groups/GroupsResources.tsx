@@ -19,7 +19,9 @@ const GroupsResources = ({
   return (
     <div className="ml-2 flex flex-col">
       {filteredGroups.length > 0 && (
-        <p className="mb-2 text-xs font-medium text-gray-500">Groups</p>
+        <p className="mb-2 text-xs font-medium text-nav-text-secondary">
+          Groups
+        </p>
       )}
       {filteredGroups.map((group) => (
         <ResourceMenuItem

@@ -10,6 +10,7 @@
 # OS
 .DS_Store
 Thumbs.db
+bash.exe.*
 
 # AI Agents & Tools
 .agents

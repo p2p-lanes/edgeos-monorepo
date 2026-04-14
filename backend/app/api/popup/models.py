@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from app.api.popup_reviewer.models import PopupReviewers
     from app.api.product.models import Products
     from app.api.tenant.models import Tenants
+    from app.api.ticketing_step.models import TicketingSteps
 
 
 class Popups(PopupBase, table=True):
@@ -73,3 +74,8 @@ class Popups(PopupBase, table=True):
 
     # Events
     events: list["Events"] = Relationship(back_populates="popup", cascade_delete=True)
+
+    # Ticketing step configuration
+    ticketing_steps: list["TicketingSteps"] = Relationship(
+        back_populates="popup", cascade_delete=True
+    )

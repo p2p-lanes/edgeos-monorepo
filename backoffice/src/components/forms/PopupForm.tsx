@@ -30,6 +30,7 @@ import { FieldError } from "@/components/Common/FieldError"
 import { FormErrorSummary } from "@/components/Common/FormErrorSummary"
 import { ApprovalStrategyForm } from "@/components/forms/ApprovalStrategyForm"
 import { ReviewersManager } from "@/components/forms/ReviewersManager"
+import { ThemeConfigForm } from "@/components/forms/ThemeConfigForm"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { DatePicker } from "@/components/ui/date-picker"
@@ -646,6 +647,27 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
             )}
           </form.Field>
         </InlineSection>
+
+        {/* Portal Theme (edit only). The form is `mx-auto max-w-2xl` (672px),
+            but the theme section needs more horizontal room for the side-by-side
+            preview panel. Negative margins on lg+ widen this single section
+            without breaking the rest of the form's column. The parent route
+            container is `max-w-7xl` with `p-6 md:p-8`, so -mx-32 (128px) at lg
+            and -mx-48 (192px) at xl stay safely inside the page padding. */}
+        {isEdit && (
+          <>
+            <Separator />
+            <div className="lg:-mx-32 xl:-mx-48">
+              <ThemeConfigForm
+                popupId={defaultValues!.id}
+                themeConfig={
+                  defaultValues!.theme_config as Record<string, unknown> | null
+                }
+                readOnly={readOnly}
+              />
+            </div>
+          </>
+        )}
 
         <Separator />
 

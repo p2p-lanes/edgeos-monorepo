@@ -8,7 +8,6 @@ from app.api.product import crud
 from app.api.product.schemas import (
     ProductBatch,
     ProductBatchResult,
-    ProductCategory,
     ProductCreate,
     ProductPublic,
     ProductUpdate,
@@ -21,11 +20,30 @@ from app.core.dependencies.users import (
     CurrentUser,
     CurrentWriter,
     HumanTenantSession,
+    SessionDep,
     TenantSession,
 )
 from app.utils.utils import slugify
 
 router = APIRouter(prefix="/products", tags=["products"])
+
+
+@router.get("/categories", response_model=list[str])
+async def list_product_categories(
+    db: SessionDep,
+    popup_id: uuid.UUID,
+) -> list[str]:
+    """Return distinct active product categories for a popup. No auth required."""
+    from app.api.product.models import Products
+    from sqlmodel import select, distinct
+
+    statement = (
+        select(distinct(Products.category))
+        .where(Products.popup_id == popup_id, Products.is_active == True)  # noqa: E712
+        .order_by(Products.category)
+    )
+    results = list(db.exec(statement).all())
+    return results
 
 
 @router.get("", response_model=ListModel[ProductPublic])
@@ -34,7 +52,7 @@ async def list_products(
     _: CurrentUser,
     popup_id: uuid.UUID | None = None,
     is_active: bool | None = None,
-    category: ProductCategory | None = None,
+    category: str | None = None,
     search: str | None = None,
     sort_by: str | None = None,
     sort_order: Literal["asc", "desc"] = "desc",
@@ -258,7 +276,7 @@ async def list_portal_products(
     _: CurrentHuman,
     popup_id: uuid.UUID | None = None,
     is_active: bool | None = None,
-    category: ProductCategory | None = None,
+    category: str | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[ProductPublic]:
