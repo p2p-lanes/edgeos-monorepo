@@ -3,6 +3,7 @@
 import { useQueries, useQuery } from "@tanstack/react-query"
 import {
   CalendarDays,
+  CheckCircle,
   Clock,
   Filter,
   Layers,
@@ -24,7 +25,6 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Switch } from "@/components/ui/switch"
 import { useCityProvider } from "@/providers/cityProvider"
 import { GoogleCalendarConnectionCard } from "./lib/GoogleCalendarConnectionCard"
 import { useEventTimezone } from "./lib/useEventTimezone"
@@ -138,17 +138,15 @@ export default function EventsPage() {
             className="pl-9"
           />
         </div>
-        <label
-          htmlFor="rsvped-only"
-          className="inline-flex items-center gap-2 rounded-md border bg-card px-3 py-1.5 text-sm cursor-pointer select-none"
+        <Button
+          variant={rsvpedOnly ? "default" : "outline"}
+          size="sm"
+          onClick={() => setRsvpedOnly((v) => !v)}
+          aria-pressed={rsvpedOnly}
         >
-          <Switch
-            id="rsvped-only"
-            checked={rsvpedOnly}
-            onCheckedChange={setRsvpedOnly}
-          />
-          <span className="text-xs font-medium">My RSVPs only</span>
-        </label>
+          <CheckCircle className="mr-2 h-4 w-4" />
+          My RSVPs
+        </Button>
         <Button variant="outline" size="sm" asChild>
           <Link href={`/portal/${city?.slug}/events/tracks`}>
             <Layers className="mr-2 h-4 w-4" />
