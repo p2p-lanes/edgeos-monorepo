@@ -52,6 +52,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
+import { TimePicker } from "@/components/ui/time-picker"
 import { Textarea } from "@/components/ui/textarea"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useCustomToast from "@/hooks/useCustomToast"
@@ -506,22 +507,14 @@ function WeeklyHoursEditor({ venueId, initial }: WeeklyHoursEditorProps) {
               </div>
               {!entry.is_closed && (
                 <div className="flex items-center gap-2">
-                  <Input
-                    type="time"
+                  <TimePicker
                     value={entry.open_time ?? ""}
-                    onChange={(e) =>
-                      updateDay(day.value, { open_time: e.target.value })
-                    }
-                    className="w-[110px]"
+                    onChange={(v) => updateDay(day.value, { open_time: v })}
                   />
                   <span className="text-sm text-muted-foreground">to</span>
-                  <Input
-                    type="time"
+                  <TimePicker
                     value={entry.close_time ?? ""}
-                    onChange={(e) =>
-                      updateDay(day.value, { close_time: e.target.value })
-                    }
-                    className="w-[110px]"
+                    onChange={(v) => updateDay(day.value, { close_time: v })}
                   />
                 </div>
               )}

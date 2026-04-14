@@ -5,12 +5,12 @@ import { CalendarIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
-import { Input } from "@/components/ui/input"
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
+import { TimePicker } from "@/components/ui/time-picker"
 import { cn } from "@/lib/utils"
 
 interface DateTimePickerProps {
@@ -99,12 +99,11 @@ export function DateTimePicker({
           />
         </PopoverContent>
       </Popover>
-      <Input
-        type="time"
+      <TimePicker
         value={timePart}
-        onChange={(e) => handleTimeChange(e.target.value)}
+        onChange={handleTimeChange}
         disabled={disabled}
-        className="w-[110px] shrink-0"
+        className="shrink-0"
       />
     </div>
   )
