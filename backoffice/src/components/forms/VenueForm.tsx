@@ -4,6 +4,7 @@ import * as LucideIcons from "lucide-react"
 import {
   Calendar,
   Clock,
+  HelpCircle,
   Loader2,
   Pencil,
   Plus,
@@ -53,6 +54,7 @@ import {
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { TimePicker } from "@/components/ui/time-picker"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Textarea } from "@/components/ui/textarea"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useCustomToast from "@/hooks/useCustomToast"
@@ -345,34 +347,40 @@ function PropertyPicker({ value, onChange }: PropertyPickerProps) {
                 placeholder="Projector, Wi-Fi, Parking..."
               />
             </div>
-            <div className="flex-1 min-w-[160px] space-y-1">
-              <Label htmlFor="new-property-icon">Icon (optional)</Label>
-              <div className="relative">
-                <Input
-                  id="new-property-icon"
-                  value={newIcon}
-                  onChange={(e) => setNewIcon(e.target.value)}
-                  placeholder="Mic, Monitor, Armchair, Wifi..."
-                  className="pr-8"
-                />
-                {newIcon && (
-                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground">
-                    <LucideIconByName name={newIcon} className="h-4 w-4" />
-                  </span>
-                )}
+            <div className="flex-1 min-w-[140px] space-y-1">
+              <div className="flex items-center gap-1">
+                <Label htmlFor="new-property-icon">Icon (optional)</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className="inline-flex h-4 w-4 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
+                      aria-label="Icon help"
+                    >
+                      <HelpCircle className="h-3.5 w-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-[220px] text-xs">
+                    PascalCase lucide name (Mic, Monitor, Armchair, Wifi…).
+                    Browse at{" "}
+                    <a
+                      href="https://lucide.dev/icons/"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline"
+                    >
+                      lucide.dev/icons
+                    </a>
+                    .
+                  </TooltipContent>
+                </Tooltip>
               </div>
-              <p className="text-xs text-muted-foreground">
-                PascalCase lucide name (see{" "}
-                <a
-                  href="https://lucide.dev/icons/"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="underline hover:text-foreground"
-                >
-                  lucide.dev/icons
-                </a>
-                ).
-              </p>
+              <Input
+                id="new-property-icon"
+                value={newIcon}
+                onChange={(e) => setNewIcon(e.target.value)}
+                placeholder="Mic"
+              />
             </div>
             <div className="flex gap-2">
               <LoadingButton
