@@ -4,7 +4,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query"
-import { createFileRoute, Link } from "@tanstack/react-router"
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
 import { format } from "date-fns"
 import {
@@ -12,11 +12,12 @@ import {
   EllipsisVertical,
   Pencil,
   Plus,
+  Repeat,
   Trash2,
 } from "lucide-react"
-import { Suspense, useState } from "react"
+import { Suspense, useMemo, useState } from "react"
 
-import { EventsService, type EventPublic } from "@/client"
+import { EventsService, EventVenuesService, type EventPublic } from "@/client"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
@@ -70,11 +71,68 @@ const statusVariant: Record<string, "default" | "secondary" | "destructive"> = {
   cancelled: "destructive",
 }
 
+function parseOccurrenceId(
+  occurrenceId: string | null | undefined,
+): { masterId: string; start: string } | null {
+  if (!occurrenceId) return null
+  const idx = occurrenceId.lastIndexOf("_")
+  if (idx < 0) return null
+  const masterId = occurrenceId.slice(0, idx)
+  const stamp = occurrenceId.slice(idx + 1)
+  // stamp format: YYYYMMDDTHHMMSS
+  if (stamp.length < 15) return null
+  const iso = `${stamp.slice(0, 4)}-${stamp.slice(4, 6)}-${stamp.slice(6, 8)}T${stamp.slice(9, 11)}:${stamp.slice(11, 13)}:${stamp.slice(13, 15)}Z`
+  return { masterId, start: iso }
+}
+
 function EventActionsMenu({ event }: { event: EventPublic }) {
   const [open, setOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [editChoiceOpen, setEditChoiceOpen] = useState(false)
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const { showSuccessToast, showErrorToast } = useCustomToast()
+
+  const occurrenceRef = parseOccurrenceId(event.occurrence_id)
+  const isOccurrence = occurrenceRef !== null
+
+  const detachMutation = useMutation({
+    mutationFn: async () => {
+      if (!occurrenceRef) throw new Error("Not an occurrence")
+      return EventsService.detachOccurrence({
+        eventId: occurrenceRef.masterId,
+        requestBody: { occurrence_start: occurrenceRef.start },
+      })
+    },
+    onSuccess: (child) => {
+      showSuccessToast("Detached occurrence for editing")
+      setEditChoiceOpen(false)
+      setOpen(false)
+      queryClient.invalidateQueries({ queryKey: ["events"] })
+      navigate({
+        to: "/events/$eventId/edit",
+        params: { eventId: child.id },
+      })
+    },
+    onError: createErrorHandler(showErrorToast),
+  })
+
+  const deleteOccurrenceMutation = useMutation({
+    mutationFn: async () => {
+      if (!occurrenceRef) throw new Error("Not an occurrence")
+      return EventsService.deleteOccurrence({
+        eventId: occurrenceRef.masterId,
+        requestBody: { occurrence_start: occurrenceRef.start },
+      })
+    },
+    onSuccess: () => {
+      showSuccessToast("Occurrence removed")
+      setDeleteOpen(false)
+      setOpen(false)
+    },
+    onError: createErrorHandler(showErrorToast),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["events"] }),
+  })
 
   const deleteMutation = useMutation({
     mutationFn: () =>
@@ -88,6 +146,17 @@ function EventActionsMenu({ event }: { event: EventPublic }) {
     onSettled: () => queryClient.invalidateQueries({ queryKey: ["events"] }),
   })
 
+  const handleEdit = () => {
+    if (isOccurrence) {
+      setEditChoiceOpen(true)
+    } else {
+      navigate({
+        to: "/events/$eventId/edit",
+        params: { eventId: event.id },
+      })
+    }
+  }
+
   return (
     <>
       <DropdownMenu open={open} onOpenChange={setOpen}>
@@ -97,11 +166,14 @@ function EventActionsMenu({ event }: { event: EventPublic }) {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem asChild>
-            <Link to="/events/$eventId/edit" params={{ eventId: event.id }}>
-              <Pencil className="mr-2 h-4 w-4" />
-              Edit
-            </Link>
+          <DropdownMenuItem
+            onSelect={(e) => {
+              e.preventDefault()
+              handleEdit()
+            }}
+          >
+            <Pencil className="mr-2 h-4 w-4" />
+            Edit
           </DropdownMenuItem>
           <DropdownMenuItem
             variant="destructive"
@@ -114,13 +186,53 @@ function EventActionsMenu({ event }: { event: EventPublic }) {
         </DropdownMenuContent>
       </DropdownMenu>
 
+      <Dialog open={editChoiceOpen} onOpenChange={setEditChoiceOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit recurring event</DialogTitle>
+            <DialogDescription>
+              This is one instance of a recurring series. Would you like to
+              edit only this event, or the entire series?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (!occurrenceRef) return
+                setEditChoiceOpen(false)
+                setOpen(false)
+                navigate({
+                  to: "/events/$eventId/edit",
+                  params: { eventId: occurrenceRef.masterId },
+                })
+              }}
+            >
+              Edit series
+            </Button>
+            <LoadingButton
+              loading={detachMutation.isPending}
+              onClick={() => detachMutation.mutate()}
+            >
+              Edit only this event
+            </LoadingButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Event</DialogTitle>
+            <DialogTitle>
+              {isOccurrence ? "Delete this occurrence" : "Delete Event"}
+            </DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete "{event.title}"? This action cannot
-              be undone.
+              {isOccurrence
+                ? `Skip the "${event.title}" occurrence starting ${formatDateTime(event.start_time)}? Other occurrences in this series will remain.`
+                : `Are you sure you want to delete "${event.title}"? This action cannot be undone.`}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -129,10 +241,18 @@ function EventActionsMenu({ event }: { event: EventPublic }) {
             </DialogClose>
             <LoadingButton
               variant="destructive"
-              loading={deleteMutation.isPending}
-              onClick={() => deleteMutation.mutate()}
+              loading={
+                isOccurrence
+                  ? deleteOccurrenceMutation.isPending
+                  : deleteMutation.isPending
+              }
+              onClick={() =>
+                isOccurrence
+                  ? deleteOccurrenceMutation.mutate()
+                  : deleteMutation.mutate()
+              }
             >
-              Delete
+              {isOccurrence ? "Skip" : "Delete"}
             </LoadingButton>
           </DialogFooter>
         </DialogContent>
@@ -141,58 +261,78 @@ function EventActionsMenu({ event }: { event: EventPublic }) {
   )
 }
 
-const columns: ColumnDef<EventPublic>[] = [
-  {
-    accessorKey: "title",
-    header: ({ column }) => <SortableHeader label="Title" column={column} />,
-    cell: ({ row }) => <span className="font-medium">{row.original.title}</span>,
-  },
-  {
-    accessorKey: "status",
-    header: "Status",
-    cell: ({ row }) => (
-      <Badge variant={statusVariant[row.original.status as string] ?? "secondary"}>
-        {row.original.status}
-      </Badge>
-    ),
-  },
-  {
-    accessorKey: "kind",
-    header: "Type",
-    cell: ({ row }) => (
-      <span className="text-muted-foreground capitalize">
-        {row.original.kind || "—"}
-      </span>
-    ),
-  },
-  {
-    accessorKey: "start_time",
-    header: ({ column }) => <SortableHeader label="Start" column={column} />,
-    cell: ({ row }) => (
-      <span className="text-muted-foreground">
-        {formatDateTime(row.original.start_time)}
-      </span>
-    ),
-  },
-  {
-    accessorKey: "location",
-    header: "Location",
-    cell: ({ row }) => (
-      <span className="text-muted-foreground truncate max-w-[200px] block">
-        {row.original.location || "—"}
-      </span>
-    ),
-  },
-  {
-    id: "actions",
-    header: () => <span className="sr-only">Actions</span>,
-    cell: ({ row }) => (
-      <div className="flex justify-end">
-        <EventActionsMenu event={row.original} />
-      </div>
-    ),
-  },
-]
+function buildEventColumns(
+  venueNameById: Map<string, string>,
+): ColumnDef<EventPublic>[] {
+  return [
+    {
+      accessorKey: "title",
+      header: ({ column }) => <SortableHeader label="Title" column={column} />,
+      cell: ({ row }) => (
+        <span className="font-medium inline-flex items-center gap-1.5">
+          {row.original.title}
+          {row.original.rrule && (
+            <Repeat
+              className="h-3.5 w-3.5 text-muted-foreground"
+              aria-label="Recurring event"
+            />
+          )}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "status",
+      header: "Status",
+      cell: ({ row }) => (
+        <Badge
+          variant={statusVariant[row.original.status as string] ?? "secondary"}
+        >
+          {row.original.status}
+        </Badge>
+      ),
+    },
+    {
+      accessorKey: "kind",
+      header: "Type",
+      cell: ({ row }) => (
+        <span className="text-muted-foreground capitalize">
+          {row.original.kind || "—"}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "start_time",
+      header: ({ column }) => <SortableHeader label="Start" column={column} />,
+      cell: ({ row }) => (
+        <span className="text-muted-foreground">
+          {formatDateTime(row.original.start_time)}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "venue_id",
+      header: "Venue",
+      cell: ({ row }) => {
+        const venueId = row.original.venue_id
+        const label = venueId ? venueNameById.get(venueId) : null
+        return (
+          <span className="text-muted-foreground truncate max-w-[200px] block">
+            {label ?? "—"}
+          </span>
+        )
+      },
+    },
+    {
+      id: "actions",
+      header: () => <span className="sr-only">Actions</span>,
+      cell: ({ row }) => (
+        <div className="flex justify-end">
+          <EventActionsMenu event={row.original} />
+        </div>
+      ),
+    },
+  ]
+}
 
 function EventsTableContent() {
   const searchParams = Route.useSearch()
@@ -218,6 +358,27 @@ function EventsTableContent() {
     placeholderData: keepPreviousData,
   })
 
+  const { data: venues } = useQuery({
+    queryKey: ["event-venues", { popupId: selectedPopupId, limit: 200 }],
+    queryFn: () =>
+      EventVenuesService.listVenues({
+        popupId: selectedPopupId!,
+        limit: 200,
+      }),
+    enabled: !!selectedPopupId,
+  })
+
+  const venueNameById = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const v of venues?.results ?? []) map.set(v.id, v.title)
+    return map
+  }, [venues])
+
+  const columns = useMemo(
+    () => buildEventColumns(venueNameById),
+    [venueNameById],
+  )
+
   if (!events) return <Skeleton className="h-64 w-full" />
 
   return (
@@ -225,7 +386,7 @@ function EventsTableContent() {
       columns={columns}
       data={events.results}
       searchPlaceholder="Search by title..."
-      hiddenOnMobile={["kind", "location", "start_time"]}
+      hiddenOnMobile={["kind", "venue_id", "start_time"]}
       searchValue={search}
       onSearchChange={setSearch}
       serverPagination={{

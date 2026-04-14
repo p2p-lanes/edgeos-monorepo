@@ -28,6 +28,9 @@ dependencies = [
     "boto3>=1.35.0",
     "redis>=7.1.0",
     "reportlab>=4.0",
+    "google-auth>=2.30,<3.0",
+    "google-auth-oauthlib>=1.2,<2.0",
+    "google-api-python-client>=2.140,<3.0",
 ]
 
 [dependency-groups]

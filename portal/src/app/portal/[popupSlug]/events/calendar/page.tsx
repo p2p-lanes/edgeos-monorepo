@@ -1,16 +1,14 @@
 "use client"
 
-import { useQuery } from "@tanstack/react-query"
+import { useQueries, useQuery } from "@tanstack/react-query"
 import {
   addDays,
   addMonths,
   endOfMonth,
   endOfWeek,
   format,
-  isSameDay,
   isSameMonth,
   isToday,
-  parseISO,
   startOfMonth,
   startOfWeek,
   subMonths,
@@ -19,22 +17,26 @@ import { Calendar, ChevronLeft, ChevronRight, Clock, MapPin } from "lucide-react
 import Link from "next/link"
 import { useState } from "react"
 
-import { EventsService, type EventPublic } from "@/client"
+import {
+  EventsService,
+  EventVenuesService,
+  type EventPublic,
+  type EventVenuePublic,
+} from "@/client"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useCityProvider } from "@/providers/cityProvider"
-
-function formatTime(dateStr: string) {
-  return format(parseISO(dateStr), "HH:mm")
-}
+import { useEventTimezone } from "../lib/useEventTimezone"
 
 export default function CalendarPage() {
   const { getCity } = useCityProvider()
   const city = getCity()
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date())
+  const { timezone, formatTime, formatDayKey, formatGridDayKey } =
+    useEventTimezone(city?.id)
 
-  const { data, isLoading } = useQuery({
+  const { data } = useQuery({
     queryKey: ["portal-events-calendar", city?.id, format(currentMonth, "yyyy-MM")],
     queryFn: () =>
       EventsService.listPortalEvents({
@@ -50,8 +52,29 @@ export default function CalendarPage() {
   const events = data?.results ?? []
 
   function getEventsForDate(date: Date): EventPublic[] {
-    return events.filter((e) => isSameDay(parseISO(e.start_time), date))
+    const cellKey = formatGridDayKey(date)
+    return events.filter((e) => formatDayKey(e.start_time) === cellKey)
   }
+
+  // Batch-fetch venues for displayed events to show venue titles.
+  const venueIds = Array.from(
+    new Set(
+      events
+        .map((e) => e.venue_id)
+        .filter((v): v is string => typeof v === "string" && v.length > 0),
+    ),
+  )
+  const venueQueries = useQueries({
+    queries: venueIds.map((venueId) => ({
+      queryKey: ["portal-event-venue", venueId],
+      queryFn: () => EventVenuesService.getVenue({ venueId }),
+      staleTime: 5 * 60 * 1000,
+    })),
+  })
+  const venueMap = new Map<string, EventVenuePublic>()
+  venueQueries.forEach((q, idx) => {
+    if (q.data) venueMap.set(venueIds[idx], q.data)
+  })
 
   const monthStart = startOfMonth(currentMonth)
   const monthEnd = endOfMonth(currentMonth)
@@ -70,7 +93,14 @@ export default function CalendarPage() {
   return (
     <div className="max-w-4xl mx-auto p-4 sm:p-6">
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-bold">Calendar</h1>
+        <div>
+          <h1 className="text-xl font-bold">Calendar</h1>
+          {timezone && (
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Times in {timezone}
+            </p>
+          )}
+        </div>
         <Button variant="outline" size="sm" asChild>
           <Link href={`/portal/${city?.slug}/events`}>List View</Link>
         </Button>
@@ -116,7 +146,9 @@ export default function CalendarPage() {
             {days.map((d, i) => {
               const dayEvents = getEventsForDate(d)
               const isCurrentMonth = isSameMonth(d, currentMonth)
-              const isSelected = selectedDate && isSameDay(d, selectedDate)
+              const isSelected =
+                selectedDate &&
+                formatGridDayKey(d) === formatGridDayKey(selectedDate)
               return (
                 <button
                   key={i}
@@ -168,26 +200,34 @@ export default function CalendarPage() {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {selectedEvents.map((event) => (
-                    <Link
-                      key={event.id}
-                      href={`/portal/${city?.slug}/events/${event.id}`}
-                      className="block rounded-xl border bg-card p-3 hover:shadow-md transition-shadow"
-                    >
-                      <h4 className="text-sm font-medium">{event.title}</h4>
-                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
-                        <Clock className="h-3 w-3" />
-                        {formatTime(event.start_time)} –{" "}
-                        {formatTime(event.end_time)}
-                      </div>
-                      {event.location && (
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
-                          <MapPin className="h-3 w-3" />
-                          <span className="truncate">{event.location}</span>
+                  {selectedEvents.map((event) => {
+                    const venue = event.venue_id
+                      ? venueMap.get(event.venue_id)
+                      : undefined
+                    return (
+                      <Link
+                        key={event.id}
+                        href={`/portal/${city?.slug}/events/${event.id}`}
+                        className="block rounded-xl border bg-card p-3 hover:shadow-md transition-shadow"
+                      >
+                        <h4 className="text-sm font-medium">{event.title}</h4>
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
+                          <Clock className="h-3 w-3" />
+                          {formatTime(event.start_time)} –{" "}
+                          {formatTime(event.end_time)}
                         </div>
-                      )}
-                    </Link>
-                  ))}
+                        {venue && (
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                            <MapPin className="h-3 w-3" />
+                            <span className="truncate">
+                              {venue.title}
+                              {venue.location ? ` · ${venue.location}` : ""}
+                            </span>
+                          </div>
+                        )}
+                      </Link>
+                    )
+                  })}
                 </div>
               )}
             </>

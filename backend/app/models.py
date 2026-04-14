@@ -39,37 +39,9 @@ from app.api.email_template.schemas import (
     EmailTemplateType,
     EmailTemplateUpdate,
 )
-from app.api.form_field.models import FormFields
-from app.api.form_field.schemas import FormFieldCreate, FormFieldPublic, FormFieldUpdate
-
-# Form sections & fields
-from app.api.form_section.models import FormSections
-from app.api.form_section.schemas import (
-    FormSectionCreate,
-    FormSectionPublic,
-    FormSectionUpdate,
-)
-
-# Ticketing steps
-from app.api.ticketing_step.models import TicketingSteps
-from app.api.ticketing_step.schemas import (
-    TicketingStepCreate,
-    TicketingStepPublic,
-    TicketingStepUpdate,
-)
-
-# Group models
-from app.api.group.models import (
-    GroupLeaders,
-    GroupMembers,
-    GroupProducts,
-    Groups,
-    GroupWhitelistedEmails,
-)
-from app.api.group.schemas import GroupCreate, GroupPublic, GroupUpdate
 
 # Events module
-from app.api.event.models import Events
+from app.api.event.models import EventInvitations, Events
 from app.api.event.schemas import EventCreate, EventPublic, EventUpdate
 from app.api.event_participant.models import EventParticipants
 from app.api.event_participant.schemas import (
@@ -83,8 +55,45 @@ from app.api.event_settings.schemas import (
     EventSettingsPublic,
     EventSettingsUpdate,
 )
-from app.api.event_venue.models import EventVenues
-from app.api.event_venue.schemas import EventVenueCreate, EventVenuePublic, EventVenueUpdate
+from app.api.event_venue.models import (
+    EventVenues,
+    VenueExceptions,
+    VenuePhotos,
+    VenueProperties,
+    VenuePropertyTypes,
+    VenueWeeklyHours,
+)
+from app.api.event_venue.schemas import (
+    EventVenueCreate,
+    EventVenuePublic,
+    EventVenueUpdate,
+)
+from app.api.form_field.models import FormFields
+from app.api.form_field.schemas import FormFieldCreate, FormFieldPublic, FormFieldUpdate
+
+# Form sections & fields
+from app.api.form_section.models import FormSections
+from app.api.form_section.schemas import (
+    FormSectionCreate,
+    FormSectionPublic,
+    FormSectionUpdate,
+)
+
+# Google Calendar sync
+from app.api.google_calendar.models import (
+    EventGcalSync,
+    HumanGoogleCredentials,
+)
+
+# Group models
+from app.api.group.models import (
+    GroupLeaders,
+    GroupMembers,
+    GroupProducts,
+    Groups,
+    GroupWhitelistedEmails,
+)
+from app.api.group.schemas import GroupCreate, GroupPublic, GroupUpdate
 
 # Core models
 from app.api.human.models import Humans
@@ -106,6 +115,16 @@ from app.api.product.schemas import ProductCreate, ProductPublic, ProductUpdate
 from app.api.tenant.credential_models import TenantCredentials
 from app.api.tenant.models import Tenants
 from app.api.tenant.schemas import TenantCreate, TenantPublic, TenantUpdate
+
+# Ticketing steps
+from app.api.ticketing_step.models import TicketingSteps
+from app.api.ticketing_step.schemas import (
+    TicketingStepCreate,
+    TicketingStepPublic,
+    TicketingStepUpdate,
+)
+from app.api.track.models import Tracks
+from app.api.track.schemas import TrackCreate, TrackPublic, TrackUpdate
 from app.api.user.models import Users
 from app.api.user.schemas import UserCreate, UserPublic, UserUpdate
 
@@ -209,6 +228,7 @@ __all__ = [
     "ReviewDecision",
     # Events module
     "Events",
+    "EventInvitations",
     "EventCreate",
     "EventPublic",
     "EventUpdate",
@@ -217,6 +237,11 @@ __all__ = [
     "EventParticipantPublic",
     "EventParticipantUpdate",
     "EventVenues",
+    "VenueExceptions",
+    "VenuePhotos",
+    "VenueProperties",
+    "VenuePropertyTypes",
+    "VenueWeeklyHours",
     "EventVenueCreate",
     "EventVenuePublic",
     "EventVenueUpdate",
@@ -224,4 +249,11 @@ __all__ = [
     "EventSettingsCreate",
     "EventSettingsPublic",
     "EventSettingsUpdate",
+    "Tracks",
+    "TrackCreate",
+    "TrackPublic",
+    "TrackUpdate",
+    # Google Calendar sync
+    "HumanGoogleCredentials",
+    "EventGcalSync",
 ]

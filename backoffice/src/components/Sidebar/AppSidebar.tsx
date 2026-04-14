@@ -8,6 +8,7 @@ import {
   FormInput,
   Home,
   LayoutList,
+  ListTree,
   Mail,
   MapPin,
   Package,
@@ -67,6 +68,7 @@ const popupItems: Item[] = [
 const eventItems: Item[] = [
   { icon: CalendarDays, title: "Events", path: "/events" },
   { icon: MapPin, title: "Venues", path: "/events/venues" },
+  { icon: ListTree, title: "Tracks", path: "/events/tracks" },
   { icon: Settings, title: "Event Settings", path: "/events/settings" },
 ]
 

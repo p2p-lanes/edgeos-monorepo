@@ -1,12 +1,14 @@
 "use client"
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { format, parseISO } from "date-fns"
 import {
   ArrowLeft,
+  CalendarPlus,
   CheckCircle,
   Clock,
   MapPin,
+  Mail,
+  Send,
   Tag,
   UserPlus,
   Users,
@@ -14,34 +16,105 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
+import { useState } from "react"
+import { toast } from "sonner"
 
 import {
+  ApiError,
   EventParticipantsService,
   EventsService,
+  HumansService,
+  type EventInvitationBulkResult,
+  type EventInvitationPublic,
   type EventParticipantPublic,
 } from "@/client"
+import { Repeat } from "lucide-react"
+
+const WEEKDAY_NAMES: Record<string, string> = {
+  MO: "Monday",
+  TU: "Tuesday",
+  WE: "Wednesday",
+  TH: "Thursday",
+  FR: "Friday",
+  SA: "Saturday",
+  SU: "Sunday",
+}
+
+function summarizeRrule(rrule: string | null | undefined): string | null {
+  if (!rrule) return null
+  const kv: Record<string, string> = {}
+  for (const part of rrule.split(";")) {
+    const [k, v] = part.split("=")
+    if (k && v) kv[k.toUpperCase()] = v
+  }
+  const interval = parseInt(kv.INTERVAL ?? "1") || 1
+  let base = ""
+  if (kv.FREQ === "DAILY") {
+    base = interval === 1 ? "Repeats daily" : `Repeats every ${interval} days`
+  } else if (kv.FREQ === "WEEKLY") {
+    const byDay = (kv.BYDAY ?? "")
+      .split(",")
+      .map((c) => WEEKDAY_NAMES[c.toUpperCase()])
+      .filter(Boolean)
+    const every = interval === 1 ? "weekly" : `every ${interval} weeks`
+    base =
+      byDay.length > 0
+        ? `Repeats ${every} on ${byDay.join(", ")}`
+        : `Repeats ${every}`
+  } else if (kv.FREQ === "MONTHLY") {
+    base =
+      interval === 1 ? "Repeats monthly" : `Repeats every ${interval} months`
+  } else {
+    return null
+  }
+  if (kv.COUNT) {
+    base += `, for ${kv.COUNT} occurrences`
+  } else if (kv.UNTIL) {
+    const raw = kv.UNTIL.replace("Z", "")
+    if (raw.length >= 8) {
+      const y = raw.slice(0, 4)
+      const m = raw.slice(4, 6)
+      const d = raw.slice(6, 8)
+      base += `, until ${y}-${m}-${d}`
+    }
+  }
+  return base
+}
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
 import { useCityProvider } from "@/providers/cityProvider"
-
-function formatDateFull(dateStr: string) {
-  return format(parseISO(dateStr), "EEEE, MMMM d, yyyy")
-}
-function formatTime(dateStr: string) {
-  return format(parseISO(dateStr), "HH:mm")
-}
+import { downloadEventIcs } from "../lib/downloadEventIcs"
+import { useEventTimezone } from "../lib/useEventTimezone"
+import { useGoogleCalendar } from "../lib/useGoogleCalendar"
+import { useVenue } from "../lib/useVenue"
 
 export default function EventDetailPage() {
   const { getCity } = useCityProvider()
   const city = getCity()
   const params = useParams<{ eventId: string }>()
   const queryClient = useQueryClient()
+  const {
+    timezone,
+    formatTime,
+    formatDateFull,
+  } = useEventTimezone(city?.id)
 
-  const { data: event, isLoading } = useQuery({
+  const {
+    data: event,
+    isLoading,
+    error: eventError,
+  } = useQuery({
     queryKey: ["portal-event", params.eventId],
     queryFn: () =>
       EventsService.getPortalEvent({ eventId: params.eventId }),
     enabled: !!params.eventId,
+    retry: (failureCount, err) => {
+      if (err instanceof ApiError && (err.status === 404 || err.status === 403)) {
+        return false
+      }
+      return failureCount < 2
+    },
   })
 
   const { data: participantsData } = useQuery({
@@ -50,19 +123,33 @@ export default function EventDetailPage() {
       EventParticipantsService.listPortalParticipants({
         eventId: params.eventId,
       }),
-    enabled: !!params.eventId,
+    enabled: !!params.eventId && !!event,
   })
+
+  const { data: currentHuman } = useQuery({
+    queryKey: ["current-human"],
+    queryFn: () => HumansService.getCurrentHumanInfo(),
+  })
+
+  const { data: venue } = useVenue(event?.venue_id)
 
   const participants = participantsData?.results ?? []
   const activeParticipants = participants.filter(
     (p: EventParticipantPublic) => p.status !== "cancelled"
   )
 
+  const isOwner =
+    !!event && !!currentHuman && event.owner_id === currentHuman.id
+
   const myParticipation = participants.find(
-    (p: EventParticipantPublic) => p.status !== "cancelled"
-    // Note: filtering by profile_id would require knowing current human id
-    // For now we show RSVP status based on API response
+    (p: EventParticipantPublic) =>
+      currentHuman ? p.profile_id === currentHuman.id : false,
   )
+
+  const { status: gcalStatus } = useGoogleCalendar()
+  const gcalConnected = gcalStatus?.connected === true
+  const myParticipationActive =
+    myParticipation && myParticipation.status !== "cancelled"
 
   const registerMutation = useMutation({
     mutationFn: () =>
@@ -98,10 +185,65 @@ export default function EventDetailPage() {
     },
   })
 
+  const { data: invitations = [] } = useQuery<EventInvitationPublic[]>({
+    queryKey: ["portal-event-invitations", params.eventId],
+    queryFn: () =>
+      EventsService.listInvitations({ eventId: params.eventId }),
+    enabled: !!params.eventId && isOwner,
+  })
+
+  const [emailsInput, setEmailsInput] = useState("")
+
+  const bulkInviteMutation = useMutation({
+    mutationFn: async () => {
+      const emails = emailsInput
+        .split(/[\s,;]+/)
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0)
+      if (emails.length === 0) {
+        throw new Error("Enter at least one email")
+      }
+      return EventsService.bulkInvite({
+        eventId: params.eventId,
+        requestBody: { emails },
+      })
+    },
+    onSuccess: (result: EventInvitationBulkResult) => {
+      const { invited, skipped_existing, not_found } = result
+      toast.success(
+        `Invited ${invited.length} · Skipped ${skipped_existing.length} · Not found ${not_found.length}`,
+      )
+      setEmailsInput("")
+      queryClient.invalidateQueries({
+        queryKey: ["portal-event-invitations", params.eventId],
+      })
+    },
+    onError: (err: unknown) => {
+      toast.error(err instanceof Error ? err.message : "Failed to invite")
+    },
+  })
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    )
+  }
+
+  if (eventError instanceof ApiError && eventError.status === 404) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-10 text-center">
+        <h1 className="text-lg font-semibold mb-1">Event not found</h1>
+        <p className="text-sm text-muted-foreground">
+          This event does not exist or you do not have access to it.
+        </p>
+        <Link
+          href={`/portal/${city?.slug}/events`}
+          className="inline-flex items-center gap-1 text-sm text-primary mt-4"
+        >
+          <ArrowLeft className="h-4 w-4" /> Back to events
+        </Link>
       </div>
     )
   }
@@ -120,6 +262,9 @@ export default function EventDetailPage() {
     checkInMutation.isPending
   const eventStarted = new Date(event.start_time) <= new Date()
 
+  const coverUrl = event.cover_url || venue?.image_url || null
+  const coverCredit = !event.cover_url && venue?.image_url ? venue.title : null
+
   return (
     <div className="max-w-2xl mx-auto p-4 sm:p-6 space-y-4">
       <Link
@@ -129,13 +274,21 @@ export default function EventDetailPage() {
         <ArrowLeft className="h-4 w-4" /> Back to events
       </Link>
 
-      {event.cover_url && (
-        <div className="w-full h-40 sm:h-52 rounded-xl overflow-hidden">
-          <img
-            src={event.cover_url}
-            alt={event.title}
-            className="w-full h-full object-cover"
-          />
+      {coverUrl && (
+        <div>
+          <div className="w-full h-40 sm:h-52 rounded-xl overflow-hidden">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={coverUrl}
+              alt={event.title}
+              className="w-full h-full object-cover"
+            />
+          </div>
+          {coverCredit && (
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Photo: {coverCredit}
+            </p>
+          )}
         </div>
       )}
 
@@ -151,8 +304,11 @@ export default function EventDetailPage() {
           >
             {event.status}
           </Badge>
-          {event.kind && (
-            <Badge variant="outline">{event.kind}</Badge>
+          {event.kind && <Badge variant="outline">{event.kind}</Badge>}
+          {event.visibility && event.visibility !== "public" && (
+            <Badge variant="outline" className="capitalize">
+              {event.visibility}
+            </Badge>
           )}
         </div>
         <h1 className="text-xl sm:text-2xl font-bold">{event.title}</h1>
@@ -165,18 +321,42 @@ export default function EventDetailPage() {
             <Clock className="h-4 w-4 text-primary" />
           </div>
           <div>
-            <p className="text-sm font-medium">{formatDateFull(event.start_time)}</p>
+            <p className="text-sm font-medium">
+              {formatDateFull(event.start_time)}
+            </p>
             <p className="text-xs text-muted-foreground">
               {formatTime(event.start_time)} – {formatTime(event.end_time)}
             </p>
+            {timezone && (
+              <p className="text-[11px] text-muted-foreground/80 mt-0.5">
+                — in {timezone} time
+              </p>
+            )}
           </div>
         </div>
-        {event.location && (
+        {event.rrule && (
+          <div className="flex items-center gap-2.5">
+            <div className="h-8 w-8 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">
+              <Repeat className="h-4 w-4 text-blue-600" />
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {summarizeRrule(event.rrule)}
+            </p>
+          </div>
+        )}
+        {venue && (
           <div className="flex items-center gap-2.5">
             <div className="h-8 w-8 rounded-lg bg-green-500/10 flex items-center justify-center shrink-0">
               <MapPin className="h-4 w-4 text-green-600" />
             </div>
-            <p className="text-sm">{event.location}</p>
+            <div className="min-w-0">
+              <p className="text-sm font-medium truncate">{venue.title}</p>
+              {venue.location && (
+                <p className="text-xs text-muted-foreground truncate">
+                  {venue.location}
+                </p>
+              )}
+            </div>
           </div>
         )}
         {event.meeting_url && (
@@ -194,6 +374,19 @@ export default function EventDetailPage() {
             </a>
           </div>
         )}
+
+        <div className="pt-1">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              downloadEventIcs({ eventId: event.id, title: event.title })
+            }
+          >
+            <CalendarPlus className="mr-2 h-4 w-4" />
+            Add to calendar
+          </Button>
+        </div>
       </div>
 
       {event.content && (
@@ -232,6 +425,12 @@ export default function EventDetailPage() {
                     : "Registered"}
                 </span>
               </div>
+              {gcalConnected && myParticipationActive && (
+                <p className="text-xs text-muted-foreground inline-flex items-center gap-1.5">
+                  <CalendarPlus className="h-3.5 w-3.5" />
+                  Synced to your Google Calendar
+                </p>
+              )}
               {myParticipation.status === "registered" && (
                 <div className="flex gap-2">
                   {eventStarted ? (
@@ -265,8 +464,66 @@ export default function EventDetailPage() {
               className="inline-flex items-center gap-2"
             >
               <UserPlus className="h-4 w-4" />
-              RSVP
+              {gcalConnected ? "RSVP & add to Google Calendar" : "RSVP"}
             </Button>
+          )}
+        </div>
+      )}
+
+      {/* Owner-only: Paste attendees to invite */}
+      {isOwner && (
+        <div className="rounded-xl border bg-card p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Mail className="h-4 w-4 text-primary" />
+            <h3 className="text-sm font-semibold">Invite attendees</h3>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Paste emails (one per line or comma-separated). Only humans already
+            in this popup can be invited.
+          </p>
+          <Textarea
+            value={emailsInput}
+            onChange={(e) => setEmailsInput(e.target.value)}
+            placeholder={"alice@example.com\nbob@example.com"}
+            rows={5}
+            disabled={bulkInviteMutation.isPending}
+          />
+          <div className="flex justify-end">
+            <Button
+              size="sm"
+              onClick={() => bulkInviteMutation.mutate()}
+              disabled={
+                bulkInviteMutation.isPending || emailsInput.trim().length === 0
+              }
+            >
+              <Send className="mr-2 h-4 w-4" />
+              {bulkInviteMutation.isPending ? "Inviting..." : "Invite"}
+            </Button>
+          </div>
+
+          {invitations.length > 0 && (
+            <div className="pt-2 border-t">
+              <h4 className="text-xs font-semibold uppercase text-muted-foreground mb-2">
+                Invitations ({invitations.length})
+              </h4>
+              <ul className="space-y-1 max-h-48 overflow-y-auto">
+                {invitations.map((inv) => (
+                  <li
+                    key={inv.id}
+                    className="flex items-center justify-between text-xs"
+                  >
+                    <span className="truncate">
+                      {inv.first_name || inv.last_name
+                        ? `${inv.first_name ?? ""} ${inv.last_name ?? ""}`.trim()
+                        : inv.email}
+                    </span>
+                    <span className="text-muted-foreground truncate ml-2">
+                      {inv.email}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </div>
       )}

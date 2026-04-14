@@ -3075,6 +3075,1557 @@ export const EnrichedDashboardStatsSchema = {
     description: 'Full enriched dashboard response.'
 } as const;
 
+export const EventAvailabilityCheckSchema = {
+    properties: {
+        venue_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Venue Id'
+        },
+        start_time: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Start Time'
+        },
+        end_time: {
+            type: 'string',
+            format: 'date-time',
+            title: 'End Time'
+        },
+        exclude_event_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Exclude Event Id'
+        }
+    },
+    type: 'object',
+    required: ['venue_id', 'start_time', 'end_time'],
+    title: 'EventAvailabilityCheck'
+} as const;
+
+export const EventAvailabilityResultSchema = {
+    properties: {
+        available: {
+            type: 'boolean',
+            title: 'Available'
+        },
+        conflicts: {
+            items: {
+                type: 'string',
+                format: 'uuid'
+            },
+            type: 'array',
+            title: 'Conflicts',
+            default: []
+        },
+        reason: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Reason'
+        }
+    },
+    type: 'object',
+    required: ['available'],
+    title: 'EventAvailabilityResult'
+} as const;
+
+export const EventCreateSchema = {
+    properties: {
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        content: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Content'
+        },
+        start_time: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Start Time'
+        },
+        end_time: {
+            type: 'string',
+            format: 'date-time',
+            title: 'End Time'
+        },
+        timezone: {
+            type: 'string',
+            title: 'Timezone',
+            default: 'UTC'
+        },
+        cover_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Cover Url'
+        },
+        meeting_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Meeting Url'
+        },
+        max_participant: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Participant'
+        },
+        tags: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Tags',
+            default: []
+        },
+        venue_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Venue Id'
+        },
+        track_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Track Id'
+        },
+        visibility: {
+            '$ref': '#/components/schemas/EventVisibility',
+            default: 'public'
+        },
+        require_approval: {
+            type: 'boolean',
+            title: 'Require Approval',
+            default: false
+        },
+        kind: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Kind'
+        },
+        status: {
+            '$ref': '#/components/schemas/EventStatus',
+            default: 'draft'
+        },
+        recurrence: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/RecurrenceRule'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    type: 'object',
+    required: ['popup_id', 'title', 'start_time', 'end_time'],
+    title: 'EventCreate',
+    description: 'Event schema for creation.'
+} as const;
+
+export const EventInvitationBulkCreateSchema = {
+    properties: {
+        emails: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            maxItems: 1000,
+            minItems: 1,
+            title: 'Emails'
+        }
+    },
+    type: 'object',
+    required: ['emails'],
+    title: 'EventInvitationBulkCreate',
+    description: 'Paste-a-list bulk invite. Emails must match humans in the tenant.'
+} as const;
+
+export const EventInvitationBulkResultSchema = {
+    properties: {
+        invited: {
+            items: {
+                '$ref': '#/components/schemas/EventInvitationPublic'
+            },
+            type: 'array',
+            title: 'Invited'
+        },
+        skipped_existing: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Skipped Existing'
+        },
+        not_found: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Not Found'
+        }
+    },
+    type: 'object',
+    required: ['invited', 'skipped_existing', 'not_found'],
+    title: 'EventInvitationBulkResult'
+} as const;
+
+export const EventInvitationPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        event_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Event Id'
+        },
+        human_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Human Id'
+        },
+        email: {
+            type: 'string',
+            title: 'Email'
+        },
+        first_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'First Name'
+        },
+        last_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Name'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'event_id', 'human_id', 'email', 'created_at'],
+    title: 'EventInvitationPublic'
+} as const;
+
+export const EventParticipantCreateSchema = {
+    properties: {
+        event_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Event Id'
+        },
+        profile_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Profile Id'
+        },
+        role: {
+            '$ref': '#/components/schemas/ParticipantRole',
+            default: 'attendee'
+        },
+        message: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Message'
+        }
+    },
+    type: 'object',
+    required: ['event_id', 'profile_id'],
+    title: 'EventParticipantCreate',
+    description: 'Participant schema for creation (admin adding participant).'
+} as const;
+
+export const EventParticipantPublicSchema = {
+    properties: {
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        event_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Event Id'
+        },
+        profile_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Profile Id'
+        },
+        status: {
+            '$ref': '#/components/schemas/ParticipantStatus',
+            default: 'registered'
+        },
+        role: {
+            '$ref': '#/components/schemas/ParticipantRole',
+            default: 'attendee'
+        },
+        check_time: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Check Time'
+        },
+        message: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Message'
+        },
+        registered_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Registered At'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        updated_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Updated At'
+        },
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        }
+    },
+    type: 'object',
+    required: ['tenant_id', 'event_id', 'profile_id', 'id'],
+    title: 'EventParticipantPublic',
+    description: 'Participant schema for API responses.'
+} as const;
+
+export const EventParticipantUpdateSchema = {
+    properties: {
+        status: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/ParticipantStatus'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        role: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/ParticipantRole'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        message: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Message'
+        }
+    },
+    type: 'object',
+    title: 'EventParticipantUpdate',
+    description: 'Participant schema for updates.'
+} as const;
+
+export const EventPublicSchema = {
+    properties: {
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        owner_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Owner Id'
+        },
+        title: {
+            type: 'string',
+            maxLength: 255,
+            title: 'Title'
+        },
+        content: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Content'
+        },
+        start_time: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Start Time'
+        },
+        end_time: {
+            type: 'string',
+            format: 'date-time',
+            title: 'End Time'
+        },
+        timezone: {
+            type: 'string',
+            maxLength: 64,
+            title: 'Timezone',
+            default: 'UTC'
+        },
+        cover_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Cover Url'
+        },
+        meeting_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Meeting Url'
+        },
+        max_participant: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Participant'
+        },
+        tags: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Tags'
+        },
+        venue_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Venue Id'
+        },
+        track_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Track Id'
+        },
+        visibility: {
+            '$ref': '#/components/schemas/EventVisibility',
+            maxLength: 20,
+            default: 'public'
+        },
+        require_approval: {
+            type: 'boolean',
+            title: 'Require Approval',
+            default: false
+        },
+        kind: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 100
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Kind'
+        },
+        status: {
+            '$ref': '#/components/schemas/EventStatus',
+            default: 'draft'
+        },
+        rrule: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Rrule'
+        },
+        recurrence_master_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Recurrence Master Id'
+        },
+        recurrence_exdates: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Recurrence Exdates'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        updated_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Updated At'
+        },
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        occurrence_id: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Occurrence Id'
+        }
+    },
+    type: 'object',
+    required: ['tenant_id', 'popup_id', 'owner_id', 'title', 'start_time', 'end_time', 'id'],
+    title: 'EventPublic',
+    description: 'Event schema for API responses.'
+} as const;
+
+export const EventSettingsCreateSchema = {
+    properties: {
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        can_publish_event: {
+            '$ref': '#/components/schemas/PublishPermission',
+            default: 'everyone'
+        },
+        event_enabled: {
+            type: 'boolean',
+            title: 'Event Enabled',
+            default: true
+        },
+        humans_can_create_venues: {
+            type: 'boolean',
+            title: 'Humans Can Create Venues',
+            default: false
+        },
+        venues_require_approval: {
+            type: 'boolean',
+            title: 'Venues Require Approval',
+            default: true
+        },
+        timezone: {
+            type: 'string',
+            title: 'Timezone',
+            default: 'UTC'
+        }
+    },
+    type: 'object',
+    required: ['popup_id'],
+    title: 'EventSettingsCreate',
+    description: 'Event settings schema for creation.'
+} as const;
+
+export const EventSettingsPublicSchema = {
+    properties: {
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        can_publish_event: {
+            '$ref': '#/components/schemas/PublishPermission',
+            default: 'everyone'
+        },
+        event_enabled: {
+            type: 'boolean',
+            title: 'Event Enabled',
+            default: true
+        },
+        humans_can_create_venues: {
+            type: 'boolean',
+            title: 'Humans Can Create Venues',
+            default: false
+        },
+        venues_require_approval: {
+            type: 'boolean',
+            title: 'Venues Require Approval',
+            default: true
+        },
+        timezone: {
+            type: 'string',
+            maxLength: 64,
+            title: 'Timezone',
+            default: 'UTC'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        updated_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Updated At'
+        },
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        }
+    },
+    type: 'object',
+    required: ['tenant_id', 'popup_id', 'id'],
+    title: 'EventSettingsPublic',
+    description: 'Event settings schema for API responses.'
+} as const;
+
+export const EventSettingsUpdateSchema = {
+    properties: {
+        can_publish_event: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/PublishPermission'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        event_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Event Enabled'
+        },
+        humans_can_create_venues: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Humans Can Create Venues'
+        },
+        venues_require_approval: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Venues Require Approval'
+        },
+        timezone: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Timezone'
+        }
+    },
+    type: 'object',
+    title: 'EventSettingsUpdate',
+    description: 'Event settings schema for updates.'
+} as const;
+
+export const EventStatusSchema = {
+    type: 'string',
+    enum: ['draft', 'published', 'cancelled'],
+    title: 'EventStatus'
+} as const;
+
+export const EventUpdateSchema = {
+    properties: {
+        title: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Title'
+        },
+        content: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Content'
+        },
+        start_time: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Start Time'
+        },
+        end_time: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'End Time'
+        },
+        timezone: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Timezone'
+        },
+        cover_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Cover Url'
+        },
+        meeting_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Meeting Url'
+        },
+        max_participant: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Participant'
+        },
+        tags: {
+            anyOf: [
+                {
+                    items: {
+                        type: 'string'
+                    },
+                    type: 'array'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Tags'
+        },
+        venue_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Venue Id'
+        },
+        track_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Track Id'
+        },
+        visibility: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/EventVisibility'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        require_approval: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Require Approval'
+        },
+        kind: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Kind'
+        },
+        status: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/EventStatus'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    type: 'object',
+    title: 'EventUpdate',
+    description: 'Event schema for updates.'
+} as const;
+
+export const EventVenueCreateSchema = {
+    properties: {
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        location: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Location'
+        },
+        formatted_address: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Formatted Address'
+        },
+        geo_lat: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Geo Lat'
+        },
+        geo_lng: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Geo Lng'
+        },
+        capacity: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Capacity'
+        },
+        start_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Start Date'
+        },
+        end_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'End Date'
+        },
+        amenities: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Amenities',
+            default: []
+        },
+        tags: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Tags',
+            default: []
+        },
+        image_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Image Url'
+        },
+        booking_mode: {
+            '$ref': '#/components/schemas/VenueBookingMode',
+            default: 'free'
+        },
+        setup_time_minutes: {
+            type: 'integer',
+            title: 'Setup Time Minutes',
+            default: 0
+        },
+        teardown_time_minutes: {
+            type: 'integer',
+            title: 'Teardown Time Minutes',
+            default: 0
+        },
+        property_type_ids: {
+            items: {
+                type: 'string',
+                format: 'uuid'
+            },
+            type: 'array',
+            title: 'Property Type Ids',
+            default: []
+        }
+    },
+    type: 'object',
+    required: ['popup_id', 'title'],
+    title: 'EventVenueCreate',
+    description: 'Venue schema for creation.'
+} as const;
+
+export const EventVenuePublicSchema = {
+    properties: {
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        owner_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Owner Id'
+        },
+        title: {
+            type: 'string',
+            maxLength: 255,
+            title: 'Title'
+        },
+        location: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Location'
+        },
+        formatted_address: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Formatted Address'
+        },
+        geo_lat: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Geo Lat'
+        },
+        geo_lng: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Geo Lng'
+        },
+        capacity: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Capacity'
+        },
+        start_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Start Date'
+        },
+        end_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'End Date'
+        },
+        amenities: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Amenities'
+        },
+        tags: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Tags'
+        },
+        image_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Image Url'
+        },
+        booking_mode: {
+            '$ref': '#/components/schemas/VenueBookingMode',
+            maxLength: 30,
+            default: 'free'
+        },
+        setup_time_minutes: {
+            type: 'integer',
+            title: 'Setup Time Minutes',
+            default: 0
+        },
+        teardown_time_minutes: {
+            type: 'integer',
+            title: 'Teardown Time Minutes',
+            default: 0
+        },
+        status: {
+            '$ref': '#/components/schemas/VenueStatus',
+            maxLength: 20,
+            default: 'active'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        updated_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Updated At'
+        },
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        properties: {
+            items: {
+                '$ref': '#/components/schemas/VenuePropertyRef'
+            },
+            type: 'array',
+            title: 'Properties',
+            default: []
+        },
+        photos: {
+            items: {
+                '$ref': '#/components/schemas/VenuePhotoRef'
+            },
+            type: 'array',
+            title: 'Photos',
+            default: []
+        },
+        weekly_hours: {
+            items: {
+                '$ref': '#/components/schemas/VenueWeeklyHourRef'
+            },
+            type: 'array',
+            title: 'Weekly Hours',
+            default: []
+        },
+        exceptions: {
+            items: {
+                '$ref': '#/components/schemas/VenueExceptionRef'
+            },
+            type: 'array',
+            title: 'Exceptions',
+            default: []
+        }
+    },
+    type: 'object',
+    required: ['tenant_id', 'popup_id', 'owner_id', 'title', 'id'],
+    title: 'EventVenuePublic',
+    description: 'Venue schema for API responses.'
+} as const;
+
+export const EventVenueUpdateSchema = {
+    properties: {
+        title: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Title'
+        },
+        location: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Location'
+        },
+        formatted_address: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Formatted Address'
+        },
+        geo_lat: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Geo Lat'
+        },
+        geo_lng: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Geo Lng'
+        },
+        capacity: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Capacity'
+        },
+        start_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Start Date'
+        },
+        end_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'End Date'
+        },
+        amenities: {
+            anyOf: [
+                {
+                    items: {
+                        type: 'string'
+                    },
+                    type: 'array'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Amenities'
+        },
+        tags: {
+            anyOf: [
+                {
+                    items: {
+                        type: 'string'
+                    },
+                    type: 'array'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Tags'
+        },
+        image_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Image Url'
+        },
+        booking_mode: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/VenueBookingMode'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        setup_time_minutes: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Setup Time Minutes'
+        },
+        teardown_time_minutes: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Teardown Time Minutes'
+        },
+        status: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/VenueStatus'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        property_type_ids: {
+            anyOf: [
+                {
+                    items: {
+                        type: 'string',
+                        format: 'uuid'
+                    },
+                    type: 'array'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Property Type Ids'
+        }
+    },
+    type: 'object',
+    title: 'EventVenueUpdate',
+    description: 'Venue schema for updates.'
+} as const;
+
+export const EventVisibilitySchema = {
+    type: 'string',
+    enum: ['public', 'private', 'unlisted'],
+    title: 'EventVisibility'
+} as const;
+
 export const FormFieldCreateSchema = {
     properties: {
         popup_id: {
@@ -3493,6 +5044,61 @@ export const FormSectionUpdateSchema = {
     },
     type: 'object',
     title: 'FormSectionUpdate'
+} as const;
+
+export const GoogleAuthUrlResponseSchema = {
+    properties: {
+        url: {
+            type: 'string',
+            title: 'Url'
+        },
+        state: {
+            type: 'string',
+            title: 'State'
+        }
+    },
+    type: 'object',
+    required: ['url', 'state'],
+    title: 'GoogleAuthUrlResponse'
+} as const;
+
+export const GoogleConnectionStatusSchema = {
+    properties: {
+        configured: {
+            type: 'boolean',
+            title: 'Configured'
+        },
+        connected: {
+            type: 'boolean',
+            title: 'Connected'
+        },
+        calendar_id: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Calendar Id'
+        },
+        connected_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Connected At'
+        }
+    },
+    type: 'object',
+    required: ['configured', 'connected'],
+    title: 'GoogleConnectionStatus'
 } as const;
 
 export const GroupAdminUpdateSchema = {
@@ -5015,6 +6621,60 @@ export const ListModel_EmailTemplatePublic_Schema = {
     title: 'ListModel[EmailTemplatePublic]'
 } as const;
 
+export const ListModel_EventParticipantPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/EventParticipantPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[EventParticipantPublic]'
+} as const;
+
+export const ListModel_EventPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/EventPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[EventPublic]'
+} as const;
+
+export const ListModel_EventVenuePublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/EventVenuePublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[EventVenuePublic]'
+} as const;
+
 export const ListModel_FormFieldPublic_Schema = {
     properties: {
         results: {
@@ -5195,6 +6855,24 @@ export const ListModel_TicketingStepPublic_Schema = {
     title: 'ListModel[TicketingStepPublic]'
 } as const;
 
+export const ListModel_TrackPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/TrackPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[TrackPublic]'
+} as const;
+
 export const ListModel_UserPublic_Schema = {
     properties: {
         results: {
@@ -5227,6 +6905,20 @@ export const NoParticipationSchema = {
     description: 'Response when human has no participation in the popup.'
 } as const;
 
+export const OccurrenceRefSchema = {
+    properties: {
+        occurrence_start: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Occurrence Start'
+        }
+    },
+    type: 'object',
+    required: ['occurrence_start'],
+    title: 'OccurrenceRef',
+    description: 'Body referencing a specific instance of a recurring series.'
+} as const;
+
 export const PagingSchema = {
     properties: {
         limit: {
@@ -5245,6 +6937,18 @@ export const PagingSchema = {
     type: 'object',
     required: ['limit', 'offset', 'total'],
     title: 'Paging'
+} as const;
+
+export const ParticipantRoleSchema = {
+    type: 'string',
+    enum: ['host', 'speaker', 'attendee'],
+    title: 'ParticipantRole'
+} as const;
+
+export const ParticipantStatusSchema = {
+    type: 'string',
+    enum: ['registered', 'checked_in', 'cancelled'],
+    title: 'ParticipantStatus'
 } as const;
 
 export const PaymentCreateSchema = {
@@ -8265,6 +9969,119 @@ export const ProductWithQuantitySchema = {
     description: 'Product with quantity for attendee products.'
 } as const;
 
+export const PublishPermissionSchema = {
+    type: 'string',
+    enum: ['admin_only', 'everyone'],
+    title: 'PublishPermission'
+} as const;
+
+export const RecurrenceRuleSchema = {
+    properties: {
+        freq: {
+            type: 'string',
+            enum: ['DAILY', 'WEEKLY', 'MONTHLY'],
+            title: 'Freq'
+        },
+        interval: {
+            type: 'integer',
+            maximum: 999,
+            minimum: 1,
+            title: 'Interval',
+            default: 1
+        },
+        by_day: {
+            anyOf: [
+                {
+                    items: {
+                        type: 'string',
+                        enum: ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU']
+                    },
+                    type: 'array'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'By Day'
+        },
+        count: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    maximum: 1000,
+                    minimum: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Count'
+        },
+        until: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Until'
+        }
+    },
+    type: 'object',
+    required: ['freq'],
+    title: 'RecurrenceRule',
+    description: `UI-friendly representation of the subset of RFC-5545 we support.
+
+Converted to/from a canonical RRULE string via
+\`\`app.api.event.recurrence.format_rrule\`\`/\`\`parse_rrule\`\`.`
+} as const;
+
+export const RecurrenceUpdateSchema = {
+    properties: {
+        recurrence: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/RecurrenceRule'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    type: 'object',
+    title: 'RecurrenceUpdate',
+    description: `Body for PATCH /events/{id}/recurrence.
+
+\`\`recurrence=None\`\` clears the RRULE (series becomes a one-off).`
+} as const;
+
+export const RegisterRequestSchema = {
+    properties: {
+        role: {
+            '$ref': '#/components/schemas/ParticipantRole',
+            default: 'attendee'
+        },
+        message: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Message'
+        }
+    },
+    type: 'object',
+    title: 'RegisterRequest',
+    description: 'Request body for self-registration.'
+} as const;
+
 export const RevenueBreakdownSchema = {
     properties: {
         by_product: {
@@ -9310,6 +11127,145 @@ export const TokenSchema = {
     title: 'Token'
 } as const;
 
+export const TrackCreateSchema = {
+    properties: {
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        name: {
+            type: 'string',
+            maxLength: 255,
+            minLength: 1,
+            title: 'Name'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        topic: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Topic',
+            default: []
+        }
+    },
+    type: 'object',
+    required: ['popup_id', 'name'],
+    title: 'TrackCreate'
+} as const;
+
+export const TrackPublicSchema = {
+    properties: {
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        name: {
+            type: 'string',
+            maxLength: 255,
+            title: 'Name'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        topic: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Topic'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        updated_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Updated At'
+        },
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        }
+    },
+    type: 'object',
+    required: ['tenant_id', 'popup_id', 'name', 'id'],
+    title: 'TrackPublic'
+} as const;
+
+export const TrackUpdateSchema = {
+    properties: {
+        name: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255,
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Name'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        topic: {
+            anyOf: [
+                {
+                    items: {
+                        type: 'string'
+                    },
+                    type: 'array'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Topic'
+        }
+    },
+    type: 'object',
+    title: 'TrackUpdate'
+} as const;
+
 export const UserAuthSchema = {
     properties: {
         email: {
@@ -9581,4 +11537,591 @@ export const ValidationErrorSchema = {
     type: 'object',
     required: ['loc', 'msg', 'type'],
     title: 'ValidationError'
+} as const;
+
+export const VenueAvailabilitySchema = {
+    properties: {
+        venue_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Venue Id'
+        },
+        open_ranges: {
+            items: {
+                prefixItems: [
+                    {
+                        type: 'string',
+                        format: 'date-time'
+                    },
+                    {
+                        type: 'string',
+                        format: 'date-time'
+                    }
+                ],
+                type: 'array',
+                maxItems: 2,
+                minItems: 2
+            },
+            type: 'array',
+            title: 'Open Ranges'
+        },
+        busy: {
+            items: {
+                '$ref': '#/components/schemas/VenueBusySlot'
+            },
+            type: 'array',
+            title: 'Busy'
+        }
+    },
+    type: 'object',
+    required: ['venue_id', 'open_ranges', 'busy'],
+    title: 'VenueAvailability'
+} as const;
+
+export const VenueBookingModeSchema = {
+    type: 'string',
+    enum: ['free', 'approval_required', 'unbookable'],
+    title: 'VenueBookingMode'
+} as const;
+
+export const VenueBusySlotSchema = {
+    properties: {
+        start: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Start'
+        },
+        end: {
+            type: 'string',
+            format: 'date-time',
+            title: 'End'
+        },
+        source: {
+            type: 'string',
+            title: 'Source'
+        },
+        label: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Label'
+        }
+    },
+    type: 'object',
+    required: ['start', 'end', 'source'],
+    title: 'VenueBusySlot'
+} as const;
+
+export const VenueExceptionCreateSchema = {
+    properties: {
+        start_datetime: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Start Datetime'
+        },
+        end_datetime: {
+            type: 'string',
+            format: 'date-time',
+            title: 'End Datetime'
+        },
+        reason: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Reason'
+        },
+        is_closed: {
+            type: 'boolean',
+            title: 'Is Closed',
+            default: true
+        }
+    },
+    type: 'object',
+    required: ['start_datetime', 'end_datetime'],
+    title: 'VenueExceptionCreate'
+} as const;
+
+export const VenueExceptionPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        venue_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Venue Id'
+        },
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        start_datetime: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Start Datetime'
+        },
+        end_datetime: {
+            type: 'string',
+            format: 'date-time',
+            title: 'End Datetime'
+        },
+        reason: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Reason'
+        },
+        is_closed: {
+            type: 'boolean',
+            title: 'Is Closed'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'venue_id', 'tenant_id', 'start_datetime', 'end_datetime', 'is_closed', 'created_at'],
+    title: 'VenueExceptionPublic'
+} as const;
+
+export const VenueExceptionRefSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        start_datetime: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Start Datetime'
+        },
+        end_datetime: {
+            type: 'string',
+            format: 'date-time',
+            title: 'End Datetime'
+        },
+        reason: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Reason'
+        },
+        is_closed: {
+            type: 'boolean',
+            title: 'Is Closed'
+        }
+    },
+    type: 'object',
+    required: ['id', 'start_datetime', 'end_datetime', 'is_closed'],
+    title: 'VenueExceptionRef'
+} as const;
+
+export const VenueExceptionUpdateSchema = {
+    properties: {
+        start_datetime: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Start Datetime'
+        },
+        end_datetime: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'End Datetime'
+        },
+        reason: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Reason'
+        },
+        is_closed: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Is Closed'
+        }
+    },
+    type: 'object',
+    title: 'VenueExceptionUpdate'
+} as const;
+
+export const VenuePhotoCreateSchema = {
+    properties: {
+        image_url: {
+            type: 'string',
+            title: 'Image Url'
+        },
+        position: {
+            type: 'integer',
+            title: 'Position',
+            default: 0
+        }
+    },
+    type: 'object',
+    required: ['image_url'],
+    title: 'VenuePhotoCreate'
+} as const;
+
+export const VenuePhotoPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        venue_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Venue Id'
+        },
+        image_url: {
+            type: 'string',
+            title: 'Image Url'
+        },
+        position: {
+            type: 'integer',
+            title: 'Position'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'venue_id', 'image_url', 'position', 'created_at'],
+    title: 'VenuePhotoPublic'
+} as const;
+
+export const VenuePhotoRefSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        image_url: {
+            type: 'string',
+            title: 'Image Url'
+        },
+        position: {
+            type: 'integer',
+            title: 'Position'
+        }
+    },
+    type: 'object',
+    required: ['id', 'image_url', 'position'],
+    title: 'VenuePhotoRef'
+} as const;
+
+export const VenuePhotoUpdateSchema = {
+    properties: {
+        image_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Image Url'
+        },
+        position: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Position'
+        }
+    },
+    type: 'object',
+    title: 'VenuePhotoUpdate'
+} as const;
+
+export const VenuePropertyRefSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        icon: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Icon'
+        }
+    },
+    type: 'object',
+    required: ['id', 'name'],
+    title: 'VenuePropertyRef'
+} as const;
+
+export const VenuePropertyTypeCreateSchema = {
+    properties: {
+        name: {
+            type: 'string',
+            maxLength: 100,
+            minLength: 1,
+            title: 'Name'
+        },
+        icon: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 100
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Icon'
+        }
+    },
+    type: 'object',
+    required: ['name'],
+    title: 'VenuePropertyTypeCreate'
+} as const;
+
+export const VenuePropertyTypePublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        icon: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Icon'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'tenant_id', 'name', 'created_at'],
+    title: 'VenuePropertyTypePublic'
+} as const;
+
+export const VenuePropertyTypeUpdateSchema = {
+    properties: {
+        name: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 100,
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Name'
+        },
+        icon: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 100
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Icon'
+        }
+    },
+    type: 'object',
+    title: 'VenuePropertyTypeUpdate'
+} as const;
+
+export const VenueStatusSchema = {
+    type: 'string',
+    enum: ['pending', 'active'],
+    title: 'VenueStatus'
+} as const;
+
+export const VenueWeeklyHourInputSchema = {
+    properties: {
+        day_of_week: {
+            type: 'integer',
+            maximum: 6,
+            minimum: 0,
+            title: 'Day Of Week'
+        },
+        open_time: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Time'
+        },
+        close_time: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Close Time'
+        },
+        is_closed: {
+            type: 'boolean',
+            title: 'Is Closed',
+            default: false
+        }
+    },
+    type: 'object',
+    required: ['day_of_week'],
+    title: 'VenueWeeklyHourInput'
+} as const;
+
+export const VenueWeeklyHourRefSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        day_of_week: {
+            type: 'integer',
+            title: 'Day Of Week'
+        },
+        open_time: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Open Time'
+        },
+        close_time: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Close Time'
+        },
+        is_closed: {
+            type: 'boolean',
+            title: 'Is Closed'
+        }
+    },
+    type: 'object',
+    required: ['id', 'day_of_week', 'open_time', 'close_time', 'is_closed'],
+    title: 'VenueWeeklyHourRef'
+} as const;
+
+export const VenueWeeklyHoursUpdateSchema = {
+    properties: {
+        hours: {
+            items: {
+                '$ref': '#/components/schemas/VenueWeeklyHourInput'
+            },
+            type: 'array',
+            title: 'Hours'
+        }
+    },
+    type: 'object',
+    required: ['hours'],
+    title: 'VenueWeeklyHoursUpdate'
 } as const;

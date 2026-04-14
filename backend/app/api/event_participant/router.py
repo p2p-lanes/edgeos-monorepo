@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, status
+from loguru import logger
 
 from app.api.event_participant import crud
 from app.api.event_participant.schemas import (
@@ -11,6 +12,7 @@ from app.api.event_participant.schemas import (
     ParticipantStatus,
     RegisterRequest,
 )
+from app.api.google_calendar import service as gcal_service
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
     CurrentHuman,
@@ -21,6 +23,36 @@ from app.core.dependencies.users import (
 )
 
 router = APIRouter(prefix="/event-participants", tags=["event-participants"])
+
+
+# ---------------------------------------------------------------------------
+# Google Calendar sync helpers — best-effort. Never propagate failures to
+# the HTTP response; just log.
+# ---------------------------------------------------------------------------
+
+
+def _safe_gcal_sync(db, event, human_id: uuid.UUID) -> None:
+    try:
+        gcal_service.sync_event_to_human(db, event, human_id)
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.warning(
+            "GCal sync (RSVP) failed for human {} event {}: {}",
+            human_id,
+            getattr(event, "id", None),
+            exc,
+        )
+
+
+def _safe_gcal_delete(db, event, human_id: uuid.UUID) -> None:
+    try:
+        gcal_service.delete_event_for_human(db, event, human_id)
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.warning(
+            "GCal delete (cancel RSVP) failed for human {} event {}: {}",
+            human_id,
+            getattr(event, "id", None),
+            exc,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -77,6 +109,7 @@ async def admin_add_participant(
         db.add(existing)
         db.commit()
         db.refresh(existing)
+        _safe_gcal_sync(db, event, existing.profile_id)
         return EventParticipantPublic.model_validate(existing)
 
     tenant_id = event.tenant_id if current_user.role == UserRole.SUPERADMIN else current_user.tenant_id
@@ -86,6 +119,7 @@ async def admin_add_participant(
     db.add(participant)
     db.commit()
     db.refresh(participant)
+    _safe_gcal_sync(db, event, participant.profile_id)
     return EventParticipantPublic.model_validate(participant)
 
 
@@ -97,11 +131,23 @@ async def update_participant(
     _: CurrentWriter,
 ) -> EventParticipantPublic:
     """Update a participant (backoffice)."""
+    from app.api.event.crud import events_crud
+
     participant = crud.event_participants_crud.get(db, participant_id)
     if not participant:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Participant not found")
 
+    prior_status = participant.status
     updated = crud.event_participants_crud.update(db, participant, participant_in)
+
+    if participant_in.status is not None and participant_in.status != prior_status:
+        event = events_crud.get(db, updated.event_id)
+        if event is not None:
+            if participant_in.status == ParticipantStatus.CANCELLED:
+                _safe_gcal_delete(db, event, updated.profile_id)
+            elif prior_status == ParticipantStatus.CANCELLED:
+                _safe_gcal_sync(db, event, updated.profile_id)
+
     return EventParticipantPublic.model_validate(updated)
 
 
@@ -112,10 +158,19 @@ async def delete_participant(
     _: CurrentWriter,
 ) -> None:
     """Delete a participant (backoffice)."""
+    from app.api.event.crud import events_crud
+
     participant = crud.event_participants_crud.get(db, participant_id)
     if not participant:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Participant not found")
+
+    event = events_crud.get(db, participant.event_id)
+    human_id = participant.profile_id
+
     crud.event_participants_crud.delete(db, participant)
+
+    if event is not None:
+        _safe_gcal_delete(db, event, human_id)
 
 
 # ---------------------------------------------------------------------------
@@ -176,6 +231,7 @@ async def register_for_event(
         db.add(existing)
         db.commit()
         db.refresh(existing)
+        _safe_gcal_sync(db, event, current_human.id)
         return EventParticipantPublic.model_validate(existing)
 
     req = body or RegisterRequest()
@@ -189,6 +245,7 @@ async def register_for_event(
     db.add(participant)
     db.commit()
     db.refresh(participant)
+    _safe_gcal_sync(db, event, current_human.id)
     return EventParticipantPublic.model_validate(participant)
 
 
@@ -199,6 +256,8 @@ async def cancel_registration(
     current_human: CurrentHuman,
 ) -> EventParticipantPublic:
     """Cancel current human's registration (portal)."""
+    from app.api.event.crud import events_crud
+
     existing = crud.event_participants_crud.get_by_event_and_profile(db, event_id, current_human.id)
     if not existing or existing.status == ParticipantStatus.CANCELLED:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No active registration found")
@@ -207,6 +266,11 @@ async def cancel_registration(
     db.add(existing)
     db.commit()
     db.refresh(existing)
+
+    event = events_crud.get(db, event_id)
+    if event:
+        _safe_gcal_delete(db, event, current_human.id)
+
     return EventParticipantPublic.model_validate(existing)
 
 
