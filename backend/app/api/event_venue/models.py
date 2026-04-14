@@ -58,7 +58,9 @@ class VenuePropertyTypes(SQLModel, table=True):
         default_factory=datetime.utcnow, sa_type=DateTime(timezone=True)
     )
 
-    properties: list["VenueProperties"] = Relationship(back_populates="property_type")
+    properties: list["VenueProperties"] = Relationship(
+        back_populates="property_type", cascade_delete=True
+    )
 
 
 class VenueProperties(SQLModel, table=True):

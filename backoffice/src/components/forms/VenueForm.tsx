@@ -326,30 +326,27 @@ function PropertyPicker({ value, onChange }: PropertyPickerProps) {
             No property types yet. Create one below.
           </p>
         ) : (
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(96px,1fr))] gap-2">
             {propertyTypes.map((pt) => {
               const selected = value.includes(pt.id)
               return (
-                <div
-                  key={pt.id}
-                  className="group relative inline-flex"
-                >
+                <div key={pt.id} className="group relative">
                   <button
                     type="button"
                     onClick={() => toggle(pt.id)}
                     aria-pressed={selected}
                     className={
-                      "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 pr-6 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring " +
+                      "flex w-full flex-col items-center justify-center gap-1.5 rounded-lg border p-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring " +
                       (selected
-                        ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                        : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground")
+                        ? "bg-primary text-primary-foreground border-primary hover:bg-primary/90"
+                        : "bg-card text-foreground hover:bg-muted/50")
                     }
                   >
                     <LucideIconByName
                       name={pt.icon}
-                      className="h-3.5 w-3.5"
+                      className="h-6 w-6"
                     />
-                    <span>{pt.name}</span>
+                    <span className="line-clamp-1 break-all">{pt.name}</span>
                   </button>
                   <button
                     type="button"
@@ -359,10 +356,7 @@ function PropertyPicker({ value, onChange }: PropertyPickerProps) {
                       setPendingDelete(pt)
                     }}
                     className={
-                      "absolute right-1 top-1/2 -translate-y-1/2 inline-flex h-4 w-4 items-center justify-center rounded-full opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100 focus:outline-none " +
-                      (selected
-                        ? "text-primary-foreground/80 hover:text-primary-foreground hover:bg-primary-foreground/20"
-                        : "text-muted-foreground hover:text-destructive hover:bg-destructive/10")
+                      "absolute right-1 top-1 inline-flex h-5 w-5 items-center justify-center rounded-full border bg-background opacity-0 shadow-sm transition-opacity group-hover:opacity-100 focus:opacity-100 focus:outline-none hover:text-destructive hover:border-destructive/40"
                     }
                   >
                     <X className="h-3 w-3" />
