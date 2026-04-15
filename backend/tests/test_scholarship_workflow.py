@@ -19,7 +19,6 @@ import uuid
 from decimal import Decimal
 from unittest.mock import MagicMock
 
-import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
@@ -31,7 +30,6 @@ from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
-
 
 # ---------------------------------------------------------------------------
 # Helpers — reused across all tests
@@ -537,8 +535,7 @@ class TestPaymentBestOfThree:
         We verify the scholarship_discount flag behavior directly using the CRUD.
         """
         from decimal import Decimal
-        from app.api.payment.crud import PaymentsCRUD
-        from app.api.payment.schemas import PaymentCreate, PaymentPreview
+
 
         # Validate that the scholarship discount block exists in _apply_discounts:
         # scholarship_status=APPROVED and discount_percentage > 0 should set scholarship_discount=True

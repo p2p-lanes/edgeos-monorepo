@@ -34,8 +34,9 @@ async def list_product_categories(
     popup_id: uuid.UUID,
 ) -> list[str]:
     """Return distinct active product categories for a popup. No auth required."""
+    from sqlmodel import distinct, select
+
     from app.api.product.models import Products
-    from sqlmodel import select, distinct
 
     statement = (
         select(distinct(Products.category))

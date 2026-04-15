@@ -6,7 +6,8 @@ Calculates application status based on reviews and approval strategy.
 
 from datetime import UTC, datetime
 
-from sqlmodel import Session, col, select as sm_select
+from sqlmodel import Session, col
+from sqlmodel import select as sm_select
 
 from app.api.application.models import Applications
 from app.api.application.schemas import ApplicationStatus

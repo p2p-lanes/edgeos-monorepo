@@ -7,7 +7,6 @@ from pydantic import BaseModel, ConfigDict, model_validator
 from sqlalchemy import Numeric, Text
 from sqlmodel import Column, DateTime, Field, SQLModel
 
-
 # ProductCategory is now a free-form string so admins can create custom categories.
 # Known built-in values are listed below for reference.
 ProductCategory = str

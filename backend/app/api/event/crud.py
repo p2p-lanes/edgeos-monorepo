@@ -1,6 +1,6 @@
 import uuid
+from collections.abc import Iterable
 from datetime import datetime, timedelta
-from typing import Iterable
 
 from sqlalchemy import asc
 from sqlmodel import Session, col, func, select
@@ -77,7 +77,6 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
                 results,
                 window_start=start_after,
                 window_end=start_before,
-                popup_id=popup_id,
             )
 
         return results, total
@@ -170,7 +169,6 @@ def _expand_rows_in_window(
     *,
     window_start: datetime | None,
     window_end: datetime | None,
-    popup_id: uuid.UUID,
 ) -> list[Events]:
     """Return ``rows`` with series masters expanded to occurrences.
 
@@ -299,7 +297,7 @@ def _strip_tz(dt: datetime) -> datetime:
         return dt
     import datetime as _dt
 
-    return dt.astimezone(_dt.timezone.utc).replace(tzinfo=None)
+    return dt.astimezone(_dt.UTC).replace(tzinfo=None)
 
 
 def expanded_events_with_occurrence_id(events: Iterable[Events]) -> list[tuple[Events, str | None]]:

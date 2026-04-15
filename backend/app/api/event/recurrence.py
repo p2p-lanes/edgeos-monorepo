@@ -60,7 +60,7 @@ def format_rrule(rule: RecurrenceRule) -> str:
             # Convert to naive UTC for serialization.
             import datetime as _dt
 
-            until = until.astimezone(_dt.timezone.utc).replace(tzinfo=None)
+            until = until.astimezone(_dt.UTC).replace(tzinfo=None)
         parts.append("UNTIL=" + until.strftime("%Y%m%dT%H%M%SZ"))
     return ";".join(parts)
 
@@ -192,7 +192,7 @@ def _as_naive_utc(dt: datetime) -> datetime:
         return dt
     import datetime as _dt
 
-    return dt.astimezone(_dt.timezone.utc).replace(tzinfo=None)
+    return dt.astimezone(_dt.UTC).replace(tzinfo=None)
 
 
 def expand(
