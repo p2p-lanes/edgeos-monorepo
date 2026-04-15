@@ -12,6 +12,7 @@ import {
   X,
 } from "lucide-react"
 import { useState } from "react"
+import { useTranslation } from "react-i18next"
 import { cn } from "@/lib/utils"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCheckout } from "@/providers/checkoutProvider"
@@ -20,6 +21,7 @@ import { formatCheckoutDate, formatCurrency } from "@/types/checkout"
 import InsuranceCard from "../InsuranceCard"
 
 export default function ConfirmStep() {
+  const { t } = useTranslation()
   const {
     cart,
     summary,
@@ -113,10 +115,10 @@ export default function ConfirmStep() {
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <ShoppingBag className="w-12 h-12 text-gray-300 mb-4" />
         <h3 className="text-lg font-semibold text-gray-900 mb-2">
-          Your cart is empty
+          {t("checkout.cart.empty_title")}
         </h3>
         <p className="text-gray-500 max-w-md">
-          Please go back and select some passes to continue.
+          {t("checkout.cart.empty_description")}
         </p>
       </div>
     )

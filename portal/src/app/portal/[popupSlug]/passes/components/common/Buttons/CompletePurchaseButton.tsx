@@ -1,8 +1,10 @@
+import { useTranslation } from "react-i18next"
 import { ButtonAnimated } from "@/components/ui/button"
 import { usePassesProvider } from "@/providers/passesProvider"
 import usePurchaseProducts from "../../../hooks/usePurchaseProducts"
 
 const CompletePurchaseButton = ({ edit }: { edit?: boolean }) => {
+  const { t } = useTranslation()
   const { purchaseProducts, loading } = usePurchaseProducts()
   const { attendeePasses: attendees } = usePassesProvider()
   const someSelected = attendees.some((attendee) =>
@@ -21,7 +23,11 @@ const CompletePurchaseButton = ({ edit }: { edit?: boolean }) => {
       onClick={() => purchaseProducts(attendees)}
       data-purchase
     >
-      {loading ? "Loading..." : edit ? "Confirm" : "Confirm and Pay"}
+      {loading
+        ? t("common.loading")
+        : edit
+          ? t("passes.confirm")
+          : t("passes.confirm_and_pay")}
     </ButtonAnimated>
   )
 }

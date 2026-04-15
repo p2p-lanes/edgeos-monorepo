@@ -1,9 +1,11 @@
 import { FileText, Ticket, Users } from "lucide-react"
+import { useTranslation } from "react-i18next"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import type { Resource } from "@/types/resources"
 
 const useResources = () => {
+  const { t } = useTranslation()
   const { getCity } = useCityProvider()
   const { getRelevantApplication, participation } = useApplication()
   const application = getRelevantApplication()
@@ -16,20 +18,20 @@ const useResources = () => {
   if (isCompanion) {
     const resources: Resource[] = [
       {
-        name: "Companion",
+        name: t("sidebar.companion"),
         icon: Users,
         status: "active",
         path: `/portal/${city?.slug}`,
         children: [
           {
-            name: "Status",
+            name: t("sidebar.status"),
             status: "inactive",
             value: "companion",
           },
         ],
       },
       {
-        name: "Passes",
+        name: t("sidebar.passes"),
         icon: Ticket,
         status: companionCanSeePasses ? "active" : "hidden",
         path: `/portal/${city?.slug}/passes`,
@@ -41,26 +43,26 @@ const useResources = () => {
 
   const resources: Resource[] = [
     {
-      name: "Application",
+      name: t("sidebar.application"),
       icon: FileText,
       status: "active",
       path: `/portal/${city?.slug}`,
       children: [
         {
-          name: "Status",
+          name: t("sidebar.status"),
           status: "inactive",
           value: application?.status ?? "not started",
         },
       ],
     },
     {
-      name: "Passes",
+      name: t("sidebar.passes"),
       icon: Ticket,
       status: canSeeAttendees ? "active" : "hidden",
       path: `/portal/${city?.slug}/passes`,
     },
     {
-      name: "Attendee Directory",
+      name: t("sidebar.attendee_directory"),
       icon: Users,
       status: canSeeAttendees ? "active" : "hidden",
       path: `/portal/${city?.slug}/attendees`,

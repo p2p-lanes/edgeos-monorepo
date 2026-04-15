@@ -1,10 +1,12 @@
 "use client"
 
 import { Heart, Home, Shield, ShoppingBag, Tag, Ticket, X } from "lucide-react"
+import { useTranslation } from "react-i18next"
 import { useCheckout } from "@/providers/checkoutProvider"
 import { formatCurrency } from "@/types/checkout"
 
 export default function CartItemList() {
+  const { t } = useTranslation()
   const {
     cart,
     summary,
@@ -301,7 +303,7 @@ export default function CartItemList() {
 
       {!hasItems && (
         <div className="py-8 text-center">
-          <p className="text-gray-500">Your cart is empty</p>
+          <p className="text-gray-500">{t("checkout.cart.empty_title")}</p>
         </div>
       )}
     </>

@@ -100,7 +100,7 @@ const UserInfoForm = ({
     ) {
       setErrors((prev) => ({
         ...prev,
-        email: "Invalid email",
+        email: t("auth.invalid_email"),
       }))
       return
     }

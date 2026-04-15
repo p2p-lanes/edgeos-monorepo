@@ -1,6 +1,7 @@
 import { ArrowRight, FileText, Plus, Sparkles, Ticket } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 import { useState } from "react"
+import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -22,6 +23,7 @@ interface YourPassesProps {
 }
 
 const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
+  const { t } = useTranslation()
   const { attendeePasses: attendees, products } = usePassesProvider()
   const mainAttendee = attendees.find((a) => a.category === "main")
   const specialProduct = mainAttendee?.products.find(
@@ -67,13 +69,10 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
         <div className="flex items-center gap-3">
           <Ticket className="w-6 h-6 text-pass-text" />
           <h1 className="text-3xl font-bold tracking-tight text-pass-title">
-            Your Passes
+            {t("passes.your_passes")}
           </h1>
         </div>
-        <p className="text-pass-text">
-          View and manage your passes here. Need to make changes? You can switch
-          your week closer to the event to match your plans!
-        </p>
+        <p className="text-pass-text">{t("passes.your_passes_description")}</p>
 
         {/* Inline Text Links */}
         <div className="flex flex-wrap items-center gap-3 text-sm mt-2">
@@ -100,7 +99,7 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
                 >
                   <Plus className="w-3 h-3" />
                 </div>
-                <span>Add spouse</span>
+                <span>{t("passes.add_spouse")}</span>
               </button>
               <span className="text-gray-300">|</span>
             </>
@@ -116,7 +115,7 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
                 <div className="bg-gray-100 p-0.5 rounded-full group-hover:bg-gray-200 transition-colors">
                   <Plus className="w-3 h-3" />
                 </div>
-                <span>Add children</span>
+                <span>{t("passes.add_children")}</span>
               </button>
               <span className="text-gray-300">|</span>
             </>
@@ -128,7 +127,7 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
               onClick={() => setIsInvoiceModalOpen(true)}
             >
               <FileText className="w-3.5 h-3.5" />
-              <span>View invoices</span>
+              <span>{t("passes.view_invoices")}</span>
             </button>
           )}
         </div>
@@ -184,14 +183,14 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
                   <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm px-2.5 py-1 rounded-full mb-3">
                     <Sparkles className="w-3.5 h-3.5 text-yellow-400" />
                     <span className="text-xs text-white/90 font-medium">
-                      100+ people already registered
+                      {t("passes.people_registered")}
                     </span>
                   </div>
                   <h3 className="text-white font-bold text-2xl">
-                    Your adventure awaits
+                    {t("passes.adventure_awaits")}
                   </h3>
                   <p className="text-gray-300 text-sm mt-1 max-w-md">
-                    Join the village for people building a brighter future.
+                    {t("passes.village_subtitle")}
                   </p>
                 </div>
                 <div className="flex flex-col gap-1.5 flex-shrink-0">
@@ -199,12 +198,14 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
                     onClick={onSwitchToBuy}
                     className="flex items-center justify-center gap-2 bg-white hover:bg-gray-100 text-gray-900 px-8 py-4 h-auto rounded-xl text-base font-bold transition-all shadow-xl whitespace-nowrap active:scale-95"
                   >
-                    Get Your Pass
+                    {t("passes.get_your_pass")}
                     <ArrowRight className="w-5 h-5" />
                   </Button>
                   {minPrice != null && (
                     <p className="text-center text-gray-400 text-xs">
-                      Starting at {formatCurrency(minPrice)}
+                      {t("passes.starting_at", {
+                        price: formatCurrency(minPrice),
+                      })}
                     </p>
                   )}
                 </div>
@@ -215,16 +216,18 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-pass-title font-medium">Need more passes?</p>
+                <p className="text-pass-title font-medium">
+                  {t("passes.need_more_passes")}
+                </p>
                 <p className="text-pass-text text-xs mt-0.5">
-                  Add family members or more weeks
+                  {t("passes.add_family_or_weeks")}
                 </p>
               </div>
               <Button
                 onClick={onSwitchToBuy}
                 className="flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-all whitespace-nowrap active:scale-95"
               >
-                Buy Passes
+                {t("passes.buy_passes")}
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </div>
@@ -241,18 +244,18 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
                 <div className="flex items-center gap-1.5 mb-0.5">
                   <Sparkles className="w-3 h-3 text-yellow-400" />
                   <span className="text-xs text-gray-400 font-medium">
-                    500+ builders registered
+                    {t("passes.builders_registered")}
                   </span>
                 </div>
                 <p className="text-white font-semibold text-sm">
-                  Your adventure awaits
+                  {t("passes.adventure_awaits")}
                 </p>
               </div>
               <Button
                 onClick={onSwitchToBuy}
                 className="flex items-center justify-center gap-1.5 bg-white hover:bg-gray-100 text-gray-900 px-5 py-2.5 rounded-xl text-sm font-bold transition-all shadow-lg whitespace-nowrap active:scale-95"
               >
-                Buy
+                {t("passes.buy")}
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </div>
@@ -262,17 +265,17 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
             <div className="flex items-center justify-between gap-3">
               <div className="flex-1 min-w-0">
                 <p className="text-pass-title font-semibold text-sm">
-                  Need more passes?
+                  {t("passes.need_more_passes")}
                 </p>
                 <p className="text-pass-text text-xs mt-0.5">
-                  Add family members or more weeks
+                  {t("passes.add_family_or_weeks")}
                 </p>
               </div>
               <Button
                 onClick={onSwitchToBuy}
                 className="flex items-center justify-center gap-1.5 bg-gray-900 hover:bg-gray-800 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-all shadow-lg whitespace-nowrap active:scale-95"
               >
-                Buy
+                {t("passes.buy")}
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </div>

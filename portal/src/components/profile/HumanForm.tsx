@@ -11,6 +11,7 @@ import {
 } from "lucide-react"
 import Image from "next/image"
 import { useRef, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { RiTelegram2Line } from "react-icons/ri"
 import type { HumanPublic } from "@/client"
 import uploadFileToS3 from "@/helpers/upload"
@@ -36,6 +37,7 @@ const HumanForm = ({
   editForm: any
   setEditForm: (editForm: any) => void
 }) => {
+  const { t } = useTranslation()
   const [isHovering, setIsHovering] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [showLinkedEmails, setShowLinkedEmails] = useState(false)
@@ -63,14 +65,12 @@ const HumanForm = ({
     if (!file) return
 
     if (!file.type.startsWith("image/")) {
-      alert("Por favor selecciona un archivo de imagen válido")
+      alert(t("profile.image_invalid"))
       return
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      alert(
-        "El archivo es demasiado grande. Por favor selecciona una imagen menor a 5MB",
-      )
+      alert(t("profile.image_too_large"))
       return
     }
 
@@ -81,7 +81,7 @@ const HumanForm = ({
 
       setEditForm({ ...editForm, picture_url: imageUrl })
     } catch (_error) {
-      alert("Error al subir la imagen. Por favor intenta de nuevo.")
+      alert(t("profile.image_upload_error"))
     } finally {
       setIsUploading(false)
       if (event.target) {
@@ -149,7 +149,7 @@ const HumanForm = ({
             className="w-full md:w-auto text-gray-700 border-gray-300 hover:bg-gray-50"
           >
             <Edit2 className="w-4 h-4 mr-2" />
-            Edit Profile
+            {t("profile.edit_profile")}
           </Button>
         ) : (
           <>
@@ -160,7 +160,7 @@ const HumanForm = ({
               className="text-gray-700 border-gray-300 hover:bg-gray-50 bg-transparent"
             >
               <X className="w-4 h-4 mr-2" />
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               size="sm"
@@ -168,7 +168,7 @@ const HumanForm = ({
               className="bg-blue-600 hover:bg-blue-700 text-white"
             >
               <Save className="w-4 h-4 mr-2" />
-              Save
+              {t("common.save")}
             </Button>
           </>
         )}
@@ -181,7 +181,7 @@ const HumanForm = ({
               <div className="flex items-start md:items-center gap-3">
                 <Mail className="w-5 h-5 text-gray-400 mt-0.5 md:mt-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-gray-600">Email</p>
+                  <p className="text-sm text-gray-600">{t("common.email")}</p>
                   <p className="text-gray-900 break-all">{userData?.email}</p>
                   {filteredLinkedEmails.length > 0 && (
                     <div className="mt-1">
@@ -193,15 +193,14 @@ const HumanForm = ({
                         {showLinkedEmails ? (
                           <>
                             <ChevronUp className="w-3 h-3" />
-                            Hide linked emails
+                            {t("profile.hide_linked_emails")}
                           </>
                         ) : (
                           <>
                             <ChevronDown className="w-3 h-3" />
-                            {filteredLinkedEmails.length}{" "}
-                            {filteredLinkedEmails.length === 1
-                              ? "linked email"
-                              : "linked emails"}
+                            {t("profile.linked_email", {
+                              count: filteredLinkedEmails.length,
+                            })}
                           </>
                         )}
                       </button>
@@ -236,7 +235,7 @@ const HumanForm = ({
               <div className="flex items-center gap-3">
                 <RiTelegram2Line className="w-5 h-5 text-gray-400" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm text-gray-600">Telegram</p>
+                  <p className="text-sm text-gray-600">{t("form.telegram")}</p>
                   <p className="text-gray-900 break-words">
                     {userData?.telegram}
                   </p>
@@ -252,7 +251,7 @@ const HumanForm = ({
                   htmlFor="first_name"
                   className="text-sm font-medium text-gray-700"
                 >
-                  First Name
+                  {t("form.first_name")}
                 </Label>
                 <Input
                   id="first_name"
@@ -268,7 +267,7 @@ const HumanForm = ({
                   htmlFor="last_name"
                   className="text-sm font-medium text-gray-700"
                 >
-                  Last Name
+                  {t("form.last_name")}
                 </Label>
                 <Input
                   id="last_name"
@@ -287,7 +286,7 @@ const HumanForm = ({
                   htmlFor="telegram"
                   className="text-sm font-medium text-gray-700"
                 >
-                  Telegram
+                  {t("form.telegram")}
                 </Label>
                 <Input
                   id="telegram"

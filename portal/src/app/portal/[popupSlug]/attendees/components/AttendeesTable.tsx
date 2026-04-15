@@ -81,8 +81,8 @@ const AttendeesTable = ({
                     attendee.brings_kids === "*"
                       ? "*"
                       : attendee.brings_kids
-                        ? "Yes"
-                        : "No"
+                        ? t("common.yes")
+                        : t("common.no")
                   }
                 />
                 <CommonCell

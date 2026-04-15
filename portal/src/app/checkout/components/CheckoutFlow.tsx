@@ -3,6 +3,7 @@
 import { AnimatePresence } from "framer-motion"
 import { useSearchParams } from "next/navigation"
 import { useEffect, useMemo } from "react"
+import { useTranslation } from "react-i18next"
 import CartFooter from "@/components/checkout-flow/CartFooter"
 import DynamicProductStep from "@/components/checkout-flow/DynamicProductStep"
 import {
@@ -17,20 +18,22 @@ import { useCheckout } from "@/providers/checkoutProvider"
 import type { CheckoutStep } from "@/types/checkout"
 import CheckoutSkeleton from "./CheckoutSkeleton"
 
+type Translator = (key: string) => string
+
 // Fallback titles/subtitles when stepConfigs aren't loaded yet
-function getDefaultStepTitle(step: CheckoutStep): string {
+function getDefaultStepTitle(step: CheckoutStep, t: Translator): string {
   switch (step) {
     case "passes":
     case "tickets":
-      return "Select Your Passes"
+      return t("checkout.steps.passes_title")
     case "housing":
-      return "Choose Housing"
+      return t("checkout.steps.housing_title")
     case "merch":
-      return "Event Merchandise"
+      return t("checkout.steps.merch_title")
     case "patron":
-      return "Become a Patron"
+      return t("checkout.steps.patron_title")
     case "confirm":
-      return "Review & Confirm"
+      return t("checkout.steps.confirm_title")
     case "success":
       return ""
     default:
@@ -38,19 +41,19 @@ function getDefaultStepTitle(step: CheckoutStep): string {
   }
 }
 
-function getDefaultStepSubtitle(step: CheckoutStep): string {
+function getDefaultStepSubtitle(step: CheckoutStep, t: Translator): string {
   switch (step) {
     case "passes":
     case "tickets":
-      return "Choose passes for yourself and family members"
+      return t("checkout.steps.passes_subtitle")
     case "housing":
-      return "Optional: Book accommodation for your stay"
+      return t("checkout.steps.housing_subtitle")
     case "merch":
-      return "Optional: Pick up exclusive merch at the event"
+      return t("checkout.steps.merch_subtitle")
     case "patron":
-      return "Optional: Support the community with a contribution"
+      return t("checkout.steps.patron_subtitle")
     case "confirm":
-      return "Review your order before payment"
+      return t("checkout.steps.confirm_subtitle")
     case "success":
       return ""
     default:
@@ -69,6 +72,7 @@ export default function CheckoutFlow({
   onBack,
   isLoading = false,
 }: CheckoutFlowProps) {
+  const { t } = useTranslation()
   const {
     currentStep,
     availableSteps,
@@ -137,9 +141,9 @@ export default function CheckoutFlow({
       (s.step_type === "tickets" && currentStep === "passes"),
   )
 
-  const stepTitle = stepConfig?.title ?? getDefaultStepTitle(currentStep)
+  const stepTitle = stepConfig?.title ?? getDefaultStepTitle(currentStep, t)
   const stepSubtitle =
-    stepConfig?.description ?? getDefaultStepSubtitle(currentStep)
+    stepConfig?.description ?? getDefaultStepSubtitle(currentStep, t)
 
   const renderStepContent = () => {
     // Passes/tickets: dynamic step or fall-back legacy section

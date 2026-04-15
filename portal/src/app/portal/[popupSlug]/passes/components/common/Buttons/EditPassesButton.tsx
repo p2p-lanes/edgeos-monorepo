@@ -1,4 +1,5 @@
 import { PencilIcon, XIcon } from "lucide-react"
+import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
 import { usePassesProvider } from "@/providers/passesProvider"
 
@@ -7,6 +8,7 @@ interface EditPassesButtonProps {
 }
 
 const EditPassesButton = ({ onSwitchToBuy }: EditPassesButtonProps) => {
+  const { t } = useTranslation()
   const { toggleEditing, isEditing, attendeePasses } = usePassesProvider()
 
   const somePurchased = attendeePasses.some((attendee) =>
@@ -32,7 +34,7 @@ const EditPassesButton = ({ onSwitchToBuy }: EditPassesButtonProps) => {
         onClick={() => toggleEditing()}
       >
         <XIcon className="w-4 h-4" />
-        Cancel Pass Editing
+        {t("passes.cancel_pass_editing")}
       </Button>
     )
   }
@@ -44,7 +46,7 @@ const EditPassesButton = ({ onSwitchToBuy }: EditPassesButtonProps) => {
       onClick={handleEditClick}
     >
       <PencilIcon className="w-4 h-4" />
-      Edit Passes
+      {t("passes.edit_passes")}
     </Button>
   )
 }

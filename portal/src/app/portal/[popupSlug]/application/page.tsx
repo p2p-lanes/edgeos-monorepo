@@ -108,7 +108,7 @@ export default function FormPage() {
     if (importSource) {
       setImportedData(importSource)
       setShowImport(false)
-      toast.success("Previous application data imported successfully")
+      toast.success(t("application.import_success"))
     }
   }
 

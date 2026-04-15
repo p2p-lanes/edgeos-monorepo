@@ -8,6 +8,7 @@ import {
   Loader2,
 } from "lucide-react"
 import { useState } from "react"
+import { useTranslation } from "react-i18next"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
 import { useCityProvider } from "@/providers/cityProvider"
@@ -20,6 +21,7 @@ interface CartFooterProps {
 }
 
 export default function CartFooter({ onPay, onBack }: CartFooterProps) {
+  const { t } = useTranslation()
   const {
     cart,
     summary,
@@ -84,7 +86,7 @@ export default function CartFooter({ onPay, onBack }: CartFooterProps) {
       {isExpanded && (
         <button
           type="button"
-          aria-label="Close cart"
+          aria-label={t("checkout.cart.close_aria")}
           className="fixed inset-0 z-20 cursor-default"
           onClick={() => setIsExpanded(false)}
         />
@@ -114,7 +116,7 @@ export default function CartFooter({ onPay, onBack }: CartFooterProps) {
             >
               <ArrowLeft className="w-4 h-4" />
               <span className="hidden lg:inline text-sm font-medium ml-1.5">
-                Back
+                {t("common.back")}
               </span>
             </button>
 
@@ -127,7 +129,7 @@ export default function CartFooter({ onPay, onBack }: CartFooterProps) {
               <div className="flex flex-col items-start min-w-0 overflow-hidden">
                 <div className="flex items-center gap-1.5">
                   <span className="text-[10px] lg:text-xs text-gray-500 uppercase tracking-wider font-medium">
-                    {isEditing ? "To Pay" : "Total"}
+                    {isEditing ? t("checkout.to_pay") : t("common.total")}
                   </span>
                   {hasItems &&
                     (isExpanded ? (
@@ -141,7 +143,9 @@ export default function CartFooter({ onPay, onBack }: CartFooterProps) {
                 </span>
                 {isEditing && editCredit > 0 && (
                   <span className="text-[10px] lg:text-xs text-orange-400 font-medium">
-                    Credit: {formatCurrency(editCredit)}
+                    {t("checkout.credit_label", {
+                      amount: formatCurrency(editCredit),
+                    })}
                   </span>
                 )}
               </div>
@@ -162,7 +166,7 @@ export default function CartFooter({ onPay, onBack }: CartFooterProps) {
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Processing...</span>
+                  <span>{t("common.processing")}</span>
                 </>
               ) : (
                 <>
@@ -170,14 +174,14 @@ export default function CartFooter({ onPay, onBack }: CartFooterProps) {
                     {isEditing
                       ? isConfirmStep
                         ? summary.grandTotal === 0
-                          ? "Confirm Edit"
-                          : "Pay & Confirm Edit"
-                        : "Continue"
+                          ? t("checkout.actions.confirm_edit")
+                          : t("checkout.actions.pay_and_confirm_edit")
+                        : t("common.continue")
                       : isConfirmStep
                         ? summary.grandTotal === 0
-                          ? "Claim Pass"
-                          : "Pay"
-                        : "Continue"}
+                          ? t("checkout.actions.claim_pass")
+                          : t("checkout.actions.pay")
+                        : t("common.continue")}
                   </span>
                   <ArrowRight className="w-4 h-4 shrink-0" />
                 </>
