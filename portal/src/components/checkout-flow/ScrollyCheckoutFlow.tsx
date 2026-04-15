@@ -17,10 +17,7 @@ import {
 import { useSearchParams } from "next/navigation"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useSidebar } from "@/components/Sidebar/SidebarComponents"
-import {
-  DesignVariantProvider,
-  useDesignVariant,
-} from "@/context/designVariant"
+import { DesignVariantProvider } from "@/context/designVariant"
 import { usePaymentVerification } from "@/hooks/checkout"
 import { useIsMobile } from "@/hooks/useIsMobile"
 import { cn } from "@/lib/utils"
@@ -35,7 +32,6 @@ import {
   STEP_COMPONENT_REGISTRY,
   shouldUseDynamicStep,
 } from "./registries/stepRegistry"
-import ScrollySection from "./ScrollySection"
 import ScrollySectionNav, {
   type FooterDesign,
   type NavDesign,
@@ -892,7 +888,6 @@ function ScrollyCheckoutFlowInner({
   onPaymentComplete,
   onBack,
 }: ScrollyCheckoutFlowProps) {
-  const { variant } = useDesignVariant()
   const isMobile = useIsMobile()
   const { availableSteps, submitPayment, stepConfigs } = useCheckout()
 
@@ -1011,100 +1006,10 @@ function ScrollyCheckoutFlowInner({
     scrollToIndexRef.current?.(idx)
   }, [allSections])
 
-  // Scroll-to-section handler for the scrolly variant nav bar
-  const scrollToSection = useCallback((sectionId: string) => {
-    const target = document.getElementById(sectionId)
-    if (!target) return
-
-    // Walk up to find the scroll container
-    let scrollContainer: HTMLElement | null = target.parentElement
-    while (scrollContainer && scrollContainer !== document.documentElement) {
-      const { overflowY, overflow } = getComputedStyle(scrollContainer)
-      if (/(auto|scroll)/.test(overflowY) || /(auto|scroll)/.test(overflow)) {
-        break
-      }
-      scrollContainer = scrollContainer.parentElement
-    }
-    if (!scrollContainer || scrollContainer === document.documentElement) return
-
-    const targetTop =
-      scrollContainer.scrollTop +
-      target.getBoundingClientRect().top -
-      scrollContainer.getBoundingClientRect().top -
-      56 // offset for sticky nav height
-
-    gsap.to(scrollContainer, {
-      scrollTo: { y: targetTop },
-      duration: 0.6,
-      ease: "power2.inOut",
-    })
-  }, [])
-
-  // IntersectionObserver to track active section in scrolly variant
-  useEffect(() => {
-    if (variant !== "scrolly") return
-
-    const sectionIds = allSections.map((s) => s.id)
-    const elements = sectionIds
-      .map((id) => document.getElementById(id))
-      .filter(Boolean) as HTMLElement[]
-
-    if (elements.length === 0) return
-
-    // Find scroll container
-    let root: Element | null = null
-    let parent = elements[0].parentElement
-    while (parent && parent !== document.body) {
-      const style = getComputedStyle(parent)
-      if (
-        /(auto|scroll)/.test(style.overflowY) ||
-        /(auto|scroll)/.test(style.overflow)
-      ) {
-        root = parent
-        break
-      }
-      parent = parent.parentElement
-    }
-
-    const visibleSections = new Set<string>()
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            visibleSections.add(entry.target.id)
-          } else {
-            visibleSections.delete(entry.target.id)
-          }
-        }
-        // Pick the first visible section in document order
-        for (const id of sectionIds) {
-          if (visibleSections.has(id)) {
-            setActiveSection(id)
-            break
-          }
-        }
-      },
-      {
-        root: root as Element | null,
-        rootMargin: "-48px 0px -40% 0px",
-        threshold: 0,
-      },
-    )
-
-    for (const el of elements) {
-      observer.observe(el)
-    }
-
-    return () => observer.disconnect()
-  }, [variant, allSections])
-
   // Snap scroll — GSAP-driven on desktop; native scroll + CSS scroll-snap on mobile.
   // Mobile browsers (especially iOS WebKit / Brave) fight the custom touch handlers
   // with their own momentum scroll, which produced visible jitter and stuck scrolls.
   useEffect(() => {
-    if (variant !== "snap") return
-
     // SidebarInset also renders a <main>, so querySelector("main") returns the
     // outer overflow:hidden shell. Find the real scrollable container by walking
     // up from the first section element.
@@ -1282,7 +1187,7 @@ function ScrollyCheckoutFlowInner({
       navRo.disconnect()
       scrollToIndexRef.current = null
     }
-  }, [variant, allSections, isMobile])
+  }, [allSections, isMobile])
 
   const renderSectionContent = (stepId: string) => {
     // Passes/tickets: dynamic step or fall-back legacy section
@@ -1324,106 +1229,45 @@ function ScrollyCheckoutFlowInner({
     )
   }
 
-  // --- SNAP VARIANT ---
-  if (variant === "snap") {
-    return (
-      <div className="relative font-sans">
-        <ScrollySectionNav
-          sections={allSections}
-          activeSection={activeSection}
-          onSectionClick={(sectionId) => {
-            const idx = allSections.findIndex((s) => s.id === sectionId)
-            if (idx >= 0) scrollToIndexRef.current?.(idx)
-          }}
-          variant={navDesign}
-        />
-        {/* Sections — overflow/scroll is applied to <main> via useEffect */}
-        {allSections.map((section) => {
-          const config = getStepConfig(section.id)
-          return (
-            <SnapSection key={section.id} id={section.id}>
-              <SectionHeader
-                title={config?.title ?? section.label}
-                subtitle={config?.description ?? undefined}
-                variant="snap"
-                watermark={config?.watermark ?? section.label}
-                watermarkStyle={watermarkStyle}
-                showTitle={config?.show_title ?? true}
-                showWatermark={config?.show_watermark ?? true}
-              />
-              {renderSectionContent(section.id)}
-              {(() => {
-                const ft = (
-                  config?.template_config as Record<string, unknown> | undefined
-                )?.footer_text
-                return typeof ft === "string" && ft ? (
-                  <p className="text-xs text-gray-400 leading-relaxed px-1 pt-4 text-center">
-                    {ft}
-                  </p>
-                ) : null
-              })()}
-            </SnapSection>
-          )
-        })}
-
-        <DesignVariantPanel
-          navDesign={navDesign}
-          onNavDesignChange={setNavDesignPersisted}
-          footerDesign={footerDesign}
-          onFooterDesignChange={setFooterDesignPersisted}
-        />
-        <SnapDotNav
-          sections={allSections}
-          activeSection={activeSection}
-          onDotClick={(i) => scrollToIndexRef.current?.(i)}
-        />
-
-        <SnapFooter
-          footerMode={footerMode}
-          footerDesign={footerDesign}
-          onPay={handlePayment}
-          onBack={onBack}
-          activeSection={activeSection}
-          onGoToConfirm={goToConfirm}
-        />
-      </div>
-    )
-  }
-
-  // --- SCROLLY VARIANT (default) ---
   return (
-    <div data-variant={variant} className="relative min-h-screen font-sans">
+    <div className="relative font-sans">
       <ScrollySectionNav
         sections={allSections}
         activeSection={activeSection}
-        onSectionClick={scrollToSection}
+        onSectionClick={(sectionId) => {
+          const idx = allSections.findIndex((s) => s.id === sectionId)
+          if (idx >= 0) scrollToIndexRef.current?.(idx)
+        }}
         variant={navDesign}
       />
-      <main className="max-w-2xl mx-auto px-4 pt-6 pb-32">
-        {allSections.map((section) => {
-          const config = getStepConfig(section.id)
-          return (
-            <ScrollySection key={section.id} id={section.id}>
-              <SectionHeader
-                title={config?.title ?? section.label}
-                subtitle={config?.description ?? undefined}
-                showTitle={config?.show_title ?? true}
-              />
-              {renderSectionContent(section.id)}
-              {(() => {
-                const ft = (
-                  config?.template_config as Record<string, unknown> | undefined
-                )?.footer_text
-                return typeof ft === "string" && ft ? (
-                  <p className="text-xs text-gray-400 leading-relaxed px-1 pt-4 text-center">
-                    {ft}
-                  </p>
-                ) : null
-              })()}
-            </ScrollySection>
-          )
-        })}
-      </main>
+      {/* Sections — overflow/scroll is applied to <main> via useEffect */}
+      {allSections.map((section) => {
+        const config = getStepConfig(section.id)
+        return (
+          <SnapSection key={section.id} id={section.id}>
+            <SectionHeader
+              title={config?.title ?? section.label}
+              subtitle={config?.description ?? undefined}
+              variant="snap"
+              watermark={config?.watermark ?? section.label}
+              watermarkStyle={watermarkStyle}
+              showTitle={config?.show_title ?? true}
+              showWatermark={config?.show_watermark ?? true}
+            />
+            {renderSectionContent(section.id)}
+            {(() => {
+              const ft = (
+                config?.template_config as Record<string, unknown> | undefined
+              )?.footer_text
+              return typeof ft === "string" && ft ? (
+                <p className="text-xs text-gray-400 leading-relaxed px-1 pt-4 text-center">
+                  {ft}
+                </p>
+              ) : null
+            })()}
+          </SnapSection>
+        )
+      })}
 
       <DesignVariantPanel
         navDesign={navDesign}
@@ -1431,12 +1275,20 @@ function ScrollyCheckoutFlowInner({
         footerDesign={footerDesign}
         onFooterDesignChange={setFooterDesignPersisted}
       />
+      <SnapDotNav
+        sections={allSections}
+        activeSection={activeSection}
+        onDotClick={(i) => scrollToIndexRef.current?.(i)}
+      />
 
-      <div className="sticky bottom-0 z-30">
-        <div className="max-w-2xl mx-auto px-4">
-          <CartFooter onPay={handlePayment} onBack={onBack} />
-        </div>
-      </div>
+      <SnapFooter
+        footerMode={footerMode}
+        footerDesign={footerDesign}
+        onPay={handlePayment}
+        onBack={onBack}
+        activeSection={activeSection}
+        onGoToConfirm={goToConfirm}
+      />
     </div>
   )
 }

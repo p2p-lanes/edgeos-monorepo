@@ -2,7 +2,6 @@
 
 import { Settings2, X } from "lucide-react"
 import { useEffect, useState } from "react"
-import { useDesignVariant } from "@/context/designVariant"
 import { cn } from "@/lib/utils"
 import type { FooterDesign, NavDesign } from "./ScrollySectionNav"
 
@@ -58,7 +57,6 @@ export default function DesignVariantPanel({
   footerDesign,
   onFooterDesignChange,
 }: DesignVariantPanelProps) {
-  const { variant } = useDesignVariant()
   const [isOpen, setIsOpen] = useState(false)
 
   useEffect(() => {
@@ -115,18 +113,16 @@ export default function DesignVariantPanel({
           onChange={onNavDesignChange}
         />
 
-        {variant === "snap" && (
-          <SegmentedControl<FooterDesign>
-            label="Footer"
-            value={footerDesign}
-            options={[
-              { value: "pill", label: "Pill" },
-              { value: "stripe", label: "Stripe" },
-              { value: "dock", label: "Dock" },
-            ]}
-            onChange={onFooterDesignChange}
-          />
-        )}
+        <SegmentedControl<FooterDesign>
+          label="Footer"
+          value={footerDesign}
+          options={[
+            { value: "pill", label: "Pill" },
+            { value: "stripe", label: "Stripe" },
+            { value: "dock", label: "Dock" },
+          ]}
+          onChange={onFooterDesignChange}
+        />
       </div>
     </div>
   )
