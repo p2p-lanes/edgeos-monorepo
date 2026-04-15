@@ -66,34 +66,38 @@ export function EventsToolbar({
         </Link>
       </Button>
 
-      {/* Segmented List / Calendar switcher — same spot on both pages. */}
+      {/* Segmented List / Calendar switcher — the active option shows its
+          label; the inactive one is icon-only, saving horizontal space. */}
       <div className="inline-flex rounded-md border bg-card p-0.5">
         <Button
           variant={view === "list" ? "default" : "ghost"}
           size="sm"
           asChild
-          className={cn(
-            "h-7 rounded-sm",
-            view === "list" && "shadow-none",
-          )}
+          aria-label="List view"
+          title="List view"
+          className={cn("h-7 rounded-sm", view === "list" && "shadow-none")}
         >
           <Link href={`/portal/${slug}/events`}>
-            <List className="mr-1.5 h-4 w-4" />
-            List
+            <List className={cn("h-4 w-4", view === "list" && "mr-1.5")} />
+            {view === "list" && <span>List</span>}
           </Link>
         </Button>
         <Button
           variant={view === "calendar" ? "default" : "ghost"}
           size="sm"
           asChild
+          aria-label="Calendar view"
+          title="Calendar view"
           className={cn(
             "h-7 rounded-sm",
             view === "calendar" && "shadow-none",
           )}
         >
           <Link href={`/portal/${slug}/events/calendar`}>
-            <CalendarDays className="mr-1.5 h-4 w-4" />
-            Calendar
+            <CalendarDays
+              className={cn("h-4 w-4", view === "calendar" && "mr-1.5")}
+            />
+            {view === "calendar" && <span>Calendar</span>}
           </Link>
         </Button>
       </div>

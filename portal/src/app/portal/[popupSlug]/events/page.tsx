@@ -97,7 +97,7 @@ export default function EventsPage() {
 
   if (!eventsEnabled) {
     return (
-      <div className="flex flex-col h-full max-w-3xl mx-auto p-4 sm:p-6">
+      <div className="flex flex-col h-full max-w-4xl mx-auto p-4 sm:p-6">
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <CalendarDays className="h-10 w-10 text-muted-foreground/50 mb-3" />
           <h1 className="text-xl font-semibold">Events are disabled</h1>
@@ -110,7 +110,7 @@ export default function EventsPage() {
   }
 
   return (
-    <div className="flex flex-col h-full max-w-3xl mx-auto p-4 sm:p-6">
+    <div className="flex flex-col h-full max-w-4xl mx-auto p-4 sm:p-6">
       <div className="flex-none mb-6">
         <h1 className="text-2xl font-bold tracking-tight">Events</h1>
         <p className="text-sm text-muted-foreground mt-1">
