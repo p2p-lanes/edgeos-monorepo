@@ -10,7 +10,7 @@ const nextConfig: NextConfig = {
         output: "standalone",
         outputFileTracingRoot: path.resolve(__dirname, ".."),
       }),
-  transpilePackages: ["@edgeos/shared-form-ui"],
+  transpilePackages: ["@edgeos/shared-form-ui", "@edgeos/shared-events"],
   env: {
     NEXT_PUBLIC_API_URL:
       process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000",

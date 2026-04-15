@@ -632,6 +632,83 @@ async def list_invitations(
     ]
 
 
+def _run_bulk_invite(
+    db,
+    event,
+    emails: Iterable[str],
+    inviter_id: uuid.UUID,
+) -> EventInvitationBulkResult:
+    """Create invitations for the given emails (skipping unknowns and dupes).
+
+    Shared by the staff-side and portal bulk-invite endpoints. Caller is
+    responsible for resolving the event and authorising the inviter.
+    """
+    from sqlmodel import select
+
+    from app.api.event.models import EventInvitations
+    from app.api.human.models import Humans
+
+    cleaned = {e.strip().lower() for e in emails if e.strip()}
+    if not cleaned:
+        raise HTTPException(status_code=400, detail="No valid emails provided")
+
+    humans = list(
+        db.exec(
+            select(Humans)
+            .where(Humans.tenant_id == event.tenant_id)
+            .where(Humans.email.in_(cleaned))
+        ).all()
+    )
+    found_by_email = {h.email.lower(): h for h in humans}
+    not_found = sorted(e for e in cleaned if e not in found_by_email)
+
+    existing = list(
+        db.exec(
+            select(EventInvitations).where(EventInvitations.event_id == event.id)
+        ).all()
+    )
+    already_invited = {inv.human_id for inv in existing}
+
+    created: list[EventInvitations] = []
+    skipped_existing: list[str] = []
+    for email, human in found_by_email.items():
+        if human.id in already_invited:
+            skipped_existing.append(email)
+            continue
+        inv = EventInvitations(
+            tenant_id=event.tenant_id,
+            event_id=event.id,
+            human_id=human.id,
+            invited_by=inviter_id,
+        )
+        db.add(inv)
+        created.append(inv)
+
+    db.commit()
+    for inv in created:
+        db.refresh(inv)
+
+    by_id = {h.id: h for h in found_by_email.values()}
+    invited_public = [
+        EventInvitationPublic(
+            id=inv.id,
+            event_id=inv.event_id,
+            human_id=inv.human_id,
+            email=by_id[inv.human_id].email,
+            first_name=by_id[inv.human_id].first_name,
+            last_name=by_id[inv.human_id].last_name,
+            created_at=inv.created_at,
+        )
+        for inv in created
+    ]
+
+    return EventInvitationBulkResult(
+        invited=invited_public,
+        skipped_existing=skipped_existing,
+        not_found=not_found,
+    )
+
+
 @router.post(
     "/{event_id}/invitations",
     response_model=EventInvitationBulkResult,
@@ -643,73 +720,10 @@ async def bulk_invite(
     db: TenantSession,
     current_user: CurrentUser,
 ) -> EventInvitationBulkResult:
-    from sqlmodel import select
-
-    from app.api.event.models import EventInvitations
-    from app.api.human.models import Humans
-
     event = crud.events_crud.get(db, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
-
-    cleaned = {e.strip().lower() for e in payload.emails if e.strip()}
-    if not cleaned:
-        raise HTTPException(status_code=400, detail="No valid emails provided")
-
-    humans = list(
-        db.exec(
-            select(Humans).where(Humans.tenant_id == event.tenant_id).where(
-                Humans.email.in_(cleaned)
-            )
-        ).all()
-    )
-    found_by_email = {h.email.lower(): h for h in humans}
-    not_found = sorted(e for e in cleaned if e not in found_by_email)
-
-    existing_invitations = list(
-        db.exec(
-            select(EventInvitations).where(EventInvitations.event_id == event_id)
-        ).all()
-    )
-    already_invited_human_ids = {inv.human_id for inv in existing_invitations}
-
-    created: list[EventInvitations] = []
-    skipped_existing: list[str] = []
-    for email, human in found_by_email.items():
-        if human.id in already_invited_human_ids:
-            skipped_existing.append(email)
-            continue
-        inv = EventInvitations(
-            tenant_id=event.tenant_id,
-            event_id=event.id,
-            human_id=human.id,
-            invited_by=current_user.id,
-        )
-        db.add(inv)
-        created.append(inv)
-
-    db.commit()
-    for inv in created:
-        db.refresh(inv)
-
-    invited_public = [
-        EventInvitationPublic(
-            id=inv.id,
-            event_id=inv.event_id,
-            human_id=inv.human_id,
-            email=found_by_email[next(k for k, v in found_by_email.items() if v.id == inv.human_id)].email,
-            first_name=found_by_email[next(k for k, v in found_by_email.items() if v.id == inv.human_id)].first_name,
-            last_name=found_by_email[next(k for k, v in found_by_email.items() if v.id == inv.human_id)].last_name,
-            created_at=inv.created_at,
-        )
-        for inv in created
-    ]
-
-    return EventInvitationBulkResult(
-        invited=invited_public,
-        skipped_existing=skipped_existing,
-        not_found=not_found,
-    )
+    return _run_bulk_invite(db, event, payload.emails, current_user.id)
 
 
 @router.delete("/{event_id}/invitations/{invitation_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -792,81 +806,8 @@ async def bulk_invite_portal(
     db: HumanTenantSession,
     current_human: CurrentHuman,
 ) -> EventInvitationBulkResult:
-    from sqlmodel import select
-
-    from app.api.event.models import EventInvitations
-    from app.api.human.models import Humans
-
     event = _ensure_portal_event_owner(db, event_id, current_human)
-
-    cleaned = {e.strip().lower() for e in payload.emails if e.strip()}
-    if not cleaned:
-        raise HTTPException(status_code=400, detail="No valid emails provided")
-
-    humans = list(
-        db.exec(
-            select(Humans)
-            .where(Humans.tenant_id == event.tenant_id)
-            .where(Humans.email.in_(cleaned))
-        ).all()
-    )
-    found_by_email = {h.email.lower(): h for h in humans}
-    not_found = sorted(e for e in cleaned if e not in found_by_email)
-
-    existing = list(
-        db.exec(
-            select(EventInvitations).where(EventInvitations.event_id == event_id)
-        ).all()
-    )
-    already_invited = {inv.human_id for inv in existing}
-
-    created: list[EventInvitations] = []
-    skipped_existing: list[str] = []
-    for email, human in found_by_email.items():
-        if human.id in already_invited:
-            skipped_existing.append(email)
-            continue
-        inv = EventInvitations(
-            tenant_id=event.tenant_id,
-            event_id=event.id,
-            human_id=human.id,
-            invited_by=current_human.id,
-        )
-        db.add(inv)
-        created.append(inv)
-
-    db.commit()
-    for inv in created:
-        db.refresh(inv)
-
-    invited_public = [
-        EventInvitationPublic(
-            id=inv.id,
-            event_id=inv.event_id,
-            human_id=inv.human_id,
-            email=next(
-                e for e, h in found_by_email.items() if h.id == inv.human_id
-            ),
-            first_name=next(
-                h.first_name
-                for h in found_by_email.values()
-                if h.id == inv.human_id
-            ),
-            last_name=next(
-                h.last_name
-                for h in found_by_email.values()
-                if h.id == inv.human_id
-            ),
-            created_at=inv.created_at,
-        )
-        for inv in created
-    ]
-
-    return EventInvitationBulkResult(
-        invited=invited_public,
-        skipped_existing=skipped_existing,
-        not_found=not_found,
-    )
+    return _run_bulk_invite(db, event, payload.emails, current_human.id)
 
 
 @router.delete(

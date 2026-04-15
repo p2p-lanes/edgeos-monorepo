@@ -14,11 +14,12 @@ const DEFAULT_TZ =
   "UTC"
 
 /**
- * Returns a popup's configured timezone along with reusable formatters.
- * Falls back to the browser timezone when settings are missing.
+ * Single source of truth for the portal-event-settings query. Other hooks
+ * and pages should consume this rather than refetching the same endpoint
+ * with the same query key.
  */
-export function useEventTimezone(popupId: string | undefined) {
-  const { data: settings, isLoading } = useQuery({
+export function usePortalEventSettings(popupId: string | undefined) {
+  return useQuery({
     queryKey: ["portal-event-settings", popupId],
     queryFn: () =>
       EventSettingsService.getPortalEventSettings({
@@ -27,6 +28,14 @@ export function useEventTimezone(popupId: string | undefined) {
     enabled: !!popupId,
     staleTime: 5 * 60 * 1000,
   })
+}
+
+/**
+ * Returns a popup's configured timezone along with reusable formatters.
+ * Falls back to the browser timezone when settings are missing.
+ */
+export function useEventTimezone(popupId: string | undefined) {
+  const { data: settings, isLoading } = usePortalEventSettings(popupId)
 
   const timezone = settings?.timezone || DEFAULT_TZ
 

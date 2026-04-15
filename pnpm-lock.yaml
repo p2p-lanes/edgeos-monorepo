@@ -19,6 +19,9 @@ importers:
       '@dnd-kit/utilities':
         specifier: ^3.2.2
         version: 3.2.2(react@19.2.4)
+      '@edgeos/shared-events':
+        specifier: workspace:*
+        version: link:../packages/shared-events
       '@edgeos/shared-form-ui':
         specifier: workspace:*
         version: link:../packages/shared-form-ui
@@ -195,6 +198,12 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/node@24.10.15)(jiti@2.6.1)(lightningcss@1.31.1)(msw@2.12.10(@types/node@24.10.15)(typescript@5.9.3))(tsx@4.21.0)
 
+  packages/shared-events:
+    devDependencies:
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
   packages/shared-form-ui:
     dependencies:
       '@radix-ui/react-checkbox':
@@ -240,6 +249,9 @@ importers:
 
   portal:
     dependencies:
+      '@edgeos/shared-events':
+        specifier: workspace:*
+        version: link:../packages/shared-events
       '@edgeos/shared-form-ui':
         specifier: workspace:*
         version: link:../packages/shared-form-ui

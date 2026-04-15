@@ -1,6 +1,6 @@
 import { useForm, useStore } from "@tanstack/react-form"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Check, Trash2, X } from "lucide-react"
+import { Trash2 } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 
 import {
@@ -9,7 +9,6 @@ import {
   EventSettingsService,
   EventsService,
   EventVenuesService,
-  type RecurrenceRule,
   TracksService,
 } from "@/client"
 import { Badge } from "@/components/ui/badge"
@@ -24,11 +23,6 @@ import {
 import { Input } from "@/components/ui/input"
 import { LoadingButton } from "@/components/ui/loading-button"
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -39,14 +33,25 @@ import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useCustomToast from "@/hooks/useCustomToast"
-import { cn } from "@/lib/utils"
 import {
   availableStartOptionsForDuration,
   dayBoundsInTz,
   durationFits,
   freeIntervalsForDay,
-} from "@/lib/venue-slots"
+} from "@edgeos/shared-events"
 import { createErrorHandler } from "@/utils"
+import {
+  AvailabilityIndicator,
+  type AvailabilityState,
+} from "./EventForm/AvailabilityIndicator"
+import { ChipInput } from "./EventForm/ChipInput"
+import {
+  buildRecurrence,
+  parseRruleToState,
+  RepeatPicker,
+  type RepeatState,
+} from "./EventForm/RepeatPicker"
+import { StartTimeCombobox } from "./EventForm/StartTimeCombobox"
 
 interface EventFormProps {
   defaultValues?: EventPublic
@@ -57,105 +62,6 @@ const EVENT_STATUSES = [
   { value: "draft", label: "Draft" },
   { value: "published", label: "Published" },
 ] as const
-
-const WEEKDAY_CODES = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"] as const
-type WeekdayCode = (typeof WEEKDAY_CODES)[number]
-const WEEKDAY_LABELS: Record<WeekdayCode, string> = {
-  MO: "M",
-  TU: "T",
-  WE: "W",
-  TH: "T",
-  FR: "F",
-  SA: "S",
-  SU: "S",
-}
-
-type RepeatMode = "none" | "daily" | "weekly" | "monthly"
-type RepeatEnd = "never" | "count" | "until"
-
-interface RepeatState {
-  mode: RepeatMode
-  interval: number
-  byDay: WeekdayCode[]
-  end: RepeatEnd
-  count: number
-  until: string // YYYY-MM-DD
-}
-
-const DEFAULT_REPEAT: RepeatState = {
-  mode: "none",
-  interval: 1,
-  byDay: [],
-  end: "never",
-  count: 10,
-  until: "",
-}
-
-function parseRruleToState(rrule: string | null | undefined): RepeatState {
-  if (!rrule) return { ...DEFAULT_REPEAT }
-  const kv: Record<string, string> = {}
-  for (const part of rrule.split(";")) {
-    const [k, v] = part.split("=")
-    if (k && v) kv[k.toUpperCase()] = v
-  }
-  const freq = kv.FREQ
-  const mode: RepeatMode =
-    freq === "DAILY"
-      ? "daily"
-      : freq === "WEEKLY"
-        ? "weekly"
-        : freq === "MONTHLY"
-          ? "monthly"
-          : "none"
-  const interval = kv.INTERVAL ? parseInt(kv.INTERVAL) || 1 : 1
-  const byDay =
-    kv.BYDAY != null
-      ? (kv.BYDAY.split(",")
-          .map((c) => c.toUpperCase())
-          .filter((c): c is WeekdayCode =>
-            (WEEKDAY_CODES as readonly string[]).includes(c),
-          ) as WeekdayCode[])
-      : []
-  let end: RepeatEnd = "never"
-  let count = DEFAULT_REPEAT.count
-  let until = ""
-  if (kv.COUNT) {
-    end = "count"
-    count = parseInt(kv.COUNT) || count
-  } else if (kv.UNTIL) {
-    end = "until"
-    // Accept YYYYMMDDTHHMMSSZ or YYYYMMDD
-    const raw = kv.UNTIL.replace("Z", "")
-    if (raw.length >= 8) {
-      until = `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`
-    }
-  }
-  return { mode, interval, byDay, end, count, until }
-}
-
-function buildRecurrence(state: RepeatState): RecurrenceRule | null {
-  if (state.mode === "none") return null
-  const freq =
-    state.mode === "daily"
-      ? "DAILY"
-      : state.mode === "weekly"
-        ? "WEEKLY"
-        : "MONTHLY"
-  const rule: RecurrenceRule = {
-    freq,
-    interval: Math.max(1, state.interval || 1),
-  }
-  if (freq === "WEEKLY" && state.byDay.length > 0) {
-    rule.by_day = state.byDay
-  }
-  if (state.end === "count") {
-    rule.count = Math.max(1, state.count || 1)
-  } else if (state.end === "until" && state.until) {
-    const [y, m, d] = state.until.split("-").map(Number)
-    rule.until = new Date(Date.UTC(y, (m ?? 1) - 1, d ?? 1)).toISOString()
-  }
-  return rule
-}
 
 const VISIBILITY_OPTIONS = [
   {
@@ -174,13 +80,6 @@ const VISIBILITY_OPTIONS = [
     help: "Hidden from the calendar; anyone with the link can view and RSVP.",
   },
 ] as const
-
-type AvailabilityState =
-  | { status: "idle" }
-  | { status: "checking" }
-  | { status: "available" }
-  | { status: "unavailable"; reason?: string | null }
-  | { status: "error"; message: string }
 
 export function EventForm({ defaultValues, onSuccess }: EventFormProps) {
   const queryClient = useQueryClient()
@@ -1079,354 +978,5 @@ export function EventForm({ defaultValues, onSuccess }: EventFormProps) {
         </LoadingButton>
       </div>
     </form>
-  )
-}
-
-// ---------------------------------------------------------------------------
-//  Internal components
-// ---------------------------------------------------------------------------
-
-function AvailabilityIndicator({
-  availability,
-}: {
-  availability: AvailabilityState
-}) {
-  if (availability.status === "idle") return null
-  if (availability.status === "checking") {
-    return (
-      <p className="text-xs text-muted-foreground">Checking availability...</p>
-    )
-  }
-  if (availability.status === "available") {
-    return (
-      <p className="flex items-center gap-1 text-xs text-green-600 dark:text-green-500">
-        <Check className="h-3.5 w-3.5" /> Slot available
-      </p>
-    )
-  }
-  if (availability.status === "unavailable") {
-    return (
-      <p className="flex items-center gap-1 text-xs text-destructive">
-        <X className="h-3.5 w-3.5" />{" "}
-        {availability.reason ?? "Slot unavailable"}
-      </p>
-    )
-  }
-  return (
-    <p className="text-xs text-muted-foreground">{availability.message}</p>
-  )
-}
-
-interface StartTimeComboboxProps {
-  /** "YYYY-MM-DD" — required only to contextualize the popover header. */
-  dateStr: string
-  /** "HH:mm" — the currently selected time (in browser-local for this form). */
-  value: string
-  onChange: (hhmm: string) => void
-  options: { label: string; isoUtc: string }[]
-  disabled?: boolean
-  fits: boolean
-  placeholder?: string
-}
-
-function StartTimeCombobox({
-  value,
-  onChange,
-  options,
-  disabled,
-  fits,
-  placeholder,
-}: StartTimeComboboxProps) {
-  const [open, setOpen] = useState(false)
-
-  return (
-    <div className="w-full">
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <div className="relative">
-            <Input
-              type="time"
-              value={value}
-              placeholder={placeholder}
-              disabled={disabled}
-              onFocus={() => {
-                if (options.length > 0) setOpen(true)
-              }}
-              onChange={(e) => {
-                const raw = e.target.value
-                // Drop seconds if the browser provided any.
-                onChange(raw ? raw.slice(0, 5) : "")
-              }}
-              className={cn(
-                "w-full",
-                !fits && value
-                  ? "border-destructive focus-visible:ring-destructive/40"
-                  : "",
-              )}
-            />
-          </div>
-        </PopoverTrigger>
-        {options.length > 0 && (
-          <PopoverContent
-            align="start"
-            className="w-[220px] p-1"
-            onOpenAutoFocus={(e) => e.preventDefault()}
-          >
-            <p className="px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-              Suggested slots
-            </p>
-            <ul className="max-h-60 overflow-y-auto">
-              {options.map((o) => (
-                <li key={o.isoUtc}>
-                  <button
-                    type="button"
-                    className={cn(
-                      "flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground",
-                      value === o.label
-                        ? "bg-accent text-accent-foreground"
-                        : "",
-                    )}
-                    onClick={() => {
-                      onChange(o.label)
-                      setOpen(false)
-                    }}
-                  >
-                    <span>{o.label}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </PopoverContent>
-        )}
-      </Popover>
-      {!fits && value && (
-        <p className="mt-1 text-xs text-destructive">
-          Not available — overlaps busy
-        </p>
-      )}
-    </div>
-  )
-}
-
-interface ChipInputProps {
-  value: string[]
-  onChange: (next: string[]) => void
-}
-
-function ChipInput({ value, onChange }: ChipInputProps) {
-  const [draft, setDraft] = useState("")
-
-  const addTag = (raw: string) => {
-    const tag = raw.trim().toLowerCase()
-    if (!tag) return
-    if (value.includes(tag)) {
-      setDraft("")
-      return
-    }
-    onChange([...value, tag])
-    setDraft("")
-  }
-
-  const removeAt = (index: number) => {
-    const next = value.slice()
-    next.splice(index, 1)
-    onChange(next)
-  }
-
-  return (
-    <div
-      className={cn(
-        "flex min-h-9 w-80 flex-wrap items-center gap-1.5 rounded-md border bg-transparent px-2 py-1.5",
-        "focus-within:ring-[3px] focus-within:ring-ring/50 focus-within:border-ring",
-      )}
-    >
-      {value.map((tag, index) => (
-        <span
-          key={`${tag}-${index}`}
-          className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-xs text-secondary-foreground"
-        >
-          {tag}
-          <button
-            type="button"
-            aria-label={`Remove ${tag}`}
-            className="opacity-70 hover:opacity-100"
-            onClick={() => removeAt(index)}
-          >
-            <X className="h-3 w-3" />
-          </button>
-        </span>
-      ))}
-      <input
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault()
-            addTag(draft)
-          } else if (e.key === "Backspace" && !draft && value.length > 0) {
-            e.preventDefault()
-            removeAt(value.length - 1)
-          } else if (e.key === "," || e.key === "Tab") {
-            if (draft.trim()) {
-              e.preventDefault()
-              addTag(draft)
-            }
-          }
-        }}
-        onBlur={() => {
-          if (draft.trim()) addTag(draft)
-        }}
-        placeholder={value.length === 0 ? "Add tag..." : ""}
-        className="flex-1 min-w-[80px] border-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-      />
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-//  Recurrence picker
-// ---------------------------------------------------------------------------
-
-interface RepeatPickerProps {
-  value: RepeatState
-  onChange: (next: RepeatState) => void
-}
-
-function RepeatPicker({ value, onChange }: RepeatPickerProps) {
-  const update = (patch: Partial<RepeatState>) =>
-    onChange({ ...value, ...patch })
-
-  const unitLabel =
-    value.mode === "daily"
-      ? value.interval === 1
-        ? "day"
-        : "days"
-      : value.mode === "weekly"
-        ? value.interval === 1
-          ? "week"
-          : "weeks"
-        : value.mode === "monthly"
-          ? value.interval === 1
-            ? "month"
-            : "months"
-          : ""
-
-  return (
-    <div className="flex w-full flex-col items-end gap-3">
-      <Select
-        value={value.mode}
-        onValueChange={(v) => update({ mode: v as RepeatMode })}
-      >
-        <SelectTrigger className="w-56">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="none">Does not repeat</SelectItem>
-          <SelectItem value="daily">Daily</SelectItem>
-          <SelectItem value="weekly">Weekly</SelectItem>
-          <SelectItem value="monthly">Monthly</SelectItem>
-        </SelectContent>
-      </Select>
-
-      {value.mode !== "none" && (
-        <div className="flex w-full max-w-xs flex-col items-end gap-2 rounded-md border bg-card/40 p-3">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">Every</span>
-            <Input
-              type="number"
-              min={1}
-              max={999}
-              value={value.interval}
-              onChange={(e) =>
-                update({ interval: parseInt(e.target.value) || 1 })
-              }
-              className="w-16"
-            />
-            <span className="text-xs text-muted-foreground">{unitLabel}</span>
-          </div>
-
-          {value.mode === "weekly" && (
-            <div className="flex gap-1">
-              {WEEKDAY_CODES.map((code) => {
-                const active = value.byDay.includes(code)
-                return (
-                  <button
-                    key={code}
-                    type="button"
-                    className={cn(
-                      "inline-flex h-7 w-7 items-center justify-center rounded-full border text-xs",
-                      active
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-input bg-background text-muted-foreground",
-                    )}
-                    onClick={() =>
-                      update({
-                        byDay: active
-                          ? value.byDay.filter((c) => c !== code)
-                          : [...value.byDay, code],
-                      })
-                    }
-                  >
-                    {WEEKDAY_LABELS[code]}
-                  </button>
-                )
-              })}
-            </div>
-          )}
-
-          <div className="flex flex-col gap-1 text-xs">
-            <label className="flex items-center gap-2">
-              <input
-                type="radio"
-                name="repeat-end"
-                checked={value.end === "never"}
-                onChange={() => update({ end: "never" })}
-              />
-              Never
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="radio"
-                name="repeat-end"
-                checked={value.end === "count"}
-                onChange={() => update({ end: "count" })}
-              />
-              After{" "}
-              <Input
-                type="number"
-                min={1}
-                max={1000}
-                value={value.count}
-                onChange={(e) =>
-                  update({
-                    end: "count",
-                    count: parseInt(e.target.value) || 1,
-                  })
-                }
-                className="h-7 w-20"
-              />{" "}
-              occurrences
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="radio"
-                name="repeat-end"
-                checked={value.end === "until"}
-                onChange={() => update({ end: "until" })}
-              />
-              On{" "}
-              <Input
-                type="date"
-                value={value.until}
-                onChange={(e) =>
-                  update({ end: "until", until: e.target.value })
-                }
-                className="h-7 w-36"
-              />
-            </label>
-          </div>
-        </div>
-      )}
-    </div>
   )
 }

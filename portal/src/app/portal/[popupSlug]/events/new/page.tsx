@@ -18,7 +18,6 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import {
   ApiError,
   EventsService,
-  EventSettingsService,
   EventVenuesService,
   type EventVenuePublic,
   TracksService,
@@ -44,14 +43,17 @@ import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import { useCityProvider } from "@/providers/cityProvider"
 import { toast } from "sonner"
-import { useEventTimezone } from "../lib/useEventTimezone"
+import {
+  useEventTimezone,
+  usePortalEventSettings,
+} from "../lib/useEventTimezone"
 import { useFileUpload } from "../lib/useFileUpload"
 import {
   availableStartOptionsForDuration,
   dayBoundsInTz,
   durationFits,
   freeIntervalsForDay,
-} from "../lib/venue-slots"
+} from "@edgeos/shared-events"
 
 /** "YYYY-MM-DD" of today in the given TZ (used as initial date picker value). */
 function todayInTz(tz: string): string {
@@ -127,12 +129,8 @@ export default function NewPortalEventPage() {
   const fileRef = useRef<HTMLInputElement>(null)
 
   // ---- settings-driven gates ------------------------------------------
-  const { data: settings, isLoading: settingsLoading } = useQuery({
-    queryKey: ["portal-event-settings", popupId],
-    queryFn: () =>
-      EventSettingsService.getPortalEventSettings({ popupId: popupId! }),
-    enabled: !!popupId,
-  })
+  const { data: settings, isLoading: settingsLoading } =
+    usePortalEventSettings(popupId)
   const eventsEnabled = settings?.event_enabled ?? false
   const canPublish = settings?.can_publish_event === "everyone"
 

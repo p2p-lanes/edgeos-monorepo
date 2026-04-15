@@ -2,6 +2,7 @@ packages:
   - backoffice
   - portal
   - packages/shared-form-ui
+  - packages/shared-events
 
 onlyBuiltDependencies:
   - '@swc/core'

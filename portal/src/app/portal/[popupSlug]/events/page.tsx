@@ -12,7 +12,6 @@ import Link from "next/link"
 import { useState } from "react"
 
 import {
-  EventSettingsService,
   EventsService,
   EventVenuesService,
   type EventPublic,
@@ -23,7 +22,10 @@ import { useCityProvider } from "@/providers/cityProvider"
 import { CalendarBody } from "./lib/CalendarBody"
 import { EventsToolbar } from "./lib/EventsToolbar"
 import { GoogleCalendarConnectionCard } from "./lib/GoogleCalendarConnectionCard"
-import { useEventTimezone } from "./lib/useEventTimezone"
+import {
+  useEventTimezone,
+  usePortalEventSettings,
+} from "./lib/useEventTimezone"
 
 function groupByDate(
   events: EventPublic[],
@@ -53,12 +55,7 @@ export default function EventsPage() {
   const { timezone, formatTime, formatDateShort, formatDayKey } =
     useEventTimezone(city?.id)
 
-  const { data: eventSettings } = useQuery({
-    queryKey: ["portal-event-settings", city?.id],
-    queryFn: () =>
-      EventSettingsService.getPortalEventSettings({ popupId: city!.id }),
-    enabled: !!city?.id,
-  })
+  const { data: eventSettings } = usePortalEventSettings(city?.id)
   const eventsEnabled = eventSettings?.event_enabled ?? true
 
   const { data, isLoading } = useQuery({

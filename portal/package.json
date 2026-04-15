@@ -11,6 +11,7 @@
     "generate-client": "openapi-ts"
   },
   "dependencies": {
+    "@edgeos/shared-events": "workspace:*",
     "@edgeos/shared-form-ui": "workspace:*",
     "@radix-ui/react-avatar": "^1.1.1",
     "@radix-ui/react-checkbox": "^1.1.2",

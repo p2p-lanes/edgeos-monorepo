@@ -116,33 +116,6 @@ function formatInTz(ms: number, timeZone: string): string {
 }
 
 /**
- * Valid start-time options for the day: every step that fits inside any
- * free interval (last option = interval.end - step, so there's always at
- * least one valid end).
- */
-export function availableStartOptions(
-  freeIntervals: Interval[],
-  stepMinutes: number,
-  timeZone: string,
-): SlotOption[] {
-  const step = stepMinutes * 60 * 1000
-  const options: SlotOption[] = []
-  const seen = new Set<number>()
-  for (const iv of freeIntervals) {
-    for (const t of stepThrough(iv, stepMinutes)) {
-      if (t + step > iv.end) break // too close to the end, no room for a booking
-      if (seen.has(t)) continue
-      seen.add(t)
-      options.push({
-        label: formatInTz(t, timeZone),
-        isoUtc: new Date(t).toISOString(),
-      })
-    }
-  }
-  return options.sort((a, b) => Date.parse(a.isoUtc) - Date.parse(b.isoUtc))
-}
-
-/**
  * Same as availableStartOptions but filtered so that `start + duration`
  * also fits inside the same free interval (i.e. the whole event fits).
  */
