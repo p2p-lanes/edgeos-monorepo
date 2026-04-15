@@ -138,7 +138,6 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
     return merged
   }, [apiCategories, customCategories])
 
-
   const createMutation = useMutation({
     mutationFn: (data: ProductCreate) =>
       ProductsService.createProduct({ requestBody: data }),
