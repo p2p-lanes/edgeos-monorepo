@@ -20,6 +20,7 @@ import {
 } from "@/client"
 import { Badge } from "@/components/ui/badge"
 import { useCityProvider } from "@/providers/cityProvider"
+import { CalendarBody } from "./lib/CalendarBody"
 import { EventsToolbar } from "./lib/EventsToolbar"
 import { GoogleCalendarConnectionCard } from "./lib/GoogleCalendarConnectionCard"
 import { useEventTimezone } from "./lib/useEventTimezone"
@@ -48,6 +49,7 @@ export default function EventsPage() {
   const city = getCity()
   const [search, setSearch] = useState("")
   const [rsvpedOnly, setRsvpedOnly] = useState(false)
+  const [view, setView] = useState<"list" | "calendar">("list")
   const { timezone, formatTime, formatDateShort, formatDayKey } =
     useEventTimezone(city?.id)
 
@@ -69,7 +71,7 @@ export default function EventsPage() {
         rsvpedOnly: rsvpedOnly || undefined,
         limit: 200,
       }),
-    enabled: !!city?.id && eventsEnabled,
+    enabled: !!city?.id && eventsEnabled && view === "list",
   })
 
   const events = data?.results ?? []
@@ -126,7 +128,8 @@ export default function EventsPage() {
       <div className="flex-none mb-4">
         <EventsToolbar
           slug={city?.slug}
-          view="list"
+          view={view}
+          onViewChange={setView}
           search={search}
           onSearchChange={setSearch}
           rsvpedOnly={rsvpedOnly}
@@ -136,7 +139,14 @@ export default function EventsPage() {
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {isLoading ? (
+        {view === "calendar" ? (
+          <CalendarBody
+            popupId={city?.id}
+            slug={city?.slug}
+            search={search}
+            rsvpedOnly={rsvpedOnly}
+          />
+        ) : isLoading ? (
           <div className="flex items-center justify-center py-20">
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           </div>

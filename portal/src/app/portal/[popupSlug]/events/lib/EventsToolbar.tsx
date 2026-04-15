@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils"
 interface EventsToolbarProps {
   slug: string | undefined
   view: "list" | "calendar"
+  onViewChange: (view: "list" | "calendar") => void
   search: string
   onSearchChange: (value: string) => void
   rsvpedOnly: boolean
@@ -31,6 +32,7 @@ interface EventsToolbarProps {
 export function EventsToolbar({
   slug,
   view,
+  onViewChange,
   search,
   onSearchChange,
   rsvpedOnly,
@@ -66,39 +68,39 @@ export function EventsToolbar({
         </Link>
       </Button>
 
-      {/* Segmented List / Calendar switcher — the active option shows its
-          label; the inactive one is icon-only, saving horizontal space. */}
+      {/* Segmented List / Calendar switcher — same page, only the body
+          swaps. Active option shows label + icon, inactive is icon-only. */}
       <div className="inline-flex rounded-md border bg-card p-0.5">
         <Button
+          type="button"
           variant={view === "list" ? "default" : "ghost"}
           size="sm"
-          asChild
           aria-label="List view"
           title="List view"
+          aria-pressed={view === "list"}
+          onClick={() => onViewChange("list")}
           className={cn("h-7 rounded-sm", view === "list" && "shadow-none")}
         >
-          <Link href={`/portal/${slug}/events`}>
-            <List className={cn("h-4 w-4", view === "list" && "mr-1.5")} />
-            {view === "list" && <span>List</span>}
-          </Link>
+          <List className={cn("h-4 w-4", view === "list" && "mr-1.5")} />
+          {view === "list" && <span>List</span>}
         </Button>
         <Button
+          type="button"
           variant={view === "calendar" ? "default" : "ghost"}
           size="sm"
-          asChild
           aria-label="Calendar view"
           title="Calendar view"
+          aria-pressed={view === "calendar"}
+          onClick={() => onViewChange("calendar")}
           className={cn(
             "h-7 rounded-sm",
             view === "calendar" && "shadow-none",
           )}
         >
-          <Link href={`/portal/${slug}/events/calendar`}>
-            <CalendarDays
-              className={cn("h-4 w-4", view === "calendar" && "mr-1.5")}
-            />
-            {view === "calendar" && <span>Calendar</span>}
-          </Link>
+          <CalendarDays
+            className={cn("h-4 w-4", view === "calendar" && "mr-1.5")}
+          />
+          {view === "calendar" && <span>Calendar</span>}
         </Button>
       </div>
 
