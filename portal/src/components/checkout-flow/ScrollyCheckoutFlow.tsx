@@ -165,6 +165,10 @@ function ScrollyCheckoutFlowInner({
 
     const updateHeight = () => {
       mainEl.style.setProperty("--snap-section-h", `${mainEl.clientHeight}px`)
+      mainEl.style.setProperty(
+        "--snap-scrollbar-w",
+        `${mainEl.offsetWidth - mainEl.clientWidth}px`,
+      )
     }
     updateHeight()
     const ro = new ResizeObserver(updateHeight)
@@ -225,6 +229,7 @@ function ScrollyCheckoutFlowInner({
         mainEl.style.overscrollBehaviorY = ""
         mainEl.style.removeProperty("--snap-section-h")
         mainEl.style.removeProperty("--snap-nav-h")
+        mainEl.style.removeProperty("--snap-scrollbar-w")
         mainEl.style.scrollSnapType = prevSnapType
         for (const el of sectionEls) {
           el.style.scrollSnapAlign = ""

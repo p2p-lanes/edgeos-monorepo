@@ -242,7 +242,7 @@ export default function SnapFooter({
   return (
     <div
       className="fixed bottom-0 z-30 transition-[left] duration-200"
-      style={{ left: leftOffset, right: 0 }}
+      style={{ left: leftOffset, right: "var(--snap-scrollbar-w, 0px)" }}
     >
       <div className="max-w-2xl mx-auto px-4">
         {isCartOpen && (
