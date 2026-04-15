@@ -2,7 +2,7 @@
 
 import { Building2, Calendar, Check, Home } from "lucide-react"
 import Image from "next/image"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import ExpandableDescription from "@/components/ui/ExpandableDescription"
 import QuantitySelector, {
@@ -963,8 +963,12 @@ export default function VariantHousingDate({
   )
 
   // Sync local selection when housing is cleared externally (e.g. cart drawer X)
+  const prevHousingRef = useRef(cart.housing)
   useEffect(() => {
-    if (!cart.housing && selectedProductId) {
+    const wasSet = prevHousingRef.current != null
+    prevHousingRef.current = cart.housing
+    // Only clear when housing transitions from set → null (external clear)
+    if (wasSet && !cart.housing && selectedProductId) {
       setSelectedProductId(null)
     }
   }, [cart.housing, selectedProductId])
@@ -988,10 +992,19 @@ export default function VariantHousingDate({
     }
   }
 
-  const getQuantity = (productId: string) =>
-    selectedProductId === productId && cart.housing?.productId === productId
-      ? cart.housing.quantity
-      : 0
+  const getQuantity = (productId: string) => {
+    if (
+      selectedProductId === productId &&
+      cart.housing?.productId === productId
+    ) {
+      return cart.housing.quantity
+    }
+    // Product just selected locally, housing effect hasn't run yet — show 1
+    if (selectedProductId === productId) {
+      return 1
+    }
+    return 0
+  }
 
   const handleIncrement = (productId: string) => {
     if (
@@ -999,7 +1012,7 @@ export default function VariantHousingDate({
       cart.housing?.productId === productId
     ) {
       updateHousingQuantity(cart.housing.quantity + 1)
-    } else {
+    } else if (selectedProductId !== productId) {
       setSelectedProductId(productId)
     }
   }
