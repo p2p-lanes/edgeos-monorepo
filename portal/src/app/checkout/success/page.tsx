@@ -3,6 +3,7 @@
 import { motion } from "framer-motion"
 import { CheckCircle, Home } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
 import { useApplicationsQuery } from "@/hooks/useGetApplications"
 import { getBackgroundProps } from "@/lib/background-image"
@@ -10,6 +11,7 @@ import { useCityProvider } from "@/providers/cityProvider"
 import { useTenant } from "@/providers/tenantProvider"
 
 const SuccessPage = () => {
+  const { t } = useTranslation()
   const router = useRouter()
   const { tenant } = useTenant()
   const { getCity } = useCityProvider()
@@ -45,10 +47,10 @@ const SuccessPage = () => {
               <CheckCircle className="h-10 w-10" />
             </div>
             <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
-              Tickets Purchased!
+              {t("checkout.success_title")}
             </h1>
             <p className="mt-2 text-gray-600">
-              Thank you for your purchase. Your tickets are now ready for use.
+              {t("checkout.success_description")}
             </p>
           </div>
 
@@ -88,7 +90,7 @@ const SuccessPage = () => {
               className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white"
             >
               <Home className="h-4 w-4" />
-              Go to Portal
+              {t("checkout.go_to_portal")}
             </Button>
           </div>
 

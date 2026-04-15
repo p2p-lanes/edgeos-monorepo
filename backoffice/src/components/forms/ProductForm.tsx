@@ -14,6 +14,7 @@ import {
 } from "lucide-react"
 import { useMemo, useState } from "react"
 import {
+  PopupsService,
   type ProductCreate,
   type ProductPublic,
   ProductsService,
@@ -27,6 +28,7 @@ type ProductCategory = string
 import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
+import { TranslationManager } from "@/components/translations/TranslationManager"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -119,6 +121,12 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
     enabled: !!popupId,
   })
 
+  const { data: popupData } = useQuery({
+    queryKey: ["popups", popupId],
+    queryFn: () => PopupsService.getPopup({ popupId: popupId! }),
+    enabled: isEdit && !!popupId,
+  })
+
   // Merge hardcoded defaults + API categories + locally added ones (deduplicated)
   const allCategories = useMemo(() => {
     const known = PRODUCT_CATEGORIES.map((c) => c.value)
@@ -129,6 +137,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
     }
     return merged
   }, [apiCategories, customCategories])
+
 
   const createMutation = useMutation({
     mutationFn: (data: ProductCreate) =>
@@ -613,6 +622,23 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
             )
           }
         </form.Subscribe>
+
+        {isEdit && (popupData?.supported_languages?.length ?? 0) > 1 && (
+          <>
+            <Separator />
+            <TranslationManager
+              entityType="product"
+              entityId={defaultValues!.id}
+              translatableFields={["name", "description"]}
+              sourceData={{
+                name: defaultValues!.name,
+                description: defaultValues!.description,
+              }}
+              supportedLanguages={popupData!.supported_languages!}
+              defaultLanguage={popupData!.default_language!}
+            />
+          </>
+        )}
 
         <Separator />
 

@@ -3,19 +3,20 @@
 import { CalendarDays, MapPin } from "lucide-react"
 import NextImage from "next/image"
 import { createContext, useContext } from "react"
+import { useTranslation } from "react-i18next"
 import type { PopupPublic } from "@/client"
 import { ButtonAnimated } from "@/components/ui/button"
 import { CardAnimation, CardContent } from "@/components/ui/card"
 import { EventProgressBar, type EventStatus } from "./EventProgressBar"
 
-const CTA_LABELS: Record<EventStatus, string> = {
-  not_started: "Apply",
-  draft: "Continue Application",
-  pending_fee: "Complete Payment",
-  "in review": "Edit Application",
-  accepted: "Go to Passes",
+const CTA_KEYS: Record<EventStatus, string> = {
+  not_started: "cta.not_started",
+  draft: "cta.draft",
+  pending_fee: "cta.pending_fee",
+  "in review": "cta.in_review",
+  accepted: "cta.accepted",
   rejected: "",
-  withdrawn: "Resume Application",
+  withdrawn: "cta.withdrawn",
 }
 
 interface EventCardContext {
@@ -139,13 +140,14 @@ interface ApplyButtonProps {
 
 function ApplyButton({ onClick }: ApplyButtonProps) {
   const { status } = useEventCard()
-  const label = CTA_LABELS[status]
-  if (!label) return null
+  const { t } = useTranslation()
+  const key = CTA_KEYS[status]
+  if (!key) return null
 
   return (
     <div className="flex items-end justify-end sm:justify-end">
       <ButtonAnimated onClick={onClick} className="w-full md:w-auto px-9">
-        {label}
+        {t(key)}
       </ButtonAnimated>
     </div>
   )

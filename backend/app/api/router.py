@@ -21,6 +21,7 @@ from app.api import (
     product,
     tenant,
     ticketing_step,
+    translation,
     upload,
     user,
 )
@@ -55,6 +56,9 @@ api_router.include_router(application.router)
 api_router.include_router(attendee.router)
 api_router.include_router(payment.router)
 api_router.include_router(cart.router)
+
+# Translations (i18n)
+api_router.include_router(translation.router)
 
 # Utility resources
 api_router.include_router(upload.router)

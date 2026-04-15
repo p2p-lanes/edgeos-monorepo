@@ -25,6 +25,7 @@ from app.core.dependencies.users import (
     SessionDep,
     TenantSession,
 )
+from app.api.translation.service import delete_translations_for_entity
 from app.utils.utils import slugify
 
 router = APIRouter(prefix="/groups", tags=["groups"])
@@ -203,6 +204,7 @@ async def delete_group(
                     detail="Cannot delete group with members that have purchased products",
                 )
 
+    delete_translations_for_entity(db, "group", group.id)
     crud.groups_crud.delete(db, group)
 
 

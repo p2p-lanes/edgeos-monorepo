@@ -1,3 +1,15 @@
+const LOCALE_MAP: Record<string, string> = {
+  en: "en-US",
+  es: "es-ES",
+  zh: "zh-CN",
+}
+
+function getLocale(): string {
+  if (typeof window === "undefined") return "en-US"
+  const lang = localStorage.getItem("portal_language") ?? "en"
+  return LOCALE_MAP[lang] ?? "en-US"
+}
+
 /**
  * Parse a date string as a local date (ignoring timezone).
  * "2026-05-10T00:00:00Z" → May 10 in any timezone, not May 9 in UTC-3.
@@ -8,7 +20,7 @@ const parseLocalDate = (date: string): Date => {
 }
 
 export const toDate = (date: string) => {
-  return parseLocalDate(date).toLocaleDateString("en-US", {
+  return parseLocalDate(date).toLocaleDateString(getLocale(), {
     month: "long",
     day: "numeric",
   })
@@ -27,5 +39,5 @@ export const formatDate = (
   },
 ) => {
   if (!date) return ""
-  return parseLocalDate(date).toLocaleDateString("en-EN", formatString)
+  return parseLocalDate(date).toLocaleDateString(getLocale(), formatString)
 }
