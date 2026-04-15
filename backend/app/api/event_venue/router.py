@@ -78,25 +78,52 @@ def _set_property_types(
     venue: EventVenues,
     property_type_ids: list[uuid.UUID] | None,
 ) -> None:
-    """Replace a venue's property links with the provided ids."""
+    """Replace a venue's property links with the provided ids.
+
+    Dedupes the input (the UI prevents duplicates but a malformed payload
+    shouldn't 500), and flushes the deletes before issuing the new inserts
+    so the unique(venue_id, property_type_id) constraint doesn't see the
+    old rows transiently.
+    """
     if property_type_ids is None:
         return
+
+    # Preserve order while removing duplicates.
+    unique_ids: list[uuid.UUID] = []
+    seen: set[uuid.UUID] = set()
+    for pt_id in property_type_ids:
+        if pt_id in seen:
+            continue
+        seen.add(pt_id)
+        unique_ids.append(pt_id)
 
     existing = list(
         db.exec(
             select(VenueProperties).where(VenueProperties.venue_id == venue.id)
         ).all()
     )
-    for link in existing:
-        db.delete(link)
+    existing_ids = {link.property_type_id: link for link in existing}
 
-    for pt_id in property_type_ids:
-        link = VenueProperties(
-            tenant_id=venue.tenant_id,
-            venue_id=venue.id,
-            property_type_id=pt_id,
+    # Remove links that shouldn't stay.
+    to_delete = [
+        link for pt_id, link in existing_ids.items() if pt_id not in seen
+    ]
+    for link in to_delete:
+        db.delete(link)
+    if to_delete:
+        db.flush()
+
+    # Add links that don't exist yet.
+    for pt_id in unique_ids:
+        if pt_id in existing_ids and existing_ids[pt_id] not in to_delete:
+            continue
+        db.add(
+            VenueProperties(
+                tenant_id=venue.tenant_id,
+                venue_id=venue.id,
+                property_type_id=pt_id,
+            )
         )
-        db.add(link)
 
 
 def _get_venue_or_404(db, venue_id: uuid.UUID) -> EventVenues:
