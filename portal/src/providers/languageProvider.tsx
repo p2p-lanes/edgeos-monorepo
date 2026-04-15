@@ -17,6 +17,24 @@ import { useCityProvider } from "./cityProvider"
 
 const STORAGE_KEY = "portal_language"
 const PORTAL_LANGUAGES = Object.keys(SUPPORTED_LANGUAGES)
+const DEFAULT_LANGUAGE = "en"
+
+// Match navigator.languages (e.g. "es-AR", "zh-Hant") against supported locales.
+// Prefer exact match, then fall back to the base subtag ("es-AR" → "es").
+function detectBrowserLanguage(): string | null {
+  if (typeof navigator === "undefined") return null
+  const candidates = navigator.languages?.length
+    ? navigator.languages
+    : [navigator.language]
+  for (const raw of candidates) {
+    if (!raw) continue
+    const lower = raw.toLowerCase()
+    if (PORTAL_LANGUAGES.includes(lower)) return lower
+    const base = lower.split("-")[0]
+    if (PORTAL_LANGUAGES.includes(base)) return base
+  }
+  return null
+}
 
 interface LanguageContextValue {
   currentLanguage: string
@@ -35,12 +53,9 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const city = getCity()
 
   const supportedLanguages = PORTAL_LANGUAGES
-  const defaultLanguage = city?.default_language ?? "en"
 
   const [currentLanguage, setCurrentLanguage] = useState(() => {
-    // Resolution order: URL param > localStorage > popup default
-    // Don't validate against supportedLanguages here — popup data
-    // may not be loaded yet. The sync effect validates once it loads.
+    // Resolution order: URL param > localStorage > navigator > default
     const urlLang = searchParams.get("lang")
     if (urlLang) return urlLang
 
@@ -49,10 +64,10 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
       if (stored) return stored
     }
 
-    return defaultLanguage
+    return detectBrowserLanguage() ?? DEFAULT_LANGUAGE
   })
 
-  // Sync language when popup data loads or changes
+  // Sync language when popup data loads or URL param changes
   useEffect(() => {
     const urlLang = searchParams.get("lang")
     if (urlLang && supportedLanguages.includes(urlLang)) {
@@ -60,11 +75,11 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
       return
     }
 
-    // Only validate once popup data has actually loaded
+    // Validate current selection against supported list once popup loads
     if (city && !supportedLanguages.includes(currentLanguage)) {
-      setCurrentLanguage(defaultLanguage)
+      setCurrentLanguage(detectBrowserLanguage() ?? DEFAULT_LANGUAGE)
     }
-  }, [defaultLanguage, searchParams, currentLanguage, city])
+  }, [searchParams, currentLanguage, city])
 
   // Sync i18n instance, localStorage, and invalidate queries on language change
   useEffect(() => {
