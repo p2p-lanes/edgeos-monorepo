@@ -76,7 +76,7 @@ export default function ScrollySectionNav({
   return (
     <div
       data-snap-nav
-      className="sticky top-0 z-20 bg-checkout-nav-bg/95 backdrop-blur-sm border-b border-gray-200/60"
+      className="sticky top-0 z-20 bg-checkout-nav-bg/95 backdrop-blur-sm"
     >
       <div className="max-w-2xl mx-auto px-4 py-2">
         {variant === "pills" && (

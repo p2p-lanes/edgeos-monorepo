@@ -101,10 +101,14 @@ export default function CartFooter({ onPay, onBack }: CartFooterProps) {
     const pass = cart.passes.find(
       (p) => p.attendeeId === attendeeId && p.productId === productId,
     )
-    const isDayProduct = pass?.product.duration_type === "day"
+    if (!pass) return
+
+    const isDayProduct = pass.product.duration_type === "day"
 
     if (isDayProduct) {
       resetDayProduct(attendeeId, productId)
+    } else if (pass.quantity > 1) {
+      togglePass(attendeeId, productId, 0)
     } else {
       togglePass(attendeeId, productId)
     }
@@ -152,6 +156,7 @@ export default function CartFooter({ onPay, onBack }: CartFooterProps) {
                           {getAttendeeName(pass.attendeeId)}
                         </p>
                         <p className="text-xs text-gray-500">
+                          {pass.quantity > 1 && <span>{pass.quantity} × </span>}
                           {pass.product.name}
                         </p>
                       </div>
@@ -187,6 +192,11 @@ export default function CartFooter({ onPay, onBack }: CartFooterProps) {
                   <Home className="w-4 h-4 text-gray-400 shrink-0" />
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">
+                      {cart.housing.quantity > 1 && (
+                        <span className="text-gray-500">
+                          {cart.housing.quantity} ×{" "}
+                        </span>
+                      )}
                       {cart.housing.product.name}
                     </p>
                     <p className="text-xs text-gray-500">
@@ -228,10 +238,12 @@ export default function CartFooter({ onPay, onBack }: CartFooterProps) {
                       <ShoppingBag className="w-4 h-4 text-gray-400 shrink-0" />
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-gray-900 truncate">
+                          {item.quantity > 1 && (
+                            <span className="text-gray-500">
+                              {item.quantity} ×{" "}
+                            </span>
+                          )}
                           {item.product.name}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          Qty: {item.quantity}
                         </p>
                       </div>
                     </div>
@@ -300,13 +312,13 @@ export default function CartFooter({ onPay, onBack }: CartFooterProps) {
                         <Ticket className="w-4 h-4 text-gray-400 shrink-0" />
                         <div className="min-w-0">
                           <p className="text-sm font-medium text-gray-900 truncate">
+                            {item.quantity > 1 && (
+                              <span className="text-gray-500">
+                                {item.quantity} ×{" "}
+                              </span>
+                            )}
                             {item.product.name}
                           </p>
-                          {item.quantity > 1 && (
-                            <p className="text-xs text-gray-500">
-                              Qty: {item.quantity}
-                            </p>
-                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2">

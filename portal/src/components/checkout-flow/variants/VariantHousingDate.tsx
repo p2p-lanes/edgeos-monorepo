@@ -962,6 +962,13 @@ export default function VariantHousingDate({
     formatDateInput(checkOut),
   )
 
+  // Sync local selection when housing is cleared externally (e.g. cart drawer X)
+  useEffect(() => {
+    if (!cart.housing && selectedProductId) {
+      setSelectedProductId(null)
+    }
+  }, [cart.housing, selectedProductId])
+
   useEffect(() => {
     if (selectedProductId) {
       selectHousing(

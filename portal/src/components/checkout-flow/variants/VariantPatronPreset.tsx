@@ -232,7 +232,6 @@ function PatronDefault({
           </div>
         )}
       </div>
-
     </div>
   )
 }
@@ -316,7 +315,6 @@ function PatronCompact({
           </div>
         )}
       </div>
-
     </div>
   )
 }
@@ -412,7 +410,6 @@ function PatronGrid({
           </button>
         </div>
       )}
-
     </div>
   )
 }

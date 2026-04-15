@@ -298,6 +298,7 @@ export function TicketSelectConfig({
                     onUpdate={handleSectionUpdate}
                     onDelete={handleSectionDelete}
                     products={products}
+                    showMediaFields={false}
                   />
                 ))}
             </div>

@@ -163,7 +163,14 @@ export default function ConfirmStep() {
                       key={pass.productId}
                       className="flex items-center justify-between text-sm py-0.5"
                     >
-                      <span className="text-gray-600">{pass.product.name}</span>
+                      <span className="text-gray-600">
+                        {pass.quantity > 1 && (
+                          <span className="text-gray-400">
+                            {pass.quantity} ×{" "}
+                          </span>
+                        )}
+                        {pass.product.name}
+                      </span>
                       <span className="font-medium text-gray-900">
                         {formatCurrency(pass.originalPrice ?? pass.price)}
                       </span>
@@ -201,13 +208,12 @@ export default function ConfirmStep() {
                         className="flex items-center justify-between text-sm"
                       >
                         <span className="text-gray-600">
-                          {item.product.name}
                           {item.quantity > 1 && (
                             <span className="text-gray-400">
-                              {" "}
-                              ×{item.quantity}
+                              {item.quantity} ×{" "}
                             </span>
                           )}
+                          {item.product.name}
                         </span>
                         <span className="font-medium text-gray-900">
                           {formatCurrency(item.price)}
@@ -235,6 +241,11 @@ export default function ConfirmStep() {
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-700">
+                    {cart.housing.quantity > 1 && (
+                      <span className="text-gray-400">
+                        {cart.housing.quantity} ×{" "}
+                      </span>
+                    )}
                     {cart.housing.product.name}
                   </p>
                   <p className="text-xs text-gray-500">
@@ -273,8 +284,12 @@ export default function ConfirmStep() {
                     className="flex items-center justify-between text-sm"
                   >
                     <span className="text-gray-600">
-                      {item.product.name}{" "}
-                      <span className="text-gray-400">×{item.quantity}</span>
+                      {item.quantity > 1 && (
+                        <span className="text-gray-400">
+                          {item.quantity} ×{" "}
+                        </span>
+                      )}
+                      {item.product.name}
                     </span>
                     <span className="font-medium text-gray-900">
                       {formatCurrency(item.totalPrice)}

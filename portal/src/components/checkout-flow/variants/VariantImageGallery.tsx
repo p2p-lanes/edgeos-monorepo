@@ -278,7 +278,6 @@ function LightboxGallery({
           </div>
         </div>
       )}
-
     </div>
   )
 }

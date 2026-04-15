@@ -40,6 +40,7 @@ interface SortableSectionCardProps {
   onDelete: (key: string) => void
   products: Array<{ id: string; name: string }>
   assignLabel?: string
+  showMediaFields?: boolean
 }
 
 export function SortableSectionCard({
@@ -48,6 +49,7 @@ export function SortableSectionCard({
   onDelete,
   products,
   assignLabel = "Assign product",
+  showMediaFields = true,
 }: SortableSectionCardProps) {
   const {
     attributes,
@@ -109,37 +111,41 @@ export function SortableSectionCard({
         </Button>
       </div>
 
-      <div className="px-3 pb-3 flex flex-col gap-2">
-        <div className="flex flex-col gap-1">
-          <label
-            htmlFor={`${section.key}-image`}
-            className="text-xs font-medium text-muted-foreground"
-          >
-            Image
-          </label>
-          <ImageUpload
-            value={section.image_url || null}
-            onChange={(url) => onUpdate(section.key, { image_url: url ?? "" })}
-          />
+      {showMediaFields && (
+        <div className="px-3 pb-3 flex flex-col gap-2">
+          <div className="flex flex-col gap-1">
+            <label
+              htmlFor={`${section.key}-image`}
+              className="text-xs font-medium text-muted-foreground"
+            >
+              Image
+            </label>
+            <ImageUpload
+              value={section.image_url || null}
+              onChange={(url) =>
+                onUpdate(section.key, { image_url: url ?? "" })
+              }
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label
+              htmlFor={`${section.key}-description`}
+              className="text-xs font-medium text-muted-foreground"
+            >
+              Description
+            </label>
+            <Textarea
+              id={`${section.key}-description`}
+              value={section.description ?? ""}
+              onChange={(e) =>
+                onUpdate(section.key, { description: e.target.value })
+              }
+              placeholder="Short description shown on the property card"
+              className="min-h-[60px] text-sm"
+            />
+          </div>
         </div>
-        <div className="flex flex-col gap-1">
-          <label
-            htmlFor={`${section.key}-description`}
-            className="text-xs font-medium text-muted-foreground"
-          >
-            Description
-          </label>
-          <Textarea
-            id={`${section.key}-description`}
-            value={section.description ?? ""}
-            onChange={(e) =>
-              onUpdate(section.key, { description: e.target.value })
-            }
-            placeholder="Short description shown on the property card"
-            className="min-h-[60px] text-sm"
-          />
-        </div>
-      </div>
+      )}
 
       {assignedProducts.length > 0 && (
         <>

@@ -54,7 +54,6 @@ interface ScrollyCheckoutFlowProps {
 const FOOTER_MODE_STORAGE_KEY = "passes-footer-mode"
 const FOOTER_DESIGN_STORAGE_KEY = "passes-footer-design"
 const NAV_DESIGN_STORAGE_KEY = "passes-nav-design"
-const WATERMARK_STYLE_STORAGE_KEY = "passes-watermark-style"
 
 function SectionHeader({
   title,
@@ -297,8 +296,12 @@ function CartDrawerContent() {
     const pass = cart.passes.find(
       (p) => p.attendeeId === attendeeId && p.productId === productId,
     )
-    if (pass?.product.duration_type === "day") {
+    if (!pass) return
+
+    if (pass.product.duration_type === "day") {
       resetDayProduct(attendeeId, productId)
+    } else if (pass.quantity > 1) {
+      togglePass(attendeeId, productId, 0)
     } else {
       togglePass(attendeeId, productId)
     }
@@ -326,6 +329,7 @@ function CartDrawerContent() {
                         {getAttendeeName(pass.attendeeId)}
                       </p>
                       <p className="text-xs text-gray-500">
+                        {pass.quantity > 1 && <span>{pass.quantity} × </span>}
                         {pass.product.name}
                       </p>
                     </div>
@@ -361,6 +365,11 @@ function CartDrawerContent() {
                 <Home className="w-4 h-4 text-gray-400 shrink-0" />
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-gray-900 truncate">
+                    {cart.housing.quantity > 1 && (
+                      <span className="text-gray-500">
+                        {cart.housing.quantity} ×{" "}
+                      </span>
+                    )}
                     {cart.housing.product.name}
                   </p>
                   <p className="text-xs text-gray-500">
@@ -402,10 +411,12 @@ function CartDrawerContent() {
                     <ShoppingBag className="w-4 h-4 text-gray-400 shrink-0" />
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">
+                        {item.quantity > 1 && (
+                          <span className="text-gray-500">
+                            {item.quantity} ×{" "}
+                          </span>
+                        )}
                         {item.product.name}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        Qty: {item.quantity}
                       </p>
                     </div>
                   </div>
@@ -921,7 +932,7 @@ function ScrollyCheckoutFlowInner({
   const [footerMode, setFooterMode] = useState<"guided" | "quickpay">("guided")
   const [footerDesign, setFooterDesign] = useState<FooterDesign>("stripe")
   const [navDesign, setNavDesign] = useState<NavDesign>("pills")
-  const [watermarkStyle, setWatermarkStyle] = useState<WatermarkStyle>("none")
+  const watermarkStyle: WatermarkStyle = "bold"
 
   useEffect(() => {
     const storedMode = localStorage.getItem(FOOTER_MODE_STORAGE_KEY) as
@@ -951,17 +962,6 @@ function ScrollyCheckoutFlowInner({
     ) {
       setNavDesign(storedNavDesign)
     }
-    const storedWatermark = localStorage.getItem(
-      WATERMARK_STYLE_STORAGE_KEY,
-    ) as WatermarkStyle | null
-    if (
-      storedWatermark === "none" ||
-      storedWatermark === "ghost" ||
-      storedWatermark === "stroke" ||
-      storedWatermark === "bold"
-    ) {
-      setWatermarkStyle(storedWatermark)
-    }
   }, [])
 
   const _toggleFooterMode = () => {
@@ -978,11 +978,6 @@ function ScrollyCheckoutFlowInner({
   const setNavDesignPersisted = (v: NavDesign) => {
     setNavDesign(v)
     localStorage.setItem(NAV_DESIGN_STORAGE_KEY, v)
-  }
-
-  const setWatermarkStylePersisted = (v: WatermarkStyle) => {
-    setWatermarkStyle(v)
-    localStorage.setItem(WATERMARK_STYLE_STORAGE_KEY, v)
   }
 
   // Build sections list from availableSteps (respects is_enabled + order + product availability)
@@ -1376,8 +1371,6 @@ function ScrollyCheckoutFlowInner({
           onNavDesignChange={setNavDesignPersisted}
           footerDesign={footerDesign}
           onFooterDesignChange={setFooterDesignPersisted}
-          watermarkStyle={watermarkStyle}
-          onWatermarkStyleChange={setWatermarkStylePersisted}
         />
         <SnapDotNav
           sections={allSections}
@@ -1437,8 +1430,6 @@ function ScrollyCheckoutFlowInner({
         onNavDesignChange={setNavDesignPersisted}
         footerDesign={footerDesign}
         onFooterDesignChange={setFooterDesignPersisted}
-        watermarkStyle={watermarkStyle}
-        onWatermarkStyleChange={setWatermarkStylePersisted}
       />
 
       <div className="sticky bottom-0 z-30">
