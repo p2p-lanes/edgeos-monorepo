@@ -12,9 +12,11 @@ import {
   useState,
 } from "react"
 import { useTranslation } from "react-i18next"
+import { SUPPORTED_LANGUAGES } from "@/i18n/config"
 import { useCityProvider } from "./cityProvider"
 
 const STORAGE_KEY = "portal_language"
+const PORTAL_LANGUAGES = Object.keys(SUPPORTED_LANGUAGES)
 
 interface LanguageContextValue {
   currentLanguage: string
@@ -32,7 +34,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const prevLanguageRef = useRef<string | null>(null)
   const city = getCity()
 
-  const supportedLanguages = city?.supported_languages ?? ["en"]
+  const supportedLanguages = PORTAL_LANGUAGES
   const defaultLanguage = city?.default_language ?? "en"
 
   const [currentLanguage, setCurrentLanguage] = useState(() => {
@@ -62,7 +64,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     if (city && !supportedLanguages.includes(currentLanguage)) {
       setCurrentLanguage(defaultLanguage)
     }
-  }, [supportedLanguages, defaultLanguage, searchParams, currentLanguage, city])
+  }, [defaultLanguage, searchParams, currentLanguage, city])
 
   // Sync i18n instance, localStorage, and invalidate queries on language change
   useEffect(() => {
@@ -84,14 +86,11 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     prevLanguageRef.current = currentLanguage
   }, [currentLanguage, i18n, queryClient])
 
-  const setLanguage = useCallback(
-    (lang: string) => {
-      if (supportedLanguages.includes(lang)) {
-        setCurrentLanguage(lang)
-      }
-    },
-    [supportedLanguages],
-  )
+  const setLanguage = useCallback((lang: string) => {
+    if (supportedLanguages.includes(lang)) {
+      setCurrentLanguage(lang)
+    }
+  }, [])
 
   return (
     <LanguageContext.Provider

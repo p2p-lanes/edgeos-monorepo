@@ -8,13 +8,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { SUPPORTED_LANGUAGES, type SupportedLanguage } from "@/i18n/config"
+import { SUPPORTED_LANGUAGES } from "@/i18n/config"
 import { useLanguage } from "@/providers/languageProvider"
 
 export function LanguageSwitcher() {
-  const { currentLanguage, supportedLanguages, setLanguage } = useLanguage()
-
-  if (supportedLanguages.length <= 1) return null
+  const { currentLanguage, setLanguage } = useLanguage()
 
   return (
     <Select value={currentLanguage} onValueChange={setLanguage}>
@@ -23,9 +21,9 @@ export function LanguageSwitcher() {
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        {supportedLanguages.map((lang) => (
-          <SelectItem key={lang} value={lang}>
-            {SUPPORTED_LANGUAGES[lang as SupportedLanguage] ?? lang}
+        {Object.entries(SUPPORTED_LANGUAGES).map(([code, label]) => (
+          <SelectItem key={code} value={code}>
+            {label}
           </SelectItem>
         ))}
       </SelectContent>
