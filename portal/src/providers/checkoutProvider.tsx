@@ -222,6 +222,7 @@ export function CheckoutProvider({
   const {
     savedCart,
     saveCart,
+    scheduleSave,
     clearCart: clearPersistedCart,
   } = useCartPersistence({
     cityId,
@@ -295,6 +296,23 @@ export function CheckoutProvider({
     insurance,
     currentStep,
   }
+
+  // Auto-save cart selections (debounced). currentStep is excluded — goToStep
+  // saves immediately. scheduleSave self-guards against pre-restoration and
+  // post-payment states.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: deps drive the save; scheduleSave reads via ref
+  useEffect(() => {
+    scheduleSave()
+  }, [
+    selectedPasses,
+    housing,
+    merch,
+    patron,
+    promoCode,
+    promoCodeValid,
+    insurance,
+    scheduleSave,
+  ])
 
   // Credit calculations
   const { editCredit, monthUpgradeCredit } = useCreditCalculation({

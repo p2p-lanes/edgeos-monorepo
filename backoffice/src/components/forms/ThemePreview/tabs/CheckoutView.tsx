@@ -1,6 +1,6 @@
+import { Ticket } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { PreviewCheckoutBottomBar } from "../parts/PreviewCheckoutBottomBar"
-import { PreviewCheckoutPassCard } from "../parts/PreviewCheckoutPassCard"
 import { PreviewCheckoutTopBar } from "../parts/PreviewCheckoutTopBar"
 import { useDisplayEvent, usePreview } from "../parts/PreviewContext"
 import { makeIsHl, ringIf } from "../parts/ring"
@@ -12,8 +12,8 @@ const FALLBACK_BG =
   "radial-gradient(ellipse at 30% 20%, #4c3a8a 0%, #1b1540 50%, #080618 100%)"
 
 // Replica del flujo de Pases del checkout real: background image fullscreen,
-// navbar sticky con step actual + badge, watermark grande "Pases",
-// stack de cards, y bottom bar con total + CTA.
+// navbar sticky con pills de steps, una sola card con el header del tenant y
+// la sección "Experiencias" con un producto, y bottom bar flotante.
 export function CheckoutView() {
   const { highlightedKeys, event } = usePreview()
   const display = useDisplayEvent()
@@ -34,77 +34,118 @@ export function CheckoutView() {
     >
       <PreviewCheckoutTopBar />
 
-      <div className="flex-1 overflow-hidden px-6 pb-6 pt-8">
-        <div className="relative mb-8">
-          <div
-            aria-hidden="true"
-            className={cn(
-              "pointer-events-none select-none whitespace-nowrap text-[5rem] font-black leading-none tracking-tight",
-              ringIf(isHl("checkout_watermark_color")),
-            )}
-            style={{ color: "var(--checkout-watermark)" }}
-          >
-            Pases
+      <div className="flex-1 overflow-hidden px-4 pb-6 pt-6">
+        <div
+          className={cn(
+            "mx-auto max-w-2xl overflow-hidden shadow-sm",
+            ringIf(isHl("checkout_card_bg_color")),
+          )}
+          style={{
+            backgroundColor: "var(--checkout-card-bg)",
+            borderRadius: "calc(var(--radius) + 4px)",
+          }}
+        >
+          <div className="flex items-center gap-3 px-4 py-3">
+            <div
+              className="flex size-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold"
+              style={{
+                backgroundColor: "var(--checkout-badge-bg)",
+                color: "var(--checkout-badge-title)",
+              }}
+            >
+              {display.initial}
+            </div>
+            <div className="flex min-w-0 flex-col">
+              <span
+                className={cn(
+                  "truncate text-sm font-semibold",
+                  ringIf(isHl("checkout_title_color")),
+                )}
+                style={{ color: "var(--checkout-title)" }}
+              >
+                {display.name}
+              </span>
+              <span
+                className={cn(
+                  "text-[10px]",
+                  ringIf(isHl("checkout_subtitle_color")),
+                )}
+                style={{ color: "var(--checkout-subtitle)" }}
+              >
+                V1.0
+              </span>
+            </div>
           </div>
-          <p
+
+          <div className="border-t border-black/5" />
+
+          <div
             className={cn(
-              "mt-2 text-base",
+              "px-4 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-wider",
               ringIf(isHl("checkout_subtitle_color")),
             )}
             style={{ color: "var(--checkout-subtitle)" }}
           >
-            Elegí los pases que querés comprar para {display.name}.
-          </p>
-        </div>
+            Experiencias
+          </div>
 
-        <div className="flex flex-col gap-3">
-          {/* Attendee header card */}
-          <div
-            className={cn(
-              "rounded-xl p-4 shadow-sm",
-              ringIf(isHl("checkout_card_bg_color")),
-            )}
-            style={{
-              backgroundColor: "var(--checkout-card-bg)",
-              borderRadius: "calc(var(--radius) + 4px)",
-            }}
-          >
+          <div className="flex items-start justify-between gap-4 px-4 pb-4">
+            <div className="flex min-w-0 flex-1 flex-col">
+              <div className="flex items-center gap-2">
+                <Ticket
+                  className="size-4 shrink-0"
+                  style={{ color: "var(--checkout-subtitle)" }}
+                />
+                <span
+                  className={cn(
+                    "text-sm font-semibold",
+                    ringIf(isHl("checkout_title_color")),
+                  )}
+                  style={{ color: "var(--checkout-title)" }}
+                >
+                  Ticket 4 Días
+                </span>
+              </div>
+              <span
+                className={cn(
+                  "mt-1 text-xs",
+                  ringIf(isHl("checkout_subtitle_color")),
+                )}
+                style={{ color: "var(--checkout-subtitle)" }}
+              >
+                20 nov → 24 nov
+              </span>
+              <span
+                className={cn(
+                  "mt-1 line-clamp-2 text-[11px]",
+                  ringIf(isHl("checkout_subtitle_color")),
+                )}
+                style={{ color: "var(--checkout-subtitle)" }}
+              >
+                La entrada te brinda acceso a todas las actividades, talleres y
+                shows durante los cuatro días del festival. Podés participar de
+                Amanita Festival: 20 al 24 de Noviembre,...
+              </span>
+              <span
+                className={cn(
+                  "mt-1 text-[11px] font-semibold",
+                  ringIf(isHl("checkout_badge_bg_color")),
+                )}
+                style={{ color: "var(--checkout-badge-bg)" }}
+              >
+                Ver más
+              </span>
+            </div>
             <span
               className={cn(
-                "block text-xs font-medium uppercase tracking-wider",
-                ringIf(isHl("checkout_subtitle_color")),
-              )}
-              style={{ color: "var(--checkout-subtitle)" }}
-            >
-              Asistente
-            </span>
-            <span
-              className={cn(
-                "mt-1 block text-lg font-semibold",
+                "shrink-0 text-sm font-bold",
                 ringIf(isHl("checkout_title_color")),
               )}
               style={{ color: "var(--checkout-title)" }}
             >
-              {display.name}
+              $215.000
             </span>
           </div>
-
-          <PreviewCheckoutPassCard
-            title="Ticket 6 días"
-            description="Acceso al evento completo (lun a sab)."
-            price="$20.000"
-            selected
-          />
-          <PreviewCheckoutPassCard
-            title="Ticket 7 días"
-            description="Acceso full al evento, incluye apertura."
-            price="$25.000"
-          />
-          <PreviewCheckoutPassCard
-            title="Entrada Niños"
-            description="Menores de 12 años acompañados."
-            price="$5.000"
-          />
         </div>
       </div>
 
