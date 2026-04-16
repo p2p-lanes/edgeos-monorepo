@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from app.api.attendee.models import Attendees
     from app.api.coupon.models import Coupons
     from app.api.group.models import Groups
+    from app.api.popup.models import Popups
     from app.api.product.models import Products
     from app.api.tenant.models import Tenants
 
@@ -43,13 +44,22 @@ class PaymentProducts(PaymentProductBase, table=True):
 class Payments(PaymentBase, table=True):
     """Payment model for tracking purchases."""
 
+    # application_id is nullable (direct-sale payments have no application).
+    # ix_payments_application_status is a PARTIAL index — only includes rows
+    # where application_id IS NOT NULL.
     __table_args__ = (
-        Index("ix_payments_application_status", "application_id", "status"),
+        Index(
+            "ix_payments_application_status",
+            "application_id",
+            "status",
+            postgresql_where=text("application_id IS NOT NULL"),
+        ),
         Index(
             "ix_payments_pending_queue",
             "created_at",
             postgresql_where=text("status = 'pending'"),
         ),
+        Index("ix_payments_popup_id", "popup_id"),
     )
 
     id: uuid.UUID = Field(
@@ -78,7 +88,8 @@ class Payments(PaymentBase, table=True):
 
     # Relationships
     tenant: "Tenants" = Relationship(back_populates="payments")
-    application: "Applications" = Relationship(back_populates="payments")
+    application: Optional["Applications"] = Relationship(back_populates="payments")
+    popup: "Popups" = Relationship(back_populates="payments")
     products_snapshot: list["PaymentProducts"] = Relationship(
         back_populates="payment",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},

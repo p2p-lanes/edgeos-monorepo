@@ -1,6 +1,6 @@
 import uuid
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import Index
 from sqlalchemy.dialects.postgresql import UUID
@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from app.api.application.models import Applications
     from app.api.human.models import Humans
     from app.api.payment.models import PaymentProducts
+    from app.api.popup.models import Popups
     from app.api.product.models import Products
     from app.api.tenant.models import Tenants
 
@@ -31,6 +32,7 @@ class Attendees(AttendeeBase, table=True):
 
     __table_args__ = (
         Index("ix_attendees_application_category", "application_id", "category"),
+        Index("ix_attendees_popup_id", "popup_id"),
     )
 
     id: uuid.UUID = Field(
@@ -59,7 +61,8 @@ class Attendees(AttendeeBase, table=True):
 
     # Relationships
     tenant: "Tenants" = Relationship(back_populates="attendees")
-    application: "Applications" = Relationship(back_populates="attendees")
+    application: Optional["Applications"] = Relationship(back_populates="attendees")
+    popup: "Popups" = Relationship(back_populates="attendees")
     human: "Humans" = Relationship(
         back_populates="attendees",
         sa_relationship_kwargs={"lazy": "selectin"},

@@ -9,6 +9,7 @@ from sqlalchemy import Boolean, Column, Numeric
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlmodel import Field, SQLModel, String
 
+from app.api.shared.enums import SaleType
 from app.utils.utils import slugify
 
 
@@ -28,6 +29,10 @@ class PopupBase(SQLModel):
     start_date: datetime | None = None
     end_date: datetime | None = None
     status: PopupStatus = PopupStatus.draft
+    sale_type: SaleType = Field(
+        default=SaleType.application,
+        sa_column=Column(String, nullable=False, server_default="application"),
+    )
     allows_spouse: bool | None = False
     allows_children: bool | None = False
     allows_coupons: bool | None = False
@@ -78,6 +83,7 @@ class PopupCreate(SQLModel):
     start_date: datetime | None = None
     end_date: datetime | None = None
     status: PopupStatus = PopupStatus.draft
+    sale_type: SaleType = SaleType.application
     allows_spouse: bool | None = False
     allows_children: bool | None = False
     allows_coupons: bool | None = False
@@ -162,6 +168,7 @@ class PopupPublic(SQLModel):
     location: str | None = None
     slug: str
     status: PopupStatus = PopupStatus.draft
+    sale_type: SaleType = SaleType.application
     start_date: datetime | None = None
     end_date: datetime | None = None
     image_url: str | None = None
