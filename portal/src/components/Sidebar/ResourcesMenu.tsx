@@ -1,4 +1,4 @@
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { useCallback } from "react"
 import { useTranslation } from "react-i18next"
 import useResources from "@/hooks/useResources"
@@ -30,8 +30,12 @@ const ResourceItem: React.FC<{
   resource: Resource
   level?: number
   onNavigate: (path: string) => void
-}> = ({ resource, level = 0, onNavigate }) => {
+  pathname: string
+}> = ({ resource, level = 0, onNavigate, pathname }) => {
   const { t } = useTranslation()
+
+  const isActive = resource.path === pathname
+
   return (
     <SidebarMenuItem>
       <Tooltip>
@@ -41,6 +45,7 @@ const ResourceItem: React.FC<{
             level={level}
             color={statusColor(resource.value as string)}
             onNavigate={onNavigate}
+            isActive={isActive}
           />
         </TooltipTrigger>
         <TooltipContent
@@ -60,6 +65,7 @@ const ResourceItem: React.FC<{
               resource={child}
               level={level + 1}
               onNavigate={onNavigate}
+              pathname={pathname}
             />
           ))}
         </SidebarMenuSub>
@@ -72,6 +78,7 @@ const ResourcesMenu = () => {
   const { t } = useTranslation()
   const { resources } = useResources()
   const router = useRouter()
+  const pathname = usePathname()
 
   const handleNavigate = useCallback(
     (path: string) => {
@@ -93,6 +100,7 @@ const ResourcesMenu = () => {
                   key={resource.name}
                   resource={resource}
                   onNavigate={handleNavigate}
+                  pathname={pathname}
                 />
               ))}
             <Separator className="my-4" />

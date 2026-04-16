@@ -3,6 +3,7 @@ import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { toast } from "sonner"
 import type { GroupPublic } from "@/client"
+import { getPublicGroupLink } from "@/lib/group-route"
 import { useCityProvider } from "@/providers/cityProvider"
 import useGetGroups from "../Sidebar/hooks/useGetGroups"
 import { Badge } from "../ui/badge"
@@ -11,8 +12,7 @@ import { Card } from "../ui/card"
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip"
 
 const getCheckoutLinkForGroup = (group: GroupPublic): string => {
-  const origin = window.location.origin
-  return `${origin}/checkout?group=${group.slug}`
+  return getPublicGroupLink(window.location.origin, group.slug)
 }
 
 const Groups = () => {

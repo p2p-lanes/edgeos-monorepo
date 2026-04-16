@@ -2,18 +2,23 @@
 
 import { useRouter, useSearchParams } from "next/navigation"
 import { useEffect } from "react"
+import { getPublicGroupPath } from "@/lib/group-route"
 
 const CheckoutPage = () => {
   const router = useRouter()
   const searchParams = useSearchParams()
 
   useEffect(() => {
-    // Direct-sale entry point — the portal's primary direct-sale UI lives at
-    // `/portal/{popupSlug}`, so forward the user there. The existing
-    // `?group=` flow is handled by the downstream group-checkout UI.
     const popupSlug = searchParams.get("popup")
+    const groupSlug = searchParams.get("group")
+
+    if (groupSlug) {
+      router.replace(getPublicGroupPath(groupSlug))
+      return
+    }
+
     if (popupSlug) {
-      router.replace(`/portal/${popupSlug}`)
+      router.replace(`/checkout/${popupSlug}`)
       return
     }
 

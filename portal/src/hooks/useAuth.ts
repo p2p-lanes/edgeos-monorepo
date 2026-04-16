@@ -1,20 +1,19 @@
 "use client"
 
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { useParams, useRouter } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { useCallback } from "react"
 import { HumansService } from "@/client"
 import {
   dispatchAuthChange,
   useIsAuthenticated,
 } from "@/hooks/useIsAuthenticated"
+import { saveAuthRedirect } from "@/lib/authRedirect"
 import { queryKeys } from "@/lib/query-keys"
 
 const useAuth = () => {
   const router = useRouter()
   const queryClient = useQueryClient()
-  const params = useParams()
-  const popupSlug = params.popupSlug as string | undefined
   const isAuthenticated = useIsAuthenticated()
 
   const {
@@ -32,12 +31,9 @@ const useAuth = () => {
     dispatchAuthChange()
     queryClient.clear()
 
-    if (popupSlug) {
-      router.push(`/auth?popup=${popupSlug}`)
-    } else {
-      router.push("/auth")
-    }
-  }, [queryClient, router, popupSlug])
+    saveAuthRedirect(`${window.location.pathname}${window.location.search}`)
+    router.push("/auth")
+  }, [queryClient, router])
 
   return {
     user,

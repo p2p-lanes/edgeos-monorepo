@@ -3,13 +3,14 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { motion } from "framer-motion"
 import Image from "next/image"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { z } from "zod/v4"
 import { ApiError, AuthService } from "@/client"
 import { ButtonAnimated } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { consumeAuthRedirect } from "@/lib/authRedirect"
 import { queryKeys } from "@/lib/query-keys"
 import { useTenant } from "@/providers/tenantProvider"
 
@@ -18,8 +19,6 @@ export default function AuthForm() {
   const { tenantId, tenant } = useTenant()
   const router = useRouter()
   const queryClient = useQueryClient()
-  const params = useSearchParams()
-  const popupSlug = params.get("popup")
 
   const emailSchema = z.email(t("auth.invalid_email"))
   const codeSchema = z
@@ -88,7 +87,7 @@ export default function AuthForm() {
         timerRef.current = null
       }
       queryClient.invalidateQueries({ queryKey: queryKeys.profile.current })
-      router.push(`/portal${popupSlug ? `/${popupSlug}` : ""}`)
+      router.replace(consumeAuthRedirect("/portal"))
     },
     onError: (err) => {
       if (err instanceof ApiError) {

@@ -4,6 +4,7 @@ import { Check, Copy } from "lucide-react"
 import { useState } from "react"
 import type { GroupPublic, PopupPublic } from "@/client"
 import { Button } from "@/components/ui/button"
+import { getPublicGroupLink } from "@/lib/group-route"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import { useTenant } from "@/providers/tenantProvider"
@@ -87,7 +88,7 @@ export default function ReferralLinks({
 
             if (!groupPopup) return null
 
-            const link = `${window.location.origin}/checkout?group=${group.slug}`
+            const link = getPublicGroupLink(window.location.origin, group.slug)
 
             return (
               <div

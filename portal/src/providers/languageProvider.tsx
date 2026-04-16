@@ -13,7 +13,7 @@ import {
 } from "react"
 import { useTranslation } from "react-i18next"
 import { SUPPORTED_LANGUAGES } from "@/i18n/config"
-import { useCityProvider } from "./cityProvider"
+import { CityContext } from "./cityProvider"
 
 const STORAGE_KEY = "portal_language"
 const PORTAL_LANGUAGES = Object.keys(SUPPORTED_LANGUAGES)
@@ -46,11 +46,11 @@ const LanguageContext = createContext<LanguageContextValue | null>(null)
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const { i18n } = useTranslation()
-  const { getCity } = useCityProvider()
+  const cityContext = useContext(CityContext)
   const searchParams = useSearchParams()
   const queryClient = useQueryClient()
   const prevLanguageRef = useRef<string | null>(null)
-  const city = getCity()
+  const city = cityContext?.getCity() ?? null
 
   const supportedLanguages = PORTAL_LANGUAGES
 

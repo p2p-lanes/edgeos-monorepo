@@ -1,11 +1,12 @@
 "use client"
 
 import dynamic from "next/dynamic"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { Suspense, useEffect } from "react"
 import Quote from "@/app/auth/Quote"
 import { Loader } from "@/components/ui/Loader"
 import { useIsAuthenticated } from "@/hooks/useIsAuthenticated"
+import { consumeAuthRedirect } from "@/lib/authRedirect"
 
 const AuthForm = dynamic(() => import("@/app/auth/AuthForm"), {
   ssr: false,
@@ -13,15 +14,13 @@ const AuthForm = dynamic(() => import("@/app/auth/AuthForm"), {
 
 function AuthContent() {
   const router = useRouter()
-  const params = useSearchParams()
-  const popupSlug = params.get("popup")
   const loggedIn = useIsAuthenticated()
 
   useEffect(() => {
     if (loggedIn) {
-      router.push(`/portal${popupSlug ? `/${popupSlug}` : ""}`)
+      router.replace(consumeAuthRedirect("/portal"))
     }
-  }, [loggedIn, router, popupSlug])
+  }, [loggedIn, router])
 
   if (loggedIn) {
     return (

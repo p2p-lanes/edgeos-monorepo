@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
+  CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
@@ -19,12 +20,14 @@ import PersonalInfoForm from "./PersonalInfoForm"
 
 interface UserInfoFormProps {
   popupId: string
+  popupName: string
   onSubmit: (data: FormDataProps) => Promise<void>
   isSubmitting: boolean
 }
 
 const UserInfoForm = ({
   popupId,
+  popupName,
   onSubmit,
   isSubmitting,
 }: UserInfoFormProps) => {
@@ -141,6 +144,7 @@ const UserInfoForm = ({
           <CardTitle className="text-2xl font-bold mb-2">
             {t("checkout.title")}
           </CardTitle>
+          <CardDescription>{popupName}</CardDescription>
           <div className="mt-6 p-3 bg-red-100 border border-red-300 text-red-800 rounded-md">
             {errors.general}
           </div>
@@ -156,6 +160,7 @@ const UserInfoForm = ({
           <CardTitle className="text-2xl font-bold mb-2">
             {t("checkout.loading_info")}
           </CardTitle>
+          <CardDescription>{popupName}</CardDescription>
         </CardHeader>
         <CardContent className="flex justify-center py-6">
           <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500" />
@@ -170,6 +175,7 @@ const UserInfoForm = ({
         <CardTitle className="text-2xl font-bold">
           {t("checkout.express_title")}
         </CardTitle>
+        <CardDescription>{popupName}</CardDescription>
       </CardHeader>
       <form noValidate onSubmit={handleSubmit}>
         <CardContent className="space-y-4">

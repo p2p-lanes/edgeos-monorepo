@@ -2,6 +2,7 @@ import { Check, Copy, Import, Plus, Users } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
 import type { GroupWithMembers } from "@/client"
+import { getPublicGroupLink } from "@/lib/group-route"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import MemberFormModal from "./AddMemberModal"
@@ -61,8 +62,7 @@ const TeamHeader = ({
   }
 
   const handleCopyCheckoutLink = async () => {
-    const origin = window.location.origin
-    const checkoutLink = `${origin}/checkout?group=${group.slug}`
+    const checkoutLink = getPublicGroupLink(window.location.origin, group.slug)
 
     try {
       await navigator.clipboard.writeText(checkoutLink)

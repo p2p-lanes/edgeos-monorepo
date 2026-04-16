@@ -29,6 +29,7 @@ import {
   usePromoCode,
 } from "@/hooks/checkout"
 import useGetPassesData from "@/hooks/useGetPassesData"
+import { useIsAuthenticated } from "@/hooks/useIsAuthenticated"
 import type { AttendeePassState } from "@/types/Attendee"
 import type {
   CheckoutCartState,
@@ -116,6 +117,7 @@ export function CheckoutProvider({
   const { getRelevantApplication } = useApplication()
   const { getCity } = useCityProvider()
   const { products } = useGetPassesData()
+  const isAuthenticated = useIsAuthenticated()
   const application = getRelevantApplication()
   const appCredit = application?.credit
   const city = getCity()
@@ -132,7 +134,7 @@ export function CheckoutProvider({
       TicketingStepsService.listPortalTicketingSteps({
         popupId: cityId!,
       }),
-    enabled: !!cityId,
+    enabled: !!cityId && isAuthenticated,
   })
   const configuredSteps = stepsData?.results ?? []
 
