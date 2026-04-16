@@ -1,12 +1,9 @@
 "use client"
 
-import gsap from "gsap"
-import { ScrollToPlugin } from "gsap/ScrollToPlugin"
 import { useSearchParams } from "next/navigation"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { DesignVariantProvider } from "@/context/designVariant"
 import { usePaymentVerification } from "@/hooks/checkout"
-import { useIsMobile } from "@/hooks/useIsMobile"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCheckout } from "@/providers/checkoutProvider"
 import DesignVariantPanel from "./DesignVariantPanel"
@@ -28,8 +25,6 @@ import SnapSection from "./SnapSection"
 import PassSelectionSection from "./steps/PassSelectionSection"
 import SuccessStep from "./steps/SuccessStep"
 
-gsap.registerPlugin(ScrollToPlugin)
-
 interface ScrollyCheckoutFlowProps {
   onPaymentComplete?: () => void
   onBack?: () => void
@@ -42,7 +37,6 @@ function ScrollyCheckoutFlowInner({
   onPaymentComplete,
   onBack,
 }: ScrollyCheckoutFlowProps) {
-  const isMobile = useIsMobile()
   const { availableSteps, submitPayment, stepConfigs } = useCheckout()
 
   const getStepConfig = (stepType: string) =>
@@ -161,8 +155,6 @@ function ScrollyCheckoutFlowInner({
     const mainEl = findScrollContainer()
     if (!mainEl) return
 
-    mainEl.style.overscrollBehaviorY = "none"
-
     const updateHeight = () => {
       mainEl.style.setProperty("--snap-section-h", `${mainEl.clientHeight}px`)
       mainEl.style.setProperty(
@@ -190,152 +182,56 @@ function ScrollyCheckoutFlowInner({
       el.getBoundingClientRect().top -
       mainEl.getBoundingClientRect().top
 
-    // --- MOBILE: native scroll + CSS scroll-snap ---
-    if (isMobile) {
-      const prevSnapType = mainEl.style.scrollSnapType
-      mainEl.style.scrollSnapType = "y proximity"
+    const prevSnapType = mainEl.style.scrollSnapType
+    mainEl.style.scrollSnapType = "y proximity"
 
-      const sectionEls = sectionsSnapshot
-        .map((s) => document.getElementById(s.id))
-        .filter(Boolean) as HTMLElement[]
-      for (const el of sectionEls) {
-        el.style.scrollSnapAlign = "start"
-      }
-
-      const observer = new IntersectionObserver(
-        (entries) => {
-          for (const entry of entries) {
-            if (entry.isIntersecting && entry.intersectionRatio >= 0.3) {
-              setActiveSection(entry.target.id)
-            }
-          }
-        },
-        { root: mainEl, threshold: [0.3] },
-      )
-      for (const el of sectionEls) observer.observe(el)
-
-      scrollToIndexRef.current = (index: number) => {
-        const clamped = Math.max(
-          0,
-          Math.min(index, sectionsSnapshot.length - 1),
-        )
-        const el = document.getElementById(sectionsSnapshot[clamped].id)
-        if (!el) return
-        mainEl.scrollTo({ top: getScrollTop(el), behavior: "smooth" })
-        setActiveSection(sectionsSnapshot[clamped].id)
-      }
-
-      return () => {
-        mainEl.style.overscrollBehaviorY = ""
-        mainEl.style.removeProperty("--snap-section-h")
-        mainEl.style.removeProperty("--snap-nav-h")
-        mainEl.style.removeProperty("--snap-scrollbar-w")
-        mainEl.style.scrollSnapType = prevSnapType
-        for (const el of sectionEls) {
-          el.style.scrollSnapAlign = ""
-        }
-        observer.disconnect()
-        ro.disconnect()
-        navRo.disconnect()
-        scrollToIndexRef.current = null
-      }
+    const sectionEls = sectionsSnapshot
+      .map((s) => document.getElementById(s.id))
+      .filter(Boolean) as HTMLElement[]
+    for (const el of sectionEls) {
+      el.style.scrollSnapAlign = "start"
     }
 
-    // --- DESKTOP: GSAP-driven snap (wheel-based) ---
-    const currentSection = { current: 0 }
-    const isAnimating = { current: false }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.3) {
+            setActiveSection(entry.target.id)
+          }
+        }
+      },
+      { root: mainEl, threshold: [0.3] },
+    )
+    for (const el of sectionEls) observer.observe(el)
 
-    const scrollToIndex = (index: number) => {
+    scrollToIndexRef.current = (index: number) => {
       const clamped = Math.max(0, Math.min(index, sectionsSnapshot.length - 1))
       const el = document.getElementById(sectionsSnapshot[clamped].id)
-      if (!el || isAnimating.current) return
-
-      isAnimating.current = true
-      currentSection.current = clamped
-      setActiveSection(sectionsSnapshot[clamped].id)
-
-      gsap.to(mainEl, {
-        scrollTo: { y: getScrollTop(el), autoKill: false },
-        duration: 0.75,
-        ease: "power2.inOut",
-        onComplete: () => {
-          isAnimating.current = false
-        },
+      if (!el) return
+      const reduceMotion = window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches
+      mainEl.scrollTo({
+        top: getScrollTop(el),
+        behavior: reduceMotion ? "auto" : "smooth",
       })
+      setActiveSection(sectionsSnapshot[clamped].id)
     }
-
-    scrollToIndexRef.current = scrollToIndex
-
-    const updateCurrentSection = () => {
-      if (isAnimating.current) return
-      const scrollTop = mainEl.scrollTop
-      let active = 0
-      for (let i = 0; i < sectionsSnapshot.length; i++) {
-        const el = document.getElementById(sectionsSnapshot[i].id)
-        if (!el) continue
-        if (scrollTop >= getScrollTop(el) - 10) active = i
-      }
-      if (active !== currentSection.current) {
-        currentSection.current = active
-        setActiveSection(sectionsSnapshot[active].id)
-      }
-    }
-
-    const SNAP_MARGIN = 30
-    const atBoundary = (dir: 1 | -1): boolean => {
-      const el = document.getElementById(
-        sectionsSnapshot[currentSection.current].id,
-      )
-      if (!el) return true
-      const sectionTop = getScrollTop(el)
-      const sectionBottom = sectionTop + el.offsetHeight
-      const scrollTop = mainEl.scrollTop
-      const viewportMid = scrollTop + mainEl.clientHeight / 2
-
-      if (dir > 0) {
-        // Content end = section bottom minus the 50vh breathing-room padding
-        const contentEnd = sectionBottom - mainEl.clientHeight * 0.5
-        return viewportMid >= contentEnd
-      }
-      return scrollTop <= sectionTop + SNAP_MARGIN
-    }
-
-    let accumulatedDelta = 0
-    const DELTA_THRESHOLD = 80
-
-    const handleWheel = (e: WheelEvent) => {
-      if (isAnimating.current) {
-        e.preventDefault()
-        return
-      }
-      const dir = e.deltaY > 0 ? 1 : -1
-      if (!atBoundary(dir)) {
-        accumulatedDelta = 0
-        return
-      }
-      e.preventDefault()
-      accumulatedDelta += Math.abs(e.deltaY)
-      if (accumulatedDelta >= DELTA_THRESHOLD) {
-        accumulatedDelta = 0
-        scrollToIndex(currentSection.current + dir)
-      }
-    }
-
-    mainEl.addEventListener("scroll", updateCurrentSection)
-    mainEl.addEventListener("wheel", handleWheel, { passive: false })
 
     return () => {
-      mainEl.style.overscrollBehaviorY = ""
       mainEl.style.removeProperty("--snap-section-h")
       mainEl.style.removeProperty("--snap-nav-h")
-      mainEl.removeEventListener("scroll", updateCurrentSection)
-      mainEl.removeEventListener("wheel", handleWheel)
-      gsap.killTweensOf(mainEl)
+      mainEl.style.removeProperty("--snap-scrollbar-w")
+      mainEl.style.scrollSnapType = prevSnapType
+      for (const el of sectionEls) {
+        el.style.scrollSnapAlign = ""
+      }
+      observer.disconnect()
       ro.disconnect()
       navRo.disconnect()
       scrollToIndexRef.current = null
     }
-  }, [allSections, isMobile])
+  }, [allSections])
 
   const renderSectionContent = (stepId: string) => {
     if (stepId === "passes" || stepId === "tickets") {
