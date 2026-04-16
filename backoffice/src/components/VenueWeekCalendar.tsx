@@ -310,85 +310,134 @@ export function VenueWeekCalendar({
         </div>
       </div>
 
-      <div className="rounded-lg border bg-card overflow-hidden">
-        <div className="grid grid-cols-[64px_repeat(7,minmax(0,1fr))] border-b bg-muted/30">
-          <div className="border-r" />
-          {days.map((d) => (
-            <div
-              key={d.key}
-              className={cn(
-                "px-2 py-2 text-center text-xs font-medium border-r last:border-r-0",
-                d.isToday && "text-primary",
-              )}
-            >
-              {d.label}
-            </div>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-[64px_repeat(7,minmax(0,1fr))] max-h-[720px] overflow-y-auto">
-          {/* Hour labels column */}
-          <div className="border-r">
-            {Array.from({ length: 24 }, (_, h) => (
-              <div
-                key={h}
-                style={{ height: HOUR_HEIGHT }}
-                className="flex items-start justify-end pr-2 pt-0.5 text-[10px] text-muted-foreground border-t first:border-t-0"
-              >
-                {h === 0 ? "" : `${String(h).padStart(2, "0")}:00`}
-              </div>
-            ))}
-          </div>
-
-          {days.map((d) => {
-            const dayOpen = openByDay[d.key] ?? []
-            const dayBusy = busyByDay[d.key] ?? []
-            return (
+      <div className="rounded-lg border-2 border-border bg-card overflow-hidden">
+        {/*
+          Single scroll container so the header and day columns stay
+          aligned regardless of vertical-scrollbar width (that was the
+          source of the 1-2px misalignment when the header and body
+          were separate grids).
+        */}
+        <div className="max-h-[720px] overflow-y-auto">
+          <div className="grid grid-cols-[64px_repeat(7,minmax(0,1fr))]">
+            {/* Sticky header row */}
+            <div className="sticky top-0 z-10 bg-muted border-b-2 border-r border-border h-12" />
+            {days.map((d, i) => (
               <div
                 key={d.key}
-                className="relative border-r last:border-r-0"
-                style={{ height: HOUR_HEIGHT * 24 }}
+                className={cn(
+                  "sticky top-0 z-10 bg-muted border-b-2 border-border h-12 flex flex-col items-center justify-center gap-0.5",
+                  i < 6 && "border-r",
+                  d.isToday && "bg-primary/10",
+                )}
               >
-                {/* Hour grid lines */}
-                {Array.from({ length: 24 }, (_, h) => (
-                  <div
-                    key={h}
-                    style={{ top: h * HOUR_HEIGHT }}
-                    className="absolute left-0 right-0 border-t border-border/40"
-                  />
-                ))}
-
-                {/* Open range band (subtle, behind busy) */}
-                {dayOpen.map((o) => (
-                  <div
-                    key={o.key}
-                    style={{ top: o.top, height: o.height }}
-                    className="absolute left-0 right-0 bg-green-500/5"
-                  />
-                ))}
-
-                {/* Busy blocks: events + closed exceptions */}
-                {dayBusy.map((b) => {
-                  const isClosedException = b.source === "exception"
-                  return (
-                    <div
-                      key={b.key}
-                      style={{ top: b.top + 1, height: b.height - 2 }}
-                      title={b.label}
-                      className={cn(
-                        "absolute left-1 right-1 rounded-md px-1.5 py-1 text-[11px] leading-tight overflow-hidden",
-                        isClosedException
-                          ? "bg-muted text-muted-foreground border border-dashed"
-                          : "bg-primary/15 text-primary border border-primary/30",
-                      )}
-                    >
-                      <div className="truncate font-medium">{b.label}</div>
-                    </div>
-                  )
-                })}
+                <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  {d.date.toLocaleDateString("en-US", {
+                    weekday: "short",
+                    timeZone: "UTC",
+                  })}
+                </span>
+                <span
+                  className={cn(
+                    "text-sm font-semibold leading-none",
+                    d.isToday ? "text-primary" : "text-foreground",
+                  )}
+                >
+                  {d.date.toLocaleDateString("en-US", {
+                    day: "numeric",
+                    timeZone: "UTC",
+                  })}
+                </span>
               </div>
-            )
-          })}
+            ))}
+
+            {/* Hour labels column */}
+            <div className="border-r border-border">
+              {Array.from({ length: 24 }, (_, h) => (
+                <div
+                  key={h}
+                  style={{ height: HOUR_HEIGHT }}
+                  className="flex items-start justify-end pr-2 pt-0.5 text-[11px] font-medium text-muted-foreground border-t border-border first:border-t-0"
+                >
+                  {h === 0 ? "" : `${String(h).padStart(2, "0")}:00`}
+                </div>
+              ))}
+            </div>
+
+            {/* Day columns */}
+            {days.map((d, i) => {
+              const dayOpen = openByDay[d.key] ?? []
+              const dayBusy = busyByDay[d.key] ?? []
+              return (
+                <div
+                  key={d.key}
+                  className={cn(
+                    "relative",
+                    i < 6 && "border-r border-border",
+                    d.isToday && "bg-primary/[0.03]",
+                  )}
+                  style={{ height: HOUR_HEIGHT * 24 }}
+                >
+                  {/* Hour grid lines — strong enough to see but not noisy */}
+                  {Array.from({ length: 24 }, (_, h) => (
+                    <div
+                      key={h}
+                      style={{ top: h * HOUR_HEIGHT }}
+                      className="absolute left-0 right-0 border-t border-border"
+                    />
+                  ))}
+
+                  {/* Open range band — visible green tint for "when the venue is open" */}
+                  {dayOpen.map((o) => (
+                    <div
+                      key={o.key}
+                      style={{ top: o.top, height: o.height }}
+                      className="absolute left-0 right-0 bg-emerald-500/10"
+                    />
+                  ))}
+
+                  {/* Busy blocks: events + closed exceptions.
+                      We use fixed sky/zinc palette (not theme tokens) so
+                      contrast stays punchy in both light and dark modes —
+                      the tenant's `primary` can be an arbitrarily dark
+                      brand colour which reads invisible against a dark
+                      calendar surface. */}
+                  {dayBusy.map((b) => {
+                    const isClosedException = b.source === "exception"
+                    return (
+                      <div
+                        key={b.key}
+                        style={{ top: b.top + 1, height: b.height - 2 }}
+                        title={b.label}
+                        className={cn(
+                          "absolute left-1 right-1 rounded-md px-1.5 py-1 text-[11px] font-medium leading-tight overflow-hidden shadow-sm",
+                          isClosedException
+                            ? "bg-zinc-300 text-zinc-800 border border-zinc-500 border-dashed dark:bg-zinc-700 dark:text-zinc-100 dark:border-zinc-400"
+                            : "bg-sky-600 text-white border border-sky-700 dark:bg-sky-500 dark:text-white dark:border-sky-400",
+                        )}
+                      >
+                        <div className="truncate">{b.label}</div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1.5">
+          <span className="h-3 w-3 rounded-sm bg-sky-600 dark:bg-sky-500" />
+          Event
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="h-3 w-3 rounded-sm bg-emerald-500/30" />
+          Open hours
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="h-3 w-3 rounded-sm bg-zinc-300 border border-dashed border-zinc-500 dark:bg-zinc-700 dark:border-zinc-400" />
+          Closed exception
         </div>
       </div>
     </div>
