@@ -6,7 +6,15 @@ import {
 } from "@tanstack/react-query"
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
-import { Check, CheckCircle2, MapPin, Pencil, Plus, Trash2 } from "lucide-react"
+import {
+  CalendarRange,
+  Check,
+  CheckCircle2,
+  MapPin,
+  Pencil,
+  Plus,
+  Trash2,
+} from "lucide-react"
 import { Suspense, useMemo, useState } from "react"
 
 import { type EventVenuePublic, EventVenuesService } from "@/client"
@@ -149,6 +157,21 @@ function VenueRowActions({ venue }: { venue: EventVenuePublic }) {
             <Check className="h-4 w-4" />
           </Button>
         )}
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={`Schedule ${venue.title || "venue"}`}
+          title="Schedule"
+          onClick={() =>
+            navigate({
+              to: "/events/venues-schedule",
+              search: { venueId: venue.id },
+            })
+          }
+          className="text-muted-foreground hover:text-primary"
+        >
+          <CalendarRange className="h-4 w-4" />
+        </Button>
         <Button
           variant="ghost"
           size="icon"

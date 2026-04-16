@@ -35,6 +35,7 @@ import { Route as LayoutOrganizationsNewRouteImport } from './routes/_layout/org
 import { Route as LayoutHumansNewRouteImport } from './routes/_layout/humans/new'
 import { Route as LayoutGroupsNewRouteImport } from './routes/_layout/groups/new'
 import { Route as LayoutFormBuilderNewRouteImport } from './routes/_layout/form-builder/new'
+import { Route as LayoutEventsVenuesScheduleRouteImport } from './routes/_layout/events/venues-schedule'
 import { Route as LayoutEventsVenuesNewRouteImport } from './routes/_layout/events/venues-new'
 import { Route as LayoutEventsVenuesEditRouteImport } from './routes/_layout/events/venues-edit'
 import { Route as LayoutEventsVenuesRouteImport } from './routes/_layout/events/venues'
@@ -195,6 +196,12 @@ const LayoutFormBuilderNewRoute = LayoutFormBuilderNewRouteImport.update({
   path: '/form-builder/new',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutEventsVenuesScheduleRoute =
+  LayoutEventsVenuesScheduleRouteImport.update({
+    id: '/events/venues-schedule',
+    path: '/events/venues-schedule',
+    getParentRoute: () => LayoutRoute,
+  } as any)
 const LayoutEventsVenuesNewRoute = LayoutEventsVenuesNewRouteImport.update({
   id: '/events/venues-new',
   path: '/events/venues-new',
@@ -350,6 +357,7 @@ export interface FileRoutesByFullPath {
   '/events/venues': typeof LayoutEventsVenuesRoute
   '/events/venues-edit': typeof LayoutEventsVenuesEditRoute
   '/events/venues-new': typeof LayoutEventsVenuesNewRoute
+  '/events/venues-schedule': typeof LayoutEventsVenuesScheduleRoute
   '/form-builder/new': typeof LayoutFormBuilderNewRoute
   '/groups/new': typeof LayoutGroupsNewRoute
   '/humans/new': typeof LayoutHumansNewRoute
@@ -403,6 +411,7 @@ export interface FileRoutesByTo {
   '/events/venues': typeof LayoutEventsVenuesRoute
   '/events/venues-edit': typeof LayoutEventsVenuesEditRoute
   '/events/venues-new': typeof LayoutEventsVenuesNewRoute
+  '/events/venues-schedule': typeof LayoutEventsVenuesScheduleRoute
   '/form-builder/new': typeof LayoutFormBuilderNewRoute
   '/groups/new': typeof LayoutGroupsNewRoute
   '/humans/new': typeof LayoutHumansNewRoute
@@ -458,6 +467,7 @@ export interface FileRoutesById {
   '/_layout/events/venues': typeof LayoutEventsVenuesRoute
   '/_layout/events/venues-edit': typeof LayoutEventsVenuesEditRoute
   '/_layout/events/venues-new': typeof LayoutEventsVenuesNewRoute
+  '/_layout/events/venues-schedule': typeof LayoutEventsVenuesScheduleRoute
   '/_layout/form-builder/new': typeof LayoutFormBuilderNewRoute
   '/_layout/groups/new': typeof LayoutGroupsNewRoute
   '/_layout/humans/new': typeof LayoutHumansNewRoute
@@ -513,6 +523,7 @@ export interface FileRouteTypes {
     | '/events/venues'
     | '/events/venues-edit'
     | '/events/venues-new'
+    | '/events/venues-schedule'
     | '/form-builder/new'
     | '/groups/new'
     | '/humans/new'
@@ -566,6 +577,7 @@ export interface FileRouteTypes {
     | '/events/venues'
     | '/events/venues-edit'
     | '/events/venues-new'
+    | '/events/venues-schedule'
     | '/form-builder/new'
     | '/groups/new'
     | '/humans/new'
@@ -620,6 +632,7 @@ export interface FileRouteTypes {
     | '/_layout/events/venues'
     | '/_layout/events/venues-edit'
     | '/_layout/events/venues-new'
+    | '/_layout/events/venues-schedule'
     | '/_layout/form-builder/new'
     | '/_layout/groups/new'
     | '/_layout/humans/new'
@@ -845,6 +858,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutFormBuilderNewRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/events/venues-schedule': {
+      id: '/_layout/events/venues-schedule'
+      path: '/events/venues-schedule'
+      fullPath: '/events/venues-schedule'
+      preLoaderRoute: typeof LayoutEventsVenuesScheduleRouteImport
+      parentRoute: typeof LayoutRoute
+    }
     '/_layout/events/venues-new': {
       id: '/_layout/events/venues-new'
       path: '/events/venues-new'
@@ -1047,6 +1067,7 @@ interface LayoutRouteChildren {
   LayoutEventsVenuesRoute: typeof LayoutEventsVenuesRoute
   LayoutEventsVenuesEditRoute: typeof LayoutEventsVenuesEditRoute
   LayoutEventsVenuesNewRoute: typeof LayoutEventsVenuesNewRoute
+  LayoutEventsVenuesScheduleRoute: typeof LayoutEventsVenuesScheduleRoute
   LayoutFormBuilderNewRoute: typeof LayoutFormBuilderNewRoute
   LayoutGroupsNewRoute: typeof LayoutGroupsNewRoute
   LayoutHumansNewRoute: typeof LayoutHumansNewRoute
@@ -1100,6 +1121,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutEventsVenuesRoute: LayoutEventsVenuesRoute,
   LayoutEventsVenuesEditRoute: LayoutEventsVenuesEditRoute,
   LayoutEventsVenuesNewRoute: LayoutEventsVenuesNewRoute,
+  LayoutEventsVenuesScheduleRoute: LayoutEventsVenuesScheduleRoute,
   LayoutFormBuilderNewRoute: LayoutFormBuilderNewRoute,
   LayoutGroupsNewRoute: LayoutGroupsNewRoute,
   LayoutHumansNewRoute: LayoutHumansNewRoute,
