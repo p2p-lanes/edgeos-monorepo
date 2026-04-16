@@ -8,7 +8,7 @@ import type { PaymentsProps } from "@/types/passes"
 function mapPayment(p: PaymentPublic): PaymentsProps {
   return {
     id: p.id,
-    application_id: p.application_id,
+    application_id: p.application_id ?? null,
     external_id: p.external_id ?? null,
     status: (p.status ?? "pending") as PaymentsProps["status"],
     amount: Number(p.amount ?? 0),

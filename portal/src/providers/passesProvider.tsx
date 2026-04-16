@@ -10,7 +10,6 @@ import {
 } from "react"
 import type { AttendeePurchases } from "@/client"
 import { supportsQuantitySelector } from "@/components/ui/QuantitySelector"
-import { sortAttendees } from "@/helpers/filters"
 import { useCart } from "@/hooks/useCartApi"
 import useGetPassesData from "@/hooks/useGetPassesData"
 import { usePurchasesQuery } from "@/hooks/useGetPurchases"
@@ -19,7 +18,6 @@ import { getProductStrategy } from "@/strategies/ProductStrategies"
 import { getPurchaseStrategy } from "@/strategies/PurchaseStrategy"
 import type { AttendeePassState } from "@/types/Attendee"
 import type { ProductsPass } from "@/types/Products"
-import { useApplication } from "./applicationProvider"
 import { useCityProvider } from "./cityProvider"
 import { useDiscount } from "./discountProvider"
 
@@ -35,6 +33,12 @@ export const PassesContext = createContext<PassesContext_interface | null>(null)
 
 interface PassesProviderProps {
   children: ReactNode
+  /**
+   * Attendees to drive the passes selection state off. Callers are
+   * responsible for sorting — see `useResolvedAttendees` for the canonical
+   * source that handles application vs direct-sale flows.
+   */
+  attendees: AttendeePassState[]
   restoreFromCart?: boolean
 }
 
@@ -204,17 +208,11 @@ function preserveSelections(
 
 const PassesProvider = ({
   children,
+  attendees,
   restoreFromCart = false,
 }: PassesProviderProps) => {
-  const { getAttendees } = useApplication()
   const { discountApplied } = useDiscount()
   const [attendeePasses, setAttendeePasses] = useState<AttendeePassState[]>([])
-
-  const attendees = useMemo(
-    () => sortAttendees(getAttendees()),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [getAttendees],
-  )
 
   const [isEditing, setIsEditing] = useState(false)
   const { products } = useGetPassesData()

@@ -2,10 +2,11 @@
 
 import { AnimatePresence, motion } from "framer-motion"
 import { useRouter } from "next/navigation"
-import { useEffect, useRef } from "react"
+import { useEffect, useMemo, useRef } from "react"
 import type { PopupPublic } from "@/client"
 import ScrollyCheckoutFlow from "@/components/checkout-flow/ScrollyCheckoutFlow"
 import { SidebarProvider } from "@/components/Sidebar/SidebarComponents"
+import { sortAttendees } from "@/helpers/filters"
 import { useApplication } from "@/providers/applicationProvider"
 import { CheckoutProvider } from "@/providers/checkoutProvider"
 import { useCityProvider } from "@/providers/cityProvider"
@@ -29,10 +30,11 @@ export const PopupCheckoutContent = ({
     handleSubmit,
     setCheckoutState,
   } = useCheckoutState({ popupId: popup.id })
-  const { getRelevantApplication } = useApplication()
+  const { getRelevantApplication, getAttendees } = useApplication()
   const { getCity } = useCityProvider()
   const router = useRouter()
   const hasSkippedForm = useRef(false)
+  const attendees = useMemo(() => sortAttendees(getAttendees()), [getAttendees])
 
   useEffect(() => {
     if (checkoutState === "passes") {
@@ -76,7 +78,7 @@ export const PopupCheckoutContent = ({
           } as React.CSSProperties
         }
       >
-        <PassesProvider restoreFromCart>
+        <PassesProvider attendees={attendees} restoreFromCart>
           <CheckoutProvider initialStep="passes">
             <div
               className={`h-svh overflow-y-auto ${background.className}`}
