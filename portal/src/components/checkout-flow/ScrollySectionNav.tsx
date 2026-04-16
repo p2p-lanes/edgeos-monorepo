@@ -44,14 +44,6 @@ function resolveIcon(section: { id: string; template?: string | null }) {
   return SECTION_ICONS[section.id] ?? Ticket
 }
 
-const SHORT_LABELS: Record<string, string> = {
-  passes: "Passes",
-  housing: "Housing",
-  merch: "Merch",
-  patron: "Patron",
-  confirm: "Review",
-}
-
 interface ScrollySectionNavProps {
   sections: { id: string; label: string; template?: string | null }[]
   activeSection: string
@@ -141,9 +133,7 @@ function PillsNav({
             )}
           >
             <Icon className="size-4 shrink-0" />
-            <span className="hidden sm:inline">
-              {SHORT_LABELS[section.id] ?? section.label}
-            </span>
+            <span className="hidden sm:inline">{section.label}</span>
           </button>
         )
       })}
@@ -191,7 +181,7 @@ function ProgressNav({
                   !isActive && "text-checkout-nav-text/40",
                 )}
               >
-                {SHORT_LABELS[section.id] ?? section.label}
+                {section.label}
               </span>
             </button>
           </Fragment>
@@ -225,7 +215,7 @@ function UnderlineNav({
                 "text-checkout-nav-text/40 hover:text-checkout-nav-text/60",
             )}
           >
-            {SHORT_LABELS[section.id] ?? section.label}
+            {section.label}
             {isActive && (
               <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-checkout-nav-text rounded-full" />
             )}
