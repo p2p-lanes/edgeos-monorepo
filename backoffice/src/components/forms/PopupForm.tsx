@@ -379,11 +379,12 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
 
         <Separator />
 
-        {/* Sale Model — decides identity of the popup. Immutable after creation. */}
+        {/* Sale Model — keep commerce decisions near the event identity,
+            like the previous implementation. */}
         <div className="space-y-3">
           <div className="space-y-1 px-1">
             <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Sale Model
+              Commerce setup
             </h3>
             <p className="text-sm text-muted-foreground">
               Decide how people will access this event. This is the primary
@@ -391,7 +392,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
             </p>
           </div>
 
-          <InlineSection>
+          <InlineSection title="How this event sells">
             <form.Field name="sale_type">
               {(field) => (
                 <InlineRow
@@ -456,28 +457,6 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
             }}
           </form.Subscribe>
         </div>
-
-        <Separator />
-
-        {/* Cover Image */}
-        <form.Field name="image_url">
-          {(field) => (
-            <div className="space-y-2">
-              <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Cover Image
-              </Label>
-              <p className="text-xs text-muted-foreground">
-                Main event image used in cards, tickets, application headers,
-                invoices, and emails
-              </p>
-              <ImageUpload
-                value={field.state.value || null}
-                onChange={(url) => field.handleChange(url ?? "")}
-                disabled={readOnly}
-              />
-            </div>
-          )}
-        </form.Field>
 
         <Separator />
 
@@ -730,6 +709,30 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
 
         {/* Branding */}
         <InlineSection title="Branding">
+          <form.Field name="image_url">
+            {(field) => (
+              <div className="space-y-2 py-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+                    <Image className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Cover Image</p>
+                    <p className="text-xs text-muted-foreground">
+                      Main event image used in cards, tickets, application
+                      headers, invoices, and emails
+                    </p>
+                  </div>
+                </div>
+                <ImageUpload
+                  value={field.state.value || null}
+                  onChange={(url) => field.handleChange(url ?? "")}
+                  disabled={readOnly}
+                />
+              </div>
+            )}
+          </form.Field>
+
           <form.Field name="icon_url">
             {(field) => (
               <div className="space-y-2 py-3">
