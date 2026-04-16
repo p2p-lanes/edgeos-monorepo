@@ -6,8 +6,9 @@ import {
   CalendarPlus,
   CheckCircle,
   Clock,
-  MapPin,
   Mail,
+  MapPin,
+  Repeat,
   Send,
   Tag,
   Trash2,
@@ -19,26 +20,23 @@ import Link from "next/link"
 import { useParams } from "next/navigation"
 import { useState } from "react"
 import { toast } from "sonner"
-
 import {
   ApiError,
-  EventParticipantsService,
-  EventsService,
-  HumansService,
   type EventInvitationBulkResult,
   type EventInvitationPublic,
   type EventParticipantPublic,
+  EventParticipantsService,
+  EventsService,
+  HumansService,
 } from "@/client"
-import { Repeat } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { useCityProvider } from "@/providers/cityProvider"
-import { downloadEventIcs } from "../lib/downloadEventIcs"
+import { AddToCalendarModal } from "../lib/AddToCalendarModal"
 import { summarizeRrule } from "../lib/summarizeRrule"
 import { useEventTimezone } from "../lib/useEventTimezone"
-import { useGoogleCalendar } from "../lib/useGoogleCalendar"
 import { useVenue } from "../lib/useVenue"
 
 export default function EventDetailPage() {
@@ -46,11 +44,7 @@ export default function EventDetailPage() {
   const city = getCity()
   const params = useParams<{ eventId: string }>()
   const queryClient = useQueryClient()
-  const {
-    timezone,
-    formatTime,
-    formatDateFull,
-  } = useEventTimezone(city?.id)
+  const { timezone, formatTime, formatDateFull } = useEventTimezone(city?.id)
 
   const {
     data: event,
@@ -58,11 +52,13 @@ export default function EventDetailPage() {
     error: eventError,
   } = useQuery({
     queryKey: ["portal-event", params.eventId],
-    queryFn: () =>
-      EventsService.getPortalEvent({ eventId: params.eventId }),
+    queryFn: () => EventsService.getPortalEvent({ eventId: params.eventId }),
     enabled: !!params.eventId,
     retry: (failureCount, err) => {
-      if (err instanceof ApiError && (err.status === 404 || err.status === 403)) {
+      if (
+        err instanceof ApiError &&
+        (err.status === 404 || err.status === 403)
+      ) {
         return false
       }
       return failureCount < 2
@@ -87,19 +83,16 @@ export default function EventDetailPage() {
 
   const participants = participantsData?.results ?? []
   const activeParticipants = participants.filter(
-    (p: EventParticipantPublic) => p.status !== "cancelled"
+    (p: EventParticipantPublic) => p.status !== "cancelled",
   )
 
   const isOwner =
     !!event && !!currentHuman && event.owner_id === currentHuman.id
 
-  const myParticipation = participants.find(
-    (p: EventParticipantPublic) =>
-      currentHuman ? p.profile_id === currentHuman.id : false,
+  const myParticipation = participants.find((p: EventParticipantPublic) =>
+    currentHuman ? p.profile_id === currentHuman.id : false,
   )
 
-  const { status: gcalStatus } = useGoogleCalendar()
-  const gcalConnected = gcalStatus?.connected === true
   const myParticipationActive =
     myParticipation && myParticipation.status !== "cancelled"
 
@@ -145,6 +138,7 @@ export default function EventDetailPage() {
   })
 
   const [emailsInput, setEmailsInput] = useState("")
+  const [addToCalOpen, setAddToCalOpen] = useState(false)
 
   const bulkInviteMutation = useMutation({
     mutationFn: async () => {
@@ -347,15 +341,27 @@ export default function EventDetailPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() =>
-              downloadEventIcs({ eventId: event.id, title: event.title })
-            }
+            onClick={() => setAddToCalOpen(true)}
           >
             <CalendarPlus className="mr-2 h-4 w-4" />
             Add to calendar
           </Button>
         </div>
       </div>
+
+      <AddToCalendarModal
+        open={addToCalOpen}
+        onOpenChange={setAddToCalOpen}
+        eventId={event.id}
+        event={{
+          title: event.title,
+          startIso: event.start_time,
+          endIso: event.end_time,
+          description: event.content,
+          location:
+            [venue?.title, venue?.location].filter(Boolean).join(" — ") || null,
+        }}
+      />
 
       {event.content && (
         <div className="rounded-xl border bg-card p-4">
@@ -393,12 +399,6 @@ export default function EventDetailPage() {
                     : "Registered"}
                 </span>
               </div>
-              {gcalConnected && myParticipationActive && (
-                <p className="text-xs text-muted-foreground inline-flex items-center gap-1.5">
-                  <CalendarPlus className="h-3.5 w-3.5" />
-                  Synced to your Google Calendar
-                </p>
-              )}
               {myParticipation?.status === "registered" && (
                 <div className="flex gap-2">
                   {eventStarted ? (
@@ -432,7 +432,7 @@ export default function EventDetailPage() {
               className="inline-flex items-center gap-2"
             >
               <UserPlus className="h-4 w-4" />
-              {gcalConnected ? "RSVP & add to Google Calendar" : "RSVP"}
+              RSVP
             </Button>
           )}
         </div>
@@ -520,28 +520,30 @@ export default function EventDetailPage() {
           <p className="text-sm text-muted-foreground">No participants yet</p>
         ) : (
           <div className="space-y-2">
-            {activeParticipants.slice(0, 10).map((p: EventParticipantPublic) => (
-              <div key={p.id} className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center">
-                    <Users className="h-3 w-3 text-muted-foreground" />
+            {activeParticipants
+              .slice(0, 10)
+              .map((p: EventParticipantPublic) => (
+                <div key={p.id} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center">
+                      <Users className="h-3 w-3 text-muted-foreground" />
+                    </div>
+                    <span className="text-sm">
+                      {p.profile_id.slice(0, 8)}...
+                    </span>
                   </div>
-                  <span className="text-sm">
-                    {p.profile_id.slice(0, 8)}...
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {p.role !== "attendee" && (
+                      <Badge variant="outline" className="text-xs">
+                        {p.role}
+                      </Badge>
+                    )}
+                    {p.status === "checked_in" && (
+                      <CheckCircle className="h-3 w-3 text-green-500" />
+                    )}
+                  </div>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  {p.role !== "attendee" && (
-                    <Badge variant="outline" className="text-xs">
-                      {p.role}
-                    </Badge>
-                  )}
-                  {p.status === "checked_in" && (
-                    <CheckCircle className="h-3 w-3 text-green-500" />
-                  )}
-                </div>
-              </div>
-            ))}
+              ))}
             {activeParticipants.length > 10 && (
               <p className="text-xs text-muted-foreground text-center">
                 +{activeParticipants.length - 10} more

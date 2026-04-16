@@ -1,8 +1,13 @@
+import {
+  availableStartOptionsForDuration,
+  dayBoundsInTz,
+  durationFits,
+  freeIntervalsForDay,
+} from "@edgeos/shared-events"
 import { useForm, useStore } from "@tanstack/react-form"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Trash2 } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
-
 import {
   type EventCreate,
   type EventPublic,
@@ -13,6 +18,7 @@ import {
 } from "@/client"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { DatePicker } from "@/components/ui/date-picker"
 import { DateTimePicker } from "@/components/ui/datetime-picker"
 import { ImageUpload } from "@/components/ui/image-upload"
 import {
@@ -31,14 +37,9 @@ import {
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
+import { VenueHoursSummary } from "@/components/VenueHoursSummary"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useCustomToast from "@/hooks/useCustomToast"
-import {
-  availableStartOptionsForDuration,
-  dayBoundsInTz,
-  durationFits,
-  freeIntervalsForDay,
-} from "@edgeos/shared-events"
 import { createErrorHandler } from "@/utils"
 import {
   AvailabilityIndicator,
@@ -80,6 +81,18 @@ const VISIBILITY_OPTIONS = [
     help: "Hidden from the calendar; anyone with the link can view and RSVP.",
   },
 ] as const
+
+// BYDAY codes index as MO=0, TU=1, ... SU=6 — matches backend day_of_week.
+// Declared at module scope so the useMemo dependency stays stable.
+const WEEKDAY_CODE_TO_BACKEND: Record<string, number> = {
+  MO: 0,
+  TU: 1,
+  WE: 2,
+  TH: 3,
+  FR: 4,
+  SA: 5,
+  SU: 6,
+}
 
 export function EventForm({ defaultValues, onSuccess }: EventFormProps) {
   const queryClient = useQueryClient()
@@ -177,17 +190,13 @@ export function EventForm({ defaultValues, onSuccess }: EventFormProps) {
       ? initialDurationMinutes / 60
       : initialDurationMinutes
 
-  const [durationUnit, setDurationUnit] = useState<DurationUnit>(
-    initialDurationUnit,
-  )
-  const [durationValue, setDurationValue] = useState<number>(
-    initialDurationValue,
-  )
+  const [durationUnit, setDurationUnit] =
+    useState<DurationUnit>(initialDurationUnit)
+  const [durationValue, setDurationValue] =
+    useState<number>(initialDurationValue)
   const durationMinutes = Math.max(
     1,
-    Math.round(
-      durationUnit === "hours" ? durationValue * 60 : durationValue,
-    ),
+    Math.round(durationUnit === "hours" ? durationValue * 60 : durationValue),
   )
 
   const form = useForm({
@@ -228,9 +237,7 @@ export function EventForm({ defaultValues, onSuccess }: EventFormProps) {
         return
       }
 
-      const tags = value.tags
-        .map((t) => t.trim().toLowerCase())
-        .filter(Boolean)
+      const tags = value.tags.map((t) => t.trim().toLowerCase()).filter(Boolean)
 
       const startDate = new Date(value.start_time)
       const endDate = new Date(startDate.getTime() + durationMinutes * 60_000)
@@ -246,7 +253,7 @@ export function EventForm({ defaultValues, onSuccess }: EventFormProps) {
         cover_url: value.cover_url || null,
         meeting_url: value.meeting_url || null,
         max_participant: value.max_participant
-          ? parseInt(value.max_participant)
+          ? parseInt(value.max_participant, 10)
           : null,
         venue_id: value.venue_id || null,
         track_id: value.track_id || null,
@@ -288,12 +295,51 @@ export function EventForm({ defaultValues, onSuccess }: EventFormProps) {
   // Fetch selected venue details for capacity / booking mode / setup & teardown
   const { data: selectedVenue } = useQuery({
     queryKey: ["event-venue", venueIdValue],
-    queryFn: () =>
-      EventVenuesService.getVenue({ venueId: venueIdValue }),
+    queryFn: () => EventVenuesService.getVenue({ venueId: venueIdValue }),
     enabled: !!venueIdValue,
   })
 
   const isVenueUnbookable = selectedVenue?.booking_mode === "unbookable"
+
+  // Map backend weekly_hours (day_of_week: 0=Mon..6=Sun) into a Set of
+  // closed weekdays. We consult it both for the DatePicker matcher and the
+  // venue summary rendered below the selector.
+  const venueWeeklyHours = selectedVenue?.weekly_hours ?? []
+  const closedBackendDays = useMemo(() => {
+    const s = new Set<number>()
+    for (const h of venueWeeklyHours) if (h.is_closed) s.add(h.day_of_week)
+    return s
+  }, [venueWeeklyHours])
+
+  // DayPicker gives us JS Date; JS getDay(): 0=Sun..6=Sat. Convert to
+  // backend indexing (0=Mon..6=Sun) before the lookup.
+  const isClosedOnDate = useMemo(() => {
+    if (closedBackendDays.size === 0) return undefined
+    return (date: Date) => {
+      const backendDay = (date.getDay() + 6) % 7
+      return closedBackendDays.has(backendDay)
+    }
+  }, [closedBackendDays])
+
+  const recurrenceWarning = useMemo<string | null>(() => {
+    if (repeat.mode === "none" || closedBackendDays.size === 0) return null
+    if (repeat.mode === "weekly") {
+      const hits = repeat.byDay
+        .filter((code) =>
+          closedBackendDays.has(WEEKDAY_CODE_TO_BACKEND[code] ?? -1),
+        )
+        .map((code) => code)
+      if (hits.length > 0) {
+        return `Recurrence falls on days the venue is closed (${hits.join(", ")}). Those occurrences will be skipped or rejected.`
+      }
+      // No byDay → rrule picks from the start weekday. Already covered by
+      // DatePicker's disabled matcher on the start date itself.
+      return null
+    }
+    // Daily / monthly: some generated instances almost certainly hit a
+    // closed day. Keep it as a gentle heads-up rather than a hard block.
+    return "This recurrence may produce instances on days the venue is closed; some occurrences could be rejected."
+  }, [repeat, closedBackendDays])
 
   // --- Availability check (debounced) ------------------------------------
   const [availability, setAvailability] = useState<AvailabilityState>({
@@ -412,10 +458,17 @@ export function EventForm({ defaultValues, onSuccess }: EventFormProps) {
     return durationFits(freeIntervals, ms, durationMinutes)
   }, [freeIntervals, startTimeValue, durationMinutes])
 
+  // Combined availability: if the slot doesn't fit locally, report unavailable
+  // so we don't show a stale "Slot available" message from the server check.
+  const effectiveAvailability: AvailabilityState =
+    startTimeValue && !startFits
+      ? { status: "unavailable", reason: "Not available — overlaps busy" }
+      : availability
+
   // --- Max participant warning -------------------------------------------
   const venueCapacity = selectedVenue?.capacity ?? null
   const maxParticipantNumber = maxParticipantValue
-    ? parseInt(maxParticipantValue)
+    ? parseInt(maxParticipantValue, 10)
     : null
   const exceedsCapacity =
     venueCapacity != null &&
@@ -557,6 +610,7 @@ export function EventForm({ defaultValues, onSuccess }: EventFormProps) {
                 </span>
               )}
             </div>
+            <VenueHoursSummary hours={venueWeeklyHours} />
             {isVenueUnbookable && (
               <p className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-destructive">
                 This venue is marked as unbookable. Date selection is disabled.
@@ -594,71 +648,21 @@ export function EventForm({ defaultValues, onSuccess }: EventFormProps) {
         </InlineRow>
 
         <InlineRow label="Date" description="Day the event takes place">
-          <Input
-            type="date"
+          <DatePicker
             value={dateStr}
             disabled={isVenueUnbookable}
-            onChange={(e) => {
-              const newDate = e.target.value
+            disabledDays={isClosedOnDate}
+            onChange={(newDate) => {
               if (!newDate) return
               const currentStartTime = startTimeValue?.slice(11, 16) || "09:00"
-              form.setFieldValue(
-                "start_time",
-                `${newDate}T${currentStartTime}`,
-              )
+              form.setFieldValue("start_time", `${newDate}T${currentStartTime}`)
             }}
-            className="w-[200px]"
+            className="w-[220px]"
+            placeholder="Pick a date"
           />
         </InlineRow>
 
-        {venueIdValue ? (
-          <InlineRow label="Start time" description="Pick or type a time">
-            <div className="flex flex-col items-end gap-1 w-[240px]">
-              <StartTimeCombobox
-                dateStr={dateStr}
-                value={startTimeValue ? startTimeValue.slice(11, 16) : ""}
-                onChange={(hhmm) => {
-                  if (!hhmm) {
-                    form.setFieldValue("start_time", "")
-                    return
-                  }
-                  const date =
-                    dateStr || new Date().toISOString().slice(0, 10)
-                  form.setFieldValue("start_time", `${date}T${hhmm}`)
-                }}
-                options={startSlotOptions}
-                disabled={isVenueUnbookable}
-                fits={startFits}
-                placeholder={
-                  startSlotOptions.length === 0
-                    ? "No open hours"
-                    : "HH:mm"
-                }
-              />
-              <AvailabilityIndicator availability={availability} />
-            </div>
-          </InlineRow>
-        ) : (
-          <InlineRow label="Start" description="When the event begins">
-            <form.Field name="start_time">
-              {(field) => (
-                <div className="flex flex-col items-end gap-1">
-                  <DateTimePicker
-                    value={field.state.value}
-                    onChange={field.handleChange}
-                    placeholder="Select start date"
-                  />
-                  <AvailabilityIndicator availability={availability} />
-                </div>
-              )}
-            </form.Field>
-          </InlineRow>
-        )}
-
-        <InlineRow
-          label="Duration"
-          description="How long the event lasts"
-        >
+        <InlineRow label="Duration" description="How long the event lasts">
           <div className="flex items-center gap-2">
             <Input
               type="number"
@@ -700,11 +704,59 @@ export function EventForm({ defaultValues, onSuccess }: EventFormProps) {
           </div>
         </InlineRow>
 
+        {venueIdValue ? (
+          <InlineRow label="Start time" description="Pick or type a time">
+            <div className="flex flex-col items-end gap-1 w-[240px]">
+              <StartTimeCombobox
+                dateStr={dateStr}
+                value={startTimeValue ? startTimeValue.slice(11, 16) : ""}
+                onChange={(hhmm) => {
+                  if (!hhmm) {
+                    form.setFieldValue("start_time", "")
+                    return
+                  }
+                  const date = dateStr || new Date().toISOString().slice(0, 10)
+                  form.setFieldValue("start_time", `${date}T${hhmm}`)
+                }}
+                options={startSlotOptions}
+                disabled={isVenueUnbookable}
+                fits={startFits}
+                placeholder={
+                  startSlotOptions.length === 0 ? "No open hours" : "HH:mm"
+                }
+              />
+              <AvailabilityIndicator availability={effectiveAvailability} />
+            </div>
+          </InlineRow>
+        ) : (
+          <InlineRow label="Start" description="When the event begins">
+            <form.Field name="start_time">
+              {(field) => (
+                <div className="flex flex-col items-end gap-1">
+                  <DateTimePicker
+                    value={field.state.value}
+                    onChange={field.handleChange}
+                    placeholder="Select start date"
+                  />
+                  <AvailabilityIndicator availability={effectiveAvailability} />
+                </div>
+              )}
+            </form.Field>
+          </InlineRow>
+        )}
+
         <InlineRow
           label="Repeats"
           description="Make this event recur like Google Calendar."
         >
-          <RepeatPicker value={repeat} onChange={setRepeat} />
+          <div className="flex flex-col items-end gap-1">
+            <RepeatPicker value={repeat} onChange={setRepeat} />
+            {recurrenceWarning && (
+              <p className="max-w-xs text-right text-xs text-yellow-600 dark:text-yellow-500">
+                {recurrenceWarning}
+              </p>
+            )}
+          </div>
         </InlineRow>
 
         <InlineRow
@@ -733,8 +785,9 @@ export function EventForm({ defaultValues, onSuccess }: EventFormProps) {
                 </Select>
                 <p className="max-w-xs text-right text-xs text-muted-foreground">
                   {
-                    VISIBILITY_OPTIONS.find((o) => o.value === field.state.value)
-                      ?.help
+                    VISIBILITY_OPTIONS.find(
+                      (o) => o.value === field.state.value,
+                    )?.help
                   }
                 </p>
               </div>
@@ -755,7 +808,10 @@ export function EventForm({ defaultValues, onSuccess }: EventFormProps) {
           </form.Field>
         </InlineRow>
 
-        <InlineRow label="Track" description="Optional track this event belongs to">
+        <InlineRow
+          label="Track"
+          description="Optional track this event belongs to"
+        >
           <form.Field name="track_id">
             {(field) => (
               <Select
@@ -953,9 +1009,7 @@ export function EventForm({ defaultValues, onSuccess }: EventFormProps) {
                         size="icon-sm"
                         aria-label={`Remove invitation for ${inv.email}`}
                         disabled={deleteInvitationMutation.isPending}
-                        onClick={() =>
-                          deleteInvitationMutation.mutate(inv.id)
-                        }
+                        onClick={() => deleteInvitationMutation.mutate(inv.id)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>

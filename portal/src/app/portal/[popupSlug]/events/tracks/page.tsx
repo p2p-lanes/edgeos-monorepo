@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query"
 import { ArrowLeft, Layers } from "lucide-react"
 import Link from "next/link"
 
-import { TracksService, type TrackPublic } from "@/client"
+import { type TrackPublic, TracksService } from "@/client"
 import { useCityProvider } from "@/providers/cityProvider"
 
 export default function TracksPage() {

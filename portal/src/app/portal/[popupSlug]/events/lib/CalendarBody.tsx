@@ -24,10 +24,10 @@ import Link from "next/link"
 import { useState } from "react"
 
 import {
-  EventsService,
-  EventVenuesService,
   type EventPublic,
+  EventsService,
   type EventVenuePublic,
+  EventVenuesService,
 } from "@/client"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -53,7 +53,8 @@ export function CalendarBody({
 }: CalendarBodyProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date())
-  const { formatTime, formatDayKey, formatGridDayKey } = useEventTimezone(popupId)
+  const { formatTime, formatDayKey, formatGridDayKey } =
+    useEventTimezone(popupId)
 
   const { data } = useQuery({
     queryKey: [
@@ -162,6 +163,7 @@ export function CalendarBody({
             return (
               <button
                 key={i}
+                type="button"
                 onClick={() => setSelectedDate(d)}
                 className={cn(
                   "relative aspect-square flex flex-col items-center justify-center rounded-lg text-xs transition-colors",

@@ -661,7 +661,7 @@ export type EmailTemplatePublic = {
     updated_at?: (string | null);
 };
 
-export type EmailTemplateType = 'login_code_user' | 'login_code_human' | 'application_received' | 'application_accepted' | 'application_rejected' | 'application_accepted_with_discount' | 'application_accepted_with_incentive' | 'application_accepted_scholarship_rejected' | 'payment_confirmed' | 'abandoned_cart' | 'edit_passes_confirmed';
+export type EmailTemplateType = 'login_code_user' | 'login_code_human' | 'application_received' | 'application_accepted' | 'application_rejected' | 'application_accepted_with_discount' | 'application_accepted_with_incentive' | 'application_accepted_scholarship_rejected' | 'payment_confirmed' | 'abandoned_cart' | 'edit_passes_confirmed' | 'event_invitation' | 'event_approval_approved' | 'event_approval_rejected';
 
 export type EmailTemplateUpdate = {
     subject?: (string | null);
@@ -681,6 +681,10 @@ export type EnrichedDashboardStats = {
     applications: ApplicationStats;
     attendees: AttendeeStats;
     payments: PaymentStats;
+};
+
+export type EventApprovalPayload = {
+    reason?: (string | null);
 };
 
 export type EventAvailabilityCheck = {
@@ -848,7 +852,7 @@ export type EventSettingsUpdate = {
     timezone?: (string | null);
 };
 
-export type EventStatus = 'draft' | 'published' | 'cancelled';
+export type EventStatus = 'draft' | 'published' | 'cancelled' | 'pending_approval' | 'rejected';
 
 /**
  * Event schema for updates.
@@ -1010,18 +1014,6 @@ export type FormSectionUpdate = {
     label?: (string | null);
     description?: (string | null);
     order?: (number | null);
-};
-
-export type GoogleAuthUrlResponse = {
-    url: string;
-    state: string;
-};
-
-export type GoogleConnectionStatus = {
-    configured: boolean;
-    connected: boolean;
-    calendar_id?: (string | null);
-    connected_at?: (string | null);
 };
 
 /**
@@ -3058,6 +3050,22 @@ export type EventsBulkInvitePortalData = {
 
 export type EventsBulkInvitePortalResponse = (EventInvitationBulkResult);
 
+export type EventsApproveEventData = {
+    eventId: string;
+    requestBody: EventApprovalPayload;
+    xTenantId?: (string | null);
+};
+
+export type EventsApproveEventResponse = (EventPublic);
+
+export type EventsRejectEventData = {
+    eventId: string;
+    requestBody: EventApprovalPayload;
+    xTenantId?: (string | null);
+};
+
+export type EventsRejectEventResponse = (EventPublic);
+
 export type EventsDeletePortalInvitationData = {
     eventId: string;
     invitationId: string;
@@ -3410,20 +3418,6 @@ export type FormSectionsDeleteFormSectionData = {
 };
 
 export type FormSectionsDeleteFormSectionResponse = (void);
-
-export type GoogleCalendarGetAuthUrlResponse = (GoogleAuthUrlResponse);
-
-export type GoogleCalendarOauthCallbackData = {
-    code?: (string | null);
-    error?: (string | null);
-    state?: (string | null);
-};
-
-export type GoogleCalendarOauthCallbackResponse = (unknown);
-
-export type GoogleCalendarDisconnectResponse = (void);
-
-export type GoogleCalendarStatusEndpointResponse = (GoogleConnectionStatus);
 
 export type GroupsListGroupsData = {
     /**

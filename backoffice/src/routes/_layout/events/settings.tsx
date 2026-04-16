@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
 import { Suspense } from "react"
 
-import { EventSettingsService, type EventSettingsCreate } from "@/client"
+import { type EventSettingsCreate, EventSettingsService } from "@/client"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { Label } from "@/components/ui/label"
@@ -64,7 +64,9 @@ function EventSettingsForm() {
     queryKey: ["event-settings", selectedPopupId],
     queryFn: async () => {
       try {
-        return await EventSettingsService.getEventSettings({ popupId: selectedPopupId! })
+        return await EventSettingsService.getEventSettings({
+          popupId: selectedPopupId!,
+        })
       } catch {
         return null
       }
@@ -119,7 +121,8 @@ function EventSettingsForm() {
           />
         </div>
         <p className="text-sm text-muted-foreground">
-          When off, the events section is hidden in the portal for humans and no one can publish. Who can publish controls permission when on.
+          When off, the events section is hidden in the portal for humans and no
+          one can publish. Who can publish controls permission when on.
         </p>
       </div>
 
@@ -144,7 +147,8 @@ function EventSettingsForm() {
           </SelectContent>
         </Select>
         <p className="text-sm text-muted-foreground">
-          Controls who can publish events. Drafts can always be created by anyone.
+          Controls who can publish events. Drafts can always be created by
+          anyone.
         </p>
       </div>
 
@@ -180,7 +184,8 @@ function EventSettingsForm() {
         <div>
           <h2 className="text-lg font-semibold">Venue permissions</h2>
           <p className="text-sm text-muted-foreground">
-            Control whether humans can create their own venues and whether those submissions need admin approval before use.
+            Control whether humans can create their own venues and whether those
+            submissions need admin approval before use.
           </p>
         </div>
 
@@ -203,11 +208,17 @@ function EventSettingsForm() {
           />
         </div>
 
-        <div className="flex items-center justify-between rounded-lg border p-4 data-[disabled=true]:opacity-60" data-disabled={!currentSettings.humans_can_create_venues}>
+        <div
+          className="flex items-center justify-between rounded-lg border p-4 data-[disabled=true]:opacity-60"
+          data-disabled={!currentSettings.humans_can_create_venues}
+        >
           <div className="space-y-0.5">
-            <Label className="text-base">Human-created venues require approval</Label>
+            <Label className="text-base">
+              Human-created venues require approval
+            </Label>
             <p className="text-sm text-muted-foreground">
-              When enabled, venues submitted by humans stay hidden until an admin approves them.
+              When enabled, venues submitted by humans stay hidden until an
+              admin approves them.
             </p>
           </div>
           <Switch

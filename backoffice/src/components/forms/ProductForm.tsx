@@ -29,6 +29,7 @@ import { FieldError } from "@/components/Common/FieldError"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { DatePicker } from "@/components/ui/date-picker"
 import {
   Dialog,
   DialogContent,
@@ -578,12 +579,12 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
                         label="Start Date"
                         description="When the ticket validity begins"
                       >
-                        <Input
-                          type="date"
+                        <DatePicker
                           value={field.state.value}
-                          onChange={(e) => field.handleChange(e.target.value)}
+                          onChange={(v) => field.handleChange(v)}
                           disabled={readOnly}
-                          className="max-w-44 text-sm"
+                          className="max-w-52"
+                          placeholder="Start date"
                         />
                       </InlineRow>
                     )}
@@ -598,12 +599,12 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
                         label="End Date"
                         description="When the ticket validity ends"
                       >
-                        <Input
-                          type="date"
+                        <DatePicker
                           value={field.state.value}
-                          onChange={(e) => field.handleChange(e.target.value)}
+                          onChange={(v) => field.handleChange(v)}
                           disabled={readOnly}
-                          className="max-w-44 text-sm"
+                          className="max-w-52"
+                          placeholder="End date"
                         />
                       </InlineRow>
                     )}

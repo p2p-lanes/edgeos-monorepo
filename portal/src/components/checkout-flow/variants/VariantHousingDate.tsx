@@ -124,7 +124,9 @@ function DatePickerSection({
             className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           />
         </div>
-        <span className="hidden sm:block self-center text-muted-foreground">to</span>
+        <span className="hidden sm:block self-center text-muted-foreground">
+          to
+        </span>
         <div className="flex-1 min-w-0">
           <label
             htmlFor="checkout-date"

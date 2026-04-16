@@ -36,3 +36,38 @@ jobs:
       - name: Pytest
         working-directory: backend
         run: uv run pytest -v
+
+  frontend:
+    name: Frontend (biome + tsc)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # biome ci is the check-only variant of `pnpm lint` (which would
+      # auto-fix in place). Infos/warnings don't fail the job; errors do.
+      - name: Biome (backoffice)
+        run: pnpm --filter backoffice exec biome ci .
+
+      - name: Biome (portal)
+        run: pnpm --filter portal exec biome ci .
+
+      - name: Typecheck (backoffice)
+        run: pnpm --filter backoffice exec tsc -p tsconfig.build.json --noEmit
+
+      - name: Typecheck (portal)
+        run: pnpm --filter portal exec tsc --noEmit

@@ -13,14 +13,16 @@ const WEEKDAY_LABELS: Record<string, string> = {
   SU: "Sunday",
 }
 
-export function summarizeRrule(rrule: string | null | undefined): string | null {
+export function summarizeRrule(
+  rrule: string | null | undefined,
+): string | null {
   if (!rrule) return null
   const kv: Record<string, string> = {}
   for (const part of rrule.split(";")) {
     const [k, v] = part.split("=")
     if (k && v) kv[k.toUpperCase()] = v
   }
-  const interval = parseInt(kv.INTERVAL ?? "1") || 1
+  const interval = parseInt(kv.INTERVAL ?? "1", 10) || 1
   let base = ""
   if (kv.FREQ === "DAILY") {
     base = interval === 1 ? "Repeats daily" : `Repeats every ${interval} days`

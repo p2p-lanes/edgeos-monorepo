@@ -81,9 +81,7 @@ function TrackEventsList({ trackId }: { trackId: string }) {
               {formatDateTime(event.start_time)}
             </span>
           </div>
-          <Badge
-            variant={statusVariant[event.status as string] ?? "secondary"}
-          >
+          <Badge variant={statusVariant[event.status as string] ?? "secondary"}>
             {event.status}
           </Badge>
         </li>

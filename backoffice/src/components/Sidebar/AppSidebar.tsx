@@ -14,6 +14,7 @@ import {
   Package,
   Settings,
   ShoppingCart,
+  Sparkles,
   Tag,
   User,
   Users,
@@ -68,6 +69,7 @@ const popupItems: Item[] = [
 const eventItems: Item[] = [
   { icon: CalendarDays, title: "Events", path: "/events" },
   { icon: MapPin, title: "Venues", path: "/events/venues" },
+  { icon: Sparkles, title: "Venue Properties", path: "/events/properties" },
   { icon: ListTree, title: "Tracks", path: "/events/tracks" },
   { icon: Settings, title: "Event Settings", path: "/events/settings" },
 ]

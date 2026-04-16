@@ -1,27 +1,21 @@
 "use client"
 
 import { useQueries, useQuery } from "@tanstack/react-query"
-import {
-  CalendarDays,
-  Clock,
-  Filter,
-  MapPin,
-  Tag,
-} from "lucide-react"
+import { CalendarDays, Clock, Filter, MapPin, Pencil, Tag } from "lucide-react"
 import Link from "next/link"
 import { useState } from "react"
 
 import {
-  EventsService,
-  EventVenuesService,
   type EventPublic,
+  EventsService,
   type EventVenuePublic,
+  EventVenuesService,
+  HumansService,
 } from "@/client"
 import { Badge } from "@/components/ui/badge"
 import { useCityProvider } from "@/providers/cityProvider"
 import { CalendarBody } from "./lib/CalendarBody"
 import { EventsToolbar } from "./lib/EventsToolbar"
-import { GoogleCalendarConnectionCard } from "./lib/GoogleCalendarConnectionCard"
 import {
   useEventTimezone,
   usePortalEventSettings,
@@ -41,7 +35,8 @@ function groupByDate(
 }
 
 const statusColors: Record<string, string> = {
-  published: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+  published:
+    "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
   draft: "bg-muted text-muted-foreground",
   cancelled: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
 }
@@ -51,7 +46,14 @@ export default function EventsPage() {
   const city = getCity()
   const [search, setSearch] = useState("")
   const [rsvpedOnly, setRsvpedOnly] = useState(false)
+  const [mineOnly, setMineOnly] = useState(false)
   const [view, setView] = useState<"list" | "calendar">("list")
+
+  const { data: currentHuman } = useQuery({
+    queryKey: ["current-human"],
+    queryFn: () => HumansService.getCurrentHumanInfo(),
+    staleTime: 5 * 60 * 1000,
+  })
   const { timezone, formatTime, formatDateShort, formatDayKey } =
     useEventTimezone(city?.id)
 
@@ -59,19 +61,24 @@ export default function EventsPage() {
   const eventsEnabled = eventSettings?.event_enabled ?? true
 
   const { data, isLoading } = useQuery({
-    queryKey: ["portal-events", city?.id, search, rsvpedOnly],
+    queryKey: ["portal-events", city?.id, search, rsvpedOnly, mineOnly],
     queryFn: () =>
       EventsService.listPortalEvents({
         popupId: city!.id,
         search: search || undefined,
-        eventStatus: "published",
+        // When showing "My events" we want drafts / pending / rejected too;
+        // otherwise restrict to what's publicly visible.
+        eventStatus: mineOnly ? undefined : "published",
         rsvpedOnly: rsvpedOnly || undefined,
         limit: 200,
       }),
     enabled: !!city?.id && eventsEnabled && view === "list",
   })
 
-  const events = data?.results ?? []
+  const rawEvents = data?.results ?? []
+  const events = mineOnly
+    ? rawEvents.filter((e) => currentHuman && e.owner_id === currentHuman.id)
+    : rawEvents
   const grouped = groupByDate(events, formatDayKey)
 
   // Batch-fetch venue titles for events that reference a venue.
@@ -119,10 +126,6 @@ export default function EventsPage() {
       </div>
 
       <div className="flex-none mb-4">
-        <GoogleCalendarConnectionCard />
-      </div>
-
-      <div className="flex-none mb-4">
         <EventsToolbar
           slug={city?.slug}
           view={view}
@@ -131,6 +134,8 @@ export default function EventsPage() {
           onSearchChange={setSearch}
           rsvpedOnly={rsvpedOnly}
           onRsvpedOnlyChange={setRsvpedOnly}
+          mineOnly={mineOnly}
+          onMineOnlyChange={setMineOnly}
           canCreate={eventSettings?.can_publish_event === "everyone"}
         />
       </div>
@@ -168,55 +173,71 @@ export default function EventsPage() {
                     const venue = event.venue_id
                       ? venueMap.get(event.venue_id)
                       : undefined
+                    const isOwner =
+                      currentHuman != null && event.owner_id === currentHuman.id
                     return (
-                      <Link
+                      <div
                         key={event.id}
-                        href={`/portal/${city?.slug}/events/${event.id}`}
-                        className="block rounded-xl border bg-card p-3 sm:p-4 hover:shadow-md transition-shadow"
+                        className="relative rounded-xl border bg-card hover:shadow-md transition-shadow"
                       >
-                        <div className="flex items-start justify-between gap-2 mb-1">
-                          <h3 className="font-medium text-sm sm:text-base">
-                            {event.title}
-                          </h3>
-                          <Badge
-                            variant="secondary"
-                            className={
-                              statusColors[event.status as string] ?? ""
-                            }
-                          >
-                            {event.status}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                          <Clock className="h-3 w-3" />
-                          <span>
-                            {formatTime(event.start_time)} –{" "}
-                            {formatTime(event.end_time)}
-                          </span>
-                        </div>
-                        {venue && (
-                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
-                            <MapPin className="h-3 w-3" />
-                            <span className="truncate">
-                              {venue.title}
-                              {venue.location ? ` · ${venue.location}` : ""}
+                        <Link
+                          href={`/portal/${city?.slug}/events/${event.id}`}
+                          className="block p-3 sm:p-4"
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-1 pr-8">
+                            <h3 className="font-medium text-sm sm:text-base">
+                              {event.title}
+                            </h3>
+                            <Badge
+                              variant="secondary"
+                              className={
+                                statusColors[event.status as string] ?? ""
+                              }
+                            >
+                              {event.status}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <Clock className="h-3 w-3" />
+                            <span>
+                              {formatTime(event.start_time)} –{" "}
+                              {formatTime(event.end_time)}
                             </span>
                           </div>
-                        )}
-                        {event.tags && event.tags.length > 0 && (
-                          <div className="flex items-center gap-1 mt-1.5 flex-wrap">
-                            {event.tags.slice(0, 3).map((tag: string) => (
-                              <span
-                                key={tag}
-                                className="inline-flex items-center gap-0.5 text-[10px] bg-muted px-1.5 py-0.5 rounded"
-                              >
-                                <Tag className="h-2.5 w-2.5" />
-                                {tag}
+                          {venue && (
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                              <MapPin className="h-3 w-3" />
+                              <span className="truncate">
+                                {venue.title}
+                                {venue.location ? ` · ${venue.location}` : ""}
                               </span>
-                            ))}
-                          </div>
+                            </div>
+                          )}
+                          {event.tags && event.tags.length > 0 && (
+                            <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+                              {event.tags.slice(0, 3).map((tag: string) => (
+                                <span
+                                  key={tag}
+                                  className="inline-flex items-center gap-0.5 text-[10px] bg-muted px-1.5 py-0.5 rounded"
+                                >
+                                  <Tag className="h-2.5 w-2.5" />
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </Link>
+                        {isOwner && (
+                          <Link
+                            href={`/portal/${city?.slug}/events/${event.id}/edit`}
+                            onClick={(e) => e.stopPropagation()}
+                            aria-label={`Edit ${event.title}`}
+                            className="absolute bottom-2 right-2 inline-flex h-7 w-7 items-center justify-center rounded-md border bg-background text-muted-foreground shadow-sm transition-colors hover:text-foreground"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Link>
                         )}
-                      </Link>
+                      </div>
                     )
                   })}
                 </div>

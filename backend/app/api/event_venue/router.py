@@ -20,7 +20,6 @@ from app.api.event_venue.schemas import (
     EventVenuePublic,
     EventVenueUpdate,
     VenueAvailability,
-    VenueBookingMode,
     VenueBusySlot,
     VenueExceptionCreate,
     VenueExceptionPublic,
@@ -247,7 +246,15 @@ async def set_weekly_hours(
     )
     for row in existing:
         db.delete(row)
+    # Flush deletes first so the unique (venue_id, day_of_week) constraint
+    # doesn't trip on the inserts below while the old rows are still pending.
+    db.flush()
+    # Dedupe by day_of_week just in case the client posts duplicates.
+    seen_days: set[int] = set()
     for h in payload.hours:
+        if h.day_of_week in seen_days:
+            continue
+        seen_days.add(h.day_of_week)
         db.add(
             VenueWeeklyHours(
                 tenant_id=venue.tenant_id,
@@ -259,7 +266,7 @@ async def set_weekly_hours(
             )
         )
     db.commit()
-    return {"count": len(payload.hours)}
+    return {"count": len(seen_days)}
 
 
 # ---------------------------------------------------------------------------

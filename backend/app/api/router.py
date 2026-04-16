@@ -17,7 +17,6 @@ from app.api import (
     event_venue,
     form_field,
     form_section,
-    google_calendar,
     group,
     human,
     payment,
@@ -73,9 +72,6 @@ api_router.include_router(event_venue.utils_router)
 api_router.include_router(event_venue.property_types_router)
 api_router.include_router(event_settings.router)
 api_router.include_router(track.router)
-
-# Google Calendar sync (portal — no-op when env vars unset)
-api_router.include_router(google_calendar.router)
 
 # Dashboard
 api_router.include_router(dashboard.router)

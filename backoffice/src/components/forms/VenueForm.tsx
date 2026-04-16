@@ -8,14 +8,15 @@ import {
   type EventVenuePublic,
   EventVenuesService,
   type VenueBookingMode,
+  type VenueWeeklyHourInput,
 } from "@/client"
 import { ImageUpload } from "@/components/ui/image-upload"
-import { Input } from "@/components/ui/input"
 import {
   HeroInput,
   InlineRow,
   InlineSection,
 } from "@/components/ui/inline-form"
+import { Input } from "@/components/ui/input"
 import { LoadingButton } from "@/components/ui/loading-button"
 import {
   Select,
@@ -31,7 +32,10 @@ import { ChipsWithSuggestions } from "./VenueForm/ChipsWithSuggestions"
 import { ExceptionsEditor } from "./VenueForm/ExceptionsEditor"
 import { GallerySection } from "./VenueForm/GallerySection"
 import { PropertyPicker } from "./VenueForm/PropertyPicker"
-import { WeeklyHoursEditor } from "./VenueForm/WeeklyHoursEditor"
+import {
+  buildInitialWeeklyHours,
+  WeeklyHoursEditor,
+} from "./VenueForm/WeeklyHoursEditor"
 
 interface VenueFormProps {
   defaultValues?: EventVenuePublic
@@ -106,8 +110,21 @@ export function VenueForm({ defaultValues, onSuccess }: VenueFormProps) {
   const isEdit = !!defaultValues
 
   const createMutation = useMutation({
-    mutationFn: (data: Record<string, unknown>) =>
-      EventVenuesService.createVenue({ requestBody: data as EventVenueCreate }),
+    mutationFn: async (args: {
+      data: Record<string, unknown>
+      hours: VenueWeeklyHourInput[]
+    }) => {
+      const created = await EventVenuesService.createVenue({
+        requestBody: args.data as EventVenueCreate,
+      })
+      if (created?.id) {
+        await EventVenuesService.setWeeklyHours({
+          venueId: created.id,
+          requestBody: { hours: args.hours },
+        })
+      }
+      return created
+    },
     onSuccess: () => {
       showSuccessToast("Venue created successfully")
       queryClient.invalidateQueries({ queryKey: ["event-venues"] })
@@ -118,11 +135,20 @@ export function VenueForm({ defaultValues, onSuccess }: VenueFormProps) {
   })
 
   const updateMutation = useMutation({
-    mutationFn: (data: Record<string, unknown>) =>
-      EventVenuesService.updateVenue({
+    mutationFn: async (args: {
+      data: Record<string, unknown>
+      hours: VenueWeeklyHourInput[]
+    }) => {
+      const updated = await EventVenuesService.updateVenue({
         venueId: defaultValues!.id,
-        requestBody: data,
-      }),
+        requestBody: args.data,
+      })
+      await EventVenuesService.setWeeklyHours({
+        venueId: defaultValues!.id,
+        requestBody: { hours: args.hours },
+      })
+      return updated
+    },
     onSuccess: () => {
       showSuccessToast("Venue updated successfully")
       queryClient.invalidateQueries({ queryKey: ["event-venues"] })
@@ -155,18 +181,14 @@ export function VenueForm({ defaultValues, onSuccess }: VenueFormProps) {
   const existingTags = useMemo(
     () =>
       Array.from(
-        new Set(
-          (popupVenues?.results ?? []).flatMap((v) => v.tags ?? []),
-        ),
+        new Set((popupVenues?.results ?? []).flatMap((v) => v.tags ?? [])),
       ).sort(),
     [popupVenues],
   )
   const existingAmenities = useMemo(
     () =>
       Array.from(
-        new Set(
-          (popupVenues?.results ?? []).flatMap((v) => v.amenities ?? []),
-        ),
+        new Set((popupVenues?.results ?? []).flatMap((v) => v.amenities ?? [])),
       ).sort(),
     [popupVenues],
   )
@@ -181,17 +203,15 @@ export function VenueForm({ defaultValues, onSuccess }: VenueFormProps) {
       ),
       capacity: defaultValues?.capacity?.toString() ?? "",
       image_url: defaultValues?.image_url ?? "",
-      booking_mode: (defaultValues?.booking_mode ??
-        "free") as VenueBookingMode,
-      setup_time_minutes: (
-        defaultValues?.setup_time_minutes ?? 0
-      ).toString(),
+      booking_mode: (defaultValues?.booking_mode ?? "free") as VenueBookingMode,
+      setup_time_minutes: (defaultValues?.setup_time_minutes ?? 0).toString(),
       teardown_time_minutes: (
         defaultValues?.teardown_time_minutes ?? 0
       ).toString(),
       property_type_ids: initialPropertyIds,
       tags: (defaultValues?.tags ?? []) as string[],
       amenities: (defaultValues?.amenities ?? []) as string[],
+      weekly_hours: buildInitialWeeklyHours(defaultValues?.weekly_hours),
     },
     onSubmit: ({ value }) => {
       if (!selectedPopupId && !isEdit) {
@@ -212,14 +232,14 @@ export function VenueForm({ defaultValues, onSuccess }: VenueFormProps) {
         formatted_address: value.location || null,
         geo_lat: coords?.lat ?? null,
         geo_lng: coords?.lng ?? null,
-        capacity: value.capacity ? parseInt(value.capacity) : null,
+        capacity: value.capacity ? parseInt(value.capacity, 10) : null,
         image_url: value.image_url || null,
         booking_mode: value.booking_mode,
         setup_time_minutes: value.setup_time_minutes
-          ? Math.max(0, parseInt(value.setup_time_minutes))
+          ? Math.max(0, parseInt(value.setup_time_minutes, 10))
           : 0,
         teardown_time_minutes: value.teardown_time_minutes
-          ? Math.max(0, parseInt(value.teardown_time_minutes))
+          ? Math.max(0, parseInt(value.teardown_time_minutes, 10))
           : 0,
         property_type_ids: value.property_type_ids,
         tags,
@@ -227,9 +247,9 @@ export function VenueForm({ defaultValues, onSuccess }: VenueFormProps) {
       }
 
       if (isEdit) {
-        updateMutation.mutate(payload)
+        updateMutation.mutate({ data: payload, hours: value.weekly_hours })
       } else {
-        createMutation.mutate(payload)
+        createMutation.mutate({ data: payload, hours: value.weekly_hours })
       }
     },
   })
@@ -371,9 +391,7 @@ export function VenueForm({ defaultValues, onSuccess }: VenueFormProps) {
             {(field) => (
               <Select
                 value={field.state.value}
-                onValueChange={(v) =>
-                  field.handleChange(v as VenueBookingMode)
-                }
+                onValueChange={(v) => field.handleChange(v as VenueBookingMode)}
               >
                 <SelectTrigger className="w-[220px]">
                   <SelectValue />
@@ -435,13 +453,15 @@ export function VenueForm({ defaultValues, onSuccess }: VenueFormProps) {
         )}
       </form.Field>
 
-      {/* 5. Weekly hours (edit mode only) */}
-      {isEdit && defaultValues && (
-        <WeeklyHoursEditor
-          venueId={defaultValues.id}
-          initial={defaultValues.weekly_hours}
-        />
-      )}
+      {/* 5. Weekly hours */}
+      <form.Field name="weekly_hours">
+        {(field) => (
+          <WeeklyHoursEditor
+            value={field.state.value}
+            onChange={field.handleChange}
+          />
+        )}
+      </form.Field>
 
       {/* 6. Exceptions (edit mode only) */}
       {isEdit && defaultValues && (

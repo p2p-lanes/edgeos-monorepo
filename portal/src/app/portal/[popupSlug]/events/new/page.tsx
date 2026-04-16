@@ -1,5 +1,11 @@
 "use client"
 
+import {
+  availableStartOptionsForDuration,
+  dayBoundsInTz,
+  durationFits,
+  freeIntervalsForDay,
+} from "@edgeos/shared-events"
 import { useMutation, useQuery } from "@tanstack/react-query"
 import {
   ArrowLeft,
@@ -14,17 +20,18 @@ import {
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useRef, useState } from "react"
-
+import { toast } from "sonner"
 import {
   ApiError,
   EventsService,
-  EventVenuesService,
   type EventVenuePublic,
-  TracksService,
+  EventVenuesService,
   type TrackPublic,
+  TracksService,
 } from "@/client"
-import { Badge } from "@/components/ui/badge"
+import { CoverImageCropper } from "@/components/CoverImageCropper"
 import { Button } from "@/components/ui/button"
+import { DatePicker } from "@/components/ui/date-picker"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -40,20 +47,14 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { VenueHoursSummary } from "@/components/VenueHoursSummary"
 import { cn } from "@/lib/utils"
 import { useCityProvider } from "@/providers/cityProvider"
-import { toast } from "sonner"
 import {
   useEventTimezone,
   usePortalEventSettings,
 } from "../lib/useEventTimezone"
 import { useFileUpload } from "../lib/useFileUpload"
-import {
-  availableStartOptionsForDuration,
-  dayBoundsInTz,
-  durationFits,
-  freeIntervalsForDay,
-} from "@edgeos/shared-events"
 
 /** "YYYY-MM-DD" of today in the given TZ (used as initial date picker value). */
 function todayInTz(tz: string): string {
@@ -169,9 +170,7 @@ export default function NewPortalEventPage() {
   const [durationUnit, setDurationUnit] = useState<DurationUnit>("minutes")
   const durationMinutes = Math.max(
     1,
-    Math.round(
-      durationUnit === "hours" ? durationValue * 60 : durationValue,
-    ),
+    Math.round(durationUnit === "hours" ? durationValue * 60 : durationValue),
   )
   const [visibility, setVisibility] = useState<Visibility>("public")
   const [maxParticipants, setMaxParticipants] = useState("")
@@ -192,6 +191,22 @@ export default function NewPortalEventPage() {
   const selectedVenue: EventVenuePublic | undefined = venues.find(
     (v) => v.id === venueId,
   )
+
+  // True when the picked date falls on a weekday the venue is closed. HTML
+  // date inputs don't support day-level disabling, so we surface a warning
+  // and let the user correct it before submitting.
+  const selectedDateIsClosed = useMemo(() => {
+    if (!selectedVenue?.weekly_hours || !dateStr) return false
+    // dateStr is YYYY-MM-DD in display tz. Parse as local date.
+    const [y, m, d] = dateStr.split("-").map(Number)
+    if (!y || !m || !d) return false
+    const jsDay = new Date(y, m - 1, d).getDay() // 0=Sun..6=Sat
+    const backendDay = (jsDay + 6) % 7 // 0=Mon..6=Sun
+    const entry = selectedVenue.weekly_hours.find(
+      (h) => h.day_of_week === backendDay,
+    )
+    return !entry || entry.is_closed
+  }, [selectedVenue, dateStr])
 
   const { data: tracksData } = useQuery({
     queryKey: ["portal-tracks", popupId],
@@ -330,11 +345,9 @@ export default function NewPortalEventPage() {
     onError: (err) => {
       const msg =
         err instanceof ApiError
-          ? (typeof err.body === "object" && err.body !== null
-              ? String(
-                  (err.body as { detail?: string }).detail ?? err.message,
-                )
-              : err.message)
+          ? typeof err.body === "object" && err.body !== null
+            ? String((err.body as { detail?: string }).detail ?? err.message)
+            : err.message
           : (err as Error).message
       toast.error(msg)
     },
@@ -357,15 +370,44 @@ export default function NewPortalEventPage() {
     setTags(next)
   }
 
-  const onPickFile = async (files: FileList | null) => {
+  // Local object URL of the picture the user just chose. While set, the
+  // cropper dialog is open and nothing has been uploaded yet.
+  const [pendingCrop, setPendingCrop] = useState<{
+    url: string
+    name: string
+  } | null>(null)
+
+  const onPickFile = (files: FileList | null) => {
     if (!files || files.length === 0) return
+    const file = files[0]
+    const url = URL.createObjectURL(file)
+    setPendingCrop({ url, name: file.name })
+  }
+
+  const handleCropConfirm = async (blob: Blob) => {
+    if (!pendingCrop) return
     try {
-      const { publicUrl } = await uploadFile(files[0])
+      const file = new File(
+        [blob],
+        pendingCrop.name.replace(/\.\w+$/, ".jpg"),
+        {
+          type: "image/jpeg",
+        },
+      )
+      const { publicUrl } = await uploadFile(file)
       setCoverUrl(publicUrl)
       toast.success("Image uploaded")
     } catch (err) {
       toast.error((err as Error).message)
+    } finally {
+      URL.revokeObjectURL(pendingCrop.url)
+      setPendingCrop(null)
     }
+  }
+
+  const handleCropCancel = () => {
+    if (pendingCrop) URL.revokeObjectURL(pendingCrop.url)
+    setPendingCrop(null)
   }
 
   const venueMaxCapacity = selectedVenue?.capacity ?? null
@@ -447,11 +489,10 @@ export default function NewPortalEventPage() {
             </SelectContent>
           </Select>
           {selectedVenue && (
-            <div className="text-xs text-muted-foreground space-y-0.5">
+            <div className="text-xs text-muted-foreground space-y-2">
+              <VenueHoursSummary hours={selectedVenue.weekly_hours} />
               {selectedVenue.booking_mode === "unbookable" && (
-                <p className="text-destructive">
-                  This venue is not bookable.
-                </p>
+                <p className="text-destructive">This venue is not bookable.</p>
               )}
               {selectedVenue.booking_mode === "approval_required" && (
                 <p>This venue requires admin approval for new events.</p>
@@ -459,11 +500,16 @@ export default function NewPortalEventPage() {
               {(selectedVenue.setup_time_minutes ?? 0) > 0 ||
               (selectedVenue.teardown_time_minutes ?? 0) > 0 ? (
                 <p>
-                  Locked {selectedVenue.setup_time_minutes ?? 0}m before
-                  start and {selectedVenue.teardown_time_minutes ?? 0}m
-                  after end for setup/teardown.
+                  Locked {selectedVenue.setup_time_minutes ?? 0}m before start
+                  and {selectedVenue.teardown_time_minutes ?? 0}m after end for
+                  setup/teardown.
                 </p>
               ) : null}
+              {selectedDateIsClosed && (
+                <p className="text-yellow-600 dark:text-yellow-500">
+                  The selected date falls on a day the venue is closed.
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -480,15 +526,76 @@ export default function NewPortalEventPage() {
           />
         </div>
 
+        {/* Cover image */}
+        <div className="space-y-2">
+          <Label>Cover image (optional)</Label>
+          <input
+            ref={fileRef}
+            type="file"
+            className="hidden"
+            accept="image/jpeg,image/png,image/gif,image/webp"
+            onChange={(e) => {
+              onPickFile(e.target.files)
+              // Allow picking the same file again after cancelling the crop.
+              e.target.value = ""
+            }}
+          />
+          {coverUrl ? (
+            <div className="relative w-full overflow-hidden rounded-lg border">
+              <img
+                src={coverUrl}
+                alt="Event cover"
+                className="aspect-[16/9] w-full object-cover"
+              />
+              <div className="absolute top-2 right-2 flex gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => fileRef.current?.click()}
+                >
+                  <Upload className="mr-1 h-4 w-4" />
+                  Replace
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setCoverUrl("")}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isUploading}
+                onClick={() => fileRef.current?.click()}
+              >
+                {isUploading ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Upload className="mr-2 h-4 w-4" />
+                )}
+                {isUploading ? "Uploading…" : "Upload image"}
+              </Button>
+              <p className="text-xs text-muted-foreground mt-1">
+                Leave empty to fall back to the venue&apos;s main photo.
+              </p>
+            </div>
+          )}
+        </div>
+
         {/* Date */}
         <div className="space-y-2">
           <Label htmlFor="date">Date</Label>
-          <Input
+          <DatePicker
             id="date"
-            type="date"
             value={dateStr}
-            onChange={(e) => {
-              const newDate = e.target.value
+            onChange={(newDate) => {
               setDateStr(newDate)
               if (venueId && timeStr) {
                 const ms = combineDateTimeInTz(newDate, timeStr, displayTz)
@@ -498,7 +605,6 @@ export default function NewPortalEventPage() {
               }
             }}
             disabled={selectedVenue?.booking_mode === "unbookable"}
-            required
           />
         </div>
 
@@ -517,7 +623,9 @@ export default function NewPortalEventPage() {
                     return
                   }
                   const ms = combineDateTimeInTz(dateStr, hhmm, displayTz)
-                  setStartIso(Number.isNaN(ms) ? "" : new Date(ms).toISOString())
+                  setStartIso(
+                    Number.isNaN(ms) ? "" : new Date(ms).toISOString(),
+                  )
                 }}
                 options={startOptions}
                 disabled={selectedVenue?.booking_mode === "unbookable"}
@@ -547,9 +655,7 @@ export default function NewPortalEventPage() {
                 id="start"
                 type="datetime-local"
                 value={startIso ? toLocalInput(new Date(startIso)) : ""}
-                onChange={(e) =>
-                  setStartIso(localInputToIso(e.target.value))
-                }
+                onChange={(e) => setStartIso(localInputToIso(e.target.value))}
                 required
               />
             </div>
@@ -637,8 +743,8 @@ export default function NewPortalEventPage() {
           />
           {exceedsCapacity && (
             <p className="text-xs text-yellow-600">
-              Exceeds venue capacity ({venueMaxCapacity}). Extra attendees
-              will still be allowed.
+              Exceeds venue capacity ({venueMaxCapacity}). Extra attendees will
+              still be allowed.
             </p>
           )}
         </div>
@@ -723,55 +829,6 @@ export default function NewPortalEventPage() {
           />
         </div>
 
-        {/* Cover image */}
-        <div className="space-y-2">
-          <Label>Cover image (optional)</Label>
-          {coverUrl ? (
-            <div className="relative w-full max-w-sm overflow-hidden rounded-lg border">
-              <img
-                src={coverUrl}
-                alt="Event cover"
-                className="w-full h-40 object-cover"
-              />
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                className="absolute top-2 right-2"
-                onClick={() => setCoverUrl("")}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-          ) : (
-            <div>
-              <input
-                ref={fileRef}
-                type="file"
-                className="hidden"
-                accept="image/jpeg,image/png,image/gif,image/webp"
-                onChange={(e) => onPickFile(e.target.files)}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                disabled={isUploading}
-                onClick={() => fileRef.current?.click()}
-              >
-                {isUploading ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Upload className="mr-2 h-4 w-4" />
-                )}
-                {isUploading ? "Uploading…" : "Upload image"}
-              </Button>
-              <p className="text-xs text-muted-foreground mt-1">
-                Leave empty to fall back to the venue&apos;s main photo.
-              </p>
-            </div>
-          )}
-        </div>
-
         <div className="flex justify-end gap-2 pt-2">
           <Button
             type="button"
@@ -790,6 +847,16 @@ export default function NewPortalEventPage() {
           </Button>
         </div>
       </form>
+
+      {pendingCrop && (
+        <CoverImageCropper
+          src={pendingCrop.url}
+          open={true}
+          onCancel={handleCropCancel}
+          onConfirm={handleCropConfirm}
+          saving={isUploading}
+        />
+      )}
     </div>
   )
 }

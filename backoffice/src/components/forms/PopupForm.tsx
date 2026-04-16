@@ -12,11 +12,11 @@ import {
   Heart,
   Image,
   Key,
+  Link as LinkIcon,
   Mail,
   MapPin,
   Scale,
   Ticket,
-  Twitter,
 } from "lucide-react"
 import {
   ApprovalStrategiesService,
@@ -714,7 +714,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
           <form.Field name="twitter_url">
             {(field) => (
               <InlineRow
-                icon={<Twitter className="h-4 w-4 text-muted-foreground" />}
+                icon={<LinkIcon className="h-4 w-4 text-muted-foreground" />}
                 label="Twitter"
               >
                 <Input

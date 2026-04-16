@@ -1,9 +1,10 @@
 import uuid
+from collections.abc import Iterable
 from datetime import datetime
-from typing import Iterable
 
 from fastapi import APIRouter, HTTPException, Response, status
 from loguru import logger
+from pydantic import BaseModel
 
 from app.api.event import crud
 from app.api.event.recurrence import (
@@ -26,7 +27,6 @@ from app.api.event.schemas import (
     OccurrenceRef,
     RecurrenceUpdate,
 )
-from app.api.google_calendar import service as gcal_service
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
     CurrentHuman,
@@ -35,18 +35,36 @@ from app.core.dependencies.users import (
     HumanTenantSession,
     TenantSession,
 )
+from app.services.event_itip import (
+    bump_and_dispatch_cancel as _bump_and_dispatch_itip_cancel,
+)
+from app.services.event_itip import (
+    bump_and_dispatch_update as _bump_and_dispatch_itip_update,
+)
+from app.services.event_itip import (
+    calendar_fields_changed as _event_calendar_fields_changed,
+)
+from app.services.event_itip import send_event_itip as _send_event_itip
 
 router = APIRouter(prefix="/events", tags=["events"])
 
 
-def _safe_gcal_sync_all(db, event) -> None:
-    """Propagate an event change to every registered participant's GCal."""
-    try:
-        gcal_service.sync_event_to_all_participants(db, event)
-    except Exception as exc:  # pragma: no cover - defensive
-        logger.warning(
-            "GCal propagation failed for event {}: {}", getattr(event, "id", None), exc
-        )
+async def _send_event_invitation_emails(
+    db,
+    event,
+    invited: list[EventInvitationPublic],
+) -> None:
+    """Dispatch iTIP REQUEST to the given freshly-created invitees."""
+    recipients = [
+        {
+            "human_id": inv.human_id,
+            "email": inv.email,
+            "first_name": inv.first_name or "",
+        }
+        for inv in invited
+        if inv.email
+    ]
+    await _send_event_itip(db, event, recipients, method="REQUEST")
 
 
 # ---------------------------------------------------------------------------
@@ -343,8 +361,17 @@ async def update_event(
             exclude_event_id=event.id,
         )
 
+    before = {
+        "title": event.title,
+        "start_time": event.start_time,
+        "end_time": event.end_time,
+        "venue_id": event.venue_id,
+    }
     updated = crud.events_crud.update(db, event, event_in)
-    _safe_gcal_sync_all(db, updated)
+
+    if _event_calendar_fields_changed(before, updated):
+        await _bump_and_dispatch_itip_update(db, updated)
+
     return _to_public(updated)
 
 
@@ -362,7 +389,7 @@ async def cancel_event(
 
     cancel_update = EventUpdate(status=EventStatus.CANCELLED)
     updated = crud.events_crud.update(db, event, cancel_update)
-    _safe_gcal_sync_all(db, updated)
+    await _bump_and_dispatch_itip_cancel(db, updated)
     return _to_public(updated)
 
 
@@ -375,38 +402,13 @@ async def delete_event(
     event = crud.events_crud.get(db, event_id)
     if not event:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
-    # Best-effort: delete mirrors in every connected participant's GCal.
+    # Send CANCEL to every attendee *before* we drop the row so they get a
+    # clean tombstone in their calendar.
     try:
-        _delete_gcal_for_all(db, event)
+        await _bump_and_dispatch_itip_cancel(db, event)
     except Exception as exc:  # pragma: no cover - defensive
-        logger.warning("GCal cleanup on event delete {} failed: {}", event_id, exc)
+        logger.warning("iTIP CANCEL on event delete {} failed: {}", event_id, exc)
     crud.events_crud.delete(db, event)
-
-
-def _delete_gcal_for_all(db, event) -> None:
-    """Remove gcal mirrors for every non-cancelled participant."""
-    from sqlmodel import select
-
-    from app.api.event_participant.models import EventParticipants
-    from app.api.event_participant.schemas import ParticipantStatus
-
-    participants = list(
-        db.exec(
-            select(EventParticipants)
-            .where(EventParticipants.event_id == event.id)
-            .where(EventParticipants.status != ParticipantStatus.CANCELLED)
-        ).all()
-    )
-    for p in participants:
-        try:
-            gcal_service.delete_event_for_human(db, event, p.profile_id)
-        except Exception as exc:  # pragma: no cover - defensive
-            logger.warning(
-                "GCal delete failed for human {} event {}: {}",
-                p.profile_id,
-                event.id,
-                exc,
-            )
 
 
 # ---------------------------------------------------------------------------
@@ -723,7 +725,9 @@ async def bulk_invite(
     event = crud.events_crud.get(db, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
-    return _run_bulk_invite(db, event, payload.emails, current_user.id)
+    result = _run_bulk_invite(db, event, payload.emails, current_user.id)
+    await _send_event_invitation_emails(db, event, result.invited)
+    return result
 
 
 @router.delete("/{event_id}/invitations/{invitation_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -795,6 +799,140 @@ async def list_portal_invitations(
     ]
 
 
+class EventApprovalPayload(BaseModel):
+    reason: str | None = None
+
+
+async def _send_event_approval_email(
+    db,
+    event,
+    *,
+    approved: bool,
+    reason: str | None,
+) -> None:
+    """Best-effort email to the event creator after an approval decision."""
+    from app.api.human.models import Humans
+    from app.core.config import settings
+    from app.services.email import (
+        EventApprovalApprovedContext,
+        EventApprovalRejectedContext,
+        get_email_service,
+    )
+
+    if not settings.emails_enabled:
+        return
+
+    human = db.get(Humans, event.owner_id)
+    if not human or not human.email:
+        return
+
+    popup = getattr(event, "popup", None)
+    popup_name = popup.name if popup else ""
+    popup_slug = getattr(popup, "slug", None) if popup else None
+    venue_title = getattr(getattr(event, "venue", None), "title", "") or ""
+
+    event_url = ""
+    if popup_slug:
+        event_url = (
+            f"{settings.PORTAL_URL.rstrip('/')}/portal/{popup_slug}/events/"
+            f"{event.id}"
+        )
+
+    when = event.start_time.strftime("%b %d, %Y at %H:%M") if event.start_time else ""
+
+    service = get_email_service()
+    from_address = popup.tenant.sender_email if popup and popup.tenant else None
+    from_name = popup.tenant.sender_name if popup and popup.tenant else None
+
+    try:
+        if approved:
+            await service.send_event_approval_approved(
+                to=human.email,
+                subject=f'Your event "{event.title}" was approved',
+                context=EventApprovalApprovedContext(
+                    first_name=human.first_name or "",
+                    event_title=event.title or "",
+                    popup_name=popup_name,
+                    event_when=when,
+                    venue_title=venue_title,
+                    event_url=event_url,
+                    reason=reason or "",
+                ),
+                from_address=from_address,
+                from_name=from_name,
+                popup_id=event.popup_id,
+                db_session=db,
+            )
+        else:
+            await service.send_event_approval_rejected(
+                to=human.email,
+                subject=f'Your event "{event.title}" was not approved',
+                context=EventApprovalRejectedContext(
+                    first_name=human.first_name or "",
+                    event_title=event.title or "",
+                    popup_name=popup_name,
+                    event_when=when,
+                    venue_title=venue_title,
+                    reason=reason or "",
+                ),
+                from_address=from_address,
+                from_name=from_name,
+                popup_id=event.popup_id,
+                db_session=db,
+            )
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.warning(
+            "Failed to send event approval email for {}: {}", event.id, exc
+        )
+
+
+@router.post("/{event_id}/approve", response_model=EventPublic)
+async def approve_event(
+    event_id: uuid.UUID,
+    payload: EventApprovalPayload,
+    db: TenantSession,
+    _: CurrentWriter,
+) -> EventPublic:
+    event = crud.events_crud.get(db, event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    if event.status != EventStatus.PENDING_APPROVAL:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Event is not pending approval (status={event.status})",
+        )
+    event.status = EventStatus.PUBLISHED
+    event.visibility = EventVisibility.PUBLIC
+    db.add(event)
+    db.commit()
+    db.refresh(event)
+    await _send_event_approval_email(db, event, approved=True, reason=payload.reason)
+    return _to_public(event)
+
+
+@router.post("/{event_id}/reject", response_model=EventPublic)
+async def reject_event(
+    event_id: uuid.UUID,
+    payload: EventApprovalPayload,
+    db: TenantSession,
+    _: CurrentWriter,
+) -> EventPublic:
+    event = crud.events_crud.get(db, event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    if event.status != EventStatus.PENDING_APPROVAL:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Event is not pending approval (status={event.status})",
+        )
+    event.status = EventStatus.REJECTED
+    db.add(event)
+    db.commit()
+    db.refresh(event)
+    await _send_event_approval_email(db, event, approved=False, reason=payload.reason)
+    return _to_public(event)
+
+
 @router.post(
     "/portal/events/{event_id}/invitations",
     response_model=EventInvitationBulkResult,
@@ -807,7 +945,9 @@ async def bulk_invite_portal(
     current_human: CurrentHuman,
 ) -> EventInvitationBulkResult:
     event = _ensure_portal_event_owner(db, event_id, current_human)
-    return _run_bulk_invite(db, event, payload.emails, current_human.id)
+    result = _run_bulk_invite(db, event, payload.emails, current_human.id)
+    await _send_event_invitation_emails(db, event, result.invited)
+    return result
 
 
 @router.delete(
@@ -949,7 +1089,7 @@ async def list_portal_events(
                     .where(EventParticipants.status != ParticipantStatus.CANCELLED)
                 ).all()
             )
-            active_set = {eid for eid in active}
+            active_set = set(active)
             visible = [e for e in visible if e.id in active_set]
         else:
             visible = []
@@ -1019,6 +1159,22 @@ async def create_portal_event(
     event_data["rrule"] = rrule_str
     event_data["tenant_id"] = current_human.tenant_id
     event_data["owner_id"] = current_human.id
+
+    # If the chosen venue requires approval, intercept the request: the event
+    # stays pending + unlisted until an admin decides. Submitting "published"
+    # for such a venue is not an error — we just downgrade the status.
+    requires_approval = False
+    if event_in.venue_id is not None:
+        from app.api.event_venue import crud as venue_crud
+
+        venue = venue_crud.event_venues_crud.get(db, event_in.venue_id)
+        if venue and venue.booking_mode == "approval_required":
+            requires_approval = True
+
+    if requires_approval:
+        event_data["status"] = EventStatus.PENDING_APPROVAL
+        event_data["visibility"] = EventVisibility.UNLISTED
+
     event = Events(**event_data)
 
     db.add(event)
@@ -1059,8 +1215,15 @@ async def update_portal_event(
             exclude_event_id=event.id,
         )
 
+    before = {
+        "title": event.title,
+        "start_time": event.start_time,
+        "end_time": event.end_time,
+        "venue_id": event.venue_id,
+    }
     updated = crud.events_crud.update(db, event, event_in)
-    _safe_gcal_sync_all(db, updated)
+    if _event_calendar_fields_changed(before, updated):
+        await _bump_and_dispatch_itip_update(db, updated)
     return _to_public(updated)
 
 

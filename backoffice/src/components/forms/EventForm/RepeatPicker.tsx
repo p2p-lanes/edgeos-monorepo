@@ -1,4 +1,5 @@
 import type { RecurrenceRule } from "@/client"
+import { DatePicker } from "@/components/ui/date-picker"
 import { Input } from "@/components/ui/input"
 import {
   Select,
@@ -61,7 +62,7 @@ export function parseRruleToState(
         : freq === "MONTHLY"
           ? "monthly"
           : "none"
-  const interval = kv.INTERVAL ? parseInt(kv.INTERVAL) || 1 : 1
+  const interval = kv.INTERVAL ? parseInt(kv.INTERVAL, 10) || 1 : 1
   const byDay =
     kv.BYDAY != null
       ? (kv.BYDAY.split(",")
@@ -75,7 +76,7 @@ export function parseRruleToState(
   let until = ""
   if (kv.COUNT) {
     end = "count"
-    count = parseInt(kv.COUNT) || count
+    count = parseInt(kv.COUNT, 10) || count
   } else if (kv.UNTIL) {
     end = "until"
     // Accept YYYYMMDDTHHMMSSZ or YYYYMMDD
@@ -162,7 +163,7 @@ export function RepeatPicker({ value, onChange }: RepeatPickerProps) {
               max={999}
               value={value.interval}
               onChange={(e) =>
-                update({ interval: parseInt(e.target.value) || 1 })
+                update({ interval: parseInt(e.target.value, 10) || 1 })
               }
               className="w-16"
             />
@@ -224,7 +225,7 @@ export function RepeatPicker({ value, onChange }: RepeatPickerProps) {
                 onChange={(e) =>
                   update({
                     end: "count",
-                    count: parseInt(e.target.value) || 1,
+                    count: parseInt(e.target.value, 10) || 1,
                   })
                 }
                 className="h-7 w-20"
@@ -239,13 +240,11 @@ export function RepeatPicker({ value, onChange }: RepeatPickerProps) {
                 onChange={() => update({ end: "until" })}
               />
               On{" "}
-              <Input
-                type="date"
+              <DatePicker
                 value={value.until}
-                onChange={(e) =>
-                  update({ end: "until", until: e.target.value })
-                }
-                className="h-7 w-36"
+                onChange={(v) => update({ end: "until", until: v })}
+                className="h-7 w-40"
+                placeholder="Pick date"
               />
             </label>
           </div>

@@ -176,7 +176,9 @@ export function ExceptionsEditor({ venueId }: ExceptionsEditorProps) {
                       {formatRange(exc)}
                     </div>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Badge variant={exc.is_closed ? "destructive" : "secondary"}>
+                      <Badge
+                        variant={exc.is_closed ? "destructive" : "secondary"}
+                      >
                         {exc.is_closed ? "Closed" : "Open"}
                       </Badge>
                       {exc.reason && <span>{exc.reason}</span>}

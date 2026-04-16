@@ -1,14 +1,16 @@
 "use client"
 
-import { useQuery } from "@tanstack/react-query"
+import { useQueries, useQuery } from "@tanstack/react-query"
 import { ArrowLeft, Clock, Layers, MapPin } from "lucide-react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 
 import {
   ApiError,
-  TracksService,
   type EventPublic,
+  type EventVenuePublic,
+  EventVenuesService,
+  TracksService,
 } from "@/client"
 import { Badge } from "@/components/ui/badge"
 import { useCityProvider } from "@/providers/cityProvider"
@@ -30,7 +32,10 @@ export default function TrackDetailPage() {
     queryFn: () => TracksService.getPortalTrack({ trackId: params.trackId }),
     enabled: !!params.trackId,
     retry: (failureCount, err) => {
-      if (err instanceof ApiError && (err.status === 404 || err.status === 403)) {
+      if (
+        err instanceof ApiError &&
+        (err.status === 404 || err.status === 403)
+      ) {
         return false
       }
       return failureCount < 2
@@ -48,6 +53,28 @@ export default function TrackDetailPage() {
   })
 
   const events: EventPublic[] = eventsData?.results ?? []
+
+  // Batch-fetch venue details for events that reference a venue, so each
+  // card can show the real location (not just the event.kind placeholder).
+  // Matches the pattern used on the main events list page.
+  const venueIds = Array.from(
+    new Set(
+      events
+        .map((e) => e.venue_id)
+        .filter((v): v is string => typeof v === "string" && v.length > 0),
+    ),
+  )
+  const venueQueries = useQueries({
+    queries: venueIds.map((venueId) => ({
+      queryKey: ["portal-event-venue", venueId],
+      queryFn: () => EventVenuesService.getVenue({ venueId }),
+      staleTime: 5 * 60 * 1000,
+    })),
+  })
+  const venueMap = new Map<string, EventVenuePublic>()
+  venueQueries.forEach((q, idx) => {
+    if (q.data) venueMap.set(venueIds[idx], q.data)
+  })
 
   if (trackLoading) {
     return (
@@ -150,30 +177,36 @@ export default function TrackDetailPage() {
                   <div className="flex-1 h-px bg-border" />
                 </div>
                 <div className="space-y-2 pl-5 border-l-2 border-border">
-                  {dayEvents.map((event) => (
-                    <Link
-                      key={event.id}
-                      href={`/portal/${city?.slug}/events/${event.id}`}
-                      className="block rounded-xl border bg-card p-3 hover:shadow-md transition-shadow"
-                    >
-                      <h4 className="text-sm font-medium">{event.title}</h4>
-                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
-                        <Clock className="h-3 w-3" />
-                        <span>
-                          {formatTime(event.start_time)} –{" "}
-                          {formatTime(event.end_time)}
-                        </span>
-                      </div>
-                      {event.kind && (
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
-                          <MapPin className="h-3 w-3" />
-                          <span className="truncate capitalize">
-                            {event.kind}
+                  {dayEvents.map((event) => {
+                    const venue = event.venue_id
+                      ? venueMap.get(event.venue_id)
+                      : undefined
+                    return (
+                      <Link
+                        key={event.id}
+                        href={`/portal/${city?.slug}/events/${event.id}`}
+                        className="block rounded-xl border bg-card p-3 hover:shadow-md transition-shadow"
+                      >
+                        <h4 className="text-sm font-medium">{event.title}</h4>
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
+                          <Clock className="h-3 w-3" />
+                          <span>
+                            {formatTime(event.start_time)} –{" "}
+                            {formatTime(event.end_time)}
                           </span>
                         </div>
-                      )}
-                    </Link>
-                  ))}
+                        {venue && (
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                            <MapPin className="h-3 w-3" />
+                            <span className="truncate">
+                              {venue.title}
+                              {venue.location ? ` · ${venue.location}` : ""}
+                            </span>
+                          </div>
+                        )}
+                      </Link>
+                    )
+                  })}
                 </div>
               </div>
             ))}

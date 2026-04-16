@@ -79,12 +79,6 @@ from app.api.form_section.schemas import (
     FormSectionUpdate,
 )
 
-# Google Calendar sync
-from app.api.google_calendar.models import (
-    EventGcalSync,
-    HumanGoogleCredentials,
-)
-
 # Group models
 from app.api.group.models import (
     GroupLeaders,
@@ -253,7 +247,4 @@ __all__ = [
     "TrackCreate",
     "TrackPublic",
     "TrackUpdate",
-    # Google Calendar sync
-    "HumanGoogleCredentials",
-    "EventGcalSync",
 ]

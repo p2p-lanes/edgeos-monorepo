@@ -28,6 +28,12 @@ const HeaderBar = () => {
   const pathsToDisplay =
     pathSegments.length > 0 ? pathSegments : ["application"]
 
+  // Build cumulative href per segment so each breadcrumb links back to its
+  // own level. Anchored at `/portal/{slug}` when a slug is present;
+  // otherwise we hand the raw path through and let the segment render as
+  // a non-clickable label via `href=undefined`.
+  const base = city?.slug ? `/portal/${city.slug}` : null
+
   return (
     <header className="flex h-14 shrink-0 items-center gap-4 border-b bg-white px-6 text-nav-text">
       <SidebarTrigger />
@@ -41,18 +47,27 @@ const HeaderBar = () => {
             </BreadcrumbLink>
           </BreadcrumbItem>
 
-          {pathsToDisplay.map((path) => (
-            <Fragment key={path}>
-              <BreadcrumbSeparator>
-                <ChevronRight className="h-4 w-4" />
-              </BreadcrumbSeparator>
-              <BreadcrumbSegment
-                path={path}
-                isLoading={isLoading}
-                groupMapping={groupMapping}
-              />
-            </Fragment>
-          ))}
+          {pathsToDisplay.map((path, idx) => {
+            const isCurrent = idx === pathsToDisplay.length - 1
+            const href =
+              base != null
+                ? `${base}/${pathsToDisplay.slice(0, idx + 1).join("/")}`
+                : undefined
+            return (
+              <Fragment key={path}>
+                <BreadcrumbSeparator>
+                  <ChevronRight className="h-4 w-4" />
+                </BreadcrumbSeparator>
+                <BreadcrumbSegment
+                  path={path}
+                  href={href}
+                  isCurrent={isCurrent}
+                  isLoading={isLoading}
+                  groupMapping={groupMapping}
+                />
+              </Fragment>
+            )
+          })}
         </BreadcrumbList>
       </Breadcrumb>
     </header>

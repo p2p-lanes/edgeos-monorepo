@@ -115,19 +115,5 @@ class Settings(BaseSettings):
             return "https://api.simplefi.tech"
         return "https://apidev.simplefi.tech"
 
-    # Google Calendar OAuth (optional — feature degrades gracefully when unset)
-    GOOGLE_OAUTH_CLIENT_ID: str | None = None
-    GOOGLE_OAUTH_CLIENT_SECRET: str | None = None
-    GOOGLE_OAUTH_REDIRECT_URI: str | None = None
-
-    @computed_field
-    @property
-    def google_calendar_enabled(self) -> bool:
-        return bool(
-            self.GOOGLE_OAUTH_CLIENT_ID
-            and self.GOOGLE_OAUTH_CLIENT_SECRET
-            and self.GOOGLE_OAUTH_REDIRECT_URI
-        )
-
 
 settings = Settings()

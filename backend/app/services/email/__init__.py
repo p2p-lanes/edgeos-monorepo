@@ -14,6 +14,9 @@ from app.services.email.templates import (
     ApplicationRejectedContext,
     EditPassesConfirmedContext,
     EmailTemplates,
+    EventApprovalApprovedContext,
+    EventApprovalRejectedContext,
+    EventInvitationContext,
     LoginCodeHumanContext,
     LoginCodeUserContext,
     PaymentAttendeeItem,
@@ -42,6 +45,10 @@ __all__ = [
     "EditPassesConfirmedContext",
     "PaymentProductItem",
     "PaymentAttendeeItem",
+    # Event contexts
+    "EventInvitationContext",
+    "EventApprovalApprovedContext",
+    "EventApprovalRejectedContext",
     # Helpers
     "compute_order_summary",
     "EmailAttachment",

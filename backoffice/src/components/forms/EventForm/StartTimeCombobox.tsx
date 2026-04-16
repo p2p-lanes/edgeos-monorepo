@@ -90,11 +90,6 @@ export function StartTimeCombobox({
           </PopoverContent>
         )}
       </Popover>
-      {!fits && value && (
-        <p className="mt-1 text-xs text-destructive">
-          Not available — overlaps busy
-        </p>
-      )}
     </div>
   )
 }

@@ -5,6 +5,8 @@ import {
   CheckCircle,
   Layers,
   List,
+  MapPin,
+  Pencil,
   Plus,
   Search,
 } from "lucide-react"
@@ -21,6 +23,8 @@ interface EventsToolbarProps {
   onSearchChange: (value: string) => void
   rsvpedOnly: boolean
   onRsvpedOnlyChange: (value: boolean) => void
+  mineOnly: boolean
+  onMineOnlyChange: (value: boolean) => void
   canCreate: boolean
 }
 
@@ -37,6 +41,8 @@ export function EventsToolbar({
   onSearchChange,
   rsvpedOnly,
   onRsvpedOnlyChange,
+  mineOnly,
+  onMineOnlyChange,
   canCreate,
 }: EventsToolbarProps) {
   return (
@@ -59,6 +65,23 @@ export function EventsToolbar({
       >
         <CheckCircle className="mr-2 h-4 w-4" />
         My RSVPs
+      </Button>
+
+      <Button
+        variant={mineOnly ? "default" : "outline"}
+        size="sm"
+        onClick={() => onMineOnlyChange(!mineOnly)}
+        aria-pressed={mineOnly}
+      >
+        <Pencil className="mr-2 h-4 w-4" />
+        My events
+      </Button>
+
+      <Button variant="outline" size="sm" asChild>
+        <Link href={`/portal/${slug}/events/venues`}>
+          <MapPin className="mr-2 h-4 w-4" />
+          Venues
+        </Link>
       </Button>
 
       <Button variant="outline" size="sm" asChild>
@@ -92,10 +115,7 @@ export function EventsToolbar({
           title="Calendar view"
           aria-pressed={view === "calendar"}
           onClick={() => onViewChange("calendar")}
-          className={cn(
-            "h-7 rounded-sm",
-            view === "calendar" && "shadow-none",
-          )}
+          className={cn("h-7 rounded-sm", view === "calendar" && "shadow-none")}
         >
           <CalendarDays
             className={cn("h-4 w-4", view === "calendar" && "mr-1.5")}

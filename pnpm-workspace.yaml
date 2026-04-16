@@ -1,6 +1,7 @@
 packages:
   - backoffice
   - portal
+  - e2e
   - packages/shared-form-ui
   - packages/shared-events
 

@@ -33,7 +33,5 @@ export function AvailabilityIndicator({
       </p>
     )
   }
-  return (
-    <p className="text-xs text-muted-foreground">{availability.message}</p>
-  )
+  return <p className="text-xs text-muted-foreground">{availability.message}</p>
 }

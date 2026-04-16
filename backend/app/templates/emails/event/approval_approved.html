@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Your event "{{ event_title }}" was approved{% endblock %}
+
+{% block content %}
+<h1>Your event was approved</h1>
+
+<p>Hi {{ first_name or "there" }},</p>
+
+<p>
+    Good news — your event <strong>{{ event_title }}</strong>{% if popup_name %}
+    at <strong>{{ popup_name }}</strong>{% endif %} was approved and is now
+    live.
+</p>
+
+<div style="background-color: #f0f9f0; border-left: 4px solid #28a745; border-radius: 4px; padding: 16px; margin: 20px 0;">
+    <table style="width: 100%; border-collapse: collapse;">
+        {% if event_when %}
+        <tr>
+            <td style="padding: 6px 0; color: #666;">When</td>
+            <td style="padding: 6px 0; font-weight: 600;">{{ event_when }}</td>
+        </tr>
+        {% endif %}
+        {% if venue_title %}
+        <tr>
+            <td style="padding: 6px 0; color: #666;">Venue</td>
+            <td style="padding: 6px 0; font-weight: 600;">{{ venue_title }}</td>
+        </tr>
+        {% endif %}
+    </table>
+</div>
+
+{% if reason %}
+<p><strong>Note from the admin:</strong> {{ reason }}</p>
+{% endif %}
+
+{% if event_url %}
+<p class="text-center">
+    <a href="{{ event_url }}" class="button">View event</a>
+</p>
+{% endif %}
+{% endblock %}

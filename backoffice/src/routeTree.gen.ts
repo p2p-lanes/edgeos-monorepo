@@ -39,6 +39,7 @@ import { Route as LayoutEventsVenuesNewRouteImport } from './routes/_layout/even
 import { Route as LayoutEventsVenuesEditRouteImport } from './routes/_layout/events/venues-edit'
 import { Route as LayoutEventsVenuesRouteImport } from './routes/_layout/events/venues'
 import { Route as LayoutEventsSettingsRouteImport } from './routes/_layout/events/settings'
+import { Route as LayoutEventsPropertiesRouteImport } from './routes/_layout/events/properties'
 import { Route as LayoutEventsNewRouteImport } from './routes/_layout/events/new'
 import { Route as LayoutCouponsNewRouteImport } from './routes/_layout/coupons/new'
 import { Route as LayoutApplicationsReviewQueueRouteImport } from './routes/_layout/applications/review-queue'
@@ -214,6 +215,11 @@ const LayoutEventsSettingsRoute = LayoutEventsSettingsRouteImport.update({
   path: '/events/settings',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutEventsPropertiesRoute = LayoutEventsPropertiesRouteImport.update({
+  id: '/events/properties',
+  path: '/events/properties',
+  getParentRoute: () => LayoutRoute,
+} as any)
 const LayoutEventsNewRoute = LayoutEventsNewRouteImport.update({
   id: '/events/new',
   path: '/events/new',
@@ -339,6 +345,7 @@ export interface FileRoutesByFullPath {
   '/applications/review-queue': typeof LayoutApplicationsReviewQueueRoute
   '/coupons/new': typeof LayoutCouponsNewRoute
   '/events/new': typeof LayoutEventsNewRoute
+  '/events/properties': typeof LayoutEventsPropertiesRoute
   '/events/settings': typeof LayoutEventsSettingsRoute
   '/events/venues': typeof LayoutEventsVenuesRoute
   '/events/venues-edit': typeof LayoutEventsVenuesEditRoute
@@ -391,6 +398,7 @@ export interface FileRoutesByTo {
   '/applications/review-queue': typeof LayoutApplicationsReviewQueueRoute
   '/coupons/new': typeof LayoutCouponsNewRoute
   '/events/new': typeof LayoutEventsNewRoute
+  '/events/properties': typeof LayoutEventsPropertiesRoute
   '/events/settings': typeof LayoutEventsSettingsRoute
   '/events/venues': typeof LayoutEventsVenuesRoute
   '/events/venues-edit': typeof LayoutEventsVenuesEditRoute
@@ -445,6 +453,7 @@ export interface FileRoutesById {
   '/_layout/applications/review-queue': typeof LayoutApplicationsReviewQueueRoute
   '/_layout/coupons/new': typeof LayoutCouponsNewRoute
   '/_layout/events/new': typeof LayoutEventsNewRoute
+  '/_layout/events/properties': typeof LayoutEventsPropertiesRoute
   '/_layout/events/settings': typeof LayoutEventsSettingsRoute
   '/_layout/events/venues': typeof LayoutEventsVenuesRoute
   '/_layout/events/venues-edit': typeof LayoutEventsVenuesEditRoute
@@ -499,6 +508,7 @@ export interface FileRouteTypes {
     | '/applications/review-queue'
     | '/coupons/new'
     | '/events/new'
+    | '/events/properties'
     | '/events/settings'
     | '/events/venues'
     | '/events/venues-edit'
@@ -551,6 +561,7 @@ export interface FileRouteTypes {
     | '/applications/review-queue'
     | '/coupons/new'
     | '/events/new'
+    | '/events/properties'
     | '/events/settings'
     | '/events/venues'
     | '/events/venues-edit'
@@ -604,6 +615,7 @@ export interface FileRouteTypes {
     | '/_layout/applications/review-queue'
     | '/_layout/coupons/new'
     | '/_layout/events/new'
+    | '/_layout/events/properties'
     | '/_layout/events/settings'
     | '/_layout/events/venues'
     | '/_layout/events/venues-edit'
@@ -861,6 +873,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutEventsSettingsRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/events/properties': {
+      id: '/_layout/events/properties'
+      path: '/events/properties'
+      fullPath: '/events/properties'
+      preLoaderRoute: typeof LayoutEventsPropertiesRouteImport
+      parentRoute: typeof LayoutRoute
+    }
     '/_layout/events/new': {
       id: '/_layout/events/new'
       path: '/events/new'
@@ -1023,6 +1042,7 @@ interface LayoutRouteChildren {
   LayoutApplicationsReviewQueueRoute: typeof LayoutApplicationsReviewQueueRoute
   LayoutCouponsNewRoute: typeof LayoutCouponsNewRoute
   LayoutEventsNewRoute: typeof LayoutEventsNewRoute
+  LayoutEventsPropertiesRoute: typeof LayoutEventsPropertiesRoute
   LayoutEventsSettingsRoute: typeof LayoutEventsSettingsRoute
   LayoutEventsVenuesRoute: typeof LayoutEventsVenuesRoute
   LayoutEventsVenuesEditRoute: typeof LayoutEventsVenuesEditRoute
@@ -1075,6 +1095,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutApplicationsReviewQueueRoute: LayoutApplicationsReviewQueueRoute,
   LayoutCouponsNewRoute: LayoutCouponsNewRoute,
   LayoutEventsNewRoute: LayoutEventsNewRoute,
+  LayoutEventsPropertiesRoute: LayoutEventsPropertiesRoute,
   LayoutEventsSettingsRoute: LayoutEventsSettingsRoute,
   LayoutEventsVenuesRoute: LayoutEventsVenuesRoute,
   LayoutEventsVenuesEditRoute: LayoutEventsVenuesEditRoute,

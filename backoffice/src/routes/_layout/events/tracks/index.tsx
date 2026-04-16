@@ -6,13 +6,7 @@ import {
 } from "@tanstack/react-query"
 import { createFileRoute, Link } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
-import {
-  EllipsisVertical,
-  ListTree,
-  Pencil,
-  Plus,
-  Trash2,
-} from "lucide-react"
+import { EllipsisVertical, ListTree, Pencil, Plus, Trash2 } from "lucide-react"
 import { Suspense, useState } from "react"
 
 import { type TrackPublic, TracksService } from "@/client"
@@ -132,9 +126,7 @@ const columns: ColumnDef<TrackPublic>[] = [
   {
     accessorKey: "name",
     header: ({ column }) => <SortableHeader label="Name" column={column} />,
-    cell: ({ row }) => (
-      <span className="font-medium">{row.original.name}</span>
-    ),
+    cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
   },
   {
     accessorKey: "topic",

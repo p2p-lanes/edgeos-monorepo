@@ -2998,7 +2998,7 @@ export const EmailTemplatePublicSchema = {
 
 export const EmailTemplateTypeSchema = {
     type: 'string',
-    enum: ['login_code_user', 'login_code_human', 'application_received', 'application_accepted', 'application_rejected', 'application_accepted_with_discount', 'application_accepted_with_incentive', 'application_accepted_scholarship_rejected', 'payment_confirmed', 'abandoned_cart', 'edit_passes_confirmed'],
+    enum: ['login_code_user', 'login_code_human', 'application_received', 'application_accepted', 'application_rejected', 'application_accepted_with_discount', 'application_accepted_with_incentive', 'application_accepted_scholarship_rejected', 'payment_confirmed', 'abandoned_cart', 'edit_passes_confirmed', 'event_invitation', 'event_approval_approved', 'event_approval_rejected'],
     title: 'EmailTemplateType'
 } as const;
 
@@ -3073,6 +3073,24 @@ export const EnrichedDashboardStatsSchema = {
     required: ['key_metrics', 'cumulative_trends', 'revenue_breakdown', 'distribution', 'application_funnel', 'applications', 'attendees', 'payments'],
     title: 'EnrichedDashboardStats',
     description: 'Full enriched dashboard response.'
+} as const;
+
+export const EventApprovalPayloadSchema = {
+    properties: {
+        reason: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Reason'
+        }
+    },
+    type: 'object',
+    title: 'EventApprovalPayload'
 } as const;
 
 export const EventAvailabilityCheckSchema = {
@@ -3897,7 +3915,7 @@ export const EventSettingsUpdateSchema = {
 
 export const EventStatusSchema = {
     type: 'string',
-    enum: ['draft', 'published', 'cancelled'],
+    enum: ['draft', 'published', 'cancelled', 'pending_approval', 'rejected'],
     title: 'EventStatus'
 } as const;
 
@@ -5044,61 +5062,6 @@ export const FormSectionUpdateSchema = {
     },
     type: 'object',
     title: 'FormSectionUpdate'
-} as const;
-
-export const GoogleAuthUrlResponseSchema = {
-    properties: {
-        url: {
-            type: 'string',
-            title: 'Url'
-        },
-        state: {
-            type: 'string',
-            title: 'State'
-        }
-    },
-    type: 'object',
-    required: ['url', 'state'],
-    title: 'GoogleAuthUrlResponse'
-} as const;
-
-export const GoogleConnectionStatusSchema = {
-    properties: {
-        configured: {
-            type: 'boolean',
-            title: 'Configured'
-        },
-        connected: {
-            type: 'boolean',
-            title: 'Connected'
-        },
-        calendar_id: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Calendar Id'
-        },
-        connected_at: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'date-time'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Connected At'
-        }
-    },
-    type: 'object',
-    required: ['configured', 'connected'],
-    title: 'GoogleConnectionStatus'
 } as const;
 
 export const GroupAdminUpdateSchema = {

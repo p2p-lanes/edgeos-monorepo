@@ -13,6 +13,12 @@ class EventStatus(str, Enum):
     DRAFT = "draft"
     PUBLISHED = "published"
     CANCELLED = "cancelled"
+    # The event was created against a venue that requires admin approval and
+    # is waiting for a decision. While pending the event stays unlisted and
+    # cannot be published until an admin approves the request.
+    PENDING_APPROVAL = "pending_approval"
+    # Admin rejected the event request. Kept for audit instead of deleting.
+    REJECTED = "rejected"
 
 
 class EventVisibility(str, Enum):
@@ -92,6 +98,10 @@ class EventBase(SQLModel):
         default_factory=list,
         sa_column=Column(JSONB, nullable=False, server_default="[]"),
     )
+    # iTIP SEQUENCE (RFC 5546). Bumps on material changes (title, start, end,
+    # venue, cancel) so updated invitation emails replace the prior calendar
+    # entry in Gmail / Apple Calendar / Outlook instead of creating a new one.
+    ical_sequence: int = Field(default=0, ge=0)
     created_at: datetime = Field(
         default_factory=datetime.utcnow,
         sa_type=DateTime(timezone=True),

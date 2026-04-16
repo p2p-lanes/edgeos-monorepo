@@ -1,21 +1,11 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { Clock } from "lucide-react"
-import { useEffect, useState } from "react"
 
-import {
-  EventVenuesService,
-  type VenueWeeklyHourInput,
-  type VenueWeeklyHourRef,
-} from "@/client"
+import type { VenueWeeklyHourInput, VenueWeeklyHourRef } from "@/client"
 import { InlineSection } from "@/components/ui/inline-form"
 import { Label } from "@/components/ui/label"
-import { LoadingButton } from "@/components/ui/loading-button"
 import { Switch } from "@/components/ui/switch"
 import { TimePicker } from "@/components/ui/time-picker"
-import useCustomToast from "@/hooks/useCustomToast"
-import { createErrorHandler } from "@/utils"
 
-// Days of week (backend: 0 = Monday ... 6 = Sunday)
 const DAYS_OF_WEEK: { value: number; label: string; short: string }[] = [
   { value: 0, label: "Monday", short: "Mon" },
   { value: 1, label: "Tuesday", short: "Tue" },
@@ -26,12 +16,7 @@ const DAYS_OF_WEEK: { value: number; label: string; short: string }[] = [
   { value: 6, label: "Sunday", short: "Sun" },
 ]
 
-interface WeeklyHoursEditorProps {
-  venueId: string
-  initial: VenueWeeklyHourRef[] | undefined
-}
-
-function buildInitialWeek(
+export function buildInitialWeeklyHours(
   initial: VenueWeeklyHourRef[] | undefined,
 ): VenueWeeklyHourInput[] {
   return DAYS_OF_WEEK.map((day) => {
@@ -53,44 +38,22 @@ function buildInitialWeek(
   })
 }
 
-export function WeeklyHoursEditor({ venueId, initial }: WeeklyHoursEditorProps) {
-  const queryClient = useQueryClient()
-  const { showErrorToast, showSuccessToast } = useCustomToast()
-  const [hours, setHours] = useState<VenueWeeklyHourInput[]>(() =>
-    buildInitialWeek(initial),
-  )
+interface WeeklyHoursEditorProps {
+  value: VenueWeeklyHourInput[]
+  onChange: (hours: VenueWeeklyHourInput[]) => void
+}
 
-  useEffect(() => {
-    setHours(buildInitialWeek(initial))
-  }, [initial])
-
-  const saveMutation = useMutation({
-    mutationFn: () =>
-      EventVenuesService.setWeeklyHours({
-        venueId,
-        requestBody: { hours },
-      }),
-    onSuccess: () => {
-      showSuccessToast("Weekly hours saved")
-      queryClient.invalidateQueries({ queryKey: ["event-venues", venueId] })
-    },
-    onError: createErrorHandler(showErrorToast),
-  })
-
-  const updateDay = (
-    day: number,
-    patch: Partial<VenueWeeklyHourInput>,
-  ) => {
-    setHours((prev) =>
-      prev.map((h) => (h.day_of_week === day ? { ...h, ...patch } : h)),
-    )
+export function WeeklyHoursEditor({ value, onChange }: WeeklyHoursEditorProps) {
+  const updateDay = (day: number, patch: Partial<VenueWeeklyHourInput>) => {
+    onChange(value.map((h) => (h.day_of_week === day ? { ...h, ...patch } : h)))
   }
 
   return (
     <InlineSection title="Weekly hours">
       <div className="space-y-2 py-3">
         {DAYS_OF_WEEK.map((day) => {
-          const entry = hours.find((h) => h.day_of_week === day.value)!
+          const entry = value.find((h) => h.day_of_week === day.value)
+          if (!entry) return null
           return (
             <div
               key={day.value}
@@ -131,16 +94,6 @@ export function WeeklyHoursEditor({ venueId, initial }: WeeklyHoursEditorProps) 
             </div>
           )
         })}
-        <div className="flex justify-end pt-2">
-          <LoadingButton
-            type="button"
-            size="sm"
-            loading={saveMutation.isPending}
-            onClick={() => saveMutation.mutate()}
-          >
-            Save weekly hours
-          </LoadingButton>
-        </div>
       </div>
     </InlineSection>
   )

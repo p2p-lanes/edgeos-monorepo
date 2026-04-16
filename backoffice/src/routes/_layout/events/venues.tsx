@@ -6,14 +6,15 @@ import {
 } from "@tanstack/react-query"
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
-import { EllipsisVertical, MapPin, Pencil, Plus, Trash2 } from "lucide-react"
-import { Suspense, useState } from "react"
+import { Check, CheckCircle2, MapPin, Pencil, Plus, Trash2 } from "lucide-react"
+import { Suspense, useMemo, useState } from "react"
 
-import { EventVenuesService, type EventVenuePublic } from "@/client"
+import { type EventVenuePublic, EventVenuesService } from "@/client"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -24,12 +25,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { LoadingButton } from "@/components/ui/loading-button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
@@ -59,10 +54,32 @@ const columns: ColumnDef<EventVenuePublic>[] = [
     ),
   },
   {
+    accessorKey: "status",
+    header: "Status",
+    cell: ({ row }) =>
+      row.original.status === "pending" ? (
+        <Badge
+          variant="outline"
+          className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+        >
+          Pending
+        </Badge>
+      ) : (
+        <Badge
+          variant="outline"
+          className="border-green-500/40 bg-green-500/10 text-green-700 dark:text-green-400"
+        >
+          Active
+        </Badge>
+      ),
+  },
+  {
     accessorKey: "location",
     header: "Location",
     cell: ({ row }) => (
-      <span className="text-muted-foreground">{row.original.location || "—"}</span>
+      <span className="text-muted-foreground">
+        {row.original.location || "—"}
+      </span>
     ),
   },
   {
@@ -79,14 +96,13 @@ const columns: ColumnDef<EventVenuePublic>[] = [
     header: () => <span className="sr-only">Actions</span>,
     cell: ({ row }) => (
       <div className="flex justify-end">
-        <VenueActionsMenu venue={row.original} />
+        <VenueRowActions venue={row.original} />
       </div>
     ),
   },
 ]
 
-function VenueActionsMenu({ venue }: { venue: EventVenuePublic }) {
-  const [open, setOpen] = useState(false)
+function VenueRowActions({ venue }: { venue: EventVenuePublic }) {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -97,45 +113,65 @@ function VenueActionsMenu({ venue }: { venue: EventVenuePublic }) {
     onSuccess: () => {
       showSuccessToast("Venue deleted successfully")
       setDeleteOpen(false)
-      setOpen(false)
     },
     onError: createErrorHandler(showErrorToast),
     onSettled: () =>
       queryClient.invalidateQueries({ queryKey: ["event-venues"] }),
   })
 
+  const approveMutation = useMutation({
+    mutationFn: () =>
+      EventVenuesService.updateVenue({
+        venueId: venue.id,
+        requestBody: { status: "active" },
+      }),
+    onSuccess: () => showSuccessToast("Venue approved"),
+    onError: createErrorHandler(showErrorToast),
+    onSettled: () =>
+      queryClient.invalidateQueries({ queryKey: ["event-venues"] }),
+  })
+
+  const isPending = venue.status === "pending"
+
   return (
     <>
-      <DropdownMenu open={open} onOpenChange={setOpen}>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" aria-label="Venue actions">
-            <EllipsisVertical className="h-4 w-4" />
+      <div className="flex items-center justify-end gap-1">
+        {isPending && (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={`Approve ${venue.title || "venue"}`}
+            title="Approve"
+            disabled={approveMutation.isPending}
+            onClick={() => approveMutation.mutate()}
+            className="text-muted-foreground hover:text-green-600"
+          >
+            <Check className="h-4 w-4" />
           </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem
-            onSelect={(e) => {
-              e.preventDefault()
-              setOpen(false)
-              navigate({
-                to: "/events/venues-edit",
-                search: { venueId: venue.id },
-              })
-            }}
-          >
-            <Pencil className="mr-2 h-4 w-4" />
-            Edit
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            variant="destructive"
-            onSelect={(e) => e.preventDefault()}
-            onClick={() => setDeleteOpen(true)}
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Delete
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+        )}
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={`Edit ${venue.title || "venue"}`}
+          onClick={() =>
+            navigate({
+              to: "/events/venues-edit",
+              search: { venueId: venue.id },
+            })
+          }
+        >
+          <Pencil className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={`Delete ${venue.title || "venue"}`}
+          onClick={() => setDeleteOpen(true)}
+          className="text-muted-foreground hover:text-destructive"
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </div>
 
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent>
@@ -172,11 +208,17 @@ function VenuesTableContent() {
     searchParams,
     "/events/venues",
   )
+  const [pendingOnly, setPendingOnly] = useState(false)
 
   const { data: venues } = useQuery({
     queryKey: [
       "event-venues",
-      { popupId: selectedPopupId, page: pagination.pageIndex, pageSize: pagination.pageSize, search },
+      {
+        popupId: selectedPopupId,
+        page: pagination.pageIndex,
+        pageSize: pagination.pageSize,
+        search,
+      },
     ],
     queryFn: () =>
       EventVenuesService.listVenues({
@@ -189,30 +231,72 @@ function VenuesTableContent() {
     placeholderData: keepPreviousData,
   })
 
+  // Client-side status filter + pending counter. The list endpoint doesn't
+  // accept a ``status`` query yet — if pending venues grow into the
+  // hundreds we should push this to the backend.
+  const rows = venues?.results ?? []
+  const pendingCount = useMemo(
+    () => rows.filter((v) => v.status === "pending").length,
+    [rows],
+  )
+  const filtered = useMemo(
+    () => (pendingOnly ? rows.filter((v) => v.status === "pending") : rows),
+    [rows, pendingOnly],
+  )
+
   if (!venues) return <Skeleton className="h-64 w-full" />
 
   return (
-    <DataTable
-      columns={columns}
-      data={venues.results}
-      searchPlaceholder="Search venues..."
-      searchValue={search}
-      onSearchChange={setSearch}
-      serverPagination={{
-        total: venues.paging.total,
-        pagination: pagination,
-        onPaginationChange: setPagination,
-      }}
-      emptyState={
-        !search ? (
-          <EmptyState
-            icon={MapPin}
-            title="No venues yet"
-            description="Venues will appear here when created."
-          />
-        ) : undefined
-      }
-    />
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          variant={pendingOnly ? "default" : "outline"}
+          size="sm"
+          onClick={() => setPendingOnly((v) => !v)}
+          aria-pressed={pendingOnly}
+        >
+          <CheckCircle2 className="mr-2 h-4 w-4" />
+          Pending approval
+          {!pendingOnly && pendingCount > 0 && (
+            <Badge variant="secondary" className="ml-2">
+              {pendingCount}
+            </Badge>
+          )}
+        </Button>
+      </div>
+
+      <DataTable
+        columns={columns}
+        data={filtered}
+        searchPlaceholder="Search venues..."
+        searchValue={search}
+        onSearchChange={setSearch}
+        serverPagination={
+          // When filtering client-side, server pagination stops making
+          // sense — fall back to unpaged rendering until pendingOnly is off.
+          pendingOnly
+            ? undefined
+            : {
+                total: venues.paging.total,
+                pagination: pagination,
+                onPaginationChange: setPagination,
+              }
+        }
+        emptyState={
+          !search ? (
+            <EmptyState
+              icon={MapPin}
+              title={pendingOnly ? "No pending venues" : "No venues yet"}
+              description={
+                pendingOnly
+                  ? "Venues awaiting approval will appear here."
+                  : "Venues will appear here when created."
+              }
+            />
+          ) : undefined
+        }
+      />
+    </div>
   )
 }
 

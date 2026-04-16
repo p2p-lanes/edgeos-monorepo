@@ -9,15 +9,17 @@ import type { ColumnDef } from "@tanstack/react-table"
 import { format } from "date-fns"
 import {
   CalendarDays,
+  CheckCircle2,
   EllipsisVertical,
   Pencil,
   Plus,
   Repeat,
   Trash2,
+  XCircle,
 } from "lucide-react"
 import { Suspense, useMemo, useState } from "react"
 
-import { EventsService, EventVenuesService, type EventPublic } from "@/client"
+import { type EventPublic, EventsService, EventVenuesService } from "@/client"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
@@ -70,6 +72,13 @@ const statusVariant: Record<string, "default" | "secondary" | "destructive"> = {
   published: "default",
   draft: "secondary",
   cancelled: "destructive",
+  pending_approval: "secondary",
+  rejected: "destructive",
+}
+
+const statusLabel: Record<string, string> = {
+  pending_approval: "Pending approval",
+  rejected: "Rejected",
 }
 
 function parseOccurrenceId(
@@ -90,12 +99,49 @@ function EventActionsMenu({ event }: { event: EventPublic }) {
   const [open, setOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [editChoiceOpen, setEditChoiceOpen] = useState(false)
+  const [decisionOpen, setDecisionOpen] = useState<null | "approve" | "reject">(
+    null,
+  )
+  const [decisionReason, setDecisionReason] = useState("")
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const { showSuccessToast, showErrorToast } = useCustomToast()
 
   const occurrenceRef = parseOccurrenceId(event.occurrence_id)
   const isOccurrence = occurrenceRef !== null
+  const isPendingApproval = event.status === "pending_approval"
+
+  const approveMutation = useMutation({
+    mutationFn: () =>
+      EventsService.approveEvent({
+        eventId: event.id,
+        requestBody: { reason: decisionReason.trim() || null },
+      }),
+    onSuccess: () => {
+      showSuccessToast("Event approved")
+      setDecisionOpen(null)
+      setDecisionReason("")
+      setOpen(false)
+    },
+    onError: createErrorHandler(showErrorToast),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["events"] }),
+  })
+
+  const rejectMutation = useMutation({
+    mutationFn: () =>
+      EventsService.rejectEvent({
+        eventId: event.id,
+        requestBody: { reason: decisionReason.trim() || null },
+      }),
+    onSuccess: () => {
+      showSuccessToast("Event rejected")
+      setDecisionOpen(null)
+      setDecisionReason("")
+      setOpen(false)
+    },
+    onError: createErrorHandler(showErrorToast),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["events"] }),
+  })
 
   const detachMutation = useMutation({
     mutationFn: async () => {
@@ -136,8 +182,7 @@ function EventActionsMenu({ event }: { event: EventPublic }) {
   })
 
   const deleteMutation = useMutation({
-    mutationFn: () =>
-      EventsService.deleteEvent({ eventId: event.id }),
+    mutationFn: () => EventsService.deleteEvent({ eventId: event.id }),
     onSuccess: () => {
       showSuccessToast("Event deleted successfully")
       setDeleteOpen(false)
@@ -167,6 +212,30 @@ function EventActionsMenu({ event }: { event: EventPublic }) {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
+          {isPendingApproval && (
+            <>
+              <DropdownMenuItem
+                onSelect={(e) => e.preventDefault()}
+                onClick={() => {
+                  setDecisionOpen("approve")
+                  setDecisionReason("")
+                }}
+              >
+                <CheckCircle2 className="mr-2 h-4 w-4 text-green-600" />
+                Approve
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={(e) => e.preventDefault()}
+                onClick={() => {
+                  setDecisionOpen("reject")
+                  setDecisionReason("")
+                }}
+              >
+                <XCircle className="mr-2 h-4 w-4 text-destructive" />
+                Reject
+              </DropdownMenuItem>
+            </>
+          )}
           <DropdownMenuItem
             onSelect={(e) => {
               e.preventDefault()
@@ -187,13 +256,62 @@ function EventActionsMenu({ event }: { event: EventPublic }) {
         </DropdownMenuContent>
       </DropdownMenu>
 
+      <Dialog
+        open={!!decisionOpen}
+        onOpenChange={(v) => !v && setDecisionOpen(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {decisionOpen === "approve" ? "Approve event" : "Reject event"}
+            </DialogTitle>
+            <DialogDescription>
+              {decisionOpen === "approve"
+                ? `Approve "${event.title}"? It will become published and the creator will be notified.`
+                : `Reject "${event.title}"? The creator will be notified. You can leave an optional reason.`}
+            </DialogDescription>
+          </DialogHeader>
+          <textarea
+            value={decisionReason}
+            onChange={(e) => setDecisionReason(e.target.value)}
+            rows={3}
+            placeholder={
+              decisionOpen === "approve"
+                ? "Optional note to the organizer"
+                : "Optional reason (shown to the organizer)"
+            }
+            className="w-full rounded-md border bg-background p-2 text-sm"
+          />
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
+            <LoadingButton
+              variant={decisionOpen === "reject" ? "destructive" : "default"}
+              loading={
+                decisionOpen === "approve"
+                  ? approveMutation.isPending
+                  : rejectMutation.isPending
+              }
+              onClick={() =>
+                decisionOpen === "approve"
+                  ? approveMutation.mutate()
+                  : rejectMutation.mutate()
+              }
+            >
+              {decisionOpen === "approve" ? "Approve" : "Reject"}
+            </LoadingButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={editChoiceOpen} onOpenChange={setEditChoiceOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Edit recurring event</DialogTitle>
             <DialogDescription>
-              This is one instance of a recurring series. Would you like to
-              edit only this event, or the entire series?
+              This is one instance of a recurring series. Would you like to edit
+              only this event, or the entire series?
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -284,13 +402,21 @@ function buildEventColumns(
     {
       accessorKey: "status",
       header: "Status",
-      cell: ({ row }) => (
-        <Badge
-          variant={statusVariant[row.original.status as string] ?? "secondary"}
-        >
-          {row.original.status}
-        </Badge>
-      ),
+      cell: ({ row }) => {
+        const status = row.original.status as string
+        return (
+          <Badge
+            variant={statusVariant[status] ?? "secondary"}
+            className={
+              status === "pending_approval"
+                ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300 border-transparent"
+                : undefined
+            }
+          >
+            {statusLabel[status] ?? status}
+          </Badge>
+        )
+      },
     },
     {
       accessorKey: "kind",
@@ -342,11 +468,18 @@ function EventsTableContent() {
     searchParams,
     "/events",
   )
+  const [pendingOnly, setPendingOnly] = useState(false)
 
   const { data: events } = useQuery({
     queryKey: [
       "events",
-      { popupId: selectedPopupId, page: pagination.pageIndex, pageSize: pagination.pageSize, search },
+      {
+        popupId: selectedPopupId,
+        page: pagination.pageIndex,
+        pageSize: pagination.pageSize,
+        search,
+        pendingOnly,
+      },
     ],
     queryFn: () =>
       EventsService.listEvents({
@@ -354,10 +487,20 @@ function EventsTableContent() {
         search: search || undefined,
         skip: pagination.pageIndex * pagination.pageSize,
         limit: pagination.pageSize,
+        // Backend accepts a single status filter; fetch everything and
+        // narrow client-side for simplicity when the toggle is off.
+        eventStatus: pendingOnly ? "pending_approval" : undefined,
       }),
     enabled: !!selectedPopupId,
     placeholderData: keepPreviousData,
   })
+
+  const pendingCount = useMemo(
+    () =>
+      events?.results.filter((e) => e.status === "pending_approval").length ??
+      0,
+    [events],
+  )
 
   const { data: venues } = useQuery({
     queryKey: ["event-venues", { popupId: selectedPopupId, limit: 200 }],
@@ -383,36 +526,61 @@ function EventsTableContent() {
   if (!events) return <Skeleton className="h-64 w-full" />
 
   return (
-    <DataTable
-      columns={columns}
-      data={events.results}
-      searchPlaceholder="Search by title..."
-      hiddenOnMobile={["kind", "venue_id", "start_time"]}
-      searchValue={search}
-      onSearchChange={setSearch}
-      serverPagination={{
-        total: events.paging.total,
-        pagination: pagination,
-        onPaginationChange: setPagination,
-      }}
-      emptyState={
-        !search ? (
-          <EmptyState
-            icon={CalendarDays}
-            title="No events yet"
-            description="Create the first event for this pop-up."
-            action={
-              <Button asChild>
-                <Link to="/events/new">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create Event
-                </Link>
-              </Button>
-            }
-          />
-        ) : undefined
-      }
-    />
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          variant={pendingOnly ? "default" : "outline"}
+          size="sm"
+          onClick={() => setPendingOnly((v) => !v)}
+          aria-pressed={pendingOnly}
+        >
+          <CheckCircle2 className="mr-2 h-4 w-4" />
+          Pending approval
+          {!pendingOnly && pendingCount > 0 && (
+            <Badge variant="secondary" className="ml-2">
+              {pendingCount}
+            </Badge>
+          )}
+        </Button>
+      </div>
+
+      <DataTable
+        columns={columns}
+        data={events.results}
+        searchPlaceholder="Search by title..."
+        hiddenOnMobile={["kind", "venue_id", "start_time"]}
+        searchValue={search}
+        onSearchChange={setSearch}
+        serverPagination={{
+          total: events.paging.total,
+          pagination: pagination,
+          onPaginationChange: setPagination,
+        }}
+        emptyState={
+          !search ? (
+            <EmptyState
+              icon={CalendarDays}
+              title={pendingOnly ? "No pending requests" : "No events yet"}
+              description={
+                pendingOnly
+                  ? "Events awaiting venue approval will appear here."
+                  : "Create the first event for this pop-up."
+              }
+              action={
+                pendingOnly ? undefined : (
+                  <Button asChild>
+                    <Link to="/events/new">
+                      <Plus className="mr-2 h-4 w-4" />
+                      Create Event
+                    </Link>
+                  </Button>
+                )
+              }
+            />
+          ) : undefined
+        }
+      />
+    </div>
   )
 }
 

@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query"
 
-import { EventVenuesService, type EventVenuePublic } from "@/client"
+import { type EventVenuePublic, EventVenuesService } from "@/client"
 
 /**
  * Fetch a single venue by id. Returns null when no id is provided.

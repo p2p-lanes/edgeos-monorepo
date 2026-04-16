@@ -3,18 +3,14 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { X } from "lucide-react"
 import { type KeyboardEvent, useState } from "react"
 
-import {
-  type TrackCreate,
-  type TrackPublic,
-  TracksService,
-} from "@/client"
+import { type TrackCreate, type TrackPublic, TracksService } from "@/client"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
 import {
   HeroInput,
   InlineRow,
   InlineSection,
 } from "@/components/ui/inline-form"
+import { Input } from "@/components/ui/input"
 import { LoadingButton } from "@/components/ui/loading-button"
 import { Textarea } from "@/components/ui/textarea"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
@@ -166,7 +162,9 @@ export function TrackForm({ defaultValues, onSuccess }: TrackFormProps) {
       onSubmit={(e) => {
         e.preventDefault()
         form.handleSubmit().catch((err: unknown) => {
-          showErrorToast(err instanceof Error ? err.message : "Error submitting form")
+          showErrorToast(
+            err instanceof Error ? err.message : "Error submitting form",
+          )
         })
       }}
       className="max-w-2xl space-y-8"

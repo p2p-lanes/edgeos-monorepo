@@ -3,10 +3,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { useMemo } from "react"
 
-import {
-  EventSettingsService,
-  type EventSettingsPublic,
-} from "@/client"
+import { type EventSettingsPublic, EventSettingsService } from "@/client"
 
 const DEFAULT_TZ =
   (typeof Intl !== "undefined" &&
