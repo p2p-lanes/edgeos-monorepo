@@ -37,12 +37,12 @@ export default function SectionHeader({
   return (
     <div className="mb-4">
       {showTitle && (
-        <h2 className="text-xl font-bold tracking-tight text-heading">
+        <h2 className="text-xl font-bold tracking-tight text-checkout-title">
           {title}
         </h2>
       )}
       {subtitle && (
-        <p className="text-sm text-heading-secondary mt-0.5">{subtitle}</p>
+        <p className="text-sm text-checkout-subtitle mt-0.5">{subtitle}</p>
       )}
     </div>
   )
@@ -64,16 +64,15 @@ function SnapSectionHeader({
   showWatermark: boolean
 }) {
   const watermarkText = watermark ?? title
+  // All variants use the themed checkout_watermark_color. The user-configured
+  // alpha controls the watermark's visual weight; the `style` variants live on
+  // for future tweaks (e.g. stroke) but no longer hardcode gray/white.
   const watermarkClassName = cn(
-    "absolute sm:-top-8 left-0 sm:text-[7rem] -top-4 text-[5rem] font-black leading-none select-none pointer-events-none whitespace-nowrap z-[5]",
-    watermarkStyle === "none" && "text-white",
-    watermarkStyle === "ghost" && "text-gray-100",
-    watermarkStyle === "stroke" && "text-white",
-    watermarkStyle === "bold" && "text-gray-200",
+    "absolute sm:-top-8 left-0 sm:text-[7rem] -top-4 text-[5rem] font-black leading-none select-none pointer-events-none whitespace-nowrap z-[5] text-checkout-watermark",
   )
   const watermarkInlineStyle =
     watermarkStyle === "stroke"
-      ? { WebkitTextStroke: "1px #d1d5db" }
+      ? { WebkitTextStroke: "1px currentColor" }
       : undefined
 
   const wrapperRef = useRef<HTMLDivElement>(null)
@@ -133,7 +132,7 @@ function SnapSectionHeader({
           {showTitle && (
             <h2
               data-section-title
-              className="relative text-2xl sm:text-4xl font-bold tracking-tight text-heading z-10 drop-shadow-[0_0_12px_rgba(255,255,255,0.9)]"
+              className="relative text-2xl sm:text-4xl font-bold tracking-tight text-checkout-title z-10 drop-shadow-[0_0_12px_rgba(255,255,255,0.9)]"
             >
               {title}
             </h2>
@@ -143,7 +142,7 @@ function SnapSectionHeader({
       {subtitle && (
         <p
           data-section-subtitle
-          className="text-base sm:text-lg text-heading-secondary my-2 rounded px-1 w-fit"
+          className="text-base sm:text-lg text-checkout-subtitle my-2 rounded px-1 w-fit"
         >
           {subtitle}
         </p>

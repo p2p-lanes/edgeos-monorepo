@@ -671,13 +671,39 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
           <>
             <Separator />
             <div className="lg:-mx-32 xl:-mx-48">
-              <ThemeConfigForm
-                popupId={defaultValues!.id}
-                themeConfig={
-                  defaultValues!.theme_config as Record<string, unknown> | null
-                }
-                readOnly={readOnly}
-              />
+              <form.Subscribe
+                selector={(state) => ({
+                  name: state.values.name,
+                  tagline: state.values.tagline,
+                  location: state.values.location,
+                  start_date: state.values.start_date,
+                  end_date: state.values.end_date,
+                  express_checkout_background:
+                    state.values.express_checkout_background,
+                })}
+              >
+                {(event) => (
+                  <ThemeConfigForm
+                    popupId={defaultValues!.id}
+                    themeConfig={
+                      defaultValues!.theme_config as Record<
+                        string,
+                        unknown
+                      > | null
+                    }
+                    readOnly={readOnly}
+                    previewEvent={{
+                      name: event.name,
+                      tagline: event.tagline || null,
+                      location: event.location || null,
+                      start_date: event.start_date || null,
+                      end_date: event.end_date || null,
+                      express_checkout_background:
+                        event.express_checkout_background || null,
+                    }}
+                  />
+                )}
+              </form.Subscribe>
             </div>
           </>
         )}

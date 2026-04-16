@@ -248,7 +248,7 @@ function MerchDefault({
 }: CardListProps) {
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-100">
+      <div className="bg-checkout-card-bg rounded-2xl shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-100">
         {products.map((product) => (
           <MerchDefaultItem
             key={product.id}
@@ -284,7 +284,7 @@ function MerchGrid({
             <div
               key={product.id}
               className={cn(
-                "rounded-2xl border overflow-hidden bg-white transition-all",
+                "rounded-2xl border overflow-hidden bg-checkout-card-bg transition-all",
                 hasQty ? "border-blue-200" : "border-gray-200",
               )}
             >

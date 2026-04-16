@@ -68,7 +68,7 @@ export default function ScrollySectionNav({
   return (
     <div
       data-snap-nav
-      className="sticky top-0 z-20 bg-checkout-nav-bg/95 backdrop-blur-sm"
+      className="sticky top-0 z-20 bg-checkout-navbar-bg backdrop-blur-md"
     >
       <div className="max-w-2xl mx-auto px-4 py-2">
         {variant === "pills" && (
@@ -125,11 +125,13 @@ function PillsNav({
             className={cn(
               "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-200",
               isActive &&
-                "bg-white shadow-sm text-checkout-nav-text ring-1 ring-gray-200/80",
+                "bg-checkout-badge-bg text-checkout-badge-title shadow-sm",
               !isActive &&
                 !isComplete &&
-                "text-checkout-nav-text/50 hover:bg-gray-200/60",
-              !isActive && isComplete && "text-checkout-nav-text/60",
+                "bg-checkout-badge-bg-disabled text-checkout-badge-title-disabled hover:opacity-80",
+              !isActive &&
+                isComplete &&
+                "bg-checkout-badge-bg-disabled text-checkout-badge-title",
             )}
           >
             <Icon className="size-4 shrink-0" />

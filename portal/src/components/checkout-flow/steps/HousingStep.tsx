@@ -113,7 +113,7 @@ export default function HousingStep({ onSkip }: HousingStepProps) {
   return (
     <div className="space-y-6">
       {/* Date Selection */}
-      <div className="bg-card rounded-2xl shadow-sm border border-border p-4 overflow-hidden">
+      <div className="bg-checkout-card-bg rounded-2xl shadow-sm border border-border p-4 overflow-hidden">
         <div className="flex items-center gap-2 mb-3">
           <Calendar className="w-4 h-4 text-muted-foreground shrink-0" />
           <span className="text-sm font-medium text-foreground">
@@ -227,7 +227,7 @@ function PropertyCard({
   const compareTotal = compareBase != null ? compareBase * quantity : null
 
   return (
-    <div className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
+    <div className="bg-checkout-card-bg rounded-2xl shadow-sm border border-border overflow-hidden">
       <div className="relative h-32 sm:h-40 bg-gradient-to-br from-muted to-muted/60">
         {product.image_url ? (
           <Image

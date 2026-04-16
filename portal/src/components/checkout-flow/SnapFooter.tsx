@@ -34,32 +34,32 @@ function StripeFooter({
   const canPay = cart.passes.length > 0 && !requiresTerms && !isSubmitting
 
   return (
-    <div className="mb-4 bg-white/80 backdrop-blur-md border-t border-gray-200 rounded-2xl shadow-sm">
+    <div className="mb-4 bg-checkout-navbar-bg backdrop-blur-md border-t border-gray-200 rounded-2xl shadow-sm">
       <div className="flex items-center gap-3 px-4 py-3">
         <button
           type="button"
           onClick={onBack}
-          className="text-gray-500 hover:text-gray-900 transition-colors shrink-0"
+          className="text-checkout-subtitle hover:text-checkout-title transition-colors shrink-0"
         >
           <ArrowLeft className="w-4 h-4" />
         </button>
         <button
           type="button"
           onClick={onCartToggle}
-          className="relative text-gray-500 hover:text-gray-900 hover:bg-gray-100 p-1.5 rounded-lg transition-colors shrink-0"
+          className="relative text-checkout-subtitle hover:text-checkout-title hover:bg-gray-100 p-1.5 rounded-lg transition-colors shrink-0"
         >
           <ShoppingBag className="w-4 h-4" />
           {itemCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-gray-900 text-white text-[9px] rounded-full flex items-center justify-center font-bold">
+            <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-checkout-badge-bg text-checkout-badge-title text-[9px] rounded-full flex items-center justify-center font-bold">
               {itemCount}
             </span>
           )}
         </button>
         <div className="flex-1 flex flex-col items-center">
-          <span className="text-[10px] text-gray-400 uppercase tracking-wider">
+          <span className="text-[10px] text-checkout-subtitle uppercase tracking-wider">
             Total
           </span>
-          <span className="text-lg font-bold text-gray-900">
+          <span className="text-lg font-bold text-checkout-title">
             {formatCurrency(summary.grandTotal)}
           </span>
         </div>
@@ -67,7 +67,7 @@ function StripeFooter({
           <button
             type="button"
             onClick={onGoToConfirm}
-            className="px-5 py-2 rounded-xl text-sm font-semibold bg-gray-900 text-white hover:bg-gray-700 shrink-0"
+            className="px-5 py-2 rounded-xl text-sm font-semibold bg-checkout-badge-bg text-checkout-badge-title hover:opacity-90 shrink-0"
           >
             Review
           </button>
@@ -79,8 +79,8 @@ function StripeFooter({
             className={cn(
               "px-5 py-2 rounded-xl text-sm font-semibold transition-all shrink-0",
               canPay
-                ? "bg-gray-900 text-white hover:bg-gray-700"
-                : "bg-gray-100 text-gray-400 cursor-not-allowed",
+                ? "bg-checkout-button text-checkout-button-title hover:opacity-90"
+                : "bg-checkout-button-disabled text-checkout-button-title-disabled cursor-not-allowed",
             )}
           >
             {isSubmitting ? (
@@ -124,19 +124,19 @@ function DockFooter({
       <button
         type="button"
         onClick={onBack}
-        className="w-12 h-12 rounded-2xl bg-white/90 backdrop-blur-sm shadow-lg border border-gray-200 flex items-center justify-center hover:scale-110 transition-transform"
+        className="w-12 h-12 rounded-2xl bg-checkout-card-bg/90 backdrop-blur-sm shadow-lg border border-gray-200 flex items-center justify-center hover:scale-110 transition-transform"
       >
-        <ArrowLeft className="w-5 h-5 text-gray-700" />
+        <ArrowLeft className="w-5 h-5 text-checkout-title" />
       </button>
       {/* cart badge */}
       <button
         type="button"
         onClick={onCartToggle}
-        className="relative w-12 h-12 rounded-2xl bg-white/90 backdrop-blur-sm shadow-lg border border-gray-200 flex items-center justify-center hover:scale-110 transition-transform"
+        className="relative w-12 h-12 rounded-2xl bg-checkout-card-bg/90 backdrop-blur-sm shadow-lg border border-gray-200 flex items-center justify-center hover:scale-110 transition-transform"
       >
-        <ShoppingBag className="w-5 h-5 text-gray-700" />
+        <ShoppingBag className="w-5 h-5 text-checkout-title" />
         {itemCount > 0 && (
-          <span className="absolute -top-1 -right-1 w-5 h-5 bg-gray-900 text-white text-[10px] rounded-full flex items-center justify-center font-bold">
+          <span className="absolute -top-1 -right-1 w-5 h-5 bg-checkout-badge-bg text-checkout-badge-title text-[10px] rounded-full flex items-center justify-center font-bold">
             {itemCount}
           </span>
         )}
@@ -150,8 +150,8 @@ function DockFooter({
           className={cn(
             "h-12 px-5 rounded-2xl shadow-lg font-semibold text-sm flex items-center gap-2 hover:scale-105 transition-transform",
             cart.passes.length > 0
-              ? "bg-gray-900 text-white"
-              : "bg-white/60 text-gray-400 cursor-not-allowed border border-gray-200",
+              ? "bg-checkout-button text-checkout-button-title"
+              : "bg-checkout-button-disabled text-checkout-button-title-disabled cursor-not-allowed border border-gray-200",
           )}
         >
           {formatCurrency(summary.grandTotal)}{" "}
@@ -165,8 +165,8 @@ function DockFooter({
           className={cn(
             "h-12 px-5 rounded-2xl shadow-lg font-semibold text-sm flex items-center gap-2 hover:scale-105 transition-transform",
             canPay
-              ? "bg-gray-900 text-white"
-              : "bg-white/60 text-gray-400 cursor-not-allowed border border-gray-200",
+              ? "bg-checkout-button text-checkout-button-title"
+              : "bg-checkout-button-disabled text-checkout-button-title-disabled cursor-not-allowed border border-gray-200",
           )}
         >
           {isSubmitting ? (

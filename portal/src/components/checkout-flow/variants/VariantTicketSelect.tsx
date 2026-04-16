@@ -766,7 +766,7 @@ function CompactAttendeeCard({
   return (
     <div
       className={cn(
-        "bg-white rounded-xl border border-gray-100 shadow-sm p-3 border-l-2",
+        "bg-checkout-card-bg rounded-xl border border-gray-100 shadow-sm p-3 border-l-2",
         meta.accent,
       )}
     >
@@ -825,7 +825,7 @@ function CompactAttendeeCard({
                     "flex items-center gap-1 px-2 py-1.5 rounded-lg border text-xs font-medium transition-all",
                     qty > 0
                       ? "bg-blue-50 border-blue-300"
-                      : "bg-white border-gray-200",
+                      : "bg-checkout-card-bg border-gray-200",
                     tileDisabled && "opacity-40",
                   )}
                 >
@@ -895,7 +895,7 @@ function CompactAttendeeCard({
                       ? "bg-blue-600 border-blue-600 text-white shadow-sm"
                       : isDisabled
                         ? "bg-gray-50 border-gray-100 text-gray-300 cursor-not-allowed opacity-50"
-                        : "bg-white border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50",
+                        : "bg-checkout-card-bg border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50",
                 )}
               >
                 {isSelected && <Check className="w-3 h-3" />}
@@ -944,7 +944,7 @@ function StackedLayout({
         <div
           key={attendee.id}
           id={`attendee-card-${attendee.id}`}
-          className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden"
+          className="bg-checkout-card-bg rounded-2xl shadow-sm border border-gray-100 overflow-hidden"
         >
           <AttendeeHeader attendee={attendee} />
           <AttendeePassRows
@@ -983,7 +983,7 @@ function TabsLayout({
   }, [focusedAttendeeId, attendees])
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+    <div className="bg-checkout-card-bg rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
       {/* Tab bar */}
       <div className="flex border-b border-gray-100 bg-gray-50/50 overflow-x-auto">
         {attendees.map((a, idx) => {
@@ -1113,7 +1113,7 @@ function AccordionLayout({
           <div
             key={attendee.id}
             id={`attendee-card-${attendee.id}`}
-            className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
+            className="bg-checkout-card-bg rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
           >
             <button
               type="button"
@@ -1292,7 +1292,7 @@ function LegacySectionLayout({
           {groups.map(({ section, products: sp }) => (
             <div
               key={section.key}
-              className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden"
+              className="bg-checkout-card-bg rounded-2xl shadow-sm border border-gray-100 overflow-hidden"
             >
               <div
                 className="relative px-5 py-2 bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100 overflow-hidden"
@@ -1309,7 +1309,7 @@ function LegacySectionLayout({
           ))}
         </div>
       ) : (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-100">
+        <div className="bg-checkout-card-bg rounded-2xl shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-100">
           {products.map(renderRow)}
         </div>
       )}
