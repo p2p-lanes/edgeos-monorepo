@@ -144,7 +144,7 @@ export default function ConfirmStep() {
         />
       )}
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-checkout-card-bg rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         {/* Passes Section */}
         {cart.passes.length > 0 && (
           <div className="px-5 py-4">

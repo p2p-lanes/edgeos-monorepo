@@ -61,7 +61,7 @@ export function useCartPersistence({
 
   // Cart API hooks (internalized)
   const { data: savedCart, isSuccess: cartLoaded } = useCart(cityId)
-  const { saveImmediate, cancelPendingSave } = useSaveCart(cityId)
+  const { save, saveImmediate, cancelPendingSave } = useSaveCart(cityId)
   const clearCartMutation = useClearCart(cityId)
 
   // --- Build CartState from the ref's current value ---
@@ -116,6 +116,18 @@ export function useCartPersistence({
     hasRestoredCheckoutRef,
     paymentCompleteRef,
   ])
+
+  // --- Schedule a debounced save (for auto-save on state changes) ---
+  const scheduleSave = useCallback(() => {
+    if (
+      !cityId ||
+      !hasRestoredCheckoutRef.current ||
+      paymentCompleteRef.current
+    )
+      return
+
+    save(buildCartState())
+  }, [cityId, save, buildCartState, hasRestoredCheckoutRef, paymentCompleteRef])
 
   // --- Clear cart ---
   const clearCart = useCallback(() => {
@@ -273,6 +285,7 @@ export function useCartPersistence({
     savedCart,
     cartLoaded,
     saveCart,
+    scheduleSave,
     clearCart,
     cancelPendingSave,
   }

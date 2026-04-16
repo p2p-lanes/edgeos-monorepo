@@ -9,7 +9,7 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "rounded-xl border bg-card text-card-foreground shadow",
+      "rounded-[var(--border-radius)] border bg-card text-card-foreground shadow",
       className,
     )}
     {...props}
@@ -107,7 +107,7 @@ const CardAnimation = React.forwardRef<HTMLDivElement, CardAnimationProps>(
         exit="exit"
         variants={anim ? variants[anim] : {}}
         transition={{ duration }}
-        className="rounded-xl"
+        className="rounded-[var(--border-radius)]"
       >
         <Card
           ref={ref}

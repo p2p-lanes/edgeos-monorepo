@@ -99,7 +99,7 @@ function DatePickerSection({
   onCheckOutChange: (date: Date) => void
 }) {
   return (
-    <div className="bg-card rounded-2xl shadow-sm border border-border p-4 overflow-hidden">
+    <div className="bg-checkout-card-bg rounded-2xl shadow-sm border border-border p-4 overflow-hidden">
       <div className="flex items-center gap-2 mb-3">
         <Calendar className="w-4 h-4 text-muted-foreground shrink-0" />
         <span className="text-sm font-medium text-foreground">
@@ -244,7 +244,7 @@ function CompactCard({
         "w-full flex items-center gap-3 rounded-xl border-l-4 px-3 py-3 text-left transition-all",
         isSelected
           ? "border-l-primary bg-primary/10"
-          : "border-l-border bg-card hover:bg-muted",
+          : "border-l-border bg-checkout-card-bg hover:bg-muted",
       )}
     >
       {supportsQty ? (
@@ -263,7 +263,7 @@ function CompactCard({
             "w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors",
             isSelected
               ? "bg-primary border-primary"
-              : "bg-card border-muted-foreground/40",
+              : "bg-checkout-card-bg border-muted-foreground/40",
           )}
         >
           {isSelected && <Check className="w-3 h-3 text-white" />}
@@ -357,7 +357,7 @@ function GridCard({
         }
       }}
       className={cn(
-        "relative flex flex-col rounded-2xl border overflow-hidden text-left transition-all bg-card",
+        "relative flex flex-col rounded-2xl border overflow-hidden text-left transition-all bg-checkout-card-bg",
         isSelected
           ? "border-primary ring-2 ring-primary/20"
           : "border-border hover:border-muted-foreground/30",
@@ -476,7 +476,7 @@ function DefaultSectionCard({
     section.image_url || products.find((p) => p.image_url)?.image_url
 
   return (
-    <div className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
+    <div className="bg-checkout-card-bg rounded-2xl shadow-sm border border-border overflow-hidden">
       {section.label && (
         <div className="relative h-28 sm:h-36 bg-gradient-to-br from-muted to-muted/60">
           {heroImage ? (
@@ -659,7 +659,7 @@ function ShowcaseSectionCard({
     section.image_url || products.find((p) => p.image_url)?.image_url
 
   return (
-    <div className="rounded-2xl overflow-hidden bg-card shadow-md border border-border">
+    <div className="rounded-2xl overflow-hidden bg-checkout-card-bg shadow-md border border-border">
       {heroImage ? (
         <div className="relative h-44 sm:h-56">
           <Image
@@ -797,7 +797,7 @@ function ShowcaseSectionCard({
                       "w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0",
                       isSelected
                         ? "border-primary bg-primary"
-                        : "border-muted-foreground/40 bg-card",
+                        : "border-muted-foreground/40 bg-checkout-card-bg",
                     )}
                   >
                     {isSelected && <Check className="w-3 h-3 text-white" />}

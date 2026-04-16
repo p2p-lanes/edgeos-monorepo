@@ -63,17 +63,17 @@ export default function CartItemList() {
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <Ticket className="w-4 h-4 text-gray-400 shrink-0" />
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">
+                    <p className="text-sm font-medium text-checkout-title truncate">
                       {getAttendeeName(pass.attendeeId)}
                     </p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-checkout-subtitle">
                       {pass.quantity > 1 && <span>{pass.quantity} × </span>}
                       {pass.product.name}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-gray-900">
+                  <span className="text-sm font-medium text-checkout-title">
                     {formatCurrency(pass.originalPrice ?? pass.price)}
                   </span>
                   <button
@@ -102,7 +102,7 @@ export default function CartItemList() {
             <div className="flex items-center gap-3 flex-1 min-w-0">
               <Home className="w-4 h-4 text-gray-400 shrink-0" />
               <div className="min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">
+                <p className="text-sm font-medium text-checkout-title truncate">
                   {cart.housing.quantity > 1 && (
                     <span className="text-gray-500">
                       {cart.housing.quantity} ×{" "}
@@ -110,7 +110,7 @@ export default function CartItemList() {
                   )}
                   {cart.housing.product.name}
                 </p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-checkout-subtitle">
                   {cart.housing.pricePerDay !== false
                     ? `${cart.housing.nights} night${cart.housing.nights !== 1 ? "s" : ""}`
                     : "Full stay"}
@@ -118,7 +118,7 @@ export default function CartItemList() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-gray-900">
+              <span className="text-sm font-medium text-checkout-title">
                 {formatCurrency(cart.housing.totalPrice)}
               </span>
               <button
@@ -148,7 +148,7 @@ export default function CartItemList() {
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <ShoppingBag className="w-4 h-4 text-gray-400 shrink-0" />
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">
+                    <p className="text-sm font-medium text-checkout-title truncate">
                       {item.quantity > 1 && (
                         <span className="text-gray-500">
                           {item.quantity} ×{" "}
@@ -159,7 +159,7 @@ export default function CartItemList() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-gray-900">
+                  <span className="text-sm font-medium text-checkout-title">
                     {formatCurrency(item.totalPrice)}
                   </span>
                   <button
@@ -185,12 +185,12 @@ export default function CartItemList() {
           <div className="flex items-center justify-between py-2">
             <div className="flex items-center gap-3">
               <Heart className="w-4 h-4 text-gray-400 shrink-0" />
-              <span className="text-sm font-medium text-gray-900">
+              <span className="text-sm font-medium text-checkout-title">
                 Community Support
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-gray-900">
+              <span className="text-sm font-medium text-checkout-title">
                 {formatCurrency(cart.patron.amount)}
               </span>
               <button
@@ -222,7 +222,7 @@ export default function CartItemList() {
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     <Ticket className="w-4 h-4 text-gray-400 shrink-0" />
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">
+                      <p className="text-sm font-medium text-checkout-title truncate">
                         {item.quantity > 1 && (
                           <span className="text-gray-500">
                             {item.quantity} ×{" "}
@@ -233,7 +233,7 @@ export default function CartItemList() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-900">
+                    <span className="text-sm font-medium text-checkout-title">
                       {formatCurrency(item.price)}
                     </span>
                     <button
@@ -261,11 +261,11 @@ export default function CartItemList() {
           <div className="flex items-center justify-between py-2">
             <div className="flex items-center gap-3">
               <Shield className="w-4 h-4 text-gray-400 shrink-0" />
-              <span className="text-sm font-medium text-gray-900">
+              <span className="text-sm font-medium text-checkout-title">
                 Coverage for all passes
               </span>
             </div>
-            <span className="text-sm font-medium text-gray-900">
+            <span className="text-sm font-medium text-checkout-title">
               {formatCurrency(summary.insuranceSubtotal)}
             </span>
           </div>

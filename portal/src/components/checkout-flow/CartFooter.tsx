@@ -95,7 +95,7 @@ export default function CartFooter({ onPay, onBack }: CartFooterProps) {
       {/* Expanded Cart Drawer */}
       <div
         className={cn(
-          "bg-white shadow-2xl transition-all duration-300 ease-in-out overflow-hidden rounded-2xl mb-2 relative z-30",
+          "bg-checkout-card-bg shadow-2xl transition-all duration-300 ease-in-out overflow-hidden rounded-2xl mb-2 relative z-30",
           isExpanded ? "max-h-[60vh]" : "max-h-0",
         )}
       >
@@ -106,13 +106,13 @@ export default function CartFooter({ onPay, onBack }: CartFooterProps) {
 
       {/* Floating Footer */}
       <div className="mb-4">
-        <div className="backdrop-blur-xl bg-gray-900/95 rounded-2xl shadow-2xl border border-white/10 p-3 lg:p-4">
+        <div className="backdrop-blur-xl bg-checkout-bottom-bar-bg rounded-2xl shadow-2xl border border-white/10 p-3 lg:p-4">
           <div className="flex items-center gap-2 lg:gap-3">
             {/* Back button */}
             <button
               type="button"
               onClick={isFirstStep ? onBack : goToPreviousStep}
-              className="flex items-center justify-center p-2.5 lg:px-3 lg:py-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors shrink-0"
+              className="flex items-center justify-center p-2.5 lg:px-3 lg:py-2 text-checkout-bottom-bar-text/60 hover:text-checkout-bottom-bar-text hover:bg-white/10 rounded-lg transition-colors shrink-0"
             >
               <ArrowLeft className="w-4 h-4" />
               <span className="hidden lg:inline text-sm font-medium ml-1.5">
@@ -128,17 +128,17 @@ export default function CartFooter({ onPay, onBack }: CartFooterProps) {
             >
               <div className="flex flex-col items-start min-w-0 overflow-hidden">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] lg:text-xs text-gray-500 uppercase tracking-wider font-medium">
+                  <span className="text-[10px] lg:text-xs text-checkout-bottom-bar-text/60 uppercase tracking-wider font-medium">
                     {isEditing ? t("checkout.to_pay") : t("common.total")}
                   </span>
                   {hasItems &&
                     (isExpanded ? (
-                      <ChevronDown className="w-3 h-3 text-gray-500 shrink-0" />
+                      <ChevronDown className="w-3 h-3 text-checkout-bottom-bar-text/60 shrink-0" />
                     ) : (
-                      <ChevronUp className="w-3 h-3 text-gray-500 shrink-0" />
+                      <ChevronUp className="w-3 h-3 text-checkout-bottom-bar-text/60 shrink-0" />
                     ))}
                 </div>
-                <span className="text-lg lg:text-2xl font-bold text-white truncate max-w-full">
+                <span className="text-lg lg:text-2xl font-bold text-checkout-bottom-bar-text truncate max-w-full">
                   {formatCurrency(summary.grandTotal)}
                 </span>
                 {isEditing && editCredit > 0 && (
@@ -159,8 +159,8 @@ export default function CartFooter({ onPay, onBack }: CartFooterProps) {
               className={cn(
                 "flex items-center justify-center gap-1.5 lg:gap-2 px-3 lg:px-6 py-3 lg:py-3.5 rounded-xl text-sm font-semibold transition-all shrink-0 whitespace-nowrap",
                 canContinue && !isSubmitting
-                  ? "bg-white hover:bg-gray-100 text-gray-900 shadow-lg active:scale-95"
-                  : "bg-white/20 text-gray-400 cursor-not-allowed",
+                  ? "bg-checkout-button text-checkout-button-title shadow-lg active:scale-95 hover:opacity-90"
+                  : "bg-checkout-button-disabled text-checkout-button-title-disabled cursor-not-allowed",
               )}
             >
               {isSubmitting ? (

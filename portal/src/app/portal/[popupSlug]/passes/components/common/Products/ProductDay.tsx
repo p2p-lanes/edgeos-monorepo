@@ -24,7 +24,8 @@ const variants: Record<VariantStyles, string> = {
   purchased: "bg-slate-800 text-white border-neutral-700",
   edit: "bg-slate-800/30 border-dashed border-slate-200 text-neutral-700 border",
   disabled: "bg-neutral-0 text-neutral-300 cursor-not-allowed ",
-  default: "bg-white border-neutral-300 text-neutral-700 hover:bg-slate-100",
+  default:
+    "bg-checkout-card-bg border-neutral-300 text-checkout-title hover:bg-slate-100",
 }
 
 const Product = ({

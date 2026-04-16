@@ -236,14 +236,14 @@ export default function CheckoutFlow({
   const showFooter = currentStep !== "success"
 
   return (
-    <div className="flex flex-col bg-[#F5F5F7] font-sans text-body rounded-lg">
+    <div className="flex flex-col font-sans rounded-lg">
       <main className="flex-1 max-w-md lg:max-w-2xl mx-auto px-4 pt-6 pb-4 w-full">
         {showHeader && (
           <div className="mb-6">
-            <h1 className="text-2xl font-bold tracking-tight text-heading">
+            <h1 className="text-2xl font-bold tracking-tight text-checkout-title">
               {stepTitle}
             </h1>
-            <p className="text-heading-secondary mt-1">{stepSubtitle}</p>
+            <p className="text-checkout-subtitle mt-1">{stepSubtitle}</p>
           </div>
         )}
 

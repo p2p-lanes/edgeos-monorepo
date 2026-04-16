@@ -51,7 +51,7 @@ export default function MerchSection({ onSkip }: MerchSectionProps) {
 
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-100">
+      <div className="bg-checkout-card-bg rounded-2xl shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-100">
         {merchProducts.map((product) => (
           <MerchItem
             key={product.id}

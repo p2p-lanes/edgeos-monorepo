@@ -104,7 +104,7 @@ const variants: Record<VariantStyles, string> = {
   edit: "bg-slate-800/30 border-dashed border-slate-200 text-neutral-700",
   disabled: "bg-neutral-0 text-neutral-300 cursor-not-allowed ",
   default:
-    "bg-white border-neutral-300 text-neutral-700 hover:bg-gradient-to-r hover:from-[#FF7B7B]/10 hover:to-[#E040FB]/10",
+    "bg-checkout-card-bg border-neutral-300 text-checkout-title hover:bg-gradient-to-r hover:from-[#FF7B7B]/10 hover:to-[#E040FB]/10",
 }
 
 // Componente base
