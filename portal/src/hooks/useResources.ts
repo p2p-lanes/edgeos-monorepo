@@ -1,5 +1,6 @@
 import { FileText, Ticket, Users } from "lucide-react"
 import { useTranslation } from "react-i18next"
+import useAuth from "@/hooks/useAuth"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import type { Resource } from "@/types/resources"
@@ -8,12 +9,34 @@ const useResources = () => {
   const { t } = useTranslation()
   const { getCity } = useCityProvider()
   const { getRelevantApplication, participation } = useApplication()
+  const { user } = useAuth()
   const application = getRelevantApplication()
   const city = getCity()
 
   const isCompanion = participation?.type === "companion"
   const canSeeAttendees = application?.status === "accepted"
   const companionCanSeePasses = isCompanion
+
+  // Direct-sale popups have no application and no reviewer-controlled
+  // attendees — just checkout + passes browsing once logged in.
+  if (city?.sale_type === "direct" && user) {
+    const resources: Resource[] = [
+      {
+        name: t("sidebar.checkout", { defaultValue: "Checkout" }),
+        icon: Ticket,
+        status: "active",
+        path: `/portal/${city?.slug}`,
+      },
+      {
+        name: t("sidebar.passes"),
+        icon: Ticket,
+        status: "active",
+        path: `/portal/${city?.slug}/passes`,
+      },
+    ]
+
+    return { resources }
+  }
 
   if (isCompanion) {
     const resources: Resource[] = [

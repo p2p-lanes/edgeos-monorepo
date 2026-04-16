@@ -22,7 +22,7 @@ export default function BuyPassesPage() {
 
   return (
     <div className="w-full md:mt-0 mx-auto items-center max-w-3xl ">
-      <PassesProvider restoreFromCart>
+      <PassesProvider attendees={attendees} restoreFromCart>
         <CheckoutProvider initialStep="passes">
           <ScrollyCheckoutFlow
             onBack={handleBack}
