@@ -183,13 +183,14 @@ function ScrollyCheckoutFlowInner({
       mainEl.getBoundingClientRect().top
 
     const prevSnapType = mainEl.style.scrollSnapType
-    mainEl.style.scrollSnapType = "y proximity"
+    mainEl.style.scrollSnapType = "y mandatory"
 
     const sectionEls = sectionsSnapshot
       .map((s) => document.getElementById(s.id))
       .filter(Boolean) as HTMLElement[]
     for (const el of sectionEls) {
       el.style.scrollSnapAlign = "start"
+      el.style.scrollSnapStop = "always"
     }
 
     const observer = new IntersectionObserver(
@@ -225,6 +226,7 @@ function ScrollyCheckoutFlowInner({
       mainEl.style.scrollSnapType = prevSnapType
       for (const el of sectionEls) {
         el.style.scrollSnapAlign = ""
+        el.style.scrollSnapStop = ""
       }
       observer.disconnect()
       ro.disconnect()
