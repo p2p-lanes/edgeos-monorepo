@@ -1,6 +1,6 @@
 "use client"
 
-import { useQueries, useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   addDays,
   addMonths,
@@ -15,22 +15,26 @@ import {
 } from "date-fns"
 import {
   Calendar as CalendarIcon,
+  CheckCircle,
   ChevronLeft,
   ChevronRight,
   Clock,
   MapPin,
+  Repeat,
+  Tag,
+  Users,
 } from "lucide-react"
 import Link from "next/link"
 import { useState } from "react"
 
 import {
+  EventParticipantsService,
   type EventPublic,
   EventsService,
-  type EventVenuePublic,
-  EventVenuesService,
 } from "@/client"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { summarizeRrule } from "./summarizeRrule"
 import { useEventTimezone } from "./useEventTimezone"
 
 interface CalendarBodyProps {
@@ -38,6 +42,7 @@ interface CalendarBodyProps {
   slug: string | undefined
   search: string
   rsvpedOnly: boolean
+  tags?: string[]
 }
 
 /**
@@ -50,7 +55,9 @@ export function CalendarBody({
   slug,
   search,
   rsvpedOnly,
+  tags,
 }: CalendarBodyProps) {
+  const queryClient = useQueryClient()
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date())
   const { formatTime, formatDayKey, formatGridDayKey } =
@@ -63,6 +70,7 @@ export function CalendarBody({
       format(currentMonth, "yyyy-MM"),
       rsvpedOnly,
       search,
+      tags,
     ],
     queryFn: () =>
       EventsService.listPortalEvents({
@@ -72,9 +80,25 @@ export function CalendarBody({
         startBefore: endOfMonth(currentMonth).toISOString(),
         rsvpedOnly: rsvpedOnly || undefined,
         search: search || undefined,
+        tags: tags?.length ? tags : undefined,
         limit: 200,
       }),
     enabled: !!popupId,
+  })
+
+  const rsvpMutation = useMutation({
+    mutationFn: (eventId: string) =>
+      EventParticipantsService.registerForEvent({ eventId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["portal-events-calendar"] })
+    },
+  })
+  const cancelRsvpMutation = useMutation({
+    mutationFn: (eventId: string) =>
+      EventParticipantsService.cancelRegistration({ eventId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["portal-events-calendar"] })
+    },
   })
 
   const events = data?.results ?? []
@@ -83,25 +107,6 @@ export function CalendarBody({
     const cellKey = formatGridDayKey(date)
     return events.filter((e) => formatDayKey(e.start_time) === cellKey)
   }
-
-  const venueIds = Array.from(
-    new Set(
-      events
-        .map((e) => e.venue_id)
-        .filter((v): v is string => typeof v === "string" && v.length > 0),
-    ),
-  )
-  const venueQueries = useQueries({
-    queries: venueIds.map((venueId) => ({
-      queryKey: ["portal-event-venue", venueId],
-      queryFn: () => EventVenuesService.getVenue({ venueId }),
-      staleTime: 5 * 60 * 1000,
-    })),
-  })
-  const venueMap = new Map<string, EventVenuePublic>()
-  venueQueries.forEach((q, idx) => {
-    if (q.data) venueMap.set(venueIds[idx], q.data)
-  })
 
   const monthStart = startOfMonth(currentMonth)
   const monthEnd = endOfMonth(currentMonth)
@@ -212,31 +217,112 @@ export function CalendarBody({
             ) : (
               <div className="space-y-2">
                 {selectedEvents.map((event) => {
-                  const venue = event.venue_id
-                    ? venueMap.get(event.venue_id)
-                    : undefined
+                  const recurrenceLabel =
+                    summarizeRrule(event.rrule) ??
+                    (event.recurrence_master_id
+                      ? "Part of a recurring series"
+                      : null)
                   return (
-                    <Link
+                    <div
                       key={event.id}
-                      href={`/portal/${slug}/events/${event.id}`}
-                      className="block rounded-xl border bg-card p-3 hover:shadow-md transition-shadow"
+                      className="relative rounded-xl border bg-card hover:shadow-md transition-shadow"
                     >
-                      <h4 className="text-sm font-medium">{event.title}</h4>
-                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
-                        <Clock className="h-3 w-3" />
-                        {formatTime(event.start_time)} –{" "}
-                        {formatTime(event.end_time)}
-                      </div>
-                      {venue && (
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
-                          <MapPin className="h-3 w-3" />
-                          <span className="truncate">
-                            {venue.title}
-                            {venue.location ? ` · ${venue.location}` : ""}
-                          </span>
+                      <Link
+                        href={`/portal/${slug}/events/${event.id}`}
+                        className="block p-3"
+                      >
+                        <div className="flex items-start gap-3">
+                          {event.venue_image_url && (
+                            <div className="h-12 w-12 rounded-md overflow-hidden shrink-0 bg-muted">
+                              {/* biome-ignore lint/performance/noImgElement: external S3 URL, next/image not configured */}
+                              <img
+                                src={event.venue_image_url}
+                                alt={event.venue_title ?? ""}
+                                className="h-full w-full object-cover"
+                              />
+                            </div>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <h4 className="text-sm font-medium truncate">
+                              {event.title}
+                            </h4>
+                            {event.kind && (
+                              <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-0.5">
+                                {event.kind}
+                              </p>
+                            )}
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
+                              <Clock className="h-3 w-3" />
+                              {formatTime(event.start_time)} –{" "}
+                              {formatTime(event.end_time)}
+                            </div>
+                            {event.venue_title && (
+                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                                <MapPin className="h-3 w-3" />
+                                <span className="truncate">
+                                  {event.venue_title}
+                                  {event.venue_location
+                                    ? ` · ${event.venue_location}`
+                                    : ""}
+                                </span>
+                              </div>
+                            )}
+                            {recurrenceLabel && (
+                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                                <Repeat className="h-3 w-3" />
+                                <span className="truncate">
+                                  {recurrenceLabel}
+                                </span>
+                              </div>
+                            )}
+                            {event.max_participant != null && (
+                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                                <Users className="h-3 w-3" />
+                                <span>Max {event.max_participant}</span>
+                              </div>
+                            )}
+                            {event.tags && event.tags.length > 0 && (
+                              <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+                                {event.tags.slice(0, 3).map((tag: string) => (
+                                  <span
+                                    key={tag}
+                                    className="inline-flex items-center gap-0.5 text-[10px] bg-muted px-1.5 py-0.5 rounded"
+                                  >
+                                    <Tag className="h-2.5 w-2.5" />
+                                    {tag}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </Link>
+                      {event.status === "published" && (
+                        <div className="absolute top-2 right-2">
+                          {event.my_rsvp_status &&
+                          event.my_rsvp_status !== "cancelled" ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                cancelRsvpMutation.mutate(event.id)
+                              }
+                              className="inline-flex items-center gap-1 rounded-md border border-primary/30 bg-primary/10 px-2 py-1 text-xs font-medium text-primary hover:bg-primary/20"
+                            >
+                              <CheckCircle className="h-3 w-3" />
+                              Going
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => rsvpMutation.mutate(event.id)}
+                              className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs font-medium hover:bg-muted"
+                            >
+                              RSVP
+                            </button>
+                          )}
                         </div>
                       )}
-                    </Link>
+                    </div>
                   )
                 })}
               </div>

@@ -777,6 +777,8 @@ export type EventParticipantPublic = {
     created_at?: string;
     updated_at?: string;
     id: string;
+    first_name?: (string | null);
+    last_name?: (string | null);
 };
 
 /**
@@ -818,6 +820,11 @@ export type EventPublic = {
     updated_at?: string;
     id: string;
     occurrence_id?: (string | null);
+    venue_title?: (string | null);
+    venue_location?: (string | null);
+    venue_image_url?: (string | null);
+    hidden?: boolean;
+    my_rsvp_status?: (string | null);
 };
 
 /**
@@ -830,6 +837,8 @@ export type EventSettingsCreate = {
     humans_can_create_venues?: boolean;
     venues_require_approval?: boolean;
     timezone?: string;
+    allowed_tags?: Array<(string)>;
+    approval_notification_email?: (string | null);
 };
 
 /**
@@ -843,6 +852,8 @@ export type EventSettingsPublic = {
     humans_can_create_venues?: boolean;
     venues_require_approval?: boolean;
     timezone?: string;
+    allowed_tags?: Array<(string)>;
+    approval_notification_email?: (string | null);
     created_at?: string;
     updated_at?: string;
     id: string;
@@ -857,6 +868,8 @@ export type EventSettingsUpdate = {
     humans_can_create_venues?: (boolean | null);
     venues_require_approval?: (boolean | null);
     timezone?: (string | null);
+    allowed_tags?: (Array<(string)> | null);
+    approval_notification_email?: (string | null);
 };
 
 export type EventStatus = 'draft' | 'published' | 'cancelled' | 'pending_approval' | 'rejected';
@@ -888,6 +901,7 @@ export type EventUpdate = {
 export type EventVenueCreate = {
     popup_id: string;
     title: string;
+    description?: (string | null);
     location?: (string | null);
     formatted_address?: (string | null);
     geo_lat?: (number | null);
@@ -912,6 +926,7 @@ export type EventVenuePublic = {
     popup_id: string;
     owner_id: string;
     title: string;
+    description?: (string | null);
     location?: (string | null);
     formatted_address?: (string | null);
     geo_lat?: (number | null);
@@ -940,6 +955,7 @@ export type EventVenuePublic = {
  */
 export type EventVenueUpdate = {
     title?: (string | null);
+    description?: (string | null);
     location?: (string | null);
     formatted_address?: (string | null);
     geo_lat?: (number | null);
@@ -2281,6 +2297,9 @@ export type VenueBusySlot = {
     end: string;
     source: string;
     label?: (string | null);
+    event_id?: (string | null);
+    event_start?: (string | null);
+    event_end?: (string | null);
 };
 
 export type VenueExceptionCreate = {
@@ -3117,6 +3136,7 @@ export type EventsExportEventIcsResponse = (unknown);
 
 export type EventsListPortalEventsData = {
     eventStatus?: (EventStatus | null);
+    includeHidden?: boolean;
     kind?: (string | null);
     /**
      * Maximum number of items to return
@@ -3131,6 +3151,7 @@ export type EventsListPortalEventsData = {
     skip?: number;
     startAfter?: (string | null);
     startBefore?: (string | null);
+    tags?: (Array<(string)> | null);
     trackId?: (string | null);
     venueId?: (string | null);
 };
@@ -3142,6 +3163,14 @@ export type EventsCreatePortalEventData = {
 };
 
 export type EventsCreatePortalEventResponse = (EventPublic);
+
+export type EventsPortalHiddenEventsCountData = {
+    popupId?: (string | null);
+};
+
+export type EventsPortalHiddenEventsCountResponse = ({
+    [key: string]: (number);
+});
 
 export type EventsGetPortalEventData = {
     eventId: string;
@@ -3155,6 +3184,18 @@ export type EventsUpdatePortalEventData = {
 };
 
 export type EventsUpdatePortalEventResponse = (EventPublic);
+
+export type EventsHidePortalEventData = {
+    eventId: string;
+};
+
+export type EventsHidePortalEventResponse = (void);
+
+export type EventsUnhidePortalEventData = {
+    eventId: string;
+};
+
+export type EventsUnhidePortalEventResponse = (void);
 
 export type EventsExportPortalEventIcsData = {
     eventId: string;

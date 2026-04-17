@@ -1,21 +1,32 @@
 "use client"
 
-import { useQueries, useQuery } from "@tanstack/react-query"
-import { CalendarDays, Clock, Filter, MapPin, Pencil, Tag } from "lucide-react"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import {
+  CalendarDays,
+  CheckCircle,
+  Clock,
+  Eye,
+  EyeOff,
+  Filter,
+  MapPin,
+  Pencil,
+  Repeat,
+  Tag,
+} from "lucide-react"
 import Link from "next/link"
 import { useState } from "react"
 
 import {
+  EventParticipantsService,
   type EventPublic,
   EventsService,
-  type EventVenuePublic,
-  EventVenuesService,
   HumansService,
 } from "@/client"
 import { Badge } from "@/components/ui/badge"
 import { useCityProvider } from "@/providers/cityProvider"
 import { CalendarBody } from "./lib/CalendarBody"
 import { EventsToolbar } from "./lib/EventsToolbar"
+import { summarizeRrule } from "./lib/summarizeRrule"
 import {
   useEventTimezone,
   usePortalEventSettings,
@@ -47,7 +58,10 @@ export default function EventsPage() {
   const [search, setSearch] = useState("")
   const [rsvpedOnly, setRsvpedOnly] = useState(false)
   const [mineOnly, setMineOnly] = useState(false)
+  const [showHidden, setShowHidden] = useState(false)
+  const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [view, setView] = useState<"list" | "calendar">("list")
+  const queryClient = useQueryClient()
 
   const { data: currentHuman } = useQuery({
     queryKey: ["current-human"],
@@ -60,8 +74,33 @@ export default function EventsPage() {
   const { data: eventSettings } = usePortalEventSettings(city?.id)
   const eventsEnabled = eventSettings?.event_enabled ?? true
 
+  // Expansion window for recurring events. Passing start_after triggers the
+  // backend to expand RRULEs into concrete occurrences; without it, recurring
+  // events render only at their master's start (hiding the other instances
+  // from the list while the calendar still showed them).
+  const listWindow = useState(() => {
+    const start = new Date()
+    start.setUTCHours(0, 0, 0, 0)
+    const end = new Date(start)
+    end.setUTCDate(end.getUTCDate() + 180)
+    return {
+      startAfter: start.toISOString(),
+      startBefore: end.toISOString(),
+    }
+  })[0]
+
   const { data, isLoading } = useQuery({
-    queryKey: ["portal-events", city?.id, search, rsvpedOnly, mineOnly],
+    queryKey: [
+      "portal-events",
+      city?.id,
+      search,
+      rsvpedOnly,
+      mineOnly,
+      showHidden,
+      selectedTags,
+      listWindow.startAfter,
+      listWindow.startBefore,
+    ],
     queryFn: () =>
       EventsService.listPortalEvents({
         popupId: city!.id,
@@ -70,9 +109,55 @@ export default function EventsPage() {
         // otherwise restrict to what's publicly visible.
         eventStatus: mineOnly ? undefined : "published",
         rsvpedOnly: rsvpedOnly || undefined,
+        includeHidden: showHidden || undefined,
+        tags: selectedTags.length ? selectedTags : undefined,
+        startAfter: listWindow.startAfter,
+        startBefore: listWindow.startBefore,
         limit: 200,
       }),
     enabled: !!city?.id && eventsEnabled && view === "list",
+  })
+
+  const { data: hiddenCountData } = useQuery({
+    queryKey: ["portal-events-hidden-count", city?.id],
+    queryFn: () => EventsService.portalHiddenEventsCount({ popupId: city!.id }),
+    enabled: !!city?.id && eventsEnabled,
+    staleTime: 30 * 1000,
+  })
+
+  const rsvpMutation = useMutation({
+    mutationFn: (eventId: string) =>
+      EventParticipantsService.registerForEvent({ eventId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["portal-events"] })
+    },
+  })
+  const cancelRsvpMutation = useMutation({
+    mutationFn: (eventId: string) =>
+      EventParticipantsService.cancelRegistration({ eventId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["portal-events"] })
+    },
+  })
+
+  const hideMutation = useMutation({
+    mutationFn: (eventId: string) => EventsService.hidePortalEvent({ eventId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["portal-events"] })
+      queryClient.invalidateQueries({
+        queryKey: ["portal-events-hidden-count"],
+      })
+    },
+  })
+  const unhideMutation = useMutation({
+    mutationFn: (eventId: string) =>
+      EventsService.unhidePortalEvent({ eventId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["portal-events"] })
+      queryClient.invalidateQueries({
+        queryKey: ["portal-events-hidden-count"],
+      })
+    },
   })
 
   const rawEvents = data?.results ?? []
@@ -80,26 +165,6 @@ export default function EventsPage() {
     ? rawEvents.filter((e) => currentHuman && e.owner_id === currentHuman.id)
     : rawEvents
   const grouped = groupByDate(events, formatDayKey)
-
-  // Batch-fetch venue titles for events that reference a venue.
-  const venueIds = Array.from(
-    new Set(
-      events
-        .map((e) => e.venue_id)
-        .filter((v): v is string => typeof v === "string" && v.length > 0),
-    ),
-  )
-  const venueQueries = useQueries({
-    queries: venueIds.map((venueId) => ({
-      queryKey: ["portal-event-venue", venueId],
-      queryFn: () => EventVenuesService.getVenue({ venueId }),
-      staleTime: 5 * 60 * 1000,
-    })),
-  })
-  const venueMap = new Map<string, EventVenuePublic>()
-  venueQueries.forEach((q, idx) => {
-    if (q.data) venueMap.set(venueIds[idx], q.data)
-  })
 
   if (!eventsEnabled) {
     return (
@@ -136,6 +201,12 @@ export default function EventsPage() {
           onRsvpedOnlyChange={setRsvpedOnly}
           mineOnly={mineOnly}
           onMineOnlyChange={setMineOnly}
+          showHidden={showHidden}
+          onShowHiddenChange={setShowHidden}
+          hiddenCount={hiddenCountData?.count}
+          allowedTags={eventSettings?.allowed_tags ?? []}
+          selectedTags={selectedTags}
+          onSelectedTagsChange={setSelectedTags}
           canCreate={eventSettings?.can_publish_event === "everyone"}
         />
       </div>
@@ -147,6 +218,7 @@ export default function EventsPage() {
             slug={city?.slug}
             search={search}
             rsvpedOnly={rsvpedOnly}
+            tags={selectedTags}
           />
         ) : isLoading ? (
           <div className="flex items-center justify-center py-20">
@@ -170,19 +242,21 @@ export default function EventsPage() {
                 </div>
                 <div className="space-y-2 pl-5 border-l-2 border-border">
                   {dayEvents.map((event) => {
-                    const venue = event.venue_id
-                      ? venueMap.get(event.venue_id)
-                      : undefined
                     const isOwner =
                       currentHuman != null && event.owner_id === currentHuman.id
+                    const isHidden = event.hidden === true
                     return (
                       <div
                         key={event.id}
-                        className="relative rounded-xl border bg-card hover:shadow-md transition-shadow"
+                        className={
+                          isHidden
+                            ? "relative rounded-xl border bg-card opacity-60 hover:opacity-100 transition-opacity"
+                            : "relative rounded-xl border bg-card hover:shadow-md transition-shadow"
+                        }
                       >
                         <Link
                           href={`/portal/${city?.slug}/events/${event.id}`}
-                          className="block p-3 sm:p-4"
+                          className="block p-3 sm:p-4 pb-11"
                         >
                           <div className="flex items-start justify-between gap-2 mb-1 pr-8">
                             <h3 className="font-medium text-sm sm:text-base">
@@ -204,12 +278,23 @@ export default function EventsPage() {
                               {formatTime(event.end_time)}
                             </span>
                           </div>
-                          {venue && (
+                          {event.venue_title && (
                             <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
                               <MapPin className="h-3 w-3" />
                               <span className="truncate">
-                                {venue.title}
-                                {venue.location ? ` · ${venue.location}` : ""}
+                                {event.venue_title}
+                                {event.venue_location
+                                  ? ` · ${event.venue_location}`
+                                  : ""}
+                              </span>
+                            </div>
+                          )}
+                          {(event.rrule || event.recurrence_master_id) && (
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                              <Repeat className="h-3 w-3" />
+                              <span className="truncate">
+                                {summarizeRrule(event.rrule) ??
+                                  "Part of a recurring series"}
                               </span>
                             </div>
                           )}
@@ -227,16 +312,68 @@ export default function EventsPage() {
                             </div>
                           )}
                         </Link>
-                        {isOwner && (
-                          <Link
-                            href={`/portal/${city?.slug}/events/${event.id}/edit`}
-                            onClick={(e) => e.stopPropagation()}
-                            aria-label={`Edit ${event.title}`}
-                            className="absolute bottom-2 right-2 inline-flex h-7 w-7 items-center justify-center rounded-md border bg-background text-muted-foreground shadow-sm transition-colors hover:text-foreground"
+                        <div className="absolute bottom-2 right-2 flex items-center gap-1.5">
+                          {event.status === "published" &&
+                            (event.my_rsvp_status &&
+                            event.my_rsvp_status !== "cancelled" ? (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  cancelRsvpMutation.mutate(event.id)
+                                }}
+                                className="inline-flex h-7 items-center gap-1 rounded-md border border-primary/30 bg-primary/10 px-2 text-xs font-medium text-primary hover:bg-primary/20"
+                              >
+                                <CheckCircle className="h-3 w-3" />
+                                Going
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  rsvpMutation.mutate(event.id)
+                                }}
+                                className="inline-flex h-7 items-center gap-1 rounded-md border bg-background px-2 text-xs font-medium shadow-sm hover:bg-muted"
+                              >
+                                RSVP
+                              </button>
+                            ))}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              if (isHidden) unhideMutation.mutate(event.id)
+                              else hideMutation.mutate(event.id)
+                            }}
+                            aria-label={
+                              isHidden
+                                ? `Unhide ${event.title}`
+                                : `Hide ${event.title}`
+                            }
+                            title={isHidden ? "Unhide" : "Hide from my list"}
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-md border bg-background text-muted-foreground shadow-sm transition-colors hover:text-foreground"
                           >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Link>
-                        )}
+                            {isHidden ? (
+                              <EyeOff className="h-3.5 w-3.5" />
+                            ) : (
+                              <Eye className="h-3.5 w-3.5" />
+                            )}
+                          </button>
+                          {isOwner && (
+                            <Link
+                              href={`/portal/${city?.slug}/events/${event.id}/edit`}
+                              onClick={(e) => e.stopPropagation()}
+                              aria-label={`Edit ${event.title}`}
+                              className="inline-flex h-7 w-7 items-center justify-center rounded-md border bg-background text-muted-foreground shadow-sm transition-colors hover:text-foreground"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Link>
+                          )}
+                        </div>
                       </div>
                     )
                   })}

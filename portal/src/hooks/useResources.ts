@@ -1,4 +1,11 @@
-import { CalendarDays, FileText, Ticket, Users } from "lucide-react"
+import {
+  CalendarDays,
+  FileText,
+  Layers,
+  MapPin,
+  Ticket,
+  Users,
+} from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
@@ -72,6 +79,20 @@ const useResources = () => {
       icon: CalendarDays,
       status: canSeeAttendees ? "active" : "hidden",
       path: `/portal/${city?.slug}/events`,
+      children: [
+        {
+          name: "Venues",
+          icon: MapPin,
+          status: canSeeAttendees ? "active" : "hidden",
+          path: `/portal/${city?.slug}/events/venues`,
+        },
+        {
+          name: "Tracks",
+          icon: Layers,
+          status: canSeeAttendees ? "active" : "hidden",
+          path: `/portal/${city?.slug}/events/tracks`,
+        },
+      ],
     },
   ]
 

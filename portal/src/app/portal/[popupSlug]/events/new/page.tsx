@@ -175,7 +175,6 @@ export default function NewPortalEventPage() {
   const [visibility, setVisibility] = useState<Visibility>("public")
   const [maxParticipants, setMaxParticipants] = useState("")
   const [meetingUrl, setMeetingUrl] = useState("")
-  const [tagDraft, setTagDraft] = useState("")
   const [tags, setTags] = useState<string[]>([])
   const [trackId, setTrackId] = useState<string>("")
   const [coverUrl, setCoverUrl] = useState("")
@@ -352,23 +351,6 @@ export default function NewPortalEventPage() {
       toast.error(msg)
     },
   })
-
-  // ---- handlers -------------------------------------------------------
-  const addTag = (raw: string) => {
-    const t = raw.trim().toLowerCase()
-    if (!t || tags.includes(t)) {
-      setTagDraft("")
-      return
-    }
-    setTags([...tags, t])
-    setTagDraft("")
-  }
-
-  const removeTag = (idx: number) => {
-    const next = tags.slice()
-    next.splice(idx, 1)
-    setTags(next)
-  }
 
   // Local object URL of the picture the user just chose. While set, the
   // cropper dialog is open and nothing has been uploaded yet.
@@ -749,49 +731,39 @@ export default function NewPortalEventPage() {
           )}
         </div>
 
-        {/* Topic tags */}
+        {/* Topic tags — restricted to the admin-curated list */}
         <div className="space-y-2">
-          <Label htmlFor="tags">Topic</Label>
-          <div className="flex flex-wrap items-center gap-1.5 rounded-md border bg-transparent px-2 py-1.5 focus-within:ring-[3px] focus-within:ring-ring/50 focus-within:border-ring">
-            {tags.map((t, i) => (
-              <span
-                key={`${t}-${i}`}
-                className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-xs text-secondary-foreground"
-              >
-                {t}
-                <button
-                  type="button"
-                  onClick={() => removeTag(i)}
-                  aria-label={`Remove ${t}`}
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
-            ))}
-            <input
-              id="tags"
-              value={tagDraft}
-              onChange={(e) => setTagDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === "," || e.key === "Tab") {
-                  if (tagDraft.trim()) {
-                    e.preventDefault()
-                    addTag(tagDraft)
-                  }
-                } else if (
-                  e.key === "Backspace" &&
-                  !tagDraft &&
-                  tags.length > 0
-                ) {
-                  e.preventDefault()
-                  removeTag(tags.length - 1)
-                }
-              }}
-              onBlur={() => tagDraft.trim() && addTag(tagDraft)}
-              placeholder={tags.length === 0 ? "Add tag..." : ""}
-              className="flex-1 min-w-[80px] border-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-            />
-          </div>
+          <Label>Topic</Label>
+          {settings?.allowed_tags && settings.allowed_tags.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5">
+              {settings.allowed_tags.map((t) => {
+                const active = tags.includes(t)
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => {
+                      if (active) setTags(tags.filter((x) => x !== t))
+                      else setTags([...tags, t])
+                    }}
+                    className={
+                      active
+                        ? "inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-0.5 text-xs text-primary-foreground"
+                        : "inline-flex items-center gap-1 rounded-full border border-input bg-background px-2.5 py-0.5 text-xs text-muted-foreground hover:bg-muted"
+                    }
+                  >
+                    {t}
+                    {active && <X className="h-3 w-3" />}
+                  </button>
+                )
+              })}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Tags for this pop-up are not configured. Ask an admin to set them
+              in Event Settings.
+            </p>
+          )}
         </div>
 
         {/* Track */}

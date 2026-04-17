@@ -21,7 +21,15 @@ export function VenueHoursSummary({ hours, className }: Props) {
     )
   }
 
-  const byDay = new Map(hours.map((h) => [h.day_of_week, h]))
+  // Group multiple open/close rows per weekday so split schedules (e.g.
+  // 09-11 AND 17-21 on the same day) can be summarized as comma-joined
+  // ranges instead of overwriting each other.
+  const byDay = new Map<number, VenueWeeklyHourRef[]>()
+  for (const h of hours) {
+    const list = byDay.get(h.day_of_week) ?? []
+    list.push(h)
+    byDay.set(h.day_of_week, list)
+  }
 
   return (
     <div
@@ -31,15 +39,22 @@ export function VenueHoursSummary({ hours, className }: Props) {
       }
     >
       {DAY_LABELS.map((label, idx) => {
-        const entry = byDay.get(idx)
-        const closed = !entry || entry.is_closed
+        const entries = byDay.get(idx) ?? []
+        const openSlots = entries
+          .filter((e) => !e.is_closed && e.open_time && e.close_time)
+          .sort((a, b) => (a.open_time ?? "").localeCompare(b.open_time ?? ""))
         return (
           <div key={label} className="contents">
             <span className="font-medium text-foreground">{label}</span>
             <span>
-              {closed
+              {openSlots.length === 0
                 ? "Closed"
-                : `${formatTime(entry?.open_time)} – ${formatTime(entry?.close_time)}`}
+                : openSlots
+                    .map(
+                      (s) =>
+                        `${formatTime(s.open_time)} – ${formatTime(s.close_time)}`,
+                    )
+                    .join(", ")}
             </span>
           </div>
         )

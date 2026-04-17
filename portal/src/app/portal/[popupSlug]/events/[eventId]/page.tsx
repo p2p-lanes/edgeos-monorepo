@@ -37,7 +37,6 @@ import { useCityProvider } from "@/providers/cityProvider"
 import { AddToCalendarModal } from "../lib/AddToCalendarModal"
 import { summarizeRrule } from "../lib/summarizeRrule"
 import { useEventTimezone } from "../lib/useEventTimezone"
-import { useVenue } from "../lib/useVenue"
 
 export default function EventDetailPage() {
   const { getCity } = useCityProvider()
@@ -78,8 +77,6 @@ export default function EventDetailPage() {
     queryKey: ["current-human"],
     queryFn: () => HumansService.getCurrentHumanInfo(),
   })
-
-  const { data: venue } = useVenue(event?.venue_id)
 
   const participants = participantsData?.results ?? []
   const activeParticipants = participants.filter(
@@ -224,8 +221,9 @@ export default function EventDetailPage() {
     checkInMutation.isPending
   const eventStarted = new Date(event.start_time) <= new Date()
 
-  const coverUrl = event.cover_url || venue?.image_url || null
-  const coverCredit = !event.cover_url && venue?.image_url ? venue.title : null
+  const coverUrl = event.cover_url || event.venue_image_url || null
+  const coverCredit =
+    !event.cover_url && event.venue_image_url ? event.venue_title : null
 
   return (
     <div className="max-w-2xl mx-auto p-4 sm:p-6 space-y-4">
@@ -306,16 +304,18 @@ export default function EventDetailPage() {
             </p>
           </div>
         )}
-        {venue && (
+        {event.venue_title && (
           <div className="flex items-center gap-2.5">
             <div className="h-8 w-8 rounded-lg bg-green-500/10 flex items-center justify-center shrink-0">
               <MapPin className="h-4 w-4 text-green-600" />
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-medium truncate">{venue.title}</p>
-              {venue.location && (
+              <p className="text-sm font-medium truncate">
+                {event.venue_title}
+              </p>
+              {event.venue_location && (
                 <p className="text-xs text-muted-foreground truncate">
-                  {venue.location}
+                  {event.venue_location}
                 </p>
               )}
             </div>
@@ -359,7 +359,9 @@ export default function EventDetailPage() {
           endIso: event.end_time,
           description: event.content,
           location:
-            [venue?.title, venue?.location].filter(Boolean).join(" — ") || null,
+            [event.venue_title, event.venue_location]
+              .filter(Boolean)
+              .join(" — ") || null,
         }}
       />
 
@@ -522,28 +524,32 @@ export default function EventDetailPage() {
           <div className="space-y-2">
             {activeParticipants
               .slice(0, 10)
-              .map((p: EventParticipantPublic) => (
-                <div key={p.id} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center">
-                      <Users className="h-3 w-3 text-muted-foreground" />
+              .map((p: EventParticipantPublic) => {
+                const name = [p.first_name, p.last_name]
+                  .filter(Boolean)
+                  .join(" ")
+                  .trim()
+                return (
+                  <div key={p.id} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center">
+                        <Users className="h-3 w-3 text-muted-foreground" />
+                      </div>
+                      <span className="text-sm">{name || "Unnamed"}</span>
                     </div>
-                    <span className="text-sm">
-                      {p.profile_id.slice(0, 8)}...
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {p.role !== "attendee" && (
+                        <Badge variant="outline" className="text-xs">
+                          {p.role}
+                        </Badge>
+                      )}
+                      {p.status === "checked_in" && (
+                        <CheckCircle className="h-3 w-3 text-green-500" />
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    {p.role !== "attendee" && (
-                      <Badge variant="outline" className="text-xs">
-                        {p.role}
-                      </Badge>
-                    )}
-                    {p.status === "checked_in" && (
-                      <CheckCircle className="h-3 w-3 text-green-500" />
-                    )}
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             {activeParticipants.length > 10 && (
               <p className="text-xs text-muted-foreground text-center">
                 +{activeParticipants.length - 10} more

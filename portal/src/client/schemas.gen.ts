@@ -3526,6 +3526,28 @@ export const EventParticipantPublicSchema = {
             type: 'string',
             format: 'uuid',
             title: 'Id'
+        },
+        first_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'First Name'
+        },
+        last_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Name'
         }
     },
     type: 'object',
@@ -3773,6 +3795,55 @@ export const EventPublicSchema = {
                 }
             ],
             title: 'Occurrence Id'
+        },
+        venue_title: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Venue Title'
+        },
+        venue_location: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Venue Location'
+        },
+        venue_image_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Venue Image Url'
+        },
+        hidden: {
+            type: 'boolean',
+            title: 'Hidden',
+            default: false
+        },
+        my_rsvp_status: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'My Rsvp Status'
         }
     },
     type: 'object',
@@ -3811,6 +3882,25 @@ export const EventSettingsCreateSchema = {
             type: 'string',
             title: 'Timezone',
             default: 'UTC'
+        },
+        allowed_tags: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Allowed Tags',
+            default: []
+        },
+        approval_notification_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Approval Notification Email'
         }
     },
     type: 'object',
@@ -3855,6 +3945,24 @@ export const EventSettingsPublicSchema = {
             maxLength: 64,
             title: 'Timezone',
             default: 'UTC'
+        },
+        allowed_tags: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Allowed Tags'
+        },
+        approval_notification_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Approval Notification Email'
         },
         created_at: {
             type: 'string',
@@ -3933,6 +4041,31 @@ export const EventSettingsUpdateSchema = {
                 }
             ],
             title: 'Timezone'
+        },
+        allowed_tags: {
+            anyOf: [
+                {
+                    items: {
+                        type: 'string'
+                    },
+                    type: 'array'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Allowed Tags'
+        },
+        approval_notification_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Approval Notification Email'
         }
     },
     type: 'object',
@@ -4135,6 +4268,17 @@ export const EventVenueCreateSchema = {
             type: 'string',
             title: 'Title'
         },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
         location: {
             anyOf: [
                 {
@@ -4292,6 +4436,17 @@ export const EventVenuePublicSchema = {
             type: 'string',
             maxLength: 255,
             title: 'Title'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
         },
         location: {
             anyOf: [
@@ -4483,6 +4638,17 @@ export const EventVenueUpdateSchema = {
                 }
             ],
             title: 'Title'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
         },
         location: {
             anyOf: [
@@ -11729,6 +11895,42 @@ export const VenueBusySlotSchema = {
                 }
             ],
             title: 'Label'
+        },
+        event_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Event Id'
+        },
+        event_start: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Event Start'
+        },
+        event_end: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Event End'
         }
     },
     type: 'object',

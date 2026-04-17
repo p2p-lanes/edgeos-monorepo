@@ -3,9 +3,10 @@
 import {
   CalendarDays,
   CheckCircle,
-  Layers,
+  Eye,
+  EyeOff,
+  Filter,
   List,
-  MapPin,
   Pencil,
   Plus,
   Search,
@@ -13,6 +14,11 @@ import {
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 
 interface EventsToolbarProps {
@@ -25,6 +31,12 @@ interface EventsToolbarProps {
   onRsvpedOnlyChange: (value: boolean) => void
   mineOnly: boolean
   onMineOnlyChange: (value: boolean) => void
+  showHidden?: boolean
+  onShowHiddenChange?: (value: boolean) => void
+  hiddenCount?: number
+  allowedTags?: string[]
+  selectedTags?: string[]
+  onSelectedTagsChange?: (tags: string[]) => void
   canCreate: boolean
 }
 
@@ -43,6 +55,12 @@ export function EventsToolbar({
   onRsvpedOnlyChange,
   mineOnly,
   onMineOnlyChange,
+  showHidden,
+  onShowHiddenChange,
+  hiddenCount,
+  allowedTags,
+  selectedTags,
+  onSelectedTagsChange,
   canCreate,
 }: EventsToolbarProps) {
   return (
@@ -77,19 +95,92 @@ export function EventsToolbar({
         My events
       </Button>
 
-      <Button variant="outline" size="sm" asChild>
-        <Link href={`/portal/${slug}/events/venues`}>
-          <MapPin className="mr-2 h-4 w-4" />
-          Venues
-        </Link>
-      </Button>
+      {onShowHiddenChange && (
+        <Button
+          variant={showHidden ? "default" : "outline"}
+          size="sm"
+          onClick={() => onShowHiddenChange(!showHidden)}
+          aria-pressed={!!showHidden}
+          title={showHidden ? "Hiding hidden events" : "Show hidden events"}
+          disabled={!showHidden && (hiddenCount ?? 0) === 0}
+        >
+          {showHidden ? (
+            <EyeOff className="mr-2 h-4 w-4" />
+          ) : (
+            <Eye className="mr-2 h-4 w-4" />
+          )}
+          Hidden
+          {typeof hiddenCount === "number" && hiddenCount > 0 && (
+            <span className="ml-1.5 text-xs opacity-80">({hiddenCount})</span>
+          )}
+        </Button>
+      )}
 
-      <Button variant="outline" size="sm" asChild>
-        <Link href={`/portal/${slug}/events/tracks`}>
-          <Layers className="mr-2 h-4 w-4" />
-          Tracks
-        </Link>
-      </Button>
+      {allowedTags && allowedTags.length > 0 && onSelectedTagsChange && (
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant={
+                selectedTags && selectedTags.length > 0 ? "default" : "outline"
+              }
+              size="sm"
+              title="Filter by tags"
+            >
+              <Filter className="mr-2 h-4 w-4" />
+              Tags
+              {selectedTags && selectedTags.length > 0 && (
+                <span className="ml-1.5 text-xs opacity-80">
+                  ({selectedTags.length})
+                </span>
+              )}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-64 p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Filter by tag
+              </span>
+              {selectedTags && selectedTags.length > 0 && (
+                <button
+                  type="button"
+                  className="text-[11px] text-muted-foreground hover:text-foreground"
+                  onClick={() => onSelectedTagsChange([])}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {allowedTags.map((t) => {
+                const active = !!selectedTags?.includes(t)
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => {
+                      const current = selectedTags ?? []
+                      onSelectedTagsChange(
+                        active
+                          ? current.filter((x) => x !== t)
+                          : [...current, t],
+                      )
+                    }}
+                    aria-pressed={active}
+                    className={cn(
+                      "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium leading-none transition-colors",
+                      active
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-input bg-background text-muted-foreground hover:bg-muted hover:text-foreground",
+                    )}
+                  >
+                    {t}
+                  </button>
+                )
+              })}
+            </div>
+          </PopoverContent>
+        </Popover>
+      )}
 
       {/* Segmented List / Calendar switcher — same page, only the body
           swaps. Active option shows label + icon, inactive is icon-only. */}
