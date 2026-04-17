@@ -18,11 +18,12 @@ import {
 } from "lucide-react"
 import { Suspense, useState } from "react"
 
-import { type PopupAdmin, PopupsService } from "@/client"
+import { type PopupAdmin, PopupsService, type SaleType } from "@/client"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -186,11 +187,31 @@ function formatDate(dateStr: string | null | undefined): string {
   }
 }
 
+function SaleTypeBadge({ saleType }: { saleType: SaleType | undefined }) {
+  if (saleType === "direct") {
+    return (
+      <Badge
+        variant="outline"
+        className="border-amber-300 bg-amber-100 text-amber-800 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+      >
+        Direct
+      </Badge>
+    )
+  }
+  // Default: "application" or undefined (pre-existing popups default to application)
+  return <Badge variant="secondary">Application</Badge>
+}
+
 const columns: ColumnDef<PopupAdmin>[] = [
   {
     accessorKey: "name",
     header: ({ column }) => <SortableHeader label="Name" column={column} />,
     cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
+  },
+  {
+    accessorKey: "sale_type",
+    header: () => <span>Sale Type</span>,
+    cell: ({ row }) => <SaleTypeBadge saleType={row.original.sale_type} />,
   },
   {
     accessorKey: "status",
@@ -251,7 +272,7 @@ function PopupsTableContent() {
       columns={columns}
       data={popups.results}
       searchPlaceholder="Search by name..."
-      hiddenOnMobile={["start_date", "end_date"]}
+      hiddenOnMobile={["sale_type", "start_date", "end_date"]}
       searchValue={search}
       onSearchChange={setSearch}
       serverPagination={{

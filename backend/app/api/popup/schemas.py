@@ -4,12 +4,24 @@ from decimal import Decimal
 from enum import StrEnum
 from typing import Self
 
-from pydantic import model_validator
+from pydantic import field_validator, model_validator
 from sqlalchemy import Boolean, Column, Numeric
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlmodel import Field, SQLModel, String
 
+from app.api.shared.enums import SaleType
 from app.utils.utils import slugify
+
+ALLOWED_CURRENCIES = ("USD", "ARS", "EUR")
+
+
+def validate_currency_value(value: str | None) -> str | None:
+    if value is None:
+        return value
+    normalized = value.upper()
+    if normalized not in ALLOWED_CURRENCIES:
+        raise ValueError(f"currency must be one of {ALLOWED_CURRENCIES}")
+    return normalized
 
 
 class PopupStatus(StrEnum):
@@ -28,6 +40,10 @@ class PopupBase(SQLModel):
     start_date: datetime | None = None
     end_date: datetime | None = None
     status: PopupStatus = PopupStatus.draft
+    sale_type: SaleType = Field(
+        default=SaleType.application,
+        sa_column=Column(String, nullable=False, server_default="application"),
+    )
     allows_spouse: bool | None = False
     allows_children: bool | None = False
     allows_coupons: bool | None = False
@@ -50,6 +66,7 @@ class PopupBase(SQLModel):
     invoice_company_name: str | None = None
     invoice_company_address: str | None = None
     invoice_company_email: str | None = None
+    currency: str = Field(default="USD", max_length=3)
     requires_application_fee: bool = Field(
         default=False,
         sa_column=Column(Boolean, nullable=False, server_default="false"),
@@ -68,6 +85,11 @@ class PopupBase(SQLModel):
         sa_column=Column(ARRAY(String), nullable=False, server_default="{en}"),
     )
 
+    @field_validator("currency")
+    @classmethod
+    def validate_currency(cls, value: str) -> str:
+        return validate_currency_value(value) or "USD"
+
 
 class PopupCreate(SQLModel):
     tenant_id: uuid.UUID | None = None
@@ -78,6 +100,7 @@ class PopupCreate(SQLModel):
     start_date: datetime | None = None
     end_date: datetime | None = None
     status: PopupStatus = PopupStatus.draft
+    sale_type: SaleType = SaleType.application
     allows_spouse: bool | None = False
     allows_children: bool | None = False
     allows_coupons: bool | None = False
@@ -94,11 +117,17 @@ class PopupCreate(SQLModel):
     invoice_company_name: str | None = None
     invoice_company_address: str | None = None
     invoice_company_email: str | None = None
+    currency: str = Field(default="USD", max_length=3)
     requires_application_fee: bool = False
     application_fee_amount: Decimal | None = None
     theme_config: dict | None = None
     default_language: str = "en"
     supported_languages: list[str] = ["en"]
+
+    @field_validator("currency")
+    @classmethod
+    def validate_currency(cls, value: str) -> str:
+        return validate_currency_value(value) or "USD"
 
     @model_validator(mode="after")
     def generate_slug(self) -> Self:
@@ -136,11 +165,17 @@ class PopupUpdate(SQLModel):
     invoice_company_name: str | None = None
     invoice_company_address: str | None = None
     invoice_company_email: str | None = None
+    currency: str | None = Field(default=None, max_length=3)
     requires_application_fee: bool | None = None
     application_fee_amount: Decimal | None = None
     theme_config: dict | None = None
     default_language: str | None = None
     supported_languages: list[str] | None = None
+
+    @field_validator("currency")
+    @classmethod
+    def validate_currency(cls, value: str | None) -> str | None:
+        return validate_currency_value(value)
 
     @model_validator(mode="after")
     def validate_fee_config(self) -> Self:
@@ -162,6 +197,7 @@ class PopupPublic(SQLModel):
     location: str | None = None
     slug: str
     status: PopupStatus = PopupStatus.draft
+    sale_type: SaleType = SaleType.application
     start_date: datetime | None = None
     end_date: datetime | None = None
     image_url: str | None = None
@@ -174,6 +210,7 @@ class PopupPublic(SQLModel):
     allows_children: bool | None = False
     allows_coupons: bool | None = False
     allows_scholarship: bool = False
+    currency: str = "USD"
     terms_and_conditions_url: str | None = None
     invoice_company_name: str | None = None
     requires_application_fee: bool = False

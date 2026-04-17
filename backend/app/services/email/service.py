@@ -43,6 +43,9 @@ if TYPE_CHECKING:
     from app.api.payment.models import Payments
 
 
+CURRENCY_SYMBOLS: dict[str, str] = {"USD": "$", "ARS": "$", "EUR": "€"}
+
+
 @dataclass
 class EmailAttachment:
     """A file attachment for an email."""
@@ -61,9 +64,12 @@ def compute_order_summary(payment: "Payments") -> str:
     lines: list[str] = []
     for ps in payment.products_snapshot:
         attendee_name = ps.attendee.name if ps.attendee else "N/A"
+        currency = ps.product_currency or payment.currency or "USD"
+        symbol = CURRENCY_SYMBOLS.get(currency)
+        price = f"{float(ps.product_price):.2f}"
+        display_price = f"{symbol}{price}" if symbol else f"{price} {currency}"
         lines.append(
-            f"<strong>{ps.product_name}</strong> ({attendee_name})"
-            f" — ${float(ps.product_price):.2f}"
+            f"<strong>{ps.product_name}</strong> ({attendee_name}) — {display_price}"
         )
     return "<br>".join(lines)
 

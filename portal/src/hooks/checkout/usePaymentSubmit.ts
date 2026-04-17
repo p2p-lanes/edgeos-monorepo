@@ -1,7 +1,7 @@
 "use client"
 
 import { useQueryClient } from "@tanstack/react-query"
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import { PaymentsService } from "@/client"
 import { markPurchasePending } from "@/hooks/usePaymentRedirect"
@@ -65,6 +65,10 @@ export function usePaymentSubmit({
 }: UsePaymentSubmitParams) {
   const queryClient = useQueryClient()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  // Holds the id of the last payment created by this hook. Used by payment
+  // verification polling after a SimpleFI redirect (direct-sale flow has no
+  // application_id, so verification keys off payment_id instead).
+  const lastPaymentIdRef = useRef<string | null>(null)
 
   // Reset isSubmitting when page is restored from bfcache
   useEffect(() => {
@@ -79,7 +83,12 @@ export function usePaymentSubmit({
   }, [])
 
   const submitPayment = useCallback(async (): Promise<PaymentSubmitResult> => {
-    if (!applicationId) {
+    // Direct-sale flow: no application_id, but we do have a popup_id. We POST
+    // to /payments/direct with a minimal product list (no housing/merch/etc.
+    // in Feature 1 scope — those extras come with checkout_mode work).
+    const isDirectSale = !applicationId && !!popupId
+
+    if (!isDirectSale && !applicationId) {
       return { success: false, error: "Application not available" }
     }
 
@@ -109,19 +118,34 @@ export function usePaymentSubmit({
         },
       )
 
-      const result = await PaymentsService.createMyPayment({
-        requestBody: {
-          application_id: applicationId,
-          products: productsToSend,
-          coupon_code: promoCodeValid ? promoCode : undefined,
-          edit_passes: isEditing || isMonthUpgrade ? true : undefined,
-          insurance: insurance || undefined,
-        },
-      })
+      const result = isDirectSale
+        ? await PaymentsService.createDirectPayment({
+            requestBody: {
+              popup_id: popupId!,
+              products: productsToSend.map((p) => ({
+                product_id: p.product_id,
+                quantity: p.quantity,
+              })),
+            },
+          })
+        : await PaymentsService.createMyPayment({
+            requestBody: {
+              application_id: applicationId!,
+              products: productsToSend,
+              coupon_code: promoCodeValid ? promoCode : undefined,
+              edit_passes: isEditing || isMonthUpgrade ? true : undefined,
+              insurance: insurance || undefined,
+            },
+          })
 
       const data = result as {
+        id?: string
         status?: string
         checkout_url?: string | null
+      }
+
+      if (data.id) {
+        lastPaymentIdRef.current = data.id
       }
 
       if (data.status === "pending" && data.checkout_url) {
@@ -192,5 +216,5 @@ export function usePaymentSubmit({
     popupId,
   ])
 
-  return { submitPayment, isSubmitting }
+  return { submitPayment, isSubmitting, lastPaymentIdRef }
 }

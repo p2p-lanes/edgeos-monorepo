@@ -301,7 +301,8 @@ export type AttendeeInfo = {
  */
 export type AttendeePublic = {
     tenant_id: string;
-    application_id: string;
+    application_id?: (string | null);
+    popup_id: string;
     human_id?: (string | null);
     name: string;
     category: string;
@@ -626,6 +627,25 @@ export type DirectoryProduct = {
     duration_type?: (string | null);
     start_date?: (string | null);
     end_date?: (string | null);
+};
+
+/**
+ * Product selection for a direct purchase (no attendee_id — server creates).
+ */
+export type DirectProductRequest = {
+    product_id: string;
+    quantity?: number;
+};
+
+/**
+ * Schema for creating a direct-sale payment.
+ *
+ * Used for popups with sale_type="direct". Auth is via CurrentHuman — the
+ * server creates/reuses the Attendee from Human data automatically.
+ */
+export type DirectPurchaseCreate = {
+    popup_id: string;
+    products: Array<DirectProductRequest>;
 };
 
 /**
@@ -1432,9 +1452,15 @@ export type ParticipantStatus = 'registered' | 'checked_in' | 'cancelled';
 
 /**
  * Schema for creating a payment.
+ *
+ * Either application_id (application-based flow) or popup_id (direct-sale)
+ * must be provided — at least one source is required. The existing
+ * application-based flow always passes application_id; direct-sale uses
+ * DirectPurchaseCreate, which is translated into this shape server-side.
  */
 export type PaymentCreate = {
-    application_id: string;
+    application_id?: (string | null);
+    popup_id?: (string | null);
     products: Array<PaymentProductRequest>;
     coupon_code?: (string | null);
     edit_passes?: boolean;
@@ -1482,6 +1508,7 @@ export type PaymentProductResponse = {
     product_description?: (string | null);
     product_price: string;
     product_category: string;
+    product_currency: string;
     attendee_name?: (string | null);
     created_at: string;
 };
@@ -1491,12 +1518,14 @@ export type PaymentProductResponse = {
  */
 export type PaymentPublic = {
     tenant_id: string;
-    application_id: string;
+    application_id?: (string | null);
+    popup_id: string;
     external_id?: (string | null);
     status?: string;
     amount?: string;
     insurance_amount?: string;
     currency?: string;
+    settlement_currency?: (string | null);
     rate?: (string | null);
     source?: (string | null);
     checkout_url?: (string | null);
@@ -1516,9 +1545,9 @@ export type PaymentPublic = {
 };
 
 /**
- * Payment source/provider.
+ * Settlement rail/provider shown to users.
  */
-export type PaymentSource = 'SimpleFI' | 'Stripe';
+export type PaymentSource = 'SimpleFI' | 'Stripe' | 'MercadoPago';
 
 /**
  * Statistics for payments.
@@ -1558,6 +1587,7 @@ export type PaymentUpdate = {
     source?: (PaymentSource | null);
     rate?: (number | string | null);
     currency?: (string | null);
+    settlement_currency?: (string | null);
 };
 
 /**
@@ -1572,6 +1602,7 @@ export type PopupAdmin = {
     start_date?: (string | null);
     end_date?: (string | null);
     status?: PopupStatus;
+    sale_type?: SaleType;
     allows_spouse?: (boolean | null);
     allows_children?: (boolean | null);
     allows_coupons?: (boolean | null);
@@ -1588,6 +1619,7 @@ export type PopupAdmin = {
     invoice_company_name?: (string | null);
     invoice_company_address?: (string | null);
     invoice_company_email?: (string | null);
+    currency?: string;
     requires_application_fee?: boolean;
     application_fee_amount?: (string | null);
     theme_config?: ({
@@ -1607,6 +1639,7 @@ export type PopupCreate = {
     start_date?: (string | null);
     end_date?: (string | null);
     status?: PopupStatus;
+    sale_type?: SaleType;
     allows_spouse?: (boolean | null);
     allows_children?: (boolean | null);
     allows_coupons?: (boolean | null);
@@ -1623,6 +1656,7 @@ export type PopupCreate = {
     invoice_company_name?: (string | null);
     invoice_company_address?: (string | null);
     invoice_company_email?: (string | null);
+    currency?: string;
     requires_application_fee?: boolean;
     application_fee_amount?: (number | string | null);
     theme_config?: ({
@@ -1642,6 +1676,7 @@ export type PopupPublic = {
     location?: (string | null);
     slug: string;
     status?: PopupStatus;
+    sale_type?: SaleType;
     start_date?: (string | null);
     end_date?: (string | null);
     image_url?: (string | null);
@@ -1654,6 +1689,7 @@ export type PopupPublic = {
     allows_children?: (boolean | null);
     allows_coupons?: (boolean | null);
     allows_scholarship?: boolean;
+    currency?: string;
     terms_and_conditions_url?: (string | null);
     invoice_company_name?: (string | null);
     requires_application_fee?: boolean;
@@ -1721,6 +1757,7 @@ export type PopupUpdate = {
     invoice_company_name?: (string | null);
     invoice_company_address?: (string | null);
     invoice_company_email?: (string | null);
+    currency?: (string | null);
     requires_application_fee?: (boolean | null);
     application_fee_amount?: (number | string | null);
     theme_config?: ({
@@ -2005,6 +2042,15 @@ export type ReviewSummary = {
     weighted_score?: (number | null);
     reviews: Array<ApplicationReviewPublic>;
 };
+
+/**
+ * Popup sale model.
+ *
+ * - application: traditional application-based flow (approval required).
+ * - direct: direct purchase by a logged-in Human, no application.
+ * Enum is extensible for future types (e.g. waitlist, lottery, registration).
+ */
+export type SaleType = 'application' | 'direct';
 
 /**
  * Admin request body for PATCH /applications/{id}/scholarship.
@@ -3732,6 +3778,12 @@ export type PaymentsCreateMyPaymentData = {
 };
 
 export type PaymentsCreateMyPaymentResponse = (PaymentPublic);
+
+export type PaymentsCreateDirectPaymentData = {
+    requestBody: DirectPurchaseCreate;
+};
+
+export type PaymentsCreateDirectPaymentResponse = (PaymentPublic);
 
 export type PaymentsSimplefiWebhookResponse = ({
     [key: string]: unknown;

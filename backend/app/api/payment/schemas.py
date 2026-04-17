@@ -3,8 +3,8 @@ from datetime import datetime
 from decimal import Decimal
 from enum import Enum
 
-from pydantic import BaseModel, ConfigDict, field_validator
-from sqlalchemy import Integer, Numeric, Text
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from sqlalchemy import Integer, Numeric, String, Text
 from sqlmodel import Column, Field, SQLModel
 
 
@@ -16,10 +16,11 @@ class PaymentType(str, Enum):
 
 
 class PaymentSource(str, Enum):
-    """Payment source/provider."""
+    """Settlement rail/provider shown to users."""
 
     SIMPLEFI = "SimpleFI"
     STRIPE = "Stripe"
+    MERCADOPAGO = "MercadoPago"
 
 
 class PaymentStatus(str, Enum):
@@ -50,13 +51,20 @@ class PaymentProductBase(SQLModel):
     product_description: str | None = Field(default=None, sa_type=Text())
     product_price: Decimal = Field(sa_column=Column(Numeric(10, 2), nullable=False))
     product_category: str
+    product_currency: str = Field(
+        default="USD",
+        sa_column=Column(String(3), nullable=False, server_default="USD"),
+    )
 
 
 class PaymentBase(SQLModel):
     """Base payment schema."""
 
     tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
-    application_id: uuid.UUID = Field(foreign_key="applications.id", index=True)
+    application_id: uuid.UUID | None = Field(
+        default=None, foreign_key="applications.id", index=True, nullable=True
+    )
+    popup_id: uuid.UUID = Field(foreign_key="popups.id", index=True)
     external_id: str | None = Field(default=None, nullable=True)
     status: str = Field(default=PaymentStatus.PENDING.value, index=True)
     amount: Decimal = Field(
@@ -67,6 +75,10 @@ class PaymentBase(SQLModel):
         sa_column=Column(Numeric(10, 2), nullable=False, server_default="0"),
     )
     currency: str = Field(default="USD")
+    settlement_currency: str | None = Field(
+        default=None,
+        sa_column=Column(String(16), nullable=True),
+    )
     rate: Decimal | None = Field(
         default=None, sa_column=Column(Numeric(18, 8), nullable=True)
     )
@@ -119,6 +131,7 @@ class PaymentProductResponse(BaseModel):
     product_description: str | None = None
     product_price: Decimal
     product_category: str
+    product_currency: str
     attendee_name: str | None = None
     created_at: datetime
 
@@ -126,9 +139,16 @@ class PaymentProductResponse(BaseModel):
 
 
 class PaymentCreate(BaseModel):
-    """Schema for creating a payment."""
+    """Schema for creating a payment.
 
-    application_id: uuid.UUID
+    Either application_id (application-based flow) or popup_id (direct-sale)
+    must be provided — at least one source is required. The existing
+    application-based flow always passes application_id; direct-sale uses
+    DirectPurchaseCreate, which is translated into this shape server-side.
+    """
+
+    application_id: uuid.UUID | None = None
+    popup_id: uuid.UUID | None = None
     products: list[PaymentProductRequest]
     coupon_code: str | None = None
     edit_passes: bool = False
@@ -140,6 +160,40 @@ class PaymentCreate(BaseModel):
         cls,
         v: list[PaymentProductRequest],
     ) -> list[PaymentProductRequest]:
+        if not v:
+            raise ValueError("At least one product must be selected")
+        return v
+
+    @model_validator(mode="after")
+    def validate_source(self) -> "PaymentCreate":
+        if self.application_id is None and self.popup_id is None:
+            raise ValueError("Either application_id or popup_id is required")
+        return self
+
+
+class DirectProductRequest(BaseModel):
+    """Product selection for a direct purchase (no attendee_id — server creates)."""
+
+    product_id: uuid.UUID
+    quantity: int = 1
+
+
+class DirectPurchaseCreate(BaseModel):
+    """Schema for creating a direct-sale payment.
+
+    Used for popups with sale_type="direct". Auth is via CurrentHuman — the
+    server creates/reuses the Attendee from Human data automatically.
+    """
+
+    popup_id: uuid.UUID
+    products: list[DirectProductRequest]
+
+    @field_validator("products", mode="before")
+    @classmethod
+    def validate_products(
+        cls,
+        v: list[DirectProductRequest],
+    ) -> list[DirectProductRequest]:
         if not v:
             raise ValueError("At least one product must be selected")
         return v
@@ -188,6 +242,7 @@ class PaymentUpdate(BaseModel):
     source: PaymentSource | None = None
     rate: Decimal | None = None
     currency: str | None = None
+    settlement_currency: str | None = None
 
 
 class PaymentFilter(BaseModel):

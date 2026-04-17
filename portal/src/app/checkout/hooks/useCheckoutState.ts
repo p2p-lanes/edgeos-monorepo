@@ -2,12 +2,27 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useState } from "react"
-import { ApiError, type ApplicationPublic, ApplicationsService } from "@/client"
+import {
+  ApiError,
+  type ApplicationPublic,
+  ApplicationsService,
+  HumansService,
+} from "@/client"
 import { queryKeys } from "@/lib/query-keys"
 import type { CheckoutState, FormDataProps } from "../types"
 import useCookies from "./useCookies"
 
-const useCheckoutState = ({ popupId }: { popupId: string }) => {
+interface UseCheckoutStateProps {
+  popupId: string
+  saleType: "application" | "direct"
+  groupId?: string | null
+}
+
+const useCheckoutState = ({
+  popupId,
+  saleType,
+  groupId,
+}: UseCheckoutStateProps) => {
   const queryClient = useQueryClient()
   const [checkoutState, setCheckoutState] = useState<CheckoutState>("form")
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -24,6 +39,19 @@ const useCheckoutState = ({ popupId }: { popupId: string }) => {
           popup_id: popupId,
         }),
       )
+
+      if (saleType === "direct") {
+        await HumansService.updateCurrentHuman({
+          requestBody: {
+            first_name: formData.first_name,
+            last_name: formData.last_name,
+            telegram: formData.telegram,
+            gender: formData.gender || undefined,
+          },
+        })
+
+        return { matchingApp: null }
+      }
 
       // Check if an application already exists (e.g. user navigated back)
       const existingApps = queryClient.getQueryData<ApplicationPublic[]>(
@@ -51,6 +79,7 @@ const useCheckoutState = ({ popupId }: { popupId: string }) => {
             email: formData.email,
             telegram: formData.telegram,
             gender: formData.gender || undefined,
+            group_id: groupId ?? undefined,
           },
         })
       }
@@ -69,11 +98,16 @@ const useCheckoutState = ({ popupId }: { popupId: string }) => {
           refetchType: "none",
         })
       }
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.profile.current,
+        refetchType: "active",
+      })
       setCheckoutState("passes")
       setErrorMessage(null)
     },
     onError: async (error: any) => {
       if (
+        saleType === "application" &&
         error instanceof ApiError &&
         (error.status === 400 ||
           error.status === 409 ||

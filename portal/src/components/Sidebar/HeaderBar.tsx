@@ -11,6 +11,7 @@ import {
   BreadcrumbSeparator,
 } from "../ui/breadcrumb"
 import BreadcrumbSegment from "./BreadcrumbSegment"
+import CartBadge from "./CartBadge"
 import useGroupMapping from "./hooks/useGroupMapping"
 import { SidebarTrigger } from "./SidebarComponents"
 
@@ -26,8 +27,10 @@ const HeaderBar = () => {
   }
 
   const pathSegments = pathname.split("/").filter(Boolean).slice(2)
+  const fallbackSegments =
+    city?.sale_type === "direct" ? ["checkout"] : ["application"]
   const pathsToDisplay =
-    pathSegments.length > 0 ? pathSegments : ["application"]
+    pathSegments.length > 0 ? pathSegments : fallbackSegments
 
   // Build cumulative href per segment so each breadcrumb links back to its
   // own level. Anchored at `/portal/{slug}` when a slug is present;
@@ -71,7 +74,8 @@ const HeaderBar = () => {
           })}
         </BreadcrumbList>
       </Breadcrumb>
-      <div className="ml-auto">
+      <div className="ml-auto flex items-center gap-2">
+        <CartBadge />
         <LanguageSwitcher />
       </div>
     </header>

@@ -16,33 +16,6 @@ interface ProductStrategy {
   ) => AttendeePassState[]
 }
 
-class ExclusiveProductStrategy implements ProductStrategy {
-  handleSelection(
-    attendees: AttendeePassState[],
-    attendeeId: string,
-    product: ProductsPass,
-  ): AttendeePassState[] {
-    return attendees.map((attendee) => {
-      if (attendee.id !== attendeeId) return attendee
-
-      const willBeSelected = !product?.selected
-
-      return {
-        ...attendee,
-        products: attendee.products.map((p) => ({
-          ...p,
-          selected:
-            p.id === product.id
-              ? !p.selected
-              : willBeSelected && !p.purchased
-                ? false
-                : p.selected,
-        })),
-      }
-    })
-  }
-}
-
 class PatreonProductStrategy implements ProductStrategy {
   private priceStrategy: PriceStrategy
 
@@ -269,12 +242,32 @@ class DayProductStrategy implements ProductStrategy {
   }
 }
 
-/**
- * Wraps any strategy to deselect exclusive products when a non-exclusive
- * product is selected, ensuring mutual exclusivity works both ways.
- */
 class ExclusivityGuard implements ProductStrategy {
   constructor(private inner: ProductStrategy) {}
+
+  private isActive(product: ProductsPass): boolean {
+    if (product.purchased) return true
+    if (product.selected) return true
+    if (
+      product.duration_type === "day" ||
+      supportsQuantitySelector(product.max_quantity)
+    ) {
+      return (product.quantity ?? 0) > 0
+    }
+    return false
+  }
+
+  private clearSelection(product: ProductsPass): ProductsPass {
+    const usesQuantity =
+      product.duration_type === "day" ||
+      supportsQuantitySelector(product.max_quantity)
+
+    return {
+      ...product,
+      selected: false,
+      quantity: usesQuantity ? 0 : product.quantity,
+    }
+  }
 
   handleSelection(
     attendees: AttendeePassState[],
@@ -289,17 +282,27 @@ class ExclusivityGuard implements ProductStrategy {
       discount,
     )
 
-    const willBeSelected = !product.selected
-    if (!willBeSelected) return result
-
     return result.map((attendee) => {
       if (attendee.id !== attendeeId) return attendee
+
+      const updatedTarget = attendee.products.find((p) => p.id === product.id)
+      if (!updatedTarget || !this.isActive(updatedTarget)) return attendee
+
       return {
         ...attendee,
-        products: attendee.products.map((p) => ({
-          ...p,
-          selected: p.exclusive && !p.purchased ? false : p.selected,
-        })),
+        products: attendee.products.map((p) => {
+          if (p.id === updatedTarget.id || p.purchased) return p
+
+          if (updatedTarget.exclusive) {
+            return this.clearSelection(p)
+          }
+
+          if (p.exclusive) {
+            return this.clearSelection(p)
+          }
+
+          return p
+        }),
       }
     })
   }
@@ -338,11 +341,11 @@ export const getProductStrategy = (
 ): ProductStrategy => {
   if (isEditing) return new EditProductStrategy()
 
-  if (product.exclusive) return new ExclusiveProductStrategy()
-
-  if (product.category === "patreon") return new PatreonProductStrategy()
-
   const baseStrategy = (() => {
+    if (product.category === "patreon") {
+      return new PatreonProductStrategy()
+    }
+
     switch (product.duration_type) {
       case "month":
         return new MonthProductStrategy()

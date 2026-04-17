@@ -1435,9 +1435,21 @@ export const AttendeePublicSchema = {
             title: 'Tenant Id'
         },
         application_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Application Id'
+        },
+        popup_id: {
             type: 'string',
             format: 'uuid',
-            title: 'Application Id'
+            title: 'Popup Id'
         },
         human_id: {
             anyOf: [
@@ -1533,7 +1545,7 @@ export const AttendeePublicSchema = {
         }
     },
     type: 'object',
-    required: ['tenant_id', 'application_id', 'name', 'category', 'check_in_code', 'id'],
+    required: ['tenant_id', 'popup_id', 'name', 'category', 'check_in_code', 'id'],
     title: 'AttendeePublic',
     description: 'Attendee schema for API responses.'
 } as const;
@@ -2775,6 +2787,49 @@ export const DashboardStatsSchema = {
     required: ['applications', 'attendees', 'payments'],
     title: 'DashboardStats',
     description: 'Complete dashboard statistics.'
+} as const;
+
+export const DirectProductRequestSchema = {
+    properties: {
+        product_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Product Id'
+        },
+        quantity: {
+            type: 'integer',
+            title: 'Quantity',
+            default: 1
+        }
+    },
+    type: 'object',
+    required: ['product_id'],
+    title: 'DirectProductRequest',
+    description: 'Product selection for a direct purchase (no attendee_id — server creates).'
+} as const;
+
+export const DirectPurchaseCreateSchema = {
+    properties: {
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        products: {
+            items: {
+                '$ref': '#/components/schemas/DirectProductRequest'
+            },
+            type: 'array',
+            title: 'Products'
+        }
+    },
+    type: 'object',
+    required: ['popup_id', 'products'],
+    title: 'DirectPurchaseCreate',
+    description: `Schema for creating a direct-sale payment.
+
+Used for popups with sale_type="direct". Auth is via CurrentHuman — the
+server creates/reuses the Attendee from Human data automatically.`
 } as const;
 
 export const DirectoryProductSchema = {
@@ -7110,9 +7165,28 @@ export const ParticipantStatusSchema = {
 export const PaymentCreateSchema = {
     properties: {
         application_id: {
-            type: 'string',
-            format: 'uuid',
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
             title: 'Application Id'
+        },
+        popup_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Id'
         },
         products: {
             items: {
@@ -7144,9 +7218,14 @@ export const PaymentCreateSchema = {
         }
     },
     type: 'object',
-    required: ['application_id', 'products'],
+    required: ['products'],
     title: 'PaymentCreate',
-    description: 'Schema for creating a payment.'
+    description: `Schema for creating a payment.
+
+Either application_id (application-based flow) or popup_id (direct-sale)
+must be provided — at least one source is required. The existing
+application-based flow always passes application_id; direct-sale uses
+DirectPurchaseCreate, which is translated into this shape server-side.`
 } as const;
 
 export const PaymentPreviewSchema = {
@@ -7345,6 +7424,10 @@ export const PaymentProductResponseSchema = {
             type: 'string',
             title: 'Product Category'
         },
+        product_currency: {
+            type: 'string',
+            title: 'Product Currency'
+        },
         attendee_name: {
             anyOf: [
                 {
@@ -7363,7 +7446,7 @@ export const PaymentProductResponseSchema = {
         }
     },
     type: 'object',
-    required: ['product_id', 'attendee_id', 'quantity', 'product_name', 'product_price', 'product_category', 'created_at'],
+    required: ['product_id', 'attendee_id', 'quantity', 'product_name', 'product_price', 'product_category', 'product_currency', 'created_at'],
     title: 'PaymentProductResponse',
     description: 'Payment product snapshot in response.'
 } as const;
@@ -7376,9 +7459,21 @@ export const PaymentPublicSchema = {
             title: 'Tenant Id'
         },
         application_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Application Id'
+        },
+        popup_id: {
             type: 'string',
             format: 'uuid',
-            title: 'Application Id'
+            title: 'Popup Id'
         },
         external_id: {
             anyOf: [
@@ -7412,6 +7507,17 @@ export const PaymentPublicSchema = {
             type: 'string',
             title: 'Currency',
             default: 'USD'
+        },
+        settlement_currency: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Settlement Currency'
         },
         rate: {
             anyOf: [
@@ -7571,16 +7677,16 @@ export const PaymentPublicSchema = {
         }
     },
     type: 'object',
-    required: ['tenant_id', 'application_id', 'id'],
+    required: ['tenant_id', 'popup_id', 'id'],
     title: 'PaymentPublic',
     description: 'Payment schema for API responses.'
 } as const;
 
 export const PaymentSourceSchema = {
     type: 'string',
-    enum: ['SimpleFI', 'Stripe'],
+    enum: ['SimpleFI', 'Stripe', 'MercadoPago'],
     title: 'PaymentSource',
-    description: 'Payment source/provider.'
+    description: 'Settlement rail/provider shown to users.'
 } as const;
 
 export const PaymentStatsSchema = {
@@ -7727,6 +7833,17 @@ export const PaymentUpdateSchema = {
                 }
             ],
             title: 'Currency'
+        },
+        settlement_currency: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Settlement Currency'
         }
     },
     type: 'object',
@@ -7798,6 +7915,10 @@ export const PopupAdminSchema = {
         status: {
             '$ref': '#/components/schemas/PopupStatus',
             default: 'draft'
+        },
+        sale_type: {
+            '$ref': '#/components/schemas/SaleType',
+            default: 'application'
         },
         allows_spouse: {
             anyOf: [
@@ -7965,6 +8086,12 @@ export const PopupAdminSchema = {
                 }
             ],
             title: 'Invoice Company Email'
+        },
+        currency: {
+            type: 'string',
+            maxLength: 3,
+            title: 'Currency',
+            default: 'USD'
         },
         requires_application_fee: {
             type: 'boolean',
@@ -8094,6 +8221,10 @@ export const PopupCreateSchema = {
             '$ref': '#/components/schemas/PopupStatus',
             default: 'draft'
         },
+        sale_type: {
+            '$ref': '#/components/schemas/SaleType',
+            default: 'application'
+        },
         allows_spouse: {
             anyOf: [
                 {
@@ -8275,6 +8406,12 @@ export const PopupCreateSchema = {
             ],
             title: 'Invoice Company Email'
         },
+        currency: {
+            type: 'string',
+            maxLength: 3,
+            title: 'Currency',
+            default: 'USD'
+        },
         requires_application_fee: {
             type: 'boolean',
             title: 'Requires Application Fee',
@@ -8366,6 +8503,10 @@ export const PopupPublicSchema = {
         status: {
             '$ref': '#/components/schemas/PopupStatus',
             default: 'draft'
+        },
+        sale_type: {
+            '$ref': '#/components/schemas/SaleType',
+            default: 'application'
         },
         start_date: {
             anyOf: [
@@ -8497,6 +8638,11 @@ export const PopupPublicSchema = {
             type: 'boolean',
             title: 'Allows Scholarship',
             default: false
+        },
+        currency: {
+            type: 'string',
+            title: 'Currency',
+            default: 'USD'
         },
         terms_and_conditions_url: {
             anyOf: [
@@ -8942,6 +9088,18 @@ export const PopupUpdateSchema = {
                 }
             ],
             title: 'Invoice Company Email'
+        },
+        currency: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 3
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Currency'
         },
         requires_application_fee: {
             anyOf: [
@@ -10390,6 +10548,17 @@ export const ReviewSummarySchema = {
     required: ['total_reviews', 'strong_yes_count', 'yes_count', 'no_count', 'strong_no_count', 'reviews'],
     title: 'ReviewSummary',
     description: 'Summary of reviews for an application.'
+} as const;
+
+export const SaleTypeSchema = {
+    type: 'string',
+    enum: ['application', 'direct'],
+    title: 'SaleType',
+    description: `Popup sale model.
+
+- application: traditional application-based flow (approval required).
+- direct: direct purchase by a logged-in Human, no application.
+Enum is extensible for future types (e.g. waitlist, lottery, registration).`
 } as const;
 
 export const ScholarshipDecisionRequestSchema = {

@@ -627,6 +627,7 @@ def _seed_applications(
             attendee = Attendees(
                 tenant_id=tenant_id,
                 application_id=application.id,
+                popup_id=popup.id,
                 human_id=attendee_human_id,
                 name=attendee_data["name"],
                 category=attendee_data["category"],
@@ -716,9 +717,11 @@ def _seed_payments(
         payment = Payments(
             tenant_id=tenant_id,
             application_id=application.id,
+            popup_id=application.popup_id,
             status=payment_data.get("status", "pending"),
             amount=Decimal(payment_data.get("amount", "0")),
             currency=payment_data.get("currency", "USD"),
+            settlement_currency=payment_data.get("settlement_currency"),
             source=payment_data.get("source"),
             external_id=payment_data.get("external_id"),
             coupon_id=coupon_id,
@@ -776,6 +779,7 @@ def _seed_payments(
                 product_description=product.description,
                 product_price=product.price,
                 product_category=product.category,
+                product_currency="USD",
             )
             session.add(payment_product)
             session.commit()

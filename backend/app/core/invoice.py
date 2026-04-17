@@ -48,14 +48,21 @@ def _format_money(value: float, decimals: int = 2) -> str:
     return s.replace(",", "X").replace(".", ",").replace("X", ".")
 
 
-def _is_crypto_currency(code: str) -> bool:
-    return code.upper() in ("BTC", "ETH")
+CURRENCY_SYMBOLS: dict[str, str] = {"USD": "$", "ARS": "$", "EUR": "€"}
 
 
-def _format_currency(value: float, currency: str) -> str:
-    """Format a value with appropriate decimal places for the currency."""
-    decimals = 8 if _is_crypto_currency(currency) else 2
-    return _format_money(value, decimals)
+def _get_sale_currency(payment: Payments) -> str:
+    for item in payment.products_snapshot:
+        if item.product_currency:
+            return item.product_currency
+    return payment.currency or "USD"
+
+
+def _format_fiat_amount(value: float, currency: str) -> str:
+    symbol = CURRENCY_SYMBOLS.get(currency)
+    if symbol:
+        return f"{symbol}{_format_money(value)}"
+    return f"{_format_money(value)} {currency}"
 
 
 # ---- Cropped Image Flowable -------------------------------------------------
@@ -206,41 +213,26 @@ def generate_invoice_pdf(
     flow.append(Spacer(1, 12))
 
     # ---- Products table ------------------------------------------------------
-    payment_rate = float(payment.rate) if payment.rate else 1.0
-    payment_currency = payment.currency or "USD"
-
     headers = ["Qty", "Description", "Unit Price", "Amount"]
-    show_rate = payment_rate > 1
-    if show_rate:
-        headers.insert(3, "Rate")
-
     table_data: list[list[str | Paragraph]] = [list(headers)]
+    sale_currency = _get_sale_currency(payment)
 
-    subtotal_usd = 0.0
+    subtotal_amount = 0.0
     for item in payment.products_snapshot:
-        unit_price_usd = float(item.product_price)
+        line_currency = item.product_currency or sale_currency
+        unit_price = float(item.product_price)
         qty = int(item.quantity)
-        line_total_usd = unit_price_usd * qty
-        subtotal_usd += line_total_usd
+        line_total = unit_price * qty
+        subtotal_amount += line_total
 
         desc_para = Paragraph(escape(item.product_name), styles["Body"])
 
-        if show_rate:
-            line_in_currency = line_total_usd / payment_rate
-            row: list[str | Paragraph] = [
-                str(qty),
-                desc_para,
-                f"{_format_money(unit_price_usd)} USD",
-                f"1 {payment_currency} = {_format_money(payment_rate)} USD",
-                f"{_format_currency(line_in_currency, payment_currency)} {payment_currency}",
-            ]
-        else:
-            row = [
-                str(qty),
-                desc_para,
-                f"{_format_money(unit_price_usd)} USD",
-                f"{_format_money(line_total_usd)} USD",
-            ]
+        row: list[str | Paragraph] = [
+            str(qty),
+            desc_para,
+            _format_fiat_amount(unit_price, line_currency),
+            _format_fiat_amount(line_total, line_currency),
+        ]
         table_data.append(row)
 
     # ---- Column widths (auto-size) -------------------------------------------
@@ -248,7 +240,6 @@ def generate_invoice_pdf(
     qty_min = 10 * mm
     unit_min = 24 * mm
     amount_min = 28 * mm
-    rate_min = 36 * mm
     desc_min = 30 * mm
 
     def _measure(text: str, bold: bool = False) -> float:
@@ -263,18 +254,15 @@ def generate_invoice_pdf(
             col_max[c_idx] = max(col_max[c_idx], w)
 
     pad = 10
-    # Assign widths: qty=0, desc=1, unit=2, [rate=3], amount=last
+    # Assign widths: qty=0, desc=1, unit=2, amount=3
     qty_w = max(qty_min, col_max[0] + pad)
     unit_w = max(unit_min, col_max[2] + pad)
     amount_w = max(amount_min, col_max[-1] + pad)
-    rate_w = max(rate_min, col_max[3] + pad) if show_rate else 0
 
-    other_sum = qty_w + unit_w + amount_w + rate_w
+    other_sum = qty_w + unit_w + amount_w
     desc_w = max(desc_min, doc.width - other_sum)
 
     col_widths = [qty_w, desc_w, unit_w]
-    if show_rate:
-        col_widths.append(rate_w)
     col_widths.append(amount_w)
 
     # ---- Table style ---------------------------------------------------------
@@ -303,7 +291,7 @@ def generate_invoice_pdf(
     # ---- Footer: Subtotal / Discount / Total ---------------------------------
     payment_amount = float(payment.amount)
     discount_value = float(payment.discount_value) if payment.discount_value else 0.0
-    has_discount = discount_value > 0 or payment_amount < subtotal_usd
+    has_discount = discount_value > 0 or payment_amount < subtotal_amount
 
     # Build discount label
     discount_label = "Discount"
@@ -314,21 +302,10 @@ def generate_invoice_pdf(
     elif discount_value > 0:
         discount_label = f"Discount ({discount_value:.0f}%)"
 
-    # Convert amounts for crypto
-    if show_rate:
-        subtotal_display = _format_currency(
-            subtotal_usd / payment_rate, payment_currency
-        )
-        total_display = _format_currency(
-            payment_amount / payment_rate, payment_currency
-        )
-        discount_amount = (subtotal_usd - payment_amount) / payment_rate
-        discount_display = _format_currency(discount_amount, payment_currency)
-    else:
-        subtotal_display = _format_money(subtotal_usd)
-        total_display = _format_money(payment_amount)
-        discount_amount = subtotal_usd - payment_amount
-        discount_display = _format_money(discount_amount)
+    subtotal_display = _format_fiat_amount(subtotal_amount, sale_currency)
+    total_display = _format_fiat_amount(payment_amount, sale_currency)
+    discount_amount = subtotal_amount - payment_amount
+    discount_display = _format_fiat_amount(discount_amount, sale_currency)
 
     footer_data: list[list[str | Paragraph]] = []
 
@@ -336,26 +313,20 @@ def generate_invoice_pdf(
         footer_data.append(
             [
                 Paragraph("Subtotal:", styles["Right"]),
-                Paragraph(f"{subtotal_display} {payment_currency}", styles["Right"]),
+                Paragraph(subtotal_display, styles["Right"]),
             ]
         )
         footer_data.append(
             [
                 Paragraph(f"{escape(discount_label)}:", styles["Right"]),
-                Paragraph(
-                    f"-{discount_display} {payment_currency}",
-                    styles["Right"],
-                ),
+                Paragraph(f"-{discount_display}", styles["Right"]),
             ]
         )
 
     footer_data.append(
         [
             Paragraph("<b>Total:</b>", styles["BoldRight"]),
-            Paragraph(
-                f"<b>{total_display} {payment_currency}</b>",
-                styles["BoldRight"],
-            ),
+            Paragraph(f"<b>{total_display}</b>", styles["BoldRight"]),
         ]
     )
 

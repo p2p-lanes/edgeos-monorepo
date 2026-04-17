@@ -1,4 +1,5 @@
 import uuid
+from decimal import Decimal
 
 from fastapi import APIRouter, HTTPException, Request, Response, status
 from sqlmodel import Session
@@ -7,6 +8,7 @@ from app.api.payment.crud import payments_crud
 from app.api.payment.models import Payments
 from app.api.payment.schemas import (
     ApplicationFeeCreate,
+    DirectPurchaseCreate,
     PaymentCreate,
     PaymentFilter,
     PaymentPreview,
@@ -39,19 +41,82 @@ from app.services.email_helpers import send_application_status_email
 router = APIRouter(prefix="/payments", tags=["payments"])
 
 
+def _normalize_payment_source(provider: str | None) -> str:
+    """Normalize provider labels from SimpleFI to local payment sources."""
+    if not provider:
+        return "SimpleFI"
+
+    normalized = provider.strip().lower()
+    if normalized == "stripe":
+        return "Stripe"
+    if normalized in {"mercadopago", "mercado pago", "mercado_pago"}:
+        return "MercadoPago"
+    return provider.strip()
+
+
+def _extract_settlement_details(
+    payload: SimpleFIWebhookPayload,
+) -> tuple[str | None, Decimal | None, str]:
+    """Extract settlement currency, rate, and visible source from a webhook."""
+    payment_request = payload.data.payment_request
+    settlement_currency = None
+    settlement_rate = None
+
+    if payload.data.new_payment is not None:
+        settlement_currency = payload.data.new_payment.coin
+
+    card_payment = payment_request.card_payment
+    if card_payment is not None:
+        settlement_currency = card_payment.coin or settlement_currency
+        source = _normalize_payment_source(card_payment.provider)
+    else:
+        source = "SimpleFI"
+
+    if settlement_currency:
+        for transaction in payment_request.transactions:
+            if transaction.coin == settlement_currency:
+                settlement_rate = Decimal(str(transaction.price_details.rate))
+                break
+
+    return settlement_currency, settlement_rate, source
+
+
 async def _send_payment_confirmed_email(payment, db_session=None) -> None:
     """Send payment confirmation email.
 
     If the popup has invoice details configured (company name, address, email),
     an invoice PDF is generated and attached to the email.
+
+    Branches on payment.application_id:
+    - application-based: resolve human via payment.application.human.
+    - direct-sale: resolve human via the attendee in the first product snapshot,
+      and popup via payment.popup.
     """
     from loguru import logger
 
     payment_model: Payments = payment
 
-    application = payment_model.application
-    human = application.human
-    popup = application.popup
+    if payment_model.application_id is not None:
+        # Application-based payment (existing flow)
+        application = payment_model.application
+        human = application.human if application else None
+        popup = application.popup if application else None
+    else:
+        # Direct-sale payment: no application. Human comes from the attendee
+        # linked to the first product snapshot (direct-sale only ever has one
+        # attendee per payment — the buyer).
+        popup = payment_model.popup
+        human = None
+        if payment_model.products_snapshot:
+            attendee = payment_model.products_snapshot[0].attendee
+            if attendee is not None:
+                human = attendee.human
+
+    if popup is None:
+        logger.warning(
+            f"Cannot send payment confirmed email: popup missing for payment {payment.id}"
+        )
+        return
     tenant = popup.tenant
 
     if not human or not human.email:
@@ -216,9 +281,21 @@ async def get_payment_invoice(
             detail="Payment not found",
         )
 
-    popup = payment.application.popup
+    # Resolve popup + human. Direct-sale payments have no application.
+    if payment.application_id is not None and payment.application is not None:
+        popup = payment.application.popup
+        human = payment.application.human
+    else:
+        popup = payment.popup
+        human = None
+        if payment.products_snapshot:
+            attendee = payment.products_snapshot[0].attendee
+            if attendee is not None:
+                human = attendee.human
+
     if not (
-        popup.invoice_company_name
+        popup
+        and popup.invoice_company_name
         and popup.invoice_company_address
         and popup.invoice_company_email
     ):
@@ -227,8 +304,9 @@ async def get_payment_invoice(
             detail="Invoice not available for this event",
         )
 
-    human = payment.application.human
-    client_name = f"{human.first_name or ''} {human.last_name or ''}".strip() or "N/A"
+    first_name = human.first_name if human else ""
+    last_name = human.last_name if human else ""
+    client_name = f"{first_name or ''} {last_name or ''}".strip() or "N/A"
 
     pdf_bytes = generate_invoice_pdf(
         payment=payment,
@@ -281,7 +359,11 @@ async def update_payment(
     return PaymentPublic.model_validate(payment)
 
 
-@router.post("/my/application-fee", response_model=PaymentPublic, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/my/application-fee",
+    response_model=PaymentPublic,
+    status_code=status.HTTP_201_CREATED,
+)
 async def create_my_application_fee(
     fee_in: ApplicationFeeCreate,
     db: HumanTenantSession,
@@ -385,18 +467,38 @@ async def get_my_invoice(
             detail="Payment not found",
         )
 
-    # Verify human owns this payment's application
-    application = applications_crud.get(db, payment.application_id)
-    if not application or application.human_id != current_human.id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Payment not found",
-        )
+    # Resolve ownership + popup. Two paths:
+    # - Application-based: verify via application.human_id
+    # - Direct-sale: verify via the attendee's human_id on the product snapshot
+    if payment.application_id is not None:
+        application = applications_crud.get(db, payment.application_id)
+        if not application or application.human_id != current_human.id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Payment not found",
+            )
+        popup = application.popup
+        human = application.human
+    else:
+        # Direct-sale: the buyer is on products_snapshot[0].attendee
+        popup = payment.popup
+        human = None
+        owns_payment = False
+        if payment.products_snapshot:
+            attendee = payment.products_snapshot[0].attendee
+            if attendee is not None and attendee.human_id == current_human.id:
+                human = attendee.human
+                owns_payment = True
+        if not owns_payment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Payment not found",
+            )
 
     # Only generate invoice if popup has all invoice fields configured
-    popup = application.popup
     if not (
-        popup.invoice_company_name
+        popup
+        and popup.invoice_company_name
         and popup.invoice_company_address
         and popup.invoice_company_email
     ):
@@ -405,8 +507,9 @@ async def get_my_invoice(
             detail="Invoice not available for this event",
         )
 
-    human = application.human
-    client_name = f"{human.first_name or ''} {human.last_name or ''}".strip() or "N/A"
+    first_name = human.first_name if human else ""
+    last_name = human.last_name if human else ""
+    client_name = f"{first_name or ''} {last_name or ''}".strip() or "N/A"
 
     pdf_bytes = generate_invoice_pdf(
         payment=payment,
@@ -484,6 +587,46 @@ async def create_my_payment(
     return PaymentPublic.model_validate(payment)
 
 
+@router.post(
+    "/direct",
+    response_model=PaymentPublic,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_direct_payment(
+    purchase_in: DirectPurchaseCreate,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+) -> PaymentPublic:
+    """Create a direct-sale payment for the current human (Portal).
+
+    Used for popups with sale_type="direct". No application required. The
+    server resolves the Attendee from CurrentHuman automatically and creates
+    a SimpleFI payment request (or auto-approves if the total is zero).
+    """
+    from app.api.human.crud import humans_crud
+    from app.api.tenant.crud import tenants_crud
+
+    # Load human + tenant (the request session is already tenant-scoped, but
+    # we need the Tenants ORM instance for the SimpleFI call)
+    human = humans_crud.get(db, current_human.id)
+    if not human:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Human not found",
+        )
+    tenant = tenants_crud.get(db, current_human.tenant_id)
+    if not tenant:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tenant not found",
+        )
+
+    payment = payments_crud.create_direct_payment(
+        db, obj=purchase_in, human=human, tenant=tenant
+    )
+    return PaymentPublic.model_validate(payment)
+
+
 @router.post("/webhook/simplefi", status_code=status.HTTP_200_OK)
 async def simplefi_webhook(
     request: Request,
@@ -533,8 +676,6 @@ async def _handle_regular_payment(
     webhook_cache: WebhookCache,
 ) -> dict:
     """Handle new_payment/new_card_payment for regular (non-installment) payments."""
-    from decimal import Decimal
-
     from loguru import logger
 
     payment_request_id = payload.data.payment_request.id
@@ -569,24 +710,26 @@ async def _handle_regular_payment(
         )
         return {"message": "Payment status unchanged"}
 
-    # Extract currency and rate from transaction
-    currency = "USD"
-    rate = Decimal("1")
-    if payload.data.new_payment:
-        currency = payload.data.new_payment.coin
-        for t in payload.data.payment_request.transactions:
-            if t.coin == currency:
-                rate = Decimal(str(t.price_details.rate))
-                break
+    settlement_currency, settlement_rate, source = _extract_settlement_details(payload)
 
     if payment_request_status == "approved":
         from app.api.payment.schemas import PaymentType
 
         if payment.payment_type == PaymentType.APPLICATION_FEE.value:
-            await _handle_fee_payment_approved(db, payment, currency=currency, rate=rate)
+            await _handle_fee_payment_approved(
+                db,
+                payment,
+                settlement_currency=settlement_currency,
+                rate=settlement_rate,
+                source=source,
+            )
         else:
             payment = payments_crud.approve_payment(
-                db, payment.id, currency=currency, rate=rate
+                db,
+                payment.id,
+                settlement_currency=settlement_currency,
+                rate=settlement_rate,
+                source=source,
             )
             await _send_payment_confirmed_email(payment, db_session=db)
         logger.info("Payment {} approved via SimpleFI webhook", payment.id)
@@ -605,8 +748,9 @@ async def _handle_fee_payment_approved(
     db: Session,
     payment: Payments,
     *,
-    currency: str = "USD",
-    rate: object = None,
+    settlement_currency: str | None = None,
+    rate: Decimal | None = None,
+    source: str = "SimpleFI",
 ) -> None:
     """Handle approval of an application fee payment.
 
@@ -618,25 +762,23 @@ async def _handle_fee_payment_approved(
 
     from app.api.application.crud import applications_crud
     from app.api.application.schemas import ApplicationStatus
-    from app.api.payment.schemas import PaymentSource, PaymentStatus
+    from app.api.payment.schemas import PaymentStatus
 
     status_before = ApplicationStatus.PENDING_FEE.value
 
     # Approve the payment record first
     payment.status = PaymentStatus.APPROVED.value
-    payment.currency = currency
+    payment.settlement_currency = settlement_currency
     if rate is not None:
         payment.rate = rate
-    payment.source = PaymentSource.SIMPLEFI.value
+    payment.source = source
     db.add(payment)
     db.flush()
 
     # Load application
     application = applications_crud.get(db, payment.application_id)
     if not application:
-        logger.warning(
-            "Fee payment {} has no associated application", payment.id
-        )
+        logger.warning("Fee payment {} has no associated application", payment.id)
         db.commit()
         return
 
@@ -685,7 +827,6 @@ async def _handle_installment_payment(
 ) -> dict:
     """Handle new_payment/new_card_payment for installment plans."""
     from datetime import UTC, datetime
-    from decimal import Decimal
 
     from loguru import logger
 
@@ -717,6 +858,8 @@ async def _handle_installment_payment(
         )
 
     # Extract payment details
+    settlement_currency, settlement_rate, source = _extract_settlement_details(payload)
+
     if isinstance(new_payment, SimpleFIPaymentInfo):
         amount = Decimal(str(new_payment.amount))
         currency = new_payment.coin
@@ -742,7 +885,13 @@ async def _handle_installment_payment(
     # First installment: approve payment to assign products
     is_first_installment = (payment.installments_paid or 0) == 0
     if is_first_installment and payment.status != "approved":
-        payment = payments_crud.approve_payment(db, payment.id, currency=currency)
+        payment = payments_crud.approve_payment(
+            db,
+            payment.id,
+            settlement_currency=settlement_currency,
+            rate=settlement_rate,
+            source=source,
+        )
         logger.info("First installment received - payment {} approved", payment.id)
 
     # Increment installments_paid
@@ -811,7 +960,7 @@ async def _handle_installment_plan_completed(
         "Payment %s not approved when installment_plan_completed received", payment.id
     )
     payment.installments_paid = installment_plan.paid_installments_count
-    payment = payments_crud.approve_payment(db, payment.id, currency="USD")
+    payment = payments_crud.approve_payment(db, payment.id)
     await _send_payment_confirmed_email(payment, db_session=db)
 
     return {"message": "Installment plan payment approved successfully"}

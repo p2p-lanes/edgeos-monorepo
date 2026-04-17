@@ -4,6 +4,7 @@ import { toast } from "sonner"
 import type { GroupWithMembers } from "@/client"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { getPublicGroupLink } from "@/lib/group-route"
 import MemberFormModal from "./AddMemberModal"
 import ImportMembersModal from "./ImportMembersModal"
 import WelcomeMessageModal from "./WelcomeMessageModal"
@@ -61,8 +62,7 @@ const TeamHeader = ({
   }
 
   const handleCopyCheckoutLink = async () => {
-    const origin = window.location.origin
-    const checkoutLink = `${origin}/checkout?group=${group.slug}`
+    const checkoutLink = getPublicGroupLink(window.location.origin, group.slug)
 
     try {
       await navigator.clipboard.writeText(checkoutLink)

@@ -1,22 +1,17 @@
 "use client"
 
 import { useSearchParams } from "next/navigation"
+import type { ReactNode } from "react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { DesignVariantProvider } from "@/context/designVariant"
 import { usePaymentVerification } from "@/hooks/checkout"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCheckout } from "@/providers/checkoutProvider"
-import DesignVariantPanel from "./DesignVariantPanel"
 import DynamicProductStep from "./DynamicProductStep"
 import {
   STEP_COMPONENT_REGISTRY,
   shouldUseDynamicStep,
 } from "./registries/stepRegistry"
-import type {
-  FooterDesign,
-  NavDesign,
-  WatermarkStyle,
-} from "./ScrollySectionNav"
+import type { WatermarkStyle } from "./ScrollySectionNav"
 import ScrollySectionNav from "./ScrollySectionNav"
 import SectionHeader from "./SectionHeader"
 import SnapDotNav from "./SnapDotNav"
@@ -28,14 +23,13 @@ import SuccessStep from "./steps/SuccessStep"
 interface ScrollyCheckoutFlowProps {
   onPaymentComplete?: () => void
   onBack?: () => void
+  navExtraContent?: ReactNode
 }
-
-const FOOTER_DESIGN_STORAGE_KEY = "passes-footer-design"
-const NAV_DESIGN_STORAGE_KEY = "passes-nav-design"
 
 function ScrollyCheckoutFlowInner({
   onPaymentComplete,
   onBack,
+  navExtraContent,
 }: ScrollyCheckoutFlowProps) {
   const { availableSteps, submitPayment, stepConfigs } = useCheckout()
 
@@ -70,42 +64,9 @@ function ScrollyCheckoutFlowInner({
   const [activeSection, setActiveSection] = useState<string>("passes")
   const scrollToIndexRef = useRef<((index: number) => void) | null>(null)
 
-  const [footerDesign, setFooterDesign] = useState<FooterDesign>("stripe")
-  const [navDesign, setNavDesign] = useState<NavDesign>("pills")
+  const footerDesign = "stripe" as const
+  const navDesign = "pills" as const
   const watermarkStyle: WatermarkStyle = "bold"
-
-  useEffect(() => {
-    const storedDesign = localStorage.getItem(
-      FOOTER_DESIGN_STORAGE_KEY,
-    ) as FooterDesign | null
-    if (
-      storedDesign === "pill" ||
-      storedDesign === "stripe" ||
-      storedDesign === "dock"
-    ) {
-      setFooterDesign(storedDesign)
-    }
-    const storedNavDesign = localStorage.getItem(
-      NAV_DESIGN_STORAGE_KEY,
-    ) as NavDesign | null
-    if (
-      storedNavDesign === "pills" ||
-      storedNavDesign === "progress" ||
-      storedNavDesign === "underline"
-    ) {
-      setNavDesign(storedNavDesign)
-    }
-  }, [])
-
-  const setFooterDesignPersisted = (v: FooterDesign) => {
-    setFooterDesign(v)
-    localStorage.setItem(FOOTER_DESIGN_STORAGE_KEY, v)
-  }
-
-  const setNavDesignPersisted = (v: NavDesign) => {
-    setNavDesign(v)
-    localStorage.setItem(NAV_DESIGN_STORAGE_KEY, v)
-  }
 
   const allSections = useMemo(() => {
     return availableSteps
@@ -284,6 +245,7 @@ function ScrollyCheckoutFlowInner({
           if (idx >= 0) scrollToIndexRef.current?.(idx)
         }}
         variant={navDesign}
+        extraContent={navExtraContent}
       />
       {allSections.map((section) => {
         const config = getStepConfig(section.id)
@@ -317,12 +279,6 @@ function ScrollyCheckoutFlowInner({
         )
       })}
 
-      <DesignVariantPanel
-        navDesign={navDesign}
-        onNavDesignChange={setNavDesignPersisted}
-        footerDesign={footerDesign}
-        onFooterDesignChange={setFooterDesignPersisted}
-      />
       <SnapDotNav
         sections={allSections}
         activeSection={activeSection}
@@ -341,9 +297,5 @@ function ScrollyCheckoutFlowInner({
 }
 
 export default function ScrollyCheckoutFlow(props: ScrollyCheckoutFlowProps) {
-  return (
-    <DesignVariantProvider>
-      <ScrollyCheckoutFlowInner {...props} />
-    </DesignVariantProvider>
-  )
+  return <ScrollyCheckoutFlowInner {...props} />
 }
