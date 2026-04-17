@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from app.api.group.models import Groups
     from app.api.human.models import Humans
     from app.api.payment.schemas import DirectPurchaseCreate
+    from app.api.popup.models import Popups
     from app.api.tenant.models import Tenants
 from app.api.application.schemas import ApplicationStatus, ScholarshipStatus
 from app.api.attendee.models import AttendeeProducts, Attendees
@@ -33,6 +34,16 @@ from app.api.shared.crud import BaseCRUD
 
 # Decimal precision for money calculations
 MONEY_PRECISION = Decimal("0.01")
+
+
+def _require_application_id(application_id: uuid.UUID | None) -> uuid.UUID:
+    """Narrow optional application ids for application-based flows."""
+    if application_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Application id is required",
+        )
+    return application_id
 
 
 def _get_discounted_price(price: Decimal, discount_value: Decimal) -> Decimal:
@@ -203,11 +214,52 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         )
         return session.exec(statement).first()
 
+    def get_portal_owned_payment(
+        self,
+        session: Session,
+        payment_id: uuid.UUID,
+        current_human_id: uuid.UUID,
+    ) -> Payments | None:
+        """Get a payment owned by the current portal human.
+
+        Ownership rules:
+        - Application payment: application.human_id matches current human.
+        - Direct-sale payment: any snapshot attendee human_id matches current human.
+        """
+        statement = (
+            select(Payments)
+            .where(Payments.id == payment_id)
+            .options(
+                selectinload(Payments.application).selectinload(Applications.human),  # ty: ignore[invalid-argument-type]
+                selectinload(Payments.application).selectinload(Applications.popup),  # ty: ignore[invalid-argument-type]
+                selectinload(Payments.popup),  # ty: ignore[invalid-argument-type]
+                selectinload(Payments.products_snapshot)  # ty: ignore[invalid-argument-type]
+                .selectinload(PaymentProducts.attendee)  # ty: ignore[invalid-argument-type]
+                .selectinload(Attendees.human),  # ty: ignore[invalid-argument-type]
+            )
+        )
+        payment = session.exec(statement).first()
+        if payment is None:
+            return None
+
+        if (
+            payment.application is not None
+            and payment.application.human_id == current_human_id
+        ):
+            return payment
+
+        for product_snapshot in payment.products_snapshot:
+            attendee = product_snapshot.attendee
+            if attendee is not None and attendee.human_id == current_human_id:
+                return payment
+
+        return None
+
     def create_fee_payment(
         self,
         session: Session,
         application: "Applications",
-        popup: object,
+        popup: "Popups",
     ) -> Payments:
         """Create an application fee payment for an application in PENDING_FEE status.
 
@@ -226,10 +278,11 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             )
 
         # 2. Validate popup is configured for fee
+        application_fee_amount = popup.application_fee_amount
         if (
-            not getattr(popup, "requires_application_fee", False)
-            or not getattr(popup, "application_fee_amount", None)
-            or popup.application_fee_amount <= 0
+            not popup.requires_application_fee
+            or application_fee_amount is None
+            or application_fee_amount <= 0
         ):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -239,7 +292,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         # 3. Check for existing pending fee payment
         existing = self.get_latest_fee_payment(session, application.id)
         if existing and existing.status == PaymentStatus.PENDING.value:
-            if not getattr(popup, "simplefi_api_key", None):
+            simplefi_api_key = popup.simplefi_api_key
+            if not simplefi_api_key:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Payment provider not configured for this popup",
@@ -247,7 +301,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
             from app.services.simplefi import get_simplefi_client
 
-            simplefi_client = get_simplefi_client(popup.simplefi_api_key)
+            simplefi_client = get_simplefi_client(simplefi_api_key)
 
             if existing.external_id:
                 try:
@@ -289,10 +343,11 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     session.refresh(existing)
 
         # 4. Snapshot fee amount from popup
-        fee_amount = Decimal(str(popup.application_fee_amount))
+        fee_amount = Decimal(str(application_fee_amount))
 
         # 5. Validate SimpleFI is configured
-        if not getattr(popup, "simplefi_api_key", None):
+        simplefi_api_key = popup.simplefi_api_key
+        if not simplefi_api_key:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Payment provider not configured for this popup",
@@ -300,7 +355,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         from app.services.simplefi import get_simplefi_client
 
-        simplefi_client = get_simplefi_client(popup.simplefi_api_key)
+        simplefi_client = get_simplefi_client(simplefi_api_key)
 
         # Build success/cancel paths for fee flow
         portal_base = get_portal_url(popup.tenant)
@@ -374,9 +429,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         statement = statement.order_by(desc(Payments.created_at))  # type: ignore[arg-type]
         statement = statement.offset(skip).limit(limit)
         statement = statement.options(
-            selectinload(Payments.products_snapshot).selectinload(
-                PaymentProducts.attendee
-            ),  # type: ignore[arg-type]
+            selectinload(Payments.products_snapshot).selectinload(  # ty: ignore[invalid-argument-type]
+                PaymentProducts.attendee  # ty: ignore[invalid-argument-type]
+            ),
         )
         results = list(session.exec(statement).all())
 
@@ -407,9 +462,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         statement = statement.order_by(desc(Payments.created_at))  # type: ignore[arg-type]
         statement = statement.offset(skip).limit(limit)
         statement = statement.options(
-            selectinload(Payments.products_snapshot).selectinload(
-                PaymentProducts.attendee
-            ),  # type: ignore[arg-type]
+            selectinload(Payments.products_snapshot).selectinload(  # ty: ignore[invalid-argument-type]
+                PaymentProducts.attendee  # ty: ignore[invalid-argument-type]
+            ),
         )
         results = list(session.exec(statement).all())
 
@@ -712,7 +767,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         Returns calculated amounts with discounts applied.
         """
-        application = self._get_application_with_products(session, obj.application_id)
+        application = self._get_application_with_products(
+            session,
+            _require_application_id(obj.application_id),
+        )
         if not application:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -765,7 +823,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         preview = self.preview_payment(session, obj)
 
         # Use eager loading to avoid N+1 when accessing application relationships
-        application = self._get_application_with_products(session, obj.application_id)
+        application = self._get_application_with_products(
+            session,
+            _require_application_id(obj.application_id),
+        )
         if not application:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -776,10 +837,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         if preview.amount <= 0:
             if preview.amount < 0:
                 # Store remaining credit
-                application.credit = float(-preview.amount)
+                application.credit = -preview.amount
                 preview.amount = Decimal("0")
             else:
-                application.credit = 0.0
+                application.credit = Decimal("0")
 
             # Clear existing products if editing passes
             if obj.edit_passes:

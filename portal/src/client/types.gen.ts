@@ -2767,6 +2767,12 @@ export type PaymentsGetMyLatestPaymentData = {
 
 export type PaymentsGetMyLatestPaymentResponse = (PaymentStatusCheck);
 
+export type PaymentsGetMyPaymentStatusData = {
+    paymentId: string;
+};
+
+export type PaymentsGetMyPaymentStatusResponse = (PaymentStatusCheck);
+
 export type PaymentsListMyPaymentsData = {
     applicationId: string;
     /**
