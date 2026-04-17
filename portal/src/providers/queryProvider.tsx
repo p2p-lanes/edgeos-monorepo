@@ -15,6 +15,7 @@ function handleApiError(error: Error) {
       localStorage.removeItem("token")
       const isPublicRoute =
         window.location.pathname.startsWith("/checkout") ||
+        window.location.pathname.startsWith("/groups/") ||
         window.location.pathname.includes("/invite/")
       if (!isPublicRoute) {
         window.location.href = "/auth"

@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Header, HTTPException, status
+from fastapi import APIRouter, Header, HTTPException, Request, status
 
 from app.api.approval_strategy.crud import approval_strategies_crud
 from app.api.approval_strategy.schemas import (
@@ -20,7 +20,7 @@ from app.api.popup.schemas import (
     PopupStatus,
     PopupUpdate,
 )
-from app.api.shared.enums import UserRole
+from app.api.shared.enums import SaleType, UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.api.translation.service import (
     TRANSLATABLE_FIELDS,
@@ -118,46 +118,50 @@ async def create_popup(
 
     popup = crud.create(db, popup_in)
 
-    # Create default auto-accept approval strategy for the popup
-    approval_strategies_crud.create_for_popup(
-        db,
-        popup_id=popup.id,
-        tenant_id=popup.tenant_id,
-        strategy_in=ApprovalStrategyCreate(
-            strategy_type=ApprovalStrategyType.AUTO_ACCEPT
-        ),
-    )
-
-    # Create default form sections and base field configs
-    # Feature-gated sections are only created when their flag is enabled
-    section_map: dict[str, uuid.UUID] = {}
-    for key, section_def in DEFAULT_SECTIONS.items():
-        if key == "scholarship" and not popup.allows_scholarship:
-            continue
-        if (
-            key == "companions"
-            and not popup.allows_spouse
-            and not popup.allows_children
-        ):
-            continue
-        section = FormSections(
-            tenant_id=popup.tenant_id,
+    # Direct-sale popups skip the application-centric bootstrap (no approval
+    # strategy, no form sections, no base field configs). Only ticketing steps
+    # are seeded so the ticketing flow is always available.
+    if popup.sale_type == SaleType.application.value:
+        # Create default auto-accept approval strategy for the popup
+        approval_strategies_crud.create_for_popup(
+            db,
             popup_id=popup.id,
-            label=section_def["label"],
-            order=section_def["order"],
-            protected=True,
+            tenant_id=popup.tenant_id,
+            strategy_in=ApprovalStrategyCreate(
+                strategy_type=ApprovalStrategyType.AUTO_ACCEPT
+            ),
         )
-        db.add(section)
-        db.commit()
-        db.refresh(section)
-        section_map[key] = section.id
 
-    base_field_configs_crud.create_defaults_for_popup(
-        db,
-        popup_id=popup.id,
-        tenant_id=popup.tenant_id,
-        section_map=section_map,
-    )
+        # Create default form sections and base field configs
+        # Feature-gated sections are only created when their flag is enabled
+        section_map: dict[str, uuid.UUID] = {}
+        for key, section_def in DEFAULT_SECTIONS.items():
+            if key == "scholarship" and not popup.allows_scholarship:
+                continue
+            if (
+                key == "companions"
+                and not popup.allows_spouse
+                and not popup.allows_children
+            ):
+                continue
+            section = FormSections(
+                tenant_id=popup.tenant_id,
+                popup_id=popup.id,
+                label=section_def["label"],
+                order=section_def["order"],
+                protected=True,
+            )
+            db.add(section)
+            db.commit()
+            db.refresh(section)
+            section_map[key] = section.id
+
+        base_field_configs_crud.create_defaults_for_popup(
+            db,
+            popup_id=popup.id,
+            tenant_id=popup.tenant_id,
+            section_map=section_map,
+        )
 
     seed_ticketing_steps_for_popup(db, popup_id=popup.id, tenant_id=popup.tenant_id)
 
@@ -168,9 +172,21 @@ async def create_popup(
 async def update_popup(
     popup_id: uuid.UUID,
     popup_in: PopupUpdate,
+    request: Request,
     db: TenantSession,
     _current_user: CurrentWriter,
 ) -> PopupAdmin:
+    # Immutability guard: sale_type is set at creation time and cannot be
+    # changed. Reject with 422 if the client attempts to modify it. We inspect
+    # the raw body (not popup_in) because sale_type is intentionally absent
+    # from PopupUpdate — Pydantic would silently drop it.
+    raw_body = await request.json()
+    if isinstance(raw_body, dict) and "sale_type" in raw_body:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="sale_type is immutable and cannot be updated",
+        )
+
     popup = crud.get(db, popup_id)
 
     if not popup:

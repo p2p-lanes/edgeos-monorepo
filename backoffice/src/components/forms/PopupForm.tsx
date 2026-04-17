@@ -13,9 +13,11 @@ import {
   Image,
   Key,
   Languages,
+  Lock,
   Mail,
   MapPin,
   Scale,
+  ShoppingCart,
   Ticket,
   Twitter,
 } from "lucide-react"
@@ -25,6 +27,7 @@ import {
   type PopupCreate,
   PopupsService,
   type PopupUpdate,
+  type SaleType,
 } from "@/client"
 import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
@@ -78,6 +81,35 @@ const AVAILABLE_LANGUAGES = [
   { value: "es", label: "Español" },
   { value: "zh", label: "中文" },
 ] as const
+
+const SALE_TYPE_COPY = {
+  application: {
+    label: "Popup / application flow",
+    description:
+      "People apply first. Use this when you need review workflows, companions, or applicant-specific options.",
+  },
+  direct: {
+    label: "Festival / direct ticketing",
+    description:
+      "People buy directly. Use this when tickets behave like a shared catalog without family-specific attendee pricing.",
+  },
+} as const
+
+function getSaleTypeGuidance(saleType: SaleType) {
+  if (saleType === "application") {
+    return {
+      title: "Buyers will apply first",
+      description:
+        "Applicants go through a structured review flow. You'll be able to configure approval strategies, reviewers, companions, and applicant-specific options.",
+    }
+  }
+
+  return {
+    title: "Buyers will purchase tickets directly",
+    description:
+      "Tickets behave like a shared catalog. No application flow, no reviewers — logged-in buyers pick from your product list and pay.",
+  }
+}
 
 export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
   const navigate = useNavigate()
@@ -141,6 +173,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
       tagline: defaultValues?.tagline ?? "",
       location: defaultValues?.location ?? "",
       status: defaultValues?.status ?? "draft",
+      sale_type: (defaultValues?.sale_type ?? "application") as SaleType,
       start_date: formatDateForInput(defaultValues?.start_date),
       end_date: formatDateForInput(defaultValues?.end_date),
       allows_spouse: defaultValues?.allows_spouse ?? false,
@@ -203,9 +236,13 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         supported_languages: value.supported_languages,
       }
       if (isEdit) {
+        // sale_type is immutable — never sent on update (backend would 422)
         updateMutation.mutate(payload)
       } else {
-        createMutation.mutate(payload)
+        createMutation.mutate({
+          ...payload,
+          sale_type: value.sale_type,
+        })
       }
     },
   })
@@ -342,25 +379,84 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
 
         <Separator />
 
-        {/* Cover Image */}
-        <form.Field name="image_url">
-          {(field) => (
-            <div className="space-y-2">
-              <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Cover Image
-              </Label>
-              <p className="text-xs text-muted-foreground">
-                Main event image used in cards, tickets, application headers,
-                invoices, and emails
-              </p>
-              <ImageUpload
-                value={field.state.value || null}
-                onChange={(url) => field.handleChange(url ?? "")}
-                disabled={readOnly}
-              />
-            </div>
-          )}
-        </form.Field>
+        {/* Sale Model — keep commerce decisions near the event identity,
+            like the previous implementation. */}
+        <div className="space-y-3">
+          <div className="space-y-1 px-1">
+            <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Commerce setup
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Decide how people will access this event. This is the primary
+              identity of the popup and cannot be changed after creation.
+            </p>
+          </div>
+
+          <InlineSection title="How this event sells">
+            <form.Field name="sale_type">
+              {(field) => (
+                <InlineRow
+                  icon={
+                    isEdit ? (
+                      <Lock className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+                    )
+                  }
+                  label="Sale Type"
+                  description={
+                    isEdit
+                      ? "Sale type cannot be changed after creation"
+                      : "Choose whether people apply first or buy tickets directly"
+                  }
+                >
+                  <Select
+                    value={field.state.value}
+                    onValueChange={(value) =>
+                      field.handleChange(value as SaleType)
+                    }
+                    disabled={readOnly || isEdit}
+                  >
+                    <SelectTrigger className="w-[220px] text-sm" size="sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="application">
+                        {SALE_TYPE_COPY.application.label}
+                      </SelectItem>
+                      <SelectItem value="direct">
+                        {SALE_TYPE_COPY.direct.label}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </InlineRow>
+              )}
+            </form.Field>
+          </InlineSection>
+
+          <form.Subscribe selector={(state) => state.values.sale_type}>
+            {(saleType) => {
+              const copy = SALE_TYPE_COPY[saleType]
+              const guidance = getSaleTypeGuidance(saleType)
+              return (
+                <div className="rounded-xl border bg-muted/30 p-4">
+                  <p className="text-sm font-semibold">{copy.label}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {copy.description}
+                  </p>
+                  <div className="mt-3 border-t pt-3">
+                    <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      {guidance.title}
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {guidance.description}
+                    </p>
+                  </div>
+                </div>
+              )
+            }}
+          </form.Subscribe>
+        </div>
 
         <Separator />
 
@@ -613,6 +709,30 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
 
         {/* Branding */}
         <InlineSection title="Branding">
+          <form.Field name="image_url">
+            {(field) => (
+              <div className="space-y-2 py-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+                    <Image className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Cover Image</p>
+                    <p className="text-xs text-muted-foreground">
+                      Main event image used in cards, tickets, application
+                      headers, invoices, and emails
+                    </p>
+                  </div>
+                </div>
+                <ImageUpload
+                  value={field.state.value || null}
+                  onChange={(url) => field.handleChange(url ?? "")}
+                  disabled={readOnly}
+                />
+              </div>
+            )}
+          </form.Field>
+
           <form.Field name="icon_url">
             {(field) => (
               <div className="space-y-2 py-3">
@@ -947,26 +1067,33 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
 
         <Separator />
 
-        {/* Approval strategy + Reviewers (edit only) */}
+        {/* Approval strategy + Reviewers (edit only, application sale_type only —
+            direct-sale popups have no application flow, so these are meaningless) */}
         {isEdit && (
-          <>
-            <Separator />
+          <form.Subscribe selector={(state) => state.values.sale_type}>
+            {(saleType) =>
+              saleType === "application" ? (
+                <>
+                  <Separator />
 
-            <ApprovalStrategyForm
-              popupId={defaultValues!.id}
-              readOnly={readOnly}
-              variant="inline"
-            />
+                  <ApprovalStrategyForm
+                    popupId={defaultValues!.id}
+                    readOnly={readOnly}
+                    variant="inline"
+                  />
 
-            <Separator />
+                  <Separator />
 
-            <ConditionalReviewersManager
-              popupId={defaultValues!.id}
-              tenantId={defaultValues!.tenant_id}
-              readOnly={readOnly}
-              variant="inline"
-            />
-          </>
+                  <ConditionalReviewersManager
+                    popupId={defaultValues!.id}
+                    tenantId={defaultValues!.tenant_id}
+                    readOnly={readOnly}
+                    variant="inline"
+                  />
+                </>
+              ) : null
+            }
+          </form.Subscribe>
         )}
 
         {isEdit && (defaultValues?.supported_languages?.length ?? 0) > 1 && (

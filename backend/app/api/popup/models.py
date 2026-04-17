@@ -9,12 +9,14 @@ from app.api.popup.schemas import PopupBase
 if TYPE_CHECKING:
     from app.api.application.models import Applications
     from app.api.approval_strategy.models import ApprovalStrategies
+    from app.api.attendee.models import Attendees
     from app.api.base_field_config.models import BaseFieldConfigs
     from app.api.coupon.models import Coupons
     from app.api.email_template.models import EmailTemplates
     from app.api.form_field.models import FormFields
     from app.api.form_section.models import FormSections
     from app.api.group.models import Groups
+    from app.api.payment.models import Payments
     from app.api.popup_reviewer.models import PopupReviewers
     from app.api.product.models import Products
     from app.api.tenant.models import Tenants
@@ -75,3 +77,8 @@ class Popups(PopupBase, table=True):
     ticketing_steps: list["TicketingSteps"] = Relationship(
         back_populates="popup", cascade_delete=True
     )
+
+    # Direct-sale reverse relationships (payments/attendees may reference popup
+    # directly when sale_type == "direct" — application is optional).
+    attendees: list["Attendees"] = Relationship(back_populates="popup")
+    payments: list["Payments"] = Relationship(back_populates="popup")

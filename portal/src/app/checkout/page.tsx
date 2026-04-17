@@ -1,14 +1,29 @@
 "use client"
 
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useEffect } from "react"
+import { getPublicGroupPath } from "@/lib/group-route"
 
 const CheckoutPage = () => {
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   useEffect(() => {
+    const popupSlug = searchParams.get("popup")
+    const groupSlug = searchParams.get("group")
+
+    if (groupSlug) {
+      router.replace(getPublicGroupPath(groupSlug))
+      return
+    }
+
+    if (popupSlug) {
+      router.replace(`/checkout/${popupSlug}`)
+      return
+    }
+
     router.replace("/portal")
-  }, [router])
+  }, [router, searchParams])
 
   return (
     <div className="flex items-center justify-center h-screen">

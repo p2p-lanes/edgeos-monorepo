@@ -1,6 +1,9 @@
 "use client"
 
+import { useParams, useRouter, useSearchParams } from "next/navigation"
+import { useEffect } from "react"
 import { getBackgroundProps } from "@/lib/background-image"
+import { getPublicGroupPath } from "@/lib/group-route"
 import { useCityProvider } from "@/providers/cityProvider"
 import { useTenant } from "@/providers/tenantProvider"
 import { PopupCheckoutContent } from "../components/PopupCheckoutContent"
@@ -12,17 +15,48 @@ const LoadingFallback = () => (
 )
 
 const PopupCheckoutPage = () => {
+  const params = useParams<{ popupSlug: string }>()
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const { tenant } = useTenant()
-  const { getCity, popupsLoaded } = useCityProvider()
+  const { getPopups, popupsLoaded } = useCityProvider()
+  const groupSlug = searchParams.get("group")
 
-  const popup = getCity()
-  const background = getBackgroundProps(popup, tenant)
+  useEffect(() => {
+    if (!groupSlug) return
 
-  if (!popupsLoaded || !popup) {
+    router.replace(getPublicGroupPath(groupSlug))
+  }, [groupSlug, router])
+
+  if (groupSlug) {
     return <LoadingFallback />
   }
 
-  return <PopupCheckoutContent popup={popup} background={background} />
+  const popups = getPopups()
+  const popupFromSlug = popups.find((item) => item.slug === params.popupSlug)
+
+  if (!popupsLoaded) {
+    return <LoadingFallback />
+  }
+
+  if (!popupFromSlug) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-neutral-100 p-6">
+        <div className="max-w-md rounded-2xl bg-white p-8 text-center shadow-sm">
+          <h1 className="text-2xl font-bold text-neutral-900">
+            Event not found
+          </h1>
+          <p className="mt-3 text-sm text-neutral-600">
+            The checkout link is invalid or this event is no longer available.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  const background = getBackgroundProps(popupFromSlug, tenant)
+
+  return <PopupCheckoutContent popup={popupFromSlug} background={background} />
 }
 
 export default PopupCheckoutPage

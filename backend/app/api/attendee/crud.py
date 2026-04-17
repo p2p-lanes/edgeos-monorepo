@@ -63,14 +63,13 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         limit: int = 100,
         search: str | None = None,
     ) -> tuple[list[Attendees], int]:
-        """Find attendees by popup_id via their applications with eager loading."""
-        from app.api.application.models import Applications
+        """Find attendees by popup_id with eager loading.
 
-        base_statement = (
-            select(Attendees)
-            .join(Applications, Attendees.application_id == Applications.id)  # type: ignore[arg-type]
-            .where(Applications.popup_id == popup_id)
-        )
+        Queries directly on Attendees.popup_id (denormalized). Covers both
+        application-based attendees (popup_id backfilled from application)
+        and direct-sale attendees (popup_id set at creation, no application).
+        """
+        base_statement = select(Attendees).where(Attendees.popup_id == popup_id)
 
         if search:
             search_term = f"%{search}%"
@@ -101,6 +100,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         session: Session,
         tenant_id: uuid.UUID,
         application_id: uuid.UUID,
+        popup_id: uuid.UUID,
         name: str,
         category: str,
         check_in_code: str,
@@ -112,6 +112,9 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
 
         If email is provided and human_id is not, attempts to find an existing
         Human with matching email+tenant_id and links them.
+
+        popup_id is REQUIRED — it's a NOT NULL column on attendees. Callers
+        that work with an application should pass application.popup_id.
         """
         # If email provided but no human_id, try to find matching Human
         if email and not human_id:
@@ -120,12 +123,74 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         attendee = Attendees(
             tenant_id=tenant_id,
             application_id=application_id,
+            popup_id=popup_id,
             name=name,
             category=category,
             check_in_code=check_in_code,
             email=email,
             gender=gender,
             human_id=human_id,
+        )
+        session.add(attendee)
+        session.commit()
+        session.refresh(attendee)
+        return attendee
+
+    def find_direct_attendee(
+        self,
+        session: Session,
+        human_id: uuid.UUID,
+        popup_id: uuid.UUID,
+    ) -> Attendees | None:
+        """Find the direct-sale attendee for a (human, popup) pair.
+
+        Direct-sale attendees have application_id=NULL. Returns the existing
+        attendee so repeated direct purchases by the same human reuse the
+        same record (one attendee per human per popup for direct sales).
+        """
+        statement = (
+            select(Attendees)
+            .where(
+                Attendees.human_id == human_id,
+                Attendees.popup_id == popup_id,
+                Attendees.application_id.is_(None),  # type: ignore[union-attr]
+            )
+            .limit(1)
+        )
+        return session.exec(statement).first()
+
+    def create_direct_attendee(
+        self,
+        session: Session,
+        human_id: uuid.UUID,
+        popup_id: uuid.UUID,
+        tenant_id: uuid.UUID,
+        name: str,
+        email: str | None = None,
+    ) -> Attendees:
+        """Create a direct-sale attendee (no application).
+
+        Used for popups with sale_type="direct". The attendee is bound to a
+        Human and a Popup directly — application_id remains NULL.
+        """
+        prefix = ""
+        # Short prefix from popup slug if available
+        from app.api.popup.models import Popups
+
+        popup = session.get(Popups, popup_id)
+        if popup and popup.slug:
+            prefix = popup.slug[:3].upper()
+        check_in_code = generate_check_in_code(prefix)
+
+        attendee = Attendees(
+            tenant_id=tenant_id,
+            application_id=None,
+            popup_id=popup_id,
+            human_id=human_id,
+            name=name,
+            category="main",
+            check_in_code=check_in_code,
+            email=email.lower() if email else None,
         )
         session.add(attendee)
         session.commit()

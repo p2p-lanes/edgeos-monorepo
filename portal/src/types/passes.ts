@@ -25,7 +25,7 @@ export interface ProductsSnapshotProps {
 
 export interface PaymentsProps {
   id: string
-  application_id: string
+  application_id: string | null
   external_id: string | null
   status: "approved" | "pending" | "rejected"
   amount: number

@@ -104,6 +104,12 @@ export default function FormPage() {
     }
   }, [isReturnFromCheckout, city?.slug, router])
 
+  useEffect(() => {
+    if (city?.sale_type === "direct") {
+      router.replace(`/portal/${city.slug}`)
+    }
+  }, [city, router])
+
   const handleImport = () => {
     if (importSource) {
       setImportedData(importSource)
@@ -117,6 +123,10 @@ export default function FormPage() {
   }
 
   if (schemaLoading || !city) {
+    return <Loader />
+  }
+
+  if (city.sale_type === "direct") {
     return <Loader />
   }
 

@@ -10,7 +10,7 @@ import {
   ShoppingBag,
   Ticket,
 } from "lucide-react"
-import { Fragment } from "react"
+import { Fragment, type ReactNode } from "react"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
 import type { CheckoutStep } from "@/types/checkout"
@@ -49,6 +49,7 @@ interface ScrollySectionNavProps {
   activeSection: string
   onSectionClick: (sectionId: string) => void
   variant?: NavDesign
+  extraContent?: ReactNode
 }
 
 export default function ScrollySectionNav({
@@ -56,6 +57,7 @@ export default function ScrollySectionNav({
   activeSection,
   onSectionClick,
   variant = "pills",
+  extraContent,
 }: ScrollySectionNavProps) {
   const { isStepComplete } = useCheckout()
 
@@ -70,28 +72,36 @@ export default function ScrollySectionNav({
       data-snap-nav
       className="sticky top-0 z-20 bg-checkout-navbar-bg backdrop-blur-md"
     >
-      <div className="max-w-2xl mx-auto px-4 py-2">
-        {variant === "pills" && (
-          <PillsNav
-            sections={sections}
-            getSectionState={getSectionState}
-            onSectionClick={onSectionClick}
-          />
-        )}
-        {variant === "progress" && (
-          <ProgressNav
-            sections={sections}
-            getSectionState={getSectionState}
-            onSectionClick={onSectionClick}
-          />
-        )}
-        {variant === "underline" && (
-          <UnderlineNav
-            sections={sections}
-            getSectionState={getSectionState}
-            onSectionClick={onSectionClick}
-          />
-        )}
+      <div className="max-w-4xl mx-auto px-4 py-2">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div className="min-w-0 flex-1">
+            {variant === "pills" && (
+              <PillsNav
+                sections={sections}
+                getSectionState={getSectionState}
+                onSectionClick={onSectionClick}
+              />
+            )}
+            {variant === "progress" && (
+              <ProgressNav
+                sections={sections}
+                getSectionState={getSectionState}
+                onSectionClick={onSectionClick}
+              />
+            )}
+            {variant === "underline" && (
+              <UnderlineNav
+                sections={sections}
+                getSectionState={getSectionState}
+                onSectionClick={onSectionClick}
+              />
+            )}
+          </div>
+
+          {extraContent ? (
+            <div className="md:max-w-[260px] md:shrink-0">{extraContent}</div>
+          ) : null}
+        </div>
       </div>
     </div>
   )
@@ -152,7 +162,7 @@ function ProgressNav({
     <div className="flex items-center justify-between flex-wrap gap-y-2">
       {sections.map((section, i) => {
         const Icon = resolveIcon(section)
-        const { isActive, isComplete } = getSectionState(section)
+        const { isActive } = getSectionState(section)
         const _prevComplete =
           i > 0 && getSectionState(sections[i - 1]).isComplete
 

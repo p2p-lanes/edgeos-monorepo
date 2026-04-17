@@ -9,6 +9,7 @@ interface ResourceMenuItemProps {
   color: string
   onNavigate: (path: string) => void
   isGroup?: boolean
+  isActive?: boolean
 }
 
 const ResourceMenuItem = ({
@@ -17,12 +18,13 @@ const ResourceMenuItem = ({
   color,
   onNavigate,
   isGroup = false,
+  isActive = false,
 }: ResourceMenuItemProps) => {
   const { t } = useTranslation()
   const { status } = resource
 
   const handleClick = () => {
-    if (status === "active" && resource.path) {
+    if (status === "active" && resource.path && !isActive) {
       onNavigate(resource.path)
     }
   }
@@ -54,6 +56,7 @@ const ResourceMenuItem = ({
   return (
     <SidebarMenuButton
       disabled={isDisabled}
+      isActive={isActive}
       onClick={handleClick}
       className={cn(isGroup ? "py-2" : "py-5", level > 0 && "pl-6")}
     >

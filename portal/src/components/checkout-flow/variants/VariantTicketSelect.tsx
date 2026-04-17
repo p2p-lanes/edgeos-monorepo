@@ -8,7 +8,6 @@ import QuantitySelector, {
   resolveMaxQuantity,
   supportsQuantitySelector,
 } from "@/components/ui/QuantitySelector"
-import { type PassesVariant, useDesignVariant } from "@/context/designVariant"
 import { formatDate } from "@/helpers/dates"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
@@ -97,6 +96,8 @@ const stripedStyle = {
     "repeating-linear-gradient(135deg, transparent, transparent 3px, rgba(0,0,0,0.07) 3px, rgba(0,0,0,0.07) 6px)",
 }
 
+type TicketSelectVariant = "stacked" | "tabs" | "compact" | "accordion"
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -129,9 +130,8 @@ export default function VariantTicketSelect({
   onSkip,
   templateConfig,
 }: VariantProps) {
-  const { passesVariant: devVariant } = useDesignVariant()
-  const passesVariant: PassesVariant =
-    (templateConfig?.variant as PassesVariant) || devVariant || "stacked"
+  const passesVariant: TicketSelectVariant =
+    (templateConfig?.variant as TicketSelectVariant) || "stacked"
   const { attendeePasses, toggleProduct, isEditing } = usePassesProvider()
   const [focusedAttendeeId, setFocusedAttendeeId] = useState<string | null>(
     null,
