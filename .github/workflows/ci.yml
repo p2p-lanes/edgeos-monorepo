@@ -35,6 +35,21 @@ jobs:
 
       - name: Pytest
         working-directory: backend
+        # The Settings() validator requires these env vars at import time
+        # even though the test fixtures override Postgres via testcontainers.
+        # Values are placeholders — the real Postgres URL is supplied by the
+        # test container, and SECRET_KEY / SUPERADMIN aren't exercised by
+        # the test suite.
+        env:
+          SECRET_KEY: test-ci-secret-key
+          PROJECT_NAME: edgeos-ci
+          POSTGRES_SERVER: localhost
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: edgeos_ci
+          SUPERADMIN: ci@example.com
+          BACKOFFICE_URL: http://localhost
+          PORTAL_URL: http://localhost
         run: uv run pytest -v
 
   frontend:
