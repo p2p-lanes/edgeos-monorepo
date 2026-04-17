@@ -34,7 +34,6 @@ import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
 import { FormErrorSummary } from "@/components/Common/FormErrorSummary"
 import { ApprovalStrategyForm } from "@/components/forms/ApprovalStrategyForm"
-import { PopupCheckoutModeInfo } from "@/components/forms/popupCheckoutModeInfo"
 import { ReviewersManager } from "@/components/forms/ReviewersManager"
 import { ThemeConfigForm } from "@/components/forms/ThemeConfigForm"
 import { TranslationManager } from "@/components/translations/TranslationManager"
@@ -448,16 +447,32 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                 </InlineRow>
               )}
             </form.Field>
+          </InlineSection>
 
-            <form.Subscribe selector={(state) => state.values.sale_type}>
-              {(saleType) => (
-                <PopupCheckoutModeInfo
-                  saleType={saleType}
-                  checkoutMode={deriveCheckoutMode(saleType)}
-                />
-              )}
-            </form.Subscribe>
+          <form.Subscribe selector={(state) => state.values.sale_type}>
+            {(saleType) => {
+              const copy = SALE_TYPE_COPY[saleType]
+              const guidance = getSaleTypeGuidance(saleType)
+              return (
+                <div className="rounded-xl border bg-muted/30 p-4">
+                  <p className="text-sm font-semibold">{copy.label}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {copy.description}
+                  </p>
+                  <div className="mt-3 border-t pt-3">
+                    <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      {guidance.title}
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {guidance.description}
+                    </p>
+                  </div>
+                </div>
+              )
+            }}
+          </form.Subscribe>
 
+          <InlineSection>
             <form.Field name="currency">
               {(field) => (
                 <InlineRow
@@ -487,29 +502,6 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
               )}
             </form.Field>
           </InlineSection>
-
-          <form.Subscribe selector={(state) => state.values.sale_type}>
-            {(saleType) => {
-              const copy = SALE_TYPE_COPY[saleType]
-              const guidance = getSaleTypeGuidance(saleType)
-              return (
-                <div className="rounded-xl border bg-muted/30 p-4">
-                  <p className="text-sm font-semibold">{copy.label}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {copy.description}
-                  </p>
-                  <div className="mt-3 border-t pt-3">
-                    <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                      {guidance.title}
-                    </p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {guidance.description}
-                    </p>
-                  </div>
-                </div>
-              )
-            }}
-          </form.Subscribe>
         </div>
 
         <Separator />
