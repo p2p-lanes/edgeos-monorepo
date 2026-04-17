@@ -19,6 +19,7 @@ import {
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { useState } from "react"
+import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import {
   ApiError,
@@ -39,6 +40,7 @@ import { summarizeRrule } from "../lib/summarizeRrule"
 import { useEventTimezone } from "../lib/useEventTimezone"
 
 export default function EventDetailPage() {
+  const { t } = useTranslation()
   const { getCity } = useCityProvider()
   const city = getCity()
   const params = useParams<{ eventId: string }>()
@@ -144,7 +146,7 @@ export default function EventDetailPage() {
         .map((s) => s.trim())
         .filter((s) => s.length > 0)
       if (emails.length === 0) {
-        throw new Error("Enter at least one email")
+        throw new Error(t("events.detail.enter_at_least_one_email") as string)
       }
       return EventsService.bulkInvitePortal({
         eventId: params.eventId,
@@ -154,7 +156,11 @@ export default function EventDetailPage() {
     onSuccess: (result: EventInvitationBulkResult) => {
       const { invited, skipped_existing, not_found } = result
       toast.success(
-        `Invited ${invited.length} · Skipped ${skipped_existing.length} · Not found ${not_found.length}`,
+        t("events.detail.bulk_invite_success", {
+          invited: invited.length,
+          skipped: skipped_existing.length,
+          notFound: not_found.length,
+        }),
       )
       setEmailsInput("")
       queryClient.invalidateQueries({
@@ -162,7 +168,11 @@ export default function EventDetailPage() {
       })
     },
     onError: (err: unknown) => {
-      toast.error(err instanceof Error ? err.message : "Failed to invite")
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : (t("events.detail.bulk_invite_error") as string),
+      )
     },
   })
 
@@ -178,7 +188,11 @@ export default function EventDetailPage() {
       })
     },
     onError: (err: unknown) => {
-      toast.error(err instanceof Error ? err.message : "Failed to remove")
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : (t("events.detail.remove_invitation_error") as string),
+      )
     },
   })
 
@@ -193,15 +207,17 @@ export default function EventDetailPage() {
   if (eventError instanceof ApiError && eventError.status === 404) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-10 text-center">
-        <h1 className="text-lg font-semibold mb-1">Event not found</h1>
+        <h1 className="text-lg font-semibold mb-1">
+          {t("events.detail.event_not_found")}
+        </h1>
         <p className="text-sm text-muted-foreground">
-          This event does not exist or you do not have access to it.
+          {t("events.detail.event_not_found_message")}
         </p>
         <Link
           href={`/portal/${city?.slug}/events`}
           className="inline-flex items-center gap-1 text-sm text-primary mt-4"
         >
-          <ArrowLeft className="h-4 w-4" /> Back to events
+          <ArrowLeft className="h-4 w-4" /> {t("events.common.back_to_events")}
         </Link>
       </div>
     )
@@ -210,7 +226,9 @@ export default function EventDetailPage() {
   if (!event) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-10 text-center">
-        <p className="text-muted-foreground">Event not found</p>
+        <p className="text-muted-foreground">
+          {t("events.detail.event_not_found")}
+        </p>
       </div>
     )
   }
@@ -231,7 +249,7 @@ export default function EventDetailPage() {
         href={`/portal/${city?.slug}/events`}
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
       >
-        <ArrowLeft className="h-4 w-4" /> Back to events
+        <ArrowLeft className="h-4 w-4" /> {t("events.common.back_to_events")}
       </Link>
 
       {coverUrl && (
@@ -246,7 +264,7 @@ export default function EventDetailPage() {
           </div>
           {coverCredit && (
             <p className="text-[11px] text-muted-foreground mt-1">
-              Photo: {coverCredit}
+              {t("events.detail.photo_credit", { venueName: coverCredit })}
             </p>
           )}
         </div>
@@ -289,7 +307,7 @@ export default function EventDetailPage() {
             </p>
             {timezone && (
               <p className="text-[11px] text-muted-foreground/80 mt-0.5">
-                — in {timezone} time
+                — {t("events.common.in_timezone_time", { timezone })}
               </p>
             )}
           </div>
@@ -332,7 +350,7 @@ export default function EventDetailPage() {
               rel="noopener noreferrer"
               className="text-sm text-primary hover:underline"
             >
-              Join meeting
+              {t("events.detail.join_meeting")}
             </a>
           </div>
         )}
@@ -344,7 +362,7 @@ export default function EventDetailPage() {
             onClick={() => setAddToCalOpen(true)}
           >
             <CalendarPlus className="mr-2 h-4 w-4" />
-            Add to calendar
+            {t("events.detail.add_to_calendar_button")}
           </Button>
         </div>
       </div>
@@ -367,7 +385,9 @@ export default function EventDetailPage() {
 
       {event.content && (
         <div className="rounded-xl border bg-card p-4">
-          <h2 className="text-sm font-semibold mb-2">Description</h2>
+          <h2 className="text-sm font-semibold mb-2">
+            {t("events.detail.description_heading")}
+          </h2>
           <p className="text-sm text-muted-foreground whitespace-pre-wrap break-words">
             {event.content}
           </p>
@@ -397,8 +417,8 @@ export default function EventDetailPage() {
                 <CheckCircle className="h-4 w-4" />
                 <span className="text-sm font-medium">
                   {myParticipation?.status === "checked_in"
-                    ? "Checked in"
-                    : "Registered"}
+                    ? t("events.rsvp.checked_in")
+                    : t("events.rsvp.registered")}
                 </span>
               </div>
               {myParticipation?.status === "registered" && (
@@ -409,11 +429,11 @@ export default function EventDetailPage() {
                       onClick={() => checkInMutation.mutate()}
                       disabled={isPending}
                     >
-                      Check in
+                      {t("events.rsvp.check_in")}
                     </Button>
                   ) : (
                     <p className="text-xs text-muted-foreground">
-                      Check-in opens at start time
+                      {t("events.rsvp.check_in_opens_at_start")}
                     </p>
                   )}
                   <Button
@@ -422,7 +442,7 @@ export default function EventDetailPage() {
                     onClick={() => cancelMutation.mutate()}
                     disabled={isPending}
                   >
-                    Cancel RSVP
+                    {t("events.rsvp.cancel")}
                   </Button>
                 </div>
               )}
@@ -434,7 +454,7 @@ export default function EventDetailPage() {
               className="inline-flex items-center gap-2"
             >
               <UserPlus className="h-4 w-4" />
-              RSVP
+              {t("events.rsvp.rsvp")}
             </Button>
           )}
         </div>
@@ -445,16 +465,17 @@ export default function EventDetailPage() {
         <div className="rounded-xl border bg-card p-4 space-y-3">
           <div className="flex items-center gap-2">
             <Mail className="h-4 w-4 text-primary" />
-            <h3 className="text-sm font-semibold">Invite attendees</h3>
+            <h3 className="text-sm font-semibold">
+              {t("events.detail.invite_attendees_heading")}
+            </h3>
           </div>
           <p className="text-xs text-muted-foreground">
-            Paste emails (one per line or comma-separated). Only humans already
-            in this popup can be invited.
+            {t("events.detail.invite_attendees_text")}
           </p>
           <Textarea
             value={emailsInput}
             onChange={(e) => setEmailsInput(e.target.value)}
-            placeholder={"alice@example.com\nbob@example.com"}
+            placeholder={t("events.detail.email_placeholder")}
             rows={5}
             disabled={bulkInviteMutation.isPending}
           />
@@ -467,14 +488,18 @@ export default function EventDetailPage() {
               }
             >
               <Send className="mr-2 h-4 w-4" />
-              {bulkInviteMutation.isPending ? "Inviting..." : "Invite"}
+              {bulkInviteMutation.isPending
+                ? t("events.detail.inviting_button")
+                : t("events.detail.invite_button")}
             </Button>
           </div>
 
           {invitations.length > 0 && (
             <div className="pt-2 border-t">
               <h4 className="text-xs font-semibold uppercase text-muted-foreground mb-2">
-                Invitations ({invitations.length})
+                {t("events.detail.invitations_heading", {
+                  count: invitations.length,
+                })}
               </h4>
               <ul className="space-y-1 max-h-48 overflow-y-auto">
                 {invitations.map((inv) => (
@@ -495,7 +520,9 @@ export default function EventDetailPage() {
                       variant="ghost"
                       size="sm"
                       className="h-6 w-6 p-0 shrink-0"
-                      aria-label={`Remove invitation for ${inv.email}`}
+                      aria-label={t("events.detail.remove_invitation_aria", {
+                        email: inv.email,
+                      })}
                       disabled={deleteInvitationMutation.isPending}
                       onClick={() => deleteInvitationMutation.mutate(inv.id)}
                     >
@@ -512,14 +539,18 @@ export default function EventDetailPage() {
       {/* Participants */}
       <div className="rounded-xl border bg-card p-4">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold">Participants</h3>
+          <h3 className="text-sm font-semibold">
+            {t("events.detail.participants_heading")}
+          </h3>
           <span className="text-sm text-muted-foreground">
             {activeParticipants.length}
             {event.max_participant ? ` / ${event.max_participant}` : ""}
           </span>
         </div>
         {activeParticipants.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No participants yet</p>
+          <p className="text-sm text-muted-foreground">
+            {t("events.detail.no_participants_yet")}
+          </p>
         ) : (
           <div className="space-y-2">
             {activeParticipants
@@ -535,7 +566,9 @@ export default function EventDetailPage() {
                       <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center">
                         <Users className="h-3 w-3 text-muted-foreground" />
                       </div>
-                      <span className="text-sm">{name || "Unnamed"}</span>
+                      <span className="text-sm">
+                        {name || t("events.detail.unnamed_participant")}
+                      </span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       {p.role !== "attendee" && (
@@ -552,7 +585,9 @@ export default function EventDetailPage() {
               })}
             {activeParticipants.length > 10 && (
               <p className="text-xs text-muted-foreground text-center">
-                +{activeParticipants.length - 10} more
+                {t("events.detail.participants_more", {
+                  count: activeParticipants.length - 10,
+                })}
               </p>
             )}
           </div>

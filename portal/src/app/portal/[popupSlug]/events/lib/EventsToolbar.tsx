@@ -12,6 +12,7 @@ import {
   Search,
 } from "lucide-react"
 import Link from "next/link"
+import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -63,6 +64,7 @@ export function EventsToolbar({
   onSelectedTagsChange,
   canCreate,
 }: EventsToolbarProps) {
+  const { t } = useTranslation()
   return (
     <div className="flex flex-wrap items-center gap-2">
       <div className="relative flex-1 min-w-[200px]">
@@ -70,7 +72,7 @@ export function EventsToolbar({
         <Input
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
-          placeholder="Search events..."
+          placeholder={t("events.toolbar.search_placeholder")}
           className="pl-9"
         />
       </div>
@@ -82,7 +84,7 @@ export function EventsToolbar({
         aria-pressed={rsvpedOnly}
       >
         <CheckCircle className="mr-2 h-4 w-4" />
-        My RSVPs
+        {t("events.toolbar.my_rsvps")}
       </Button>
 
       <Button
@@ -92,7 +94,7 @@ export function EventsToolbar({
         aria-pressed={mineOnly}
       >
         <Pencil className="mr-2 h-4 w-4" />
-        My events
+        {t("events.toolbar.my_events")}
       </Button>
 
       {onShowHiddenChange && (
@@ -101,7 +103,11 @@ export function EventsToolbar({
           size="sm"
           onClick={() => onShowHiddenChange(!showHidden)}
           aria-pressed={!!showHidden}
-          title={showHidden ? "Hiding hidden events" : "Show hidden events"}
+          title={
+            showHidden
+              ? t("events.toolbar.hidden_title_showing")
+              : t("events.toolbar.hidden_title_hidden")
+          }
           disabled={!showHidden && (hiddenCount ?? 0) === 0}
         >
           {showHidden ? (
@@ -109,7 +115,7 @@ export function EventsToolbar({
           ) : (
             <Eye className="mr-2 h-4 w-4" />
           )}
-          Hidden
+          {t("events.toolbar.hidden")}
           {typeof hiddenCount === "number" && hiddenCount > 0 && (
             <span className="ml-1.5 text-xs opacity-80">({hiddenCount})</span>
           )}
@@ -124,10 +130,10 @@ export function EventsToolbar({
                 selectedTags && selectedTags.length > 0 ? "default" : "outline"
               }
               size="sm"
-              title="Filter by tags"
+              title={t("events.toolbar.filter_by_tags")}
             >
               <Filter className="mr-2 h-4 w-4" />
-              Tags
+              {t("events.toolbar.tags_label")}
               {selectedTags && selectedTags.length > 0 && (
                 <span className="ml-1.5 text-xs opacity-80">
                   ({selectedTags.length})
@@ -138,7 +144,7 @@ export function EventsToolbar({
           <PopoverContent align="start" className="w-64 p-3">
             <div className="mb-2 flex items-center justify-between">
               <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Filter by tag
+                {t("events.toolbar.filter_by_tag_label")}
               </span>
               {selectedTags && selectedTags.length > 0 && (
                 <button
@@ -146,7 +152,7 @@ export function EventsToolbar({
                   className="text-[11px] text-muted-foreground hover:text-foreground"
                   onClick={() => onSelectedTagsChange([])}
                 >
-                  Clear
+                  {t("events.toolbar.clear_filters")}
                 </button>
               )}
             </div>
@@ -189,21 +195,23 @@ export function EventsToolbar({
           type="button"
           variant={view === "list" ? "default" : "ghost"}
           size="sm"
-          aria-label="List view"
-          title="List view"
+          aria-label={t("events.toolbar.list_view_label")}
+          title={t("events.toolbar.list_view_label")}
           aria-pressed={view === "list"}
           onClick={() => onViewChange("list")}
           className={cn("h-7 rounded-sm", view === "list" && "shadow-none")}
         >
           <List className={cn("h-4 w-4", view === "list" && "mr-1.5")} />
-          {view === "list" && <span>List</span>}
+          {view === "list" && (
+            <span>{t("events.toolbar.list_view_short")}</span>
+          )}
         </Button>
         <Button
           type="button"
           variant={view === "calendar" ? "default" : "ghost"}
           size="sm"
-          aria-label="Calendar view"
-          title="Calendar view"
+          aria-label={t("events.toolbar.calendar_view_label")}
+          title={t("events.toolbar.calendar_view_label")}
           aria-pressed={view === "calendar"}
           onClick={() => onViewChange("calendar")}
           className={cn("h-7 rounded-sm", view === "calendar" && "shadow-none")}
@@ -211,7 +219,9 @@ export function EventsToolbar({
           <CalendarDays
             className={cn("h-4 w-4", view === "calendar" && "mr-1.5")}
           />
-          {view === "calendar" && <span>Calendar</span>}
+          {view === "calendar" && (
+            <span>{t("events.toolbar.calendar_view_short")}</span>
+          )}
         </Button>
       </div>
 
@@ -219,7 +229,7 @@ export function EventsToolbar({
         <Button size="sm" asChild>
           <Link href={`/portal/${slug}/events/new`}>
             <Plus className="mr-2 h-4 w-4" />
-            Create event
+            {t("events.toolbar.create_event")}
           </Link>
         </Button>
       )}

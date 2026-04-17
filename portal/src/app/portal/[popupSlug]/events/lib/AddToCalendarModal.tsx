@@ -2,6 +2,7 @@
 
 import { Download } from "lucide-react"
 import type { ReactNode } from "react"
+import { useTranslation } from "react-i18next"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -39,30 +40,31 @@ export function AddToCalendarModal({
   eventId,
   event,
 }: Props) {
+  const { t } = useTranslation()
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle>Add to calendar</DialogTitle>
+          <DialogTitle>{t("events.add_to_calendar.title")}</DialogTitle>
           <DialogDescription>
-            Pick the calendar you use and we&apos;ll pre-fill the event.
+            {t("events.add_to_calendar.description")}
           </DialogDescription>
         </DialogHeader>
         <div className="grid grid-cols-1 gap-2">
           <ProviderButton
             href={googleCalendarUrl(event)}
             icon={<GoogleIcon />}
-            label="Google Calendar"
+            label={t("events.add_to_calendar.google_calendar")}
           />
           <ProviderButton
             href={outlookCalendarUrl(event)}
             icon={<OutlookIcon />}
-            label="Outlook"
+            label={t("events.add_to_calendar.outlook")}
           />
           <ProviderButton
             href={yahooCalendarUrl(event)}
             icon={<YahooIcon />}
-            label="Yahoo"
+            label={t("events.add_to_calendar.yahoo")}
           />
           <Button
             variant="outline"
@@ -73,7 +75,7 @@ export function AddToCalendarModal({
             }}
           >
             <AppleIcon />
-            Apple Calendar / other (.ics)
+            {t("events.add_to_calendar.apple_calendar")}
           </Button>
           <Button
             variant="ghost"
@@ -85,7 +87,7 @@ export function AddToCalendarModal({
             }}
           >
             <Download className="h-4 w-4" />
-            Download .ics file
+            {t("events.add_to_calendar.download_ics")}
           </Button>
         </div>
       </DialogContent>

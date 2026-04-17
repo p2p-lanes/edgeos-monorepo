@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query"
 import { ArrowLeft, ArrowUpRight, Clock, MapPin, Users } from "lucide-react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
+import { useTranslation } from "react-i18next"
 
 import { type EventVenuePublic, EventVenuesService } from "@/client"
 import { LucideIcon } from "@/components/LucideIcon"
@@ -11,6 +12,7 @@ import { VenueHoursSummary } from "@/components/VenueHoursSummary"
 import { useCityProvider } from "@/providers/cityProvider"
 
 export default function PortalVenueDetailPage() {
+  const { t } = useTranslation()
   const params = useParams<{ popupSlug: string; venueId: string }>()
   const { getCity } = useCityProvider()
   const city = getCity()
@@ -43,10 +45,11 @@ export default function PortalVenueDetailPage() {
           href={`/portal/${city?.slug}/events/venues`}
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-3"
         >
-          <ArrowLeft className="h-4 w-4" /> All venues
+          <ArrowLeft className="h-4 w-4" />{" "}
+          {t("events.venues.detail.all_venues_link")}
         </Link>
         <p className="text-center py-20 text-muted-foreground">
-          Venue not found.
+          {t("events.venues.detail.venue_not_found")}
         </p>
       </div>
     )
@@ -67,7 +70,8 @@ export default function PortalVenueDetailPage() {
         href={`/portal/${city?.slug}/events/venues`}
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
       >
-        <ArrowLeft className="h-4 w-4" /> All venues
+        <ArrowLeft className="h-4 w-4" />{" "}
+        {t("events.venues.detail.all_venues_link")}
       </Link>
 
       {/* Cover */}
@@ -84,7 +88,7 @@ export default function PortalVenueDetailPage() {
 
       <div>
         <h1 className="text-2xl font-bold tracking-tight">
-          {venue.title || "Untitled venue"}
+          {venue.title || t("events.venues.detail.untitled_venue")}
         </h1>
         {venue.location && (
           <p className="text-sm text-muted-foreground mt-1 inline-flex items-center gap-1">
@@ -97,7 +101,8 @@ export default function PortalVenueDetailPage() {
                 rel="noreferrer"
                 className="ml-1 inline-flex items-center gap-0.5 underline"
               >
-                Map <ArrowUpRight className="h-3 w-3" />
+                {t("events.venues.detail.map_link")}{" "}
+                <ArrowUpRight className="h-3 w-3" />
               </a>
             )}
           </p>
@@ -107,36 +112,49 @@ export default function PortalVenueDetailPage() {
       {/* Stats row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <InfoCard
-          label="Capacity"
+          label={t("events.venues.detail.capacity_label")}
           value={venue.capacity != null ? String(venue.capacity) : "—"}
           icon={<Users className="h-4 w-4" />}
         />
         <InfoCard
-          label="Setup"
+          label={t("events.venues.detail.setup_label")}
           value={
             venue.setup_time_minutes != null
-              ? `${venue.setup_time_minutes} min`
+              ? t("events.venues.detail.setup_value", {
+                  minutes: venue.setup_time_minutes,
+                })
               : "—"
           }
           icon={<Clock className="h-4 w-4" />}
         />
         <InfoCard
-          label="Teardown"
+          label={t("events.venues.detail.teardown_label")}
           value={
             venue.teardown_time_minutes != null
-              ? `${venue.teardown_time_minutes} min`
+              ? t("events.venues.detail.teardown_value", {
+                  minutes: venue.teardown_time_minutes,
+                })
               : "—"
           }
           icon={<Clock className="h-4 w-4" />}
         />
-        <InfoCard label="Booking" value={venue.booking_mode ?? "free"} />
+        <InfoCard
+          label={t("events.venues.detail.booking_label")}
+          value={
+            venue.booking_mode === "approval_required"
+              ? t("events.venues.detail.booking_approval")
+              : venue.booking_mode === "unbookable"
+                ? t("events.venues.detail.booking_unbookable")
+                : t("events.venues.detail.booking_free")
+          }
+        />
       </div>
 
       {/* Properties */}
       {venue.properties && venue.properties.length > 0 && (
         <section className="space-y-2">
           <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground">
-            Properties
+            {t("events.venues.detail.properties_heading")}
           </h2>
           <div className="flex flex-wrap gap-2">
             {venue.properties.map((p) => (
@@ -155,7 +173,7 @@ export default function PortalVenueDetailPage() {
       {/* Weekly hours */}
       <section className="space-y-2">
         <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground">
-          Open hours
+          {t("events.venues.detail.open_hours_heading")}
         </h2>
         <VenueHoursSummary hours={venue.weekly_hours} />
       </section>
@@ -164,7 +182,7 @@ export default function PortalVenueDetailPage() {
       {gallery.length > 0 && (
         <section className="space-y-2">
           <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground">
-            Gallery
+            {t("events.venues.detail.gallery_heading")}
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {gallery.map((photo) => (
@@ -186,7 +204,7 @@ export default function PortalVenueDetailPage() {
         (venue.amenities?.length ?? 0) > 0) && (
         <section className="space-y-2">
           <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground">
-            Details
+            {t("events.venues.detail.details_heading")}
           </h2>
           <div className="flex flex-wrap gap-1.5">
             {venue.tags?.map((t) => (

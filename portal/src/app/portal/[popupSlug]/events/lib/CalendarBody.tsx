@@ -26,6 +26,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { useState } from "react"
+import { useTranslation } from "react-i18next"
 
 import {
   EventParticipantsService,
@@ -57,6 +58,7 @@ export function CalendarBody({
   rsvpedOnly,
   tags,
 }: CalendarBodyProps) {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date())
@@ -203,15 +205,16 @@ export function CalendarBody({
                 {format(selectedDate, "EEEE, MMMM d")}
               </h3>
               <span className="text-xs text-muted-foreground">
-                {selectedEvents.length} event
-                {selectedEvents.length !== 1 ? "s" : ""}
+                {t("events.calendar.selected_events", {
+                  count: selectedEvents.length,
+                })}
               </span>
             </div>
             {selectedEvents.length === 0 ? (
               <div className="text-center py-8">
                 <CalendarIcon className="mx-auto h-6 w-6 text-muted-foreground/50 mb-2" />
                 <p className="text-sm text-muted-foreground">
-                  No events on this day
+                  {t("events.calendar.no_events_on_day")}
                 </p>
               </div>
             ) : (
@@ -220,7 +223,7 @@ export function CalendarBody({
                   const recurrenceLabel =
                     summarizeRrule(event.rrule) ??
                     (event.recurrence_master_id
-                      ? "Part of a recurring series"
+                      ? t("events.list.part_of_recurring_series")
                       : null)
                   return (
                     <div
@@ -278,7 +281,11 @@ export function CalendarBody({
                             {event.max_participant != null && (
                               <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
                                 <Users className="h-3 w-3" />
-                                <span>Max {event.max_participant}</span>
+                                <span>
+                                  {t("events.calendar.max_participants", {
+                                    count: event.max_participant,
+                                  })}
+                                </span>
                               </div>
                             )}
                             {event.tags && event.tags.length > 0 && (
@@ -309,7 +316,7 @@ export function CalendarBody({
                               className="inline-flex items-center gap-1 rounded-md border border-primary/30 bg-primary/10 px-2 py-1 text-xs font-medium text-primary hover:bg-primary/20"
                             >
                               <CheckCircle className="h-3 w-3" />
-                              Going
+                              {t("events.rsvp.going")}
                             </button>
                           ) : (
                             <button
@@ -317,7 +324,7 @@ export function CalendarBody({
                               onClick={() => rsvpMutation.mutate(event.id)}
                               className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs font-medium hover:bg-muted"
                             >
-                              RSVP
+                              {t("events.rsvp.rsvp")}
                             </button>
                           )}
                         </div>
@@ -330,7 +337,7 @@ export function CalendarBody({
           </>
         ) : (
           <p className="text-sm text-muted-foreground text-center py-8">
-            Select a day to see events
+            {t("events.calendar.select_a_day")}
           </p>
         )}
       </div>

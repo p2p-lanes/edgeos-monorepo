@@ -12,6 +12,7 @@ import {
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { useEffect, useMemo, useRef, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
 import {
@@ -49,6 +50,7 @@ function toLocalInput(date: Date): string {
 }
 
 export default function EditPortalEventPage() {
+  const { t } = useTranslation()
   const params = useParams<{ popupSlug: string; eventId: string }>()
   const router = useRouter()
   const queryClient = useQueryClient()
@@ -133,7 +135,7 @@ export default function EditPortalEventPage() {
         requestBody: payload,
       }),
     onSuccess: () => {
-      toast.success("Event updated")
+      toast.success(t("events.form.event_updated_success"))
       queryClient.invalidateQueries({ queryKey: ["portal-event"] })
       queryClient.invalidateQueries({ queryKey: ["portal-events"] })
       router.push(`/portal/${city?.slug}/events/${params.eventId}`)
@@ -165,7 +167,7 @@ export default function EditPortalEventPage() {
       )
       const { publicUrl } = await uploadFile(file)
       setCoverUrl(publicUrl)
-      toast.success("Image uploaded")
+      toast.success(t("events.form.image_uploaded_success"))
     } catch (err) {
       toast.error((err as Error).message)
     } finally {
@@ -211,7 +213,9 @@ export default function EditPortalEventPage() {
     return (
       <div className="max-w-2xl mx-auto p-4 sm:p-6 text-center py-20">
         <ImageIcon className="mx-auto h-10 w-10 text-muted-foreground/50 mb-3" />
-        <p className="text-muted-foreground">Event not found.</p>
+        <p className="text-muted-foreground">
+          {t("events.detail.event_not_found")}
+        </p>
       </div>
     )
   }
@@ -219,15 +223,17 @@ export default function EditPortalEventPage() {
   if (!isOwner) {
     return (
       <div className="max-w-2xl mx-auto p-4 sm:p-6 text-center py-20">
-        <h1 className="text-xl font-semibold">Not your event</h1>
+        <h1 className="text-xl font-semibold">
+          {t("events.form.not_your_event_heading")}
+        </h1>
         <p className="text-sm text-muted-foreground mt-2">
-          Only the event creator can edit this event.
+          {t("events.form.not_your_event_message")}
         </p>
         <Link
           href={`/portal/${city?.slug}/events/${params.eventId}`}
           className="mt-4 inline-block text-sm underline"
         >
-          Back to event
+          {t("events.form.back_to_event")}
         </Link>
       </div>
     )
@@ -239,21 +245,29 @@ export default function EditPortalEventPage() {
         href={`/portal/${city?.slug}/events/${params.eventId}`}
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
       >
-        <ArrowLeft className="h-4 w-4" /> Back to event
+        <ArrowLeft className="h-4 w-4" /> {t("events.form.back_to_event")}
       </Link>
 
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Edit event</h1>
+        <h1 className="text-2xl font-bold tracking-tight">
+          {t("events.form.edit_heading")}
+        </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Update your event at {city?.name}
-          {timezone ? ` — times in ${timezone}` : ""}
+          {timezone
+            ? t("events.form.edit_subheading_with_tz", {
+                cityName: city?.name ?? "",
+                timezone,
+              })
+            : t("events.form.edit_subheading", {
+                cityName: city?.name ?? "",
+              })}
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-5">
         {/* Title */}
         <div className="space-y-2">
-          <Label htmlFor="title">Title</Label>
+          <Label htmlFor="title">{t("events.form.title_label")}</Label>
           <Input
             id="title"
             value={title}
@@ -264,7 +278,7 @@ export default function EditPortalEventPage() {
 
         {/* Cover */}
         <div className="space-y-2">
-          <Label>Cover image</Label>
+          <Label>{t("events.form.cover_image_label_edit")}</Label>
           <input
             ref={fileRef}
             type="file"
@@ -280,7 +294,7 @@ export default function EditPortalEventPage() {
               {/* biome-ignore lint/performance/noImgElement: user-uploaded S3 image */}
               <img
                 src={coverUrl}
-                alt="Event cover"
+                alt={t("events.form.event_cover_alt")}
                 className="aspect-[16/9] w-full object-cover"
               />
               <div className="absolute top-2 right-2 flex gap-2">
@@ -290,7 +304,8 @@ export default function EditPortalEventPage() {
                   size="sm"
                   onClick={() => fileRef.current?.click()}
                 >
-                  <Upload className="mr-1 h-4 w-4" /> Replace
+                  <Upload className="mr-1 h-4 w-4" />{" "}
+                  {t("events.form.replace_button")}
                 </Button>
                 <Button
                   type="button"
@@ -314,26 +329,28 @@ export default function EditPortalEventPage() {
               ) : (
                 <Upload className="mr-2 h-4 w-4" />
               )}
-              Upload image
+              {t("events.form.upload_image_button")}
             </Button>
           )}
         </div>
 
         {/* Venue */}
         <div className="space-y-2">
-          <Label>Venue</Label>
+          <Label>{t("events.form.venue_label")}</Label>
           <Select
             value={venueId || "__none__"}
             onValueChange={(v) => setVenueId(v === "__none__" ? "" : v)}
           >
             <SelectTrigger className="w-full">
-              <SelectValue placeholder="No venue" />
+              <SelectValue placeholder={t("events.form.venue_placeholder")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="__none__">No venue</SelectItem>
+              <SelectItem value="__none__">
+                {t("events.form.no_venue_option")}
+              </SelectItem>
               {venues.map((v) => (
                 <SelectItem key={v.id} value={v.id}>
-                  {v.title || "Untitled venue"}
+                  {v.title || t("events.venues.list.untitled_venue")}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -346,7 +363,7 @@ export default function EditPortalEventPage() {
         {/* Times */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-2">
-            <Label htmlFor="start">Start</Label>
+            <Label htmlFor="start">{t("events.form.start_label")}</Label>
             <Input
               id="start"
               type="datetime-local"
@@ -356,7 +373,7 @@ export default function EditPortalEventPage() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="end">End</Label>
+            <Label htmlFor="end">{t("events.form.end_label")}</Label>
             <Input
               id="end"
               type="datetime-local"
@@ -369,7 +386,7 @@ export default function EditPortalEventPage() {
 
         {/* Visibility */}
         <div className="space-y-2">
-          <Label>Visibility</Label>
+          <Label>{t("events.form.visibility_label")}</Label>
           <Select
             value={visibility}
             onValueChange={(v) => setVisibility(v as Visibility)}
@@ -378,16 +395,22 @@ export default function EditPortalEventPage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="public">Public</SelectItem>
-              <SelectItem value="private">Private</SelectItem>
-              <SelectItem value="unlisted">Unlisted</SelectItem>
+              <SelectItem value="public">
+                {t("events.form.visibility_public")}
+              </SelectItem>
+              <SelectItem value="private">
+                {t("events.form.visibility_private_short")}
+              </SelectItem>
+              <SelectItem value="unlisted">
+                {t("events.form.visibility_unlisted_short")}
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>
 
         {/* Max participants */}
         <div className="space-y-2">
-          <Label htmlFor="max">Max participants</Label>
+          <Label htmlFor="max">{t("events.form.max_participants_label")}</Label>
           <Input
             id="max"
             type="number"
@@ -399,19 +422,19 @@ export default function EditPortalEventPage() {
 
         {/* Meeting URL */}
         <div className="space-y-2">
-          <Label htmlFor="meeting">Meeting URL</Label>
+          <Label htmlFor="meeting">{t("events.form.meeting_url_label")}</Label>
           <Input
             id="meeting"
             type="url"
             value={meetingUrl}
             onChange={(e) => setMeetingUrl(e.target.value)}
-            placeholder="https://…"
+            placeholder={t("events.form.meeting_url_placeholder")}
           />
         </div>
 
         {/* Description */}
         <div className="space-y-2">
-          <Label htmlFor="desc">Description</Label>
+          <Label htmlFor="desc">{t("events.form.description_label")}</Label>
           <Textarea
             id="desc"
             rows={4}
@@ -423,19 +446,21 @@ export default function EditPortalEventPage() {
         {/* Track */}
         {tracks.length > 0 && (
           <div className="space-y-2">
-            <Label>Track</Label>
+            <Label>{t("events.form.track_label")}</Label>
             <Select
               value={trackId || "__none__"}
               onValueChange={(v) => setTrackId(v === "__none__" ? "" : v)}
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="No track" />
+                <SelectValue placeholder={t("events.form.track_placeholder")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="__none__">No track</SelectItem>
-                {tracks.map((t) => (
-                  <SelectItem key={t.id} value={t.id}>
-                    {t.name}
+                <SelectItem value="__none__">
+                  {t("events.form.no_track_option")}
+                </SelectItem>
+                {tracks.map((tr) => (
+                  <SelectItem key={tr.id} value={tr.id}>
+                    {tr.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -451,7 +476,7 @@ export default function EditPortalEventPage() {
               router.push(`/portal/${city?.slug}/events/${params.eventId}`)
             }
           >
-            Cancel
+            {t("events.form.cancel_button")}
           </Button>
           <Button type="submit" disabled={updateMutation.isPending}>
             {updateMutation.isPending ? (
@@ -459,7 +484,7 @@ export default function EditPortalEventPage() {
             ) : (
               <Save className="mr-2 h-4 w-4" />
             )}
-            Save changes
+            {t("events.form.save_button")}
           </Button>
         </div>
       </form>

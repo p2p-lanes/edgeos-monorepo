@@ -4,6 +4,7 @@ import { useQueries, useQuery } from "@tanstack/react-query"
 import { ArrowLeft, Clock, Layers, MapPin } from "lucide-react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
+import { useTranslation } from "react-i18next"
 
 import {
   ApiError,
@@ -17,6 +18,7 @@ import { useCityProvider } from "@/providers/cityProvider"
 import { useEventTimezone } from "../../lib/useEventTimezone"
 
 export default function TrackDetailPage() {
+  const { t } = useTranslation()
   const { getCity } = useCityProvider()
   const city = getCity()
   const params = useParams<{ trackId: string }>()
@@ -87,12 +89,15 @@ export default function TrackDetailPage() {
   if (trackError instanceof ApiError && trackError.status === 404) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-10 text-center">
-        <h1 className="text-lg font-semibold mb-1">Track not found</h1>
+        <h1 className="text-lg font-semibold mb-1">
+          {t("events.tracks.detail.track_not_found")}
+        </h1>
         <Link
           href={`/portal/${city?.slug}/events/tracks`}
           className="inline-flex items-center gap-1 text-sm text-primary mt-4"
         >
-          <ArrowLeft className="h-4 w-4" /> Back to tracks
+          <ArrowLeft className="h-4 w-4" />{" "}
+          {t("events.tracks.detail.back_to_tracks")}
         </Link>
       </div>
     )
@@ -101,7 +106,9 @@ export default function TrackDetailPage() {
   if (!track) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-10 text-center">
-        <p className="text-muted-foreground">Track not found</p>
+        <p className="text-muted-foreground">
+          {t("events.tracks.detail.track_not_found")}
+        </p>
       </div>
     )
   }
@@ -123,7 +130,8 @@ export default function TrackDetailPage() {
         href={`/portal/${city?.slug}/events/tracks`}
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
       >
-        <ArrowLeft className="h-4 w-4" /> Back to tracks
+        <ArrowLeft className="h-4 w-4" />{" "}
+        {t("events.tracks.detail.back_to_tracks")}
       </Link>
 
       <div>
@@ -138,9 +146,9 @@ export default function TrackDetailPage() {
         )}
         {track.topic && track.topic.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-3">
-            {track.topic.map((t: string) => (
-              <Badge key={t} variant="secondary">
-                {t}
+            {track.topic.map((tag: string) => (
+              <Badge key={tag} variant="secondary">
+                {tag}
               </Badge>
             ))}
           </div>
@@ -149,10 +157,12 @@ export default function TrackDetailPage() {
 
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold">Events</h2>
+          <h2 className="text-sm font-semibold">
+            {t("events.tracks.detail.heading")}
+          </h2>
           {timezone && (
             <span className="text-xs text-muted-foreground">
-              Times in {timezone}
+              {t("events.tracks.detail.times_in_timezone", { timezone })}
             </span>
           )}
         </div>
@@ -163,7 +173,7 @@ export default function TrackDetailPage() {
           </div>
         ) : events.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No events in this track yet.
+            {t("events.tracks.detail.no_events")}
           </p>
         ) : (
           <div className="space-y-6">

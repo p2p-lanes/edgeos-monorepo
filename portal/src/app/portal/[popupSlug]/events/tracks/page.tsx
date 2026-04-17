@@ -3,11 +3,13 @@
 import { useQuery } from "@tanstack/react-query"
 import { ArrowLeft, Layers } from "lucide-react"
 import Link from "next/link"
+import { useTranslation } from "react-i18next"
 
 import { type TrackPublic, TracksService } from "@/client"
 import { useCityProvider } from "@/providers/cityProvider"
 
 export default function TracksPage() {
+  const { t } = useTranslation()
   const { getCity } = useCityProvider()
   const city = getCity()
 
@@ -29,15 +31,17 @@ export default function TracksPage() {
         href={`/portal/${city?.slug}/events`}
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-3"
       >
-        <ArrowLeft className="h-4 w-4" /> Back to events
+        <ArrowLeft className="h-4 w-4" /> {t("events.common.back_to_events")}
       </Link>
 
       <div className="flex items-center gap-2 mb-4">
         <Layers className="h-5 w-5 text-primary" />
-        <h1 className="text-2xl font-bold tracking-tight">Tracks</h1>
+        <h1 className="text-2xl font-bold tracking-tight">
+          {t("events.tracks.list.heading")}
+        </h1>
       </div>
       <p className="text-sm text-muted-foreground mb-6">
-        Themed collections of events at {city?.name}.
+        {t("events.tracks.list.subheading", { cityName: city?.name ?? "" })}
       </p>
 
       {isLoading ? (
@@ -47,7 +51,9 @@ export default function TracksPage() {
       ) : tracks.length === 0 ? (
         <div className="text-center py-20">
           <Layers className="mx-auto h-10 w-10 text-muted-foreground/50 mb-3" />
-          <p className="text-muted-foreground">No tracks yet</p>
+          <p className="text-muted-foreground">
+            {t("events.tracks.list.empty_state")}
+          </p>
         </div>
       ) : (
         <div className="grid sm:grid-cols-2 gap-3">
@@ -65,12 +71,12 @@ export default function TracksPage() {
               )}
               {track.topic && track.topic.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-2">
-                  {track.topic.slice(0, 4).map((t: string) => (
+                  {track.topic.slice(0, 4).map((tag: string) => (
                     <span
-                      key={t}
+                      key={tag}
                       className="inline-flex items-center text-[10px] bg-muted px-1.5 py-0.5 rounded"
                     >
-                      {t}
+                      {tag}
                     </span>
                   ))}
                 </div>

@@ -15,6 +15,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { useState } from "react"
+import { useTranslation } from "react-i18next"
 
 import {
   EventParticipantsService,
@@ -53,6 +54,7 @@ const statusColors: Record<string, string> = {
 }
 
 export default function EventsPage() {
+  const { t } = useTranslation()
   const { getCity } = useCityProvider()
   const city = getCity()
   const [search, setSearch] = useState("")
@@ -171,9 +173,13 @@ export default function EventsPage() {
       <div className="flex flex-col h-full max-w-4xl mx-auto p-4 sm:p-6">
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <CalendarDays className="h-10 w-10 text-muted-foreground/50 mb-3" />
-          <h1 className="text-xl font-semibold">Events are disabled</h1>
+          <h1 className="text-xl font-semibold">
+            {t("events.list.events_disabled_heading")}
+          </h1>
           <p className="text-sm text-muted-foreground mt-2">
-            The organizer has turned off events for {city?.name}.
+            {t("events.list.events_disabled_message", {
+              cityName: city?.name ?? "",
+            })}
           </p>
         </div>
       </div>
@@ -183,10 +189,16 @@ export default function EventsPage() {
   return (
     <div className="flex flex-col h-full max-w-4xl mx-auto p-4 sm:p-6">
       <div className="flex-none mb-6">
-        <h1 className="text-2xl font-bold tracking-tight">Events</h1>
+        <h1 className="text-2xl font-bold tracking-tight">
+          {t("events.list.heading")}
+        </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Upcoming events at {city?.name}
-          {timezone ? ` — times shown in ${timezone}` : ""}
+          {timezone
+            ? t("events.list.subheading_with_tz", {
+                cityName: city?.name ?? "",
+                timezone,
+              })
+            : t("events.list.subheading", { cityName: city?.name ?? "" })}
         </p>
       </div>
 
@@ -227,7 +239,9 @@ export default function EventsPage() {
         ) : events.length === 0 ? (
           <div className="text-center py-20">
             <Filter className="mx-auto h-10 w-10 text-muted-foreground/50 mb-3" />
-            <p className="text-muted-foreground">No events yet</p>
+            <p className="text-muted-foreground">
+              {t("events.list.empty_state")}
+            </p>
           </div>
         ) : (
           <div className="space-y-6">
@@ -294,7 +308,7 @@ export default function EventsPage() {
                               <Repeat className="h-3 w-3" />
                               <span className="truncate">
                                 {summarizeRrule(event.rrule) ??
-                                  "Part of a recurring series"}
+                                  t("events.list.part_of_recurring_series")}
                               </span>
                             </div>
                           )}
@@ -326,7 +340,7 @@ export default function EventsPage() {
                                 className="inline-flex h-7 items-center gap-1 rounded-md border border-primary/30 bg-primary/10 px-2 text-xs font-medium text-primary hover:bg-primary/20"
                               >
                                 <CheckCircle className="h-3 w-3" />
-                                Going
+                                {t("events.rsvp.going")}
                               </button>
                             ) : (
                               <button
@@ -338,7 +352,7 @@ export default function EventsPage() {
                                 }}
                                 className="inline-flex h-7 items-center gap-1 rounded-md border bg-background px-2 text-xs font-medium shadow-sm hover:bg-muted"
                               >
-                                RSVP
+                                {t("events.rsvp.rsvp")}
                               </button>
                             ))}
                           <button
@@ -351,10 +365,18 @@ export default function EventsPage() {
                             }}
                             aria-label={
                               isHidden
-                                ? `Unhide ${event.title}`
-                                : `Hide ${event.title}`
+                                ? t("events.list.unhide_event_aria", {
+                                    title: event.title,
+                                  })
+                                : t("events.list.hide_event_aria", {
+                                    title: event.title,
+                                  })
                             }
-                            title={isHidden ? "Unhide" : "Hide from my list"}
+                            title={
+                              isHidden
+                                ? t("events.list.unhide_title")
+                                : t("events.list.hide_title")
+                            }
                             className="inline-flex h-7 w-7 items-center justify-center rounded-md border bg-background text-muted-foreground shadow-sm transition-colors hover:text-foreground"
                           >
                             {isHidden ? (
@@ -367,7 +389,9 @@ export default function EventsPage() {
                             <Link
                               href={`/portal/${city?.slug}/events/${event.id}/edit`}
                               onClick={(e) => e.stopPropagation()}
-                              aria-label={`Edit ${event.title}`}
+                              aria-label={t("events.list.edit_event_aria", {
+                                title: event.title,
+                              })}
                               className="inline-flex h-7 w-7 items-center justify-center rounded-md border bg-background text-muted-foreground shadow-sm transition-colors hover:text-foreground"
                             >
                               <Pencil className="h-3.5 w-3.5" />

@@ -20,6 +20,7 @@ import {
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useRef, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import {
   ApiError,
@@ -121,6 +122,7 @@ type Visibility = "public" | "private" | "unlisted"
 type DurationUnit = "minutes" | "hours"
 
 export default function NewPortalEventPage() {
+  const { t } = useTranslation()
   const router = useRouter()
   const { getCity } = useCityProvider()
   const city = getCity()
@@ -302,7 +304,7 @@ export default function NewPortalEventPage() {
         } else {
           setAvailability({
             state: "conflict",
-            reason: res.reason ?? "Conflicts with another event",
+            reason: res.reason ?? t("events.form.conflicts_with_another_event"),
           })
         }
       } catch {
@@ -310,12 +312,12 @@ export default function NewPortalEventPage() {
       }
     }, 500)
     return () => clearTimeout(handle)
-  }, [venueId, startIso, endIso])
+  }, [venueId, startIso, endIso, t])
 
   // ---- mutation -------------------------------------------------------
   const createMutation = useMutation({
     mutationFn: () => {
-      if (!popupId) throw new Error("No popup")
+      if (!popupId) throw new Error(t("events.form.no_popup_error"))
       return EventsService.createPortalEvent({
         requestBody: {
           popup_id: popupId,
@@ -338,7 +340,7 @@ export default function NewPortalEventPage() {
       })
     },
     onSuccess: (event) => {
-      toast.success("Event created")
+      toast.success(t("events.form.event_created_success"))
       router.push(`/portal/${city?.slug}/events/${event.id}`)
     },
     onError: (err) => {
@@ -378,7 +380,7 @@ export default function NewPortalEventPage() {
       )
       const { publicUrl } = await uploadFile(file)
       setCoverUrl(publicUrl)
-      toast.success("Image uploaded")
+      toast.success(t("events.form.image_uploaded_success"))
     } catch (err) {
       toast.error((err as Error).message)
     } finally {
@@ -409,16 +411,18 @@ export default function NewPortalEventPage() {
   if (!eventsEnabled) {
     return (
       <GatedMessage
-        title="Events are disabled"
-        message={`The organizer has turned off events for ${city?.name}.`}
+        title={t("events.list.events_disabled_heading")}
+        message={t("events.list.events_disabled_message", {
+          cityName: city?.name ?? "",
+        })}
       />
     )
   }
   if (!canPublish) {
     return (
       <GatedMessage
-        title="Event creation is restricted"
-        message="Only admins can publish events for this pop-up."
+        title={t("events.form.creation_restricted_heading")}
+        message={t("events.form.creation_restricted_message")}
       />
     )
   }
@@ -432,14 +436,22 @@ export default function NewPortalEventPage() {
         href={`/portal/${city?.slug}/events`}
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
       >
-        <ArrowLeft className="h-4 w-4" /> Back to events
+        <ArrowLeft className="h-4 w-4" /> {t("events.common.back_to_events")}
       </Link>
 
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Create event</h1>
+        <h1 className="text-2xl font-bold tracking-tight">
+          {t("events.form.create_heading")}
+        </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          New event at {city?.name}
-          {timezone ? ` — times in ${timezone}` : ""}
+          {timezone
+            ? t("events.form.create_subheading_with_tz", {
+                cityName: city?.name ?? "",
+                timezone,
+              })
+            : t("events.form.create_subheading", {
+                cityName: city?.name ?? "",
+              })}
         </p>
       </div>
 
@@ -452,20 +464,26 @@ export default function NewPortalEventPage() {
       >
         {/* Venue */}
         <div className="space-y-2">
-          <Label>Venue</Label>
+          <Label>{t("events.form.venue_label")}</Label>
           <Select
             value={venueId || "__none__"}
             onValueChange={(v) => setVenueId(v === "__none__" ? "" : v)}
           >
             <SelectTrigger className="w-full">
-              <SelectValue placeholder="No venue" />
+              <SelectValue placeholder={t("events.form.venue_placeholder")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="__none__">No venue</SelectItem>
+              <SelectItem value="__none__">
+                {t("events.form.no_venue_option")}
+              </SelectItem>
               {venues.map((v) => (
                 <SelectItem key={v.id} value={v.id}>
-                  {v.title || "Untitled venue"}
-                  {v.capacity ? ` (cap. ${v.capacity})` : ""}
+                  {v.title || t("events.venues.list.untitled_venue")}
+                  {v.capacity
+                    ? t("events.form.venue_capacity_suffix", {
+                        capacity: v.capacity,
+                      })
+                    : ""}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -474,22 +492,25 @@ export default function NewPortalEventPage() {
             <div className="text-xs text-muted-foreground space-y-2">
               <VenueHoursSummary hours={selectedVenue.weekly_hours} />
               {selectedVenue.booking_mode === "unbookable" && (
-                <p className="text-destructive">This venue is not bookable.</p>
+                <p className="text-destructive">
+                  {t("events.form.venue_not_bookable")}
+                </p>
               )}
               {selectedVenue.booking_mode === "approval_required" && (
-                <p>This venue requires admin approval for new events.</p>
+                <p>{t("events.form.venue_approval_required")}</p>
               )}
               {(selectedVenue.setup_time_minutes ?? 0) > 0 ||
               (selectedVenue.teardown_time_minutes ?? 0) > 0 ? (
                 <p>
-                  Locked {selectedVenue.setup_time_minutes ?? 0}m before start
-                  and {selectedVenue.teardown_time_minutes ?? 0}m after end for
-                  setup/teardown.
+                  {t("events.form.venue_setup_teardown", {
+                    setupTime: selectedVenue.setup_time_minutes ?? 0,
+                    teardownTime: selectedVenue.teardown_time_minutes ?? 0,
+                  })}
                 </p>
               ) : null}
               {selectedDateIsClosed && (
                 <p className="text-yellow-600 dark:text-yellow-500">
-                  The selected date falls on a day the venue is closed.
+                  {t("events.form.venue_closed_warning")}
                 </p>
               )}
             </div>
@@ -498,19 +519,19 @@ export default function NewPortalEventPage() {
 
         {/* Title */}
         <div className="space-y-2">
-          <Label htmlFor="title">Title</Label>
+          <Label htmlFor="title">{t("events.form.title_label")}</Label>
           <Input
             id="title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="Event name"
+            placeholder={t("events.form.title_placeholder")}
             required
           />
         </div>
 
         {/* Cover image */}
         <div className="space-y-2">
-          <Label>Cover image (optional)</Label>
+          <Label>{t("events.form.cover_image_label")}</Label>
           <input
             ref={fileRef}
             type="file"
@@ -526,7 +547,7 @@ export default function NewPortalEventPage() {
             <div className="relative w-full overflow-hidden rounded-lg border">
               <img
                 src={coverUrl}
-                alt="Event cover"
+                alt={t("events.form.event_cover_alt")}
                 className="aspect-[16/9] w-full object-cover"
               />
               <div className="absolute top-2 right-2 flex gap-2">
@@ -537,7 +558,7 @@ export default function NewPortalEventPage() {
                   onClick={() => fileRef.current?.click()}
                 >
                   <Upload className="mr-1 h-4 w-4" />
-                  Replace
+                  {t("events.form.replace_button")}
                 </Button>
                 <Button
                   type="button"
@@ -562,10 +583,12 @@ export default function NewPortalEventPage() {
                 ) : (
                   <Upload className="mr-2 h-4 w-4" />
                 )}
-                {isUploading ? "Uploading…" : "Upload image"}
+                {isUploading
+                  ? t("events.form.uploading_button")
+                  : t("events.form.upload_image_button")}
               </Button>
               <p className="text-xs text-muted-foreground mt-1">
-                Leave empty to fall back to the venue&apos;s main photo.
+                {t("events.form.cover_fallback_note")}
               </p>
             </div>
           )}
@@ -573,7 +596,7 @@ export default function NewPortalEventPage() {
 
         {/* Date */}
         <div className="space-y-2">
-          <Label htmlFor="date">Date</Label>
+          <Label htmlFor="date">{t("events.form.date_label")}</Label>
           <DatePicker
             id="date"
             value={dateStr}
@@ -594,7 +617,7 @@ export default function NewPortalEventPage() {
         {venueId ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label htmlFor="start">Start time</Label>
+              <Label htmlFor="start">{t("events.form.start_time_label")}</Label>
               <StartTimeCombobox
                 id="start"
                 value={timeStr}
@@ -613,12 +636,14 @@ export default function NewPortalEventPage() {
                 disabled={selectedVenue?.booking_mode === "unbookable"}
                 fits={startFits}
                 placeholder={
-                  startOptions.length === 0 ? "No open hours" : "HH:mm"
+                  startOptions.length === 0
+                    ? t("events.common.no_open_hours")
+                    : "HH:mm"
                 }
               />
             </div>
             <div className="space-y-2">
-              <Label>Duration</Label>
+              <Label>{t("events.form.duration_label")}</Label>
               <DurationPicker
                 value={durationValue}
                 unit={durationUnit}
@@ -632,7 +657,7 @@ export default function NewPortalEventPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label htmlFor="start">Start</Label>
+              <Label htmlFor="start">{t("events.form.start_label")}</Label>
               <Input
                 id="start"
                 type="datetime-local"
@@ -642,7 +667,7 @@ export default function NewPortalEventPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Duration</Label>
+              <Label>{t("events.form.duration_label")}</Label>
               <DurationPicker
                 value={durationValue}
                 unit={durationUnit}
@@ -656,18 +681,18 @@ export default function NewPortalEventPage() {
         )}
         {venueId && startOptions.length === 0 && availabilityData && (
           <p className="text-xs text-muted-foreground">
-            Venue has no open hours on this day (check weekly hours or
-            exceptions).
+            {t("events.form.no_venue_open_hours")}
           </p>
         )}
         {availability.state === "checking" && (
           <p className="text-xs text-muted-foreground">
-            Checking availability…
+            {t("events.form.checking_availability")}
           </p>
         )}
         {availability.state === "ok" && (
           <p className="text-xs text-green-600 inline-flex items-center gap-1">
-            <CheckCircle className="h-3.5 w-3.5" /> Slot available
+            <CheckCircle className="h-3.5 w-3.5" />{" "}
+            {t("events.form.slot_available")}
           </p>
         )}
         {availability.state === "conflict" && (
@@ -678,7 +703,9 @@ export default function NewPortalEventPage() {
 
         {/* Visibility */}
         <div className="space-y-2">
-          <Label htmlFor="visibility">Visibility</Label>
+          <Label htmlFor="visibility">
+            {t("events.form.visibility_label")}
+          </Label>
           <Select
             value={visibility}
             onValueChange={(v) => setVisibility(v as Visibility)}
@@ -687,10 +714,14 @@ export default function NewPortalEventPage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="public">Public</SelectItem>
-              <SelectItem value="private">Private (invitees only)</SelectItem>
+              <SelectItem value="public">
+                {t("events.form.visibility_public")}
+              </SelectItem>
+              <SelectItem value="private">
+                {t("events.form.visibility_private")}
+              </SelectItem>
               <SelectItem value="unlisted">
-                Unlisted (hidden, shareable link)
+                {t("events.form.visibility_unlisted")}
               </SelectItem>
             </SelectContent>
           </Select>
@@ -698,19 +729,19 @@ export default function NewPortalEventPage() {
 
         {/* Description */}
         <div className="space-y-2">
-          <Label htmlFor="content">Description (optional)</Label>
+          <Label htmlFor="content">{t("events.form.description_label")}</Label>
           <Textarea
             id="content"
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            placeholder="What the event is about"
+            placeholder={t("events.form.description_placeholder")}
             rows={4}
           />
         </div>
 
         {/* Max participants */}
         <div className="space-y-2">
-          <Label htmlFor="max">Max participants (optional)</Label>
+          <Label htmlFor="max">{t("events.form.max_participants_label")}</Label>
           <Input
             id="max"
             type="number"
@@ -719,32 +750,35 @@ export default function NewPortalEventPage() {
             onChange={(e) => setMaxParticipants(e.target.value)}
             placeholder={
               venueMaxCapacity != null
-                ? `Venue capacity: ${venueMaxCapacity}`
-                : "Unlimited"
+                ? t("events.form.max_participants_placeholder_capacity", {
+                    capacity: venueMaxCapacity,
+                  })
+                : t("events.form.max_participants_placeholder_unlimited")
             }
           />
           {exceedsCapacity && (
             <p className="text-xs text-yellow-600">
-              Exceeds venue capacity ({venueMaxCapacity}). Extra attendees will
-              still be allowed.
+              {t("events.form.exceeds_capacity_warning", {
+                capacity: venueMaxCapacity ?? 0,
+              })}
             </p>
           )}
         </div>
 
         {/* Topic tags — restricted to the admin-curated list */}
         <div className="space-y-2">
-          <Label>Topic</Label>
+          <Label>{t("events.form.topic_label")}</Label>
           {settings?.allowed_tags && settings.allowed_tags.length > 0 ? (
             <div className="flex flex-wrap gap-1.5">
-              {settings.allowed_tags.map((t) => {
-                const active = tags.includes(t)
+              {settings.allowed_tags.map((tag) => {
+                const active = tags.includes(tag)
                 return (
                   <button
-                    key={t}
+                    key={tag}
                     type="button"
                     onClick={() => {
-                      if (active) setTags(tags.filter((x) => x !== t))
-                      else setTags([...tags, t])
+                      if (active) setTags(tags.filter((x) => x !== tag))
+                      else setTags([...tags, tag])
                     }}
                     className={
                       active
@@ -752,7 +786,7 @@ export default function NewPortalEventPage() {
                         : "inline-flex items-center gap-1 rounded-full border border-input bg-background px-2.5 py-0.5 text-xs text-muted-foreground hover:bg-muted"
                     }
                   >
-                    {t}
+                    {tag}
                     {active && <X className="h-3 w-3" />}
                   </button>
                 )
@@ -760,8 +794,7 @@ export default function NewPortalEventPage() {
             </div>
           ) : (
             <p className="text-xs text-muted-foreground">
-              Tags for this pop-up are not configured. Ask an admin to set them
-              in Event Settings.
+              {t("events.form.no_tags_configured")}
             </p>
           )}
         </div>
@@ -769,19 +802,21 @@ export default function NewPortalEventPage() {
         {/* Track */}
         {tracks.length > 0 && (
           <div className="space-y-2">
-            <Label htmlFor="track">Track (optional)</Label>
+            <Label htmlFor="track">{t("events.form.track_label")}</Label>
             <Select
               value={trackId || "__none__"}
               onValueChange={(v) => setTrackId(v === "__none__" ? "" : v)}
             >
               <SelectTrigger id="track" className="w-full">
-                <SelectValue placeholder="No track" />
+                <SelectValue placeholder={t("events.form.track_placeholder")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="__none__">No track</SelectItem>
-                {tracks.map((t) => (
-                  <SelectItem key={t.id} value={t.id}>
-                    {t.name}
+                <SelectItem value="__none__">
+                  {t("events.form.no_track_option")}
+                </SelectItem>
+                {tracks.map((tr) => (
+                  <SelectItem key={tr.id} value={tr.id}>
+                    {tr.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -791,13 +826,13 @@ export default function NewPortalEventPage() {
 
         {/* Meeting URL */}
         <div className="space-y-2">
-          <Label htmlFor="meeting">Meeting URL (optional)</Label>
+          <Label htmlFor="meeting">{t("events.form.meeting_url_label")}</Label>
           <Input
             id="meeting"
             type="url"
             value={meetingUrl}
             onChange={(e) => setMeetingUrl(e.target.value)}
-            placeholder="https://…"
+            placeholder={t("events.form.meeting_url_placeholder")}
           />
         </div>
 
@@ -807,7 +842,7 @@ export default function NewPortalEventPage() {
             variant="outline"
             onClick={() => router.push(`/portal/${city?.slug}/events`)}
           >
-            Cancel
+            {t("events.form.cancel_button")}
           </Button>
           <Button type="submit" disabled={!canSubmit}>
             {createMutation.isPending ? (
@@ -815,7 +850,7 @@ export default function NewPortalEventPage() {
             ) : (
               <Plus className="mr-2 h-4 w-4" />
             )}
-            Create event
+            {t("events.form.create_button")}
           </Button>
         </div>
       </form>
@@ -862,6 +897,7 @@ function StartTimeCombobox({
   fits,
   placeholder,
 }: StartTimeComboboxProps) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   return (
     <div className="w-full">
@@ -895,7 +931,7 @@ function StartTimeCombobox({
             onOpenAutoFocus={(e) => e.preventDefault()}
           >
             <p className="px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-              Suggested slots
+              {t("events.form.suggested_slots")}
             </p>
             <ul className="max-h-60 overflow-y-auto">
               {options.map((o) => (
@@ -923,7 +959,7 @@ function StartTimeCombobox({
       </Popover>
       {!fits && value && (
         <p className="mt-1 text-xs text-destructive">
-          Not available — overlaps busy
+          {t("events.form.not_available_overlaps")}
         </p>
       )}
     </div>
@@ -937,6 +973,7 @@ interface DurationPickerProps {
 }
 
 function DurationPicker({ value, unit, onChange }: DurationPickerProps) {
+  const { t } = useTranslation()
   return (
     <div className="flex items-center gap-2">
       <Input
@@ -968,8 +1005,8 @@ function DurationPicker({ value, unit, onChange }: DurationPickerProps) {
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="minutes">Minutes</SelectItem>
-          <SelectItem value="hours">Hours</SelectItem>
+          <SelectItem value="minutes">{t("events.form.minutes")}</SelectItem>
+          <SelectItem value="hours">{t("events.form.hours")}</SelectItem>
         </SelectContent>
       </Select>
     </div>

@@ -98,19 +98,19 @@ const useResources = () => {
       path: `/portal/${city?.slug}/attendees`,
     },
     {
-      name: "Events",
+      name: t("sidebar.events"),
       icon: CalendarDays,
       status: canSeeAttendees ? "active" : "hidden",
       path: `/portal/${city?.slug}/events`,
       children: [
         {
-          name: "Venues",
+          name: t("sidebar.venues"),
           icon: MapPin,
           status: canSeeAttendees ? "active" : "hidden",
           path: `/portal/${city?.slug}/events/venues`,
         },
         {
-          name: "Tracks",
+          name: t("sidebar.tracks"),
           icon: Layers,
           status: canSeeAttendees ? "active" : "hidden",
           path: `/portal/${city?.slug}/events/tracks`,

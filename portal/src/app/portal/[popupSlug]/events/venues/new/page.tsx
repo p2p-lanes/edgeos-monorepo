@@ -11,6 +11,7 @@ import {
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
+import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
 import {
@@ -44,6 +45,7 @@ import { usePortalEventSettings } from "../../lib/useEventTimezone"
  * - Otherwise the venue is ``ACTIVE`` and we jump straight to its detail.
  */
 export default function NewPortalVenuePage() {
+  const { t } = useTranslation()
   const router = useRouter()
   const { getCity } = useCityProvider()
   const city = getCity()
@@ -81,7 +83,7 @@ export default function NewPortalVenuePage() {
 
   const createMutation = useMutation({
     mutationFn: async () => {
-      if (!popupId) throw new Error("No popup")
+      if (!popupId) throw new Error(t("events.venues.new.no_popup_error"))
       const capacityNum = capacity.trim() ? Number(capacity) : null
       return EventVenuesService.createPortalVenue({
         requestBody: {
@@ -99,19 +101,19 @@ export default function NewPortalVenuePage() {
     },
     onSuccess: (venue) => {
       if (venue.status === "pending") {
-        toast.success("Venue submitted — waiting for admin approval")
+        toast.success(t("events.venues.new.venue_submitted_success"))
         router.push(`/portal/${popupSlug}/events/venues`)
       } else {
-        toast.success("Venue created")
+        toast.success(t("events.venues.new.venue_created_success"))
         router.push(`/portal/${popupSlug}/events/venues/${venue.id}`)
       }
     },
     onError: (err) => {
+      const fallback = t("events.venues.new.failed_to_create")
       const msg =
         err instanceof ApiError && typeof err.body === "object"
-          ? ((err.body as { detail?: string }).detail ??
-            "Failed to create venue")
-          : "Failed to create venue"
+          ? ((err.body as { detail?: string }).detail ?? fallback)
+          : fallback
       toast.error(msg)
     },
   })
@@ -130,16 +132,19 @@ export default function NewPortalVenuePage() {
       <div className="max-w-xl mx-auto p-6 text-center">
         <CircleAlert className="mx-auto h-10 w-10 text-muted-foreground/50 mb-3" />
         <h1 className="text-lg font-semibold">
-          Venue creation is not available
+          {t("events.venues.new.venue_not_available")}
         </h1>
         <p className="text-sm text-muted-foreground mt-2">
-          The organizer has not enabled venue creation for {city?.name}.
+          {t("events.venues.new.venue_not_available_message", {
+            cityName: city?.name,
+          })}
         </p>
         <Link
           href={`/portal/${popupSlug}/events/venues`}
           className="inline-flex items-center gap-1 text-sm text-primary mt-6"
         >
-          <ArrowLeft className="h-4 w-4" /> Back to venues
+          <ArrowLeft className="h-4 w-4" />{" "}
+          {t("events.venues.new.back_to_venues")}
         </Link>
       </div>
     )
@@ -153,21 +158,24 @@ export default function NewPortalVenuePage() {
         href={`/portal/${popupSlug}/events/venues`}
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-3"
       >
-        <ArrowLeft className="h-4 w-4" /> Back to venues
+        <ArrowLeft className="h-4 w-4" />{" "}
+        {t("events.venues.new.back_to_venues")}
       </Link>
 
       <div className="flex items-center gap-2 mb-1">
         <MapPin className="h-5 w-5 text-primary" />
-        <h1 className="text-2xl font-bold tracking-tight">New venue</h1>
+        <h1 className="text-2xl font-bold tracking-tight">
+          {t("events.venues.new.heading")}
+        </h1>
       </div>
       <p className="text-sm text-muted-foreground mb-6">
-        Propose a space that events at {city?.name} can be booked against.
+        {t("events.venues.new.subheading", { cityName: city?.name })}
         {requiresApproval && (
           <>
             {" "}
             <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-400">
-              <Hourglass className="h-3 w-3" /> Requires admin approval before
-              it appears in the venue list.
+              <Hourglass className="h-3 w-3" />{" "}
+              {t("events.venues.new.requires_approval_note")}
             </span>
           </>
         )}
@@ -182,32 +190,37 @@ export default function NewPortalVenuePage() {
       >
         <div className="space-y-2">
           <Label htmlFor="title">
-            Title <span className="text-destructive">*</span>
+            {t("events.venues.new.title_label")}{" "}
+            <span className="text-destructive">*</span>
           </Label>
           <Input
             id="title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="e.g. Main Auditorium"
+            placeholder={t("events.venues.new.title_placeholder")}
             required
             maxLength={255}
           />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="location">Location</Label>
+          <Label htmlFor="location">
+            {t("events.venues.new.location_label")}
+          </Label>
           <Textarea
             id="location"
             value={location}
             onChange={(e) => setLocation(e.target.value)}
-            placeholder="Street address, floor, or a short note"
+            placeholder={t("events.venues.new.location_placeholder")}
             rows={2}
           />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-2">
-            <Label htmlFor="capacity">Capacity</Label>
+            <Label htmlFor="capacity">
+              {t("events.venues.new.capacity_label")}
+            </Label>
             <Input
               id="capacity"
               type="number"
@@ -215,12 +228,14 @@ export default function NewPortalVenuePage() {
               min={0}
               value={capacity}
               onChange={(e) => setCapacity(e.target.value)}
-              placeholder="e.g. 50"
+              placeholder={t("events.venues.new.capacity_placeholder")}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="booking_mode">Booking</Label>
+            <Label htmlFor="booking_mode">
+              {t("events.venues.new.booking_label")}
+            </Label>
             <Select
               value={bookingMode}
               onValueChange={(v) => setBookingMode(v as typeof bookingMode)}
@@ -229,11 +244,15 @@ export default function NewPortalVenuePage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="free">Free to book</SelectItem>
-                <SelectItem value="approval_required">
-                  Approval required
+                <SelectItem value="free">
+                  {t("events.venues.new.booking_free")}
                 </SelectItem>
-                <SelectItem value="unbookable">Not bookable</SelectItem>
+                <SelectItem value="approval_required">
+                  {t("events.venues.new.booking_approval")}
+                </SelectItem>
+                <SelectItem value="unbookable">
+                  {t("events.venues.new.booking_unbookable")}
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -241,7 +260,7 @@ export default function NewPortalVenuePage() {
 
         {propertyTypes && propertyTypes.length > 0 && (
           <div className="space-y-2">
-            <Label>Properties</Label>
+            <Label>{t("events.venues.new.properties_label")}</Label>
             <div className="flex flex-wrap gap-2">
               {propertyTypes.map((pt) => {
                 const selected = propertyIds.has(pt.id)
@@ -275,13 +294,13 @@ export default function NewPortalVenuePage() {
             {createMutation.isPending && (
               <Loader2 className="h-4 w-4 animate-spin" />
             )}
-            Create venue
+            {t("events.venues.new.create_button")}
           </Button>
           <Link
             href={`/portal/${popupSlug}/events/venues`}
             className="text-sm text-muted-foreground hover:text-foreground"
           >
-            Cancel
+            {t("events.venues.new.cancel_button")}
           </Link>
         </div>
       </form>

@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { ArrowLeft, MapPin, Plus, Users } from "lucide-react"
 import Link from "next/link"
+import { useTranslation } from "react-i18next"
 
 import { type EventVenuePublic, EventVenuesService } from "@/client"
 import { LucideIcon } from "@/components/LucideIcon"
@@ -11,6 +12,7 @@ import { useCityProvider } from "@/providers/cityProvider"
 import { usePortalEventSettings } from "../lib/useEventTimezone"
 
 export default function PortalVenuesPage() {
+  const { t } = useTranslation()
   const { getCity } = useCityProvider()
   const city = getCity()
 
@@ -31,13 +33,15 @@ export default function PortalVenuesPage() {
         href={`/portal/${city?.slug}/events`}
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-3"
       >
-        <ArrowLeft className="h-4 w-4" /> Back to events
+        <ArrowLeft className="h-4 w-4" /> {t("events.common.back_to_events")}
       </Link>
 
       <div className="flex items-center justify-between gap-2 mb-4">
         <div className="flex items-center gap-2">
           <MapPin className="h-5 w-5 text-primary" />
-          <h1 className="text-2xl font-bold tracking-tight">Venues</h1>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {t("events.venues.list.heading")}
+          </h1>
         </div>
         {canCreateVenue && (
           <Button asChild size="sm">
@@ -45,13 +49,14 @@ export default function PortalVenuesPage() {
               href={`/portal/${city?.slug}/events/venues/new`}
               className="inline-flex items-center gap-1.5"
             >
-              <Plus className="h-4 w-4" /> New venue
+              <Plus className="h-4 w-4" />{" "}
+              {t("events.venues.list.new_venue_button")}
             </Link>
           </Button>
         )}
       </div>
       <p className="text-sm text-muted-foreground mb-6">
-        Spaces available for events at {city?.name}.
+        {t("events.venues.list.subheading", { cityName: city?.name })}
       </p>
 
       {isLoading ? (
@@ -61,7 +66,9 @@ export default function PortalVenuesPage() {
       ) : venues.length === 0 ? (
         <div className="text-center py-20">
           <MapPin className="mx-auto h-10 w-10 text-muted-foreground/50 mb-3" />
-          <p className="text-muted-foreground">No venues yet</p>
+          <p className="text-muted-foreground">
+            {t("events.venues.list.empty_state")}
+          </p>
         </div>
       ) : (
         <div className="grid sm:grid-cols-2 gap-4">
@@ -85,7 +92,7 @@ export default function PortalVenuesPage() {
               )}
               <div className="flex-1 p-4">
                 <h3 className="font-semibold text-base mb-1 group-hover:text-primary transition-colors">
-                  {venue.title || "Untitled venue"}
+                  {venue.title || t("events.venues.list.untitled_venue")}
                 </h3>
                 {venue.location && (
                   <p className="text-sm text-muted-foreground line-clamp-1">
@@ -102,7 +109,7 @@ export default function PortalVenuesPage() {
                 </div>
                 {venue.properties && venue.properties.length > 0 && (
                   <ul
-                    aria-label="Venue properties"
+                    aria-label={t("events.venues.list.properties_aria")}
                     className="mt-2 flex flex-wrap gap-1.5"
                   >
                     {venue.properties.slice(0, 6).map((p) => (
