@@ -1,5 +1,6 @@
 import { useRouter } from "next/navigation"
 import { useCallback } from "react"
+import { useTranslation } from "react-i18next"
 import useResources from "@/hooks/useResources"
 import type { Resource } from "@/types/resources"
 import { Separator } from "../ui/separator"
@@ -30,6 +31,7 @@ const ResourceItem: React.FC<{
   level?: number
   onNavigate: (path: string) => void
 }> = ({ resource, level = 0, onNavigate }) => {
+  const { t } = useTranslation()
   return (
     <SidebarMenuItem>
       <Tooltip>
@@ -45,7 +47,8 @@ const ResourceItem: React.FC<{
           side="right"
           className="hidden group-data-[collapsible=icon]:block"
         >
-          {resource.name} {resource.status === "soon" ? "(Coming Soon)" : ""}
+          {resource.name}{" "}
+          {resource.status === "soon" ? t("sidebar.coming_soon") : ""}
         </TooltipContent>
       </Tooltip>
 
@@ -66,6 +69,7 @@ const ResourceItem: React.FC<{
 }
 
 const ResourcesMenu = () => {
+  const { t } = useTranslation()
   const { resources } = useResources()
   const router = useRouter()
 
@@ -79,7 +83,7 @@ const ResourcesMenu = () => {
   return (
     <SidebarContent>
       <SidebarGroup>
-        <SidebarGroupLabel>Your Participation</SidebarGroupLabel>
+        <SidebarGroupLabel>{t("sidebar.your_participation")}</SidebarGroupLabel>
         <SidebarGroupContent>
           <SidebarMenu>
             {resources

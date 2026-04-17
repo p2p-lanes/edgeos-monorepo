@@ -13,6 +13,12 @@ export type AbandonedCartPublic = {
     payments?: Array<CartPaymentInfo>;
 };
 
+export type AITranslateRequest = {
+    entity_type: string;
+    entity_id: string;
+    target_language: string;
+};
+
 /**
  * Response when human is the main applicant.
  */
@@ -807,6 +813,7 @@ export type EventPublic = {
     rrule?: (string | null);
     recurrence_master_id?: (string | null);
     recurrence_exdates?: Array<(string)>;
+    ical_sequence?: number;
     created_at?: string;
     updated_at?: string;
     id: string;
@@ -1570,6 +1577,8 @@ export type PopupAdmin = {
     theme_config?: ({
     [key: string]: unknown;
 } | null);
+    default_language?: string;
+    supported_languages?: Array<(string)>;
     id: string;
 };
 
@@ -1603,6 +1612,8 @@ export type PopupCreate = {
     theme_config?: ({
     [key: string]: unknown;
 } | null);
+    default_language?: string;
+    supported_languages?: Array<(string)>;
 };
 
 /**
@@ -1699,6 +1710,8 @@ export type PopupUpdate = {
     theme_config?: ({
     [key: string]: unknown;
 } | null);
+    default_language?: (string | null);
+    supported_languages?: (Array<(string)> | null);
 };
 
 /**
@@ -2173,6 +2186,28 @@ export type TrackUpdate = {
     name?: (string | null);
     description?: (string | null);
     topic?: (Array<(string)> | null);
+};
+
+export type TranslationCreate = {
+    entity_type: string;
+    entity_id: string;
+    language: string;
+    data: {
+        [key: string]: unknown;
+    };
+};
+
+export type TranslationPublic = {
+    id: string;
+    tenant_id: string;
+    entity_type: string;
+    entity_id: string;
+    language: string;
+    data: {
+        [key: string]: unknown;
+    };
+    created_at?: (string | null);
+    updated_at?: (string | null);
 };
 
 /**
@@ -3368,6 +3403,7 @@ export type FormFieldsGetApplicationSchemaResponse = ({
 });
 
 export type FormFieldsGetPortalApplicationSchemaData = {
+    acceptLanguage?: (string | null);
     popupId: string;
 };
 
@@ -3750,9 +3786,14 @@ export type PopupsDeletePopupData = {
 
 export type PopupsDeletePopupResponse = (void);
 
+export type PopupsListPortalPopupsData = {
+    acceptLanguage?: (string | null);
+};
+
 export type PopupsListPortalPopupsResponse = (Array<PopupPublic>);
 
 export type PopupsGetPortalPopupData = {
+    acceptLanguage?: (string | null);
     slug: string;
 };
 
@@ -3821,6 +3862,7 @@ export type ProductsDeleteProductData = {
 export type ProductsDeleteProductResponse = (void);
 
 export type ProductsListPortalProductsData = {
+    acceptLanguage?: (string | null);
     category?: (string | null);
     isActive?: (boolean | null);
     /**
@@ -4043,6 +4085,37 @@ export type TracksListPortalTrackEventsData = {
 };
 
 export type TracksListPortalTrackEventsResponse = (ListModel_EventPublic_);
+
+export type TranslationsListTranslationsData = {
+    entityId: string;
+    entityType: string;
+    xTenantId?: (string | null);
+};
+
+export type TranslationsListTranslationsResponse = (Array<TranslationPublic>);
+
+export type TranslationsUpsertTranslationData = {
+    requestBody: TranslationCreate;
+    xTenantId?: (string | null);
+};
+
+export type TranslationsUpsertTranslationResponse = (TranslationPublic);
+
+export type TranslationsAiTranslateData = {
+    requestBody: AITranslateRequest;
+    xTenantId?: (string | null);
+};
+
+export type TranslationsAiTranslateResponse = ({
+    [key: string]: (string);
+});
+
+export type TranslationsDeleteTranslationData = {
+    translationId: string;
+    xTenantId?: (string | null);
+};
+
+export type TranslationsDeleteTranslationResponse = (void);
 
 export type UploadsGetPresignedUploadUrlData = {
     requestBody: PresignedUrlRequest;

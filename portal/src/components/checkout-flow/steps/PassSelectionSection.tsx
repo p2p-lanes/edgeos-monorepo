@@ -227,7 +227,7 @@ function StackedVariant({
         return (
           <div
             key={category}
-            className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden"
+            className="bg-checkout-card-bg rounded-2xl shadow-sm border border-gray-100 overflow-hidden"
           >
             {/* Category Header */}
             <div className={cn("px-5 py-3", colors.header)}>
@@ -302,7 +302,7 @@ function TabsVariant({
     groupedByCategory[0]
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+    <div className="bg-checkout-card-bg rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
       {/* Tab Bar */}
       <div className="flex border-b border-gray-100 bg-gray-50/50">
         {groupedByCategory.map(([category, attendees]) => {
@@ -456,7 +456,7 @@ function CompactVariant({
                   key={attendee.id}
                   id={`attendee-card-${attendee.id}`}
                   className={cn(
-                    "bg-white rounded-xl border border-gray-100 p-3 shadow-sm",
+                    "bg-checkout-card-bg rounded-xl border border-gray-100 p-3 shadow-sm",
                     `border-l-2 ${colors.accent}`,
                   )}
                 >
@@ -724,7 +724,7 @@ function AccordionVariant({
         return (
           <div
             key={category}
-            className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
+            className="bg-checkout-card-bg rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
           >
             {/* Accordion Header */}
             <button

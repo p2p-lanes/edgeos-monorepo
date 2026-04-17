@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next"
 import Pagination from "@/components/common/Pagination"
 import ParticipationTickets from "@/components/common/ParticipationTickets"
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table"
@@ -28,6 +29,7 @@ const AttendeesTable = ({
   pageSize,
   onPageChange,
 }: AttendeesTableProps) => {
+  const { t } = useTranslation()
   const { getCity } = useCityProvider()
   const city = getCity()
   const { data: products = [] } = useProductsQuery(
@@ -37,7 +39,9 @@ const AttendeesTable = ({
   if (attendees.length === 0 && !loading) {
     return (
       <div className="flex justify-center items-center h-full">
-        <p className="text-center text-muted-foreground">No attendees found</p>
+        <p className="text-center text-muted-foreground">
+          {t("attendees.no_attendees")}
+        </p>
       </div>
     )
   }
@@ -77,8 +81,8 @@ const AttendeesTable = ({
                     attendee.brings_kids === "*"
                       ? "*"
                       : attendee.brings_kids
-                        ? "Yes"
-                        : "No"
+                        ? t("common.yes")
+                        : t("common.no")
                   }
                 />
                 <CommonCell

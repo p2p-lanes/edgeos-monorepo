@@ -1,6 +1,7 @@
 import { LogOut, Medal, Newspaper } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
+import { useTranslation } from "react-i18next"
 import InvoiceModal from "@/app/portal/[popupSlug]/passes/components/common/InvoiceModal"
 import useAuth from "@/hooks/useAuth"
 import { useCityProvider } from "@/providers/cityProvider"
@@ -9,6 +10,7 @@ import { SidebarTrigger } from "../Sidebar/SidebarComponents"
 import { Button } from "../ui/button"
 
 const HeaderProfile = () => {
+  const { t } = useTranslation()
   const router = useRouter()
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false)
   const { logout } = useAuth()
@@ -23,9 +25,11 @@ const HeaderProfile = () => {
         <div className="flex items-center gap-2">
           <SidebarTrigger className="xl:hidden" />
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">My Profile</h1>
+            <h1 className="text-2xl font-bold text-gray-900">
+              {t("profile.my_profile")}
+            </h1>
             <p className="text-gray-600">
-              Manage your {tenant?.name}&apos;s experience and history
+              {t("profile.header_subtitle", { tenant: tenant?.name })}
             </p>
           </div>
         </div>
@@ -36,7 +40,7 @@ const HeaderProfile = () => {
             onClick={() => router.push("/portal/poaps")}
           >
             <Medal className="mr-2 size-4" />
-            My Collectibles
+            {t("profile.my_collectibles")}
           </Button>
           {hasInvoiceFields && (
             <>
@@ -46,7 +50,7 @@ const HeaderProfile = () => {
                 onClick={() => setIsInvoiceModalOpen(true)}
               >
                 <Newspaper className="h-4 w-4" />
-                Invoices
+                {t("profile.invoices")}
               </Button>
               <InvoiceModal
                 isOpen={isInvoiceModalOpen}

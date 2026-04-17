@@ -1,5 +1,6 @@
 import { ChevronRight, QrCode, Ticket, User } from "lucide-react"
 import React, { useState } from "react"
+import { useTranslation } from "react-i18next"
 import {
   Collapsible,
   CollapsibleContent,
@@ -42,6 +43,7 @@ const AttendeeTicket = ({
   isDayCheckout?: boolean
   onSwitchToBuy?: () => void
 }) => {
+  const { t } = useTranslation()
   const standardProducts = attendee.products
     .filter(
       (product) =>
@@ -192,20 +194,20 @@ const AttendeeTicket = ({
 
             {standardProducts.length === 0 ? (
               <p className="text-sm font-medium text-neutral-500">
-                Coming soon.
+                {t("passes.coming_soon")}
               </p>
             ) : !toggleProduct && !hasPurchased ? (
               /* View mode - no purchased passes */
               <p className="text-pass-text max-w-xs lg:max-w-sm leading-relaxed">
-                You do not yet have any passes for {city?.name}, please go to{" "}
+                {t("passes.no_passes_yet_prefix", { city: city?.name })}{" "}
                 <button
                   type="button"
                   onClick={onSwitchToBuy}
                   className="font-bold text-pass-title hover:underline cursor-pointer"
                 >
-                  Buy Passes
+                  {t("passes.buy_passes")}
                 </button>{" "}
-                to purchase
+                {t("passes.no_passes_yet_suffix")}
               </p>
             ) : !toggleProduct && hasPurchased ? (
               /* View mode - with purchased passes - simple pass list */
@@ -248,7 +250,7 @@ const AttendeeTicket = ({
                   onClick={handleOpenQrModal}
                   className="flex items-center gap-1.5 mt-3 justify-end lg:absolute lg:bottom-6 lg:right-6 lg:mt-0 text-xs font-medium text-pass-text uppercase tracking-wider hover:text-pass-title transition-colors cursor-pointer"
                 >
-                  <span>Check-in code</span>
+                  <span>{t("passes.check_in_code")}</span>
                   <QrCode className="w-4 h-4" />
                 </button>
               </>
@@ -263,7 +265,7 @@ const AttendeeTicket = ({
                   >
                     <CollapsibleTrigger
                       className="w-full bg-accent rounded-md"
-                      aria-label="Toggle Local Tickets"
+                      aria-label={t("passes.toggle_local_tickets")}
                     >
                       <div className="flex justify-between items-center p-3">
                         <div className="flex items-center gap-2">
@@ -273,7 +275,9 @@ const AttendeeTicket = ({
                               localOpen && "transform rotate-90",
                             )}
                           />
-                          <span className="font-medium">Latam Citizens</span>
+                          <span className="font-medium">
+                            {t("passes.latam_citizens")}
+                          </span>
                         </div>
                       </div>
                     </CollapsibleTrigger>
@@ -315,7 +319,7 @@ const AttendeeTicket = ({
                         })}
                       </div>
                       <p className="text-sm font-medium text-neutral-500 text-right mt-2">
-                        ID Required at check-in *
+                        {t("passes.id_required")}
                       </p>
                     </CollapsibleContent>
                   </Collapsible>
@@ -329,7 +333,7 @@ const AttendeeTicket = ({
                   >
                     <CollapsibleTrigger
                       className="w-full bg-accent rounded-md"
-                      aria-label="Toggle Common Tickets"
+                      aria-label={t("passes.toggle_common_tickets")}
                     >
                       <div className="flex justify-between items-center p-3">
                         <div className="flex items-center gap-2">
@@ -339,7 +343,9 @@ const AttendeeTicket = ({
                               commonOpen && "transform rotate-90",
                             )}
                           />
-                          <span className="font-medium">Standard</span>
+                          <span className="font-medium">
+                            {t("passes.standard")}
+                          </span>
                         </div>
                       </div>
                     </CollapsibleTrigger>

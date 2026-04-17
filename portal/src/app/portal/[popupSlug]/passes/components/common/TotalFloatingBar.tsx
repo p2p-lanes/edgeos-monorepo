@@ -1,4 +1,5 @@
 import { Loader2 } from "lucide-react"
+import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
 import { useCalculateTotal } from "@/hooks/useCalculateTotal"
 import { usePassesProvider } from "@/providers/passesProvider"
@@ -9,6 +10,7 @@ const TotalFloatingBar = ({
 }: {
   setOpenCart: (prev: boolean) => void
 }) => {
+  const { t } = useTranslation()
   const { originalTotal, total } = useCalculateTotal()
   const { purchaseProducts, loading } = usePurchaseProducts()
   const { attendeePasses: attendees } = usePassesProvider()
@@ -33,7 +35,7 @@ const TotalFloatingBar = ({
   return (
     <div className="flex justify-between items-center">
       <div className="flex justify-center items-center gap-2">
-        <p className="text-sm font-medium">Total</p>
+        <p className="text-sm font-medium">{t("passes.total")}</p>
         {originalTotal > 0 && originalTotal !== total && (
           <span className=" text-muted-foreground line-through">
             ${originalTotal.toFixed(0)}
@@ -50,7 +52,7 @@ const TotalFloatingBar = ({
           className="p-5 whitespace-nowrap"
           onClick={handleOnClickReviewOrder}
         >
-          Review Order
+          {t("passes.review_order")}
         </Button>
         <Button
           variant="default"
@@ -59,7 +61,7 @@ const TotalFloatingBar = ({
           onClick={() => purchaseProducts(attendees)}
         >
           {loading && <Loader2 className="size-4 animate-spin" />}
-          {total <= 0 ? "Confirm" : "Confirm and Pay"}
+          {total <= 0 ? t("passes.confirm") : t("passes.confirm_and_pay")}
         </Button>
       </div>
     </div>

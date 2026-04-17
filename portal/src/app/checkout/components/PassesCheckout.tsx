@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion"
 import { ArrowLeft } from "lucide-react"
+import { useTranslation } from "react-i18next"
 import BuyPasses from "@/app/portal/[popupSlug]/passes/Tabs/BuyPasses"
 import Providers from "./providers/Providers"
 
@@ -11,6 +12,7 @@ interface PassesCheckoutProps {
 
 // Componente principal que utiliza los providers originales
 const PassesCheckout = ({ onBack }: PassesCheckoutProps) => {
+  const { t } = useTranslation()
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -24,10 +26,10 @@ const PassesCheckout = ({ onBack }: PassesCheckoutProps) => {
             type="button"
             onClick={onBack}
             className="absolute top-4 left-4 flex items-center text-gray-600 hover:text-gray-800 transition-colors"
-            aria-label="Go back to previous step"
+            aria-label={t("common.back_aria")}
           >
             <ArrowLeft className="w-5 h-5 mr-1" />
-            <span>Back</span>
+            <span>{t("common.back")}</span>
           </button>
 
           <div className="pt-8">

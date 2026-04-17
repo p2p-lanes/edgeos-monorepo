@@ -22,6 +22,13 @@ from app.api.popup.schemas import (
 from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.api.ticketing_step.constants import seed_ticketing_steps_for_popup
+from app.api.translation.service import (
+    TRANSLATABLE_FIELDS,
+    apply_translation_overlay,
+    delete_translations_for_entity,
+    get_translations_bulk,
+    get_translations_for_entity,
+)
 from app.core.dependencies.users import (
     CurrentHuman,
     CurrentUser,
@@ -238,6 +245,17 @@ async def delete_popup(
             detail="Popup not found",
         )
 
+    # Clean up translations for the popup and its child entities
+    for field in popup.form_fields:
+        delete_translations_for_entity(db, "form_field", field.id)
+    for section in popup.form_sections:
+        delete_translations_for_entity(db, "form_section", section.id)
+    for product in popup.products:
+        delete_translations_for_entity(db, "product", product.id)
+    for group in popup.groups:
+        delete_translations_for_entity(db, "group", group.id)
+    delete_translations_for_entity(db, "popup", popup.id)
+
     crud.delete(db, popup)
 
 
@@ -245,10 +263,24 @@ async def delete_popup(
 async def list_portal_popups(
     db: HumanTenantSession,
     _: CurrentHuman,
+    accept_language: Annotated[str | None, Header(alias="Accept-Language")] = None,
 ) -> list[PopupPublic]:
     """List active popups for the current human's tenant (Portal)."""
     popups, _ = crud.find(db, status=PopupStatus.active, limit=100)
-    return [PopupPublic.model_validate(p) for p in popups]
+
+    if not accept_language or accept_language == "en":
+        return [PopupPublic.model_validate(p) for p in popups]
+
+    lang = accept_language.split(",")[0].split("-")[0].strip()
+    popup_ids = [p.id for p in popups]
+    translations_map = get_translations_bulk(db, "popup", popup_ids, lang)
+
+    results = []
+    for p in popups:
+        data = PopupPublic.model_validate(p).model_dump()
+        data = apply_translation_overlay(data, translations_map.get(p.id), TRANSLATABLE_FIELDS["popup"])
+        results.append(PopupPublic.model_validate(data))
+    return results
 
 
 @router.get("/portal/{slug}", response_model=PopupPublic)
@@ -256,6 +288,7 @@ async def get_portal_popup(
     slug: str,
     db: HumanTenantSession,
     _: CurrentHuman,
+    accept_language: Annotated[str | None, Header(alias="Accept-Language")] = None,
 ) -> PopupPublic:
     """Get a popup by slug (Portal)."""
     popup = crud.get_by_slug(db, slug)
@@ -266,4 +299,11 @@ async def get_portal_popup(
             detail="Event not found",
         )
 
-    return PopupPublic.model_validate(popup)
+    if not accept_language or accept_language == "en":
+        return PopupPublic.model_validate(popup)
+
+    lang = accept_language.split(",")[0].split("-")[0].strip()
+    translation = get_translations_for_entity(db, "popup", popup.id, lang)
+    data = PopupPublic.model_validate(popup).model_dump()
+    data = apply_translation_overlay(data, translation, TRANSLATABLE_FIELDS["popup"])
+    return PopupPublic.model_validate(data)

@@ -1,6 +1,7 @@
 import { ChevronRight } from "lucide-react"
 import { usePathname, useRouter } from "next/navigation"
 import { Fragment } from "react"
+import { LanguageSwitcher } from "@/components/common/LanguageSwitcher"
 import { useCityProvider } from "@/providers/cityProvider"
 import {
   Breadcrumb,
@@ -35,7 +36,7 @@ const HeaderBar = () => {
   const base = city?.slug ? `/portal/${city.slug}` : null
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-4 border-b bg-white px-6 text-nav-text">
+    <header className="flex h-14 shrink-0 items-center gap-4 border-b bg-sidebar px-6 text-nav-text">
       <SidebarTrigger />
       <Breadcrumb>
         <BreadcrumbList>
@@ -70,6 +71,9 @@ const HeaderBar = () => {
           })}
         </BreadcrumbList>
       </Breadcrumb>
+      <div className="ml-auto">
+        <LanguageSwitcher />
+      </div>
     </header>
   )
 }

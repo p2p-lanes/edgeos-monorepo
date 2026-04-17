@@ -15,8 +15,13 @@ class UsersCRUD(BaseCRUD[Users, UserCreate, UserUpdate]):
     def __init__(self) -> None:
         super().__init__(Users)
 
-    def get_by_email(self, session: Session, email: str) -> Users | None:
-        return self.get_by_field(session, "email", email)
+    def get_by_email(
+        self, session: Session, email: str, include_deleted: bool = False
+    ) -> Users | None:
+        statement = select(Users).where(Users.email == email)
+        if not include_deleted:
+            statement = statement.where(Users.deleted == False)  # noqa: E712
+        return session.exec(statement).first()
 
     def find_filtered(
         self,

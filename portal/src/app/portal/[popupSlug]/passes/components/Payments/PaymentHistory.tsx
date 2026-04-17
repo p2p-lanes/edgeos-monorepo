@@ -2,6 +2,7 @@
 
 import { Download, FileText, Loader2 } from "lucide-react"
 import { useState } from "react"
+import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import { OpenAPI } from "@/client"
 import { Badge } from "@/components/ui/badge"
@@ -19,6 +20,7 @@ import { useApplication } from "@/providers/applicationProvider"
 import type { PaymentsProps } from "@/types/passes"
 
 const PaymentHistory = ({ payments }: { payments: PaymentsProps[] }) => {
+  const { t } = useTranslation()
   const { getRelevantApplication } = useApplication()
   const application = getRelevantApplication()
   const approvedPayments = payments?.filter(
@@ -31,10 +33,10 @@ const PaymentHistory = ({ payments }: { payments: PaymentsProps[] }) => {
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <FileText className="h-10 w-10 text-muted-foreground/40 mb-3" />
         <p className="text-sm font-medium text-muted-foreground">
-          No invoices available
+          {t("passes.no_invoices")}
         </p>
         <p className="text-xs text-muted-foreground/60 mt-1">
-          Invoices will appear here once payments are confirmed
+          {t("passes.invoices_will_appear")}
         </p>
       </div>
     )
@@ -79,7 +81,7 @@ const PaymentHistory = ({ payments }: { payments: PaymentsProps[] }) => {
       window.URL.revokeObjectURL(blobUrl)
     } catch (error: unknown) {
       console.error("Error downloading invoice:", error)
-      toast.error("Failed to download invoice. Please try again.")
+      toast.error(t("passes.download_invoice_error"))
     } finally {
       setDownloadingId(null)
     }
@@ -90,10 +92,18 @@ const PaymentHistory = ({ payments }: { payments: PaymentsProps[] }) => {
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/50">
-            <TableHead className="font-semibold">Date</TableHead>
-            <TableHead className="font-semibold">Amount</TableHead>
-            <TableHead className="font-semibold">Products</TableHead>
-            <TableHead className="font-semibold text-right">Invoice</TableHead>
+            <TableHead className="font-semibold">
+              {t("passes.invoice_date")}
+            </TableHead>
+            <TableHead className="font-semibold">
+              {t("passes.invoice_amount")}
+            </TableHead>
+            <TableHead className="font-semibold">
+              {t("passes.invoice_products")}
+            </TableHead>
+            <TableHead className="font-semibold text-right">
+              {t("passes.invoice_column")}
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -107,8 +117,9 @@ const PaymentHistory = ({ payments }: { payments: PaymentsProps[] }) => {
               </TableCell>
               <TableCell>
                 <Badge variant="secondary" className="font-normal">
-                  {payment.products_snapshot.length}{" "}
-                  {payment.products_snapshot.length === 1 ? "item" : "items"}
+                  {t("passes.item_count", {
+                    count: payment.products_snapshot.length,
+                  })}
                 </Badge>
               </TableCell>
               <TableCell className="text-right">

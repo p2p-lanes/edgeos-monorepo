@@ -19,12 +19,14 @@ import {
   FormFieldsService,
   type FormFieldUpdate,
   FormSectionsService,
+  PopupsService,
 } from "@/client"
 import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
 import { FormErrorSummary } from "@/components/Common/FormErrorSummary"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { isSpecialField } from "@/components/form-builder/constants"
+import { TranslationManager } from "@/components/translations/TranslationManager"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -94,6 +96,12 @@ export function FormFieldForm({
     isEdit && defaultValues ? isSpecialField(defaultValues) : false
 
   const popupId = isEdit ? defaultValues.popup_id : selectedPopupId
+
+  const { data: popupData } = useQuery({
+    queryKey: ["popups", popupId],
+    queryFn: () => PopupsService.getPopup({ popupId: popupId! }),
+    enabled: isEdit && !!popupId,
+  })
 
   const { data: sectionsData } = useQuery({
     queryKey: ["form-sections", popupId],
@@ -480,6 +488,30 @@ export function FormFieldForm({
                 </form.Field>
               </CardContent>
             </Card>
+
+            {isEdit && (popupData?.supported_languages?.length ?? 0) > 1 && (
+              <>
+                <Separator />
+                <TranslationManager
+                  entityType="form_field"
+                  entityId={defaultValues!.id}
+                  translatableFields={[
+                    "label",
+                    "placeholder",
+                    "help_text",
+                    "options",
+                  ]}
+                  sourceData={{
+                    label: defaultValues!.label,
+                    placeholder: defaultValues!.placeholder,
+                    help_text: defaultValues!.help_text,
+                    options: defaultValues!.options?.join("\n"),
+                  }}
+                  supportedLanguages={popupData!.supported_languages!}
+                  defaultLanguage={popupData!.default_language!}
+                />
+              </>
+            )}
 
             {/* Form Actions */}
             <div className="flex gap-4">

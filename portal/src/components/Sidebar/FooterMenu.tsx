@@ -1,6 +1,7 @@
 import { Github, Star, User } from "lucide-react"
 import Link from "next/link"
 import { useEffect, useState } from "react"
+import { useTranslation } from "react-i18next"
 import {
   SidebarFooter,
   SidebarMenu,
@@ -24,6 +25,7 @@ async function getGitHubStars() {
 }
 
 const FooterMenu = () => {
+  const { t } = useTranslation()
   const [stars, setStars] = useState<number | null>(null)
 
   useEffect(() => {
@@ -61,7 +63,9 @@ const FooterMenu = () => {
               className="mb-4 mt-4 text-nav-text-secondary"
             >
               <User className="size-4" />
-              <span className="text-sm font-medium">My Profile</span>
+              <span className="text-sm font-medium">
+                {t("profile.my_profile")}
+              </span>
             </Link>
           </SidebarMenuButton>
         </SidebarMenuItem>

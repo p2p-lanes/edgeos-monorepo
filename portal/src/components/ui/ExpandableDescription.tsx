@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from "react"
+import { useTranslation } from "react-i18next"
 import { cn } from "@/lib/utils"
 
 interface ExpandableDescriptionProps {
@@ -23,9 +24,12 @@ const ExpandableDescription = ({
   clamp = 2,
   className,
   buttonClassName,
-  moreLabel = "Ver más",
-  lessLabel = "Ver menos",
+  moreLabel,
+  lessLabel,
 }: ExpandableDescriptionProps) => {
+  const { t } = useTranslation()
+  const resolvedMoreLabel = moreLabel ?? t("common.see_more")
+  const resolvedLessLabel = lessLabel ?? t("common.see_less")
   const paragraphRef = useRef<HTMLParagraphElement>(null)
   const [isOverflowing, setIsOverflowing] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
@@ -91,7 +95,7 @@ const ExpandableDescription = ({
             buttonClassName,
           )}
         >
-          {isExpanded ? lessLabel : moreLabel}
+          {isExpanded ? resolvedLessLabel : resolvedMoreLabel}
         </button>
       )}
     </div>

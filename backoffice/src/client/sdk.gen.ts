@@ -3,7 +3,7 @@
 import type { CancelablePromise } from './core/CancelablePromise';
 import { OpenAPI } from './core/OpenAPI';
 import { request as __request } from './core/request';
-import type { ApplicationReviewsListReviewsData, ApplicationReviewsListReviewsResponse, ApplicationReviewsSubmitReviewData, ApplicationReviewsSubmitReviewResponse, ApplicationReviewsGetReviewSummaryData, ApplicationReviewsGetReviewSummaryResponse, ApplicationReviewsListPendingReviewsData, ApplicationReviewsListPendingReviewsResponse, ApplicationReviewsListMyReviewsData, ApplicationReviewsListMyReviewsResponse, ApplicationsListApplicationsData, ApplicationsListApplicationsResponse, ApplicationsCreateApplicationAdminData, ApplicationsCreateApplicationAdminResponse, ApplicationsGetApplicationData, ApplicationsGetApplicationResponse, ApplicationsListMyApplicationsData, ApplicationsListMyApplicationsResponse, ApplicationsListMyTicketsResponse, ApplicationsGetMyParticipationData, ApplicationsGetMyParticipationResponse, ApplicationsGetMyPurchasesData, ApplicationsGetMyPurchasesResponse, ApplicationsGetMyApplicationData, ApplicationsGetMyApplicationResponse, ApplicationsUpdateMyApplicationData, ApplicationsUpdateMyApplicationResponse, ApplicationsCreateMyApplicationData, ApplicationsCreateMyApplicationResponse, ApplicationsListAttendeesDirectoryData, ApplicationsListAttendeesDirectoryResponse, ApplicationsExportAttendeesDirectoryCsvData, ApplicationsExportAttendeesDirectoryCsvResponse, ApplicationsAddMyAttendeeData, ApplicationsAddMyAttendeeResponse, ApplicationsUpdateMyAttendeeData, ApplicationsUpdateMyAttendeeResponse, ApplicationsDeleteMyAttendeeData, ApplicationsDeleteMyAttendeeResponse, ApplicationsReviewScholarshipData, ApplicationsReviewScholarshipResponse, ApprovalStrategiesGetApprovalStrategyData, ApprovalStrategiesGetApprovalStrategyResponse, ApprovalStrategiesCreateOrUpdateApprovalStrategyData, ApprovalStrategiesCreateOrUpdateApprovalStrategyResponse, ApprovalStrategiesUpdateApprovalStrategyData, ApprovalStrategiesUpdateApprovalStrategyResponse, ApprovalStrategiesDeleteApprovalStrategyData, ApprovalStrategiesDeleteApprovalStrategyResponse, AttendeesListAttendeesData, AttendeesListAttendeesResponse, AttendeesGetAttendeeData, AttendeesGetAttendeeResponse, AttendeesUpdateAttendeeData, AttendeesUpdateAttendeeResponse, AttendeesDeleteAttendeeData, AttendeesDeleteAttendeeResponse, AttendeesGetByCheckInCodeData, AttendeesGetByCheckInCodeResponse, AttendeesGetTicketsByEmailData, AttendeesGetTicketsByEmailResponse, AuthUserLoginData, AuthUserLoginResponse, AuthUserAuthenticateData, AuthUserAuthenticateResponse, AuthHumanLoginData, AuthHumanLoginResponse, AuthHumanAuthenticateData, AuthHumanAuthenticateResponse, BaseFieldConfigsListBaseFieldConfigsData, BaseFieldConfigsListBaseFieldConfigsResponse, BaseFieldConfigsUpdateBaseFieldConfigData, BaseFieldConfigsUpdateBaseFieldConfigResponse, CartsListAbandonedCartsData, CartsListAbandonedCartsResponse, CartsGetMyCartData, CartsGetMyCartResponse, CartsUpdateMyCartData, CartsUpdateMyCartResponse, CartsDeleteMyCartData, CartsDeleteMyCartResponse, CouponsListCouponsData, CouponsListCouponsResponse, CouponsCreateCouponData, CouponsCreateCouponResponse, CouponsGetCouponData, CouponsGetCouponResponse, CouponsUpdateCouponData, CouponsUpdateCouponResponse, CouponsDeleteCouponData, CouponsDeleteCouponResponse, CouponsValidateCouponData, CouponsValidateCouponResponse, DashboardGetDashboardStatsData, DashboardGetDashboardStatsResponse, DashboardGetEnrichedDashboardData, DashboardGetEnrichedDashboardResponse, EmailTemplatesListTemplateTypesResponse, EmailTemplatesGetDefaultTemplateData, EmailTemplatesGetDefaultTemplateResponse, EmailTemplatesPreviewTemplateData, EmailTemplatesPreviewTemplateResponse, EmailTemplatesSendTestEmailData, EmailTemplatesSendTestEmailResponse, EmailTemplatesListEmailTemplatesData, EmailTemplatesListEmailTemplatesResponse, EmailTemplatesCreateEmailTemplateData, EmailTemplatesCreateEmailTemplateResponse, EmailTemplatesGetEmailTemplateData, EmailTemplatesGetEmailTemplateResponse, EmailTemplatesUpdateEmailTemplateData, EmailTemplatesUpdateEmailTemplateResponse, EmailTemplatesDeleteEmailTemplateData, EmailTemplatesDeleteEmailTemplateResponse, EventParticipantsListParticipantsData, EventParticipantsListParticipantsResponse, EventParticipantsAdminAddParticipantData, EventParticipantsAdminAddParticipantResponse, EventParticipantsUpdateParticipantData, EventParticipantsUpdateParticipantResponse, EventParticipantsDeleteParticipantData, EventParticipantsDeleteParticipantResponse, EventParticipantsListPortalParticipantsData, EventParticipantsListPortalParticipantsResponse, EventParticipantsRegisterForEventData, EventParticipantsRegisterForEventResponse, EventParticipantsCancelRegistrationData, EventParticipantsCancelRegistrationResponse, EventParticipantsCheckInData, EventParticipantsCheckInResponse, EventsListEventsData, EventsListEventsResponse, EventsCreateEventData, EventsCreateEventResponse, EventsGetEventData, EventsGetEventResponse, EventsUpdateEventData, EventsUpdateEventResponse, EventsDeleteEventData, EventsDeleteEventResponse, EventsCancelEventData, EventsCancelEventResponse, EventsSetRecurrenceData, EventsSetRecurrenceResponse, EventsDetachOccurrenceData, EventsDetachOccurrenceResponse, EventsDeleteOccurrenceData, EventsDeleteOccurrenceResponse, EventsCheckAvailabilityData, EventsCheckAvailabilityResponse, EventsListInvitationsData, EventsListInvitationsResponse, EventsBulkInviteData, EventsBulkInviteResponse, EventsDeleteInvitationData, EventsDeleteInvitationResponse, EventsListPortalInvitationsData, EventsListPortalInvitationsResponse, EventsBulkInvitePortalData, EventsBulkInvitePortalResponse, EventsApproveEventData, EventsApproveEventResponse, EventsRejectEventData, EventsRejectEventResponse, EventsDeletePortalInvitationData, EventsDeletePortalInvitationResponse, EventsExportEventIcsData, EventsExportEventIcsResponse, EventsListPortalEventsData, EventsListPortalEventsResponse, EventsCreatePortalEventData, EventsCreatePortalEventResponse, EventsGetPortalEventData, EventsGetPortalEventResponse, EventsUpdatePortalEventData, EventsUpdatePortalEventResponse, EventsExportPortalEventIcsData, EventsExportPortalEventIcsResponse, EventSettingsGetEventSettingsData, EventSettingsGetEventSettingsResponse, EventSettingsUpsertEventSettingsData, EventSettingsUpsertEventSettingsResponse, EventSettingsUpdateEventSettingsData, EventSettingsUpdateEventSettingsResponse, EventSettingsGetPortalEventSettingsData, EventSettingsGetPortalEventSettingsResponse, EventVenuesListVenuesData, EventVenuesListVenuesResponse, EventVenuesCreateVenueData, EventVenuesCreateVenueResponse, EventVenuesGetVenueData, EventVenuesGetVenueResponse, EventVenuesUpdateVenueData, EventVenuesUpdateVenueResponse, EventVenuesDeleteVenueData, EventVenuesDeleteVenueResponse, EventVenuesSetWeeklyHoursData, EventVenuesSetWeeklyHoursResponse, EventVenuesListExceptionsData, EventVenuesListExceptionsResponse, EventVenuesCreateExceptionData, EventVenuesCreateExceptionResponse, EventVenuesUpdateExceptionData, EventVenuesUpdateExceptionResponse, EventVenuesDeleteExceptionData, EventVenuesDeleteExceptionResponse, EventVenuesListPhotosData, EventVenuesListPhotosResponse, EventVenuesAddPhotoData, EventVenuesAddPhotoResponse, EventVenuesUpdatePhotoData, EventVenuesUpdatePhotoResponse, EventVenuesDeletePhotoData, EventVenuesDeletePhotoResponse, EventVenuesGetAvailabilityData, EventVenuesGetAvailabilityResponse, EventVenuesGetPortalAvailabilityData, EventVenuesGetPortalAvailabilityResponse, EventVenuesListPortalVenuesData, EventVenuesListPortalVenuesResponse, EventVenuesCreatePortalVenueData, EventVenuesCreatePortalVenueResponse, FormFieldsListFormFieldsData, FormFieldsListFormFieldsResponse, FormFieldsCreateFormFieldData, FormFieldsCreateFormFieldResponse, FormFieldsGetFormFieldData, FormFieldsGetFormFieldResponse, FormFieldsUpdateFormFieldData, FormFieldsUpdateFormFieldResponse, FormFieldsDeleteFormFieldData, FormFieldsDeleteFormFieldResponse, FormFieldsGetApplicationSchemaData, FormFieldsGetApplicationSchemaResponse, FormFieldsGetPortalApplicationSchemaData, FormFieldsGetPortalApplicationSchemaResponse, FormSectionsListFormSectionsData, FormSectionsListFormSectionsResponse, FormSectionsCreateFormSectionData, FormSectionsCreateFormSectionResponse, FormSectionsGetFormSectionData, FormSectionsGetFormSectionResponse, FormSectionsUpdateFormSectionData, FormSectionsUpdateFormSectionResponse, FormSectionsDeleteFormSectionData, FormSectionsDeleteFormSectionResponse, GroupsListGroupsData, GroupsListGroupsResponse, GroupsCreateGroupData, GroupsCreateGroupResponse, GroupsGetGroupData, GroupsGetGroupResponse, GroupsUpdateGroupData, GroupsUpdateGroupResponse, GroupsDeleteGroupData, GroupsDeleteGroupResponse, GroupsListMyGroupsData, GroupsListMyGroupsResponse, GroupsGetMyGroupData, GroupsGetMyGroupResponse, GroupsUpdateMyGroupData, GroupsUpdateMyGroupResponse, GroupsAddGroupMemberData, GroupsAddGroupMemberResponse, GroupsAddGroupMembersBatchData, GroupsAddGroupMembersBatchResponse, GroupsUpdateGroupMemberData, GroupsUpdateGroupMemberResponse, GroupsRemoveGroupMemberData, GroupsRemoveGroupMemberResponse, GroupsGetGroupPublicData, GroupsGetGroupPublicResponse, HumansListHumansData, HumansListHumansResponse, HumansCreateHumanData, HumansCreateHumanResponse, HumansGetCurrentHumanInfoResponse, HumansUpdateCurrentHumanData, HumansUpdateCurrentHumanResponse, HumansGetHumanData, HumansGetHumanResponse, HumansUpdateHumanData, HumansUpdateHumanResponse, PaymentsListPaymentsData, PaymentsListPaymentsResponse, PaymentsGetPaymentData, PaymentsGetPaymentResponse, PaymentsUpdatePaymentData, PaymentsUpdatePaymentResponse, PaymentsGetPaymentInvoiceData, PaymentsGetPaymentInvoiceResponse, PaymentsCreateMyApplicationFeeData, PaymentsCreateMyApplicationFeeResponse, PaymentsGetMyLatestPaymentData, PaymentsGetMyLatestPaymentResponse, PaymentsListMyPaymentsData, PaymentsListMyPaymentsResponse, PaymentsGetMyInvoiceData, PaymentsGetMyInvoiceResponse, PaymentsPreviewMyPaymentData, PaymentsPreviewMyPaymentResponse, PaymentsCreateMyPaymentData, PaymentsCreateMyPaymentResponse, PaymentsSimplefiWebhookResponse, PopupReviewersListReviewersData, PopupReviewersListReviewersResponse, PopupReviewersAddReviewerData, PopupReviewersAddReviewerResponse, PopupReviewersUpdateReviewerData, PopupReviewersUpdateReviewerResponse, PopupReviewersRemoveReviewerData, PopupReviewersRemoveReviewerResponse, PopupsListPopupsData, PopupsListPopupsResponse, PopupsCreatePopupData, PopupsCreatePopupResponse, PopupsListPublicPopupsData, PopupsListPublicPopupsResponse, PopupsGetPopupData, PopupsGetPopupResponse, PopupsUpdatePopupData, PopupsUpdatePopupResponse, PopupsDeletePopupData, PopupsDeletePopupResponse, PopupsListPortalPopupsResponse, PopupsGetPortalPopupData, PopupsGetPortalPopupResponse, ProductsListProductCategoriesData, ProductsListProductCategoriesResponse, ProductsListProductsData, ProductsListProductsResponse, ProductsCreateProductData, ProductsCreateProductResponse, ProductsCreateProductsBatchData, ProductsCreateProductsBatchResponse, ProductsGetProductData, ProductsGetProductResponse, ProductsUpdateProductData, ProductsUpdateProductResponse, ProductsDeleteProductData, ProductsDeleteProductResponse, ProductsListPortalProductsData, ProductsListPortalProductsResponse, TenantsGetTenantByDomainData, TenantsGetTenantByDomainResponse, TenantsGetTenantBySlugData, TenantsGetTenantBySlugResponse, TenantsListTenantsData, TenantsListTenantsResponse, TenantsCreateTenantData, TenantsCreateTenantResponse, TenantsGetTenantData, TenantsGetTenantResponse, TenantsUpdateTenantData, TenantsUpdateTenantResponse, TenantsDeleteTenantData, TenantsDeleteTenantResponse, TenantsGetCredentialsData, TenantsGetCredentialsResponse, TenantsDeleteCredentialsData, TenantsDeleteCredentialsResponse, TicketingStepsListPortalTicketingStepsData, TicketingStepsListPortalTicketingStepsResponse, TicketingStepsListTicketingStepsData, TicketingStepsListTicketingStepsResponse, TicketingStepsCreateTicketingStepData, TicketingStepsCreateTicketingStepResponse, TicketingStepsGetTicketingStepData, TicketingStepsGetTicketingStepResponse, TicketingStepsUpdateTicketingStepData, TicketingStepsUpdateTicketingStepResponse, TicketingStepsDeleteTicketingStepData, TicketingStepsDeleteTicketingStepResponse, TracksListTracksData, TracksListTracksResponse, TracksCreateTrackData, TracksCreateTrackResponse, TracksGetTrackData, TracksGetTrackResponse, TracksUpdateTrackData, TracksUpdateTrackResponse, TracksDeleteTrackData, TracksDeleteTrackResponse, TracksListTrackEventsData, TracksListTrackEventsResponse, TracksListPortalTracksData, TracksListPortalTracksResponse, TracksGetPortalTrackData, TracksGetPortalTrackResponse, TracksListPortalTrackEventsData, TracksListPortalTrackEventsResponse, UploadsGetPresignedUploadUrlData, UploadsGetPresignedUploadUrlResponse, UploadsGetPresignedUploadUrlPortalData, UploadsGetPresignedUploadUrlPortalResponse, UsersListUsersData, UsersListUsersResponse, UsersCreateUserData, UsersCreateUserResponse, UsersGetCurrentUserInfoResponse, UsersGetUserData, UsersGetUserResponse, UsersUpdateUserData, UsersUpdateUserResponse, UsersDeleteUserData, UsersDeleteUserResponse, UtilsResolveUrlData, UtilsResolveUrlResponse, VenuePropertyTypesListPropertyTypesData, VenuePropertyTypesListPropertyTypesResponse, VenuePropertyTypesCreatePropertyTypeData, VenuePropertyTypesCreatePropertyTypeResponse, VenuePropertyTypesUpdatePropertyTypeData, VenuePropertyTypesUpdatePropertyTypeResponse, VenuePropertyTypesDeletePropertyTypeData, VenuePropertyTypesDeletePropertyTypeResponse, VenuePropertyTypesListPropertyTypesPortalResponse } from './types.gen';
+import type { ApplicationReviewsListReviewsData, ApplicationReviewsListReviewsResponse, ApplicationReviewsSubmitReviewData, ApplicationReviewsSubmitReviewResponse, ApplicationReviewsGetReviewSummaryData, ApplicationReviewsGetReviewSummaryResponse, ApplicationReviewsListPendingReviewsData, ApplicationReviewsListPendingReviewsResponse, ApplicationReviewsListMyReviewsData, ApplicationReviewsListMyReviewsResponse, ApplicationsListApplicationsData, ApplicationsListApplicationsResponse, ApplicationsCreateApplicationAdminData, ApplicationsCreateApplicationAdminResponse, ApplicationsGetApplicationData, ApplicationsGetApplicationResponse, ApplicationsListMyApplicationsData, ApplicationsListMyApplicationsResponse, ApplicationsListMyTicketsResponse, ApplicationsGetMyParticipationData, ApplicationsGetMyParticipationResponse, ApplicationsGetMyPurchasesData, ApplicationsGetMyPurchasesResponse, ApplicationsGetMyApplicationData, ApplicationsGetMyApplicationResponse, ApplicationsUpdateMyApplicationData, ApplicationsUpdateMyApplicationResponse, ApplicationsCreateMyApplicationData, ApplicationsCreateMyApplicationResponse, ApplicationsListAttendeesDirectoryData, ApplicationsListAttendeesDirectoryResponse, ApplicationsExportAttendeesDirectoryCsvData, ApplicationsExportAttendeesDirectoryCsvResponse, ApplicationsAddMyAttendeeData, ApplicationsAddMyAttendeeResponse, ApplicationsUpdateMyAttendeeData, ApplicationsUpdateMyAttendeeResponse, ApplicationsDeleteMyAttendeeData, ApplicationsDeleteMyAttendeeResponse, ApplicationsReviewScholarshipData, ApplicationsReviewScholarshipResponse, ApprovalStrategiesGetApprovalStrategyData, ApprovalStrategiesGetApprovalStrategyResponse, ApprovalStrategiesCreateOrUpdateApprovalStrategyData, ApprovalStrategiesCreateOrUpdateApprovalStrategyResponse, ApprovalStrategiesUpdateApprovalStrategyData, ApprovalStrategiesUpdateApprovalStrategyResponse, ApprovalStrategiesDeleteApprovalStrategyData, ApprovalStrategiesDeleteApprovalStrategyResponse, AttendeesListAttendeesData, AttendeesListAttendeesResponse, AttendeesGetAttendeeData, AttendeesGetAttendeeResponse, AttendeesUpdateAttendeeData, AttendeesUpdateAttendeeResponse, AttendeesDeleteAttendeeData, AttendeesDeleteAttendeeResponse, AttendeesGetByCheckInCodeData, AttendeesGetByCheckInCodeResponse, AttendeesGetTicketsByEmailData, AttendeesGetTicketsByEmailResponse, AuthUserLoginData, AuthUserLoginResponse, AuthUserAuthenticateData, AuthUserAuthenticateResponse, AuthHumanLoginData, AuthHumanLoginResponse, AuthHumanAuthenticateData, AuthHumanAuthenticateResponse, BaseFieldConfigsListBaseFieldConfigsData, BaseFieldConfigsListBaseFieldConfigsResponse, BaseFieldConfigsUpdateBaseFieldConfigData, BaseFieldConfigsUpdateBaseFieldConfigResponse, CartsListAbandonedCartsData, CartsListAbandonedCartsResponse, CartsGetMyCartData, CartsGetMyCartResponse, CartsUpdateMyCartData, CartsUpdateMyCartResponse, CartsDeleteMyCartData, CartsDeleteMyCartResponse, CouponsListCouponsData, CouponsListCouponsResponse, CouponsCreateCouponData, CouponsCreateCouponResponse, CouponsGetCouponData, CouponsGetCouponResponse, CouponsUpdateCouponData, CouponsUpdateCouponResponse, CouponsDeleteCouponData, CouponsDeleteCouponResponse, CouponsValidateCouponData, CouponsValidateCouponResponse, DashboardGetDashboardStatsData, DashboardGetDashboardStatsResponse, DashboardGetEnrichedDashboardData, DashboardGetEnrichedDashboardResponse, EmailTemplatesListTemplateTypesResponse, EmailTemplatesGetDefaultTemplateData, EmailTemplatesGetDefaultTemplateResponse, EmailTemplatesPreviewTemplateData, EmailTemplatesPreviewTemplateResponse, EmailTemplatesSendTestEmailData, EmailTemplatesSendTestEmailResponse, EmailTemplatesListEmailTemplatesData, EmailTemplatesListEmailTemplatesResponse, EmailTemplatesCreateEmailTemplateData, EmailTemplatesCreateEmailTemplateResponse, EmailTemplatesGetEmailTemplateData, EmailTemplatesGetEmailTemplateResponse, EmailTemplatesUpdateEmailTemplateData, EmailTemplatesUpdateEmailTemplateResponse, EmailTemplatesDeleteEmailTemplateData, EmailTemplatesDeleteEmailTemplateResponse, EventParticipantsListParticipantsData, EventParticipantsListParticipantsResponse, EventParticipantsAdminAddParticipantData, EventParticipantsAdminAddParticipantResponse, EventParticipantsUpdateParticipantData, EventParticipantsUpdateParticipantResponse, EventParticipantsDeleteParticipantData, EventParticipantsDeleteParticipantResponse, EventParticipantsListPortalParticipantsData, EventParticipantsListPortalParticipantsResponse, EventParticipantsRegisterForEventData, EventParticipantsRegisterForEventResponse, EventParticipantsCancelRegistrationData, EventParticipantsCancelRegistrationResponse, EventParticipantsCheckInData, EventParticipantsCheckInResponse, EventsListEventsData, EventsListEventsResponse, EventsCreateEventData, EventsCreateEventResponse, EventsGetEventData, EventsGetEventResponse, EventsUpdateEventData, EventsUpdateEventResponse, EventsDeleteEventData, EventsDeleteEventResponse, EventsCancelEventData, EventsCancelEventResponse, EventsSetRecurrenceData, EventsSetRecurrenceResponse, EventsDetachOccurrenceData, EventsDetachOccurrenceResponse, EventsDeleteOccurrenceData, EventsDeleteOccurrenceResponse, EventsCheckAvailabilityData, EventsCheckAvailabilityResponse, EventsListInvitationsData, EventsListInvitationsResponse, EventsBulkInviteData, EventsBulkInviteResponse, EventsDeleteInvitationData, EventsDeleteInvitationResponse, EventsListPortalInvitationsData, EventsListPortalInvitationsResponse, EventsBulkInvitePortalData, EventsBulkInvitePortalResponse, EventsApproveEventData, EventsApproveEventResponse, EventsRejectEventData, EventsRejectEventResponse, EventsDeletePortalInvitationData, EventsDeletePortalInvitationResponse, EventsExportEventIcsData, EventsExportEventIcsResponse, EventsListPortalEventsData, EventsListPortalEventsResponse, EventsCreatePortalEventData, EventsCreatePortalEventResponse, EventsGetPortalEventData, EventsGetPortalEventResponse, EventsUpdatePortalEventData, EventsUpdatePortalEventResponse, EventsExportPortalEventIcsData, EventsExportPortalEventIcsResponse, EventSettingsGetEventSettingsData, EventSettingsGetEventSettingsResponse, EventSettingsUpsertEventSettingsData, EventSettingsUpsertEventSettingsResponse, EventSettingsUpdateEventSettingsData, EventSettingsUpdateEventSettingsResponse, EventSettingsGetPortalEventSettingsData, EventSettingsGetPortalEventSettingsResponse, EventVenuesListVenuesData, EventVenuesListVenuesResponse, EventVenuesCreateVenueData, EventVenuesCreateVenueResponse, EventVenuesGetVenueData, EventVenuesGetVenueResponse, EventVenuesUpdateVenueData, EventVenuesUpdateVenueResponse, EventVenuesDeleteVenueData, EventVenuesDeleteVenueResponse, EventVenuesSetWeeklyHoursData, EventVenuesSetWeeklyHoursResponse, EventVenuesListExceptionsData, EventVenuesListExceptionsResponse, EventVenuesCreateExceptionData, EventVenuesCreateExceptionResponse, EventVenuesUpdateExceptionData, EventVenuesUpdateExceptionResponse, EventVenuesDeleteExceptionData, EventVenuesDeleteExceptionResponse, EventVenuesListPhotosData, EventVenuesListPhotosResponse, EventVenuesAddPhotoData, EventVenuesAddPhotoResponse, EventVenuesUpdatePhotoData, EventVenuesUpdatePhotoResponse, EventVenuesDeletePhotoData, EventVenuesDeletePhotoResponse, EventVenuesGetAvailabilityData, EventVenuesGetAvailabilityResponse, EventVenuesGetPortalAvailabilityData, EventVenuesGetPortalAvailabilityResponse, EventVenuesListPortalVenuesData, EventVenuesListPortalVenuesResponse, EventVenuesCreatePortalVenueData, EventVenuesCreatePortalVenueResponse, FormFieldsListFormFieldsData, FormFieldsListFormFieldsResponse, FormFieldsCreateFormFieldData, FormFieldsCreateFormFieldResponse, FormFieldsGetFormFieldData, FormFieldsGetFormFieldResponse, FormFieldsUpdateFormFieldData, FormFieldsUpdateFormFieldResponse, FormFieldsDeleteFormFieldData, FormFieldsDeleteFormFieldResponse, FormFieldsGetApplicationSchemaData, FormFieldsGetApplicationSchemaResponse, FormFieldsGetPortalApplicationSchemaData, FormFieldsGetPortalApplicationSchemaResponse, FormSectionsListFormSectionsData, FormSectionsListFormSectionsResponse, FormSectionsCreateFormSectionData, FormSectionsCreateFormSectionResponse, FormSectionsGetFormSectionData, FormSectionsGetFormSectionResponse, FormSectionsUpdateFormSectionData, FormSectionsUpdateFormSectionResponse, FormSectionsDeleteFormSectionData, FormSectionsDeleteFormSectionResponse, GroupsListGroupsData, GroupsListGroupsResponse, GroupsCreateGroupData, GroupsCreateGroupResponse, GroupsGetGroupData, GroupsGetGroupResponse, GroupsUpdateGroupData, GroupsUpdateGroupResponse, GroupsDeleteGroupData, GroupsDeleteGroupResponse, GroupsListMyGroupsData, GroupsListMyGroupsResponse, GroupsGetMyGroupData, GroupsGetMyGroupResponse, GroupsUpdateMyGroupData, GroupsUpdateMyGroupResponse, GroupsAddGroupMemberData, GroupsAddGroupMemberResponse, GroupsAddGroupMembersBatchData, GroupsAddGroupMembersBatchResponse, GroupsUpdateGroupMemberData, GroupsUpdateGroupMemberResponse, GroupsRemoveGroupMemberData, GroupsRemoveGroupMemberResponse, GroupsGetGroupPublicData, GroupsGetGroupPublicResponse, HumansListHumansData, HumansListHumansResponse, HumansCreateHumanData, HumansCreateHumanResponse, HumansGetCurrentHumanInfoResponse, HumansUpdateCurrentHumanData, HumansUpdateCurrentHumanResponse, HumansGetHumanData, HumansGetHumanResponse, HumansUpdateHumanData, HumansUpdateHumanResponse, PaymentsListPaymentsData, PaymentsListPaymentsResponse, PaymentsGetPaymentData, PaymentsGetPaymentResponse, PaymentsUpdatePaymentData, PaymentsUpdatePaymentResponse, PaymentsGetPaymentInvoiceData, PaymentsGetPaymentInvoiceResponse, PaymentsCreateMyApplicationFeeData, PaymentsCreateMyApplicationFeeResponse, PaymentsGetMyLatestPaymentData, PaymentsGetMyLatestPaymentResponse, PaymentsListMyPaymentsData, PaymentsListMyPaymentsResponse, PaymentsGetMyInvoiceData, PaymentsGetMyInvoiceResponse, PaymentsPreviewMyPaymentData, PaymentsPreviewMyPaymentResponse, PaymentsCreateMyPaymentData, PaymentsCreateMyPaymentResponse, PaymentsSimplefiWebhookResponse, PopupReviewersListReviewersData, PopupReviewersListReviewersResponse, PopupReviewersAddReviewerData, PopupReviewersAddReviewerResponse, PopupReviewersUpdateReviewerData, PopupReviewersUpdateReviewerResponse, PopupReviewersRemoveReviewerData, PopupReviewersRemoveReviewerResponse, PopupsListPopupsData, PopupsListPopupsResponse, PopupsCreatePopupData, PopupsCreatePopupResponse, PopupsListPublicPopupsData, PopupsListPublicPopupsResponse, PopupsGetPopupData, PopupsGetPopupResponse, PopupsUpdatePopupData, PopupsUpdatePopupResponse, PopupsDeletePopupData, PopupsDeletePopupResponse, PopupsListPortalPopupsData, PopupsListPortalPopupsResponse, PopupsGetPortalPopupData, PopupsGetPortalPopupResponse, ProductsListProductCategoriesData, ProductsListProductCategoriesResponse, ProductsListProductsData, ProductsListProductsResponse, ProductsCreateProductData, ProductsCreateProductResponse, ProductsCreateProductsBatchData, ProductsCreateProductsBatchResponse, ProductsGetProductData, ProductsGetProductResponse, ProductsUpdateProductData, ProductsUpdateProductResponse, ProductsDeleteProductData, ProductsDeleteProductResponse, ProductsListPortalProductsData, ProductsListPortalProductsResponse, TenantsGetTenantByDomainData, TenantsGetTenantByDomainResponse, TenantsGetTenantBySlugData, TenantsGetTenantBySlugResponse, TenantsListTenantsData, TenantsListTenantsResponse, TenantsCreateTenantData, TenantsCreateTenantResponse, TenantsGetTenantData, TenantsGetTenantResponse, TenantsUpdateTenantData, TenantsUpdateTenantResponse, TenantsDeleteTenantData, TenantsDeleteTenantResponse, TenantsGetCredentialsData, TenantsGetCredentialsResponse, TenantsDeleteCredentialsData, TenantsDeleteCredentialsResponse, TicketingStepsListPortalTicketingStepsData, TicketingStepsListPortalTicketingStepsResponse, TicketingStepsListTicketingStepsData, TicketingStepsListTicketingStepsResponse, TicketingStepsCreateTicketingStepData, TicketingStepsCreateTicketingStepResponse, TicketingStepsGetTicketingStepData, TicketingStepsGetTicketingStepResponse, TicketingStepsUpdateTicketingStepData, TicketingStepsUpdateTicketingStepResponse, TicketingStepsDeleteTicketingStepData, TicketingStepsDeleteTicketingStepResponse, TracksListTracksData, TracksListTracksResponse, TracksCreateTrackData, TracksCreateTrackResponse, TracksGetTrackData, TracksGetTrackResponse, TracksUpdateTrackData, TracksUpdateTrackResponse, TracksDeleteTrackData, TracksDeleteTrackResponse, TracksListTrackEventsData, TracksListTrackEventsResponse, TracksListPortalTracksData, TracksListPortalTracksResponse, TracksGetPortalTrackData, TracksGetPortalTrackResponse, TracksListPortalTrackEventsData, TracksListPortalTrackEventsResponse, TranslationsListTranslationsData, TranslationsListTranslationsResponse, TranslationsUpsertTranslationData, TranslationsUpsertTranslationResponse, TranslationsAiTranslateData, TranslationsAiTranslateResponse, TranslationsDeleteTranslationData, TranslationsDeleteTranslationResponse, UploadsGetPresignedUploadUrlData, UploadsGetPresignedUploadUrlResponse, UploadsGetPresignedUploadUrlPortalData, UploadsGetPresignedUploadUrlPortalResponse, UsersListUsersData, UsersListUsersResponse, UsersCreateUserData, UsersCreateUserResponse, UsersGetCurrentUserInfoResponse, UsersGetUserData, UsersGetUserResponse, UsersUpdateUserData, UsersUpdateUserResponse, UsersDeleteUserData, UsersDeleteUserResponse, UtilsResolveUrlData, UtilsResolveUrlResponse, VenuePropertyTypesListPropertyTypesData, VenuePropertyTypesListPropertyTypesResponse, VenuePropertyTypesCreatePropertyTypeData, VenuePropertyTypesCreatePropertyTypeResponse, VenuePropertyTypesUpdatePropertyTypeData, VenuePropertyTypesUpdatePropertyTypeResponse, VenuePropertyTypesDeletePropertyTypeData, VenuePropertyTypesDeletePropertyTypeResponse, VenuePropertyTypesListPropertyTypesPortalResponse } from './types.gen';
 
 export class ApplicationReviewsService {
     /**
@@ -3064,6 +3064,7 @@ export class FormFieldsService {
      * Get the application form schema for a popup (Portal).
      * @param data The data for the request.
      * @param data.popupId
+     * @param data.acceptLanguage
      * @returns unknown Successful Response
      * @throws ApiError
      */
@@ -3073,6 +3074,9 @@ export class FormFieldsService {
             url: '/api/v1/form-fields/portal/schema/{popup_id}',
             path: {
                 popup_id: data.popupId
+            },
+            headers: {
+                'Accept-Language': data.acceptLanguage
             },
             errors: {
                 422: 'Validation Error'
@@ -4214,13 +4218,21 @@ export class PopupsService {
     /**
      * List Portal Popups
      * List active popups for the current human's tenant (Portal).
+     * @param data The data for the request.
+     * @param data.acceptLanguage
      * @returns PopupPublic Successful Response
      * @throws ApiError
      */
-    public static listPortalPopups(): CancelablePromise<PopupsListPortalPopupsResponse> {
+    public static listPortalPopups(data: PopupsListPortalPopupsData = {}): CancelablePromise<PopupsListPortalPopupsResponse> {
         return __request(OpenAPI, {
             method: 'GET',
-            url: '/api/v1/popups/portal/list'
+            url: '/api/v1/popups/portal/list',
+            headers: {
+                'Accept-Language': data.acceptLanguage
+            },
+            errors: {
+                422: 'Validation Error'
+            }
         });
     }
     
@@ -4229,6 +4241,7 @@ export class PopupsService {
      * Get a popup by slug (Portal).
      * @param data The data for the request.
      * @param data.slug
+     * @param data.acceptLanguage
      * @returns PopupPublic Successful Response
      * @throws ApiError
      */
@@ -4238,6 +4251,9 @@ export class PopupsService {
             url: '/api/v1/popups/portal/{slug}',
             path: {
                 slug: data.slug
+            },
+            headers: {
+                'Accept-Language': data.acceptLanguage
             },
             errors: {
                 422: 'Validation Error'
@@ -4442,6 +4458,7 @@ export class ProductsService {
      * @param data.category
      * @param data.skip Number of items to skip
      * @param data.limit Maximum number of items to return
+     * @param data.acceptLanguage
      * @returns ListModel_ProductPublic_ Successful Response
      * @throws ApiError
      */
@@ -4449,6 +4466,9 @@ export class ProductsService {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/api/v1/products/portal/products',
+            headers: {
+                'Accept-Language': data.acceptLanguage
+            },
             query: {
                 popup_id: data.popupId,
                 is_active: data.isActive,
@@ -5033,6 +5053,108 @@ export class TracksService {
             query: {
                 skip: data.skip,
                 limit: data.limit
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+}
+
+export class TranslationsService {
+    /**
+     * List Translations
+     * List all translations for an entity.
+     * @param data The data for the request.
+     * @param data.entityType
+     * @param data.entityId
+     * @param data.xTenantId
+     * @returns TranslationPublic Successful Response
+     * @throws ApiError
+     */
+    public static listTranslations(data: TranslationsListTranslationsData): CancelablePromise<TranslationsListTranslationsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/translations',
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            query: {
+                entity_type: data.entityType,
+                entity_id: data.entityId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Upsert Translation
+     * Create or update a translation for an entity.
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @param data.xTenantId
+     * @returns TranslationPublic Successful Response
+     * @throws ApiError
+     */
+    public static upsertTranslation(data: TranslationsUpsertTranslationData): CancelablePromise<TranslationsUpsertTranslationResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/translations',
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Ai Translate
+     * Use AI to generate draft translations for an entity. Returns translated fields (not saved).
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @param data.xTenantId
+     * @returns string Successful Response
+     * @throws ApiError
+     */
+    public static aiTranslate(data: TranslationsAiTranslateData): CancelablePromise<TranslationsAiTranslateResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/translations/ai-translate',
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Delete Translation
+     * Delete a translation.
+     * @param data The data for the request.
+     * @param data.translationId
+     * @param data.xTenantId
+     * @returns void Successful Response
+     * @throws ApiError
+     */
+    public static deleteTranslation(data: TranslationsDeleteTranslationData): CancelablePromise<TranslationsDeleteTranslationResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/v1/translations/{translation_id}',
+            path: {
+                translation_id: data.translationId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
             },
             errors: {
                 422: 'Validation Error'

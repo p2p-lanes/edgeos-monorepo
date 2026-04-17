@@ -164,7 +164,7 @@ function PatronDefault({
 }: PatronLayoutProps) {
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden p-5">
+      <div className="bg-checkout-card-bg rounded-2xl shadow-sm border border-gray-100 overflow-hidden p-5">
         {product.description && (
           <p className="text-sm text-gray-600 mb-4">{product.description}</p>
         )}
@@ -232,16 +232,6 @@ function PatronDefault({
           </div>
         )}
       </div>
-
-      <div className="text-center py-2">
-        <button
-          type="button"
-          onClick={onSkip}
-          className="text-gray-500 hover:text-gray-700 underline text-sm transition-colors"
-        >
-          Skip this step
-        </button>
-      </div>
     </div>
   )
 }
@@ -261,7 +251,7 @@ function PatronCompact({
 }: PatronLayoutProps) {
   return (
     <div className="space-y-3">
-      <div className="bg-white rounded-xl border border-gray-100 p-3">
+      <div className="bg-checkout-card-bg rounded-xl border border-gray-100 p-3">
         {product.description && (
           <p className="text-xs text-gray-500 mb-3">{product.description}</p>
         )}
@@ -325,16 +315,6 @@ function PatronCompact({
           </div>
         )}
       </div>
-
-      <div className="text-center py-1">
-        <button
-          type="button"
-          onClick={onSkip}
-          className="text-gray-500 hover:text-gray-700 underline text-xs transition-colors"
-        >
-          Skip this step
-        </button>
-      </div>
     </div>
   )
 }
@@ -370,7 +350,7 @@ function PatronGrid({
                 "flex flex-col items-center justify-center rounded-2xl border-2 p-5 transition-all",
                 selected
                   ? "border-gray-900 bg-gray-900 text-white shadow-md"
-                  : "border-gray-200 bg-white text-gray-700 hover:border-gray-400 hover:shadow-sm",
+                  : "border-gray-200 bg-checkout-card-bg text-gray-700 hover:border-gray-400 hover:shadow-sm",
               )}
             >
               <Heart
@@ -394,7 +374,7 @@ function PatronGrid({
                 customValue &&
                 Number.parseInt(customValue, 10) >= minimum
                 ? "border-green-400 bg-green-50"
-                : "border-gray-200 bg-white",
+                : "border-gray-200 bg-checkout-card-bg",
             )}
           >
             <Heart className="w-5 h-5 mb-2 text-gray-300" />
@@ -430,16 +410,6 @@ function PatronGrid({
           </button>
         </div>
       )}
-
-      <div className="text-center py-2">
-        <button
-          type="button"
-          onClick={onSkip}
-          className="text-gray-500 hover:text-gray-700 underline text-sm transition-colors"
-        >
-          Skip this step
-        </button>
-      </div>
     </div>
   )
 }

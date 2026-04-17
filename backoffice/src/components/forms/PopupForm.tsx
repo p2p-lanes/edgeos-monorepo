@@ -12,6 +12,7 @@ import {
   Heart,
   Image,
   Key,
+  Languages,
   Link as LinkIcon,
   Mail,
   MapPin,
@@ -31,8 +32,10 @@ import { FormErrorSummary } from "@/components/Common/FormErrorSummary"
 import { ApprovalStrategyForm } from "@/components/forms/ApprovalStrategyForm"
 import { ReviewersManager } from "@/components/forms/ReviewersManager"
 import { ThemeConfigForm } from "@/components/forms/ThemeConfigForm"
+import { TranslationManager } from "@/components/translations/TranslationManager"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { DatePicker } from "@/components/ui/date-picker"
 import { ImageUpload } from "@/components/ui/image-upload"
 import {
@@ -68,6 +71,12 @@ interface PopupFormProps {
 const POPUP_STATUSES = [
   { value: "draft", label: "Draft" },
   { value: "active", label: "Active" },
+] as const
+
+const AVAILABLE_LANGUAGES = [
+  { value: "en", label: "English" },
+  { value: "es", label: "Español" },
+  { value: "zh", label: "中文" },
 ] as const
 
 export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
@@ -154,6 +163,8 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
       invoice_company_name: defaultValues?.invoice_company_name ?? "",
       invoice_company_address: defaultValues?.invoice_company_address ?? "",
       invoice_company_email: defaultValues?.invoice_company_email ?? "",
+      default_language: defaultValues?.default_language ?? "en",
+      supported_languages: defaultValues?.supported_languages ?? ["en"],
     },
     onSubmit: ({ value }) => {
       if (readOnly) return
@@ -188,6 +199,8 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         invoice_company_name: value.invoice_company_name || null,
         invoice_company_address: value.invoice_company_address || null,
         invoice_company_email: value.invoice_company_email || null,
+        default_language: value.default_language,
+        supported_languages: value.supported_languages,
       }
       if (isEdit) {
         updateMutation.mutate(payload)
@@ -658,13 +671,39 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
           <>
             <Separator />
             <div className="lg:-mx-32 xl:-mx-48">
-              <ThemeConfigForm
-                popupId={defaultValues!.id}
-                themeConfig={
-                  defaultValues!.theme_config as Record<string, unknown> | null
-                }
-                readOnly={readOnly}
-              />
+              <form.Subscribe
+                selector={(state) => ({
+                  name: state.values.name,
+                  tagline: state.values.tagline,
+                  location: state.values.location,
+                  start_date: state.values.start_date,
+                  end_date: state.values.end_date,
+                  express_checkout_background:
+                    state.values.express_checkout_background,
+                })}
+              >
+                {(event) => (
+                  <ThemeConfigForm
+                    popupId={defaultValues!.id}
+                    themeConfig={
+                      defaultValues!.theme_config as Record<
+                        string,
+                        unknown
+                      > | null
+                    }
+                    readOnly={readOnly}
+                    previewEvent={{
+                      name: event.name,
+                      tagline: event.tagline || null,
+                      location: event.location || null,
+                      start_date: event.start_date || null,
+                      end_date: event.end_date || null,
+                      express_checkout_background:
+                        event.express_checkout_background || null,
+                    }}
+                  />
+                )}
+              </form.Subscribe>
             </div>
           </>
         )}
@@ -835,6 +874,79 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
           </form.Field>
         </InlineSection>
 
+        <Separator />
+
+        {/* Languages */}
+        <InlineSection title="Languages">
+          <form.Field name="default_language">
+            {(field) => (
+              <InlineRow
+                icon={<Languages className="h-4 w-4 text-muted-foreground" />}
+                label="Default Language"
+                description="The primary language for this event"
+              >
+                <Select
+                  value={field.state.value}
+                  onValueChange={(value) => field.handleChange(value)}
+                  disabled={readOnly}
+                >
+                  <SelectTrigger className="w-auto">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {AVAILABLE_LANGUAGES.map((lang) => (
+                      <SelectItem key={lang.value} value={lang.value}>
+                        {lang.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </InlineRow>
+            )}
+          </form.Field>
+
+          <form.Field name="supported_languages">
+            {(field) => (
+              <InlineRow
+                icon={<Globe className="h-4 w-4 text-muted-foreground" />}
+                label="Supported Languages"
+                description="Languages available in the portal"
+              >
+                <div className="flex flex-col gap-2">
+                  {AVAILABLE_LANGUAGES.map((lang) => (
+                    <div
+                      key={lang.value}
+                      className="flex items-center gap-2 text-sm"
+                    >
+                      <Checkbox
+                        id={`lang-${lang.value}`}
+                        checked={field.state.value.includes(lang.value)}
+                        disabled={readOnly}
+                        onCheckedChange={(checked) => {
+                          const current = field.state.value
+                          if (checked) {
+                            field.handleChange([...current, lang.value])
+                          } else {
+                            const defaultLang =
+                              form.getFieldValue("default_language")
+                            if (lang.value === defaultLang) return
+                            field.handleChange(
+                              current.filter((l: string) => l !== lang.value),
+                            )
+                          }
+                        }}
+                      />
+                      <Label htmlFor={`lang-${lang.value}`}>{lang.label}</Label>
+                    </div>
+                  ))}
+                </div>
+              </InlineRow>
+            )}
+          </form.Field>
+        </InlineSection>
+
+        <Separator />
+
         {/* Approval strategy + Reviewers (edit only) */}
         {isEdit && (
           <>
@@ -853,6 +965,24 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
               tenantId={defaultValues!.tenant_id}
               readOnly={readOnly}
               variant="inline"
+            />
+          </>
+        )}
+
+        {isEdit && (defaultValues?.supported_languages?.length ?? 0) > 1 && (
+          <>
+            <Separator />
+            <TranslationManager
+              entityType="popup"
+              entityId={defaultValues!.id}
+              translatableFields={["name", "tagline", "location"]}
+              sourceData={{
+                name: defaultValues!.name,
+                tagline: defaultValues!.tagline,
+                location: defaultValues!.location,
+              }}
+              supportedLanguages={defaultValues!.supported_languages!}
+              defaultLanguage={defaultValues!.default_language!}
             />
           </>
         )}

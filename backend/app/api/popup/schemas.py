@@ -5,9 +5,9 @@ from enum import StrEnum
 from typing import Self
 
 from pydantic import model_validator
-from sqlalchemy import Boolean, Numeric
-from sqlalchemy.dialects.postgresql import JSONB
-from sqlmodel import Column, Field, SQLModel
+from sqlalchemy import Boolean, Column, Numeric
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
+from sqlmodel import Field, SQLModel, String
 
 from app.utils.utils import slugify
 
@@ -62,6 +62,11 @@ class PopupBase(SQLModel):
         default=None,
         sa_column=Column(JSONB, nullable=True),
     )
+    default_language: str = Field(default="en")
+    supported_languages: list[str] = Field(
+        default=["en"],
+        sa_column=Column(ARRAY(String), nullable=False, server_default="{en}"),
+    )
 
 
 class PopupCreate(SQLModel):
@@ -92,6 +97,8 @@ class PopupCreate(SQLModel):
     requires_application_fee: bool = False
     application_fee_amount: Decimal | None = None
     theme_config: dict | None = None
+    default_language: str = "en"
+    supported_languages: list[str] = ["en"]
 
     @model_validator(mode="after")
     def generate_slug(self) -> Self:
@@ -132,6 +139,8 @@ class PopupUpdate(SQLModel):
     requires_application_fee: bool | None = None
     application_fee_amount: Decimal | None = None
     theme_config: dict | None = None
+    default_language: str | None = None
+    supported_languages: list[str] | None = None
 
     @model_validator(mode="after")
     def validate_fee_config(self) -> Self:

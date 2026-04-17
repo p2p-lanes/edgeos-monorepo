@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from "react"
 
-export type DesignVariant = "scrolly" | "snap"
+export type DesignVariant = "snap"
 export type PassesVariant = "stacked" | "tabs" | "compact" | "accordion"
 
 const STORAGE_KEY = "passes-design-variant"
@@ -17,7 +17,7 @@ interface DesignVariantContextValue {
 }
 
 const DesignVariantContext = createContext<DesignVariantContextValue>({
-  variant: "scrolly",
+  variant: "snap",
   setVariant: () => {},
   cycleVariant: () => {},
   passesVariant: "stacked",
@@ -28,7 +28,7 @@ export function useDesignVariant() {
   return useContext(DesignVariantContext)
 }
 
-const VARIANTS: DesignVariant[] = ["scrolly", "snap"]
+const VARIANTS: DesignVariant[] = ["snap"]
 const PASSES_VARIANTS: PassesVariant[] = [
   "stacked",
   "tabs",
@@ -41,14 +41,14 @@ export function DesignVariantProvider({
 }: {
   children: React.ReactNode
 }) {
-  const [variant, setVariantState] = useState<DesignVariant>("scrolly")
+  const [variant, setVariantState] = useState<DesignVariant>("snap")
   const [passesVariant, setPassesVariantState] =
     useState<PassesVariant>("stacked")
 
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY) as DesignVariant | null
-    if (stored && VARIANTS.includes(stored)) {
-      setVariantState(stored)
+    const stored = localStorage.getItem(STORAGE_KEY)
+    if (stored && !VARIANTS.includes(stored as DesignVariant)) {
+      localStorage.removeItem(STORAGE_KEY)
     }
     const storedPasses = localStorage.getItem(
       PASSES_STORAGE_KEY,

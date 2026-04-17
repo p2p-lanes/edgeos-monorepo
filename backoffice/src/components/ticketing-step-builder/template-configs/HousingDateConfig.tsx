@@ -213,6 +213,8 @@ export function HousingDateConfig({
       label: newLabel,
       order: parsed.sections.length,
       product_ids: [],
+      description: "",
+      image_url: "",
     }
     updateSections([...parsed.sections, newSection])
   }

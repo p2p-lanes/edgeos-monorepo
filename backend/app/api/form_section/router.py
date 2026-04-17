@@ -10,6 +10,7 @@ from app.api.form_section.schemas import (
 )
 from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
+from app.api.translation.service import delete_translations_for_entity
 from app.core.dependencies.users import CurrentUser, CurrentWriter, TenantSession
 
 router = APIRouter(prefix="/form-sections", tags=["form-sections"])
@@ -124,4 +125,5 @@ async def delete_form_section(
             detail="Cannot delete a protected section",
         )
 
+    delete_translations_for_entity(db, "form_section", section.id)
     crud.form_sections_crud.delete(db, section)

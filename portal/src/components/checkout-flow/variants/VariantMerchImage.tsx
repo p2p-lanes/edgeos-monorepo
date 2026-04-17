@@ -15,20 +15,6 @@ import type { VariantProps } from "../registries/variantRegistry"
 
 /* ── Shared components ────────────────────────────────────── */
 
-function SkipLink({ onSkip }: { onSkip?: () => void }) {
-  return (
-    <div className="text-center py-2">
-      <button
-        type="button"
-        onClick={onSkip}
-        className="text-gray-500 hover:text-gray-700 underline text-sm transition-colors"
-      >
-        Skip merchandise
-      </button>
-    </div>
-  )
-}
-
 interface MerchQtyControlProps {
   product: ProductsPass
   quantity: number
@@ -262,7 +248,7 @@ function MerchDefault({
 }: CardListProps) {
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-100">
+      <div className="bg-checkout-card-bg rounded-2xl shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-100">
         {products.map((product) => (
           <MerchDefaultItem
             key={product.id}
@@ -272,7 +258,6 @@ function MerchDefault({
           />
         ))}
       </div>
-      <SkipLink onSkip={onSkip} />
     </div>
   )
 }
@@ -299,7 +284,7 @@ function MerchGrid({
             <div
               key={product.id}
               className={cn(
-                "rounded-2xl border overflow-hidden bg-white transition-all",
+                "rounded-2xl border overflow-hidden bg-checkout-card-bg transition-all",
                 hasQty ? "border-blue-200" : "border-gray-200",
               )}
             >
@@ -361,7 +346,6 @@ function MerchGrid({
           )
         })}
       </div>
-      <SkipLink onSkip={onSkip} />
     </div>
   )
 }
@@ -446,7 +430,6 @@ function MerchCompact({
           </div>
         )
       })}
-      <SkipLink onSkip={onSkip} />
     </div>
   )
 }

@@ -1,7 +1,7 @@
 import uuid
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Annotated, Any
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Header, HTTPException, status
 
 from app.api.base_field_config.constants import BASE_FIELD_DEFINITIONS
 from app.api.base_field_config.crud import base_field_configs_crud
@@ -15,6 +15,7 @@ from app.api.form_field.models import FormFields
 from app.api.form_field.schemas import FormFieldCreate, FormFieldPublic, FormFieldUpdate
 from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
+from app.api.translation.service import delete_translations_for_entity
 from app.core.dependencies.users import (
     CurrentHuman,
     CurrentUser,
@@ -201,6 +202,7 @@ async def delete_form_field(
             detail="Form field not found",
         )
 
+    delete_translations_for_entity(db, "form_field", field.id)
     crud.form_fields_crud.delete(db, field)
 
 
@@ -232,6 +234,7 @@ async def get_portal_application_schema(
     popup_id: uuid.UUID,
     db: HumanTenantSession,
     _: CurrentHuman,
+    accept_language: Annotated[str | None, Header(alias="Accept-Language")] = None,
 ) -> dict[str, Any]:
     """Get the application form schema for a popup (Portal)."""
     from app.api.popup.crud import popups_crud
@@ -243,4 +246,42 @@ async def get_portal_application_schema(
             detail="Popup not found",
         )
 
-    return crud.form_fields_crud.build_schema_for_popup(db, popup_id)
+    schema = crud.form_fields_crud.build_schema_for_popup(db, popup_id)
+
+    lang = None
+    if accept_language and accept_language != "en":
+        lang = accept_language.split(",")[0].split("-")[0].strip()
+
+    if lang:
+        from app.api.translation.service import (
+            TRANSLATABLE_FIELDS,
+            get_translations_bulk,
+        )
+
+        # Translate custom fields
+        fields, _ = crud.form_fields_crud.find_by_popup(db, popup_id, skip=0, limit=1000)
+        field_ids = [f.id for f in fields]
+        field_translations = get_translations_bulk(db, "form_field", field_ids, lang)
+
+        for field in fields:
+            if field.id in field_translations:
+                t_data = field_translations[field.id]
+                entry = schema["custom_fields"].get(field.name)
+                if entry:
+                    for key in TRANSLATABLE_FIELDS["form_field"]:
+                        if key in t_data:
+                            entry[key] = t_data[key]
+
+        # Translate sections
+        section_ids = [uuid.UUID(s["id"]) for s in schema["sections"]]
+        section_translations = get_translations_bulk(db, "form_section", section_ids, lang)
+
+        for section in schema["sections"]:
+            sid = uuid.UUID(section["id"])
+            if sid in section_translations:
+                t_data = section_translations[sid]
+                for key in TRANSLATABLE_FIELDS["form_section"]:
+                    if key in t_data:
+                        section[key] = t_data[key]
+
+    return schema

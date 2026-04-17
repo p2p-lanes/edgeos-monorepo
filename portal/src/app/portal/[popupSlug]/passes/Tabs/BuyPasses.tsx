@@ -1,6 +1,7 @@
 import { Loader2 } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 import { useState } from "react"
+import { useTranslation } from "react-i18next"
 import BottomSheet from "@/components/common/BottomSheet"
 import { Separator } from "@/components/ui/separator"
 import { useCalculateTotal } from "@/hooks/useCalculateTotal"
@@ -51,6 +52,7 @@ const BuyPasses = ({
   defaultOpenDiscount?: boolean
   positionCoupon?: "top" | "bottom" | "right"
 }) => {
+  const { t } = useTranslation()
   const {
     toggleProduct,
     attendeePasses: attendees,
@@ -81,14 +83,14 @@ const BuyPasses = ({
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
-        <p className="text-muted-foreground">Loading passes information...</p>
+        <p className="text-muted-foreground">{t("passes.loading_passes")}</p>
       </div>
     )
   }
 
   return (
     <div className="space-y-6 pb-[20px] md:pb-0">
-      <TitleTabs title="Buy Passes">
+      <TitleTabs title={t("passes.buy_passes")}>
         {/* LEGACY: passes_description removed from PopupPublic */}
       </TitleTabs>
 

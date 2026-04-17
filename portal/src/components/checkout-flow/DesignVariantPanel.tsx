@@ -2,17 +2,8 @@
 
 import { Settings2, X } from "lucide-react"
 import { useEffect, useState } from "react"
-import {
-  type DesignVariant,
-  type PassesVariant,
-  useDesignVariant,
-} from "@/context/designVariant"
 import { cn } from "@/lib/utils"
-import type {
-  FooterDesign,
-  NavDesign,
-  WatermarkStyle,
-} from "./ScrollySectionNav"
+import type { FooterDesign, NavDesign } from "./ScrollySectionNav"
 
 const PANEL_OPEN_KEY = "passes-design-panel-open"
 
@@ -21,8 +12,6 @@ interface DesignVariantPanelProps {
   onNavDesignChange: (value: NavDesign) => void
   footerDesign: FooterDesign
   onFooterDesignChange: (value: FooterDesign) => void
-  watermarkStyle: WatermarkStyle
-  onWatermarkStyleChange: (value: WatermarkStyle) => void
 }
 
 function SegmentedControl<T extends string>({
@@ -67,11 +56,7 @@ export default function DesignVariantPanel({
   onNavDesignChange,
   footerDesign,
   onFooterDesignChange,
-  watermarkStyle,
-  onWatermarkStyleChange,
 }: DesignVariantPanelProps) {
-  const { variant, setVariant, passesVariant, setPassesVariant } =
-    useDesignVariant()
   const [isOpen, setIsOpen] = useState(false)
 
   useEffect(() => {
@@ -117,28 +102,6 @@ export default function DesignVariantPanel({
       </div>
 
       <div className="p-4 space-y-4">
-        <SegmentedControl<DesignVariant>
-          label="Layout"
-          value={variant}
-          options={[
-            { value: "scrolly", label: "Scrolly" },
-            { value: "snap", label: "Snap" },
-          ]}
-          onChange={setVariant}
-        />
-
-        <SegmentedControl<PassesVariant>
-          label="Passes"
-          value={passesVariant}
-          options={[
-            { value: "stacked", label: "Stacked" },
-            { value: "tabs", label: "Tabs" },
-            { value: "compact", label: "Compact" },
-            { value: "accordion", label: "Accordion" },
-          ]}
-          onChange={setPassesVariant}
-        />
-
         <SegmentedControl<NavDesign>
           label="Navigation"
           value={navDesign}
@@ -150,31 +113,16 @@ export default function DesignVariantPanel({
           onChange={onNavDesignChange}
         />
 
-        {variant === "snap" && (
-          <>
-            <SegmentedControl<FooterDesign>
-              label="Footer"
-              value={footerDesign}
-              options={[
-                { value: "pill", label: "Pill" },
-                { value: "stripe", label: "Stripe" },
-                { value: "dock", label: "Dock" },
-              ]}
-              onChange={onFooterDesignChange}
-            />
-            <SegmentedControl<WatermarkStyle>
-              label="Watermark"
-              value={watermarkStyle}
-              options={[
-                { value: "none", label: "None" },
-                { value: "ghost", label: "Ghost" },
-                { value: "stroke", label: "Stroke" },
-                { value: "bold", label: "Bold" },
-              ]}
-              onChange={onWatermarkStyleChange}
-            />
-          </>
-        )}
+        <SegmentedControl<FooterDesign>
+          label="Footer"
+          value={footerDesign}
+          options={[
+            { value: "pill", label: "Pill" },
+            { value: "stripe", label: "Stripe" },
+            { value: "dock", label: "Dock" },
+          ]}
+          onChange={onFooterDesignChange}
+        />
       </div>
     </div>
   )

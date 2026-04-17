@@ -119,6 +119,8 @@ from app.api.ticketing_step.schemas import (
 )
 from app.api.track.models import Tracks
 from app.api.track.schemas import TrackCreate, TrackPublic, TrackUpdate
+from app.api.translation.models import Translations
+from app.api.translation.schemas import TranslationCreate, TranslationPublic
 from app.api.user.models import Users
 from app.api.user.schemas import UserCreate, UserPublic, UserUpdate
 
@@ -247,4 +249,8 @@ __all__ = [
     "TrackCreate",
     "TrackPublic",
     "TrackUpdate",
+    # Translations
+    "Translations",
+    "TranslationCreate",
+    "TranslationPublic",
 ]

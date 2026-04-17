@@ -4,14 +4,18 @@ import { GripVertical, Package, Plus, Trash2, X } from "lucide-react"
 import { useState } from "react"
 
 import { Button } from "@/components/ui/button"
+import { ImageUpload } from "@/components/ui/image-upload"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
+import { Textarea } from "@/components/ui/textarea"
 
 export interface ProductSection {
   key: string
   label: string
   order: number
   product_ids: string[]
+  description?: string
+  image_url?: string
 }
 
 export function parseConfigSections(config: Record<string, unknown> | null): {
@@ -36,6 +40,7 @@ interface SortableSectionCardProps {
   onDelete: (key: string) => void
   products: Array<{ id: string; name: string }>
   assignLabel?: string
+  showMediaFields?: boolean
 }
 
 export function SortableSectionCard({
@@ -44,6 +49,7 @@ export function SortableSectionCard({
   onDelete,
   products,
   assignLabel = "Assign product",
+  showMediaFields = true,
 }: SortableSectionCardProps) {
   const {
     attributes,
@@ -104,6 +110,42 @@ export function SortableSectionCard({
           <Trash2 className="h-3.5 w-3.5" />
         </Button>
       </div>
+
+      {showMediaFields && (
+        <div className="px-3 pb-3 flex flex-col gap-2">
+          <div className="flex flex-col gap-1">
+            <label
+              htmlFor={`${section.key}-image`}
+              className="text-xs font-medium text-muted-foreground"
+            >
+              Image
+            </label>
+            <ImageUpload
+              value={section.image_url || null}
+              onChange={(url) =>
+                onUpdate(section.key, { image_url: url ?? "" })
+              }
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label
+              htmlFor={`${section.key}-description`}
+              className="text-xs font-medium text-muted-foreground"
+            >
+              Description
+            </label>
+            <Textarea
+              id={`${section.key}-description`}
+              value={section.description ?? ""}
+              onChange={(e) =>
+                onUpdate(section.key, { description: e.target.value })
+              }
+              placeholder="Short description shown on the property card"
+              className="min-h-[60px] text-sm"
+            />
+          </div>
+        </div>
+      )}
 
       {assignedProducts.length > 0 && (
         <>

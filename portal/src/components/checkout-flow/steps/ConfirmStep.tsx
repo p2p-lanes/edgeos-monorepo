@@ -12,6 +12,7 @@ import {
   X,
 } from "lucide-react"
 import { useState } from "react"
+import { useTranslation } from "react-i18next"
 import { cn } from "@/lib/utils"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCheckout } from "@/providers/checkoutProvider"
@@ -20,6 +21,7 @@ import { formatCheckoutDate, formatCurrency } from "@/types/checkout"
 import InsuranceCard from "../InsuranceCard"
 
 export default function ConfirmStep() {
+  const { t } = useTranslation()
   const {
     cart,
     summary,
@@ -113,10 +115,10 @@ export default function ConfirmStep() {
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <ShoppingBag className="w-12 h-12 text-gray-300 mb-4" />
         <h3 className="text-lg font-semibold text-gray-900 mb-2">
-          Your cart is empty
+          {t("checkout.cart.empty_title")}
         </h3>
         <p className="text-gray-500 max-w-md">
-          Please go back and select some passes to continue.
+          {t("checkout.cart.empty_description")}
         </p>
       </div>
     )
@@ -142,7 +144,7 @@ export default function ConfirmStep() {
         />
       )}
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-checkout-card-bg rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         {/* Passes Section */}
         {cart.passes.length > 0 && (
           <div className="px-5 py-4">
@@ -163,7 +165,14 @@ export default function ConfirmStep() {
                       key={pass.productId}
                       className="flex items-center justify-between text-sm py-0.5"
                     >
-                      <span className="text-gray-600">{pass.product.name}</span>
+                      <span className="text-gray-600">
+                        {pass.quantity > 1 && (
+                          <span className="text-gray-400">
+                            {pass.quantity} ×{" "}
+                          </span>
+                        )}
+                        {pass.product.name}
+                      </span>
                       <span className="font-medium text-gray-900">
                         {formatCurrency(pass.originalPrice ?? pass.price)}
                       </span>
@@ -201,13 +210,12 @@ export default function ConfirmStep() {
                         className="flex items-center justify-between text-sm"
                       >
                         <span className="text-gray-600">
-                          {item.product.name}
                           {item.quantity > 1 && (
                             <span className="text-gray-400">
-                              {" "}
-                              ×{item.quantity}
+                              {item.quantity} ×{" "}
                             </span>
                           )}
+                          {item.product.name}
                         </span>
                         <span className="font-medium text-gray-900">
                           {formatCurrency(item.price)}
@@ -235,6 +243,11 @@ export default function ConfirmStep() {
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-700">
+                    {cart.housing.quantity > 1 && (
+                      <span className="text-gray-400">
+                        {cart.housing.quantity} ×{" "}
+                      </span>
+                    )}
                     {cart.housing.product.name}
                   </p>
                   <p className="text-xs text-gray-500">
@@ -273,8 +286,12 @@ export default function ConfirmStep() {
                     className="flex items-center justify-between text-sm"
                   >
                     <span className="text-gray-600">
-                      {item.product.name}{" "}
-                      <span className="text-gray-400">×{item.quantity}</span>
+                      {item.quantity > 1 && (
+                        <span className="text-gray-400">
+                          {item.quantity} ×{" "}
+                        </span>
+                      )}
+                      {item.product.name}
                     </span>
                     <span className="font-medium text-gray-900">
                       {formatCurrency(item.totalPrice)}

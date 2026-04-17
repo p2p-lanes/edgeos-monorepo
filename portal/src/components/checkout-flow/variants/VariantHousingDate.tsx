@@ -2,7 +2,7 @@
 
 import { Building2, Calendar, Check, Home } from "lucide-react"
 import Image from "next/image"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import ExpandableDescription from "@/components/ui/ExpandableDescription"
 import QuantitySelector, {
@@ -26,6 +26,8 @@ interface TemplateSection {
   label: string
   order: number
   product_ids: string[]
+  description?: string
+  image_url?: string
 }
 
 function parseSections(
@@ -97,7 +99,7 @@ function DatePickerSection({
   onCheckOutChange: (date: Date) => void
 }) {
   return (
-    <div className="bg-card rounded-2xl shadow-sm border border-border p-4 overflow-hidden">
+    <div className="bg-checkout-card-bg rounded-2xl shadow-sm border border-border p-4 overflow-hidden">
       <div className="flex items-center gap-2 mb-3">
         <Calendar className="w-4 h-4 text-muted-foreground shrink-0" />
         <span className="text-sm font-medium text-foreground">
@@ -149,22 +151,6 @@ function DatePickerSection({
   )
 }
 
-/* ── Shared skip link ─────────────────────────────────────── */
-
-function SkipLink({ onSkip }: { onSkip?: () => void }) {
-  return (
-    <div className="text-center py-2">
-      <button
-        type="button"
-        onClick={onSkip}
-        className="text-muted-foreground hover:text-foreground underline text-sm transition-colors"
-      >
-        Skip this step
-      </button>
-    </div>
-  )
-}
-
 /* ── Card props shared by both variants ───────────────────── */
 
 interface CardListProps {
@@ -173,16 +159,43 @@ interface CardListProps {
   pricePerDay: boolean
   selectedProductId: string | null
   onProductSelect: (productId: string) => void
+  getQuantity: (productId: string) => number
+  onIncrement: (productId: string) => void
+  onDecrement: (productId: string) => void
   onSkip?: () => void
 }
 
 /* ── Section header ──────────────────────────────────────── */
 
-function SectionHeader({ label }: { label: string }) {
+function SectionHeader({ section }: { section: TemplateSection }) {
+  const hasImage = !!section.image_url
+  const hasDescription = !!section.description
   return (
-    <div className="flex items-center gap-2 pb-1">
-      <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />
-      <h3 className="text-sm font-semibold text-foreground">{label}</h3>
+    <div className="flex flex-col gap-2 pb-1">
+      <div className="flex items-center gap-2">
+        {hasImage ? (
+          <div className="relative w-8 h-8 rounded-md overflow-hidden bg-muted shrink-0">
+            <Image
+              src={section.image_url!}
+              alt={section.label || ""}
+              fill
+              className="object-cover"
+            />
+          </div>
+        ) : (
+          <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />
+        )}
+        <h3 className="text-sm font-semibold text-foreground">
+          {section.label}
+        </h3>
+      </div>
+      {hasDescription && (
+        <ExpandableDescription
+          text={section.description!}
+          clamp={2}
+          className="text-xs text-muted-foreground leading-relaxed"
+        />
+      )}
     </div>
   )
 }
@@ -194,13 +207,19 @@ function CompactCard({
   nights,
   pricePerDay,
   isSelected,
+  quantity,
   onSelect,
+  onIncrement,
+  onDecrement,
 }: {
   product: ProductsPass
   nights: number
   pricePerDay: boolean
   isSelected: boolean
+  quantity: number
   onSelect: () => void
+  onIncrement: () => void
+  onDecrement: () => void
 }) {
   const totalPrice = pricePerDay ? product.price * nights : product.price
   const compareTotal = product.compare_price
@@ -208,28 +227,48 @@ function CompactCard({
       ? product.compare_price * nights
       : product.compare_price
     : null
+  const supportsQty = supportsQuantitySelector(product.max_quantity)
+  const maxQty = product.max_quantity ?? Number.POSITIVE_INFINITY
 
   return (
     <button
       type="button"
-      onClick={onSelect}
+      onClick={() => {
+        if (supportsQty) {
+          if (quantity === 0) onIncrement()
+        } else {
+          onSelect()
+        }
+      }}
       className={cn(
         "w-full flex items-center gap-3 rounded-xl border-l-4 px-3 py-3 text-left transition-all",
         isSelected
           ? "border-l-primary bg-primary/10"
-          : "border-l-border bg-card hover:bg-muted",
+          : "border-l-border bg-checkout-card-bg hover:bg-muted",
       )}
     >
-      <div
-        className={cn(
-          "w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors",
-          isSelected
-            ? "bg-primary border-primary"
-            : "bg-card border-muted-foreground/40",
-        )}
-      >
-        {isSelected && <Check className="w-3 h-3 text-white" />}
-      </div>
+      {supportsQty ? (
+        <QuantitySelector
+          value={quantity}
+          max={maxQty}
+          onIncrement={onIncrement}
+          onDecrement={onDecrement}
+          onAdd={onIncrement}
+          size="sm"
+          className="shrink-0"
+        />
+      ) : (
+        <div
+          className={cn(
+            "w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors",
+            isSelected
+              ? "bg-primary border-primary"
+              : "bg-checkout-card-bg border-muted-foreground/40",
+          )}
+        >
+          {isSelected && <Check className="w-3 h-3 text-white" />}
+        </div>
+      )}
 
       <div className="w-14 h-14 rounded-lg overflow-hidden bg-muted shrink-0 relative">
         {product.image_url ? (
@@ -247,11 +286,11 @@ function CompactCard({
       </div>
 
       <div className="flex-1 min-w-0">
-        <p className="font-medium text-sm text-foreground truncate">
+        <p className="font-medium text-sm text-pass-title truncate">
           {product.name}
         </p>
         {pricePerDay && (
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-pass-text">
             {formatCurrency(product.price)}/night
           </p>
         )}
@@ -259,19 +298,19 @@ function CompactCard({
 
       <div className="text-right shrink-0">
         {compareTotal && compareTotal > totalPrice && (
-          <p className="text-xs text-muted-foreground line-through">
+          <p className="text-xs text-pass-text line-through">
             {formatCurrency(compareTotal)}
           </p>
         )}
         <p
           className={cn(
             "font-bold text-sm",
-            isSelected ? "text-primary" : "text-foreground",
+            isSelected ? "text-primary" : "text-pass-title",
           )}
         >
           {formatCurrency(totalPrice)}
         </p>
-        <p className="text-xs text-muted-foreground">total</p>
+        <p className="text-xs text-pass-text">total</p>
       </div>
     </button>
   )
@@ -284,13 +323,19 @@ function GridCard({
   nights,
   pricePerDay,
   isSelected,
+  quantity,
   onSelect,
+  onIncrement,
+  onDecrement,
 }: {
   product: ProductsPass
   nights: number
   pricePerDay: boolean
   isSelected: boolean
+  quantity: number
   onSelect: () => void
+  onIncrement: () => void
+  onDecrement: () => void
 }) {
   const totalPrice = pricePerDay ? product.price * nights : product.price
   const compareTotal = product.compare_price
@@ -298,13 +343,21 @@ function GridCard({
       ? product.compare_price * nights
       : product.compare_price
     : null
+  const supportsQty = supportsQuantitySelector(product.max_quantity)
+  const maxQty = product.max_quantity ?? Number.POSITIVE_INFINITY
 
   return (
     <button
       type="button"
-      onClick={onSelect}
+      onClick={() => {
+        if (supportsQty) {
+          if (quantity === 0) onIncrement()
+        } else {
+          onSelect()
+        }
+      }}
       className={cn(
-        "relative flex flex-col rounded-2xl border overflow-hidden text-left transition-all bg-card",
+        "relative flex flex-col rounded-2xl border overflow-hidden text-left transition-all bg-checkout-card-bg",
         isSelected
           ? "border-primary ring-2 ring-primary/20"
           : "border-border hover:border-muted-foreground/30",
@@ -325,32 +378,45 @@ function GridCard({
         </div>
       )}
 
-      {isSelected && (
-        <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-primary flex items-center justify-center">
-          <Check className="w-3.5 h-3.5 text-white" />
+      {supportsQty ? (
+        <div className="absolute top-2 right-2 rounded-full bg-background/90 backdrop-blur-sm shadow-sm px-1.5 py-0.5">
+          <QuantitySelector
+            value={quantity}
+            max={maxQty}
+            onIncrement={onIncrement}
+            onDecrement={onDecrement}
+            onAdd={onIncrement}
+            size="sm"
+          />
         </div>
+      ) : (
+        isSelected && (
+          <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-primary flex items-center justify-center">
+            <Check className="w-3.5 h-3.5 text-white" />
+          </div>
+        )
       )}
 
       <div className="p-3">
-        <p className="font-semibold text-foreground text-sm leading-tight">
+        <p className="font-semibold text-pass-title text-sm leading-tight">
           {product.name}
         </p>
         {product.description && (
           <ExpandableDescription
             text={product.description}
             clamp={2}
-            className="text-xs text-muted-foreground mt-1"
+            className="text-xs text-pass-text mt-1"
           />
         )}
         {pricePerDay && (
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="text-xs text-pass-text mt-1">
             {formatCurrency(product.price)}/night
           </p>
         )}
         <div className="flex items-center justify-between mt-2">
           {compareTotal && compareTotal > totalPrice ? (
             <div className="flex items-center gap-1.5">
-              <span className="text-xs text-muted-foreground line-through">
+              <span className="text-xs text-pass-text line-through">
                 {formatCurrency(compareTotal)}
               </span>
               <span className="font-bold text-green-600 text-sm">
@@ -361,7 +427,7 @@ function GridCard({
             <span
               className={cn(
                 "font-bold text-sm",
-                isSelected ? "text-primary" : "text-foreground",
+                isSelected ? "text-primary" : "text-pass-title",
               )}
             >
               {formatCurrency(totalPrice)}
@@ -392,6 +458,9 @@ function DefaultSectionCard({
   pricePerDay,
   selectedProductId,
   onProductSelect,
+  getQuantity,
+  onIncrement,
+  onDecrement,
 }: {
   section: TemplateSection
   products: ProductsPass[]
@@ -399,11 +468,15 @@ function DefaultSectionCard({
   pricePerDay: boolean
   selectedProductId: string | null
   onProductSelect: (id: string) => void
+  getQuantity: (id: string) => number
+  onIncrement: (id: string) => void
+  onDecrement: (id: string) => void
 }) {
-  const heroImage = products.find((p) => p.image_url)?.image_url
+  const heroImage =
+    section.image_url || products.find((p) => p.image_url)?.image_url
 
   return (
-    <div className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
+    <div className="bg-checkout-card-bg rounded-2xl shadow-sm border border-border overflow-hidden">
       {section.label && (
         <div className="relative h-28 sm:h-36 bg-gradient-to-br from-muted to-muted/60">
           {heroImage ? (
@@ -426,6 +499,15 @@ function DefaultSectionCard({
           </div>
         </div>
       )}
+      {section.description && (
+        <div className="px-3 sm:px-4 pt-3">
+          <ExpandableDescription
+            text={section.description}
+            clamp={2}
+            className="text-xs text-muted-foreground leading-relaxed"
+          />
+        </div>
+      )}
       <div className="p-3 sm:p-4 space-y-2">
         {products.map((product) => {
           const isSelected = selectedProductId === product.id
@@ -437,12 +519,21 @@ function DefaultSectionCard({
               ? product.compare_price * nights
               : product.compare_price
             : null
+          const supportsQty = supportsQuantitySelector(product.max_quantity)
+          const maxQty = product.max_quantity ?? Number.POSITIVE_INFINITY
+          const quantity = getQuantity(product.id)
 
           return (
             <button
               key={product.id}
               type="button"
-              onClick={() => onProductSelect(product.id)}
+              onClick={() => {
+                if (supportsQty) {
+                  if (quantity === 0) onIncrement(product.id)
+                } else {
+                  onProductSelect(product.id)
+                }
+              }}
               className={cn(
                 "w-full flex items-center justify-between p-3 rounded-xl border-2 transition-all text-left",
                 isSelected
@@ -451,22 +542,34 @@ function DefaultSectionCard({
               )}
             >
               <div className="flex items-center gap-3 min-w-0">
-                <div
-                  className={cn(
-                    "w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0",
-                    isSelected
-                      ? "border-primary bg-primary"
-                      : "border-muted-foreground/40",
-                  )}
-                >
-                  {isSelected && <Check className="w-3 h-3 text-white" />}
-                </div>
+                {supportsQty ? (
+                  <QuantitySelector
+                    value={quantity}
+                    max={maxQty}
+                    onIncrement={() => onIncrement(product.id)}
+                    onDecrement={() => onDecrement(product.id)}
+                    onAdd={() => onIncrement(product.id)}
+                    size="sm"
+                    className="shrink-0"
+                  />
+                ) : (
+                  <div
+                    className={cn(
+                      "w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0",
+                      isSelected
+                        ? "border-primary bg-primary"
+                        : "border-muted-foreground/40",
+                    )}
+                  >
+                    {isSelected && <Check className="w-3 h-3 text-white" />}
+                  </div>
+                )}
                 <div className="min-w-0">
-                  <p className="font-medium text-foreground text-sm truncate">
+                  <p className="font-medium text-pass-title text-sm truncate">
                     {product.name}
                   </p>
                   {pricePerDay && (
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-pass-text">
                       {formatCurrency(product.price)}/night
                     </p>
                   )}
@@ -474,19 +577,19 @@ function DefaultSectionCard({
               </div>
               <div className="text-right shrink-0 ml-2">
                 {compareTotal && compareTotal > totalPrice && (
-                  <p className="text-xs text-muted-foreground line-through">
+                  <p className="text-xs text-pass-text line-through">
                     {formatCurrency(compareTotal)}
                   </p>
                 )}
                 <p
                   className={cn(
                     "font-bold text-sm",
-                    isSelected ? "text-primary" : "text-foreground",
+                    isSelected ? "text-primary" : "text-pass-title",
                   )}
                 >
                   {formatCurrency(totalPrice)}
                 </p>
-                <p className="text-xs text-muted-foreground">total</p>
+                <p className="text-xs text-pass-text">total</p>
               </div>
             </button>
           )
@@ -504,6 +607,9 @@ function HousingDefault({
   pricePerDay,
   selectedProductId,
   onProductSelect,
+  getQuantity,
+  onIncrement,
+  onDecrement,
   onSkip,
 }: CardListProps) {
   return (
@@ -517,9 +623,11 @@ function HousingDefault({
           pricePerDay={pricePerDay}
           selectedProductId={selectedProductId}
           onProductSelect={onProductSelect}
+          getQuantity={getQuantity}
+          onIncrement={onIncrement}
+          onDecrement={onDecrement}
         />
       ))}
-      <SkipLink onSkip={onSkip} />
     </div>
   )
 }
@@ -533,6 +641,9 @@ function ShowcaseSectionCard({
   pricePerDay,
   selectedProductId,
   onProductSelect,
+  getQuantity,
+  onIncrement,
+  onDecrement,
 }: {
   section: TemplateSection
   products: ProductsPass[]
@@ -540,11 +651,15 @@ function ShowcaseSectionCard({
   pricePerDay: boolean
   selectedProductId: string | null
   onProductSelect: (id: string) => void
+  getQuantity: (id: string) => number
+  onIncrement: (id: string) => void
+  onDecrement: (id: string) => void
 }) {
-  const heroImage = products.find((p) => p.image_url)?.image_url
+  const heroImage =
+    section.image_url || products.find((p) => p.image_url)?.image_url
 
   return (
-    <div className="rounded-2xl overflow-hidden bg-card shadow-md border border-border">
+    <div className="rounded-2xl overflow-hidden bg-checkout-card-bg shadow-md border border-border">
       {heroImage ? (
         <div className="relative h-44 sm:h-56">
           <Image
@@ -577,6 +692,15 @@ function ShowcaseSectionCard({
           </div>
         )
       )}
+      {section.description && (
+        <div className="px-4 sm:px-5 pt-4">
+          <ExpandableDescription
+            text={section.description}
+            clamp={2}
+            className="text-sm text-muted-foreground leading-relaxed"
+          />
+        </div>
+      )}
       <div className="p-4 sm:p-5">
         <div className="space-y-3">
           {products.map((product) => {
@@ -589,12 +713,21 @@ function ShowcaseSectionCard({
                 ? product.compare_price * nights
                 : product.compare_price
               : null
+            const supportsQty = supportsQuantitySelector(product.max_quantity)
+            const maxQty = product.max_quantity ?? Number.POSITIVE_INFINITY
+            const quantity = getQuantity(product.id)
 
             return (
               <button
                 key={product.id}
                 type="button"
-                onClick={() => onProductSelect(product.id)}
+                onClick={() => {
+                  if (supportsQty) {
+                    if (quantity === 0) onIncrement(product.id)
+                  } else {
+                    onProductSelect(product.id)
+                  }
+                }}
                 className={cn(
                   "w-full flex items-center gap-4 p-3.5 rounded-xl transition-all text-left",
                   isSelected
@@ -614,18 +747,18 @@ function ShowcaseSectionCard({
                 )}
 
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm text-foreground truncate">
+                  <p className="font-semibold text-sm text-pass-title truncate">
                     {product.name}
                   </p>
                   {product.description && (
                     <ExpandableDescription
                       text={product.description}
                       clamp={2}
-                      className="text-xs text-muted-foreground mt-0.5"
+                      className="text-xs text-pass-text mt-0.5"
                     />
                   )}
                   {pricePerDay && (
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <p className="text-xs text-pass-text mt-1">
                       {formatCurrency(product.price)}/night
                     </p>
                   )}
@@ -633,31 +766,43 @@ function ShowcaseSectionCard({
 
                 <div className="text-right shrink-0">
                   {compareTotal && compareTotal > totalPrice && (
-                    <p className="text-xs text-muted-foreground line-through">
+                    <p className="text-xs text-pass-text line-through">
                       {formatCurrency(compareTotal)}
                     </p>
                   )}
                   <p
                     className={cn(
                       "font-bold text-base",
-                      isSelected ? "text-primary" : "text-foreground",
+                      isSelected ? "text-primary" : "text-pass-title",
                     )}
                   >
                     {formatCurrency(totalPrice)}
                   </p>
-                  <p className="text-xs text-muted-foreground">total</p>
+                  <p className="text-xs text-pass-text">total</p>
                 </div>
 
-                <div
-                  className={cn(
-                    "w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0",
-                    isSelected
-                      ? "border-primary bg-primary"
-                      : "border-muted-foreground/40 bg-card",
-                  )}
-                >
-                  {isSelected && <Check className="w-3 h-3 text-white" />}
-                </div>
+                {supportsQty ? (
+                  <QuantitySelector
+                    value={quantity}
+                    max={maxQty}
+                    onIncrement={() => onIncrement(product.id)}
+                    onDecrement={() => onDecrement(product.id)}
+                    onAdd={() => onIncrement(product.id)}
+                    size="sm"
+                    className="shrink-0"
+                  />
+                ) : (
+                  <div
+                    className={cn(
+                      "w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0",
+                      isSelected
+                        ? "border-primary bg-primary"
+                        : "border-muted-foreground/40 bg-checkout-card-bg",
+                    )}
+                  >
+                    {isSelected && <Check className="w-3 h-3 text-white" />}
+                  </div>
+                )}
               </button>
             )
           })}
@@ -675,6 +820,9 @@ function HousingShowcase({
   pricePerDay,
   selectedProductId,
   onProductSelect,
+  getQuantity,
+  onIncrement,
+  onDecrement,
   onSkip,
 }: CardListProps) {
   return (
@@ -688,9 +836,11 @@ function HousingShowcase({
           pricePerDay={pricePerDay}
           selectedProductId={selectedProductId}
           onProductSelect={onProductSelect}
+          getQuantity={getQuantity}
+          onIncrement={onIncrement}
+          onDecrement={onDecrement}
         />
       ))}
-      <SkipLink onSkip={onSkip} />
     </div>
   )
 }
@@ -703,13 +853,18 @@ function HousingCompact({
   pricePerDay,
   selectedProductId,
   onProductSelect,
+  getQuantity,
+  onIncrement,
+  onDecrement,
   onSkip,
 }: CardListProps) {
   return (
     <div className="space-y-4">
       {groups.map(({ section, products }) => (
         <div key={section.key} className="space-y-2">
-          {section.label && <SectionHeader label={section.label} />}
+          {(section.label || section.image_url || section.description) && (
+            <SectionHeader section={section} />
+          )}
           {products.map((product) => (
             <CompactCard
               key={product.id}
@@ -717,12 +872,14 @@ function HousingCompact({
               nights={nights}
               pricePerDay={pricePerDay}
               isSelected={selectedProductId === product.id}
+              quantity={getQuantity(product.id)}
               onSelect={() => onProductSelect(product.id)}
+              onIncrement={() => onIncrement(product.id)}
+              onDecrement={() => onDecrement(product.id)}
             />
           ))}
         </div>
       ))}
-      <SkipLink onSkip={onSkip} />
     </div>
   )
 }
@@ -735,13 +892,18 @@ function HousingGrid({
   pricePerDay,
   selectedProductId,
   onProductSelect,
+  getQuantity,
+  onIncrement,
+  onDecrement,
   onSkip,
 }: CardListProps) {
   return (
     <div className="space-y-6">
       {groups.map(({ section, products }) => (
         <div key={section.key} className="space-y-3">
-          {section.label && <SectionHeader label={section.label} />}
+          {(section.label || section.image_url || section.description) && (
+            <SectionHeader section={section} />
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {products.map((product) => (
               <GridCard
@@ -750,55 +912,20 @@ function HousingGrid({
                 nights={nights}
                 pricePerDay={pricePerDay}
                 isSelected={selectedProductId === product.id}
+                quantity={getQuantity(product.id)}
                 onSelect={() => onProductSelect(product.id)}
+                onIncrement={() => onIncrement(product.id)}
+                onDecrement={() => onDecrement(product.id)}
               />
             ))}
           </div>
         </div>
       ))}
-      <SkipLink onSkip={onSkip} />
     </div>
   )
 }
 
 /* ── Main export ──────────────────────────────────────────── */
-
-/* ── Quantity summary (shown when a multi-unit housing is selected) ── */
-
-function HousingQuantitySummary({
-  product,
-  quantity,
-  totalPrice,
-  onQuantityChange,
-}: {
-  product: ProductsPass
-  quantity: number
-  totalPrice: number
-  onQuantityChange: (qty: number) => void
-}) {
-  const max = product.max_quantity ?? Number.POSITIVE_INFINITY
-  return (
-    <div className="bg-primary/10 border border-primary/20 rounded-2xl p-4 flex items-center justify-between gap-3">
-      <div className="min-w-0">
-        <p className="text-xs text-primary uppercase font-semibold tracking-wide">
-          {product.name}
-        </p>
-        <p className="text-sm text-foreground font-medium mt-0.5">
-          {quantity} {quantity === 1 ? "unit" : "units"} ·{" "}
-          {formatCurrency(totalPrice)}
-        </p>
-      </div>
-      <QuantitySelector
-        size="md"
-        value={quantity}
-        min={1}
-        max={max}
-        onIncrement={() => onQuantityChange(quantity + 1)}
-        onDecrement={() => onQuantityChange(quantity - 1)}
-      />
-    </div>
-  )
-}
 
 export default function VariantHousingDate({
   products,
@@ -835,6 +962,17 @@ export default function VariantHousingDate({
     formatDateInput(checkOut),
   )
 
+  // Sync local selection when housing is cleared externally (e.g. cart drawer X)
+  const prevHousingRef = useRef(cart.housing)
+  useEffect(() => {
+    const wasSet = prevHousingRef.current != null
+    prevHousingRef.current = cart.housing
+    // Only clear when housing transitions from set → null (external clear)
+    if (wasSet && !cart.housing && selectedProductId) {
+      setSelectedProductId(null)
+    }
+  }, [cart.housing, selectedProductId])
+
   useEffect(() => {
     if (selectedProductId) {
       selectHousing(
@@ -851,6 +989,46 @@ export default function VariantHousingDate({
       clearHousing()
     } else {
       setSelectedProductId(productId)
+    }
+  }
+
+  const getQuantity = (productId: string) => {
+    if (
+      selectedProductId === productId &&
+      cart.housing?.productId === productId
+    ) {
+      return cart.housing.quantity
+    }
+    // Product just selected locally, housing effect hasn't run yet — show 1
+    if (selectedProductId === productId) {
+      return 1
+    }
+    return 0
+  }
+
+  const handleIncrement = (productId: string) => {
+    if (
+      selectedProductId === productId &&
+      cart.housing?.productId === productId
+    ) {
+      updateHousingQuantity(cart.housing.quantity + 1)
+    } else if (selectedProductId !== productId) {
+      setSelectedProductId(productId)
+    }
+  }
+
+  const handleDecrement = (productId: string) => {
+    if (
+      selectedProductId === productId &&
+      cart.housing?.productId === productId
+    ) {
+      const next = cart.housing.quantity - 1
+      if (next <= 0) {
+        setSelectedProductId(null)
+        clearHousing()
+      } else {
+        updateHousingQuantity(next)
+      }
     }
   }
 
@@ -901,6 +1079,9 @@ export default function VariantHousingDate({
     pricePerDay,
     selectedProductId,
     onProductSelect: handleProductSelect,
+    getQuantity,
+    onIncrement: handleIncrement,
+    onDecrement: handleDecrement,
     onSkip: handleSkip,
   }
 
@@ -911,14 +1092,6 @@ export default function VariantHousingDate({
     showcase: HousingShowcase,
   }
   const VariantLayout = VARIANT_MAP[variant] ?? HousingDefault
-
-  const selectedHousing =
-    selectedProductId && cart.housing?.productId === selectedProductId
-      ? cart.housing
-      : null
-  const canShowStepper =
-    selectedHousing != null &&
-    supportsQuantitySelector(selectedHousing.product.max_quantity)
 
   return (
     <div className="space-y-6">
@@ -932,21 +1105,6 @@ export default function VariantHousingDate({
           pricePerDay={pricePerDay}
           onCheckInChange={setCheckIn}
           onCheckOutChange={setCheckOut}
-        />
-      )}
-      {canShowStepper && selectedHousing && (
-        <HousingQuantitySummary
-          product={selectedHousing.product}
-          quantity={selectedHousing.quantity}
-          totalPrice={selectedHousing.totalPrice}
-          onQuantityChange={(qty) => {
-            if (qty <= 0) {
-              setSelectedProductId(null)
-              clearHousing()
-              return
-            }
-            updateHousingQuantity(qty)
-          }}
         />
       )}
       <VariantLayout {...cardProps} />

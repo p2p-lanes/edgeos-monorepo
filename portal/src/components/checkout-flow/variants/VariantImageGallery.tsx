@@ -32,20 +32,6 @@ function parseImages(
   return raw as GalleryImage[]
 }
 
-function SkipLink({ onSkip }: { onSkip?: () => void }) {
-  return (
-    <div className="text-center pt-2">
-      <button
-        type="button"
-        onClick={onSkip}
-        className="text-gray-500 hover:text-gray-700 underline text-sm transition-colors"
-      >
-        Continue
-      </button>
-    </div>
-  )
-}
-
 function Caption({ text }: { text?: string }) {
   if (!text) return null
   return <p className="text-sm text-gray-600 text-center mt-2">{text}</p>
@@ -136,7 +122,6 @@ function CarouselGallery({
       )}
 
       <Caption text={images[current]?.caption} />
-      <SkipLink onSkip={onSkip} />
     </div>
   )
 }
@@ -174,7 +159,6 @@ function MasonryGallery({
           </div>
         ))}
       </div>
-      <SkipLink onSkip={onSkip} />
     </div>
   )
 }
@@ -294,8 +278,6 @@ function LightboxGallery({
           </div>
         </div>
       )}
-
-      <SkipLink onSkip={onSkip} />
     </div>
   )
 }
@@ -377,7 +359,6 @@ function SlideshowGallery({
       )}
 
       <Caption text={images[current]?.caption} />
-      <SkipLink onSkip={onSkip} />
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { useForm } from "@tanstack/react-form"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import { Mail, MessageSquare, Percent, Users } from "lucide-react"
 import {
@@ -7,10 +7,12 @@ import {
   type GroupCreate,
   type GroupPublic,
   GroupsService,
+  PopupsService,
 } from "@/client"
 import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
+import { TranslationManager } from "@/components/translations/TranslationManager"
 import { Button } from "@/components/ui/button"
 import {
   HeroInput,
@@ -43,6 +45,15 @@ export function GroupForm({ defaultValues, onSuccess }: GroupFormProps) {
   const { isAdmin } = useAuth()
   const isEdit = !!defaultValues
   const readOnly = !isAdmin
+
+  const { data: popupData } = useQuery({
+    queryKey: ["popups", defaultValues?.popup_id ?? selectedPopupId],
+    queryFn: () =>
+      PopupsService.getPopup({
+        popupId: defaultValues?.popup_id ?? selectedPopupId!,
+      }),
+    enabled: isEdit && !!(defaultValues?.popup_id ?? selectedPopupId),
+  })
 
   const createMutation = useMutation({
     mutationFn: (data: GroupCreate) =>
@@ -316,6 +327,24 @@ export function GroupForm({ defaultValues, onSuccess }: GroupFormProps) {
             )}
           </form.Field>
         </div>
+
+        {isEdit && (popupData?.supported_languages?.length ?? 0) > 1 && (
+          <>
+            <Separator />
+            <TranslationManager
+              entityType="group"
+              entityId={defaultValues!.id}
+              translatableFields={["name", "description", "welcome_message"]}
+              sourceData={{
+                name: defaultValues!.name,
+                description: defaultValues!.description,
+                welcome_message: defaultValues!.welcome_message,
+              }}
+              supportedLanguages={popupData!.supported_languages!}
+              defaultLanguage={popupData!.default_language!}
+            />
+          </>
+        )}
 
         <Separator />
 

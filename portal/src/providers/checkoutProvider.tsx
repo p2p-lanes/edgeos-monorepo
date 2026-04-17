@@ -61,7 +61,11 @@ interface CheckoutContextValue {
   goToStep: (step: CheckoutStep) => void
   goToNextStep: () => void
   goToPreviousStep: () => void
-  togglePass: (attendeeId: string, productId: string) => void
+  togglePass: (
+    attendeeId: string,
+    productId: string,
+    quantityOverride?: number,
+  ) => void
   resetDayProduct: (attendeeId: string, productId: string) => void
   selectHousing: (productId: string, checkIn: string, checkOut: string) => void
   updateHousingQuantity: (quantity: number) => void
@@ -218,6 +222,7 @@ export function CheckoutProvider({
   const {
     savedCart,
     saveCart,
+    scheduleSave,
     clearCart: clearPersistedCart,
   } = useCartPersistence({
     cityId,
@@ -291,6 +296,23 @@ export function CheckoutProvider({
     insurance,
     currentStep,
   }
+
+  // Auto-save cart selections (debounced). currentStep is excluded — goToStep
+  // saves immediately. scheduleSave self-guards against pre-restoration and
+  // post-payment states.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: deps drive the save; scheduleSave reads via ref
+  useEffect(() => {
+    scheduleSave()
+  }, [
+    selectedPasses,
+    housing,
+    merch,
+    patron,
+    promoCode,
+    promoCodeValid,
+    insurance,
+    scheduleSave,
+  ])
 
   // Credit calculations
   const { editCredit, monthUpgradeCredit } = useCreditCalculation({
@@ -498,11 +520,15 @@ export function CheckoutProvider({
 
   // Pass actions (delegate to passesProvider)
   const togglePass = useCallback(
-    (attendeeId: string, productId: string) => {
+    (attendeeId: string, productId: string, quantityOverride?: number) => {
       const attendee = attendeePasses.find((a) => a.id === attendeeId)
       const product = attendee?.products.find((p) => p.id === productId)
       if (product) {
-        toggleProduct(attendeeId, product)
+        const overridden =
+          quantityOverride !== undefined
+            ? { ...product, quantity: quantityOverride }
+            : product
+        toggleProduct(attendeeId, overridden)
       }
     },
     [attendeePasses, toggleProduct],

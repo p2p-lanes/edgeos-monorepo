@@ -1,5 +1,6 @@
 import { Loader2 } from "lucide-react"
 import Link from "next/link"
+import { useTranslation } from "react-i18next"
 import {
   BreadcrumbItem,
   BreadcrumbLink,
@@ -14,6 +15,15 @@ interface BreadcrumbSegmentProps {
   groupMapping?: Record<string, string>
 }
 
+const KNOWN_SEGMENTS: Record<string, string> = {
+  application: "breadcrumbs.application",
+  passes: "breadcrumbs.passes",
+  buy: "breadcrumbs.buy",
+  attendees: "breadcrumbs.attendees",
+  groups: "breadcrumbs.groups",
+  profile: "breadcrumbs.profile",
+}
+
 const BreadcrumbSegment = ({
   path,
   href,
@@ -21,8 +31,14 @@ const BreadcrumbSegment = ({
   isLoading,
   groupMapping,
 }: BreadcrumbSegmentProps) => {
+  const { t } = useTranslation()
   const isGroupId = groupMapping && Object.keys(groupMapping).includes(path)
-  const displayText = isGroupId ? groupMapping[path] : path
+  const translationKey = KNOWN_SEGMENTS[path]
+  const displayText = isGroupId
+    ? groupMapping[path]
+    : translationKey
+      ? t(translationKey)
+      : path
 
   const formattedText =
     typeof displayText === "string"
@@ -35,7 +51,7 @@ const BreadcrumbSegment = ({
       <BreadcrumbItem>
         <div className="flex items-center">
           <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-          <BreadcrumbLink>Cargando...</BreadcrumbLink>
+          <BreadcrumbLink>{t("common.loading")}</BreadcrumbLink>
         </div>
       </BreadcrumbItem>
     )

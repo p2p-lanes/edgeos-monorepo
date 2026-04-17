@@ -1,6 +1,7 @@
 "use client"
 
 import { Ticket } from "lucide-react"
+import { useTranslation } from "react-i18next"
 import ExpandableDescription from "@/components/ui/ExpandableDescription"
 import QuantitySelector, {
   resolveMaxQuantity,
@@ -23,7 +24,8 @@ const variants: Record<VariantStyles, string> = {
   purchased: "bg-slate-800 text-white border-neutral-700",
   edit: "bg-slate-800/30 border-dashed border-slate-200 text-neutral-700 border",
   disabled: "bg-neutral-0 text-neutral-300 cursor-not-allowed ",
-  default: "bg-white border-neutral-300 text-neutral-700 hover:bg-slate-100",
+  default:
+    "bg-checkout-card-bg border-neutral-300 text-checkout-title hover:bg-slate-100",
 }
 
 const Product = ({
@@ -37,6 +39,7 @@ const Product = ({
   defaultDisabled?: boolean
   hasMonthPurchased?: boolean
 }) => {
+  const { t } = useTranslation()
   const { isEditing } = usePassesProvider()
   const disabled =
     product.disabled || defaultDisabled || hasMonthPurchased || isEditing
@@ -173,7 +176,7 @@ const Product = ({
       <Tooltip>
         <TooltipTrigger asChild>{buttonNode}</TooltipTrigger>
         <TooltipContent className="bg-white text-black shadow-md border border-gray-200 max-w-sm">
-          You already have a monthly pass. No need to buy a day ticket.
+          {t("passes.monthly_pass_collision")}
         </TooltipContent>
       </Tooltip>
     )

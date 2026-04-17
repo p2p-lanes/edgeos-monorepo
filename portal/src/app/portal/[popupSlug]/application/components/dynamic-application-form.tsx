@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion"
 import { Info } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { memo, useCallback, useMemo, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import type { ApplicationPublic, PopupPublic } from "@/client"
 import { ApplicationsService } from "@/client"
@@ -68,6 +69,7 @@ const BaseField = memo(function BaseField({
   genderSpecifyValue,
   genderSpecifyError,
 }: BaseFieldProps) {
+  const { t } = useTranslation()
   if (name === "telegram") {
     return (
       <AddonInputForm
@@ -101,7 +103,7 @@ const BaseField = memo(function BaseField({
             <motion.div {...animationProps}>
               <InputForm
                 isRequired
-                label="Specify your gender"
+                label={t("form.gender_specify")}
                 id="gender_specify"
                 value={genderSpecifyValue}
                 onChange={(v) => onChange("gender_specify", v)}
@@ -139,6 +141,7 @@ export function DynamicApplicationForm({
   existingApplication,
   popup,
 }: DynamicApplicationFormProps) {
+  const { t } = useTranslation()
   const router = useRouter()
   const queryClient = useQueryClient()
   const { getRelevantApplication, updateApplication } = useApplication()
@@ -182,8 +185,12 @@ export function DynamicApplicationForm({
     return amount.toFixed(2)
   }, [popup.application_fee_amount])
   const submitLabel = showFeeNotice
-    ? `Pay & Submit (${formattedApplicationFee ? `$${formattedApplicationFee}` : "$0.00"})`
-    : "Submit"
+    ? t("application.pay_and_submit", {
+        amount: formattedApplicationFee
+          ? `$${formattedApplicationFee}`
+          : "$0.00",
+      })
+    : t("common.submit")
 
   const submitMutation = useMutation({
     mutationFn: async (status: "draft" | "in review") => {
@@ -227,16 +234,17 @@ export function DynamicApplicationForm({
     if (_hasScholarshipSection && values.scholarship_request) {
       const details = (values.scholarship_details as string) ?? ""
       if (!details.trim()) {
-        scholarshipErrors.scholarship_details =
-          "Please tell us why you need financial support"
+        scholarshipErrors.scholarship_details = t(
+          "application.scholarship.details_required_error",
+        )
       }
     }
 
     if (!isValid || Object.keys(scholarshipErrors).length > 0) {
       const allErrors = { ...validationErrors, ...scholarshipErrors }
       const fields = Object.keys(allErrors).join(", ")
-      toast.error("Error", {
-        description: `Please fill in the following required fields: ${fields}`,
+      toast.error(t("application.error_title"), {
+        description: t("application.required_fields_error", { fields }),
       })
       if (Object.keys(scholarshipErrors).length > 0) {
         setErrors(allErrors)
@@ -252,21 +260,20 @@ export function DynamicApplicationForm({
         const feePayment = await createOrResume(result.id)
 
         if (!feePayment.checkoutUrl) {
-          throw new Error("Missing checkout URL for application fee payment")
+          throw new Error(t("application.fee.missing_checkout_url"))
         }
 
         window.location.href = feePayment.checkoutUrl
         return
       }
 
-      toast.success("Application Submitted", {
-        description: "Your application has been successfully submitted.",
+      toast.success(t("application.submitted_title"), {
+        description: t("application.submitted_description"),
       })
       router.push(`/portal/${popup.slug}`)
     } catch {
-      toast.error("Error Submitting Application", {
-        description:
-          "There was an error submitting your application. Please try again.",
+      toast.error(t("application.submit_error_title"), {
+        description: t("application.submit_error_description"),
       })
     }
     setStatusBtn({ loadingDraft: false, loadingSubmit: false })
@@ -276,12 +283,12 @@ export function DynamicApplicationForm({
     setStatusBtn({ loadingDraft: true, loadingSubmit: false })
     try {
       await submitMutation.mutateAsync("draft")
-      toast.success("Draft Saved", {
-        description: "Your draft has been successfully saved.",
+      toast.success(t("application.draft_saved_title"), {
+        description: t("application.draft_saved_description"),
       })
     } catch {
-      toast.error("Error Saving Draft", {
-        description: "There was an error saving your draft. Please try again.",
+      toast.error(t("application.draft_error_title"), {
+        description: t("application.draft_error_description"),
       })
     }
     setStatusBtn({ loadingDraft: false, loadingSubmit: false })
@@ -346,8 +353,8 @@ export function DynamicApplicationForm({
     if (bySectionIdBase._unsectioned?.length) {
       result.push({
         id: "_unsectioned_base",
-        title: "Personal Information",
-        subtitle: "Your basic information helps us identify and contact you.",
+        title: t("form.personal_info"),
+        subtitle: t("form.personal_info_description"),
         baseFields: bySectionIdBase._unsectioned,
         customFields: [],
       })
@@ -374,7 +381,7 @@ export function DynamicApplicationForm({
     if (bySectionIdCustom._unsectioned?.length) {
       result.push({
         id: "_unsectioned_custom",
-        title: "Additional Information",
+        title: t("form.additional_info"),
         baseFields: [],
         customFields: bySectionIdCustom._unsectioned,
       })
@@ -392,14 +399,14 @@ export function DynamicApplicationForm({
       if (baseFields.length === 0 && customFields.length === 0) continue
       result.push({
         id,
-        title: "Other",
+        title: t("form.other"),
         baseFields,
         customFields,
       })
     }
 
     return result
-  }, [schema])
+  }, [schema, t])
 
   const _hasChildrenSection = useMemo(
     () =>
@@ -541,11 +548,13 @@ export function DynamicApplicationForm({
             <div className="flex w-full items-start gap-3 rounded-lg border border-border bg-muted/40 p-4 text-sm text-foreground">
               <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
               <div>
-                <p className="font-semibold">Application fee required</p>
+                <p className="font-semibold">
+                  {t("application.fee.required_title")}
+                </p>
                 <p className="mt-1 text-muted-foreground">
-                  A non-refundable fee of ${formattedApplicationFee} USD is
-                  required to submit your application. You will be redirected to
-                  a secure payment page.
+                  {t("application.fee.required_description", {
+                    amount: formattedApplicationFee,
+                  })}
                 </p>
               </div>
             </div>
@@ -559,7 +568,7 @@ export function DynamicApplicationForm({
               onClick={handleDraft}
               className="w-full md:w-auto"
             >
-              Save as draft
+              {t("form.save_draft")}
             </ButtonAnimated>
             <ButtonAnimated
               loading={statusBtn.loadingSubmit}

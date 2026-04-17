@@ -41,15 +41,6 @@ export default function VariantYouTubeVideo({
           className="absolute inset-0 w-full h-full"
         />
       </div>
-      <div className="text-center">
-        <button
-          type="button"
-          onClick={onSkip}
-          className="text-gray-500 hover:text-gray-700 underline text-sm transition-colors"
-        >
-          Continue
-        </button>
-      </div>
     </div>
   )
 }

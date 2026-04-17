@@ -113,7 +113,7 @@ export default function HousingStep({ onSkip }: HousingStepProps) {
   return (
     <div className="space-y-6">
       {/* Date Selection */}
-      <div className="bg-card rounded-2xl shadow-sm border border-border p-4 overflow-hidden">
+      <div className="bg-checkout-card-bg rounded-2xl shadow-sm border border-border p-4 overflow-hidden">
         <div className="flex items-center gap-2 mb-3">
           <Calendar className="w-4 h-4 text-muted-foreground shrink-0" />
           <span className="text-sm font-medium text-foreground">
@@ -227,7 +227,7 @@ function PropertyCard({
   const compareTotal = compareBase != null ? compareBase * quantity : null
 
   return (
-    <div className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
+    <div className="bg-checkout-card-bg rounded-2xl shadow-sm border border-border overflow-hidden">
       <div className="relative h-32 sm:h-40 bg-gradient-to-br from-muted to-muted/60">
         {product.image_url ? (
           <Image
@@ -251,7 +251,7 @@ function PropertyCard({
           <ExpandableDescription
             text={product.description}
             clamp={2}
-            className="text-xs sm:text-sm text-muted-foreground mb-3"
+            className="text-xs sm:text-sm text-pass-text mb-3"
           />
         )}
         <button
@@ -276,29 +276,29 @@ function PropertyCard({
               {isSelected && <Check className="w-3 h-3 text-white" />}
             </div>
             <div className="text-left min-w-0">
-              <p className="font-medium text-foreground text-sm sm:text-base truncate">
+              <p className="font-medium text-pass-title text-sm sm:text-base truncate">
                 {product.name}
               </p>
-              <p className="text-xs sm:text-sm text-muted-foreground">
+              <p className="text-xs sm:text-sm text-pass-text">
                 {formatCurrency(product.price)}/night
               </p>
             </div>
           </div>
           <div className="text-right shrink-0 ml-2">
             {compareTotal && compareTotal > totalPrice && (
-              <p className="text-xs text-muted-foreground line-through">
+              <p className="text-xs text-pass-text line-through">
                 {formatCurrency(compareTotal)}
               </p>
             )}
             <p
               className={cn(
                 "font-bold text-base sm:text-lg",
-                isSelected ? "text-primary" : "text-foreground",
+                isSelected ? "text-primary" : "text-pass-title",
               )}
             >
               {formatCurrency(totalPrice)}
             </p>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-pass-text">
               {quantity > 1 ? `${quantity} × total` : "total"}
             </p>
           </div>

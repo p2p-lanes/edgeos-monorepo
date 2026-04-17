@@ -1,6 +1,15 @@
 "use client"
 
-import { Heart, Home, Shield, ShoppingBag, Ticket } from "lucide-react"
+import {
+  Heart,
+  HelpCircle,
+  Home,
+  ImageIcon,
+  Play,
+  Shield,
+  ShoppingBag,
+  Ticket,
+} from "lucide-react"
 import { Fragment } from "react"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
@@ -18,16 +27,25 @@ const SECTION_ICONS: Record<string, typeof Ticket> = {
   confirm: Shield,
 }
 
-const SHORT_LABELS: Record<string, string> = {
-  passes: "Passes",
-  housing: "Housing",
-  merch: "Merch",
-  patron: "Patron",
-  confirm: "Review",
+const TEMPLATE_ICONS: Record<string, typeof Ticket> = {
+  "ticket-select": Ticket,
+  "patron-preset": Heart,
+  "housing-date": Home,
+  "merch-image": ShoppingBag,
+  "youtube-video": Play,
+  "image-gallery": ImageIcon,
+  faqs: HelpCircle,
+}
+
+function resolveIcon(section: { id: string; template?: string | null }) {
+  if (section.template && TEMPLATE_ICONS[section.template]) {
+    return TEMPLATE_ICONS[section.template]
+  }
+  return SECTION_ICONS[section.id] ?? Ticket
 }
 
 interface ScrollySectionNavProps {
-  sections: { id: string; label: string }[]
+  sections: { id: string; label: string; template?: string | null }[]
   activeSection: string
   onSectionClick: (sectionId: string) => void
   variant?: NavDesign
@@ -50,7 +68,7 @@ export default function ScrollySectionNav({
   return (
     <div
       data-snap-nav
-      className="sticky top-0 z-20 bg-checkout-nav-bg/95 backdrop-blur-sm border-b border-gray-200/60"
+      className="sticky top-0 z-20 bg-checkout-navbar-bg backdrop-blur-md"
     >
       <div className="max-w-2xl mx-auto px-4 py-2">
         {variant === "pills" && (
@@ -80,7 +98,7 @@ export default function ScrollySectionNav({
 }
 
 interface InnerNavProps {
-  sections: { id: string; label: string }[]
+  sections: { id: string; label: string; template?: string | null }[]
   getSectionState: (section: { id: string }) => {
     isActive: boolean
     isComplete: boolean
@@ -96,7 +114,7 @@ function PillsNav({
   return (
     <div className="flex items-center gap-1.5 flex-wrap">
       {sections.map((section) => {
-        const Icon = SECTION_ICONS[section.id] ?? Ticket
+        const Icon = resolveIcon(section)
         const { isActive, isComplete } = getSectionState(section)
 
         return (
@@ -107,17 +125,17 @@ function PillsNav({
             className={cn(
               "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-200",
               isActive &&
-                "bg-white shadow-sm text-checkout-nav-text ring-1 ring-gray-200/80",
+                "bg-checkout-badge-bg text-checkout-badge-title shadow-sm",
               !isActive &&
                 !isComplete &&
-                "text-checkout-nav-text/50 hover:bg-gray-200/60",
-              !isActive && isComplete && "text-checkout-nav-text/60",
+                "bg-checkout-badge-bg-disabled text-checkout-badge-title-disabled hover:opacity-80",
+              !isActive &&
+                isComplete &&
+                "bg-checkout-badge-bg-disabled text-checkout-badge-title",
             )}
           >
             <Icon className="size-4 shrink-0" />
-            <span className="hidden sm:inline">
-              {SHORT_LABELS[section.id] ?? section.label}
-            </span>
+            <span className="hidden sm:inline">{section.label}</span>
           </button>
         )
       })}
@@ -133,7 +151,7 @@ function ProgressNav({
   return (
     <div className="flex items-center justify-between flex-wrap gap-y-2">
       {sections.map((section, i) => {
-        const Icon = SECTION_ICONS[section.id] ?? Ticket
+        const Icon = resolveIcon(section)
         const { isActive, isComplete } = getSectionState(section)
         const _prevComplete =
           i > 0 && getSectionState(sections[i - 1]).isComplete
@@ -165,7 +183,7 @@ function ProgressNav({
                   !isActive && "text-checkout-nav-text/40",
                 )}
               >
-                {SHORT_LABELS[section.id] ?? section.label}
+                {section.label}
               </span>
             </button>
           </Fragment>
@@ -199,7 +217,7 @@ function UnderlineNav({
                 "text-checkout-nav-text/40 hover:text-checkout-nav-text/60",
             )}
           >
-            {SHORT_LABELS[section.id] ?? section.label}
+            {section.label}
             {isActive && (
               <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-checkout-nav-text rounded-full" />
             )}
