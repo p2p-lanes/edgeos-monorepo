@@ -82,6 +82,12 @@ const AVAILABLE_LANGUAGES = [
   { value: "zh", label: "中文" },
 ] as const
 
+const CURRENCIES = [
+  { value: "USD", label: "USD — US Dollar" },
+  { value: "ARS", label: "ARS — Argentine Peso" },
+  { value: "EUR", label: "EUR — Euro" },
+] as const
+
 const SALE_TYPE_COPY = {
   application: {
     label: "Popup / application flow",
@@ -188,6 +194,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
       icon_url: defaultValues?.icon_url ?? "",
       express_checkout_background:
         defaultValues?.express_checkout_background ?? "",
+      currency: defaultValues?.currency ?? "USD",
       web_url: defaultValues?.web_url ?? "",
       blog_url: defaultValues?.blog_url ?? "",
       twitter_url: defaultValues?.twitter_url ?? "",
@@ -224,6 +231,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         image_url: value.image_url || null,
         icon_url: value.icon_url || null,
         express_checkout_background: value.express_checkout_background || null,
+        currency: value.currency,
         web_url: value.web_url || null,
         blog_url: value.blog_url || null,
         twitter_url: value.twitter_url || null,
@@ -427,6 +435,35 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                       <SelectItem value="direct">
                         {SALE_TYPE_COPY.direct.label}
                       </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </InlineRow>
+              )}
+            </form.Field>
+
+            <form.Field name="currency">
+              {(field) => (
+                <InlineRow
+                  icon={
+                    <DollarSign className="h-4 w-4 text-muted-foreground" />
+                  }
+                  label="Currency"
+                  description="Currency used for products, fees, invoices, and checkout totals"
+                >
+                  <Select
+                    value={field.state.value}
+                    onValueChange={(value) => field.handleChange(value)}
+                    disabled={readOnly}
+                  >
+                    <SelectTrigger className="w-[220px] text-sm" size="sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CURRENCIES.map((currency) => (
+                        <SelectItem key={currency.value} value={currency.value}>
+                          {currency.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </InlineRow>
@@ -673,9 +710,12 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
           </form.Field>
 
           <form.Subscribe
-            selector={(state) => state.values.requires_application_fee}
+            selector={(state) => ({
+              requiresFee: state.values.requires_application_fee,
+              currency: state.values.currency,
+            })}
           >
-            {(requiresFee) =>
+            {({ requiresFee, currency }) =>
               requiresFee ? (
                 <form.Field name="application_fee_amount">
                   {(field) => (
@@ -683,8 +723,8 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                       icon={
                         <DollarSign className="h-4 w-4 text-muted-foreground" />
                       }
-                      label="Fee Amount (USD)"
-                      description="Amount in USD that applicants must pay"
+                      label={`Fee Amount (${currency})`}
+                      description={`Amount in ${currency} that applicants must pay`}
                     >
                       <Input
                         id="application_fee_amount"

@@ -5585,6 +5585,10 @@ export const PaymentProductResponseSchema = {
             type: 'string',
             title: 'Product Category'
         },
+        product_currency: {
+            type: 'string',
+            title: 'Product Currency'
+        },
         attendee_name: {
             anyOf: [
                 {
@@ -5603,7 +5607,7 @@ export const PaymentProductResponseSchema = {
         }
     },
     type: 'object',
-    required: ['product_id', 'attendee_id', 'quantity', 'product_name', 'product_price', 'product_category', 'created_at'],
+    required: ['product_id', 'attendee_id', 'quantity', 'product_name', 'product_price', 'product_category', 'product_currency', 'created_at'],
     title: 'PaymentProductResponse',
     description: 'Payment product snapshot in response.'
 } as const;
@@ -5664,6 +5668,17 @@ export const PaymentPublicSchema = {
             type: 'string',
             title: 'Currency',
             default: 'USD'
+        },
+        settlement_currency: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Settlement Currency'
         },
         rate: {
             anyOf: [
@@ -5830,9 +5845,9 @@ export const PaymentPublicSchema = {
 
 export const PaymentSourceSchema = {
     type: 'string',
-    enum: ['SimpleFI', 'Stripe'],
+    enum: ['SimpleFI', 'Stripe', 'MercadoPago'],
     title: 'PaymentSource',
-    description: 'Payment source/provider.'
+    description: 'Settlement rail/provider shown to users.'
 } as const;
 
 export const PaymentStatsSchema = {
@@ -5979,6 +5994,17 @@ export const PaymentUpdateSchema = {
                 }
             ],
             title: 'Currency'
+        },
+        settlement_currency: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Settlement Currency'
         }
     },
     type: 'object',
@@ -6221,6 +6247,12 @@ export const PopupAdminSchema = {
                 }
             ],
             title: 'Invoice Company Email'
+        },
+        currency: {
+            type: 'string',
+            maxLength: 3,
+            title: 'Currency',
+            default: 'USD'
         },
         requires_application_fee: {
             type: 'boolean',
@@ -6535,6 +6567,12 @@ export const PopupCreateSchema = {
             ],
             title: 'Invoice Company Email'
         },
+        currency: {
+            type: 'string',
+            maxLength: 3,
+            title: 'Currency',
+            default: 'USD'
+        },
         requires_application_fee: {
             type: 'boolean',
             title: 'Requires Application Fee',
@@ -6761,6 +6799,11 @@ export const PopupPublicSchema = {
             type: 'boolean',
             title: 'Allows Scholarship',
             default: false
+        },
+        currency: {
+            type: 'string',
+            title: 'Currency',
+            default: 'USD'
         },
         terms_and_conditions_url: {
             anyOf: [
@@ -7206,6 +7249,18 @@ export const PopupUpdateSchema = {
                 }
             ],
             title: 'Invoice Company Email'
+        },
+        currency: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 3
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Currency'
         },
         requires_application_fee: {
             anyOf: [

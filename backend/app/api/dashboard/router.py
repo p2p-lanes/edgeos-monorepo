@@ -29,6 +29,7 @@ from app.api.dashboard.schemas import (
 )
 from app.api.payment.models import PaymentProducts, Payments
 from app.api.payment.schemas import PaymentStatus, PaymentType
+from app.api.popup.crud import popups_crud
 from app.api.product.models import Products
 from app.api.product.schemas import CATEGORY_HOUSING, CATEGORY_TICKET
 from app.core.dependencies.users import CurrentUser, TenantSession
@@ -219,21 +220,8 @@ def _get_key_metrics(
     # Accommodation percentage: attendees with housing product / total main attendees
     accommodation_pct = _get_accommodation_percentage(db, popup_id, people)
 
-    # Detect currency from latest approved payment
-    currency = "USD"
-    latest_currency = db.exec(
-        select(Payments.currency)
-        .join(Applications, Payments.application_id == Applications.id)
-        .where(
-            Applications.popup_id == popup_id,
-            Payments.status == PaymentStatus.APPROVED.value,
-            Payments.payment_type == PaymentType.PASS_PURCHASE.value,
-        )
-        .order_by(Payments.created_at.desc())  # type: ignore[union-attr]
-        .limit(1)
-    ).first()
-    if latest_currency:
-        currency = latest_currency
+    popup = popups_crud.get(db, popup_id)
+    currency = popup.currency if popup else "USD"
 
     return KeyMetrics(
         people=people,

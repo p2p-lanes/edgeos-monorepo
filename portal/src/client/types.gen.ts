@@ -1191,6 +1191,7 @@ export type PaymentProductResponse = {
     product_description?: (string | null);
     product_price: string;
     product_category: string;
+    product_currency: string;
     attendee_name?: (string | null);
     created_at: string;
 };
@@ -1207,6 +1208,7 @@ export type PaymentPublic = {
     amount?: string;
     insurance_amount?: string;
     currency?: string;
+    settlement_currency?: (string | null);
     rate?: (string | null);
     source?: (string | null);
     checkout_url?: (string | null);
@@ -1226,9 +1228,9 @@ export type PaymentPublic = {
 };
 
 /**
- * Payment source/provider.
+ * Settlement rail/provider shown to users.
  */
-export type PaymentSource = 'SimpleFI' | 'Stripe';
+export type PaymentSource = 'SimpleFI' | 'Stripe' | 'MercadoPago';
 
 /**
  * Statistics for payments.
@@ -1268,6 +1270,7 @@ export type PaymentUpdate = {
     source?: (PaymentSource | null);
     rate?: (number | string | null);
     currency?: (string | null);
+    settlement_currency?: (string | null);
 };
 
 /**
@@ -1299,6 +1302,7 @@ export type PopupAdmin = {
     invoice_company_name?: (string | null);
     invoice_company_address?: (string | null);
     invoice_company_email?: (string | null);
+    currency?: string;
     requires_application_fee?: boolean;
     application_fee_amount?: (string | null);
     theme_config?: ({
@@ -1335,6 +1339,7 @@ export type PopupCreate = {
     invoice_company_name?: (string | null);
     invoice_company_address?: (string | null);
     invoice_company_email?: (string | null);
+    currency?: string;
     requires_application_fee?: boolean;
     application_fee_amount?: (number | string | null);
     theme_config?: ({
@@ -1367,6 +1372,7 @@ export type PopupPublic = {
     allows_children?: (boolean | null);
     allows_coupons?: (boolean | null);
     allows_scholarship?: boolean;
+    currency?: string;
     terms_and_conditions_url?: (string | null);
     invoice_company_name?: (string | null);
     requires_application_fee?: boolean;
@@ -1434,6 +1440,7 @@ export type PopupUpdate = {
     invoice_company_name?: (string | null);
     invoice_company_address?: (string | null);
     invoice_company_email?: (string | null);
+    currency?: (string | null);
     requires_application_fee?: (boolean | null);
     application_fee_amount?: (number | string | null);
     theme_config?: ({

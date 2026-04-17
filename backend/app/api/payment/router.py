@@ -1,4 +1,5 @@
 import uuid
+from decimal import Decimal
 
 from fastapi import APIRouter, HTTPException, Request, Response, status
 from sqlmodel import Session
@@ -38,6 +39,46 @@ from app.services.email import (
 from app.services.email_helpers import send_application_status_email
 
 router = APIRouter(prefix="/payments", tags=["payments"])
+
+
+def _normalize_payment_source(provider: str | None) -> str:
+    """Normalize provider labels from SimpleFI to local payment sources."""
+    if not provider:
+        return "SimpleFI"
+
+    normalized = provider.strip().lower()
+    if normalized == "stripe":
+        return "Stripe"
+    if normalized in {"mercadopago", "mercado pago", "mercado_pago"}:
+        return "MercadoPago"
+    return provider.strip()
+
+
+def _extract_settlement_details(
+    payload: SimpleFIWebhookPayload,
+) -> tuple[str | None, Decimal | None, str]:
+    """Extract settlement currency, rate, and visible source from a webhook."""
+    payment_request = payload.data.payment_request
+    settlement_currency = None
+    settlement_rate = None
+
+    if payload.data.new_payment is not None:
+        settlement_currency = payload.data.new_payment.coin
+
+    card_payment = payment_request.card_payment
+    if card_payment is not None:
+        settlement_currency = card_payment.coin or settlement_currency
+        source = _normalize_payment_source(card_payment.provider)
+    else:
+        source = "SimpleFI"
+
+    if settlement_currency:
+        for transaction in payment_request.transactions:
+            if transaction.coin == settlement_currency:
+                settlement_rate = Decimal(str(transaction.price_details.rate))
+                break
+
+    return settlement_currency, settlement_rate, source
 
 
 async def _send_payment_confirmed_email(payment, db_session=None) -> None:
@@ -318,7 +359,11 @@ async def update_payment(
     return PaymentPublic.model_validate(payment)
 
 
-@router.post("/my/application-fee", response_model=PaymentPublic, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/my/application-fee",
+    response_model=PaymentPublic,
+    status_code=status.HTTP_201_CREATED,
+)
 async def create_my_application_fee(
     fee_in: ApplicationFeeCreate,
     db: HumanTenantSession,
@@ -631,8 +676,6 @@ async def _handle_regular_payment(
     webhook_cache: WebhookCache,
 ) -> dict:
     """Handle new_payment/new_card_payment for regular (non-installment) payments."""
-    from decimal import Decimal
-
     from loguru import logger
 
     payment_request_id = payload.data.payment_request.id
@@ -667,24 +710,26 @@ async def _handle_regular_payment(
         )
         return {"message": "Payment status unchanged"}
 
-    # Extract currency and rate from transaction
-    currency = "USD"
-    rate = Decimal("1")
-    if payload.data.new_payment:
-        currency = payload.data.new_payment.coin
-        for t in payload.data.payment_request.transactions:
-            if t.coin == currency:
-                rate = Decimal(str(t.price_details.rate))
-                break
+    settlement_currency, settlement_rate, source = _extract_settlement_details(payload)
 
     if payment_request_status == "approved":
         from app.api.payment.schemas import PaymentType
 
         if payment.payment_type == PaymentType.APPLICATION_FEE.value:
-            await _handle_fee_payment_approved(db, payment, currency=currency, rate=rate)
+            await _handle_fee_payment_approved(
+                db,
+                payment,
+                settlement_currency=settlement_currency,
+                rate=settlement_rate,
+                source=source,
+            )
         else:
             payment = payments_crud.approve_payment(
-                db, payment.id, currency=currency, rate=rate
+                db,
+                payment.id,
+                settlement_currency=settlement_currency,
+                rate=settlement_rate,
+                source=source,
             )
             await _send_payment_confirmed_email(payment, db_session=db)
         logger.info("Payment {} approved via SimpleFI webhook", payment.id)
@@ -703,8 +748,9 @@ async def _handle_fee_payment_approved(
     db: Session,
     payment: Payments,
     *,
-    currency: str = "USD",
-    rate: object = None,
+    settlement_currency: str | None = None,
+    rate: Decimal | None = None,
+    source: str = "SimpleFI",
 ) -> None:
     """Handle approval of an application fee payment.
 
@@ -716,25 +762,23 @@ async def _handle_fee_payment_approved(
 
     from app.api.application.crud import applications_crud
     from app.api.application.schemas import ApplicationStatus
-    from app.api.payment.schemas import PaymentSource, PaymentStatus
+    from app.api.payment.schemas import PaymentStatus
 
     status_before = ApplicationStatus.PENDING_FEE.value
 
     # Approve the payment record first
     payment.status = PaymentStatus.APPROVED.value
-    payment.currency = currency
+    payment.settlement_currency = settlement_currency
     if rate is not None:
         payment.rate = rate
-    payment.source = PaymentSource.SIMPLEFI.value
+    payment.source = source
     db.add(payment)
     db.flush()
 
     # Load application
     application = applications_crud.get(db, payment.application_id)
     if not application:
-        logger.warning(
-            "Fee payment {} has no associated application", payment.id
-        )
+        logger.warning("Fee payment {} has no associated application", payment.id)
         db.commit()
         return
 
@@ -783,7 +827,6 @@ async def _handle_installment_payment(
 ) -> dict:
     """Handle new_payment/new_card_payment for installment plans."""
     from datetime import UTC, datetime
-    from decimal import Decimal
 
     from loguru import logger
 
@@ -815,6 +858,8 @@ async def _handle_installment_payment(
         )
 
     # Extract payment details
+    settlement_currency, settlement_rate, source = _extract_settlement_details(payload)
+
     if isinstance(new_payment, SimpleFIPaymentInfo):
         amount = Decimal(str(new_payment.amount))
         currency = new_payment.coin
@@ -840,7 +885,13 @@ async def _handle_installment_payment(
     # First installment: approve payment to assign products
     is_first_installment = (payment.installments_paid or 0) == 0
     if is_first_installment and payment.status != "approved":
-        payment = payments_crud.approve_payment(db, payment.id, currency=currency)
+        payment = payments_crud.approve_payment(
+            db,
+            payment.id,
+            settlement_currency=settlement_currency,
+            rate=settlement_rate,
+            source=source,
+        )
         logger.info("First installment received - payment {} approved", payment.id)
 
     # Increment installments_paid
@@ -909,7 +960,7 @@ async def _handle_installment_plan_completed(
         "Payment %s not approved when installment_plan_completed received", payment.id
     )
     payment.installments_paid = installment_plan.paid_installments_count
-    payment = payments_crud.approve_payment(db, payment.id, currency="USD")
+    payment = payments_crud.approve_payment(db, payment.id)
     await _send_payment_confirmed_email(payment, db_session=db)
 
     return {"message": "Installment plan payment approved successfully"}
