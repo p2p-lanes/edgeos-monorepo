@@ -6,9 +6,9 @@ import {
 } from "@tanstack/react-query"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { Check, Trash2 } from "lucide-react"
-import { Suspense, useEffect, useState } from "react"
+import { Suspense, useEffect, useRef, useState } from "react"
 
-import { ProductsService, TicketingStepsService } from "@/client"
+import { type ApiError, ProductsService, TicketingStepsService } from "@/client"
 import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import {
@@ -39,6 +39,10 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import useCustomToast from "@/hooks/useCustomToast"
+import {
+  UnsavedChangesDialog,
+  useDirtyBlocker,
+} from "@/hooks/useUnsavedChanges"
 import { cn } from "@/lib/utils"
 import { createErrorHandler } from "@/utils"
 
@@ -79,6 +83,7 @@ function StepConfigContent({ stepId }: { stepId: string }) {
   const navigate = useNavigate()
   const { showSuccessToast, showErrorToast } = useCustomToast()
   const { data: step } = useSuspenseQuery(getStepQueryOptions(stepId))
+  const isSubmittingRef = useRef(false)
 
   // Fetch insurance step for confirm step type
   const { data: stepsData } = useQuery({
@@ -112,6 +117,23 @@ function StepConfigContent({ stepId }: { stepId: string }) {
   )
   const [insuranceEnabled, setInsuranceEnabled] = useState(
     insuranceStep?.is_enabled ?? false,
+  )
+
+  const isDirty =
+    title !== step.title ||
+    description !== (step.description ?? "") ||
+    watermark !== (step.watermark ?? "") ||
+    productCategory !== (step.product_category ?? "") ||
+    template !== (step.template ?? "") ||
+    JSON.stringify(templateConfig) !==
+      JSON.stringify(step.template_config ?? null) ||
+    showTitle !== (step.show_title ?? true) ||
+    showWatermark !== (step.show_watermark ?? true) ||
+    (!!insuranceStep && insuranceEnabled !== insuranceStep.is_enabled)
+
+  const blocker = useDirtyBlocker(
+    isDirty,
+    () => isDirty && !isSubmittingRef.current,
   )
 
   // Sync on step change
@@ -180,24 +202,36 @@ function StepConfigContent({ stepId }: { stepId: string }) {
         })
       }
     },
+    onMutate: () => {
+      isSubmittingRef.current = true
+    },
     onSuccess: () => {
       showSuccessToast("Step updated")
       queryClient.invalidateQueries({ queryKey: ["ticketing-steps"] })
       navigate({ to: "/ticketing-steps" })
     },
-    onError: createErrorHandler(showErrorToast),
+    onError: (error: Error) => {
+      isSubmittingRef.current = false
+      createErrorHandler(showErrorToast)(error as ApiError)
+    },
   })
 
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: () =>
       TicketingStepsService.deleteTicketingStep({ stepId: step.id }),
+    onMutate: () => {
+      isSubmittingRef.current = true
+    },
     onSuccess: () => {
       showSuccessToast("Step deleted")
       queryClient.invalidateQueries({ queryKey: ["ticketing-steps"] })
       navigate({ to: "/ticketing-steps" })
     },
-    onError: createErrorHandler(showErrorToast),
+    onError: (error: Error) => {
+      isSubmittingRef.current = false
+      createErrorHandler(showErrorToast)(error as ApiError)
+    },
   })
 
   // Template config component
@@ -448,6 +482,8 @@ function StepConfigContent({ stepId }: { stepId: string }) {
           Save
         </LoadingButton>
       </div>
+
+      <UnsavedChangesDialog blocker={blocker} />
     </div>
   )
 }
