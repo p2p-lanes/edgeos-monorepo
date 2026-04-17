@@ -721,6 +721,7 @@ def _seed_payments(
             status=payment_data.get("status", "pending"),
             amount=Decimal(payment_data.get("amount", "0")),
             currency=payment_data.get("currency", "USD"),
+            settlement_currency=payment_data.get("settlement_currency"),
             source=payment_data.get("source"),
             external_id=payment_data.get("external_id"),
             coupon_id=coupon_id,
@@ -778,6 +779,7 @@ def _seed_payments(
                 product_description=product.description,
                 product_price=product.price,
                 product_category=product.category,
+                product_currency="USD",
             )
             session.add(payment_product)
             session.commit()

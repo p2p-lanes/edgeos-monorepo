@@ -4,7 +4,7 @@ from decimal import Decimal
 from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
-from sqlalchemy import Integer, Numeric, Text
+from sqlalchemy import Integer, Numeric, String, Text
 from sqlmodel import Column, Field, SQLModel
 
 
@@ -16,10 +16,11 @@ class PaymentType(str, Enum):
 
 
 class PaymentSource(str, Enum):
-    """Payment source/provider."""
+    """Settlement rail/provider shown to users."""
 
     SIMPLEFI = "SimpleFI"
     STRIPE = "Stripe"
+    MERCADOPAGO = "MercadoPago"
 
 
 class PaymentStatus(str, Enum):
@@ -50,6 +51,10 @@ class PaymentProductBase(SQLModel):
     product_description: str | None = Field(default=None, sa_type=Text())
     product_price: Decimal = Field(sa_column=Column(Numeric(10, 2), nullable=False))
     product_category: str
+    product_currency: str = Field(
+        default="USD",
+        sa_column=Column(String(3), nullable=False, server_default="USD"),
+    )
 
 
 class PaymentBase(SQLModel):
@@ -70,6 +75,10 @@ class PaymentBase(SQLModel):
         sa_column=Column(Numeric(10, 2), nullable=False, server_default="0"),
     )
     currency: str = Field(default="USD")
+    settlement_currency: str | None = Field(
+        default=None,
+        sa_column=Column(String(16), nullable=True),
+    )
     rate: Decimal | None = Field(
         default=None, sa_column=Column(Numeric(18, 8), nullable=True)
     )
@@ -122,6 +131,7 @@ class PaymentProductResponse(BaseModel):
     product_description: str | None = None
     product_price: Decimal
     product_category: str
+    product_currency: str
     attendee_name: str | None = None
     created_at: datetime
 
@@ -232,6 +242,7 @@ class PaymentUpdate(BaseModel):
     source: PaymentSource | None = None
     rate: Decimal | None = None
     currency: str | None = None
+    settlement_currency: str | None = None
 
 
 class PaymentFilter(BaseModel):

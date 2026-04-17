@@ -226,7 +226,11 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             )
 
         # 2. Validate popup is configured for fee
-        if not getattr(popup, "requires_application_fee", False) or not getattr(popup, "application_fee_amount", None) or popup.application_fee_amount <= 0:
+        if (
+            not getattr(popup, "requires_application_fee", False)
+            or not getattr(popup, "application_fee_amount", None)
+            or popup.application_fee_amount <= 0
+        ):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Popup is not configured to require an application fee",
@@ -314,6 +318,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 amount=fee_amount,
                 popup_slug=popup.slug,
                 tenant_slug=popup.tenant.slug,
+                currency=popup.currency,
                 reference=reference,
                 memo=f"Application fee – {popup.name}",
                 portal_base_override=portal_base,
@@ -334,7 +339,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             popup_id=application.popup_id,
             status=simplefi_response.status,
             amount=fee_amount,
-            currency="USD",
+            currency=popup.currency,
             external_id=simplefi_response.id,
             checkout_url=simplefi_response.checkout_url,
             source=PaymentSource.SIMPLEFI.value,
@@ -608,7 +613,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             products=obj.products,
             original_amount=Decimal("0"),
             amount=Decimal("0"),
-            currency="USD",
+            currency=application.popup.currency if application.popup else "USD",
             edit_passes=obj.edit_passes,
             discount_value=discount_assigned,
         )
@@ -829,6 +834,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                         product_description=product.description,
                         product_price=product.price,
                         product_category=product.category or "",
+                        product_currency=preview.currency,
                     )
                     session.add(payment_product)
 
@@ -896,6 +902,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 amount=preview.amount,
                 popup_slug=application.popup.slug,
                 tenant_slug=application.popup.tenant.slug,
+                currency=preview.currency,
                 reference=reference,
                 memo=application.popup.tenant.name,
                 portal_base_override=get_portal_url(application.popup.tenant),
@@ -943,6 +950,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     product_description=product.description,
                     product_price=product.price,
                     product_category=product.category or "",
+                    product_currency=preview.currency,
                 )
                 session.add(payment_product)
 
@@ -1068,7 +1076,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 popup_id=popup.id,
                 status=PaymentStatus.APPROVED.value,
                 amount=Decimal("0"),
-                currency="USD",
+                currency=popup.currency,
                 source=None,
             )
             session.add(payment)
@@ -1086,6 +1094,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     product_description=product.description,
                     product_price=product.price,
                     product_category=product.category or "",
+                    product_currency=popup.currency,
                 )
                 session.add(pp)
 
@@ -1136,6 +1145,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 amount=amount,
                 popup_slug=popup.slug,
                 tenant_slug=tenant.slug,
+                currency=popup.currency,
                 reference=reference,
                 memo=f"{popup.name} — direct purchase",
                 portal_base_override=portal_base,
@@ -1153,7 +1163,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             popup_id=popup.id,
             status=simplefi_response.status,
             amount=amount,
-            currency="USD",
+            currency=popup.currency,
             external_id=simplefi_response.id,
             checkout_url=simplefi_response.checkout_url,
             source=PaymentSource.SIMPLEFI.value,
@@ -1173,6 +1183,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 product_description=product.description,
                 product_price=product.price,
                 product_category=product.category or "",
+                product_currency=popup.currency,
             )
             session.add(pp)
 
@@ -1185,8 +1196,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         session: Session,
         payment_id: uuid.UUID,
         *,
-        currency: str | None = None,
+        settlement_currency: str | None = None,
         rate: Decimal | None = None,
+        source: str | None = None,
     ) -> Payments:
         """
         Approve a payment and add products to attendees.
@@ -1205,20 +1217,17 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             return payment  # Already approved
 
         try:
-            # Use existing currency or default to USD for manual approvals
-            final_currency = currency or payment.currency or "USD"
-            source = (
-                PaymentSource.STRIPE
-                if final_currency == "USD"
-                else PaymentSource.SIMPLEFI
-            )
-
             # Set payment fields directly (no intermediate commit)
             payment.status = PaymentStatus.APPROVED.value
-            payment.currency = final_currency
+            if not payment.currency:
+                payment.currency = "USD"
+            payment.settlement_currency = (
+                settlement_currency or payment.settlement_currency
+            )
             if rate is not None:
                 payment.rate = rate
-            payment.source = source.value
+            if source is not None:
+                payment.source = source
             session.add(payment)
 
             # Clear existing products if editing passes
