@@ -1,5 +1,6 @@
 import uuid
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, HTTPException, Request, Response, status
 from sqlmodel import Session
@@ -37,6 +38,10 @@ from app.services.email import (
     get_email_service,
 )
 from app.services.email_helpers import send_application_status_email
+
+if TYPE_CHECKING:
+    from app.api.human.models import Humans
+    from app.api.popup.models import Popups
 
 router = APIRouter(prefix="/payments", tags=["payments"])
 
@@ -210,6 +215,64 @@ async def _send_payment_confirmed_email(payment, db_session=None) -> None:
     logger.info(
         f"Payment confirmed email sent to {human.email} for payment {payment.id}"
     )
+
+
+def _get_portal_owned_payment_or_404(
+    db: HumanTenantSession,
+    payment_id: uuid.UUID,
+    current_human: CurrentHuman,
+) -> Payments:
+    payment = payments_crud.get_portal_owned_payment(db, payment_id, current_human.id)
+    if payment is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Payment not found",
+        )
+    return payment
+
+
+def _get_portal_payment_context_or_404(
+    db: HumanTenantSession,
+    payment_id: uuid.UUID,
+    current_human: CurrentHuman,
+) -> tuple[Payments, "Popups", "Humans | None"]:
+    payment = _get_portal_owned_payment_or_404(db, payment_id, current_human)
+
+    if payment.application is not None:
+        popup = payment.application.popup
+        human = payment.application.human
+    else:
+        popup = payment.popup
+        human = next(
+            (
+                product_snapshot.attendee.human
+                for product_snapshot in payment.products_snapshot
+                if product_snapshot.attendee is not None
+                and product_snapshot.attendee.human_id == current_human.id
+                and product_snapshot.attendee.human is not None
+            ),
+            None,
+        )
+
+    return payment, popup, human
+
+
+def _require_application_id(application_id: uuid.UUID | None) -> uuid.UUID:
+    if application_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Application id is required",
+        )
+    return application_id
+
+
+def _require_external_id(external_id: str | None) -> str:
+    if external_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Payment not found",
+        )
+    return external_id
 
 
 @router.get("", response_model=ListModel[PaymentPublic])
@@ -418,6 +481,21 @@ async def get_my_latest_payment(
     )
 
 
+@router.get("/my/{payment_id}/status", response_model=PaymentStatusCheck)
+async def get_my_payment_status(
+    payment_id: uuid.UUID,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+) -> PaymentStatusCheck:
+    """Get the current status for an owned payment (Portal)."""
+    payment = _get_portal_owned_payment_or_404(db, payment_id, current_human)
+
+    return PaymentStatusCheck(
+        id=payment.id,
+        status=PaymentStatus(payment.status),
+    )
+
+
 @router.get("/my/{application_id}", response_model=ListModel[PaymentPublic])
 async def list_my_payments(
     application_id: uuid.UUID,
@@ -457,43 +535,13 @@ async def get_my_invoice(
 
     Only available if the popup has invoice details configured.
     """
-    from app.api.application.crud import applications_crud
     from app.core.invoice import generate_invoice_pdf
 
-    payment = payments_crud.get(db, payment_id)
-    if not payment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Payment not found",
-        )
-
-    # Resolve ownership + popup. Two paths:
-    # - Application-based: verify via application.human_id
-    # - Direct-sale: verify via the attendee's human_id on the product snapshot
-    if payment.application_id is not None:
-        application = applications_crud.get(db, payment.application_id)
-        if not application or application.human_id != current_human.id:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Payment not found",
-            )
-        popup = application.popup
-        human = application.human
-    else:
-        # Direct-sale: the buyer is on products_snapshot[0].attendee
-        popup = payment.popup
-        human = None
-        owns_payment = False
-        if payment.products_snapshot:
-            attendee = payment.products_snapshot[0].attendee
-            if attendee is not None and attendee.human_id == current_human.id:
-                human = attendee.human
-                owns_payment = True
-        if not owns_payment:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Payment not found",
-            )
+    payment, popup, human = _get_portal_payment_context_or_404(
+        db,
+        payment_id,
+        current_human,
+    )
 
     # Only generate invoice if popup has all invoice fields configured
     if not (
@@ -543,7 +591,10 @@ async def preview_my_payment(
     from app.api.application.crud import applications_crud
 
     # Verify human owns this application
-    application = applications_crud.get(db, payment_in.application_id)
+    application = applications_crud.get(
+        db,
+        _require_application_id(payment_in.application_id),
+    )
     if not application or application.human_id != current_human.id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -575,7 +626,10 @@ async def create_my_payment(
     from app.api.application.crud import applications_crud
 
     # Verify human owns this application
-    application = applications_crud.get(db, payment_in.application_id)
+    application = applications_crud.get(
+        db,
+        _require_application_id(payment_in.application_id),
+    )
     if not application or application.human_id != current_human.id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -776,7 +830,10 @@ async def _handle_fee_payment_approved(
     db.flush()
 
     # Load application
-    application = applications_crud.get(db, payment.application_id)
+    application = applications_crud.get(
+        db,
+        _require_application_id(payment.application_id),
+    )
     if not application:
         logger.warning("Fee payment {} has no associated application", payment.id)
         db.commit()
@@ -849,7 +906,10 @@ async def _handle_installment_payment(
     )
 
     # Look up Payment by installment_plan_id (stored in external_id)
-    payment = payments_crud.get_by_external_id(db, installment_plan_id)
+    payment = payments_crud.get_by_external_id(
+        db,
+        _require_external_id(installment_plan_id),
+    )
     if not payment:
         logger.warning("Payment not found for installment plan {}", installment_plan_id)
         raise HTTPException(

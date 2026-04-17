@@ -32,6 +32,15 @@ export function usePaymentVerification({
   enabled,
 }: UsePaymentVerificationParams): UsePaymentVerificationResult {
   const pollCountRef = useRef(0)
+  const identifierRef = useRef<string | null>(
+    applicationId ?? paymentId ?? null,
+  )
+
+  const currentIdentifier = applicationId ?? paymentId ?? null
+  if (identifierRef.current !== currentIdentifier) {
+    identifierRef.current = currentIdentifier
+    pollCountRef.current = 0
+  }
 
   const useApplicationPath = enabled && !!applicationId
   const usePaymentIdPath = enabled && !applicationId && !!paymentId
@@ -49,14 +58,9 @@ export function usePaymentVerification({
           applicationId: applicationId!,
         })
       }
-      // TODO(feat/payment-status-endpoint): Call
-      // PaymentsService.getMyPaymentStatus({ paymentId }) once the endpoint
-      // ships (Feature 5). Until then we optimistically report approved —
-      // the webhook will eventually update the server-side record and the
-      // next page load will reflect the real status.
-      return {
-        status: "approved" as PaymentStatus,
-      }
+      return PaymentsService.getMyPaymentStatus({
+        paymentId: paymentId!,
+      })
     },
     enabled: useApplicationPath || usePaymentIdPath,
     refetchInterval: (query) => {

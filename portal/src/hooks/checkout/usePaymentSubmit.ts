@@ -1,10 +1,14 @@
 "use client"
 
 import { useQueryClient } from "@tanstack/react-query"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useParams } from "next/navigation"
+import { useCallback, useEffect, useState } from "react"
 import { toast } from "sonner"
 import { PaymentsService } from "@/client"
-import { markPurchasePending } from "@/hooks/usePaymentRedirect"
+import {
+  markPurchasePending,
+  savePendingPaymentRedirectState,
+} from "@/hooks/usePaymentRedirect"
 import { queryKeys } from "@/lib/query-keys"
 import type { AttendeePassState } from "@/types/Attendee"
 import type {
@@ -64,11 +68,8 @@ export function usePaymentSubmit({
   paymentCompleteRef,
 }: UsePaymentSubmitParams) {
   const queryClient = useQueryClient()
+  const params = useParams<{ popupSlug: string }>()
   const [isSubmitting, setIsSubmitting] = useState(false)
-  // Holds the id of the last payment created by this hook. Used by payment
-  // verification polling after a SimpleFI redirect (direct-sale flow has no
-  // application_id, so verification keys off payment_id instead).
-  const lastPaymentIdRef = useRef<string | null>(null)
 
   // Reset isSubmitting when page is restored from bfcache
   useEffect(() => {
@@ -144,11 +145,13 @@ export function usePaymentSubmit({
         checkout_url?: string | null
       }
 
-      if (data.id) {
-        lastPaymentIdRef.current = data.id
-      }
-
       if (data.status === "pending" && data.checkout_url) {
+        if (isDirectSale && data.id && params.popupSlug) {
+          savePendingPaymentRedirectState({
+            paymentId: data.id,
+            popupSlug: params.popupSlug,
+          })
+        }
         markPurchasePending()
         window.location.href = data.checkout_url
         return { success: true }
@@ -214,7 +217,8 @@ export function usePaymentSubmit({
     setPromoError,
     paymentCompleteRef,
     popupId,
+    params.popupSlug,
   ])
 
-  return { submitPayment, isSubmitting, lastPaymentIdRef }
+  return { submitPayment, isSubmitting }
 }

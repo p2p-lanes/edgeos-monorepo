@@ -1,8 +1,8 @@
 "use client"
 
 import { AnimatePresence } from "framer-motion"
-import { useSearchParams } from "next/navigation"
-import { useEffect, useMemo } from "react"
+import { useParams, useSearchParams } from "next/navigation"
+import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 import CartFooter from "@/components/checkout-flow/CartFooter"
 import DynamicProductStep from "@/components/checkout-flow/DynamicProductStep"
@@ -13,6 +13,7 @@ import {
 import PassSelectionSection from "@/components/checkout-flow/steps/PassSelectionSection"
 import SuccessStep from "@/components/checkout-flow/steps/SuccessStep"
 import { usePaymentVerification } from "@/hooks/checkout"
+import { readAndClearPendingPaymentRedirectState } from "@/hooks/usePaymentRedirect"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCheckout } from "@/providers/checkoutProvider"
 import type { CheckoutStep } from "@/types/checkout"
@@ -87,14 +88,33 @@ export default function CheckoutFlow({
   } = useCheckout()
 
   const searchParams = useSearchParams()
+  const params = useParams<{ popupSlug: string }>()
   const { getRelevantApplication } = useApplication()
   const application = getRelevantApplication()
+  const [restoredPaymentId, setRestoredPaymentId] = useState<string | null>(
+    null,
+  )
+  const [redirectStateRestored, setRedirectStateRestored] = useState(false)
 
   // Verify payment status when returning from SimpleFI redirect
-  const isSimpleFIReturn = useMemo(
-    () => searchParams.has("checkout", "success"),
-    [searchParams],
-  )
+  const isSimpleFIReturn = searchParams.get("checkout") === "success"
+
+  useEffect(() => {
+    if (!isSimpleFIReturn) {
+      setRestoredPaymentId(null)
+      setRedirectStateRestored(true)
+      return
+    }
+
+    const redirectState = readAndClearPendingPaymentRedirectState()
+    const paymentId =
+      redirectState?.popupSlug === params.popupSlug
+        ? redirectState.paymentId
+        : null
+
+    setRestoredPaymentId(paymentId)
+    setRedirectStateRestored(true)
+  }, [isSimpleFIReturn, params.popupSlug])
 
   // Navigate to success step when returning from Stripe redirect
   useEffect(() => {
@@ -105,7 +125,9 @@ export default function CheckoutFlow({
 
   const { paymentStatus } = usePaymentVerification({
     applicationId: application?.id,
-    enabled: isSimpleFIReturn && currentStep === "success",
+    paymentId: restoredPaymentId ?? undefined,
+    enabled:
+      redirectStateRestored && isSimpleFIReturn && currentStep === "success",
   })
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll on step change
@@ -183,7 +205,13 @@ export default function CheckoutFlow({
     if (currentStep === "success") {
       return (
         <SuccessStep
-          paymentStatus={isSimpleFIReturn ? paymentStatus : "approved"}
+          paymentStatus={
+            isSimpleFIReturn && !redirectStateRestored
+              ? "verifying"
+              : isSimpleFIReturn
+                ? paymentStatus
+                : "approved"
+          }
         />
       )
     }
