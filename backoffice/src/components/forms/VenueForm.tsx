@@ -25,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useCustomToast from "@/hooks/useCustomToast"
 import { createErrorHandler } from "@/utils"
@@ -196,6 +197,7 @@ export function VenueForm({ defaultValues, onSuccess }: VenueFormProps) {
   const form = useForm({
     defaultValues: {
       title: defaultValues?.title ?? "",
+      description: defaultValues?.description ?? "",
       location: defaultValues?.location ?? "",
       google_maps_link: buildMapsLink(
         defaultValues?.geo_lat ?? null,
@@ -228,6 +230,7 @@ export function VenueForm({ defaultValues, onSuccess }: VenueFormProps) {
       const payload: Record<string, unknown> = {
         popup_id: selectedPopupId,
         title: value.title,
+        description: value.description || null,
         location: value.location || null,
         formatted_address: value.location || null,
         geo_lat: coords?.lat ?? null,
@@ -302,6 +305,25 @@ export function VenueForm({ defaultValues, onSuccess }: VenueFormProps) {
           />
         )}
       </form.Field>
+
+      <InlineSection title="Description">
+        <InlineRow
+          label="Description"
+          description="Shown to humans next to the opening hours when they pick this venue."
+        >
+          <form.Field name="description">
+            {(field) => (
+              <Textarea
+                value={field.state.value}
+                onChange={(e) => field.handleChange(e.target.value)}
+                onBlur={field.handleBlur}
+                placeholder="Accessibility notes, quirks, vibe, capacity details…"
+                rows={3}
+              />
+            )}
+          </form.Field>
+        </InlineRow>
+      </InlineSection>
 
       {/* 1. Basic */}
       <InlineSection title="Location">

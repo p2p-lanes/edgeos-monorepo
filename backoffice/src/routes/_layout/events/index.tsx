@@ -9,6 +9,7 @@ import type { ColumnDef } from "@tanstack/react-table"
 import { format } from "date-fns"
 import {
   CalendarDays,
+  CalendarRange,
   CheckCircle2,
   EllipsisVertical,
   Pencil,
@@ -597,12 +598,20 @@ function EventsPage() {
           </p>
         </div>
         {selectedPopupId && (
-          <Button asChild>
-            <Link to="/events/new">
-              <Plus className="mr-2 h-4 w-4" />
-              Create Event
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" asChild>
+              <Link to="/events/day-by-venue">
+                <CalendarRange className="mr-2 h-4 w-4" />
+                Day by venue
+              </Link>
+            </Button>
+            <Button asChild>
+              <Link to="/events/new">
+                <Plus className="mr-2 h-4 w-4" />
+                Create Event
+              </Link>
+            </Button>
+          </div>
         )}
       </div>
       {selectedPopupId ? (

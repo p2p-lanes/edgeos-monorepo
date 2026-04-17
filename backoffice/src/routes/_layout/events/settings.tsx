@@ -5,6 +5,8 @@ import { Suspense } from "react"
 import { type EventSettingsCreate, EventSettingsService } from "@/client"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
+import { ChipInput } from "@/components/forms/EventForm/ChipInput"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -97,6 +99,8 @@ function EventSettingsForm() {
     timezone: "UTC",
     humans_can_create_venues: false,
     venues_require_approval: true,
+    allowed_tags: [] as string[],
+    approval_notification_email: null as string | null,
   }
 
   return (
@@ -178,6 +182,47 @@ function EventSettingsForm() {
             })}
           </SelectContent>
         </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Allowed event tags</Label>
+        <ChipInput
+          value={currentSettings.allowed_tags ?? []}
+          onChange={(next) =>
+            upsertMutation.mutate({
+              ...currentSettings,
+              popup_id: selectedPopupId!,
+              allowed_tags: next,
+            })
+          }
+        />
+        <p className="text-sm text-muted-foreground">
+          Humans in the portal can only tag their events with values from this
+          list. Empty = no tagging allowed.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Approval notification email</Label>
+        <Input
+          type="email"
+          placeholder="admin@your-popup.com"
+          defaultValue={currentSettings.approval_notification_email ?? ""}
+          onBlur={(e) => {
+            const next = e.target.value.trim() || null
+            if (next === (currentSettings.approval_notification_email ?? null))
+              return
+            upsertMutation.mutate({
+              ...currentSettings,
+              popup_id: selectedPopupId!,
+              approval_notification_email: next,
+            })
+          }}
+        />
+        <p className="text-sm text-muted-foreground">
+          Recipient for "event/venue pending approval" emails. Falls back to the
+          tenant sender email when empty.
+        </p>
       </div>
 
       <div className="space-y-4">

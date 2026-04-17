@@ -197,8 +197,49 @@ export function dayBoundsInTz(
   return { start, end }
 }
 
+/**
+ * Convert a naive wall-clock datetime ("YYYY-MM-DDTHH:MM[:SS]") interpreted
+ * as local time in `timeZone` into the UTC instant it denotes. Round-trip
+ * inverse of `utcToLocalTzNaive`.
+ *
+ * Use when the form stores naive strings but the backend expects a UTC
+ * ISO — without this, `new Date(naive)` would parse in the browser's TZ.
+ */
+export function localTzNaiveToUtc(naive: string, timeZone: string): Date {
+  const [datePart, timePart = "00:00"] = naive.split("T")
+  const [y, m, d] = datePart.split("-").map(Number)
+  const [hh = 0, mm = 0, ss = 0] = timePart.split(":").map(Number)
+  const guess = Date.UTC(y, (m ?? 1) - 1, d ?? 1, hh, mm, ss)
+  const offsetMinutes = tzOffsetMinutes(guess, timeZone)
+  return new Date(guess - offsetMinutes * 60 * 1000)
+}
+
+/**
+ * Format a UTC instant as a naive "YYYY-MM-DDTHH:MM" wall-clock string
+ * in `timeZone`. Round-trip inverse of `localTzNaiveToUtc`.
+ */
+export function utcToLocalTzNaive(iso: string, timeZone: string): string {
+  if (!iso) return ""
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ""
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(d)
+  const get = (t: string) =>
+    parts.find((p) => p.type === t)?.value ?? "00"
+  // Intl can emit "24" for midnight in some locales; normalize to "00".
+  const hour = get("hour") === "24" ? "00" : get("hour")
+  return `${get("year")}-${get("month")}-${get("day")}T${hour}:${get("minute")}`
+}
+
 /** Minutes east of UTC for the given instant in the timezone. */
-function tzOffsetMinutes(ms: number, timeZone: string): number {
+export function tzOffsetMinutes(ms: number, timeZone: string): number {
   // Parse the wall-clock time in the target TZ and compute its offset.
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone,

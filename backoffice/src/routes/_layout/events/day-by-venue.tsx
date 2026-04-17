@@ -11,6 +11,7 @@ import {
 } from "@/client"
 import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
+import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -21,32 +22,37 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Skeleton } from "@/components/ui/skeleton"
-import { VenueWeekCalendar } from "@/components/VenueWeekCalendar"
+import { VenueDayCalendar } from "@/components/VenueDayCalendar"
+import { useWorkspace } from "@/contexts/WorkspaceContext"
 
-export const Route = createFileRoute("/_layout/events/venues-schedule")({
-  component: VenueSchedulePage,
-  validateSearch: (search: Record<string, unknown>) => ({
-    venueId: search.venueId as string,
-  }),
+export const Route = createFileRoute("/_layout/events/day-by-venue")({
+  component: DayByVenuePage,
   head: () => ({
-    meta: [{ title: "Venue Schedule - EdgeOS" }],
+    meta: [{ title: "Day by Venue - EdgeOS" }],
   }),
 })
 
-function VenueScheduleContent({ venueId }: { venueId: string }) {
+function DayByVenueContent({ popupId }: { popupId: string }) {
   const navigate = useNavigate()
-  const { data: venue } = useSuspenseQuery({
-    queryKey: ["event-venues", venueId],
-    queryFn: () => EventVenuesService.getVenue({ venueId }),
+  const { data: venues } = useSuspenseQuery({
+    queryKey: ["event-venues", { popupId, limit: 200 }],
+    queryFn: () => EventVenuesService.listVenues({ popupId, limit: 200 }),
   })
   const { data: settings } = useSuspenseQuery({
-    queryKey: ["event-settings", venue.popup_id],
-    queryFn: () =>
-      EventSettingsService.getEventSettings({ popupId: venue.popup_id }),
+    queryKey: ["event-settings", popupId],
+    queryFn: () => EventSettingsService.getEventSettings({ popupId }),
   })
   const timezone = settings?.timezone || "UTC"
 
-  const [createAt, setCreateAt] = useState<string | null>(null)
+  const venueList = (venues?.results ?? []).map((v) => ({
+    id: v.id,
+    title: v.title,
+  }))
+
+  const [createAt, setCreateAt] = useState<{
+    venueId: string
+    startIso: string
+  } | null>(null)
   const [activeEventId, setActiveEventId] = useState<string | null>(null)
   const [exceptionReason, setExceptionReason] = useState<string | null>(null)
 
@@ -55,7 +61,6 @@ function VenueScheduleContent({ venueId }: { venueId: string }) {
     queryFn: () => EventsService.getEvent({ eventId: activeEventId as string }),
     enabled: !!activeEventId,
   })
-
   const { data: activeEventParticipants } = useQuery({
     queryKey: ["event-participants", activeEventId],
     queryFn: () =>
@@ -64,25 +69,16 @@ function VenueScheduleContent({ venueId }: { venueId: string }) {
       }),
     enabled: !!activeEventId,
   })
-
   const activeCount =
     activeEventParticipants?.results?.filter((p) => p.status !== "cancelled")
       .length ?? 0
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h2 className="text-lg font-semibold">
-          {venue.title || "Untitled venue"}
-        </h2>
-        {venue.location && (
-          <p className="text-sm text-muted-foreground">{venue.location}</p>
-        )}
-      </div>
-      <VenueWeekCalendar
-        venueId={venueId}
+    <>
+      <VenueDayCalendar
+        venues={venueList}
         timezone={timezone}
-        onCreateAt={setCreateAt}
+        onCreateAt={(venueId, startIso) => setCreateAt({ venueId, startIso })}
         onEventClick={setActiveEventId}
         onExceptionClick={(reason) => setExceptionReason(reason ?? "")}
       />
@@ -104,11 +100,15 @@ function VenueScheduleContent({ venueId }: { venueId: string }) {
             </Button>
             <Button
               onClick={() => {
-                const startTime = createAt
+                const payload = createAt
                 setCreateAt(null)
+                if (!payload) return
                 navigate({
                   to: "/events/new",
-                  search: { venueId, startTime: startTime ?? undefined },
+                  search: {
+                    venueId: payload.venueId,
+                    startTime: payload.startIso,
+                  },
                 })
               }}
             >
@@ -226,24 +226,28 @@ function VenueScheduleContent({ venueId }: { venueId: string }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   )
 }
 
-function VenueSchedulePage() {
-  const { venueId } = Route.useSearch()
+function DayByVenuePage() {
+  const { selectedPopupId } = useWorkspace()
 
   return (
     <FormPageLayout
-      title="Venue Schedule"
-      description="Events and exceptions booked at this venue"
-      backTo="/events/venues"
+      title="Day by Venue"
+      description="Availability for every venue on a single day"
+      backTo="/events"
     >
-      <QueryErrorBoundary>
-        <Suspense fallback={<Skeleton className="h-96 w-full" />}>
-          <VenueScheduleContent venueId={venueId} />
-        </Suspense>
-      </QueryErrorBoundary>
+      {selectedPopupId ? (
+        <QueryErrorBoundary>
+          <Suspense fallback={<Skeleton className="h-96 w-full" />}>
+            <DayByVenueContent popupId={selectedPopupId} />
+          </Suspense>
+        </QueryErrorBoundary>
+      ) : (
+        <WorkspaceAlert resource="events" />
+      )}
     </FormPageLayout>
   )
 }

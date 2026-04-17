@@ -1,8 +1,8 @@
-import { Clock } from "lucide-react"
+import { Clock, Plus, X } from "lucide-react"
 
 import type { VenueWeeklyHourInput, VenueWeeklyHourRef } from "@/client"
+import { Button } from "@/components/ui/button"
 import { InlineSection } from "@/components/ui/inline-form"
-import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { TimePicker } from "@/components/ui/time-picker"
 
@@ -16,26 +16,30 @@ const DAYS_OF_WEEK: { value: number; label: string; short: string }[] = [
   { value: 6, label: "Sunday", short: "Sun" },
 ]
 
+/**
+ * Hydrate the editor state from the server's weekly-hours snapshot. Each
+ * server row maps to one editable slot. Days that appear with
+ * ``is_closed=true`` collapse into a single "Closed" marker so the editor
+ * can render the toggle without manufacturing hour values.
+ */
 export function buildInitialWeeklyHours(
   initial: VenueWeeklyHourRef[] | undefined,
 ): VenueWeeklyHourInput[] {
-  return DAYS_OF_WEEK.map((day) => {
-    const existing = initial?.find((h) => h.day_of_week === day.value)
-    if (existing) {
-      return {
-        day_of_week: day.value,
-        open_time: existing.open_time ?? "09:00",
-        close_time: existing.close_time ?? "17:00",
-        is_closed: existing.is_closed,
-      }
-    }
-    return {
-      day_of_week: day.value,
-      open_time: "09:00",
-      close_time: "17:00",
+  if (!initial || initial.length === 0) {
+    // Default: all days closed, single marker row per day.
+    return DAYS_OF_WEEK.map((d) => ({
+      day_of_week: d.value,
+      open_time: null,
+      close_time: null,
       is_closed: true,
-    }
-  })
+    }))
+  }
+  return initial.map((h) => ({
+    day_of_week: h.day_of_week,
+    open_time: h.open_time ?? null,
+    close_time: h.close_time ?? null,
+    is_closed: h.is_closed,
+  }))
 }
 
 interface WeeklyHoursEditorProps {
@@ -43,54 +47,177 @@ interface WeeklyHoursEditorProps {
   onChange: (hours: VenueWeeklyHourInput[]) => void
 }
 
+function isOpenSlot(h: VenueWeeklyHourInput): boolean {
+  return !h.is_closed && h.open_time != null && h.close_time != null
+}
+
 export function WeeklyHoursEditor({ value, onChange }: WeeklyHoursEditorProps) {
-  const updateDay = (day: number, patch: Partial<VenueWeeklyHourInput>) => {
-    onChange(value.map((h) => (h.day_of_week === day ? { ...h, ...patch } : h)))
+  const slotsByDay = new Map<number, VenueWeeklyHourInput[]>()
+  for (const h of value) {
+    const list = slotsByDay.get(h.day_of_week) ?? []
+    list.push(h)
+    slotsByDay.set(h.day_of_week, list)
+  }
+
+  const dayIsOpen = (day: number) =>
+    (slotsByDay.get(day) ?? []).some(isOpenSlot)
+
+  /** Replace the slots for ``day`` in ``value`` with ``nextSlots``. */
+  const setDaySlots = (day: number, nextSlots: VenueWeeklyHourInput[]) => {
+    const rest = value.filter((h) => h.day_of_week !== day)
+    onChange([...rest, ...nextSlots])
+  }
+
+  const toggleDayOpen = (day: number, open: boolean) => {
+    if (open) {
+      setDaySlots(day, [
+        {
+          day_of_week: day,
+          open_time: "09:00",
+          close_time: "17:00",
+          is_closed: false,
+        },
+      ])
+    } else {
+      setDaySlots(day, [
+        {
+          day_of_week: day,
+          open_time: null,
+          close_time: null,
+          is_closed: true,
+        },
+      ])
+    }
+  }
+
+  const addSlot = (day: number) => {
+    const current = slotsByDay.get(day) ?? []
+    const openSlots = current.filter(isOpenSlot)
+    // Seed the new slot a few hours after the last one so users can land
+    // on something sensible (e.g. 9-11 → add 13-17) instead of defaults.
+    let newOpen = "18:00"
+    let newClose = "21:00"
+    if (openSlots.length > 0) {
+      const last = openSlots[openSlots.length - 1]
+      if (last.close_time) {
+        const [hh, mm] = last.close_time.split(":").map(Number)
+        const startH = Math.min(23, (hh ?? 0) + 2)
+        newOpen = `${String(startH).padStart(2, "0")}:${String(mm ?? 0).padStart(2, "0")}`
+        newClose = `${String(Math.min(23, startH + 3)).padStart(2, "0")}:${String(mm ?? 0).padStart(2, "0")}`
+      }
+    }
+    setDaySlots(day, [
+      ...openSlots,
+      {
+        day_of_week: day,
+        open_time: newOpen,
+        close_time: newClose,
+        is_closed: false,
+      },
+    ])
+  }
+
+  const updateSlot = (
+    day: number,
+    idx: number,
+    patch: Partial<VenueWeeklyHourInput>,
+  ) => {
+    const current = (slotsByDay.get(day) ?? []).filter(isOpenSlot)
+    const next = current.map((s, i) => (i === idx ? { ...s, ...patch } : s))
+    setDaySlots(day, next)
+  }
+
+  const removeSlot = (day: number, idx: number) => {
+    const current = (slotsByDay.get(day) ?? []).filter(isOpenSlot)
+    const next = current.filter((_, i) => i !== idx)
+    if (next.length === 0) {
+      // Last slot removed → mark the day closed.
+      setDaySlots(day, [
+        {
+          day_of_week: day,
+          open_time: null,
+          close_time: null,
+          is_closed: true,
+        },
+      ])
+    } else {
+      setDaySlots(day, next)
+    }
   }
 
   return (
     <InlineSection title="Weekly hours">
       <div className="space-y-2 py-3">
         {DAYS_OF_WEEK.map((day) => {
-          const entry = value.find((h) => h.day_of_week === day.value)
-          if (!entry) return null
+          const open = dayIsOpen(day.value)
+          const slots = (slotsByDay.get(day.value) ?? []).filter(isOpenSlot)
           return (
             <div
               key={day.value}
-              className="flex flex-wrap items-center gap-3 rounded-md border px-3 py-2"
+              className="rounded-md border px-3 py-2 space-y-2"
             >
-              <div className="flex items-center gap-2 w-24 shrink-0">
-                <Clock className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium">{day.label}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Switch
-                  id={`closed-${day.value}`}
-                  checked={!entry.is_closed}
-                  onCheckedChange={(checked) =>
-                    updateDay(day.value, { is_closed: !checked })
-                  }
-                />
-                <Label
-                  htmlFor={`closed-${day.value}`}
-                  className="text-xs text-muted-foreground"
-                >
-                  {entry.is_closed ? "Closed" : "Open"}
-                </Label>
-              </div>
-              {!entry.is_closed && (
-                <div className="flex items-center gap-2">
-                  <TimePicker
-                    value={entry.open_time ?? ""}
-                    onChange={(v) => updateDay(day.value, { open_time: v })}
-                  />
-                  <span className="text-sm text-muted-foreground">to</span>
-                  <TimePicker
-                    value={entry.close_time ?? ""}
-                    onChange={(v) => updateDay(day.value, { close_time: v })}
-                  />
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 w-24 shrink-0">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">{day.label}</span>
                 </div>
-              )}
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id={`open-${day.value}`}
+                    checked={open}
+                    onCheckedChange={(checked) =>
+                      toggleDayOpen(day.value, checked)
+                    }
+                  />
+                  <span className="text-xs text-muted-foreground">
+                    {open ? "Open" : "Closed"}
+                  </span>
+                </div>
+                {open && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="ml-auto h-7 gap-1 text-xs"
+                    onClick={() => addSlot(day.value)}
+                  >
+                    <Plus className="h-3 w-3" /> Add slot
+                  </Button>
+                )}
+              </div>
+              {open &&
+                slots.map((slot, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center gap-2 pl-[7.25rem]"
+                  >
+                    <TimePicker
+                      value={slot.open_time ?? ""}
+                      onChange={(v) =>
+                        updateSlot(day.value, idx, { open_time: v })
+                      }
+                    />
+                    <span className="text-sm text-muted-foreground">to</span>
+                    <TimePicker
+                      value={slot.close_time ?? ""}
+                      onChange={(v) =>
+                        updateSlot(day.value, idx, { close_time: v })
+                      }
+                    />
+                    {slots.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        aria-label="Remove slot"
+                        onClick={() => removeSlot(day.value, idx)}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
             </div>
           )
         })}

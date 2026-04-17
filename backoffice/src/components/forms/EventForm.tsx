@@ -3,6 +3,8 @@ import {
   dayBoundsInTz,
   durationFits,
   freeIntervalsForDay,
+  localTzNaiveToUtc,
+  utcToLocalTzNaive,
 } from "@edgeos/shared-events"
 import { useForm, useStore } from "@tanstack/react-form"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
@@ -35,7 +37,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { VenueHoursSummary } from "@/components/VenueHoursSummary"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
@@ -56,6 +57,10 @@ import { StartTimeCombobox } from "./EventForm/StartTimeCombobox"
 
 interface EventFormProps {
   defaultValues?: EventPublic
+  /** Preselected venue for "create event" mode (used by calendar click-to-create). */
+  initialVenueId?: string
+  /** Preselected start time (UTC ISO) for "create event" mode. */
+  initialStartIso?: string
   onSuccess: () => void
 }
 
@@ -94,7 +99,12 @@ const WEEKDAY_CODE_TO_BACKEND: Record<string, number> = {
   SU: 6,
 }
 
-export function EventForm({ defaultValues, onSuccess }: EventFormProps) {
+export function EventForm({
+  defaultValues,
+  initialVenueId,
+  initialStartIso,
+  onSuccess,
+}: EventFormProps) {
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
   const { selectedPopupId } = useWorkspace()
@@ -165,9 +175,12 @@ export function EventForm({ defaultValues, onSuccess }: EventFormProps) {
     onError: createErrorHandler(showErrorToast),
   })
 
-  const formatForInput = (dt: string | null | undefined) => {
+  const formatForInput = (
+    dt: string | null | undefined,
+    tz: string | null | undefined,
+  ) => {
     if (!dt) return ""
-    return dt.slice(0, 16)
+    return utcToLocalTzNaive(dt, tz || "UTC")
   }
 
   // Compute initial duration (in minutes) from the default values (edit mode).
@@ -204,18 +217,25 @@ export function EventForm({ defaultValues, onSuccess }: EventFormProps) {
       title: defaultValues?.title ?? "",
       content: defaultValues?.content ?? "",
       kind: defaultValues?.kind ?? "",
-      start_time: formatForInput(defaultValues?.start_time),
+      start_time: formatForInput(
+        defaultValues?.start_time ?? initialStartIso,
+        defaultValues?.timezone,
+      ),
       timezone: defaultValues?.timezone ?? "UTC",
       cover_url: defaultValues?.cover_url ?? "",
       meeting_url: defaultValues?.meeting_url ?? "",
       max_participant: defaultValues?.max_participant?.toString() ?? "",
-      venue_id: defaultValues?.venue_id ?? "",
+      venue_id: defaultValues?.venue_id ?? initialVenueId ?? "",
       track_id: defaultValues?.track_id ?? "",
       visibility: (defaultValues?.visibility ?? "public") as
         | "public"
         | "private"
         | "unlisted",
-      require_approval: defaultValues?.require_approval ?? false,
+      // Attendee-level approval is intentionally not exposed in the UI:
+      // the product decision is that events never gate attendee access.
+      // The field stays in the schema with a hardcoded ``false`` default so
+      // existing records keep round-tripping unchanged.
+      require_approval: false,
       status: defaultValues?.status ?? "draft",
       tags: defaultValues?.tags ?? [],
     },
@@ -239,7 +259,10 @@ export function EventForm({ defaultValues, onSuccess }: EventFormProps) {
 
       const tags = value.tags.map((t) => t.trim().toLowerCase()).filter(Boolean)
 
-      const startDate = new Date(value.start_time)
+      // Interpret the naive datetime as wall time in the event's timezone,
+      // not the browser's. Otherwise round-tripping through the calendars
+      // (which render in popup tz) drifts by the browser↔popup tz delta.
+      const startDate = localTzNaiveToUtc(value.start_time, value.timezone)
       const endDate = new Date(startDate.getTime() + durationMinutes * 60_000)
 
       const payload: Record<string, unknown> = {
@@ -278,19 +301,26 @@ export function EventForm({ defaultValues, onSuccess }: EventFormProps) {
   // Track selected values reactively for side effects / derived queries.
   const venueIdValue = useStore(form.store, (s) => s.values.venue_id)
   const startTimeValue = useStore(form.store, (s) => s.values.start_time)
+  const timezoneValue = useStore(form.store, (s) => s.values.timezone)
   const visibilityValue = useStore(form.store, (s) => s.values.visibility)
   const maxParticipantValue = useStore(
     form.store,
     (s) => s.values.max_participant,
   )
 
+  // Convert the form's naive datetime (wall time in `timezoneValue`) to a
+  // UTC Date for backend calls / derived math.
+  const startUtc = useMemo(() => {
+    if (!startTimeValue) return null
+    const d = localTzNaiveToUtc(startTimeValue, timezoneValue || "UTC")
+    return Number.isNaN(d.getTime()) ? null : d
+  }, [startTimeValue, timezoneValue])
+
   // End time derived from start + duration (used for backend checks).
   const endTimeIso = useMemo(() => {
-    if (!startTimeValue) return ""
-    const start = new Date(startTimeValue)
-    if (Number.isNaN(start.getTime())) return ""
-    return new Date(start.getTime() + durationMinutes * 60_000).toISOString()
-  }, [startTimeValue, durationMinutes])
+    if (!startUtc) return ""
+    return new Date(startUtc.getTime() + durationMinutes * 60_000).toISOString()
+  }, [startUtc, durationMinutes])
 
   // Fetch selected venue details for capacity / booking mode / setup & teardown
   const { data: selectedVenue } = useQuery({
@@ -306,8 +336,20 @@ export function EventForm({ defaultValues, onSuccess }: EventFormProps) {
   // venue summary rendered below the selector.
   const venueWeeklyHours = selectedVenue?.weekly_hours ?? []
   const closedBackendDays = useMemo(() => {
+    // Multi-slot aware: a weekday is "closed" when it has no row flagged
+    // open with valid open/close times. A single ``is_closed=true`` row is
+    // no longer authoritative because a day may contain both open and
+    // closed markers when a schedule is edited across sessions.
+    const hasOpen = new Set<number>()
+    for (const h of venueWeeklyHours) {
+      if (!h.is_closed && h.open_time != null && h.close_time != null) {
+        hasOpen.add(h.day_of_week)
+      }
+    }
     const s = new Set<number>()
-    for (const h of venueWeeklyHours) if (h.is_closed) s.add(h.day_of_week)
+    for (let d = 0; d < 7; d++) {
+      if (!hasOpen.has(d)) s.add(d)
+    }
     return s
   }, [venueWeeklyHours])
 
@@ -348,11 +390,11 @@ export function EventForm({ defaultValues, onSuccess }: EventFormProps) {
   const lastCheckKey = useRef<string>("")
 
   useEffect(() => {
-    if (!venueIdValue || !startTimeValue || !endTimeIso) {
+    if (!venueIdValue || !startUtc || !endTimeIso) {
       setAvailability({ status: "idle" })
       return
     }
-    const key = `${venueIdValue}|${startTimeValue}|${endTimeIso}|${defaultValues?.id ?? ""}`
+    const key = `${venueIdValue}|${startUtc.toISOString()}|${endTimeIso}|${defaultValues?.id ?? ""}`
     if (lastCheckKey.current === key) return
 
     setAvailability({ status: "checking" })
@@ -362,7 +404,7 @@ export function EventForm({ defaultValues, onSuccess }: EventFormProps) {
         const result = await EventsService.checkAvailability({
           requestBody: {
             venue_id: venueIdValue,
-            start_time: new Date(startTimeValue).toISOString(),
+            start_time: startUtc!.toISOString(),
             end_time: endTimeIso,
             exclude_event_id: defaultValues?.id ?? null,
           },
@@ -384,7 +426,7 @@ export function EventForm({ defaultValues, onSuccess }: EventFormProps) {
     }, 500)
 
     return () => window.clearTimeout(handle)
-  }, [venueIdValue, startTimeValue, endTimeIso, defaultValues?.id])
+  }, [venueIdValue, startUtc, endTimeIso, defaultValues?.id])
 
   // --- Day-based slot picker (date + start/end Selects) -------------------
   // Derived from the form's local-datetime strings.
@@ -407,6 +449,17 @@ export function EventForm({ defaultValues, onSuccess }: EventFormProps) {
     enabled: !!selectedPopupId,
   })
   const popupTz = popupSettings?.timezone ?? "UTC"
+
+  // For new events, default the timezone field to the popup's configured tz
+  // as soon as settings load — users shouldn't have to hunt for it, and the
+  // UTC fallback creates silent round-trip drift against the calendars.
+  useEffect(() => {
+    if (isEdit || !popupSettings?.timezone) return
+    if (form.state.values.timezone && form.state.values.timezone !== "UTC") {
+      return
+    }
+    form.setFieldValue("timezone", popupSettings.timezone)
+  }, [isEdit, popupSettings?.timezone, form])
 
   const dayBounds = useMemo(() => {
     if (!dateStr) return null
@@ -451,12 +504,10 @@ export function EventForm({ defaultValues, onSuccess }: EventFormProps) {
 
   // Does the typed start + duration fit in a free window?
   const startFits = useMemo(() => {
-    if (!startTimeValue) return true
+    if (!startUtc) return true
     if (freeIntervals.length === 0) return true // no venue / no day data yet
-    const ms = new Date(startTimeValue).getTime()
-    if (Number.isNaN(ms)) return true
-    return durationFits(freeIntervals, ms, durationMinutes)
-  }, [freeIntervals, startTimeValue, durationMinutes])
+    return durationFits(freeIntervals, startUtc.getTime(), durationMinutes)
+  }, [freeIntervals, startUtc, durationMinutes])
 
   // Combined availability: if the slot doesn't fit locally, report unavailable
   // so we don't show a stale "Slot available" message from the server check.
@@ -611,6 +662,12 @@ export function EventForm({ defaultValues, onSuccess }: EventFormProps) {
               )}
             </div>
             <VenueHoursSummary hours={venueWeeklyHours} />
+            {selectedVenue.description && (
+              <p className="whitespace-pre-wrap">
+                <strong className="text-foreground">About this venue:</strong>{" "}
+                {selectedVenue.description}
+              </p>
+            )}
             {isVenueUnbookable && (
               <p className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-destructive">
                 This venue is marked as unbookable. Date selection is disabled.
@@ -911,25 +968,10 @@ export function EventForm({ defaultValues, onSuccess }: EventFormProps) {
                 />
                 {exceedsCapacity && venueCapacity != null && (
                   <p className="max-w-xs text-right text-xs text-yellow-600 dark:text-yellow-500">
-                    Exceeds venue capacity ({venueCapacity}). Additional
-                    attendees will still be allowed.
+                    Exceeds venue capacity ({venueCapacity}).
                   </p>
                 )}
               </div>
-            )}
-          </form.Field>
-        </InlineRow>
-
-        <InlineRow
-          label="Require Approval"
-          description="Participants need admin approval"
-        >
-          <form.Field name="require_approval">
-            {(field) => (
-              <Switch
-                checked={field.state.value}
-                onCheckedChange={field.handleChange}
-              />
             )}
           </form.Field>
         </InlineRow>

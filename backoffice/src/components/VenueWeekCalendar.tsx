@@ -1,5 +1,7 @@
+import { tzOffsetMinutes } from "@edgeos/shared-events"
 import { useQuery } from "@tanstack/react-query"
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
+import type * as React from "react"
 import { useMemo, useState } from "react"
 
 import {
@@ -117,6 +119,11 @@ type PositionedBlock = {
   height: number
   label: string
   source: "event" | "exception" | string
+  eventId?: string | null
+  /** Minutes of setup padding at the top of the block (already included). */
+  setupMinutes?: number
+  /** Minutes of teardown padding at the bottom. */
+  teardownMinutes?: number
 }
 
 /**
@@ -124,13 +131,34 @@ type PositionedBlock = {
  * render as one block per day. Assumes end > start.
  */
 function slotToBlocks(
-  slot: { start: string; end: string; source: string; label?: string | null },
+  slot: {
+    start: string
+    end: string
+    source: string
+    label?: string | null
+    event_id?: string | null
+    event_start?: string | null
+    event_end?: string | null
+  },
   tz: string,
   idx: number,
 ): PositionedBlock[] {
   const start = toLocalDayMinutes(slot.start, tz)
   const end = toLocalDayMinutes(slot.end, tz)
   if (!start || !end) return []
+
+  // Extract setup/teardown minutes when the backend reported the real event
+  // window. Those minutes render as a lighter band inside the busy block.
+  let setupMinutes = 0
+  let teardownMinutes = 0
+  if (slot.event_start && slot.event_end) {
+    const evStart = new Date(slot.event_start).getTime()
+    const evEnd = new Date(slot.event_end).getTime()
+    const blockStart = new Date(slot.start).getTime()
+    const blockEnd = new Date(slot.end).getTime()
+    setupMinutes = Math.max(0, Math.round((evStart - blockStart) / 60000))
+    teardownMinutes = Math.max(0, Math.round((blockEnd - evEnd) / 60000))
+  }
 
   const sameDay = start.dayKey === end.dayKey
   if (sameDay) {
@@ -145,6 +173,9 @@ function slotToBlocks(
         ),
         label: slot.label ?? "",
         source: slot.source,
+        eventId: slot.event_id ?? null,
+        setupMinutes,
+        teardownMinutes,
       },
     ]
   }
@@ -185,6 +216,46 @@ function groupByDay(
   return map
 }
 
+/**
+ * Closed bands = the complement of open ranges within a full 24h day.
+ * Emitted as positioned blocks so the caller can render them like any
+ * other overlay.
+ */
+function computeClosedBlocks(
+  openBlocks: PositionedBlock[],
+  dayKey: string,
+): PositionedBlock[] {
+  const dayHeight = 24 * HOUR_HEIGHT
+  const sorted = [...openBlocks].sort((a, b) => a.top - b.top)
+  const closed: PositionedBlock[] = []
+  let cursor = 0
+  let i = 0
+  for (const o of sorted) {
+    if (o.top > cursor) {
+      closed.push({
+        key: `closed-${dayKey}-${i++}`,
+        dayKey,
+        top: cursor,
+        height: o.top - cursor,
+        label: "",
+        source: "closed",
+      })
+    }
+    cursor = Math.max(cursor, o.top + o.height)
+  }
+  if (cursor < dayHeight) {
+    closed.push({
+      key: `closed-${dayKey}-${i++}`,
+      dayKey,
+      top: cursor,
+      height: dayHeight - cursor,
+      label: "",
+      source: "closed",
+    })
+  }
+  return closed
+}
+
 function formatHeaderTz(date: Date): string {
   // date is UTC-midnight representing a local day; format from parts to
   // avoid a timezone conversion muddling the visible label.
@@ -199,9 +270,19 @@ function formatHeaderTz(date: Date): string {
 export function VenueWeekCalendar({
   venueId,
   timezone,
+  onCreateAt,
+  onEventClick,
+  onExceptionClick,
 }: {
   venueId: string
   timezone: string
+  /** Called when the user clicks an empty space in a day column. The
+   *  ``startIso`` is rounded to the nearest 15-minute boundary. */
+  onCreateAt?: (startIso: string) => void
+  /** Called when the user clicks a busy block sourced from an event. */
+  onEventClick?: (eventId: string) => void
+  /** Called when the user clicks a closed-exception block. */
+  onExceptionClick?: (reason: string | null) => void
 }) {
   const [weekAnchor, setWeekAnchor] = useState<Date>(() =>
     startOfWeek(tzToday(timezone)),
@@ -367,13 +448,59 @@ export function VenueWeekCalendar({
             {days.map((d, i) => {
               const dayOpen = openByDay[d.key] ?? []
               const dayBusy = busyByDay[d.key] ?? []
+              const dayClosed = computeClosedBlocks(dayOpen, d.key)
+              const handleColumnClick = (
+                e: React.MouseEvent<HTMLDivElement>,
+              ) => {
+                if (!onCreateAt) return
+                const rect = e.currentTarget.getBoundingClientRect()
+                const y = e.clientY - rect.top
+                // Don't offer to create when the click lands inside a
+                // "closed" band (outside the venue's open hours). The UI
+                // would otherwise let users schedule at times the backend
+                // is going to reject.
+                const inClosed = dayClosed.some(
+                  (c) => y >= c.top && y < c.top + c.height,
+                )
+                if (inClosed) return
+                const minuteOfDay = Math.max(
+                  0,
+                  Math.min(
+                    DAY_MINUTES - 15,
+                    Math.round((y / HOUR_HEIGHT) * 60),
+                  ),
+                )
+                // Round to nearest 15-minute mark so the prefilled start time
+                // is clock-friendly.
+                const rounded = Math.round(minuteOfDay / 15) * 15
+                // Compose YYYY-MM-DDTHH:MM in the venue's TZ then convert
+                // to UTC using the Intl-offset trick.
+                const hh = String(Math.floor(rounded / 60)).padStart(2, "0")
+                const mm = String(rounded % 60).padStart(2, "0")
+                const naive = `${d.key}T${hh}:${mm}:00`
+                const guess = Date.parse(`${naive}Z`)
+                const offsetMin = tzOffsetMinutes(guess, timezone)
+                const utc = new Date(guess - offsetMin * 60_000)
+                onCreateAt(utc.toISOString())
+              }
               return (
+                // biome-ignore lint/a11y/noStaticElementInteractions: absolute-positioned calendar surface; a <button> would break overlay layout
                 <div
                   key={d.key}
+                  onClick={handleColumnClick}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter")
+                      handleColumnClick(
+                        e as unknown as React.MouseEvent<HTMLDivElement>,
+                      )
+                  }}
+                  role={onCreateAt ? "button" : undefined}
+                  tabIndex={onCreateAt ? 0 : undefined}
                   className={cn(
                     "relative",
                     i < 6 && "border-r border-border",
                     d.isToday && "bg-primary/[0.03]",
+                    onCreateAt && "cursor-crosshair",
                   )}
                   style={{ height: HOUR_HEIGHT * 24 }}
                 >
@@ -386,12 +513,13 @@ export function VenueWeekCalendar({
                     />
                   ))}
 
-                  {/* Open range band — visible green tint for "when the venue is open" */}
-                  {dayOpen.map((o) => (
+                  {/* Closed band — everything outside `open_ranges` gets a
+                      soft gray wash. Open hours keep the theme background. */}
+                  {dayClosed.map((c) => (
                     <div
-                      key={o.key}
-                      style={{ top: o.top, height: o.height }}
-                      className="absolute left-0 right-0 bg-emerald-500/10"
+                      key={c.key}
+                      style={{ top: c.top, height: c.height }}
+                      className="absolute left-0 right-0 bg-muted/60 dark:bg-muted/40"
                     />
                   ))}
 
@@ -403,19 +531,61 @@ export function VenueWeekCalendar({
                       calendar surface. */}
                   {dayBusy.map((b) => {
                     const isClosedException = b.source === "exception"
+                    const setupH = ((b.setupMinutes ?? 0) / 60) * HOUR_HEIGHT
+                    const teardownH =
+                      ((b.teardownMinutes ?? 0) / 60) * HOUR_HEIGHT
+                    const handleBlockClick = (ev: React.SyntheticEvent) => {
+                      if (isClosedException && onExceptionClick) {
+                        ev.stopPropagation()
+                        onExceptionClick(b.label || null)
+                        return
+                      }
+                      if (b.eventId && onEventClick) {
+                        ev.stopPropagation()
+                        onEventClick(b.eventId)
+                      }
+                    }
+                    const clickable =
+                      (isClosedException && !!onExceptionClick) ||
+                      (!!b.eventId && !!onEventClick)
                     return (
+                      // biome-ignore lint/a11y/noStaticElementInteractions: absolute-positioned event block; <button> would cascade unwanted styles
                       <div
                         key={b.key}
                         style={{ top: b.top + 1, height: b.height - 2 }}
                         title={b.label}
+                        onClick={handleBlockClick}
+                        onKeyDown={(ev) => {
+                          if (ev.key === "Enter") handleBlockClick(ev)
+                        }}
+                        role={clickable ? "button" : undefined}
+                        tabIndex={clickable ? 0 : undefined}
                         className={cn(
-                          "absolute left-1 right-1 rounded-md px-1.5 py-1 text-[11px] font-medium leading-tight overflow-hidden shadow-sm",
+                          "absolute left-1 right-1 rounded-md text-[11px] font-medium leading-tight overflow-hidden shadow-sm",
                           isClosedException
                             ? "bg-zinc-300 text-zinc-800 border border-zinc-500 border-dashed dark:bg-zinc-700 dark:text-zinc-100 dark:border-zinc-400"
                             : "bg-sky-600 text-white border border-sky-700 dark:bg-sky-500 dark:text-white dark:border-sky-400",
+                          clickable && "cursor-pointer",
                         )}
                       >
-                        <div className="truncate">{b.label}</div>
+                        {/* Setup band (hatched lighter) at the top of the block. */}
+                        {setupH > 1 && (
+                          <div
+                            style={{ height: setupH }}
+                            aria-hidden
+                            className="bg-sky-400/60 border-b border-sky-700/50 dark:bg-sky-400/40"
+                            title="Setup"
+                          />
+                        )}
+                        <div className="px-1.5 py-1 truncate">{b.label}</div>
+                        {teardownH > 1 && (
+                          <div
+                            style={{ height: teardownH }}
+                            aria-hidden
+                            className="bg-sky-400/60 border-t border-sky-700/50 dark:bg-sky-400/40 mt-auto"
+                            title="Teardown"
+                          />
+                        )}
                       </div>
                     )
                   })}
@@ -432,8 +602,8 @@ export function VenueWeekCalendar({
           Event
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="h-3 w-3 rounded-sm bg-emerald-500/30" />
-          Open hours
+          <span className="h-3 w-3 rounded-sm bg-muted/60 border border-border dark:bg-muted/40" />
+          Closed
         </div>
         <div className="flex items-center gap-1.5">
           <span className="h-3 w-3 rounded-sm bg-zinc-300 border border-dashed border-zinc-500 dark:bg-zinc-700 dark:border-zinc-400" />
