@@ -32,6 +32,10 @@ interface BuildPaymentProductsResult {
 /**
  * Detects whether a month/full upgrade is happening (month or full selected
  * with existing week/day purchased, and no patron selected).
+ *
+ * No category guard needed here: duration_type "month"/"full" is exclusively
+ * used by ticket products. Non-ticket products (housing, merch, etc.) never
+ * carry these duration types, so this filter is already ticket-scoped.
  */
 function detectMonthUpgrade(attendeePasses: AttendeePassState[]): boolean {
   const fullOrMonthSelectedWithWeekOrDay = attendeePasses.some(

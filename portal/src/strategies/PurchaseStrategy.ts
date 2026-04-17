@@ -1,6 +1,7 @@
 import {
   CHECKOUT_MODE,
   type CheckoutMode,
+  TICKET_CATEGORY,
 } from "@/checkout/popupCheckoutPolicy"
 import type { ProductsPass } from "@/types/Products"
 
@@ -26,7 +27,9 @@ class DefaultPurchaseStrategy implements PurchaseStrategy {
       ...product,
       purchased:
         attendeeProducts?.some((p) => p.id === product.id) ||
-        (hasMonthlyPass && product.duration_type === "week"),
+        (hasMonthlyPass &&
+          product.category === TICKET_CATEGORY &&
+          product.duration_type === "week"),
     }))
   }
 }

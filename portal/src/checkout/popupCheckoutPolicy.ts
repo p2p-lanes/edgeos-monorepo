@@ -14,6 +14,17 @@ export const CHECKOUT_MODE = {
 
 export type CheckoutMode = (typeof CHECKOUT_MODE)[keyof typeof CHECKOUT_MODE]
 
+export const TICKET_CATEGORY = "ticket"
+
+export function getEffectiveCheckoutMode(
+  category: string | undefined | null,
+  popupMode: CheckoutMode,
+): CheckoutMode {
+  return category === TICKET_CATEGORY
+    ? popupMode
+    : CHECKOUT_MODE.SIMPLE_QUANTITY
+}
+
 export const SALE_TYPE = {
   APPLICATION: "application",
   DIRECT: "direct",

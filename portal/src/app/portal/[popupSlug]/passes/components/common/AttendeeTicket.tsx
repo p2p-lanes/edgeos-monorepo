@@ -1,6 +1,7 @@
 import { ChevronRight, QrCode, Ticket, User } from "lucide-react"
 import React, { useState } from "react"
 import { useTranslation } from "react-i18next"
+import { TICKET_CATEGORY } from "@/checkout/popupCheckoutPolicy"
 import {
   Collapsible,
   CollapsibleContent,
@@ -68,7 +69,9 @@ const AttendeeTicket = ({
 
   // All ticket products go into commonProducts (local categories no longer exist)
   const localProducts: ProductsPass[] = []
-  const commonProducts = standardProducts.filter((p) => p.category === "ticket")
+  const commonProducts = standardProducts.filter(
+    (p) => p.category === TICKET_CATEGORY,
+  )
 
   // Get purchased passes for view mode display
   const purchasedPasses = attendee.products

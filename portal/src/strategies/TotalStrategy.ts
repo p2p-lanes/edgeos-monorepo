@@ -1,6 +1,7 @@
 import {
   CHECKOUT_MODE,
   type CheckoutMode,
+  TICKET_CATEGORY,
 } from "@/checkout/popupCheckoutPolicy"
 import type { AttendeePassState } from "@/types/Attendee"
 import type { DiscountProps } from "@/types/discounts"
@@ -225,13 +226,34 @@ export class TotalCalculator {
   ): TotalResult {
     const baseResult = attendees.reduce(
       (total, attendee) => {
-        const strategy = this.getStrategy(attendee.products)
-        const result = strategy.calculate(attendee.products, discount)
+        const ticketProducts = attendee.products.filter(
+          (p) => p.category === TICKET_CATEGORY || p.category === "patreon",
+        )
+        const nonTicketProducts = attendee.products.filter(
+          (p) => p.category !== TICKET_CATEGORY && p.category !== "patreon",
+        )
+
+        const ticketStrategy = this.getStrategy(ticketProducts)
+        const ticketResult = ticketStrategy.calculate(ticketProducts, discount)
+
+        const nonTicketResult =
+          nonTicketProducts.length > 0
+            ? new SimpleQuantityPriceStrategy().calculate(
+                nonTicketProducts,
+                discount,
+              )
+            : { total: 0, originalTotal: 0, discountAmount: 0 }
 
         return {
-          total: total.total + result.total,
-          originalTotal: total.originalTotal + result.originalTotal,
-          discountAmount: total.discountAmount + result.discountAmount,
+          total: total.total + ticketResult.total + nonTicketResult.total,
+          originalTotal:
+            total.originalTotal +
+            ticketResult.originalTotal +
+            nonTicketResult.originalTotal,
+          discountAmount:
+            total.discountAmount +
+            ticketResult.discountAmount +
+            nonTicketResult.discountAmount,
         }
       },
       { total: 0, originalTotal: 0, discountAmount: 0 },

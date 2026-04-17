@@ -2,6 +2,7 @@ import { ArrowRight, FileText, Plus, Sparkles, Ticket } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
+import { TICKET_CATEGORY } from "@/checkout/popupCheckoutPolicy"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -45,7 +46,7 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
   )
 
   const mainTickets = products.filter(
-    (p) => p.category === "ticket" && p.attendee_category === "main",
+    (p) => p.category === TICKET_CATEGORY && p.attendee_category === "main",
   )
   const minPrice =
     mainTickets.length > 0 ? Math.min(...mainTickets.map((p) => p.price)) : null

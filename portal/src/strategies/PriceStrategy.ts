@@ -1,6 +1,8 @@
 import {
   CHECKOUT_MODE,
   type CheckoutMode,
+  getEffectiveCheckoutMode,
+  TICKET_CATEGORY,
 } from "@/checkout/popupCheckoutPolicy"
 import type { DiscountProps } from "@/types/discounts"
 import type { ProductsPass } from "@/types/Products"
@@ -29,9 +31,14 @@ class DefaultPriceStrategy implements PriceStrategy {
     const isSpecialProduct =
       product.category === "patreon" || product.category === "supporter"
     const originalPrice = product.original_price || product.price || 0
+    const effective = getEffectiveCheckoutMode(
+      product.category,
+      this.checkoutMode,
+    )
 
     if (
-      this.checkoutMode === CHECKOUT_MODE.PASS_SYSTEM &&
+      effective === CHECKOUT_MODE.PASS_SYSTEM &&
+      product.category === TICKET_CATEGORY &&
       !isSpecialProduct &&
       hasPatreonPurchased
     ) {

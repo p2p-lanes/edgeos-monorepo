@@ -1,9 +1,6 @@
 import {
-  CHECKOUT_MODE,
-  type CheckoutMode,
   createContext,
   type ReactNode,
-  resolvePopupCheckoutPolicy,
   useCallback,
   useContext,
   useEffect,
@@ -11,6 +8,11 @@ import {
   useRef,
   useState,
 } from "react"
+import {
+  CHECKOUT_MODE,
+  type CheckoutMode,
+  resolvePopupCheckoutPolicy,
+} from "@/checkout/popupCheckoutPolicy"
 import type { AttendeePurchases } from "@/client"
 import { supportsQuantitySelector } from "@/components/ui/QuantitySelector"
 import { useCart } from "@/hooks/useCartApi"

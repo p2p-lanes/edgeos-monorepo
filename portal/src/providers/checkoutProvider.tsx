@@ -2,10 +2,8 @@
 
 import { useQuery } from "@tanstack/react-query"
 import {
-  CHECKOUT_MODE,
   createContext,
   type ReactNode,
-  resolvePopupCheckoutPolicy,
   useCallback,
   useContext,
   useEffect,
@@ -13,6 +11,10 @@ import {
   useRef,
   useState,
 } from "react"
+import {
+  CHECKOUT_MODE,
+  resolvePopupCheckoutPolicy,
+} from "@/checkout/popupCheckoutPolicy"
 import type { TicketingStepPublic } from "@/client"
 import { TicketingStepsService } from "@/client"
 import { supportsQuantitySelector } from "@/components/ui/QuantitySelector"

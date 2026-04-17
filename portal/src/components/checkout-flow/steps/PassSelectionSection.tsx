@@ -423,7 +423,7 @@ function AttendeePassCardBody({
             {fullProducts.map((product) => {
               const disabledForSpouse = shouldDisableForPrimaryRestriction({
                 checkoutMode: CHECKOUT_MODE.PASS_SYSTEM,
-                attendeeCategory: attendee.category,
+                attendeeCategory: attendee.category as AttendeeCategory,
                 primaryHasPass: primaryHasPass(product.id),
               })
               return (
@@ -463,7 +463,7 @@ function AttendeePassCardBody({
             {monthProducts.map((product) => {
               const disabledForSpouse = shouldDisableForPrimaryRestriction({
                 checkoutMode: CHECKOUT_MODE.PASS_SYSTEM,
-                attendeeCategory: attendee.category,
+                attendeeCategory: attendee.category as AttendeeCategory,
                 primaryHasPass: primaryHasPass(product.id),
               })
               return (
@@ -500,7 +500,7 @@ function AttendeePassCardBody({
             {weekProducts.map((product) => {
               const disabledForSpouse = shouldDisableForPrimaryRestriction({
                 checkoutMode: CHECKOUT_MODE.PASS_SYSTEM,
-                attendeeCategory: attendee.category,
+                attendeeCategory: attendee.category as AttendeeCategory,
                 primaryHasPass: primaryHasPass(product.id),
               })
               return (
@@ -541,7 +541,7 @@ function AttendeePassCardBody({
             {dayProducts.map((product) => {
               const disabledForSpouse = shouldDisableForPrimaryRestriction({
                 checkoutMode: CHECKOUT_MODE.PASS_SYSTEM,
-                attendeeCategory: attendee.category,
+                attendeeCategory: attendee.category as AttendeeCategory,
                 primaryHasPass: primaryHasPass(product.id),
               })
               return (

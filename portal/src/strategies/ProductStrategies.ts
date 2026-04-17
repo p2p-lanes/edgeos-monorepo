@@ -1,6 +1,7 @@
 import {
   CHECKOUT_MODE,
   type CheckoutMode,
+  getEffectiveCheckoutMode,
 } from "@/checkout/popupCheckoutPolicy"
 import { supportsQuantitySelector } from "@/components/ui/QuantitySelector"
 import {
@@ -383,7 +384,9 @@ export const getProductStrategy = (
 ): ProductStrategy => {
   if (isEditing) return new EditProductStrategy()
 
-  if (checkoutMode === CHECKOUT_MODE.SIMPLE_QUANTITY) {
+  const effective = getEffectiveCheckoutMode(product.category, checkoutMode)
+
+  if (effective === CHECKOUT_MODE.SIMPLE_QUANTITY) {
     return new SimpleQuantityProductStrategy()
   }
 
