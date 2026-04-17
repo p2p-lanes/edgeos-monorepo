@@ -47,6 +47,11 @@ class EventParticipantPublic(EventParticipantBase):
     """Participant schema for API responses."""
 
     id: uuid.UUID
+    # Joined from Humans. Populated by router helpers when listing participants
+    # so clients can render a real name instead of a UUID; None when the
+    # referenced human is missing (deleted / cross-tenant link).
+    first_name: str | None = None
+    last_name: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -34,6 +34,7 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
         start_before: datetime | None = None,
         venue_id: uuid.UUID | None = None,
         track_id: uuid.UUID | None = None,
+        tags: list[str] | None = None,
         search: str | None = None,
         expand_occurrences: bool | None = None,
     ) -> tuple[list[Events], int]:
@@ -54,6 +55,13 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
             statement = statement.where(Events.venue_id == venue_id)
         if track_id is not None:
             statement = statement.where(Events.track_id == track_id)
+        if tags:
+            # Postgres JSONB ?| operator: any of the provided tags present.
+            from sqlalchemy.dialects.postgresql import JSONB
+
+            statement = statement.where(
+                Events.tags.cast(JSONB).op("?|")(list(tags))
+            )
         if start_after is not None:
             statement = statement.where(Events.start_time >= start_after)
         if start_before is not None:

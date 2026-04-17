@@ -310,6 +310,51 @@ class TestVenueAvailability:
         assert datetime.fromisoformat(got["start"]) == exc_start
         assert datetime.fromisoformat(got["end"]) == exc_end
 
+    def test_no_hours_configured_defaults_to_always_open(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        """Venue with zero weekly_hours and no open exceptions → open 24/7
+        across the query window. Closed exceptions still carve out busy."""
+        popup = _make_popup(db, tenant_a, tz="UTC")
+        venue = _make_venue(db, tenant_a, popup)
+
+        exc_start = datetime(2026, 4, 13, 12, 0, tzinfo=UTC)
+        exc_end = datetime(2026, 4, 13, 14, 0, tzinfo=UTC)
+        db.add(
+            VenueExceptions(
+                tenant_id=tenant_a.id,
+                venue_id=venue.id,
+                start_datetime=exc_start,
+                end_datetime=exc_end,
+                is_closed=True,
+                reason="Deep clean",
+            )
+        )
+        db.commit()
+
+        range_start = datetime(2026, 4, 13, 0, 0, tzinfo=UTC)
+        range_end = datetime(2026, 4, 14, 0, 0, tzinfo=UTC)
+        status_code, data = _get_availability(
+            client,
+            venue,
+            admin_token_tenant_a,
+            start=range_start,
+            end=range_end,
+        )
+
+        assert status_code == 200, data
+        assert len(data["open_ranges"]) == 1
+        got = data["open_ranges"][0]
+        assert datetime.fromisoformat(got["start"]) == range_start
+        assert datetime.fromisoformat(got["end"]) == range_end
+        # Closed exception still lands in busy so UIs can render it.
+        assert len(data["busy"]) == 1
+        assert data["busy"][0]["source"] == "exception"
+
     def test_event_busy_includes_setup_and_teardown(
         self,
         client: TestClient,

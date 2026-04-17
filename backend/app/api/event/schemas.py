@@ -120,6 +120,21 @@ class EventPublic(EventBase):
     # master. Format: ``{master_id}_{yyyymmddTHHMMSS}``. ``None`` for real
     # (persisted) rows.
     occurrence_id: str | None = None
+    # Denormalized venue fields so portal clients can render a card without
+    # a follow-up call to /event-venues/{id} (that endpoint requires user
+    # auth the portal doesn't have). Populated by list/get helpers; None
+    # when the event has no venue.
+    venue_title: str | None = None
+    venue_location: str | None = None
+    venue_image_url: str | None = None
+    # True when the current human has hidden this event (per-user marker).
+    # Only populated by portal endpoints and only ever True inside responses
+    # to ``?include_hidden=true`` — otherwise hidden events are filtered out.
+    hidden: bool = False
+    # RSVP status of the current human for this event, populated by portal
+    # list/get helpers. None means "not registered"; "registered" /
+    # "checked_in" / "cancelled" mirror ParticipantStatus.
+    my_rsvp_status: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

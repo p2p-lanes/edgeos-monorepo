@@ -49,13 +49,13 @@ async def upsert_event_settings(
 
     existing = crud.event_settings_crud.get_by_popup_id(db, popup_id)
     if existing:
-        update = EventSettingsUpdate(
-            can_publish_event=settings_in.can_publish_event,
-            event_enabled=settings_in.event_enabled,
-            humans_can_create_venues=settings_in.humans_can_create_venues,
-            venues_require_approval=settings_in.venues_require_approval,
-            timezone=settings_in.timezone,
+        # Build the update from every ``EventSettingsUpdate`` field so any new
+        # settings field (e.g. ``allowed_tags``, ``approval_notification_email``)
+        # flows through without having to edit this list each time.
+        update_data = settings_in.model_dump(
+            include=set(EventSettingsUpdate.model_fields.keys())
         )
+        update = EventSettingsUpdate(**update_data)
         updated = crud.event_settings_crud.update(db, existing, update)
         return EventSettingsPublic.model_validate(updated)
 

@@ -3,6 +3,8 @@ from datetime import datetime
 from enum import Enum
 
 from pydantic import BaseModel, ConfigDict
+from sqlalchemy import Column, Text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import DateTime, Field, SQLModel
 
 
@@ -21,6 +23,17 @@ class EventSettingsBase(SQLModel):
     humans_can_create_venues: bool = Field(default=False)
     venues_require_approval: bool = Field(default=True)
     timezone: str = Field(default="UTC", max_length=64)
+    # Tags an admin has whitelisted. Portal EventForm offers these as
+    # selectable chips; free-text tag entry is disabled.
+    allowed_tags: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSONB, nullable=False, server_default="[]"),
+    )
+    # Email that receives notifications when an event or venue is submitted
+    # and requires approval. Falls back to the popup owner if unset.
+    approval_notification_email: str | None = Field(
+        default=None, sa_type=Text()
+    )
     created_at: datetime = Field(default_factory=datetime.utcnow, sa_type=DateTime(timezone=True))
     updated_at: datetime = Field(default_factory=datetime.utcnow, sa_type=DateTime(timezone=True))
 
@@ -42,6 +55,8 @@ class EventSettingsCreate(BaseModel):
     humans_can_create_venues: bool = False
     venues_require_approval: bool = True
     timezone: str = "UTC"
+    allowed_tags: list[str] = []
+    approval_notification_email: str | None = None
 
 
 class EventSettingsUpdate(BaseModel):
@@ -52,3 +67,5 @@ class EventSettingsUpdate(BaseModel):
     humans_can_create_venues: bool | None = None
     venues_require_approval: bool | None = None
     timezone: str | None = None
+    allowed_tags: list[str] | None = None
+    approval_notification_email: str | None = None

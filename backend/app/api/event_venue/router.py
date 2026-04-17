@@ -246,15 +246,20 @@ async def set_weekly_hours(
     )
     for row in existing:
         db.delete(row)
-    # Flush deletes first so the unique (venue_id, day_of_week) constraint
-    # doesn't trip on the inserts below while the old rows are still pending.
+    # Flush deletes before inserting fresh rows so we never collide with the
+    # previous ids (harmless since the unique constraint was dropped in
+    # 0037, but keeping the pattern keeps the SQL predictable).
     db.flush()
-    # Dedupe by day_of_week just in case the client posts duplicates.
-    seen_days: set[int] = set()
+    # Multiple rows per (venue, day_of_week) are allowed so venues can have
+    # split schedules (e.g. 09-11 AND 17-21 the same day). We only dedupe
+    # exact duplicates to keep the client idempotent.
+    seen: set[tuple[int, object, object, bool]] = set()
+    inserted = 0
     for h in payload.hours:
-        if h.day_of_week in seen_days:
+        key = (h.day_of_week, h.open_time, h.close_time, h.is_closed)
+        if key in seen:
             continue
-        seen_days.add(h.day_of_week)
+        seen.add(key)
         db.add(
             VenueWeeklyHours(
                 tenant_id=venue.tenant_id,
@@ -265,8 +270,9 @@ async def set_weekly_hours(
                 is_closed=h.is_closed,
             )
         )
+        inserted += 1
     db.commit()
-    return {"count": len(seen_days)}
+    return {"count": inserted}
 
 
 # ---------------------------------------------------------------------------
@@ -481,11 +487,15 @@ def _compute_availability(
     tz = ZoneInfo(tz_name)
 
     # --- Busy from events (+ setup/teardown) and closed exceptions --------
+    # Cancelled and rejected events no longer hold their slot; treat them
+    # as freed availability so calendars don't show ghost blocks.
     events = list(
         db.exec(
             select(Events)
             .where(Events.venue_id == venue.id)
-            .where(Events.status != EventStatus.CANCELLED)
+            .where(Events.status.notin_(
+                [EventStatus.CANCELLED, EventStatus.REJECTED]
+            ))
             .where(Events.start_time < end)
             .where(Events.end_time > start)
         ).all()
@@ -520,6 +530,9 @@ def _compute_availability(
                 end=busy_end,
                 source="event",
                 label=e.title,
+                event_id=e.id,
+                event_start=e.start_time,
+                event_end=e.end_time,
             )
         )
     for exc in closed_exceptions:
@@ -533,37 +546,52 @@ def _compute_availability(
         )
 
     # --- Open ranges from weekly_hours + open exceptions ------------------
-    weekly_by_day = {
-        row.day_of_week: row
-        for row in db.exec(
-            select(VenueWeeklyHours).where(VenueWeeklyHours.venue_id == venue.id)
-        ).all()
-    }
+    # A venue can have multiple open/close rows per weekday (split schedule),
+    # so bucket by day into a list.
+    weekly_by_day: dict[int, list] = {}
+    for row in db.exec(
+        select(VenueWeeklyHours).where(VenueWeeklyHours.venue_id == venue.id)
+    ).all():
+        weekly_by_day.setdefault(row.day_of_week, []).append(row)
 
     raw_ranges: list[tuple[datetime, datetime]] = []
     start_local = start.astimezone(tz)
     end_local = end.astimezone(tz)
-    day_cursor: date = start_local.date()
-    last_day: date = end_local.date()
-    while day_cursor <= last_day:
-        dow = day_cursor.weekday()  # Mon=0 … Sun=6 (matches our schema)
-        hours = weekly_by_day.get(dow)
-        if (
-            hours
-            and not hours.is_closed
-            and hours.open_time is not None
-            and hours.close_time is not None
-        ):
-            open_local = datetime.combine(day_cursor, hours.open_time, tzinfo=tz)
-            close_local = datetime.combine(day_cursor, hours.close_time, tzinfo=tz)
-            # Handle overnight (close < open).
-            if close_local <= open_local:
-                close_local = close_local + timedelta(days=1)
-            clamped_start = max(open_local, start)
-            clamped_end = min(close_local, end)
-            if clamped_start < clamped_end:
-                raw_ranges.append((clamped_start, clamped_end))
-        day_cursor = day_cursor + timedelta(days=1)
+    # If the venue has no weekly hours AND no open exceptions configured,
+    # treat it as always-open across the query window. Users that never
+    # set hours generally mean "the venue is permanently available";
+    # surfacing that as an empty schedule (fully closed) is counter-
+    # intuitive. Closed exceptions still carve out busy slots. If the
+    # user opted into open exceptions without weekly hours, they've
+    # expressed intent that only those windows are open — respect it.
+    if not weekly_by_day and not open_exceptions:
+        raw_ranges.append((start, end))
+    else:
+        day_cursor: date = start_local.date()
+        last_day: date = end_local.date()
+        while day_cursor <= last_day:
+            dow = day_cursor.weekday()  # Mon=0 … Sun=6 (matches our schema)
+            for hours in weekly_by_day.get(dow, []):
+                if (
+                    hours.is_closed
+                    or hours.open_time is None
+                    or hours.close_time is None
+                ):
+                    continue
+                open_local = datetime.combine(
+                    day_cursor, hours.open_time, tzinfo=tz
+                )
+                close_local = datetime.combine(
+                    day_cursor, hours.close_time, tzinfo=tz
+                )
+                # Handle overnight (close < open).
+                if close_local <= open_local:
+                    close_local = close_local + timedelta(days=1)
+                clamped_start = max(open_local, start)
+                clamped_end = min(close_local, end)
+                if clamped_start < clamped_end:
+                    raw_ranges.append((clamped_start, clamped_end))
+            day_cursor = day_cursor + timedelta(days=1)
 
     # Open exceptions add windows even when weekly_hours is closed.
     for exc in open_exceptions:
@@ -670,8 +698,9 @@ async def create_portal_venue(
     venue_data = venue_in.model_dump(exclude={"property_type_ids"})
     venue_data["tenant_id"] = current_human.tenant_id
     venue_data["owner_id"] = current_human.id
+    pending = settings.venues_require_approval
     venue_data["status"] = (
-        VenueStatus.PENDING if settings.venues_require_approval else VenueStatus.ACTIVE
+        VenueStatus.PENDING if pending else VenueStatus.ACTIVE
     )
     venue = EventVenues(**venue_data)
     db.add(venue)
@@ -679,6 +708,14 @@ async def create_portal_venue(
     _set_property_types(db, venue, venue_in.property_type_ids)
     db.commit()
     db.refresh(venue)
+
+    if pending:
+        from app.api.popup.crud import popups_crud
+        from app.services.approval_notify import notify_venue_pending_approval
+
+        popup = popups_crud.get(db, venue.popup_id)
+        await notify_venue_pending_approval(venue, popup, settings)
+
     return EventVenuePublic.model_validate(venue)
 
 

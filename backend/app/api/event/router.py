@@ -2,7 +2,7 @@ import uuid
 from collections.abc import Iterable
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, HTTPException, Query, Response, status
 from loguru import logger
 from pydantic import BaseModel
 
@@ -110,17 +110,54 @@ def _check_venue_availability(
         )
 
 
-def _to_public(event) -> EventPublic:
+VenueInfo = tuple[str | None, str | None, str | None]  # (title, location, image)
+
+
+def _to_public(
+    event,
+    venue_map: dict[uuid.UUID, VenueInfo] | None = None,
+) -> EventPublic:
     """Convert an Events row (or expanded pseudo-row) to EventPublic.
 
     Propagates the synthetic ``occurrence_id`` set by
     :func:`app.api.event.crud._clone_as_occurrence`.
+
+    ``venue_map`` lets callers pre-fetch venues in a single query and avoid
+    N+1 when serializing a list.
     """
     data = EventPublic.model_validate(event)
     occ = event.__dict__.get("_occurrence_id") if hasattr(event, "__dict__") else None
+    updates: dict = {}
     if occ:
-        data = data.model_copy(update={"occurrence_id": occ})
+        updates["occurrence_id"] = occ
+    if event.venue_id:
+        if venue_map is not None and event.venue_id in venue_map:
+            title, location, image = venue_map[event.venue_id]
+            updates["venue_title"] = title
+            updates["venue_location"] = location
+            updates["venue_image_url"] = image
+        elif venue_map is None and event.venue is not None:
+            updates["venue_title"] = event.venue.title
+            updates["venue_location"] = event.venue.location
+            updates["venue_image_url"] = event.venue.image_url
+    if updates:
+        data = data.model_copy(update=updates)
     return data
+
+
+def _venue_map_for_events(
+    db, events: list
+) -> dict[uuid.UUID, VenueInfo]:
+    """Fetch ``(title, location, image_url)`` for all venue_ids referenced."""
+    from sqlmodel import select
+
+    from app.api.event_venue.models import EventVenues
+
+    venue_ids = {e.venue_id for e in events if e.venue_id}
+    if not venue_ids:
+        return {}
+    rows = db.exec(select(EventVenues).where(EventVenues.id.in_(venue_ids))).all()
+    return {v.id: (v.title, v.location, v.image_url) for v in rows}
 
 
 def _check_recurrence_conflicts(
@@ -272,8 +309,9 @@ async def list_events(
             search_fields=["title"],
         )
 
+    venue_map = _venue_map_for_events(db, events)
     return ListModel[EventPublic](
-        results=[_to_public(e) for e in events],
+        results=[_to_public(e, venue_map) for e in events],
         paging=Paging(offset=skip, limit=limit, total=total),
     )
 
@@ -323,11 +361,51 @@ async def create_event(
     event_data["rrule"] = rrule_str
     event_data["tenant_id"] = tenant_id
     event_data["owner_id"] = current_user.id
+
+    # Approval overrides: an admin can create straight to published normally,
+    # but if the venue requires approval OR the requested capacity exceeds
+    # the venue's, we force the event into pending_approval and notify so
+    # the decision stays auditable even for admin-created events.
+    requires_approval = False
+    approval_reason = ""
+    if event_in.venue_id is not None:
+        from app.api.event_venue import crud as venue_crud
+
+        venue = venue_crud.event_venues_crud.get(db, event_in.venue_id)
+        if venue and venue.booking_mode == "approval_required":
+            requires_approval = True
+            approval_reason = "Venue requires admin approval."
+        if (
+            venue
+            and venue.capacity
+            and event_in.max_participant
+            and event_in.max_participant > venue.capacity
+        ):
+            requires_approval = True
+            approval_reason = (
+                f"Requested max_participant ({event_in.max_participant}) "
+                f"exceeds venue capacity ({venue.capacity})."
+            )
+
+    if requires_approval:
+        event_data["status"] = EventStatus.PENDING_APPROVAL
+        event_data["visibility"] = EventVisibility.UNLISTED
+
     event = Events(**event_data)
 
     db.add(event)
     db.commit()
     db.refresh(event)
+
+    if requires_approval:
+        from app.api.event_settings.crud import event_settings_crud
+        from app.services.approval_notify import notify_event_pending_approval
+
+        settings = event_settings_crud.get_by_popup_id(db, event.popup_id)
+        await notify_event_pending_approval(
+            event, popup, settings, reason=approval_reason
+        )
+
     return _to_public(event)
 
 
@@ -1045,10 +1123,12 @@ async def list_portal_events(
     kind: str | None = None,
     venue_id: uuid.UUID | None = None,
     track_id: uuid.UUID | None = None,
+    tags: list[str] | None = Query(default=None),
     start_after: datetime | None = None,
     start_before: datetime | None = None,
     search: str | None = None,
     rsvped_only: bool = False,
+    include_hidden: bool = False,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[EventPublic]:
@@ -1062,6 +1142,7 @@ async def list_portal_events(
             kind=kind,
             venue_id=venue_id,
             track_id=track_id,
+            tags=tags,
             start_after=start_after,
             start_before=start_before,
             search=search,
@@ -1094,10 +1175,99 @@ async def list_portal_events(
         else:
             visible = []
 
+    # Hide events the human previously dismissed. We hide the series as a
+    # whole: an event is filtered if its own id OR its recurrence_master_id
+    # sits in the hidden set.
+    from sqlmodel import select
+
+    from app.api.event.models import EventHiddenByHuman
+
+    hidden_ids = set(
+        db.exec(
+            select(EventHiddenByHuman.event_id).where(
+                EventHiddenByHuman.human_id == current_human.id
+            )
+        ).all()
+    )
+    if hidden_ids and not include_hidden:
+        visible = [
+            e
+            for e in visible
+            if e.id not in hidden_ids
+            and (e.recurrence_master_id or e.id) not in hidden_ids
+        ]
+
+    venue_map = _venue_map_for_events(db, visible)
+
+    # RSVP status of current human per event, so cards can render the right
+    # inline button without an extra batch call from the client.
+    from app.api.event_participant.models import EventParticipants
+
+    rsvp_status_map: dict[uuid.UUID, str] = {}
+    if visible:
+        event_ids = [e.id for e in visible]
+        rows = db.exec(
+            select(EventParticipants.event_id, EventParticipants.status)
+            .where(EventParticipants.profile_id == current_human.id)
+            .where(EventParticipants.event_id.in_(event_ids))
+        ).all()
+        rsvp_status_map = {row[0]: row[1] for row in rows}
+
+    def _publicize(e) -> EventPublic:
+        pub = _to_public(e, venue_map)
+        updates: dict = {}
+        if hidden_ids and (
+            e.id in hidden_ids
+            or (e.recurrence_master_id and e.recurrence_master_id in hidden_ids)
+        ):
+            updates["hidden"] = True
+        # Occurrences share the master's participants row, so fall back to
+        # the master id when looking up status.
+        rsvp_key = e.recurrence_master_id or e.id
+        if rsvp_key in rsvp_status_map:
+            updates["my_rsvp_status"] = rsvp_status_map[rsvp_key]
+        if updates:
+            pub = pub.model_copy(update=updates)
+        return pub
+
     return ListModel[EventPublic](
-        results=[_to_public(e) for e in visible],
+        results=[_publicize(e) for e in visible],
         paging=Paging(offset=skip, limit=limit, total=len(visible)),
     )
+
+
+@router.get("/portal/events/hidden-count")
+async def portal_hidden_events_count(
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+    popup_id: uuid.UUID | None = None,
+) -> dict[str, int]:
+    """Return how many events the human has hidden (optionally for a popup).
+
+    Used by the portal toolbar to render ``Hidden (n)`` without having to
+    fetch the full list twice.
+    """
+    from sqlalchemy import distinct, func
+    from sqlmodel import select
+
+    from app.api.event.models import EventHiddenByHuman, Events
+
+    # We count by distinct hide targets: each hide row is already unique per
+    # (human, event), so a plain count of matching events = number of
+    # currently-hidden "series or one-off" events. If ``popup_id`` is given,
+    # restrict to hides that point at events in that popup.
+    stmt = select(func.count(distinct(EventHiddenByHuman.event_id))).where(
+        EventHiddenByHuman.human_id == current_human.id
+    )
+    if popup_id is not None:
+        stmt = stmt.select_from(
+            EventHiddenByHuman.__table__.join(
+                Events.__table__,
+                EventHiddenByHuman.event_id == Events.id,
+            )
+        ).where(Events.popup_id == popup_id)
+    count = db.exec(stmt).one()
+    return {"count": int(count or 0)}
 
 
 @router.get("/portal/events/{event_id}", response_model=EventPublic)
@@ -1124,7 +1294,90 @@ async def get_portal_event(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
     # Public + unlisted are accessible via direct ID.
 
-    return _to_public(event)
+    from app.api.event_participant.models import EventParticipants
+
+    rsvp_key = event.recurrence_master_id or event.id
+    rsvp = db.exec(
+        select(EventParticipants.status)
+        .where(EventParticipants.profile_id == current_human.id)
+        .where(EventParticipants.event_id == rsvp_key)
+    ).first()
+
+    pub = _to_public(event)
+    if rsvp:
+        pub = pub.model_copy(update={"my_rsvp_status": rsvp})
+    return pub
+
+
+@router.post(
+    "/portal/events/{event_id}/hide", status_code=status.HTTP_204_NO_CONTENT
+)
+async def hide_portal_event(
+    event_id: uuid.UUID,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+) -> None:
+    """Hide an event from the current human's portal.
+
+    If the event is an expanded recurrence occurrence (virtual id like
+    ``{master}_{ts}``), we can't persist it directly — hide the master
+    instead. If it's a real exception override with a master, hide the
+    master so all siblings disappear together.
+    """
+    from sqlmodel import select
+
+    from app.api.event.models import EventHiddenByHuman
+
+    event = crud.events_crud.get(db, event_id)
+    if not event:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
+        )
+
+    target_id = event.recurrence_master_id or event.id
+
+    existing = db.exec(
+        select(EventHiddenByHuman)
+        .where(EventHiddenByHuman.human_id == current_human.id)
+        .where(EventHiddenByHuman.event_id == target_id)
+    ).first()
+    if existing:
+        return
+
+    db.add(
+        EventHiddenByHuman(
+            tenant_id=current_human.tenant_id,
+            human_id=current_human.id,
+            event_id=target_id,
+        )
+    )
+    db.commit()
+
+
+@router.delete(
+    "/portal/events/{event_id}/hide", status_code=status.HTTP_204_NO_CONTENT
+)
+async def unhide_portal_event(
+    event_id: uuid.UUID,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+) -> None:
+    """Undo a prior hide."""
+    from sqlmodel import delete
+
+    from app.api.event.models import EventHiddenByHuman
+
+    event = crud.events_crud.get(db, event_id)
+    target_id = (
+        event.recurrence_master_id or event.id if event else event_id
+    )
+
+    db.exec(
+        delete(EventHiddenByHuman)
+        .where(EventHiddenByHuman.human_id == current_human.id)
+        .where(EventHiddenByHuman.event_id == target_id)
+    )
+    db.commit()
 
 
 @router.post("/portal/events", response_model=EventPublic, status_code=status.HTTP_201_CREATED)
@@ -1160,16 +1413,30 @@ async def create_portal_event(
     event_data["tenant_id"] = current_human.tenant_id
     event_data["owner_id"] = current_human.id
 
-    # If the chosen venue requires approval, intercept the request: the event
-    # stays pending + unlisted until an admin decides. Submitting "published"
-    # for such a venue is not an error — we just downgrade the status.
+    # Reasons the event might need approval:
+    #  1. Venue is bookable only with admin approval (booking_mode).
+    #  2. User requested ``max_participant`` larger than the venue capacity.
     requires_approval = False
+    approval_reason = ""
+    venue = None
     if event_in.venue_id is not None:
         from app.api.event_venue import crud as venue_crud
 
         venue = venue_crud.event_venues_crud.get(db, event_in.venue_id)
         if venue and venue.booking_mode == "approval_required":
             requires_approval = True
+            approval_reason = "Venue requires admin approval."
+        if (
+            venue
+            and venue.capacity
+            and event_in.max_participant
+            and event_in.max_participant > venue.capacity
+        ):
+            requires_approval = True
+            approval_reason = (
+                f"Requested max_participant ({event_in.max_participant}) "
+                f"exceeds venue capacity ({venue.capacity})."
+            )
 
     if requires_approval:
         event_data["status"] = EventStatus.PENDING_APPROVAL
@@ -1180,6 +1447,16 @@ async def create_portal_event(
     db.add(event)
     db.commit()
     db.refresh(event)
+
+    if requires_approval:
+        from app.api.popup.crud import popups_crud
+        from app.services.approval_notify import notify_event_pending_approval
+
+        popup = popups_crud.get(db, event.popup_id)
+        await notify_event_pending_approval(
+            event, popup, settings, reason=approval_reason
+        )
+
     return _to_public(event)
 
 

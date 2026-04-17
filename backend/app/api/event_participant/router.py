@@ -24,6 +24,33 @@ from app.core.dependencies.users import (
 router = APIRouter(prefix="/event-participants", tags=["event-participants"])
 
 
+def _participants_with_names(
+    db, participants: list
+) -> list[EventParticipantPublic]:
+    """Serialize participants, joining Humans to fill in first/last names.
+
+    Runs a single ``profile_id IN (...)`` query so the list endpoints remain
+    O(1) in DB round-trips regardless of how many participants an event has.
+    """
+    from sqlmodel import select
+
+    from app.api.human.models import Humans
+
+    if not participants:
+        return []
+    profile_ids = {p.profile_id for p in participants}
+    rows = db.exec(select(Humans).where(Humans.id.in_(profile_ids))).all()
+    names = {h.id: (h.first_name, h.last_name) for h in rows}
+    out: list[EventParticipantPublic] = []
+    for p in participants:
+        public = EventParticipantPublic.model_validate(p)
+        first, last = names.get(p.profile_id, (None, None))
+        public.first_name = first
+        public.last_name = last
+        out.append(public)
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Backoffice endpoints (user token)
 # ---------------------------------------------------------------------------
@@ -46,7 +73,7 @@ async def list_participants(
         participants, total = crud.event_participants_crud.find(db, skip=skip, limit=limit)
 
     return ListModel[EventParticipantPublic](
-        results=[EventParticipantPublic.model_validate(p) for p in participants],
+        results=_participants_with_names(db, participants),
         paging=Paging(offset=skip, limit=limit, total=total),
     )
 
@@ -141,7 +168,7 @@ async def list_portal_participants(
         db, event_id=event_id, skip=skip, limit=limit,
     )
     return ListModel[EventParticipantPublic](
-        results=[EventParticipantPublic.model_validate(p) for p in participants],
+        results=_participants_with_names(db, participants),
         paging=Paging(offset=skip, limit=limit, total=total),
     )
 

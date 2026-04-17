@@ -26,6 +26,7 @@ class EventVenueBase(SQLModel):
     popup_id: uuid.UUID = Field(foreign_key="popups.id", index=True)
     owner_id: uuid.UUID = Field(index=True)
     title: str = Field(max_length=255)
+    description: str | None = Field(default=None, sa_type=Text())
     location: str | None = Field(default=None, sa_type=Text())
     formatted_address: str | None = Field(default=None, sa_type=Text())
     geo_lat: float | None = Field(default=None)
@@ -117,6 +118,7 @@ class EventVenueCreate(BaseModel):
 
     popup_id: uuid.UUID
     title: str
+    description: str | None = None
     location: str | None = None
     formatted_address: str | None = None
     geo_lat: float | None = None
@@ -139,6 +141,7 @@ class EventVenueUpdate(BaseModel):
     """Venue schema for updates."""
 
     title: str | None = None
+    description: str | None = None
     location: str | None = None
     formatted_address: str | None = None
     geo_lat: float | None = None
@@ -260,10 +263,18 @@ class VenuePhotoPublic(BaseModel):
 
 
 class VenueBusySlot(BaseModel):
+    # Outer block (includes venue setup/teardown padding for events).
     start: datetime
     end: datetime
     source: str  # "event" | "exception"
     label: str | None = None
+    # Populated when ``source == "event"``. ``event_start``/``event_end`` are
+    # the actual event times inside the block; the padding between those
+    # and ``start``/``end`` is setup/teardown and should render as a
+    # distinct band. ``event_id`` enables click-through in calendar views.
+    event_id: uuid.UUID | None = None
+    event_start: datetime | None = None
+    event_end: datetime | None = None
 
 
 class VenueOpenRange(BaseModel):
