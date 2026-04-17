@@ -1,3 +1,7 @@
+import {
+  CHECKOUT_MODE,
+  type CheckoutMode,
+} from "@/checkout/popupCheckoutPolicy"
 import { supportsQuantitySelector } from "@/components/ui/QuantitySelector"
 import {
   getPriceStrategy,
@@ -19,8 +23,8 @@ interface ProductStrategy {
 class PatreonProductStrategy implements ProductStrategy {
   private priceStrategy: PriceStrategy
 
-  constructor() {
-    this.priceStrategy = getPriceStrategy()
+  constructor(checkoutMode: CheckoutMode) {
+    this.priceStrategy = getPriceStrategy(checkoutMode)
   }
 
   handleSelection(
@@ -335,15 +339,57 @@ class EditProductStrategy implements ProductStrategy {
   }
 }
 
+class SimpleQuantityProductStrategy implements ProductStrategy {
+  handleSelection(
+    attendees: AttendeePassState[],
+    attendeeId: string,
+    product: ProductsPass,
+  ): AttendeePassState[] {
+    const usesQuantity =
+      product.duration_type === "day" ||
+      supportsQuantitySelector(product.max_quantity)
+
+    return attendees.map((attendee) => {
+      if (attendee.id !== attendeeId) return attendee
+
+      return {
+        ...attendee,
+        products: attendee.products.map((currentProduct) => {
+          if (currentProduct.id !== product.id) return currentProduct
+
+          if (usesQuantity) {
+            const nextQuantity = Math.max(0, product.quantity ?? 0)
+            return {
+              ...currentProduct,
+              quantity: nextQuantity,
+              selected: nextQuantity > 0,
+            }
+          }
+
+          return {
+            ...currentProduct,
+            selected: !currentProduct.selected,
+          }
+        }),
+      }
+    })
+  }
+}
+
 export const getProductStrategy = (
   product: ProductsPass,
   isEditing: boolean,
+  checkoutMode: CheckoutMode = CHECKOUT_MODE.PASS_SYSTEM,
 ): ProductStrategy => {
   if (isEditing) return new EditProductStrategy()
 
+  if (checkoutMode === CHECKOUT_MODE.SIMPLE_QUANTITY) {
+    return new SimpleQuantityProductStrategy()
+  }
+
   const baseStrategy = (() => {
     if (product.category === "patreon") {
-      return new PatreonProductStrategy()
+      return new PatreonProductStrategy(checkoutMode)
     }
 
     switch (product.duration_type) {

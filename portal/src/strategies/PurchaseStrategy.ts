@@ -1,3 +1,7 @@
+import {
+  CHECKOUT_MODE,
+  type CheckoutMode,
+} from "@/checkout/popupCheckoutPolicy"
 import type { ProductsPass } from "@/types/Products"
 
 interface PurchaseStrategy {
@@ -8,13 +12,15 @@ interface PurchaseStrategy {
 }
 
 class DefaultPurchaseStrategy implements PurchaseStrategy {
+  constructor(private readonly checkoutMode: CheckoutMode) {}
+
   applyPurchaseRules(
     products: ProductsPass[],
     attendeeProducts: ProductsPass[],
   ): ProductsPass[] {
-    const hasMonthlyPass = attendeeProducts?.some(
-      (p) => p.duration_type === "month",
-    )
+    const hasMonthlyPass =
+      this.checkoutMode === CHECKOUT_MODE.PASS_SYSTEM &&
+      attendeeProducts?.some((p) => p.duration_type === "month")
 
     return products.map((product) => ({
       ...product,
@@ -25,6 +31,8 @@ class DefaultPurchaseStrategy implements PurchaseStrategy {
   }
 }
 
-export const getPurchaseStrategy = (): PurchaseStrategy => {
-  return new DefaultPurchaseStrategy()
+export const getPurchaseStrategy = (
+  checkoutMode: CheckoutMode = CHECKOUT_MODE.PASS_SYSTEM,
+): PurchaseStrategy => {
+  return new DefaultPurchaseStrategy(checkoutMode)
 }

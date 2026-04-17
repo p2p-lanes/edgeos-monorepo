@@ -1,31 +1,30 @@
+import type { PopupPublic } from "@/client"
+
 /**
  * Popup checkout policy — resolves how a popup's checkout UI should behave
- * based on its `sale_type` (application vs direct) and its future
- * `checkout_mode` (pass_system vs simple_quantity).
- *
- * Feature 1 scope: `sale_type` is the primary axis and drives the direct-sale
- * flow. `checkout_mode` is plumbed through here but always resolves to
- * "pass_system" because the backend has not yet introduced the field
- * (that lands in Feature 3). The policy shape is future-proof so consumers
- * can branch on `isPassSystem` / `isSimpleQuantity` today without a
- * follow-up refactor.
+ * from the backend popup contract. `checkout_mode` is authoritative when the
+ * API provides it; deriving from `sale_type` remains only as a stale-client
+ * fallback.
  */
 
-export type CheckoutMode = "pass_system" | "simple_quantity"
+export const CHECKOUT_MODE = {
+  PASS_SYSTEM: "pass_system",
+  SIMPLE_QUANTITY: "simple_quantity",
+} as const
 
-export type PopupSaleType = "application" | "direct"
+export type CheckoutMode = (typeof CHECKOUT_MODE)[keyof typeof CHECKOUT_MODE]
 
-/**
- * Source shape used to derive the policy. Accepts the nullable fields that
- * the generated `PopupPublic` client type exposes (`sale_type` is optional,
- * `checkout_mode` doesn't exist yet but is declared here as a TODO/stub).
- */
-export interface PopupCheckoutPolicySource {
-  sale_type?: PopupSaleType | null
-  // TODO(feat/checkout-mode): wire this once the backend adds the field
-  // (Feature 3). Today the backend always implies "pass_system".
-  checkout_mode?: CheckoutMode | null
-}
+export const SALE_TYPE = {
+  APPLICATION: "application",
+  DIRECT: "direct",
+} as const
+
+export type PopupSaleType = (typeof SALE_TYPE)[keyof typeof SALE_TYPE]
+
+export type PopupCheckoutPolicySource = Pick<
+  PopupPublic,
+  "sale_type" | "checkout_mode"
+>
 
 export interface PopupCheckoutPolicy {
   saleType: PopupSaleType
@@ -34,8 +33,14 @@ export interface PopupCheckoutPolicy {
   isSimpleQuantity: boolean
 }
 
-const DEFAULT_SALE_TYPE: PopupSaleType = "application"
-const DEFAULT_CHECKOUT_MODE: CheckoutMode = "pass_system"
+const DEFAULT_SALE_TYPE: PopupSaleType = SALE_TYPE.APPLICATION
+const DEFAULT_CHECKOUT_MODE: CheckoutMode = CHECKOUT_MODE.PASS_SYSTEM
+
+function deriveCheckoutModeFromSaleType(saleType: PopupSaleType): CheckoutMode {
+  return saleType === SALE_TYPE.DIRECT
+    ? CHECKOUT_MODE.SIMPLE_QUANTITY
+    : CHECKOUT_MODE.PASS_SYSTEM
+}
 
 /**
  * Resolve the checkout policy for a popup. Safe to call with `null` or
@@ -46,20 +51,18 @@ export function resolvePopupCheckoutPolicy(
   popup: PopupCheckoutPolicySource | null | undefined,
 ): PopupCheckoutPolicy {
   const saleType: PopupSaleType =
-    popup?.sale_type === "direct" ? "direct" : DEFAULT_SALE_TYPE
+    popup?.sale_type === SALE_TYPE.DIRECT ? SALE_TYPE.DIRECT : DEFAULT_SALE_TYPE
 
-  // Feature 1: backend does not yet expose `checkout_mode`, so we always
-  // resolve to the default. When the field lands the resolver will honor it
-  // automatically.
   const checkoutMode: CheckoutMode =
-    popup?.checkout_mode === "simple_quantity"
-      ? "simple_quantity"
-      : DEFAULT_CHECKOUT_MODE
+    popup?.checkout_mode === CHECKOUT_MODE.PASS_SYSTEM ||
+    popup?.checkout_mode === CHECKOUT_MODE.SIMPLE_QUANTITY
+      ? popup.checkout_mode
+      : (deriveCheckoutModeFromSaleType(saleType) ?? DEFAULT_CHECKOUT_MODE)
 
   return {
     saleType,
     checkoutMode,
-    isPassSystem: checkoutMode === "pass_system",
-    isSimpleQuantity: checkoutMode === "simple_quantity",
+    isPassSystem: checkoutMode === CHECKOUT_MODE.PASS_SYSTEM,
+    isSimpleQuantity: checkoutMode === CHECKOUT_MODE.SIMPLE_QUANTITY,
   }
 }

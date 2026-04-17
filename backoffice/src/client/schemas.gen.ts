@@ -2424,6 +2424,12 @@ export const CategoryBreakdownSchema = {
     description: 'Aggregated breakdown by product category.'
 } as const;
 
+export const CheckoutModeSchema = {
+    type: 'string',
+    enum: ['pass_system', 'simple_quantity'],
+    title: 'CheckoutMode'
+} as const;
+
 export const CompanionCreateSchema = {
     properties: {
         name: {
@@ -6081,6 +6087,10 @@ export const PopupAdminSchema = {
             '$ref': '#/components/schemas/SaleType',
             default: 'application'
         },
+        checkout_mode: {
+            '$ref': '#/components/schemas/CheckoutMode',
+            default: 'pass_system'
+        },
         allows_spouse: {
             anyOf: [
                 {
@@ -6386,6 +6396,16 @@ export const PopupCreateSchema = {
             '$ref': '#/components/schemas/SaleType',
             default: 'application'
         },
+        checkout_mode: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/CheckoutMode'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
         allows_spouse: {
             anyOf: [
                 {
@@ -6668,6 +6688,10 @@ export const PopupPublicSchema = {
         sale_type: {
             '$ref': '#/components/schemas/SaleType',
             default: 'application'
+        },
+        checkout_mode: {
+            '$ref': '#/components/schemas/CheckoutMode',
+            default: 'pass_system'
         },
         start_date: {
             anyOf: [
@@ -7044,6 +7068,26 @@ export const PopupUpdateSchema = {
             anyOf: [
                 {
                     '$ref': '#/components/schemas/PopupStatus'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        sale_type: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/SaleType'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        checkout_mode: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/CheckoutMode'
                 },
                 {
                     type: 'null'

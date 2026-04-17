@@ -1,8 +1,10 @@
 "use client"
 
 import { useMemo } from "react"
+import { resolvePopupCheckoutPolicy } from "@/checkout/popupCheckoutPolicy"
 import { useGroupsQuery } from "@/components/Sidebar/hooks/useGetGroups"
 import { useApplication } from "@/providers/applicationProvider"
+import { useCityProvider } from "@/providers/cityProvider"
 import { useDiscount } from "@/providers/discountProvider"
 import { usePassesProvider } from "@/providers/passesProvider"
 import { TotalCalculator } from "@/strategies/TotalStrategy"
@@ -10,9 +12,11 @@ import { TotalCalculator } from "@/strategies/TotalStrategy"
 export function useCalculateTotal() {
   const { getRelevantApplication } = useApplication()
   const application = getRelevantApplication()
+  const { getCity } = useCityProvider()
   const { attendeePasses } = usePassesProvider()
   const { discountApplied } = useDiscount()
   const { data: groups = [] } = useGroupsQuery()
+  const checkoutPolicy = resolvePopupCheckoutPolicy(getCity())
 
   return useMemo(() => {
     let groupDiscountValue = 0
@@ -26,7 +30,7 @@ export function useCalculateTotal() {
       }
     }
 
-    const calculator = new TotalCalculator()
+    const calculator = new TotalCalculator(checkoutPolicy.checkoutMode)
     const result = calculator.calculate(
       attendeePasses,
       discountApplied,
@@ -42,5 +46,11 @@ export function useCalculateTotal() {
       groupDiscountPercentage: groupDiscountValue,
       groupName: groupNameValue,
     }
-  }, [application, attendeePasses, discountApplied, groups])
+  }, [
+    application,
+    attendeePasses,
+    checkoutPolicy.checkoutMode,
+    discountApplied,
+    groups,
+  ])
 }

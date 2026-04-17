@@ -22,3 +22,15 @@ class SaleType(StrEnum):
 
     application = "application"
     direct = "direct"
+
+
+class CheckoutMode(StrEnum):
+    pass_system = "pass_system"
+    simple_quantity = "simple_quantity"
+
+
+def derive_checkout_mode(sale_type: SaleType) -> CheckoutMode:
+    if sale_type == SaleType.direct:
+        return CheckoutMode.simple_quantity
+
+    return CheckoutMode.pass_system
