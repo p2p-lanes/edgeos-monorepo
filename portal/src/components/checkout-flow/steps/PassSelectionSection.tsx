@@ -13,10 +13,23 @@ import {
 } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 import { badgeName } from "@/app/portal/[popupSlug]/passes/constants/multiuse"
+import {
+  getPassSelectionLayout,
+  shouldDisableForPrimaryRestriction,
+} from "@/checkout/passSelectionUi"
+import {
+  CHECKOUT_MODE,
+  resolvePopupCheckoutPolicy,
+} from "@/checkout/popupCheckoutPolicy"
 import AddAttendeeButtons from "@/components/checkout-flow/shared/AddAttendeeButtons"
+import {
+  resolveMaxQuantity,
+  supportsQuantitySelector,
+} from "@/components/ui/QuantitySelector"
 import { formatDate } from "@/helpers/dates"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
+import { useCityProvider } from "@/providers/cityProvider"
 import { usePassesProvider } from "@/providers/passesProvider"
 import type { AttendeeCategory, AttendeePassState } from "@/types/Attendee"
 import type { ProductsPass } from "@/types/Products"
@@ -95,6 +108,8 @@ const stripedPatternStyle = {
 export default function PassSelectionSection() {
   const { attendeePasses, toggleProduct, isEditing } = usePassesProvider()
   const { editCredit } = useCheckout()
+  const { getCity } = useCityProvider()
+  const policy = resolvePopupCheckoutPolicy(getCity())
   const [focusedAttendeeId, setFocusedAttendeeId] = useState<string | null>(
     null,
   )
@@ -145,14 +160,22 @@ export default function PassSelectionSection() {
         <AddAttendeeButtons onAttendeeAdded={setFocusedAttendeeId} />
       )}
 
-      {/* Legacy checkout keeps the stacked layout fixed. */}
-      <StackedVariant
-        groupedByCategory={groupedByCategory}
-        allAttendees={attendeePasses}
-        toggleProduct={toggleProduct}
-        isEditing={isEditing}
-        focusedAttendeeId={focusedAttendeeId}
-      />
+      {getPassSelectionLayout(policy.checkoutMode) === "flat" ? (
+        <SimpleQuantityVariant
+          attendees={attendeePasses}
+          toggleProduct={toggleProduct}
+          isEditing={isEditing}
+          focusedAttendeeId={focusedAttendeeId}
+        />
+      ) : (
+        <StackedVariant
+          groupedByCategory={groupedByCategory}
+          allAttendees={attendeePasses}
+          toggleProduct={toggleProduct}
+          isEditing={isEditing}
+          focusedAttendeeId={focusedAttendeeId}
+        />
+      )}
     </motion.div>
   )
 }
@@ -167,6 +190,80 @@ interface VariantProps {
   toggleProduct: (attendeeId: string, product: ProductsPass) => void
   isEditing: boolean
   focusedAttendeeId?: string | null
+}
+
+function SimpleQuantityVariant({
+  attendees,
+  toggleProduct,
+  isEditing,
+  focusedAttendeeId,
+}: {
+  attendees: AttendeePassState[]
+  toggleProduct: (attendeeId: string, product: ProductsPass) => void
+  isEditing: boolean
+  focusedAttendeeId?: string | null
+}) {
+  useEffect(() => {
+    if (focusedAttendeeId) scrollToAttendeeCard(focusedAttendeeId)
+  }, [focusedAttendeeId])
+
+  return (
+    <div className="space-y-3">
+      {attendees.map((attendee) => {
+        const standardProducts = attendee.products
+          .filter((product) => product.category !== "patreon")
+          .sort(sortProductsByPriority)
+
+        return (
+          <div
+            key={attendee.id}
+            id={`attendee-card-${attendee.id}`}
+            className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm"
+          >
+            <div className="border-b border-gray-100 bg-gray-50 px-5 py-3">
+              <p className="text-sm font-semibold text-gray-900">
+                {attendee.name}
+              </p>
+              <p className="text-xs text-gray-500">
+                Choose quantities directly. No attendee pass dependencies apply
+                in this checkout mode.
+              </p>
+            </div>
+
+            <div className="divide-y divide-gray-100">
+              {standardProducts.map((product) => {
+                const usesQuantity =
+                  product.duration_type === "day" ||
+                  supportsQuantitySelector(product.max_quantity)
+
+                if (usesQuantity) {
+                  return (
+                    <QuantityPassOption
+                      key={product.id}
+                      product={product}
+                      onQuantityChange={(quantity) =>
+                        toggleProduct(attendee.id, { ...product, quantity })
+                      }
+                      isEditing={isEditing}
+                    />
+                  )
+                }
+
+                return (
+                  <PassOption
+                    key={product.id}
+                    product={product}
+                    onClick={() => toggleProduct(attendee.id, product)}
+                    isEditing={isEditing}
+                  />
+                )
+              })}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -324,8 +421,11 @@ function AttendeePassCardBody({
           </div>
           <div className="divide-y divide-gray-100">
             {fullProducts.map((product) => {
-              const isSpouse = attendee.category === "spouse"
-              const disabledForSpouse = isSpouse && !primaryHasPass(product.id)
+              const disabledForSpouse = shouldDisableForPrimaryRestriction({
+                checkoutMode: CHECKOUT_MODE.PASS_SYSTEM,
+                attendeeCategory: attendee.category,
+                primaryHasPass: primaryHasPass(product.id),
+              })
               return (
                 <PassOption
                   key={product.id}
@@ -361,8 +461,11 @@ function AttendeePassCardBody({
           </div>
           <div className="divide-y divide-gray-100">
             {monthProducts.map((product) => {
-              const isSpouse = attendee.category === "spouse"
-              const disabledForSpouse = isSpouse && !primaryHasPass(product.id)
+              const disabledForSpouse = shouldDisableForPrimaryRestriction({
+                checkoutMode: CHECKOUT_MODE.PASS_SYSTEM,
+                attendeeCategory: attendee.category,
+                primaryHasPass: primaryHasPass(product.id),
+              })
               return (
                 <PassOption
                   key={product.id}
@@ -395,8 +498,11 @@ function AttendeePassCardBody({
           </div>
           <div className="divide-y divide-gray-100">
             {weekProducts.map((product) => {
-              const isSpouse = attendee.category === "spouse"
-              const disabledForSpouse = isSpouse && !primaryHasPass(product.id)
+              const disabledForSpouse = shouldDisableForPrimaryRestriction({
+                checkoutMode: CHECKOUT_MODE.PASS_SYSTEM,
+                attendeeCategory: attendee.category,
+                primaryHasPass: primaryHasPass(product.id),
+              })
               return (
                 <PassOption
                   key={product.id}
@@ -433,8 +539,11 @@ function AttendeePassCardBody({
           </div>
           <div className="divide-y divide-gray-100">
             {dayProducts.map((product) => {
-              const isSpouse = attendee.category === "spouse"
-              const disabledForSpouse = isSpouse && !primaryHasPass(product.id)
+              const disabledForSpouse = shouldDisableForPrimaryRestriction({
+                checkoutMode: CHECKOUT_MODE.PASS_SYSTEM,
+                attendeeCategory: attendee.category,
+                primaryHasPass: primaryHasPass(product.id),
+              })
               return (
                 <DayPassOption
                   key={product.id}
@@ -672,6 +781,189 @@ interface DayPassOptionProps {
   disabled?: boolean
   disabledReason?: string
   isEditing?: boolean
+}
+
+function QuantityPassOption({
+  product,
+  onQuantityChange,
+  disabled,
+  disabledReason,
+  isEditing,
+}: DayPassOptionProps) {
+  const { purchased } = product
+  const isEditedForCredit = purchased && product.edit
+  const quantity = product.quantity ?? 0
+  const originalQuantity = product.original_quantity ?? 0
+  const comparePrice = product.compare_price ?? product.price
+  const hasDiscount = comparePrice != null && comparePrice > product.price
+  const maxQuantity = resolveMaxQuantity(product, {
+    dayPassFallbackToDateRange: product.duration_type === "day",
+  })
+  const isMaxReached = quantity >= maxQuantity
+  const isMinReached = purchased && quantity <= originalQuantity && !isEditing
+  const hasQuantity = quantity > 0
+
+  const handleIncrement = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!isMaxReached && !disabled) onQuantityChange(quantity + 1)
+  }
+
+  const handleDecrement = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!isMinReached && quantity > 0 && !disabled) {
+      onQuantityChange(quantity - 1)
+    }
+  }
+
+  if (purchased && isEditing) {
+    const creditAmount = product.price * (product.quantity ?? 1)
+    const handleEditClick = () => {
+      onQuantityChange(isEditedForCredit ? originalQuantity : 0)
+    }
+
+    return (
+      <button
+        type="button"
+        onClick={handleEditClick}
+        className={cn(
+          "w-full px-5 py-3 flex items-center justify-between gap-4 transition-all",
+          isEditedForCredit
+            ? "bg-orange-50 border-l-4 border-l-orange-400"
+            : "bg-gray-50 hover:bg-gray-100",
+        )}
+      >
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div
+            className={cn(
+              "w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all border-dashed",
+              isEditedForCredit
+                ? "bg-orange-100 border-orange-400"
+                : "border-gray-400",
+            )}
+          >
+            {isEditedForCredit && <Check className="w-3 h-3 text-orange-600" />}
+          </div>
+          <div className="flex-1 min-w-0 text-left">
+            <div className="flex items-center gap-2">
+              <Ticket
+                className={cn(
+                  "w-4 h-4",
+                  isEditedForCredit ? "text-orange-400" : "text-gray-400",
+                )}
+              />
+              <span
+                className={cn(
+                  "font-medium",
+                  isEditedForCredit
+                    ? "text-orange-700 line-through"
+                    : "text-gray-700",
+                )}
+              >
+                {product.name}
+              </span>
+              <span
+                className={cn(
+                  "px-2 py-0.5 text-[10px] font-semibold uppercase rounded tracking-wide border",
+                  isEditedForCredit
+                    ? "bg-orange-100 text-orange-700 border-orange-300"
+                    : "bg-slate-100 text-slate-500 border-slate-200",
+                )}
+              >
+                {isEditedForCredit ? "Credit" : "Owned"}
+              </span>
+            </div>
+          </div>
+        </div>
+        <div className="text-right shrink-0">
+          <p
+            className={cn(
+              "font-semibold",
+              isEditedForCredit ? "text-orange-600" : "text-gray-500",
+            )}
+          >
+            {isEditedForCredit
+              ? `+$${creditAmount.toLocaleString()}`
+              : `$${creditAmount.toLocaleString()}`}
+          </p>
+        </div>
+      </button>
+    )
+  }
+
+  return (
+    <div
+      className={cn(
+        "px-5 py-3 flex items-center justify-between gap-4",
+        disabled ? "opacity-40" : hasQuantity ? "bg-blue-50" : "",
+      )}
+    >
+      <div className="flex items-center gap-3 flex-1 min-w-0">
+        <div className="flex items-center gap-0.5 shrink-0">
+          <button
+            type="button"
+            onClick={handleDecrement}
+            disabled={disabled || quantity === 0 || isMinReached}
+            aria-label={`Decrease ${product.name} quantity`}
+            className={cn(
+              "w-5 h-5 rounded flex items-center justify-center transition-all",
+              disabled || quantity === 0 || isMinReached
+                ? "text-gray-300 cursor-not-allowed"
+                : "text-gray-500 hover:text-gray-700 hover:bg-gray-100",
+            )}
+          >
+            <Minus className="w-3.5 h-3.5" />
+          </button>
+          <span
+            className={cn(
+              "w-5 text-center font-semibold text-sm",
+              hasQuantity ? "text-blue-600" : "text-gray-400",
+            )}
+          >
+            {quantity}
+          </span>
+          <button
+            type="button"
+            onClick={handleIncrement}
+            disabled={disabled || isMaxReached}
+            aria-label={`Increase ${product.name} quantity`}
+            className={cn(
+              "w-5 h-5 rounded flex items-center justify-center transition-all",
+              disabled || isMaxReached
+                ? "text-gray-300 cursor-not-allowed"
+                : "text-gray-500 hover:text-gray-700 hover:bg-gray-100",
+            )}
+          >
+            <Plus className="w-3.5 h-3.5" />
+          </button>
+        </div>
+        <div className="flex-1 min-w-0 text-left">
+          <div className="flex items-center gap-2">
+            <Ticket className="w-4 h-4 text-gray-400" />
+            <span className="font-medium text-gray-900">{product.name}</span>
+          </div>
+          <p className="text-sm text-gray-500">quantity-based checkout</p>
+          {disabledReason && (
+            <p className="text-xs text-amber-600 mt-1">{disabledReason}</p>
+          )}
+        </div>
+      </div>
+      <div className="text-right shrink-0">
+        {hasDiscount && (
+          <p className="text-xs text-gray-400 line-through">
+            ${comparePrice?.toLocaleString()}
+          </p>
+        )}
+        <p
+          className={cn(
+            "font-semibold",
+            hasQuantity ? "text-blue-600" : "text-gray-900",
+          )}
+        >
+          ${product.price.toLocaleString()}
+        </p>
+      </div>
+    </div>
+  )
 }
 
 function DayPassOption({

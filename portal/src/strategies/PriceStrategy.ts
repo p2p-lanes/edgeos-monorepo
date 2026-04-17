@@ -1,3 +1,7 @@
+import {
+  CHECKOUT_MODE,
+  type CheckoutMode,
+} from "@/checkout/popupCheckoutPolicy"
 import type { DiscountProps } from "@/types/discounts"
 import type { ProductsPass } from "@/types/Products"
 
@@ -15,6 +19,8 @@ export interface PriceStrategy {
 }
 
 class DefaultPriceStrategy implements PriceStrategy {
+  constructor(private readonly checkoutMode: CheckoutMode) {}
+
   calculatePrice(
     product: ProductsPass,
     hasPatreonPurchased: boolean,
@@ -24,7 +30,11 @@ class DefaultPriceStrategy implements PriceStrategy {
       product.category === "patreon" || product.category === "supporter"
     const originalPrice = product.original_price || product.price || 0
 
-    if (!isSpecialProduct && hasPatreonPurchased) {
+    if (
+      this.checkoutMode === CHECKOUT_MODE.PASS_SYSTEM &&
+      !isSpecialProduct &&
+      hasPatreonPurchased
+    ) {
       return 0
     }
 
@@ -63,6 +73,8 @@ class DefaultPriceStrategy implements PriceStrategy {
   }
 }
 
-export const getPriceStrategy = (): PriceStrategy => {
-  return new DefaultPriceStrategy()
+export const getPriceStrategy = (
+  checkoutMode: CheckoutMode = CHECKOUT_MODE.PASS_SYSTEM,
+): PriceStrategy => {
+  return new DefaultPriceStrategy(checkoutMode)
 }

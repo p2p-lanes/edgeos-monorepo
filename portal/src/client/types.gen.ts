@@ -520,6 +520,8 @@ export type CategoryBreakdown = {
     revenue?: string;
 };
 
+export type CheckoutMode = 'pass_system' | 'simple_quantity';
+
 /**
  * Schema for creating companion attendees (spouse/kids) during application.
  *
@@ -1286,6 +1288,7 @@ export type PopupAdmin = {
     end_date?: (string | null);
     status?: PopupStatus;
     sale_type?: SaleType;
+    checkout_mode?: CheckoutMode;
     allows_spouse?: (boolean | null);
     allows_children?: (boolean | null);
     allows_coupons?: (boolean | null);
@@ -1323,6 +1326,7 @@ export type PopupCreate = {
     end_date?: (string | null);
     status?: PopupStatus;
     sale_type?: SaleType;
+    checkout_mode?: (CheckoutMode | null);
     allows_spouse?: (boolean | null);
     allows_children?: (boolean | null);
     allows_coupons?: (boolean | null);
@@ -1360,6 +1364,7 @@ export type PopupPublic = {
     slug: string;
     status?: PopupStatus;
     sale_type?: SaleType;
+    checkout_mode?: CheckoutMode;
     start_date?: (string | null);
     end_date?: (string | null);
     image_url?: (string | null);
@@ -1422,6 +1427,8 @@ export type PopupUpdate = {
     location?: (string | null);
     slug?: (string | null);
     status?: (PopupStatus | null);
+    sale_type?: (SaleType | null);
+    checkout_mode?: (CheckoutMode | null);
     start_date?: (string | null);
     end_date?: (string | null);
     allows_spouse?: (boolean | null);

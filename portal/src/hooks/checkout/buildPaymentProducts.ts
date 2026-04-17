@@ -1,3 +1,7 @@
+import {
+  CHECKOUT_MODE,
+  type CheckoutMode,
+} from "@/checkout/popupCheckoutPolicy"
 import type { PaymentProductRequest } from "@/client"
 import type { AttendeePassState } from "@/types/Attendee"
 import type {
@@ -17,6 +21,7 @@ interface BuildPaymentProductsParams {
   dynamicItems: Record<string, SelectedDynamicItem[]>
   isEditing: boolean
   appCredit: string | number | null | undefined
+  checkoutMode?: CheckoutMode
 }
 
 interface BuildPaymentProductsResult {
@@ -66,8 +71,11 @@ export function buildPaymentProducts({
   dynamicItems,
   isEditing,
   appCredit,
+  checkoutMode = CHECKOUT_MODE.PASS_SYSTEM,
 }: BuildPaymentProductsParams): BuildPaymentProductsResult {
-  const isMonthUpgrade = detectMonthUpgrade(attendeePasses)
+  const isMonthUpgrade =
+    checkoutMode === CHECKOUT_MODE.PASS_SYSTEM &&
+    detectMonthUpgrade(attendeePasses)
   const products: PaymentProductRequest[] = []
 
   if (isEditing) {

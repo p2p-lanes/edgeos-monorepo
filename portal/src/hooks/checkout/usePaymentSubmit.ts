@@ -3,6 +3,7 @@
 import { useQueryClient } from "@tanstack/react-query"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
+import type { CheckoutMode } from "@/checkout/popupCheckoutPolicy"
 import { PaymentsService } from "@/client"
 import { markPurchasePending } from "@/hooks/usePaymentRedirect"
 import { queryKeys } from "@/lib/query-keys"
@@ -21,6 +22,7 @@ interface UsePaymentSubmitParams {
   applicationId: string | undefined
   popupId: string | null
   appCredit: string | number | null | undefined
+  checkoutMode: CheckoutMode
   attendeePasses: AttendeePassState[]
   selectedPasses: SelectedPassItem[]
   housing: SelectedHousingItem | null
@@ -47,6 +49,7 @@ export function usePaymentSubmit({
   applicationId,
   popupId,
   appCredit,
+  checkoutMode,
   attendeePasses,
   selectedPasses,
   housing,
@@ -115,6 +118,7 @@ export function usePaymentSubmit({
           dynamicItems,
           isEditing,
           appCredit,
+          checkoutMode,
         },
       )
 
@@ -197,6 +201,7 @@ export function usePaymentSubmit({
   }, [
     applicationId,
     appCredit,
+    checkoutMode,
     selectedPasses,
     merch,
     housing,

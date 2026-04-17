@@ -2,8 +2,10 @@
 
 import { useQuery } from "@tanstack/react-query"
 import {
+  CHECKOUT_MODE,
   createContext,
   type ReactNode,
+  resolvePopupCheckoutPolicy,
   useCallback,
   useContext,
   useEffect,
@@ -121,6 +123,7 @@ export function CheckoutProvider({
   const application = getRelevantApplication()
   const appCredit = application?.credit
   const city = getCity()
+  const checkoutPolicy = resolvePopupCheckoutPolicy(city)
   const cityId = city?.id ? String(city.id) : null
 
   const hasRestoredCheckoutRef = useRef(false)
@@ -181,11 +184,16 @@ export function CheckoutProvider({
       for (const product of attendee.products) {
         if (product.selected && !(isEditing && product.purchased)) {
           const isDayPass = product.duration_type === "day"
-          const quantity = isDayPass
-            ? (product.quantity ?? 1) - (product.original_quantity ?? 0)
-            : supportsQuantitySelector(product.max_quantity)
-              ? (product.quantity ?? 1)
-              : 1
+          const quantity =
+            checkoutPolicy.checkoutMode === CHECKOUT_MODE.SIMPLE_QUANTITY
+              ? supportsQuantitySelector(product.max_quantity) || isDayPass
+                ? (product.quantity ?? 1)
+                : 1
+              : isDayPass
+                ? (product.quantity ?? 1) - (product.original_quantity ?? 0)
+                : supportsQuantitySelector(product.max_quantity)
+                  ? (product.quantity ?? 1)
+                  : 1
 
           if (quantity > 0) {
             passes.push({
@@ -205,7 +213,7 @@ export function CheckoutProvider({
     }
 
     return passes
-  }, [attendeePasses, isEditing])
+  }, [attendeePasses, checkoutPolicy.checkoutMode, isEditing])
 
   // Ref that holds the latest selection state for cart persistence.
   // Initialized with defaults — updated to real values after all hooks run.
@@ -572,6 +580,7 @@ export function CheckoutProvider({
     applicationId: application?.id,
     popupId: cityId,
     appCredit,
+    checkoutMode: checkoutPolicy.checkoutMode,
     attendeePasses,
     selectedPasses,
     housing,

@@ -23,6 +23,7 @@ import {
 } from "lucide-react"
 import {
   ApprovalStrategiesService,
+  type CheckoutMode,
   type PopupAdmin,
   type PopupCreate,
   PopupsService,
@@ -33,6 +34,7 @@ import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
 import { FormErrorSummary } from "@/components/Common/FormErrorSummary"
 import { ApprovalStrategyForm } from "@/components/forms/ApprovalStrategyForm"
+import { PopupCheckoutModeInfo } from "@/components/forms/popupCheckoutModeInfo"
 import { ReviewersManager } from "@/components/forms/ReviewersManager"
 import { ThemeConfigForm } from "@/components/forms/ThemeConfigForm"
 import { TranslationManager } from "@/components/translations/TranslationManager"
@@ -117,6 +119,10 @@ function getSaleTypeGuidance(saleType: SaleType) {
   }
 }
 
+function deriveCheckoutMode(saleType: SaleType): CheckoutMode {
+  return saleType === "direct" ? "simple_quantity" : "pass_system"
+}
+
 export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -180,6 +186,10 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
       location: defaultValues?.location ?? "",
       status: defaultValues?.status ?? "draft",
       sale_type: (defaultValues?.sale_type ?? "application") as SaleType,
+      checkout_mode: (defaultValues?.checkout_mode ??
+        deriveCheckoutMode(
+          defaultValues?.sale_type ?? "application",
+        )) as CheckoutMode,
       start_date: formatDateForInput(defaultValues?.start_date),
       end_date: formatDateForInput(defaultValues?.end_date),
       allows_spouse: defaultValues?.allows_spouse ?? false,
@@ -242,15 +252,12 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         invoice_company_email: value.invoice_company_email || null,
         default_language: value.default_language,
         supported_languages: value.supported_languages,
+        sale_type: value.sale_type,
       }
       if (isEdit) {
-        // sale_type is immutable — never sent on update (backend would 422)
         updateMutation.mutate(payload)
       } else {
-        createMutation.mutate({
-          ...payload,
-          sale_type: value.sale_type,
-        })
+        createMutation.mutate(payload)
       }
     },
   })
@@ -396,7 +403,8 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
             </h3>
             <p className="text-sm text-muted-foreground">
               Decide how people will access this event. This is the primary
-              identity of the popup and cannot be changed after creation.
+              identity of the popup. Checkout mode is always derived from this
+              choice by the backend.
             </p>
           </div>
 
@@ -414,7 +422,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                   label="Sale Type"
                   description={
                     isEdit
-                      ? "Sale type cannot be changed after creation"
+                      ? "Change sale type only if this popup has no approved payments yet"
                       : "Choose whether people apply first or buy tickets directly"
                   }
                 >
@@ -423,7 +431,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                     onValueChange={(value) =>
                       field.handleChange(value as SaleType)
                     }
-                    disabled={readOnly || isEdit}
+                    disabled={readOnly}
                   >
                     <SelectTrigger className="w-[220px] text-sm" size="sm">
                       <SelectValue />
@@ -440,6 +448,15 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                 </InlineRow>
               )}
             </form.Field>
+
+            <form.Subscribe selector={(state) => state.values.sale_type}>
+              {(saleType) => (
+                <PopupCheckoutModeInfo
+                  saleType={saleType}
+                  checkoutMode={deriveCheckoutMode(saleType)}
+                />
+              )}
+            </form.Subscribe>
 
             <form.Field name="currency">
               {(field) => (

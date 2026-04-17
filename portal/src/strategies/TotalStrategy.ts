@@ -1,3 +1,7 @@
+import {
+  CHECKOUT_MODE,
+  type CheckoutMode,
+} from "@/checkout/popupCheckoutPolicy"
 import type { AttendeePassState } from "@/types/Attendee"
 import type { DiscountProps } from "@/types/discounts"
 import type { ProductsPass } from "@/types/Products"
@@ -181,8 +185,39 @@ class MonthlyPurchasedPriceStrategy extends BasePriceStrategy {
   }
 }
 
+class SimpleQuantityPriceStrategy extends BasePriceStrategy {
+  calculate(products: ProductsPass[], _discount: DiscountProps): TotalResult {
+    const total = products
+      .filter((product) => product.selected)
+      .reduce((sum, product) => {
+        const quantity = product.quantity ?? 1
+        const originalQuantity = product.original_quantity ?? 0
+
+        if (product.purchased && product.duration_type === "day") {
+          return sum + product.price * Math.max(0, quantity - originalQuantity)
+        }
+
+        if (product.purchased && !product.edit) {
+          return sum
+        }
+
+        return sum + product.price * quantity
+      }, 0)
+
+    return {
+      total,
+      originalTotal: total,
+      discountAmount: 0,
+    }
+  }
+}
+
 // Calculadora de totales
 export class TotalCalculator {
+  constructor(
+    private readonly checkoutMode: CheckoutMode = CHECKOUT_MODE.PASS_SYSTEM,
+  ) {}
+
   calculate(
     attendees: AttendeePassState[],
     discount: DiscountProps,
@@ -220,6 +255,10 @@ export class TotalCalculator {
   }
 
   private getStrategy(products: ProductsPass[]): PriceCalculationStrategy {
+    if (this.checkoutMode === CHECKOUT_MODE.SIMPLE_QUANTITY) {
+      return new SimpleQuantityPriceStrategy()
+    }
+
     const hasPatreon = products.some(
       (p) => p.category === "patreon" && p.selected,
     )
