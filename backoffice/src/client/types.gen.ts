@@ -1385,6 +1385,8 @@ export type PopupPublic = {
     theme_config?: ({
     [key: string]: unknown;
 } | null);
+    default_language?: string;
+    supported_languages?: Array<(string)>;
 };
 
 /**

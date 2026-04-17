@@ -5,7 +5,6 @@ import { useSearchParams } from "next/navigation"
 import {
   createContext,
   type ReactNode,
-  useCallback,
   useContext,
   useEffect,
   useRef,
@@ -21,19 +20,55 @@ const DEFAULT_LANGUAGE = "en"
 
 // Match navigator.languages (e.g. "es-AR", "zh-Hant") against supported locales.
 // Prefer exact match, then fall back to the base subtag ("es-AR" → "es").
-function detectBrowserLanguage(): string | null {
+function resolveLanguageCandidate(
+  rawLanguage: string | null | undefined,
+  allowedLanguages: string[],
+): string | null {
+  if (!rawLanguage) return null
+
+  const normalizedLanguage = rawLanguage.toLowerCase()
+  if (allowedLanguages.includes(normalizedLanguage)) {
+    return normalizedLanguage
+  }
+
+  const baseLanguage = normalizedLanguage.split("-")[0]
+  if (allowedLanguages.includes(baseLanguage)) {
+    return baseLanguage
+  }
+
+  return null
+}
+
+function detectBrowserLanguage(allowedLanguages: string[]): string | null {
   if (typeof navigator === "undefined") return null
   const candidates = navigator.languages?.length
     ? navigator.languages
     : [navigator.language]
   for (const raw of candidates) {
-    if (!raw) continue
-    const lower = raw.toLowerCase()
-    if (PORTAL_LANGUAGES.includes(lower)) return lower
-    const base = lower.split("-")[0]
-    if (PORTAL_LANGUAGES.includes(base)) return base
+    const resolvedLanguage = resolveLanguageCandidate(raw, allowedLanguages)
+    if (resolvedLanguage) return resolvedLanguage
   }
   return null
+}
+
+function getAllowedLanguages(
+  popupSupportedLanguages: string[] | null | undefined,
+  popupDefaultLanguage: string | null | undefined,
+): string[] {
+  const normalizedLanguages = (popupSupportedLanguages ?? [])
+    .map((language) => resolveLanguageCandidate(language, PORTAL_LANGUAGES))
+    .filter((language): language is string => language !== null)
+
+  if (normalizedLanguages.length > 0) {
+    return Array.from(new Set(normalizedLanguages))
+  }
+
+  const resolvedDefaultLanguage = resolveLanguageCandidate(
+    popupDefaultLanguage,
+    PORTAL_LANGUAGES,
+  )
+
+  return [resolvedDefaultLanguage ?? DEFAULT_LANGUAGE]
 }
 
 interface LanguageContextValue {
@@ -50,36 +85,41 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const searchParams = useSearchParams()
   const queryClient = useQueryClient()
   const prevLanguageRef = useRef<string | null>(null)
-  const city = cityContext?.getCity() ?? null
+  const popup = cityContext?.getCity() ?? null
+  const supportedLanguages = getAllowedLanguages(
+    popup?.supported_languages,
+    popup?.default_language,
+  )
+  const defaultLanguage = resolveLanguageCandidate(
+    popup?.default_language,
+    supportedLanguages,
+  )
+  const [currentLanguage, setCurrentLanguage] = useState(DEFAULT_LANGUAGE)
 
-  const supportedLanguages = PORTAL_LANGUAGES
-
-  const [currentLanguage, setCurrentLanguage] = useState(() => {
-    // Resolution order: URL param > localStorage > navigator > default
-    const urlLang = searchParams.get("lang")
-    if (urlLang) return urlLang
-
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem(STORAGE_KEY)
-      if (stored) return stored
-    }
-
-    return detectBrowserLanguage() ?? DEFAULT_LANGUAGE
-  })
-
-  // Sync language when popup data loads or URL param changes
   useEffect(() => {
-    const urlLang = searchParams.get("lang")
-    if (urlLang && supportedLanguages.includes(urlLang)) {
-      setCurrentLanguage(urlLang)
-      return
-    }
+    const urlLanguage = resolveLanguageCandidate(
+      searchParams.get("lang"),
+      supportedLanguages,
+    )
+    const storedLanguage =
+      typeof window === "undefined"
+        ? null
+        : resolveLanguageCandidate(
+            localStorage.getItem(STORAGE_KEY),
+            supportedLanguages,
+          )
+    const browserLanguage = detectBrowserLanguage(supportedLanguages)
+    const nextLanguage =
+      urlLanguage ??
+      storedLanguage ??
+      browserLanguage ??
+      defaultLanguage ??
+      DEFAULT_LANGUAGE
 
-    // Validate current selection against supported list once popup loads
-    if (city && !supportedLanguages.includes(currentLanguage)) {
-      setCurrentLanguage(detectBrowserLanguage() ?? DEFAULT_LANGUAGE)
+    if (nextLanguage !== currentLanguage) {
+      setCurrentLanguage(nextLanguage)
     }
-  }, [searchParams, currentLanguage, city])
+  }, [searchParams, supportedLanguages, defaultLanguage, currentLanguage])
 
   // Sync i18n instance, localStorage, and invalidate queries on language change
   useEffect(() => {
@@ -101,11 +141,12 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     prevLanguageRef.current = currentLanguage
   }, [currentLanguage, i18n, queryClient])
 
-  const setLanguage = useCallback((lang: string) => {
-    if (supportedLanguages.includes(lang)) {
-      setCurrentLanguage(lang)
+  const setLanguage = (lang: string) => {
+    const resolvedLanguage = resolveLanguageCandidate(lang, supportedLanguages)
+    if (resolvedLanguage) {
+      setCurrentLanguage(resolvedLanguage)
     }
-  }, [])
+  }
 
   return (
     <LanguageContext.Provider

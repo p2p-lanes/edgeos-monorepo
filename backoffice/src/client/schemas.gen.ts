@@ -6879,6 +6879,19 @@ export const PopupPublicSchema = {
                 }
             ],
             title: 'Theme Config'
+        },
+        default_language: {
+            type: 'string',
+            title: 'Default Language',
+            default: 'en'
+        },
+        supported_languages: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Supported Languages',
+            default: ['en']
         }
     },
     type: 'object',

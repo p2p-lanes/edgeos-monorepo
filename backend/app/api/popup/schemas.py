@@ -243,6 +243,8 @@ class PopupPublic(SQLModel):
     requires_application_fee: bool = False
     application_fee_amount: Decimal | None = None
     theme_config: dict | None = None
+    default_language: str = "en"
+    supported_languages: list[str] = ["en"]
 
 
 class PopupAdmin(PopupBase):
