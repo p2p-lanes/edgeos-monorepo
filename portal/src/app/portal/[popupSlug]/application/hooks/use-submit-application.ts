@@ -14,6 +14,30 @@ import { useApplication } from "@/providers/applicationProvider"
 import type { ApplicationFormSchema } from "@/types/form-schema"
 import type { CompanionWithId } from "../components/companions-section"
 
+/** Virtual/synthetic form values that have no entry in schema.base_fields
+ * but do surface on errors. Maps them to an i18n key. */
+const VIRTUAL_FIELD_I18N_KEYS: Record<string, string> = {
+  gender_specify: "form.gender_specify",
+}
+
+/** Resolve a form field name to its user-facing label. Falls back to the
+ * raw name so we never show `undefined` if the schema drifts. */
+function resolveFieldLabel(
+  name: string,
+  schema: ApplicationFormSchema,
+  t: (key: string) => string,
+): string {
+  if (name.startsWith("custom_")) {
+    const customName = name.slice("custom_".length)
+    return schema.custom_fields[customName]?.label ?? name
+  }
+  const baseLabel = schema.base_fields[name]?.label
+  if (baseLabel) return baseLabel
+  const i18nKey = VIRTUAL_FIELD_I18N_KEYS[name]
+  if (i18nKey) return t(i18nKey)
+  return name
+}
+
 interface UseSubmitApplicationArgs {
   popup: PopupPublic
   schema: ApplicationFormSchema
@@ -85,7 +109,9 @@ export function useSubmitApplication({
     const { isValid, errors: validationErrors } = validate(false)
 
     if (!isValid) {
-      const fields = Object.keys(validationErrors).join(", ")
+      const fields = Object.keys(validationErrors)
+        .map((name) => resolveFieldLabel(name, schema, t))
+        .join(", ")
       toast.error(t("application.error_title"), {
         description: t("application.required_fields_error", { fields }),
       })

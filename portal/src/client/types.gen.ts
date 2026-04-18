@@ -102,6 +102,14 @@ export type ApplicationFunnel = {
 };
 
 /**
+ * How the portal renders the application form for a popup.
+ *
+ * - single_page: all sections stacked on one page (legacy behavior).
+ * - multi_step: one section per step, with Next/Back navigation.
+ */
+export type ApplicationLayout = 'single_page' | 'multi_step';
+
+/**
  * Application schema for API responses.
  */
 export type ApplicationPublic = {
@@ -1332,6 +1340,7 @@ export type PopupAdmin = {
     supported_languages?: Array<(string)>;
     insurance_enabled?: boolean;
     insurance_percentage?: (string | null);
+    application_layout?: ApplicationLayout;
     id: string;
 };
 
@@ -1372,6 +1381,7 @@ export type PopupCreate = {
     supported_languages?: Array<(string)>;
     insurance_enabled?: boolean;
     insurance_percentage?: (number | string | null);
+    application_layout?: ApplicationLayout;
 };
 
 /**
@@ -1410,6 +1420,7 @@ export type PopupPublic = {
     supported_languages?: Array<(string)>;
     insurance_enabled?: boolean;
     insurance_percentage?: (string | null);
+    application_layout?: ApplicationLayout;
 };
 
 /**
@@ -1482,6 +1493,7 @@ export type PopupUpdate = {
     supported_languages?: (Array<(string)> | null);
     insurance_enabled?: (boolean | null);
     insurance_percentage?: (number | string | null);
+    application_layout?: (ApplicationLayout | null);
 };
 
 /**

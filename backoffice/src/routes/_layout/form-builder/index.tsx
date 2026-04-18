@@ -25,6 +25,7 @@ import {
   type FormFieldUpdate,
   FormSectionsService,
   type FormSectionUpdate,
+  PopupsService,
 } from "@/client"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { CatalogDialog } from "@/components/form-builder/CatalogDialog"
@@ -51,6 +52,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { LoadingButton } from "@/components/ui/loading-button"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Sheet,
   SheetContent,
@@ -143,6 +151,24 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
 
   const { data: formSectionsData, isLoading: isLoadingSections } = useQuery({
     ...getAllFormSectionsQueryOptions(popupId),
+  })
+
+  const { data: popup } = useQuery({
+    queryKey: ["popup", popupId],
+    queryFn: () => PopupsService.getPopup({ popupId }),
+  })
+
+  const updateLayoutMutation = useMutation({
+    mutationFn: (layout: "single_page" | "multi_step") =>
+      PopupsService.updatePopup({
+        popupId,
+        requestBody: { application_layout: layout },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["popup", popupId] })
+      showSuccessToast("Application form layout updated")
+    },
+    onError: createErrorHandler(showErrorToast),
   })
 
   const isLoading = isLoadingFields || isLoadingSections
@@ -641,16 +667,38 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
             Drag fields from the palette to build your application form
           </p>
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => setCatalogOpen(true)}
-          className="gap-2"
-        >
-          <Sparkles className="h-4 w-4" />
-          Add predefined fields
-        </Button>
+        <div className="flex items-center gap-2">
+          {popup && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Layout</span>
+              <Select
+                value={popup.application_layout ?? "single_page"}
+                onValueChange={(v) =>
+                  updateLayoutMutation.mutate(v as "single_page" | "multi_step")
+                }
+                disabled={updateLayoutMutation.isPending}
+              >
+                <SelectTrigger className="w-[160px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="single_page">Single page</SelectItem>
+                  <SelectItem value="multi_step">Multi-step</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setCatalogOpen(true)}
+            className="gap-2"
+          >
+            <Sparkles className="h-4 w-4" />
+            Add predefined fields
+          </Button>
+        </div>
       </div>
 
       <DndContext

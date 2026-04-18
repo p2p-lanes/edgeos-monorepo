@@ -103,6 +103,7 @@
   "application": {
     "unavailable": "Application Unavailable",
     "unavailable_description": "The application form for this event is not yet configured.",
+    "step_of": "Step {{current}} of {{total}}",
     "existing_found": "Existing Application Found",
     "existing_description": "We've found a previous application associated with your email.",
     "applicant": "Applicant:",

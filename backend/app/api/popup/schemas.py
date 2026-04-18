@@ -27,7 +27,12 @@ def validate_popup_insurance_config(enabled: bool, pct: "Decimal | None") -> Non
         )
 
 
-from app.api.shared.enums import CheckoutMode, SaleType, derive_checkout_mode
+from app.api.shared.enums import (
+    ApplicationLayout,
+    CheckoutMode,
+    SaleType,
+    derive_checkout_mode,
+)
 from app.utils.utils import slugify
 
 ALLOWED_CURRENCIES = ("USD", "ARS", "EUR")
@@ -123,6 +128,10 @@ class PopupBase(SQLModel):
         default=None,
         sa_column=Column(Numeric(5, 2), nullable=True),
     )
+    application_layout: ApplicationLayout = Field(
+        default=ApplicationLayout.single_page,
+        sa_column=Column(String, nullable=False, server_default="single_page"),
+    )
 
     @field_validator("currency")
     @classmethod
@@ -165,6 +174,7 @@ class PopupCreate(SQLModel):
     supported_languages: list[str] = ["en"]
     insurance_enabled: bool = False
     insurance_percentage: Decimal | None = None
+    application_layout: ApplicationLayout = ApplicationLayout.single_page
 
     @field_validator("currency")
     @classmethod
@@ -221,6 +231,7 @@ class PopupUpdate(SQLModel):
     supported_languages: list[str] | None = None
     insurance_enabled: bool | None = None
     insurance_percentage: Decimal | None = None
+    application_layout: ApplicationLayout | None = None
 
     @field_validator("currency")
     @classmethod
@@ -283,6 +294,7 @@ class PopupPublic(SQLModel):
     supported_languages: list[str] = ["en"]
     insurance_enabled: bool = False
     insurance_percentage: Decimal | None = None
+    application_layout: ApplicationLayout = ApplicationLayout.single_page
 
 
 class PopupAdmin(PopupBase):

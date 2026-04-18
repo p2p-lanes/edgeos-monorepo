@@ -494,6 +494,16 @@ export const ApplicationFunnelSchema = {
     description: 'Application pipeline as a funnel.'
 } as const;
 
+export const ApplicationLayoutSchema = {
+    type: 'string',
+    enum: ['single_page', 'multi_step'],
+    title: 'ApplicationLayout',
+    description: `How the portal renders the application form for a popup.
+
+- single_page: all sections stacked on one page (legacy behavior).
+- multi_step: one section per step, with Next/Back navigation.`
+} as const;
+
 export const ApplicationPublicSchema = {
     properties: {
         id: {
@@ -6394,6 +6404,10 @@ export const PopupAdminSchema = {
             ],
             title: 'Insurance Percentage'
         },
+        application_layout: {
+            '$ref': '#/components/schemas/ApplicationLayout',
+            default: 'single_page'
+        },
         id: {
             type: 'string',
             format: 'uuid',
@@ -6745,6 +6759,10 @@ export const PopupCreateSchema = {
                 }
             ],
             title: 'Insurance Percentage'
+        },
+        application_layout: {
+            '$ref': '#/components/schemas/ApplicationLayout',
+            default: 'single_page'
         }
     },
     type: 'object',
@@ -7017,6 +7035,10 @@ export const PopupPublicSchema = {
                 }
             ],
             title: 'Insurance Percentage'
+        },
+        application_layout: {
+            '$ref': '#/components/schemas/ApplicationLayout',
+            default: 'single_page'
         }
     },
     type: 'object',
@@ -7532,6 +7554,16 @@ export const PopupUpdateSchema = {
                 }
             ],
             title: 'Insurance Percentage'
+        },
+        application_layout: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/ApplicationLayout'
+                },
+                {
+                    type: 'null'
+                }
+            ]
         }
     },
     type: 'object',

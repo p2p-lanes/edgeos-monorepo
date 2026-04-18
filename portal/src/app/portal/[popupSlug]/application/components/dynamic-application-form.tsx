@@ -1,7 +1,8 @@
 "use client"
 
 import { AnimatePresence, motion } from "framer-motion"
-import { memo, useCallback, useMemo } from "react"
+import { ChevronLeft, ChevronRight } from "lucide-react"
+import { memo, useCallback, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import type { ApplicationPublic, PopupPublic } from "@/client"
 import { ButtonAnimated } from "@/components/ui/button"
@@ -185,6 +186,9 @@ export function DynamicApplicationForm({
       })
     : t("common.submit")
 
+  const isMultiStep = popup.application_layout === "multi_step"
+  const [currentStep, setCurrentStep] = useState(0)
+
   // Handle gender specify logic
   const handleGenderChange = useCallback(
     (value: string) => {
@@ -304,6 +308,13 @@ export function DynamicApplicationForm({
     return result
   }, [schema, t])
 
+  const boundedStep = Math.min(currentStep, Math.max(mergedSections.length - 1, 0))
+  const visibleSections = isMultiStep
+    ? mergedSections.slice(boundedStep, boundedStep + 1)
+    : mergedSections
+  const isLastStep = boundedStep >= mergedSections.length - 1
+  const isFirstStep = boundedStep === 0
+
   return (
     <>
       <form
@@ -311,8 +322,17 @@ export function DynamicApplicationForm({
         onSubmit={handleSubmit}
         className="space-y-8 px-8 md:px-12"
       >
+        {isMultiStep && mergedSections.length > 1 && (
+          <p className="text-sm text-heading-secondary text-center">
+            {t("application.step_of", {
+              current: boundedStep + 1,
+              total: mergedSections.length,
+            })}
+          </p>
+        )}
+
         {/* Sections in schema order (base + custom fields per section) */}
-        {mergedSections.map(
+        {visibleSections.map(
           ({ id, title, subtitle, kind, baseFields, customFields }) => {
             if (kind === "companions") {
               return (
@@ -337,7 +357,10 @@ export function DynamicApplicationForm({
                   fields={scholarshipFields}
                   scholarshipRequest={getBoolean(values, "scholarship_request")}
                   scholarshipDetails={getString(values, "scholarship_details")}
-                  scholarshipVideoUrl={getString(values, "scholarship_video_url")}
+                  scholarshipVideoUrl={getString(
+                    values,
+                    "scholarship_video_url",
+                  )}
                   detailsError={errors.scholarship_details}
                   videoUrlError={errors.scholarship_video_url}
                   onScholarshipRequestChange={(checked) => {
@@ -416,14 +439,53 @@ export function DynamicApplicationForm({
             >
               {t("form.save_draft")}
             </ButtonAnimated>
-            <ButtonAnimated
-              loading={isSubmitPending}
-              disabled={isDraftPending || isFeePaymentPending}
-              type="submit"
-              className="w-full md:min-w-[11rem] md:w-auto"
-            >
-              {submitLabel}
-            </ButtonAnimated>
+            {isMultiStep && mergedSections.length > 1 ? (
+              <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+                <ButtonAnimated
+                  type="button"
+                  variant="outline"
+                  disabled={isFirstStep || isSubmitPending || isDraftPending}
+                  onClick={() => setCurrentStep((s) => Math.max(s - 1, 0))}
+                  className="w-full sm:w-auto"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  {t("common.back")}
+                </ButtonAnimated>
+                {isLastStep ? (
+                  <ButtonAnimated
+                    loading={isSubmitPending}
+                    disabled={isDraftPending || isFeePaymentPending}
+                    type="submit"
+                    className="w-full sm:min-w-[11rem] sm:w-auto"
+                  >
+                    {submitLabel}
+                  </ButtonAnimated>
+                ) : (
+                  <ButtonAnimated
+                    type="button"
+                    disabled={isSubmitPending || isDraftPending}
+                    onClick={() =>
+                      setCurrentStep((s) =>
+                        Math.min(s + 1, mergedSections.length - 1),
+                      )
+                    }
+                    className="w-full sm:w-auto"
+                  >
+                    {t("common.continue")}
+                    <ChevronRight className="h-4 w-4" />
+                  </ButtonAnimated>
+                )}
+              </div>
+            ) : (
+              <ButtonAnimated
+                loading={isSubmitPending}
+                disabled={isDraftPending || isFeePaymentPending}
+                type="submit"
+                className="w-full md:min-w-[11rem] md:w-auto"
+              >
+                {submitLabel}
+              </ButtonAnimated>
+            )}
           </div>
         </div>
       </form>

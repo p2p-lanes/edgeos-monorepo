@@ -130,9 +130,7 @@ function getFieldsInSectionKind(
     .map((s) => s.id)
   return new Set(
     Object.entries(schema.base_fields)
-      .filter(
-        ([, f]) => f.section_id && sectionIds.includes(f.section_id),
-      )
+      .filter(([, f]) => f.section_id && sectionIds.includes(f.section_id))
       .map(([name]) => name),
   )
 }
@@ -213,7 +211,13 @@ export function useApplicationForm(
       dispatch({ type: "SET_ERRORS", errors })
       return { isValid, errors }
     },
-    [schema, state.values, fieldsReplacedByCustomSection, hasScholarshipSection, t],
+    [
+      schema,
+      state.values,
+      fieldsReplacedByCustomSection,
+      hasScholarshipSection,
+      t,
+    ],
   )
 
   const progress = useMemo(() => {
