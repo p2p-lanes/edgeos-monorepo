@@ -1,20 +1,12 @@
 "use client"
 
-import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { AnimatePresence, motion } from "framer-motion"
-import { Info } from "lucide-react"
-import { useRouter } from "next/navigation"
-import { memo, useCallback, useMemo, useState } from "react"
+import { memo, useCallback, useMemo } from "react"
 import { useTranslation } from "react-i18next"
-import { toast } from "sonner"
 import type { ApplicationPublic, PopupPublic } from "@/client"
-import { ApplicationsService } from "@/client"
 import { ButtonAnimated } from "@/components/ui/button"
 import InputForm, { AddonInputForm } from "@/components/ui/Form/Input"
 import SelectForm from "@/components/ui/Form/Select"
-import { useApplicationFee } from "@/hooks/useApplicationFee"
-import { splitForCreate, splitForUpdate } from "@/lib/form-data-splitter"
-import { queryKeys } from "@/lib/query-keys"
 import { useApplication } from "@/providers/applicationProvider"
 import type {
   ApplicationFormSchema,
@@ -23,7 +15,10 @@ import type {
 } from "@/types/form-schema"
 import { getBoolean, getString } from "../hooks/form-values"
 import { useApplicationForm } from "../hooks/use-application-form"
-import { CompanionsSection, type CompanionWithId } from "./companions-section"
+import { useCompanionsState } from "../hooks/use-companions-state"
+import { useSubmitApplication } from "../hooks/use-submit-application"
+import { ApplicationFeeNotice } from "./application-fee-notice"
+import { CompanionsSection } from "./companions-section"
 import { DynamicField } from "./fields/dynamic-field"
 import { ProgressBar } from "./progress-bar"
 import SectionWrapper from "./SectionWrapper"
@@ -144,33 +139,29 @@ export function DynamicApplicationForm({
   popup,
 }: DynamicApplicationFormProps) {
   const { t } = useTranslation()
-  const router = useRouter()
-  const queryClient = useQueryClient()
-  const { getRelevantApplication, updateApplication } = useApplication()
-  const { createOrResume, isPending: isFeePaymentPending } = useApplicationFee()
+  const { getRelevantApplication } = useApplication()
   const application = getRelevantApplication()
 
   const { values, errors, handleChange, validate, progress } =
     useApplicationForm(schema, existingApplication, popup.id)
 
-  // Companions are initialized from attendees. The form remounts via key
-  // whenever existingApplication changes, so useState initial value is correct.
-  const [companions, setCompanions] = useState<CompanionWithId[]>(() => {
-    if (!existingApplication?.attendees?.length) return []
-    return existingApplication.attendees
-      .filter((a) => a.category === "spouse" || a.category === "kid")
-      .map((a) => ({
-        _id: a.id,
-        name: a.name,
-        category: a.category,
-        email: a.email ?? undefined,
-        gender: a.gender ?? undefined,
-      }))
+  const [companions, setCompanions] = useCompanionsState(existingApplication)
+
+  const {
+    handleSubmit,
+    handleDraft,
+    isDraftPending,
+    isSubmitPending,
+    isFeePaymentPending,
+  } = useSubmitApplication({
+    popup,
+    schema,
+    values,
+    companions,
+    application,
+    validate,
   })
-  const [statusBtn, setStatusBtn] = useState({
-    loadingDraft: false,
-    loadingSubmit: false,
-  })
+
   const feeAlreadyPaid = Boolean(
     existingApplication &&
       popup.requires_application_fee &&
@@ -193,92 +184,6 @@ export function DynamicApplicationForm({
           : "$0.00",
       })
     : t("common.submit")
-
-  const submitMutation = useMutation({
-    mutationFn: async (status: "draft" | "in review") => {
-      const companionPayload = companions.map(({ _id, ...rest }) => rest)
-
-      if (application?.id) {
-        return ApplicationsService.updateMyApplication({
-          popupId: popup.id,
-          requestBody: splitForUpdate({ values, status, schema }),
-        })
-      }
-
-      return ApplicationsService.createMyApplication({
-        requestBody: splitForCreate({
-          values,
-          popupId: popup.id,
-          companions: companionPayload,
-          status,
-          schema,
-        }),
-      })
-    },
-    onSuccess: (result) => {
-      updateApplication(result)
-      queryClient.invalidateQueries({ queryKey: queryKeys.applications.mine() })
-    },
-  })
-
-  const handleSubmit = async (
-    e: Parameters<NonNullable<React.ComponentProps<"form">["onSubmit"]>>[0],
-  ) => {
-    e.preventDefault()
-    if (statusBtn.loadingSubmit || isFeePaymentPending) return
-    setStatusBtn({ loadingDraft: false, loadingSubmit: true })
-
-    const { isValid, errors: validationErrors } = validate(false)
-
-    if (!isValid) {
-      const fields = Object.keys(validationErrors).join(", ")
-      toast.error(t("application.error_title"), {
-        description: t("application.required_fields_error", { fields }),
-      })
-      setStatusBtn({ loadingDraft: false, loadingSubmit: false })
-      return
-    }
-
-    try {
-      const result = await submitMutation.mutateAsync("in review")
-
-      if (result.status === "pending_fee") {
-        const feePayment = await createOrResume(result.id)
-
-        if (!feePayment.checkoutUrl) {
-          throw new Error(t("application.fee.missing_checkout_url"))
-        }
-
-        window.location.href = feePayment.checkoutUrl
-        return
-      }
-
-      toast.success(t("application.submitted_title"), {
-        description: t("application.submitted_description"),
-      })
-      router.push(`/portal/${popup.slug}`)
-    } catch {
-      toast.error(t("application.submit_error_title"), {
-        description: t("application.submit_error_description"),
-      })
-    }
-    setStatusBtn({ loadingDraft: false, loadingSubmit: false })
-  }
-
-  const handleDraft = async () => {
-    setStatusBtn({ loadingDraft: true, loadingSubmit: false })
-    try {
-      await submitMutation.mutateAsync("draft")
-      toast.success(t("application.draft_saved_title"), {
-        description: t("application.draft_saved_description"),
-      })
-    } catch {
-      toast.error(t("application.draft_error_title"), {
-        description: t("application.draft_error_description"),
-      })
-    }
-    setStatusBtn({ loadingDraft: false, loadingSubmit: false })
-  }
 
   // Handle gender specify logic
   const handleGenderChange = useCallback(
@@ -498,24 +403,12 @@ export function DynamicApplicationForm({
         {/* Submit buttons */}
         <div className="flex w-full flex-col gap-6 pt-6">
           {showFeeNotice && formattedApplicationFee && (
-            <div className="flex w-full items-start gap-3 rounded-lg border border-border bg-muted/40 p-4 text-sm text-foreground">
-              <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-              <div>
-                <p className="font-semibold">
-                  {t("application.fee.required_title")}
-                </p>
-                <p className="mt-1 text-muted-foreground">
-                  {t("application.fee.required_description", {
-                    amount: formattedApplicationFee,
-                  })}
-                </p>
-              </div>
-            </div>
+            <ApplicationFeeNotice amount={formattedApplicationFee} />
           )}
           <div className="flex w-full flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <ButtonAnimated
-              loading={statusBtn.loadingDraft}
-              disabled={statusBtn.loadingSubmit}
+              loading={isDraftPending}
+              disabled={isSubmitPending}
               variant="outline"
               type="button"
               onClick={handleDraft}
@@ -524,8 +417,8 @@ export function DynamicApplicationForm({
               {t("form.save_draft")}
             </ButtonAnimated>
             <ButtonAnimated
-              loading={statusBtn.loadingSubmit}
-              disabled={statusBtn.loadingDraft || isFeePaymentPending}
+              loading={isSubmitPending}
+              disabled={isDraftPending || isFeePaymentPending}
               type="submit"
               className="w-full md:min-w-[11rem] md:w-auto"
             >
