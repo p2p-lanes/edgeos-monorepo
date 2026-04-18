@@ -16,7 +16,7 @@ import {
 import { arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
-import { Loader2 } from "lucide-react"
+import { Loader2, Sparkles } from "lucide-react"
 import { useCallback, useMemo, useState } from "react"
 
 import {
@@ -28,12 +28,14 @@ import {
 } from "@/client"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import {
+  canRemoveField,
   FIELD_TYPES,
   isSpecialField,
   PALETTE_ITEM_PREFIX,
   parseSortableSectionId,
   SORTABLE_SECTION_PREFIX,
 } from "@/components/form-builder/constants"
+import { CatalogDialog } from "@/components/form-builder/CatalogDialog"
 import { DragOverlayContent } from "@/components/form-builder/DragOverlayContent"
 import { FieldConfigPanel } from "@/components/form-builder/FieldConfigPanel"
 import { FieldPalette } from "@/components/form-builder/FieldPalette"
@@ -126,6 +128,7 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null)
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<FormFieldPublic | null>(null)
+  const [catalogOpen, setCatalogOpen] = useState(false)
   const [liveOrderMap, setLiveOrderMap] = useState<Record<
     string,
     string[]
@@ -553,8 +556,8 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
     (fieldId: string) => {
       const field = fields.find((f) => f.id === fieldId)
       if (!field) return
-      if (isSpecialField(field)) {
-        showErrorToast("This field cannot be deleted.")
+      if (!canRemoveField(field)) {
+        showErrorToast("This field cannot be removed.")
         return
       }
       setDeleteTarget(field)
@@ -617,11 +620,23 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
 
   return (
     <div className="flex flex-col gap-4 h-[calc(100vh-120px)]">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Form Builder</h1>
-        <p className="text-muted-foreground">
-          Drag fields from the palette to build your application form
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Form Builder</h1>
+          <p className="text-muted-foreground">
+            Drag fields from the palette to build your application form
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setCatalogOpen(true)}
+          className="gap-2"
+        >
+          <Sparkles className="h-4 w-4" />
+          Add predefined fields
+        </Button>
       </div>
 
       <DndContext
@@ -689,11 +704,15 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Form Field</DialogTitle>
+            <DialogTitle>
+              {deleteTarget && isSpecialField(deleteTarget)
+                ? "Remove from this popup"
+                : "Delete Form Field"}
+            </DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete &quot;{deleteTarget?.label}
-              &quot;? Applications may lose their stored data for this field.
-              This action cannot be undone.
+              {deleteTarget && isSpecialField(deleteTarget)
+                ? `"${deleteTarget.label}" will no longer be asked on this popup. The field stays in the catalog and can be added back later.`
+                : `Are you sure you want to delete "${deleteTarget?.label}"? Applications may lose their stored data for this field. This action cannot be undone.`}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -707,7 +726,9 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
                 deleteTarget && deleteFieldMutation.mutate(deleteTarget.id)
               }
             >
-              Delete
+              {deleteTarget && isSpecialField(deleteTarget)
+                ? "Remove"
+                : "Delete"}
             </LoadingButton>
           </DialogFooter>
         </DialogContent>
@@ -722,6 +743,12 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
           Saving...
         </div>
       )}
+
+      <CatalogDialog
+        popupId={popupId}
+        open={catalogOpen}
+        onOpenChange={setCatalogOpen}
+      />
     </div>
   )
 }
