@@ -149,7 +149,7 @@ export function DynamicApplicationForm({
   const { createOrResume, isPending: isFeePaymentPending } = useApplicationFee()
   const application = getRelevantApplication()
 
-  const { values, errors, handleChange, validate, setErrors, progress } =
+  const { values, errors, handleChange, validate, progress } =
     useApplicationForm(schema, existingApplication, popup.id)
 
   // Companions are initialized from attendees. The form remounts via key
@@ -229,28 +229,11 @@ export function DynamicApplicationForm({
 
     const { isValid, errors: validationErrors } = validate(false)
 
-    // Scholarship validation: details required when scholarship_request is true.
-    // Uses schema presence (section of kind "scholarship") rather than the
-    // popup flag directly — the field is only asked when configured.
-    const scholarshipErrors: Record<string, string> = {}
-    if (hasScholarshipSection && values.scholarship_request) {
-      const details = (values.scholarship_details as string) ?? ""
-      if (!details.trim()) {
-        scholarshipErrors.scholarship_details = t(
-          "application.scholarship.details_required_error",
-        )
-      }
-    }
-
-    if (!isValid || Object.keys(scholarshipErrors).length > 0) {
-      const allErrors = { ...validationErrors, ...scholarshipErrors }
-      const fields = Object.keys(allErrors).join(", ")
+    if (!isValid) {
+      const fields = Object.keys(validationErrors).join(", ")
       toast.error(t("application.error_title"), {
         description: t("application.required_fields_error", { fields }),
       })
-      if (Object.keys(scholarshipErrors).length > 0) {
-        setErrors(allErrors)
-      }
       setStatusBtn({ loadingDraft: false, loadingSubmit: false })
       return
     }
@@ -414,11 +397,6 @@ export function DynamicApplicationForm({
 
     return result
   }, [schema, t])
-
-  const hasScholarshipSection = useMemo(
-    () => mergedSections.some((block) => block.kind === "scholarship"),
-    [mergedSections],
-  )
 
   return (
     <>
