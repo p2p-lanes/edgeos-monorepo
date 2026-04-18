@@ -335,6 +335,7 @@ export function CheckoutProvider({
   // Insurance calculations
   const { insurancePotentialAmount, insuranceAmount } = useInsuranceCalculation(
     {
+      popup: city,
       selectedPasses,
       housing,
       merch,

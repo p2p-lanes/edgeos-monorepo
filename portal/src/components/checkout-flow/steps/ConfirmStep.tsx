@@ -101,14 +101,27 @@ export default function ConfirmStep() {
     Object.values(cart.dynamicItems).some((items) => items.length > 0) ||
     hasEditChanges
 
-  // Insurance available if any product has insurance potential and total is not zero
-  const isInsuranceEnabled = stepConfigs.some(
-    (s) => s.step_type === "insurance_checkout",
-  )
+  // Insurance available if popup has insurance enabled with a valid percentage
+  const isInsuranceEnabled =
+    popup?.insurance_enabled === true && popup?.insurance_percentage != null
   const hasInsurableProducts =
     isInsuranceEnabled &&
     cart.insurancePotentialPrice > 0 &&
     summary.grandTotal - summary.insuranceSubtotal > 0
+
+  // Extract template_config from the confirm step's nested 'insurance' sub-config
+  const confirmStep = stepConfigs.find((s) => s.step_type === "confirm")
+  const insuranceTemplateConfig =
+    confirmStep?.template_config &&
+    typeof confirmStep.template_config === "object" &&
+    "insurance" in (confirmStep.template_config as object)
+      ? ((confirmStep.template_config as Record<string, unknown>).insurance as {
+          card_title?: string
+          card_subtitle?: string
+          toggle_label?: string
+          benefits?: string[]
+        })
+      : null
 
   if (!hasCartItems) {
     return (
@@ -141,6 +154,10 @@ export default function ConfirmStep() {
           insurance={cart.insurance}
           price={cart.insurancePotentialPrice}
           onToggle={toggleInsurance}
+          title={insuranceTemplateConfig?.card_title}
+          subtitle={insuranceTemplateConfig?.card_subtitle}
+          toggleLabel={insuranceTemplateConfig?.toggle_label}
+          benefits={insuranceTemplateConfig?.benefits}
         />
       )}
 

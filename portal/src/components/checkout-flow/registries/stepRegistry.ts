@@ -36,6 +36,11 @@ export function shouldUseDynamicStep(
   if (!stepConfig?.template_config) return false
   const cfg = stepConfig.template_config as Record<string, unknown>
 
+  // Confirm always renders via ConfirmStep. Its template_config.insurance
+  // sub-config is consumed internally for the InsuranceCard — it's not a
+  // dynamic product-driven step.
+  if (stepConfig.step_type === "confirm") return false
+
   // Steps with an explicit template always go dynamic
   if (stepConfig.template) return true
 
