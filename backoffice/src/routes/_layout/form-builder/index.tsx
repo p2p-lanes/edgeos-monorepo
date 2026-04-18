@@ -154,10 +154,24 @@ function FormBuilderContent({ popupId }: { popupId: string }) {
 
   const sections = useMemo(() => {
     if (!formSectionsData?.results) return []
-    return [...formSectionsData.results].sort(
+    const sorted = [...formSectionsData.results].sort(
       (a, b) => (a.order ?? 0) - (b.order ?? 0),
     )
-  }, [formSectionsData])
+    // Hide protected sections that have no fields — admins cannot delete them
+    // directly, so keeping them visible would leave an orphan card in the UI.
+    // The section stays in the DB; it reappears as soon as a field lands back.
+    const fieldsBySectionId = new Map<string, FormFieldPublic[]>()
+    for (const field of formFieldsData?.results ?? []) {
+      if (!field.section_id) continue
+      const list = fieldsBySectionId.get(field.section_id) ?? []
+      list.push(field)
+      fieldsBySectionId.set(field.section_id, list)
+    }
+    return sorted.filter((section) => {
+      if (!section.protected) return true
+      return (fieldsBySectionId.get(section.id)?.length ?? 0) > 0
+    })
+  }, [formSectionsData, formFieldsData])
 
   const fieldsBySection = useMemo(() => {
     const serverMap: Record<string, FormFieldPublic[]> = {}
