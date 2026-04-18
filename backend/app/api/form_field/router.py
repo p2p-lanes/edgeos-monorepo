@@ -14,8 +14,8 @@ if TYPE_CHECKING:
 from app.api.form_field.models import FormFields
 from app.api.form_field.schemas import FormFieldCreate, FormFieldPublic, FormFieldUpdate
 from app.api.shared.enums import UserRole
-from app.api.translation.service import delete_translations_for_entity
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
+from app.api.translation.service import delete_translations_for_entity
 from app.core.dependencies.users import (
     CurrentHuman,
     CurrentUser,
@@ -174,7 +174,14 @@ async def update_form_field(
     base_config = base_field_configs_crud.get(db, field_id)
     if base_config:
         # Only forward fields that were actually sent and are configurable
-        configurable = {"section_id", "position", "label", "placeholder", "help_text", "options"}
+        configurable = {
+            "section_id",
+            "position",
+            "label",
+            "placeholder",
+            "help_text",
+            "options",
+        }
         update_data = {
             k: getattr(field_in, k) for k in field_in.model_fields_set & configurable
         }
@@ -259,7 +266,9 @@ async def get_portal_application_schema(
         )
 
         # Translate custom fields
-        fields, _ = crud.form_fields_crud.find_by_popup(db, popup_id, skip=0, limit=1000)
+        fields, _ = crud.form_fields_crud.find_by_popup(
+            db, popup_id, skip=0, limit=1000
+        )
         field_ids = [f.id for f in fields]
         field_translations = get_translations_bulk(db, "form_field", field_ids, lang)
 
@@ -274,7 +283,9 @@ async def get_portal_application_schema(
 
         # Translate sections
         section_ids = [uuid.UUID(s["id"]) for s in schema["sections"]]
-        section_translations = get_translations_bulk(db, "form_section", section_ids, lang)
+        section_translations = get_translations_bulk(
+            db, "form_section", section_ids, lang
+        )
 
         for section in schema["sections"]:
             sid = uuid.UUID(section["id"])

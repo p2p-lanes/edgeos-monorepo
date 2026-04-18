@@ -13,7 +13,12 @@ DEFAULT_TICKETING_STEPS = [
             "sections": [
                 {"key": "full", "label": "Full Passes", "order": 0, "product_ids": []},
                 {"key": "month", "label": "Month Pass", "order": 1, "product_ids": []},
-                {"key": "week", "label": "Weekly Passes", "order": 2, "product_ids": []},
+                {
+                    "key": "week",
+                    "label": "Weekly Passes",
+                    "order": 2,
+                    "product_ids": [],
+                },
                 {"key": "day", "label": "Day Passes", "order": 3, "product_ids": []},
             ]
         },

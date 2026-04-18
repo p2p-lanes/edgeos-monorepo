@@ -1,4 +1,5 @@
 """Email dispatch helpers for application status transitions."""
+
 from typing import Union
 
 from sqlmodel import Session
@@ -182,7 +183,9 @@ async def send_application_status_email(
                 popup_id=application.popup_id,
                 db_session=db,
             )
-        elif template_type == EmailTemplateType.APPLICATION_ACCEPTED_SCHOLARSHIP_REJECTED:
+        elif (
+            template_type == EmailTemplateType.APPLICATION_ACCEPTED_SCHOLARSHIP_REJECTED
+        ):
             await email_service.send_application_accepted_scholarship_rejected(
                 to=human.email,
                 subject=f"Your application to {popup.name} — accepted",

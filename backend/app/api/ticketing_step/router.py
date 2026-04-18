@@ -2,15 +2,21 @@ import uuid
 
 from fastapi import APIRouter, HTTPException, status
 
+from app.api.shared.enums import UserRole
+from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.api.ticketing_step import crud
 from app.api.ticketing_step.schemas import (
     TicketingStepCreate,
     TicketingStepPublic,
     TicketingStepUpdate,
 )
-from app.api.shared.enums import UserRole
-from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
-from app.core.dependencies.users import CurrentHuman, CurrentUser, CurrentWriter, HumanTenantSession, SessionDep, TenantSession
+from app.core.dependencies.users import (
+    CurrentHuman,
+    CurrentUser,
+    CurrentWriter,
+    HumanTenantSession,
+    TenantSession,
+)
 
 router = APIRouter(prefix="/ticketing-steps", tags=["ticketing-steps"])
 
@@ -67,7 +73,9 @@ async def get_ticketing_step(
     return TicketingStepPublic.model_validate(step)
 
 
-@router.post("", response_model=TicketingStepPublic, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "", response_model=TicketingStepPublic, status_code=status.HTTP_201_CREATED
+)
 async def create_ticketing_step(
     step_in: TicketingStepCreate,
     db: TenantSession,

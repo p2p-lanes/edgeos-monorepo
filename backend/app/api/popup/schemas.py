@@ -10,9 +10,7 @@ from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlmodel import Field, SQLModel, String
 
 
-def validate_popup_insurance_config(
-    enabled: bool, pct: "Decimal | None"
-) -> None:
+def validate_popup_insurance_config(enabled: bool, pct: "Decimal | None") -> None:
     """Validate insurance_percentage bounds when insurance is enabled.
 
     Raises ValueError if enabled=True and pct is None, <= 0, or > 100.
@@ -27,6 +25,7 @@ def validate_popup_insurance_config(
         raise ValueError(
             "insurance_percentage must be <= 100 (it represents a percentage)"
         )
+
 
 from app.api.shared.enums import CheckoutMode, SaleType, derive_checkout_mode
 from app.utils.utils import slugify
@@ -182,7 +181,9 @@ class PopupCreate(SQLModel):
             raise ValueError(
                 "application_fee_amount must be greater than 0 when requires_application_fee is True"
             )
-        validate_popup_insurance_config(self.insurance_enabled, self.insurance_percentage)
+        validate_popup_insurance_config(
+            self.insurance_enabled, self.insurance_percentage
+        )
         return self
 
 

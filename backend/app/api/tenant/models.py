@@ -1,7 +1,6 @@
 import uuid
 from typing import TYPE_CHECKING
 
-import sqlalchemy as sa
 from sqlalchemy import Index, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlmodel import Column, Field, Relationship
@@ -16,7 +15,6 @@ if TYPE_CHECKING:
     from app.api.email_template.models import EmailTemplates
     from app.api.form_field.models import FormFields
     from app.api.form_section.models import FormSections
-    from app.api.translation.models import Translations
     from app.api.group.models import Groups
     from app.api.human.models import Humans
     from app.api.payment.models import Payments
@@ -24,6 +22,7 @@ if TYPE_CHECKING:
     from app.api.product.models import Products
     from app.api.tenant.credential_models import TenantCredentials
     from app.api.ticketing_step.models import TicketingSteps
+    from app.api.translation.models import Translations
     from app.api.user.models import Users
 
 

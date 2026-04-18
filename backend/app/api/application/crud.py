@@ -437,7 +437,10 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             )
 
         # Apply approval strategy for non-group applications still in review
-        if not data.get("group_id") and application.status == ApplicationStatus.IN_REVIEW.value:
+        if (
+            not data.get("group_id")
+            and application.status == ApplicationStatus.IN_REVIEW.value
+        ):
             # Intercept: if popup requires application fee, gate on PENDING_FEE
             if popup.requires_application_fee:
                 application.status = ApplicationStatus.PENDING_FEE.value
@@ -447,7 +450,11 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
 
         # Create snapshot for group auto-accept/reject
         if data.get("group_id"):
-            event = "auto_rejected" if application.status == ApplicationStatus.REJECTED.value else "auto_accepted"
+            event = (
+                "auto_rejected"
+                if application.status == ApplicationStatus.REJECTED.value
+                else "auto_accepted"
+            )
             self.create_snapshot(session, application, event)
 
         session.commit()
@@ -693,9 +700,13 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             # Condition uses `not in (APPROVED, REJECTED)` to catch both None and "pending".
             from app.api.application.schemas import ScholarshipStatus
 
-            if application.scholarship_request and application.scholarship_status not in (
-                ScholarshipStatus.APPROVED.value,
-                ScholarshipStatus.REJECTED.value,
+            if (
+                application.scholarship_request
+                and application.scholarship_status
+                not in (
+                    ScholarshipStatus.APPROVED.value,
+                    ScholarshipStatus.REJECTED.value,
+                )
             ):
                 self.create_snapshot(session, application, "submitted")
                 return

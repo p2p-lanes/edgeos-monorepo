@@ -3,9 +3,9 @@ from datetime import UTC, datetime
 
 from sqlmodel import Session, select
 
+from app.api.shared.crud import BaseCRUD
 from app.api.translation.models import Translations
 from app.api.translation.schemas import TranslationCreate, TranslationUpdate
-from app.api.shared.crud import BaseCRUD
 
 
 class TranslationsCRUD(BaseCRUD[Translations, TranslationCreate, TranslationUpdate]):
