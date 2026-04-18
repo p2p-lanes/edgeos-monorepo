@@ -1,7 +1,7 @@
 "use client"
 
 import "@/i18n/config"
-import { type ReactNode } from "react"
+import type { ReactNode } from "react"
 import { sortAttendees } from "@/helpers/filters"
 import ApplicationProvider, {
   useApplication,

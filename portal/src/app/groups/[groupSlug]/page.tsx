@@ -29,7 +29,9 @@ const GroupCheckoutPage = () => {
     return (
       <div className="flex min-h-screen items-center justify-center bg-neutral-100 p-6">
         <div className="max-w-md rounded-2xl bg-white p-8 text-center shadow-sm">
-          <h1 className="text-2xl font-bold text-neutral-900">Group not found</h1>
+          <h1 className="text-2xl font-bold text-neutral-900">
+            Group not found
+          </h1>
           <p className="mt-3 text-sm text-neutral-600">
             The group link is invalid or this event is no longer available.
           </p>

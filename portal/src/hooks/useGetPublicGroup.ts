@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
-import { ApiError, GroupsService, type GroupPublic } from "@/client"
+import { ApiError, type GroupPublic, GroupsService } from "@/client"
 import { queryKeys } from "@/lib/query-keys"
 
 interface UseGetPublicGroupResult {
@@ -8,7 +8,9 @@ interface UseGetPublicGroupResult {
   error: string | null
 }
 
-const useGetPublicGroup = (groupSlug: string | null): UseGetPublicGroupResult => {
+const useGetPublicGroup = (
+  groupSlug: string | null,
+): UseGetPublicGroupResult => {
   const query = useQuery({
     queryKey: queryKeys.groups.public(groupSlug ?? ""),
     queryFn: async () => {

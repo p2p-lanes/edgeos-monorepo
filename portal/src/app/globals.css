@@ -132,10 +132,26 @@
   --checkout-button-title: #1e2a4d;
   --checkout-bottom-bar-text: #ffffff;
   /* Disabled variants derived via color-mix (no editables del form). */
-  --checkout-button-disabled: color-mix(in oklab, var(--checkout-button) 35%, white);
-  --checkout-button-title-disabled: color-mix(in oklab, var(--checkout-button-title) 50%, transparent);
-  --checkout-badge-bg-disabled: color-mix(in oklab, var(--checkout-badge-bg) 25%, white);
-  --checkout-badge-title-disabled: color-mix(in oklab, var(--checkout-badge-title) 55%, transparent);
+  --checkout-button-disabled: color-mix(
+    in oklab,
+    var(--checkout-button) 35%,
+    white
+  );
+  --checkout-button-title-disabled: color-mix(
+    in oklab,
+    var(--checkout-button-title) 50%,
+    transparent
+  );
+  --checkout-badge-bg-disabled: color-mix(
+    in oklab,
+    var(--checkout-badge-bg) 25%,
+    white
+  );
+  --checkout-badge-title-disabled: color-mix(
+    in oklab,
+    var(--checkout-badge-title) 55%,
+    transparent
+  );
   /* Legacy aliases — popups anteriores a la simplificación pueden tener
      checkout_nav_bg / checkout_nav_text en el JSON. themeProvider sigue
      mapeando 1:1 hacia estas vars, así que las dejamos como alias. */
@@ -194,10 +210,26 @@
   --checkout-button: oklch(0.985 0 0);
   --checkout-button-title: oklch(0.145 0 0);
   --checkout-bottom-bar-text: oklch(0.985 0 0);
-  --checkout-button-disabled: color-mix(in oklab, var(--checkout-button) 35%, black);
-  --checkout-button-title-disabled: color-mix(in oklab, var(--checkout-button-title) 50%, transparent);
-  --checkout-badge-bg-disabled: color-mix(in oklab, var(--checkout-badge-bg) 25%, black);
-  --checkout-badge-title-disabled: color-mix(in oklab, var(--checkout-badge-title) 55%, transparent);
+  --checkout-button-disabled: color-mix(
+    in oklab,
+    var(--checkout-button) 35%,
+    black
+  );
+  --checkout-button-title-disabled: color-mix(
+    in oklab,
+    var(--checkout-button-title) 50%,
+    transparent
+  );
+  --checkout-badge-bg-disabled: color-mix(
+    in oklab,
+    var(--checkout-badge-bg) 25%,
+    black
+  );
+  --checkout-badge-title-disabled: color-mix(
+    in oklab,
+    var(--checkout-badge-title) 55%,
+    transparent
+  );
   --checkout-nav-bg: var(--checkout-navbar-bg);
   --checkout-nav-text: var(--checkout-badge-title);
   --card: oklch(0.205 0.015 285);
