@@ -1,6 +1,7 @@
 export type {
   ApplicationFormSchema,
   FormFieldSchema,
+  FormSectionKind,
   FormSectionSchema,
 } from "./types"
 export { cn } from "./utils"

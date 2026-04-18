@@ -19,6 +19,7 @@ import { useApplication } from "@/providers/applicationProvider"
 import type {
   ApplicationFormSchema,
   FormFieldSchema,
+  FormSectionKind,
 } from "@/types/form-schema"
 import { useApplicationForm } from "../hooks/use-application-form"
 import { CompanionsSection, type CompanionWithId } from "./companions-section"
@@ -228,10 +229,11 @@ export function DynamicApplicationForm({
 
     const { isValid, errors: validationErrors } = validate(false)
 
-    // Scholarship validation: details required when scholarship_request is true
-    // Uses schema presence (via _hasScholarshipSection) rather than popup flag directly
+    // Scholarship validation: details required when scholarship_request is true.
+    // Uses schema presence (section of kind "scholarship") rather than the
+    // popup flag directly — the field is only asked when configured.
     const scholarshipErrors: Record<string, string> = {}
-    if (_hasScholarshipSection && values.scholarship_request) {
+    if (hasScholarshipSection && values.scholarship_request) {
       const details = (values.scholarship_details as string) ?? ""
       if (!details.trim()) {
         scholarshipErrors.scholarship_details = t(
@@ -319,6 +321,7 @@ export function DynamicApplicationForm({
     id: string
     title: string
     subtitle?: string
+    kind: FormSectionKind
     baseFields: [string, FormFieldSchema][]
     customFields: [string, FormFieldSchema][]
   }
@@ -355,6 +358,7 @@ export function DynamicApplicationForm({
         id: "_unsectioned_base",
         title: t("form.personal_info"),
         subtitle: t("form.personal_info_description"),
+        kind: "standard",
         baseFields: bySectionIdBase._unsectioned,
         customFields: [],
       })
@@ -370,6 +374,7 @@ export function DynamicApplicationForm({
         id: section.id,
         title: section.label,
         subtitle: section.description ?? undefined,
+        kind: section.kind,
         baseFields,
         customFields,
       })
@@ -382,6 +387,7 @@ export function DynamicApplicationForm({
       result.push({
         id: "_unsectioned_custom",
         title: t("form.additional_info"),
+        kind: "standard",
         baseFields: [],
         customFields: bySectionIdCustom._unsectioned,
       })
@@ -400,6 +406,7 @@ export function DynamicApplicationForm({
       result.push({
         id,
         title: t("form.other"),
+        kind: "standard",
         baseFields,
         customFields,
       })
@@ -408,19 +415,8 @@ export function DynamicApplicationForm({
     return result
   }, [schema, t])
 
-  const _hasChildrenSection = useMemo(
-    () =>
-      mergedSections.some((block) =>
-        block.title.toLowerCase().includes("children"),
-      ),
-    [mergedSections],
-  )
-
-  const _hasScholarshipSection = useMemo(
-    () =>
-      mergedSections.some((block) =>
-        block.title.toLowerCase().includes("scholarship"),
-      ),
+  const hasScholarshipSection = useMemo(
+    () => mergedSections.some((block) => block.kind === "scholarship"),
     [mergedSections],
   )
 
@@ -433,9 +429,8 @@ export function DynamicApplicationForm({
       >
         {/* Sections in schema order (base + custom fields per section) */}
         {mergedSections.map(
-          ({ id, title, subtitle, baseFields, customFields }) => {
-            const isChildrenSection = title.toLowerCase().includes("children")
-            if (isChildrenSection) {
+          ({ id, title, subtitle, kind, baseFields, customFields }) => {
+            if (kind === "companions") {
               return (
                 <div key={id}>
                   <CompanionsSection
@@ -447,10 +442,7 @@ export function DynamicApplicationForm({
                 </div>
               )
             }
-            const isScholarshipSection = title
-              .toLowerCase()
-              .includes("scholarship")
-            if (isScholarshipSection) {
+            if (kind === "scholarship") {
               const scholarshipFields = Object.fromEntries(
                 baseFields.map(([name, field]) => [name, field]),
               )
@@ -531,16 +523,6 @@ export function DynamicApplicationForm({
             )
           },
         )}
-
-        {/* Companions section (only when no "Children" section from API) */}
-        {/* {!hasChildrenSection && (
-          <CompanionsSection
-            allowsSpouse={popup.allows_spouse ?? false}
-            allowsChildren={popup.allows_children ?? false}
-            companions={companions}
-            onCompanionsChange={setCompanions}
-          />
-        )} */}
 
         {/* Submit buttons */}
         <div className="flex w-full flex-col gap-6 pt-6">
