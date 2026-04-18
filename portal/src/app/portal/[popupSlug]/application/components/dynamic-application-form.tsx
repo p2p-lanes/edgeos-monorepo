@@ -21,6 +21,7 @@ import type {
   FormFieldSchema,
   FormSectionKind,
 } from "@/types/form-schema"
+import { getBoolean, getString } from "../hooks/form-values"
 import { useApplicationForm } from "../hooks/use-application-form"
 import { CompanionsSection, type CompanionWithId } from "./companions-section"
 import { DynamicField } from "./fields/dynamic-field"
@@ -76,7 +77,7 @@ const BaseField = memo(function BaseField({
       <AddonInputForm
         label={field.label}
         id="telegram"
-        value={(value as string) ?? ""}
+        value={typeof value === "string" ? value : ""}
         onChange={(v) => onChange("telegram", v)}
         error={error}
         isRequired={field.required}
@@ -292,12 +293,12 @@ export function DynamicApplicationForm({
 
   // Resolve display gender for select
   const displayGender = useMemo(() => {
-    const g = values.gender as string
+    const g = getString(values, "gender")
     const genderField = schema.base_fields.gender
     if (g && genderField?.options && !genderField.options.includes(g))
       return "Specify"
-    return g ?? ""
-  }, [values.gender, schema.base_fields])
+    return g
+  }, [values, schema.base_fields])
 
   // Single ordered list of sections: each block has base + custom fields, order follows schema.sections
   type SectionBlock = {
@@ -429,15 +430,9 @@ export function DynamicApplicationForm({
                   key={id}
                   section={{ id, label: title, description: subtitle }}
                   fields={scholarshipFields}
-                  scholarshipRequest={
-                    (values.scholarship_request as boolean) ?? false
-                  }
-                  scholarshipDetails={
-                    (values.scholarship_details as string) ?? ""
-                  }
-                  scholarshipVideoUrl={
-                    (values.scholarship_video_url as string) ?? ""
-                  }
+                  scholarshipRequest={getBoolean(values, "scholarship_request")}
+                  scholarshipDetails={getString(values, "scholarship_details")}
+                  scholarshipVideoUrl={getString(values, "scholarship_video_url")}
                   detailsError={errors.scholarship_details}
                   videoUrlError={errors.scholarship_video_url}
                   onScholarshipRequestChange={(checked) => {
@@ -470,9 +465,7 @@ export function DynamicApplicationForm({
                         onChange={handleChange}
                         displayGender={displayGender}
                         handleGenderChange={handleGenderChange}
-                        genderSpecifyValue={
-                          (values.gender_specify as string) ?? ""
-                        }
+                        genderSpecifyValue={getString(values, "gender_specify")}
                         genderSpecifyError={errors.gender_specify}
                       />
                     ))}
