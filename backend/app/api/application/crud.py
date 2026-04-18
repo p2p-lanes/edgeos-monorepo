@@ -309,6 +309,17 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 detail="Human not found",
             )
 
+        # Validate required base fields against BaseFieldConfigs
+        if validate_custom_fields:
+            is_valid, errors = form_fields_crud.validate_base_fields(
+                session, app_data.popup_id, app_data.model_dump(), human
+            )
+            if not is_valid:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={"message": "Invalid base fields", "errors": errors},
+                )
+
         # Validate group whitelist if group_id provided
         if hasattr(app_data, "group_id") and app_data.group_id:
             from app.api.group.crud import groups_crud
@@ -556,6 +567,17 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 ),
                 tenant_id=tenant_id,
             )
+
+        # Validate required base fields against BaseFieldConfigs
+        if validate_custom_fields:
+            is_valid, errors = form_fields_crud.validate_base_fields(
+                session, app_data.popup_id, app_data.model_dump(), human
+            )
+            if not is_valid:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={"message": "Invalid base fields", "errors": errors},
+                )
         else:
             # Update existing human profile
             profile_fields = [

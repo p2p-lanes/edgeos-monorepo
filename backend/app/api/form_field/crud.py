@@ -79,6 +79,52 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
 
         return results, total
 
+    def validate_base_fields(
+        self,
+        session: Session,
+        popup_id: uuid.UUID,
+        app_data: dict[str, Any],
+        human: Any,
+    ) -> tuple[bool, list[str]]:
+        """Validate required base fields are present.
+
+        For fields with target=human, a value already stored on the Human
+        satisfies the requirement (so humans that filled the field in a prior
+        application don't have to retype it).
+
+        Elementals (first_name, last_name) are skipped here because Pydantic
+        enforces them at the ApplicationCreate layer.
+        """
+        from app.api.base_field_config.constants import BASE_FIELD_DEFINITIONS
+        from app.api.base_field_config.crud import base_field_configs_crud
+
+        configs = base_field_configs_crud.find_by_popup(session, popup_id)
+        errors: list[str] = []
+
+        for config in configs:
+            if not config.required:
+                continue
+            definition = BASE_FIELD_DEFINITIONS.get(config.field_name)
+            if not definition:
+                continue
+            if not definition.get("removable", True):
+                continue
+
+            field_name = config.field_name
+            value = app_data.get(field_name)
+            if (
+                (value is None or value == "")
+                and definition["target"] == "human"
+                and human is not None
+            ):
+                value = getattr(human, field_name, None)
+
+            if value is None or value == "":
+                label = config.label or definition["label"]
+                errors.append(f"Required field '{label}' is missing")
+
+        return len(errors) == 0, errors
+
     def validate_custom_fields(
         self,
         session: Session,
@@ -190,76 +236,37 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
             session, popup_id, skip=0, limit=100
         )
 
-        # Load base field configs from DB
+        # Base fields are driven 100% by BaseFieldConfigs rows: if a config
+        # exists for this popup, the field is asked. The catalog is only
+        # consulted for non-configurable code-level properties (type, target).
         from app.api.base_field_config.constants import BASE_FIELD_DEFINITIONS
         from app.api.base_field_config.crud import base_field_configs_crud
 
         db_configs = base_field_configs_crud.find_by_popup(session, popup_id)
-        config_map = {c.field_name: c for c in db_configs}
 
-        # Determine which companion fields to include based on popup settings
-        spouse_fields = {"partner", "partner_email"}
-        children_fields = {"kids"}
-        scholarship_fields = {
-            "scholarship_request",
-            "scholarship_details",
-            "scholarship_video_url",
-        }
-        skip_fields: set[str] = set()
-        if popup and not popup.allows_spouse:
-            skip_fields |= spouse_fields
-        if popup and not popup.allows_children:
-            skip_fields |= children_fields
-        if not getattr(popup, "allows_scholarship", False):
-            skip_fields |= scholarship_fields
-
-        # Build base fields by merging hardcoded definitions with DB configs
         base_fields: dict[str, Any] = {}
-        for field_name, definition in BASE_FIELD_DEFINITIONS.items():
-            if field_name in skip_fields:
+        for config in db_configs:
+            definition = BASE_FIELD_DEFINITIONS.get(config.field_name)
+            if not definition:
+                # Config references a field no longer in the catalog.
                 continue
             entry: dict[str, Any] = {
                 "type": definition["type"],
-                "label": definition["label"],
-                "required": definition["required"],
                 "target": definition["target"],
+                "label": config.label or "",
+                "required": config.required,
+                "section_id": str(config.section_id) if config.section_id else None,
+                "position": config.position,
             }
-
-            # Merge configurable attrs from DB config or fall back to defaults
-            config = config_map.get(field_name)
-            if config:
-                custom_label = (config.label.strip() if config.label else "") or ""
-                if custom_label:
-                    entry["label"] = custom_label
-                entry["section_id"] = (
-                    str(config.section_id) if config.section_id else None
+            if config.options:
+                entry["options"] = config.options
+            if config.placeholder:
+                entry["placeholder"] = config.placeholder
+            if config.help_text:
+                entry["help_text"] = config.help_text.replace(
+                    "{popup_name}", popup_name
                 )
-                entry["position"] = config.position
-                if config.options:
-                    entry["options"] = config.options
-                if config.placeholder:
-                    entry["placeholder"] = config.placeholder
-                if config.help_text:
-                    entry["help_text"] = config.help_text.replace(
-                        "{popup_name}", popup_name
-                    )
-            else:
-                # Fallback for old popups without configs
-                entry["section_id"] = None
-                entry["position"] = definition.get("default_position", 0)
-                default_options = definition.get("default_options")
-                if default_options:
-                    entry["options"] = default_options
-                default_placeholder = definition.get("default_placeholder")
-                if default_placeholder:
-                    entry["placeholder"] = default_placeholder
-                default_help_text = definition.get("default_help_text")
-                if default_help_text:
-                    entry["help_text"] = default_help_text.replace(
-                        "{popup_name}", popup_name
-                    )
-
-            base_fields[field_name] = entry
+            base_fields[config.field_name] = entry
 
         # Build custom fields schema
         custom_fields = {}

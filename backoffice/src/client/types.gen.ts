@@ -398,6 +398,7 @@ export type BaseFieldConfigPublic = {
     field_name: string;
     section_id?: (string | null);
     position?: number;
+    required?: boolean;
     label?: (string | null);
     placeholder?: (string | null);
     help_text?: (string | null);
@@ -407,6 +408,7 @@ export type BaseFieldConfigPublic = {
 export type BaseFieldConfigUpdate = {
     section_id?: (string | null);
     position?: (number | null);
+    required?: (boolean | null);
     label?: (string | null);
     placeholder?: (string | null);
     help_text?: (string | null);
@@ -508,6 +510,18 @@ export type CartState = {
  */
 export type CartUpdate = {
     items: CartState;
+};
+
+/**
+ * A base field from BASE_FIELD_DEFINITIONS that is available to add to a popup.
+ */
+export type CatalogField = {
+    field_name: string;
+    type: string;
+    label: string;
+    required: boolean;
+    target: string;
+    default_section_key?: (string | null);
 };
 
 /**
@@ -738,6 +752,7 @@ export type FormFieldPublic = {
     placeholder?: (string | null);
     help_text?: (string | null);
     protected?: boolean;
+    removable?: boolean;
     target?: (string | null);
 };
 
@@ -2489,6 +2504,21 @@ export type FormFieldsCreateFormFieldData = {
 };
 
 export type FormFieldsCreateFormFieldResponse = (FormFieldPublic);
+
+export type FormFieldsListAvailableBaseFieldsData = {
+    popupId: string;
+    xTenantId?: (string | null);
+};
+
+export type FormFieldsListAvailableBaseFieldsResponse = (Array<CatalogField>);
+
+export type FormFieldsCreateBaseFieldConfigData = {
+    fieldName: string;
+    popupId: string;
+    xTenantId?: (string | null);
+};
+
+export type FormFieldsCreateBaseFieldConfigResponse = (FormFieldPublic);
 
 export type FormFieldsGetFormFieldData = {
     fieldId: string;

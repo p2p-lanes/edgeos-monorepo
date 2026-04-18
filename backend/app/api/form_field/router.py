@@ -4,9 +4,12 @@ from typing import TYPE_CHECKING, Annotated, Any
 from fastapi import APIRouter, Header, HTTPException, status
 
 from app.api.base_field_config.constants import BASE_FIELD_DEFINITIONS
-from app.api.base_field_config.crud import base_field_configs_crud
+from app.api.base_field_config.crud import (
+    base_field_configs_crud,
+    field_applies_to_popup,
+)
 from app.api.base_field_config.models import BaseFieldConfigs
-from app.api.base_field_config.schemas import BaseFieldConfigUpdate
+from app.api.base_field_config.schemas import BaseFieldConfigUpdate, CatalogField
 from app.api.form_field import crud
 
 if TYPE_CHECKING:
@@ -43,16 +46,17 @@ def _base_config_to_public(config: BaseFieldConfigs) -> FormFieldPublic:
         tenant_id=config.tenant_id,
         popup_id=config.popup_id,
         name=config.field_name,
-        label=(config.label.strip() if config.label else "") or definition["label"],
+        label=config.label or "",
         field_type=definition["type"],
         section_id=config.section_id,
         section_label=section_label,
         position=config.position,
-        required=definition["required"],
-        options=config.options or definition.get("default_options"),
-        placeholder=config.placeholder or definition.get("default_placeholder"),
-        help_text=config.help_text or definition.get("default_help_text"),
+        required=config.required,
+        options=config.options,
+        placeholder=config.placeholder,
+        help_text=config.help_text,
         protected=True,
+        removable=definition.get("removable", True),
         target=definition["target"],
     )
 
@@ -93,6 +97,142 @@ async def list_form_fields(
         results=all_fields,
         paging=Paging(offset=skip, limit=limit, total=total),
     )
+
+
+@router.get("/catalog/{popup_id}", response_model=list[CatalogField])
+async def list_available_base_fields(
+    popup_id: uuid.UUID,
+    db: TenantSession,
+    _: CurrentUser,
+) -> list[CatalogField]:
+    """List catalog base fields that are not yet configured for this popup.
+
+    Filters out fields already configured, non-removable elementals, and
+    fields disabled by the popup's feature flags.
+    """
+    from app.api.popup.crud import popups_crud
+
+    popup = popups_crud.get(db, popup_id)
+    if not popup:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Popup not found",
+        )
+
+    configured = {
+        c.field_name for c in base_field_configs_crud.find_by_popup(db, popup_id)
+    }
+
+    available: list[CatalogField] = []
+    for field_name, definition in BASE_FIELD_DEFINITIONS.items():
+        if field_name in configured:
+            continue
+        if not definition.get("removable", True):
+            # Elementals must always be present — they're seeded and not
+            # offered in the "add field" catalog.
+            continue
+        if not field_applies_to_popup(field_name, popup):
+            continue
+        available.append(
+            CatalogField(
+                field_name=field_name,
+                type=definition["type"],
+                label=definition["label"],
+                required=definition.get("required", False),
+                target=definition["target"],
+                default_section_key=definition.get("default_section_key"),
+            )
+        )
+
+    return available
+
+
+@router.post(
+    "/catalog/{popup_id}/{field_name}",
+    response_model=FormFieldPublic,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_base_field_config(
+    popup_id: uuid.UUID,
+    field_name: str,
+    db: TenantSession,
+    _current_user: CurrentWriter,
+) -> FormFieldPublic:
+    """Add a catalog base field to a popup by creating its BaseFieldConfig."""
+    from app.api.popup.crud import popups_crud
+
+    popup = popups_crud.get(db, popup_id)
+    if not popup:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Popup not found",
+        )
+
+    definition = BASE_FIELD_DEFINITIONS.get(field_name)
+    if not definition:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Field '{field_name}' is not in the catalog",
+        )
+
+    if not field_applies_to_popup(field_name, popup):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Popup does not allow field '{field_name}'",
+        )
+
+    existing = next(
+        (
+            c
+            for c in base_field_configs_crud.find_by_popup(db, popup_id)
+            if c.field_name == field_name
+        ),
+        None,
+    )
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Field '{field_name}' is already configured for this popup",
+        )
+
+    # Resolve default section by key if present.
+    section_id: uuid.UUID | None = None
+    default_section_key = definition.get("default_section_key")
+    if default_section_key:
+        from sqlmodel import select
+
+        from app.api.form_section.models import FormSections
+
+        stmt = select(FormSections).where(
+            FormSections.popup_id == popup_id,
+        )
+        sections = db.exec(stmt).all()
+        # Match by DEFAULT_SECTIONS label (seeded sections share the catalog label).
+        from app.api.base_field_config.constants import DEFAULT_SECTIONS
+
+        target_label = DEFAULT_SECTIONS.get(default_section_key, {}).get("label")
+        if target_label:
+            for s in sections:
+                if s.label == target_label:
+                    section_id = s.id
+                    break
+
+    config = BaseFieldConfigs(
+        tenant_id=popup.tenant_id,
+        popup_id=popup_id,
+        field_name=field_name,
+        section_id=section_id,
+        position=definition.get("default_position", 0),
+        required=definition.get("required", False),
+        label=definition.get("label"),
+        placeholder=definition.get("default_placeholder"),
+        help_text=definition.get("default_help_text"),
+        options=definition.get("default_options"),
+    )
+    db.add(config)
+    db.commit()
+    db.refresh(config)
+    return _base_config_to_public(config)
 
 
 @router.get("/{field_id}", response_model=FormFieldPublic)
@@ -178,6 +318,7 @@ async def update_form_field(
             "section_id",
             "position",
             "label",
+            "required",
             "placeholder",
             "help_text",
             "options",
@@ -185,6 +326,19 @@ async def update_form_field(
         update_data = {
             k: getattr(field_in, k) for k in field_in.model_fields_set & configurable
         }
+
+        # Non-removable elementals (first_name, last_name) cannot be made optional.
+        definition = BASE_FIELD_DEFINITIONS.get(base_config.field_name, {})
+        if (
+            not definition.get("removable", True)
+            and "required" in update_data
+            and update_data["required"] is False
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Field '{base_config.field_name}' is required and cannot be made optional",
+            )
+
         config_update = BaseFieldConfigUpdate(**update_data)
         updated_config = base_field_configs_crud.update(db, base_config, config_update)
         return _base_config_to_public(updated_config)
@@ -203,14 +357,29 @@ async def delete_form_field(
 ) -> None:
     field = crud.form_fields_crud.get(db, field_id)
 
-    if not field:
+    if field:
+        delete_translations_for_entity(db, "form_field", field.id)
+        crud.form_fields_crud.delete(db, field)
+        return
+
+    # Fall back to BaseFieldConfig — removing it means the popup no longer
+    # asks that base field.
+    base_config = base_field_configs_crud.get(db, field_id)
+    if not base_config:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Form field not found",
         )
 
-    delete_translations_for_entity(db, "form_field", field.id)
-    crud.form_fields_crud.delete(db, field)
+    definition = BASE_FIELD_DEFINITIONS.get(base_config.field_name, {})
+    if not definition.get("removable", True):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Field '{base_config.field_name}' cannot be removed",
+        )
+
+    delete_translations_for_entity(db, "form_field", base_config.id)
+    base_field_configs_crud.delete(db, base_config)
 
 
 @router.get("/schema/{popup_id}", response_model=dict[str, Any])

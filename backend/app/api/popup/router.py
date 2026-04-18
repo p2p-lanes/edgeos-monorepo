@@ -108,6 +108,8 @@ def _seed_application_defaults(db: TenantSession, popup: Popups) -> None:
                 field_name=field_name,
                 section_id=section_map[section_key],
                 position=definition.get("default_position", 0),
+                required=definition.get("required", False),
+                label=definition.get("label"),
                 placeholder=definition.get("default_placeholder"),
                 help_text=definition.get("default_help_text"),
                 options=definition.get("default_options"),

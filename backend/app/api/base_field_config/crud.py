@@ -1,4 +1,5 @@
 import uuid
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 from sqlmodel import Session, select
@@ -7,6 +8,26 @@ from app.api.base_field_config.constants import BASE_FIELD_DEFINITIONS
 from app.api.base_field_config.models import BaseFieldConfigs
 from app.api.base_field_config.schemas import BaseFieldConfigUpdate
 from app.api.shared.crud import BaseCRUD
+
+if TYPE_CHECKING:
+    from app.api.popup.models import Popups
+
+SPOUSE_FIELDS = frozenset({"partner", "partner_email"})
+CHILDREN_FIELDS = frozenset({"kids"})
+SCHOLARSHIP_FIELDS = frozenset(
+    {"scholarship_request", "scholarship_details", "scholarship_video_url"}
+)
+
+
+def field_applies_to_popup(field_name: str, popup: "Popups") -> bool:
+    """Return True if the given base field is allowed by the popup's flags."""
+    if field_name in SPOUSE_FIELDS and not popup.allows_spouse:
+        return False
+    if field_name in CHILDREN_FIELDS and not popup.allows_children:
+        return False
+    if field_name in SCHOLARSHIP_FIELDS and not popup.allows_scholarship:
+        return False
+    return True
 
 
 class BaseFieldConfigsCRUD(
@@ -52,6 +73,8 @@ class BaseFieldConfigsCRUD(
                 field_name=field_name,
                 section_id=section_map.get(section_key),
                 position=definition.get("default_position", 0),
+                required=definition.get("required", False),
+                label=definition.get("label"),
                 placeholder=definition.get("default_placeholder"),
                 help_text=definition.get("default_help_text"),
                 options=definition.get("default_options"),

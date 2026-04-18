@@ -1949,6 +1949,11 @@ export const BaseFieldConfigPublicSchema = {
             title: 'Position',
             default: 0
         },
+        required: {
+            type: 'boolean',
+            title: 'Required',
+            default: false
+        },
         label: {
             anyOf: [
                 {
@@ -2026,6 +2031,17 @@ export const BaseFieldConfigUpdateSchema = {
                 }
             ],
             title: 'Position'
+        },
+        required: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Required'
         },
         label: {
             anyOf: [
@@ -2394,6 +2410,46 @@ export const CartUpdateSchema = {
     required: ['items'],
     title: 'CartUpdate',
     description: 'Schema for updating cart items.'
+} as const;
+
+export const CatalogFieldSchema = {
+    properties: {
+        field_name: {
+            type: 'string',
+            title: 'Field Name'
+        },
+        type: {
+            type: 'string',
+            title: 'Type'
+        },
+        label: {
+            type: 'string',
+            title: 'Label'
+        },
+        required: {
+            type: 'boolean',
+            title: 'Required'
+        },
+        target: {
+            type: 'string',
+            title: 'Target'
+        },
+        default_section_key: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Default Section Key'
+        }
+    },
+    type: 'object',
+    required: ['field_name', 'type', 'label', 'required', 'target'],
+    title: 'CatalogField',
+    description: 'A base field from BASE_FIELD_DEFINITIONS that is available to add to a popup.'
 } as const;
 
 export const CategoryBreakdownSchema = {
@@ -3339,6 +3395,11 @@ export const FormFieldPublicSchema = {
             type: 'boolean',
             title: 'Protected',
             default: false
+        },
+        removable: {
+            type: 'boolean',
+            title: 'Removable',
+            default: true
         },
         target: {
             anyOf: [
