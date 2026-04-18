@@ -1,4 +1,5 @@
 import uuid
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, status
 from sqlmodel import select
@@ -28,9 +29,22 @@ async def list_form_sections(
     limit: PaginationLimit = 100,
 ) -> ListModel[FormSectionPublic]:
     if popup_id:
+        from app.api.popup.crud import popups_crud
+
+        popup = popups_crud.get(db, popup_id)
+        if not popup:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Popup not found",
+            )
         sections, total = crud.form_sections_crud.find_by_popup(
             db, popup_id=popup_id, skip=skip, limit=limit
         )
+        # Gate special-kind sections by current popup flags so the backoffice
+        # renders consistently with the portal after a flag is toggled off.
+        filtered = [s for s in sections if _section_allowed_by_flags(s, popup)]
+        sections = filtered
+        total = len(filtered)
     else:
         sections, total = crud.form_sections_crud.find(db, skip=skip, limit=limit)
 
@@ -38,6 +52,14 @@ async def list_form_sections(
         results=[FormSectionPublic.model_validate(s) for s in sections],
         paging=Paging(offset=skip, limit=limit, total=total),
     )
+
+
+def _section_allowed_by_flags(section: FormSections, popup: Any) -> bool:
+    if section.kind == FormSectionKind.COMPANIONS.value:
+        return bool(popup.allows_spouse or popup.allows_children)
+    if section.kind == FormSectionKind.SCHOLARSHIP.value:
+        return bool(popup.allows_scholarship)
+    return True
 
 
 @router.get("/{section_id}", response_model=FormSectionPublic)

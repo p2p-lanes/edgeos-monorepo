@@ -37,8 +37,7 @@ export function CatalogDialog({
 
   const { data, isLoading } = useQuery({
     queryKey: ["form-fields", popupId, "catalog"],
-    queryFn: () =>
-      FormFieldsService.listAvailableBaseFields({ popupId }),
+    queryFn: () => FormFieldsService.listAvailableBaseFields({ popupId }),
     enabled: open,
   })
 
@@ -80,8 +79,8 @@ export function CatalogDialog({
         <DialogHeader>
           <DialogTitle>Add a predefined field</DialogTitle>
           <DialogDescription>
-            These fields come from the base catalog. Click one to add it to
-            this popup.
+            These fields come from the base catalog. Click one to add it to this
+            popup.
           </DialogDescription>
         </DialogHeader>
 
@@ -110,9 +109,7 @@ export function CatalogDialog({
                       variant="ghost"
                       className="w-full justify-start gap-2 h-auto py-2"
                       disabled={addMutation.isPending}
-                      onClick={() =>
-                        addMutation.mutate(field.field_name)
-                      }
+                      onClick={() => addMutation.mutate(field.field_name)}
                     >
                       <Plus className="h-4 w-4 shrink-0 text-muted-foreground" />
                       <span className="flex flex-col items-start gap-0.5 text-left">

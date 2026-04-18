@@ -27,6 +27,7 @@ import {
   type FormSectionUpdate,
 } from "@/client"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
+import { CatalogDialog } from "@/components/form-builder/CatalogDialog"
 import {
   canRemoveField,
   FIELD_TYPES,
@@ -35,7 +36,6 @@ import {
   parseSortableSectionId,
   SORTABLE_SECTION_PREFIX,
 } from "@/components/form-builder/constants"
-import { CatalogDialog } from "@/components/form-builder/CatalogDialog"
 import { DragOverlayContent } from "@/components/form-builder/DragOverlayContent"
 import { FieldConfigPanel } from "@/components/form-builder/FieldConfigPanel"
 import { FieldPalette } from "@/components/form-builder/FieldPalette"

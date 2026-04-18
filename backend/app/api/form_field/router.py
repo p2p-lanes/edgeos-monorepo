@@ -14,6 +14,8 @@ from app.api.form_field import crud
 
 if TYPE_CHECKING:
     from sqlmodel import Session
+
+    from app.api.popup.models import Popups
 from app.api.form_field.models import FormFields
 from app.api.form_field.schemas import FormFieldCreate, FormFieldPublic, FormFieldUpdate
 from app.api.shared.enums import UserRole
@@ -61,12 +63,15 @@ def _base_config_to_public(config: BaseFieldConfigs) -> FormFieldPublic:
     )
 
 
-def _get_base_fields_as_public(
-    db: "Session", popup_id: uuid.UUID
-) -> list[FormFieldPublic]:
-    """Build FormFieldPublic entries from existing BaseFieldConfigs only."""
-    configs = base_field_configs_crud.find_by_popup(db, popup_id)
-    return [_base_config_to_public(c) for c in configs]
+def _get_base_fields_as_public(db: "Session", popup: "Popups") -> list[FormFieldPublic]:
+    """Build FormFieldPublic entries from existing BaseFieldConfigs, filtered
+    by the popup's current feature flags."""
+    configs = base_field_configs_crud.find_by_popup(db, popup.id)
+    return [
+        _base_config_to_public(c)
+        for c in configs
+        if field_applies_to_popup(c.field_name, popup)
+    ]
 
 
 @router.get("", response_model=ListModel[FormFieldPublic])
@@ -79,7 +84,15 @@ async def list_form_fields(
     limit: PaginationLimit = 100,
 ) -> ListModel[FormFieldPublic]:
     if popup_id:
-        base_fields = _get_base_fields_as_public(db, popup_id)
+        from app.api.popup.crud import popups_crud
+
+        popup = popups_crud.get(db, popup_id)
+        if not popup:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Popup not found",
+            )
+        base_fields = _get_base_fields_as_public(db, popup)
         custom_fields, custom_total = crud.form_fields_crud.find_by_popup(
             db, popup_id=popup_id, skip=skip, limit=limit, search=search
         )

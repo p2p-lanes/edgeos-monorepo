@@ -240,7 +240,10 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
         # exists for this popup, the field is asked. The catalog is only
         # consulted for non-configurable code-level properties (type, target).
         from app.api.base_field_config.constants import BASE_FIELD_DEFINITIONS
-        from app.api.base_field_config.crud import base_field_configs_crud
+        from app.api.base_field_config.crud import (
+            base_field_configs_crud,
+            field_applies_to_popup,
+        )
 
         db_configs = base_field_configs_crud.find_by_popup(session, popup_id)
 
@@ -249,6 +252,12 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
             definition = BASE_FIELD_DEFINITIONS.get(config.field_name)
             if not definition:
                 # Config references a field no longer in the catalog.
+                continue
+            # Gate by current popup flags: configs persist when an admin turns
+            # a flag off, but we stop surfacing them until it's re-enabled.
+            # Sections left empty by this filter are skipped by the portal
+            # (it drops sections with no base/custom fields).
+            if popup and not field_applies_to_popup(config.field_name, popup):
                 continue
             entry: dict[str, Any] = {
                 "type": definition["type"],

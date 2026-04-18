@@ -165,6 +165,7 @@ def _seed_base_field_configs(session: Session, popup_map: dict, tenant_id) -> No
                     label=section_def["label"],
                     order=section_def["order"],
                     protected=True,
+                    kind=section_def["kind"],
                 )
                 session.add(section)
                 session.commit()
