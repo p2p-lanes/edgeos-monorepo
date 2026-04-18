@@ -9,6 +9,25 @@ from sqlalchemy import Boolean, Column, Numeric
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlmodel import Field, SQLModel, String
 
+
+def validate_popup_insurance_config(
+    enabled: bool, pct: "Decimal | None"
+) -> None:
+    """Validate insurance_percentage bounds when insurance is enabled.
+
+    Raises ValueError if enabled=True and pct is None, <= 0, or > 100.
+    """
+    if not enabled:
+        return
+    if pct is None or pct <= 0:
+        raise ValueError(
+            "insurance_percentage must be > 0 when insurance_enabled is True"
+        )
+    if pct > 100:
+        raise ValueError(
+            "insurance_percentage must be <= 100 (it represents a percentage)"
+        )
+
 from app.api.shared.enums import CheckoutMode, SaleType, derive_checkout_mode
 from app.utils.utils import slugify
 
@@ -97,6 +116,14 @@ class PopupBase(SQLModel):
         default=["en"],
         sa_column=Column(ARRAY(String), nullable=False, server_default="{en}"),
     )
+    insurance_enabled: bool = Field(
+        default=False,
+        sa_column=Column(Boolean, nullable=False, server_default="false"),
+    )
+    insurance_percentage: Decimal | None = Field(
+        default=None,
+        sa_column=Column(Numeric(5, 2), nullable=True),
+    )
 
     @field_validator("currency")
     @classmethod
@@ -137,6 +164,8 @@ class PopupCreate(SQLModel):
     theme_config: dict | None = None
     default_language: str = "en"
     supported_languages: list[str] = ["en"]
+    insurance_enabled: bool = False
+    insurance_percentage: Decimal | None = None
 
     @field_validator("currency")
     @classmethod
@@ -153,6 +182,7 @@ class PopupCreate(SQLModel):
             raise ValueError(
                 "application_fee_amount must be greater than 0 when requires_application_fee is True"
             )
+        validate_popup_insurance_config(self.insurance_enabled, self.insurance_percentage)
         return self
 
 
@@ -188,6 +218,8 @@ class PopupUpdate(SQLModel):
     theme_config: dict | None = None
     default_language: str | None = None
     supported_languages: list[str] | None = None
+    insurance_enabled: bool | None = None
+    insurance_percentage: Decimal | None = None
 
     @field_validator("currency")
     @classmethod
@@ -211,6 +243,9 @@ class PopupUpdate(SQLModel):
             raise ValueError(
                 "application_fee_amount must be greater than 0 when requires_application_fee is True"
             )
+        # Validate insurance only when insurance_enabled is explicitly set to True
+        if self.insurance_enabled is True:
+            validate_popup_insurance_config(True, self.insurance_percentage)
         return self
 
 
@@ -245,6 +280,8 @@ class PopupPublic(SQLModel):
     theme_config: dict | None = None
     default_language: str = "en"
     supported_languages: list[str] = ["en"]
+    insurance_enabled: bool = False
+    insurance_percentage: Decimal | None = None
 
 
 class PopupAdmin(PopupBase):

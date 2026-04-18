@@ -6306,6 +6306,23 @@ export const PopupAdminSchema = {
             title: 'Supported Languages',
             default: ['en']
         },
+        insurance_enabled: {
+            type: 'boolean',
+            title: 'Insurance Enabled',
+            default: false
+        },
+        insurance_percentage: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Insurance Percentage'
+        },
         id: {
             type: 'string',
             format: 'uuid',
@@ -6637,6 +6654,26 @@ export const PopupCreateSchema = {
             type: 'array',
             title: 'Supported Languages',
             default: ['en']
+        },
+        insurance_enabled: {
+            type: 'boolean',
+            title: 'Insurance Enabled',
+            default: false
+        },
+        insurance_percentage: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Insurance Percentage'
         }
     },
     type: 'object',
@@ -6892,6 +6929,23 @@ export const PopupPublicSchema = {
             type: 'array',
             title: 'Supported Languages',
             default: ['en']
+        },
+        insurance_enabled: {
+            type: 'boolean',
+            title: 'Insurance Enabled',
+            default: false
+        },
+        insurance_percentage: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Insurance Percentage'
         }
     },
     type: 'object',
@@ -7381,6 +7435,32 @@ export const PopupUpdateSchema = {
                 }
             ],
             title: 'Supported Languages'
+        },
+        insurance_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Insurance Enabled'
+        },
+        insurance_percentage: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Insurance Percentage'
         }
     },
     type: 'object',
@@ -7663,20 +7743,10 @@ export const ProductBatchItemSchema = {
             ],
             title: 'Max Quantity'
         },
-        insurance_percentage: {
-            anyOf: [
-                {
-                    type: 'number'
-                },
-                {
-                    type: 'string',
-                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Insurance Percentage'
+        insurance_eligible: {
+            type: 'boolean',
+            title: 'Insurance Eligible',
+            default: false
         }
     },
     type: 'object',
@@ -7814,17 +7884,10 @@ export const ProductBatchResultSchema = {
             ],
             title: 'Max Quantity'
         },
-        insurance_percentage: {
-            anyOf: [
-                {
-                    type: 'string',
-                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Insurance Percentage'
+        insurance_eligible: {
+            type: 'boolean',
+            title: 'Insurance Eligible',
+            default: false
         },
         id: {
             type: 'string',
@@ -8032,20 +8095,10 @@ export const ProductCreateSchema = {
             ],
             title: 'Max Quantity'
         },
-        insurance_percentage: {
-            anyOf: [
-                {
-                    type: 'number'
-                },
-                {
-                    type: 'string',
-                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Insurance Percentage'
+        insurance_eligible: {
+            type: 'boolean',
+            title: 'Insurance Eligible',
+            default: false
         }
     },
     type: 'object',
@@ -8183,17 +8236,10 @@ export const ProductPublicSchema = {
             ],
             title: 'Max Quantity'
         },
-        insurance_percentage: {
-            anyOf: [
-                {
-                    type: 'string',
-                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Insurance Percentage'
+        insurance_eligible: {
+            type: 'boolean',
+            title: 'Insurance Eligible',
+            default: false
         },
         id: {
             type: 'string',
@@ -8373,20 +8419,16 @@ export const ProductUpdateSchema = {
             ],
             title: 'Max Quantity'
         },
-        insurance_percentage: {
+        insurance_eligible: {
             anyOf: [
                 {
-                    type: 'number'
-                },
-                {
-                    type: 'string',
-                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                    type: 'boolean'
                 },
                 {
                     type: 'null'
                 }
             ],
-            title: 'Insurance Percentage'
+            title: 'Insurance Eligible'
         }
     },
     type: 'object',
@@ -8523,17 +8565,10 @@ export const ProductWithQuantitySchema = {
             ],
             title: 'Max Quantity'
         },
-        insurance_percentage: {
-            anyOf: [
-                {
-                    type: 'string',
-                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Insurance Percentage'
+        insurance_eligible: {
+            type: 'boolean',
+            title: 'Insurance Eligible',
+            default: false
         },
         id: {
             type: 'string',

@@ -17,6 +17,7 @@ import {
   Mail,
   MapPin,
   Scale,
+  ShieldCheck,
   ShoppingCart,
   Ticket,
   Twitter,
@@ -214,6 +215,9 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
       invoice_company_email: defaultValues?.invoice_company_email ?? "",
       default_language: defaultValues?.default_language ?? "en",
       supported_languages: defaultValues?.supported_languages ?? ["en"],
+      insurance_enabled: defaultValues?.insurance_enabled ?? false,
+      insurance_percentage:
+        defaultValues?.insurance_percentage?.toString() ?? "",
     },
     onSubmit: ({ value }) => {
       if (readOnly) return
@@ -252,6 +256,10 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         default_language: value.default_language,
         supported_languages: value.supported_languages,
         sale_type: value.sale_type,
+        insurance_enabled: value.insurance_enabled,
+        insurance_percentage: value.insurance_enabled
+          ? value.insurance_percentage || null
+          : null,
       }
       if (isEdit) {
         updateMutation.mutate(payload)
@@ -1041,6 +1049,76 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
               </InlineRow>
             )}
           </form.Field>
+        </InlineSection>
+
+        <Separator />
+
+        {/* Insurance */}
+        <InlineSection title="Insurance">
+          <form.Field name="insurance_enabled">
+            {(field) => (
+              <InlineRow
+                icon={<ShieldCheck className="h-4 w-4 text-muted-foreground" />}
+                label="Enable Insurance"
+                description="Offer insurance for eligible products during checkout"
+              >
+                <Switch
+                  id="insurance_enabled"
+                  checked={field.state.value}
+                  onCheckedChange={(checked) => field.handleChange(checked)}
+                  disabled={readOnly}
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+
+          <form.Subscribe selector={(state) => state.values.insurance_enabled}>
+            {(insuranceEnabled) => (
+              <form.Field
+                name="insurance_percentage"
+                validators={{
+                  onBlur: ({ value }) => {
+                    if (readOnly || !insuranceEnabled) return undefined
+                    const num = Number.parseFloat(value)
+                    if (!value || Number.isNaN(num) || num <= 0) {
+                      return "Insurance percentage must be greater than 0 when insurance is enabled"
+                    }
+                    if (num > 100) {
+                      return "Insurance percentage cannot exceed 100"
+                    }
+                    return undefined
+                  },
+                }}
+              >
+                {(field) => (
+                  <div>
+                    <InlineRow
+                      icon={
+                        <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+                      }
+                      label="Insurance Rate (%)"
+                      description="Percentage of eligible product price applied as insurance fee"
+                    >
+                      <Input
+                        id="insurance_percentage"
+                        type="number"
+                        min="0.01"
+                        max="100"
+                        step="0.01"
+                        placeholder="e.g. 5.00"
+                        value={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                        disabled={readOnly || !insuranceEnabled}
+                        className="max-w-[120px] text-sm"
+                      />
+                    </InlineRow>
+                    <FieldError errors={field.state.meta.errors} />
+                  </div>
+                )}
+              </form.Field>
+            )}
+          </form.Subscribe>
         </InlineSection>
 
         <Separator />

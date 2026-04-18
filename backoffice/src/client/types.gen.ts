@@ -1313,6 +1313,8 @@ export type PopupAdmin = {
 } | null);
     default_language?: string;
     supported_languages?: Array<(string)>;
+    insurance_enabled?: boolean;
+    insurance_percentage?: (string | null);
     id: string;
 };
 
@@ -1351,6 +1353,8 @@ export type PopupCreate = {
 } | null);
     default_language?: string;
     supported_languages?: Array<(string)>;
+    insurance_enabled?: boolean;
+    insurance_percentage?: (number | string | null);
 };
 
 /**
@@ -1387,6 +1391,8 @@ export type PopupPublic = {
 } | null);
     default_language?: string;
     supported_languages?: Array<(string)>;
+    insurance_enabled?: boolean;
+    insurance_percentage?: (string | null);
 };
 
 /**
@@ -1457,6 +1463,8 @@ export type PopupUpdate = {
 } | null);
     default_language?: (string | null);
     supported_languages?: (Array<(string)> | null);
+    insurance_enabled?: (boolean | null);
+    insurance_percentage?: (number | string | null);
 };
 
 /**
@@ -1532,7 +1540,7 @@ export type ProductBatchItem = {
     is_active?: boolean;
     exclusive?: boolean;
     max_quantity?: (number | null);
-    insurance_percentage?: (number | string | null);
+    insurance_eligible?: boolean;
 };
 
 /**
@@ -1555,7 +1563,7 @@ export type ProductBatchResult = {
     is_active?: boolean;
     exclusive?: boolean;
     max_quantity?: (number | null);
-    insurance_percentage?: (string | null);
+    insurance_eligible?: boolean;
     id: string;
     success: boolean;
     err_msg?: (string | null);
@@ -1592,7 +1600,7 @@ export type ProductCreate = {
     is_active?: boolean;
     exclusive?: boolean;
     max_quantity?: (number | null);
-    insurance_percentage?: (number | string | null);
+    insurance_eligible?: boolean;
 };
 
 /**
@@ -1615,7 +1623,7 @@ export type ProductPublic = {
     is_active?: boolean;
     exclusive?: boolean;
     max_quantity?: (number | null);
-    insurance_percentage?: (string | null);
+    insurance_eligible?: boolean;
     id: string;
 };
 
@@ -1637,7 +1645,7 @@ export type ProductUpdate = {
     is_active?: (boolean | null);
     exclusive?: (boolean | null);
     max_quantity?: (number | null);
-    insurance_percentage?: (number | string | null);
+    insurance_eligible?: (boolean | null);
 };
 
 /**
@@ -1660,7 +1668,7 @@ export type ProductWithQuantity = {
     is_active?: boolean;
     exclusive?: boolean;
     max_quantity?: (number | null);
-    insurance_percentage?: (string | null);
+    insurance_eligible?: boolean;
     id: string;
     quantity?: number;
 };

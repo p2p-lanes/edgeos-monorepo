@@ -1,7 +1,9 @@
 import uuid
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from sqlalchemy import Index, UniqueConstraint, text
+from sqlalchemy import Numeric as SaNumerical
 from sqlalchemy.dialects.postgresql import UUID
 from sqlmodel import Column, Field, Relationship
 
@@ -34,6 +36,13 @@ class Products(ProductBase, table=True):
             UUID(as_uuid=True),
             primary_key=True,
         ),
+    )
+
+    # Deprecated: product-level insurance percentage, kept in DB for one release window.
+    # The authoritative source is popup.insurance_percentage + product.insurance_eligible.
+    # Will be dropped in a future migration after release N+1.
+    insurance_percentage: Decimal | None = Field(
+        default=None, sa_column=Column(SaNumerical(5, 2), nullable=True)
     )
 
     tenant: "Tenants" = Relationship(back_populates="products")

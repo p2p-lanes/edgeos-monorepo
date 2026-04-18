@@ -4,12 +4,12 @@ import { useNavigate } from "@tanstack/react-router"
 import {
   Calendar,
   Clock,
-  CloudRain,
   DollarSign,
   Hash,
   Plus,
   Power,
   Shield,
+  ShieldCheck,
   Users,
 } from "lucide-react"
 import { useMemo, useState } from "react"
@@ -31,6 +31,7 @@ import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { TranslationManager } from "@/components/translations/TranslationManager"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
   DialogContent,
@@ -45,6 +46,7 @@ import {
   InlineSection,
 } from "@/components/ui/inline-form"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { LoadingButton } from "@/components/ui/loading-button"
 import {
   Select,
@@ -195,8 +197,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
       max_quantity: defaultValues?.max_quantity?.toString() ?? "",
       start_date: toDateInputValue(defaultValues?.start_date),
       end_date: toDateInputValue(defaultValues?.end_date),
-      insurance_percentage:
-        defaultValues?.insurance_percentage?.toString() ?? "",
+      insurance_eligible: defaultValues?.insurance_eligible ?? false,
     },
     onSubmit: ({ value }) => {
       if (readOnly) return
@@ -221,7 +222,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
           is_active: value.is_active,
           exclusive: value.exclusive,
           max_quantity: maxQty,
-          insurance_percentage: value.insurance_percentage || null,
+          insurance_eligible: value.insurance_eligible,
         })
       } else {
         if (!selectedPopupId) {
@@ -243,7 +244,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
           is_active: value.is_active,
           exclusive: value.exclusive,
           max_quantity: maxQty ?? undefined,
-          insurance_percentage: value.insurance_percentage || undefined,
+          insurance_eligible: value.insurance_eligible,
         })
       }
     },
@@ -454,23 +455,26 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
             )}
           </form.Field>
 
-          <form.Field name="insurance_percentage">
+          <form.Field name="insurance_eligible">
             {(field) => (
               <InlineRow
-                icon={<CloudRain className="h-4 w-4 text-muted-foreground" />}
-                label="Insurance %"
-                description="Leave empty to disable insurance for this product"
+                icon={<ShieldCheck className="h-4 w-4 text-muted-foreground" />}
+                label="Insurance Eligible"
+                description="Include this product in the insurance calculation when popup insurance is enabled"
               >
-                <Input
-                  placeholder="—"
-                  type="text"
-                  inputMode="decimal"
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  disabled={readOnly}
-                  className="max-w-24 text-sm"
-                />
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="insurance_eligible"
+                    checked={field.state.value}
+                    onCheckedChange={(checked) =>
+                      field.handleChange(checked === true)
+                    }
+                    disabled={readOnly}
+                  />
+                  <Label htmlFor="insurance_eligible" className="text-sm">
+                    Eligible
+                  </Label>
+                </div>
               </InlineRow>
             )}
           </form.Field>

@@ -1,6 +1,6 @@
 import uuid
 from decimal import ROUND_HALF_UP, Decimal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from fastapi import HTTPException, status
 from loguru import logger
@@ -34,6 +34,36 @@ from app.api.shared.crud import BaseCRUD
 
 # Decimal precision for money calculations
 MONEY_PRECISION = Decimal("0.01")
+
+
+def calculate_insurance_amount(
+    popup: "Any",
+    product_quantity_pairs: "list[tuple[Any, int]]",
+) -> Decimal:
+    """Pure function: compute insurance amount from popup settings + eligible products.
+
+    Args:
+        popup: Object with .insurance_enabled (bool) and .insurance_percentage (Decimal|None).
+        product_quantity_pairs: List of (product, quantity) where product has
+            .price (Decimal) and .insurance_eligible (bool).
+
+    Returns:
+        Total insurance amount rounded to 2 decimal places.
+        Returns Decimal("0") if insurance is disabled or percentage is None.
+    """
+    if not popup.insurance_enabled:
+        return Decimal("0")
+    if popup.insurance_percentage is None:
+        return Decimal("0")
+
+    eligible_subtotal = Decimal("0")
+    for product, quantity in product_quantity_pairs:
+        if product.insurance_eligible:
+            eligible_subtotal += product.price * quantity
+
+    return (eligible_subtotal * popup.insurance_percentage / 100).quantize(
+        MONEY_PRECISION, rounding=ROUND_HALF_UP
+    )
 
 
 def _require_application_id(application_id: uuid.UUID | None) -> uuid.UUID:
@@ -636,22 +666,27 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         self,
         session: Session,
         requested_products: list[PaymentProductRequest],
+        popup: "Popups | None" = None,
     ) -> Decimal:
-        """Calculate insurance amount based on product insurance percentages."""
+        """Calculate insurance amount using popup.insurance_percentage and product.insurance_eligible.
+
+        Uses popup-level insurance settings (POPUP-6). Falls back to zero if popup is not provided
+        or popup insurance is disabled. The legacy per-product insurance_percentage field is no
+        longer read from this path.
+        """
+        if popup is None:
+            return Decimal("0")
+
         product_ids = list({rp.product_id for rp in requested_products})
         statement = select(Products).where(Products.id.in_(product_ids))  # type: ignore[attr-defined]
         product_models = {p.id: p for p in session.exec(statement).all()}
 
-        total = Decimal("0")
-        for req_prod in requested_products:
-            product = product_models.get(req_prod.product_id)
-            if not product or not product.insurance_percentage:
-                continue
-            total += (
-                product.price * req_prod.quantity * product.insurance_percentage / 100
-            ).quantize(MONEY_PRECISION, rounding=ROUND_HALF_UP)
-
-        return total
+        product_quantity_pairs = [
+            (product_models[rp.product_id], rp.quantity)
+            for rp in requested_products
+            if rp.product_id in product_models
+        ]
+        return calculate_insurance_amount(popup, product_quantity_pairs)
 
     def _apply_discounts(
         self,
@@ -749,9 +784,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 response.group_id = None
                 response.scholarship_discount = True
 
-        # Calculate insurance if requested
+        # Calculate insurance if requested (application-flow only — POPUP-6)
         if obj.insurance:
-            insurance_amount = self._calculate_insurance(session, obj.products)
+            popup = application.popup if application else None
+            insurance_amount = self._calculate_insurance(session, obj.products, popup)
             response.insurance_amount = insurance_amount
             response.amount += insurance_amount
 
