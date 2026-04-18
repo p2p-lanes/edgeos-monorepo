@@ -55,14 +55,27 @@ class BaseFieldConfigsCRUD(
     ) -> list[BaseFieldConfigs]:
         """Create one BaseFieldConfig per base field for a popup.
 
+        Idempotent: existing (popup_id, field_name) rows are left untouched.
+        This matters when a feature flag is toggled on, off, and back on —
+        configs persist across the off cycle and must not be re-inserted.
+
         Args:
             session: DB session
             popup_id: The popup to create configs for
             tenant_id: Tenant owning the popup
             section_map: Maps section keys (e.g. "profile") to FormSection UUIDs
         """
+        existing_names = {
+            c.field_name
+            for c in session.exec(
+                select(BaseFieldConfigs).where(BaseFieldConfigs.popup_id == popup_id)
+            ).all()
+        }
+
         configs = []
         for field_name, definition in BASE_FIELD_DEFINITIONS.items():
+            if field_name in existing_names:
+                continue
             section_key = definition.get("default_section_key", "profile")
             # Skip fields whose section was not created (e.g. scholarship when not enabled)
             if section_key not in section_map:
