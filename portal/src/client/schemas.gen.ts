@@ -3482,6 +3482,11 @@ export const FormSectionCreateSchema = {
             type: 'integer',
             title: 'Order',
             default: 0
+        },
+        kind: {
+            type: 'string',
+            title: 'Kind',
+            default: 'standard'
         }
     },
     type: 'object',
@@ -3530,6 +3535,11 @@ export const FormSectionPublicSchema = {
             type: 'boolean',
             title: 'Protected',
             default: false
+        },
+        kind: {
+            type: 'string',
+            title: 'Kind',
+            default: 'standard'
         }
     },
     type: 'object',

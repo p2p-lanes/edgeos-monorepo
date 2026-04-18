@@ -200,7 +200,11 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
         # Determine which companion fields to include based on popup settings
         spouse_fields = {"partner", "partner_email"}
         children_fields = {"kids"}
-        scholarship_fields = {"scholarship_request", "scholarship_details", "scholarship_video_url"}
+        scholarship_fields = {
+            "scholarship_request",
+            "scholarship_details",
+            "scholarship_video_url",
+        }
         skip_fields: set[str] = set()
         if popup and not popup.allows_spouse:
             skip_fields |= spouse_fields
@@ -282,6 +286,7 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
                 "label": s.label,
                 "description": s.description,
                 "order": s.order,
+                "kind": s.kind,
             }
             for s in db_sections
         ]

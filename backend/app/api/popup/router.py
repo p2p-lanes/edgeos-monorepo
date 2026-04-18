@@ -58,6 +58,7 @@ def _create_form_section(
         label=section_def["label"],
         order=section_def["order"],
         protected=True,
+        kind=section_def["kind"],
     )
     db.add(section)
     db.commit()
@@ -272,6 +273,7 @@ async def update_popup(
             label=section_def["label"],
             order=section_def["order"],
             protected=True,
+            kind=section_def["kind"],
         )
         db.add(section)
         db.commit()

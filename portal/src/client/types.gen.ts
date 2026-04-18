@@ -757,6 +757,7 @@ export type FormSectionCreate = {
     label: string;
     description?: (string | null);
     order?: number;
+    kind?: string;
 };
 
 export type FormSectionPublic = {
@@ -767,6 +768,7 @@ export type FormSectionPublic = {
     description?: (string | null);
     order?: number;
     protected?: boolean;
+    kind?: string;
 };
 
 export type FormSectionUpdate = {

@@ -1,16 +1,19 @@
 import uuid
 
 from fastapi import APIRouter, HTTPException, status
+from sqlmodel import select
 
 from app.api.form_section import crud
+from app.api.form_section.models import FormSections
 from app.api.form_section.schemas import (
     FormSectionCreate,
+    FormSectionKind,
     FormSectionPublic,
     FormSectionUpdate,
 )
 from app.api.shared.enums import UserRole
-from app.api.translation.service import delete_translations_for_entity
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
+from app.api.translation.service import delete_translations_for_entity
 from app.core.dependencies.users import CurrentUser, CurrentWriter, TenantSession
 
 router = APIRouter(prefix="/form-sections", tags=["form-sections"])
@@ -60,20 +63,49 @@ async def create_form_section(
     db: TenantSession,
     current_user: CurrentWriter,
 ) -> FormSectionPublic:
-    if current_user.role == UserRole.SUPERADMIN:
-        from app.api.popup.crud import popups_crud
+    from app.api.popup.crud import popups_crud
 
-        popup = popups_crud.get(db, section_in.popup_id)
-        if not popup:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Popup not found",
-            )
+    popup = popups_crud.get(db, section_in.popup_id)
+    if not popup:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Popup not found",
+        )
+
+    if current_user.role == UserRole.SUPERADMIN:
         tenant_id = popup.tenant_id
     else:
         tenant_id = current_user.tenant_id
 
-    from app.api.form_section.models import FormSections
+    # Gate special-kind sections by popup feature flags and uniqueness.
+    if section_in.kind != FormSectionKind.STANDARD.value:
+        if section_in.kind == FormSectionKind.COMPANIONS.value and not (
+            popup.allows_spouse or popup.allows_children
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Popup does not allow companions",
+            )
+        if (
+            section_in.kind == FormSectionKind.SCHOLARSHIP.value
+            and not popup.allows_scholarship
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Popup does not allow scholarship",
+            )
+
+        existing = db.exec(
+            select(FormSections).where(
+                FormSections.popup_id == section_in.popup_id,
+                FormSections.kind == section_in.kind,
+            )
+        ).first()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"A section of kind '{section_in.kind}' already exists for this popup",
+            )
 
     section_data = section_in.model_dump()
     section_data["tenant_id"] = tenant_id
