@@ -4,7 +4,7 @@ from decimal import Decimal
 from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, model_validator
-from sqlalchemy import Numeric, Text
+from sqlalchemy import Boolean, Numeric, Text
 from sqlmodel import Column, DateTime, Field, SQLModel
 
 
@@ -63,8 +63,9 @@ class ProductBase(SQLModel):
     is_active: bool = Field(default=True)
     exclusive: bool = Field(default=False)
     max_quantity: int | None = Field(default=None, nullable=True)
-    insurance_percentage: Decimal | None = Field(
-        default=None, sa_column=Column(Numeric(5, 2), nullable=True)
+    insurance_eligible: bool = Field(
+        default=False,
+        sa_column=Column(Boolean, nullable=False, server_default="false"),
     )
 
 
@@ -94,7 +95,7 @@ class ProductCreate(BaseModel):
     is_active: bool = True
     exclusive: bool = False
     max_quantity: int | None = None
-    insurance_percentage: Decimal | None = None
+    insurance_eligible: bool = False
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -128,7 +129,7 @@ class ProductUpdate(BaseModel):
     is_active: bool | None = None
     exclusive: bool | None = None
     max_quantity: int | None = None
-    insurance_percentage: Decimal | None = None
+    insurance_eligible: bool | None = None
 
 
 class ProductBatchItem(BaseModel):
@@ -148,7 +149,7 @@ class ProductBatchItem(BaseModel):
     is_active: bool = True
     exclusive: bool = False
     max_quantity: int | None = None
-    insurance_percentage: Decimal | None = None
+    insurance_eligible: bool = False
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
