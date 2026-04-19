@@ -8,17 +8,15 @@ import { Button } from "@/components/ui/button"
 import { useApplicationsQuery } from "@/hooks/useGetApplications"
 import { getBackgroundProps } from "@/lib/background-image"
 import { useCityProvider } from "@/providers/cityProvider"
-import { useTenant } from "@/providers/tenantProvider"
 
 const SuccessPage = () => {
   const { t } = useTranslation()
   const router = useRouter()
-  const { tenant } = useTenant()
   const { getCity } = useCityProvider()
   useApplicationsQuery()
 
   const popup = getCity()
-  const background = getBackgroundProps(popup, tenant)
+  const background = getBackgroundProps(popup)
 
   const _handleDownloadReceipt = () => {
     // Implementation to download the receipt
