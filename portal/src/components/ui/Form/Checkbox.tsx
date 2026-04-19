@@ -32,7 +32,7 @@ const CheckboxForm = ({
   return (
     <FormInputWrapper>
       {title && <LabelRequired isRequired={required}>{title}</LabelRequired>}
-      {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
+      {subtitle && <p className="text-sm text-heading-secondary">{subtitle}</p>}
       <div className="flex items-center space-x-2 my-2">
         <Checkbox
           id={id}

@@ -84,7 +84,7 @@ const Page = () => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={handleSearchKeyDown}
-              className="bg-white"
+              className="bg-card"
             />
             {(searchQuery.trim() !== "" ||
               bringsKids !== null ||
@@ -93,7 +93,7 @@ const Page = () => {
                 variant="ghost"
                 aria-label="Clear filters"
                 onClick={clearFilters}
-                className="bg-red-500 text-white hover:bg-red-500 hover:shadow-md hover:text-white"
+                className="bg-destructive text-primary-foreground hover:bg-destructive hover:shadow-md hover:text-primary-foreground"
               >
                 {t("attendees.clear_filters")}
               </Button>
@@ -104,7 +104,7 @@ const Page = () => {
                   <DialogTrigger asChild>
                     <Button
                       aria-label="Open filters"
-                      className="bg-white text-black hover:bg-white hover:shadow-md"
+                      className="bg-card text-foreground hover:bg-card hover:shadow-md"
                     >
                       <ListFilter className="w-4 h-4" />
                     </Button>
@@ -114,7 +114,7 @@ const Page = () => {
                   <p>{t("attendees.open_filters")}</p>
                 </TooltipContent>
               </Tooltip>
-              <DialogContent className="bg-white">
+              <DialogContent className="bg-card">
                 <DialogHeader>
                   <DialogTitle>{t("attendees.filters")}</DialogTitle>
                 </DialogHeader>
@@ -148,8 +148,8 @@ const Page = () => {
                             variant={isActive ? "default" : "outline"}
                             className={
                               isActive
-                                ? "bg-primary text-white"
-                                : "bg-white text-black"
+                                ? "bg-primary text-primary-foreground"
+                                : "bg-card text-foreground"
                             }
                             aria-pressed={isActive}
                             onClick={() => handleToggleWeek(week)}
@@ -188,7 +188,7 @@ const Page = () => {
               <TooltipTrigger asChild>
                 <Button
                   aria-label="Export attendees as CSV"
-                  className="bg-white text-black hover:bg-white hover:shadow-md"
+                  className="bg-card text-foreground hover:bg-card hover:shadow-md"
                   onClick={handleExportCsv}
                   disabled={isExporting}
                 >

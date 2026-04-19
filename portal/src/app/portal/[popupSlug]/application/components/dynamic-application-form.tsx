@@ -320,7 +320,7 @@ export function DynamicApplicationForm({
       <form
         noValidate
         onSubmit={handleSubmit}
-        className="space-y-8 px-8 md:px-12"
+        className="rounded-2xl border border-border bg-card text-card-foreground shadow-sm space-y-8 p-6 md:p-10"
       >
         {isMultiStep && mergedSections.length > 1 && (
           <p className="text-sm text-heading-secondary text-center">

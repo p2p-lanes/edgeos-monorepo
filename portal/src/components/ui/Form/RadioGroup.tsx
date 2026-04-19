@@ -25,7 +25,7 @@ const RadioGroupForm = ({
   return (
     <FormInputWrapper>
       <LabelRequired isRequired={isRequired}>{label}</LabelRequired>
-      <p className="text-sm text-muted-foreground">{subtitle}</p>
+      <p className="text-sm text-heading-secondary">{subtitle}</p>
       <RadioGroup
         value={value}
         onValueChange={(value) => onChange(value)}

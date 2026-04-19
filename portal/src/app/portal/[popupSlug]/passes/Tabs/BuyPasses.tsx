@@ -26,7 +26,7 @@ const _parseMarkdown = (markdown: string) => {
   const linkRegex = /\[(.*?)\]\((.*?)\)/g
   let parsedText = markdown.replace(
     linkRegex,
-    '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">$1</a>',
+    '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">$1</a>',
   )
 
   // Convertir texto en negrita **texto**
@@ -165,7 +165,7 @@ const BuyPasses = ({
             {(isFloating) =>
               isFloating ? (
                 <div className="flex justify-center lg:ml-[255px]">
-                  <div className="bg-white p-4 shadow-lg border border-neutral-200 rounded-lg min-w-[600px] pointer-events-auto">
+                  <div className="bg-card p-4 shadow-lg border border-neutral-200 rounded-lg min-w-[600px] pointer-events-auto">
                     <TotalFloatingBar setOpenCart={setOpenCart} />
                   </div>
                 </div>
@@ -193,7 +193,7 @@ const BuyPasses = ({
           <BottomSheet>
             {(isModal) => (
               <div
-                className={`${isModal ? "bg-white p-4 shadow-lg border-t border-neutral-200 rounded-t-2xl" : ""}`}
+                className={`${isModal ? "bg-card p-4 shadow-lg border-t border-neutral-200 rounded-t-2xl" : ""}`}
               >
                 <TotalPurchase
                   attendees={attendees}

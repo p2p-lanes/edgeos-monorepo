@@ -63,7 +63,7 @@ const AttendeesTable = ({
             attendees.map((attendee, index) => (
               <TableRow
                 key={index}
-                className="border-b border-gray-100 hover:bg-gray-50 bg-white sticky z-10 left-0"
+                className="border-b border-border hover:bg-muted bg-card sticky z-10 left-0"
               >
                 <AttendeeCell attendee={attendee} />
                 <CommonCell value={attendee.email ?? ""} />

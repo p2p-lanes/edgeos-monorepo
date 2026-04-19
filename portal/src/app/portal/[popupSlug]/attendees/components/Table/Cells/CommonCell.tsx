@@ -10,7 +10,7 @@ const CommonCell = ({
 }) => {
   return (
     <TableCell className={className}>
-      <CellControl className="text-gray-900" value={value}>
+      <CellControl className="text-foreground" value={value}>
         {value}
       </CellControl>
     </TableCell>

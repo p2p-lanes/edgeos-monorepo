@@ -98,10 +98,10 @@ export default function PatronSection({ onSkip }: PatronSectionProps) {
   if (patronProducts.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+        <h3 className="text-lg font-semibold text-foreground mb-2">
           Patron Support Not Available
         </h3>
-        <p className="text-gray-500 max-w-md mb-6">
+        <p className="text-muted-foreground max-w-md mb-6">
           Patron support options are not currently available for this event. You
           can continue to the next step.
         </p>
@@ -114,15 +114,15 @@ export default function PatronSection({ onSkip }: PatronSectionProps) {
 
   return (
     <div className="space-y-4">
-      <div className="bg-checkout-card-bg rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-checkout-card-bg rounded-2xl shadow-sm border border-border overflow-hidden">
         <div className="w-full p-5 text-left">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-gray-900 text-lg">
+            <h3 className="font-semibold text-foreground text-lg">
               Become a Patron
             </h3>
             {!isVariablePrice && (
               <div className="flex items-center gap-3 shrink-0">
-                <span className="text-sm font-semibold text-gray-700">
+                <span className="text-sm font-semibold text-foreground">
                   {formatCurrency(patronProduct.price)}
                 </span>
                 <Switch
@@ -133,7 +133,7 @@ export default function PatronSection({ onSkip }: PatronSectionProps) {
               </div>
             )}
           </div>
-          <div className="space-y-3 text-sm text-gray-600 leading-relaxed">
+          <div className="space-y-3 text-sm text-muted-foreground leading-relaxed">
             {patronProduct?.description ? (
               <p>{patronProduct.description}</p>
             ) : (
@@ -159,7 +159,7 @@ export default function PatronSection({ onSkip }: PatronSectionProps) {
               expanded ? "max-h-96 opacity-100" : "max-h-0 opacity-0",
             )}
           >
-            <div className="px-5 pb-5 border-t border-gray-100">
+            <div className="px-5 pb-5 border-t border-border">
               <div className="flex gap-2 pt-4 pb-3">
                 {PATRON_PRESETS.map((amount) => {
                   const isSelected = currentAmount === amount && !isCustom
@@ -171,8 +171,8 @@ export default function PatronSection({ onSkip }: PatronSectionProps) {
                       className={cn(
                         "flex-1 py-2.5 rounded-lg font-semibold text-sm transition-all",
                         isSelected
-                          ? "bg-gray-900 text-white"
-                          : "bg-gray-100 text-gray-700 hover:bg-gray-200",
+                          ? "bg-foreground text-background"
+                          : "bg-muted text-foreground hover:bg-muted/80",
                       )}
                     >
                       {formatCurrency(amount)}
@@ -181,9 +181,9 @@ export default function PatronSection({ onSkip }: PatronSectionProps) {
                 })}
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-sm text-gray-500">Custom:</span>
+                <span className="text-sm text-muted-foreground">Custom:</span>
                 <div className="relative flex-1">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
                     $
                   </span>
                   <input
@@ -202,18 +202,18 @@ export default function PatronSection({ onSkip }: PatronSectionProps) {
                         ? "border-green-400 bg-green-50 focus:ring-green-400"
                         : isCustom && customValue
                           ? "border-amber-400 bg-amber-50"
-                          : "border-gray-200 focus:ring-amber-400",
+                          : "border-border focus:ring-amber-400",
                     )}
                   />
                 </div>
                 <span
                   className={cn(
-                    "text-xs text-gray-400",
+                    "text-xs text-muted-foreground",
                     isCustom &&
                       customValue &&
                       Number.parseInt(customValue.replace(/,/g, ""), 10) <
                         PATRON_MINIMUM &&
-                      "text-black",
+                      "text-foreground",
                   )}
                 >
                   Min {formatCurrency(PATRON_MINIMUM)}
@@ -224,7 +224,7 @@ export default function PatronSection({ onSkip }: PatronSectionProps) {
                   <button
                     type="button"
                     onClick={handleClear}
-                    className="text-gray-400 hover:text-gray-600 text-xs transition-colors"
+                    className="text-muted-foreground hover:text-foreground text-xs transition-colors"
                   >
                     Remove contribution
                   </button>

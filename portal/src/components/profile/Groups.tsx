@@ -24,9 +24,9 @@ const Groups = () => {
   if (groups.length === 0) return null
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 mb-8">
-      <div className="p-6 border-b border-gray-200">
-        <h2 className="text-xl font-semibold text-gray-900">Groups</h2>
+    <div className="bg-card rounded-lg border border-border mb-8">
+      <div className="p-6 border-b border-border">
+        <h2 className="text-xl font-semibold text-foreground">Groups</h2>
       </div>
 
       <div className="p-6">
@@ -52,7 +52,7 @@ const Groups = () => {
               >
                 <div className="flex justify-between items-center">
                   <div className="flex flex-col gap-2">
-                    <h3 className="font-semibold text-gray-900">
+                    <h3 className="font-semibold text-foreground">
                       {group.name}
                     </h3>
                     {/* LEGACY: popup_name removed from API – review for deletion */}

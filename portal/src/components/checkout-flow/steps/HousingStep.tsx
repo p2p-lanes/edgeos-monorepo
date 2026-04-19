@@ -273,7 +273,7 @@ function PropertyCard({
                   : "border-muted-foreground/40",
               )}
             >
-              {isSelected && <Check className="w-3 h-3 text-white" />}
+              {isSelected && <Check className="w-3 h-3 text-primary-foreground" />}
             </div>
             <div className="text-left min-w-0">
               <p className="font-medium text-pass-title text-sm sm:text-base truncate">

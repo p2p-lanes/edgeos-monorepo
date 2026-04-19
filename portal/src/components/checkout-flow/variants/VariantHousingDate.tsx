@@ -266,7 +266,7 @@ function CompactCard({
               : "bg-checkout-card-bg border-muted-foreground/40",
           )}
         >
-          {isSelected && <Check className="w-3 h-3 text-white" />}
+          {isSelected && <Check className="w-3 h-3 text-primary-foreground" />}
         </div>
       )}
 
@@ -392,7 +392,7 @@ function GridCard({
       ) : (
         isSelected && (
           <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-primary flex items-center justify-center">
-            <Check className="w-3.5 h-3.5 text-white" />
+            <Check className="w-3.5 h-3.5 text-primary-foreground" />
           </div>
         )
       )}
@@ -561,7 +561,7 @@ function DefaultSectionCard({
                         : "border-muted-foreground/40",
                     )}
                   >
-                    {isSelected && <Check className="w-3 h-3 text-white" />}
+                    {isSelected && <Check className="w-3 h-3 text-primary-foreground" />}
                   </div>
                 )}
                 <div className="min-w-0">
@@ -800,7 +800,7 @@ function ShowcaseSectionCard({
                         : "border-muted-foreground/40 bg-checkout-card-bg",
                     )}
                   >
-                    {isSelected && <Check className="w-3 h-3 text-white" />}
+                    {isSelected && <Check className="w-3 h-3 text-primary-foreground" />}
                   </div>
                 )}
               </button>

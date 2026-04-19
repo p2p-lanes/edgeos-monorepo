@@ -21,7 +21,7 @@ type VariantStyles =
 const variants: Record<VariantStyles, string> = {
   selected:
     "bg-green-200 border-green-400 text-green-800 hover:bg-green-200/80",
-  purchased: "bg-slate-800 text-white border-neutral-700",
+  purchased: "bg-slate-800 text-primary-foreground border-neutral-700",
   edit: "bg-slate-800/30 border-dashed border-slate-200 text-neutral-700 border",
   disabled: "bg-neutral-0 text-neutral-300 cursor-not-allowed ",
   default:
@@ -122,7 +122,7 @@ const Product = ({
             {product.start_date && product.end_date && (
               <span
                 className={cn(
-                  `text-xs text-left text-muted-foreground ${product.purchased ? "text-white" : ""}`,
+                  `text-xs text-left text-muted-foreground ${product.purchased ? "text-primary-foreground" : ""}`,
                   disabled && "text-neutral-300",
                 )}
               >

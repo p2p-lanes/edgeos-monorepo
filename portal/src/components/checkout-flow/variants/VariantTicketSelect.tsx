@@ -325,7 +325,7 @@ function AttendeePassRows({
 
   if (groups.length === 0) {
     return (
-      <div className="px-5 py-8 text-center text-sm text-gray-400">
+      <div className="px-5 py-8 text-center text-sm text-muted-foreground">
         No passes available.
       </div>
     )
@@ -375,11 +375,11 @@ function PassSection({
     <>
       <div className="relative px-5 py-2 bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100 overflow-hidden">
         <div className="absolute inset-0" style={stripedStyle} />
-        <h4 className="relative text-xs font-semibold text-gray-500 uppercase tracking-wide">
+        <h4 className="relative text-xs font-semibold text-gray-600 uppercase tracking-wide">
           {label}
         </h4>
       </div>
-      <div className="divide-y divide-gray-100">{children}</div>
+      <div className="divide-y divide-border">{children}</div>
     </>
   )
 }
@@ -427,8 +427,8 @@ function PassRow({
         }}
       >
         <div className="flex items-center gap-2 min-w-0">
-          <Ticket className="w-4 h-4 text-gray-300 shrink-0" />
-          <span className="font-medium text-gray-400 truncate">
+          <Ticket className="w-4 h-4 text-muted-foreground shrink-0" />
+          <span className="font-medium text-muted-foreground truncate">
             {product.name}
           </span>
           <span className="px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-semibold uppercase rounded tracking-wide border border-slate-200 shrink-0">
@@ -448,7 +448,7 @@ function PassRow({
           "w-full px-5 py-3 flex items-center justify-between gap-4 transition-all",
           isEditedForCredit
             ? "bg-orange-50 border-l-4 border-l-orange-400"
-            : "bg-gray-50 hover:bg-gray-100",
+            : "bg-muted hover:bg-muted/80",
         )}
       >
         <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -457,7 +457,7 @@ function PassRow({
               "w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 border-dashed",
               isEditedForCredit
                 ? "bg-orange-100 border-orange-400"
-                : "border-gray-400",
+                : "border-muted-foreground",
             )}
           >
             {isEditedForCredit && <Check className="w-3 h-3 text-orange-600" />}
@@ -467,7 +467,7 @@ function PassRow({
               <Ticket
                 className={cn(
                   "w-4 h-4",
-                  isEditedForCredit ? "text-orange-400" : "text-gray-400",
+                  isEditedForCredit ? "text-orange-400" : "text-muted-foreground",
                 )}
               />
               <span
@@ -475,7 +475,7 @@ function PassRow({
                   "font-medium",
                   isEditedForCredit
                     ? "text-orange-700 line-through"
-                    : "text-gray-700",
+                    : "text-foreground",
                 )}
               >
                 {product.name}
@@ -496,7 +496,7 @@ function PassRow({
         <p
           className={cn(
             "font-semibold shrink-0",
-            isEditedForCredit ? "text-orange-600" : "text-gray-500",
+            isEditedForCredit ? "text-orange-600" : "text-muted-foreground",
           )}
         >
           {isEditedForCredit
@@ -528,10 +528,10 @@ function PassRow({
       className={cn(
         "w-full px-5 py-3 flex items-center justify-between gap-4 transition-all",
         disabled
-          ? "opacity-40 cursor-not-allowed bg-gray-50"
+          ? "opacity-40 cursor-not-allowed bg-muted"
           : rowIsActive
-            ? "bg-blue-50"
-            : "hover:bg-gray-50",
+            ? "bg-primary/10"
+            : "hover:bg-muted",
       )}
     >
       <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -552,22 +552,22 @@ function PassRow({
             className={cn(
               "w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all",
               isSelected
-                ? "bg-blue-600 border-blue-600"
+                ? "bg-primary border-primary"
                 : disabled
-                  ? "border-gray-200"
-                  : "border-gray-300",
+                  ? "border-border"
+                  : "border-border",
             )}
           >
-            {isSelected && <Check className="w-3 h-3 text-white" />}
+            {isSelected && <Check className="w-3 h-3 text-primary-foreground" />}
           </div>
         )}
         <div className="flex-1 min-w-0 text-left">
           <div className="flex items-center gap-2">
-            <Ticket className="w-4 h-4 text-gray-400" />
-            <span className="font-medium text-gray-900">{product.name}</span>
+            <Ticket className="w-4 h-4 text-muted-foreground" />
+            <span className="font-medium text-foreground">{product.name}</span>
           </div>
           {product.start_date && product.end_date && (
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-muted-foreground">
               {formatDate(product.start_date, {
                 day: "numeric",
                 month: "short",
@@ -580,21 +580,21 @@ function PassRow({
             <ExpandableDescription
               text={product.description}
               clamp={2}
-              className="text-xs text-gray-500 mt-1"
+              className="text-xs text-muted-foreground mt-1"
             />
           )}
         </div>
       </div>
       <div className="text-right shrink-0">
         {hasDiscount && (
-          <p className="text-xs text-gray-400 line-through">
+          <p className="text-xs text-muted-foreground line-through">
             ${comparePrice?.toLocaleString()}
           </p>
         )}
         <p
           className={cn(
-            "font-semibold",
-            rowIsActive ? "text-blue-600" : "text-gray-900",
+            "text-foreground",
+            rowIsActive ? "font-bold" : "font-semibold",
           )}
         >
           ${product.price.toLocaleString()}
@@ -645,7 +645,7 @@ function DayPassRow({
           "w-full px-5 py-3 flex items-center justify-between gap-4 transition-all",
           isEditedForCredit
             ? "bg-orange-50 border-l-4 border-l-orange-400"
-            : "bg-gray-50 hover:bg-gray-100",
+            : "bg-muted hover:bg-muted/80",
         )}
       >
         <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -654,7 +654,7 @@ function DayPassRow({
               "w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 border-dashed",
               isEditedForCredit
                 ? "bg-orange-100 border-orange-400"
-                : "border-gray-400",
+                : "border-muted-foreground",
             )}
           >
             {isEditedForCredit && <Check className="w-3 h-3 text-orange-600" />}
@@ -664,7 +664,7 @@ function DayPassRow({
               "font-medium",
               isEditedForCredit
                 ? "text-orange-700 line-through"
-                : "text-gray-700",
+                : "text-foreground",
             )}
           >
             {product.name} ({originalQuantity}{" "}
@@ -674,7 +674,7 @@ function DayPassRow({
         <p
           className={cn(
             "font-semibold shrink-0",
-            isEditedForCredit ? "text-orange-600" : "text-gray-500",
+            isEditedForCredit ? "text-orange-600" : "text-muted-foreground",
           )}
         >
           {isEditedForCredit
@@ -689,7 +689,7 @@ function DayPassRow({
     <div
       className={cn(
         "px-5 py-3 flex items-center justify-between gap-4",
-        disabled ? "opacity-40" : hasQuantity ? "bg-blue-50" : "",
+        disabled ? "opacity-40" : hasQuantity ? "bg-primary/10" : "",
       )}
     >
       <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -706,29 +706,29 @@ function DayPassRow({
         />
         <div className="flex-1 min-w-0 text-left">
           <div className="flex items-center gap-2">
-            <Ticket className="w-4 h-4 text-gray-400" />
-            <span className="font-medium text-gray-900">{product.name}</span>
+            <Ticket className="w-4 h-4 text-muted-foreground" />
+            <span className="font-medium text-foreground">{product.name}</span>
           </div>
-          <p className="text-sm text-gray-500">per day</p>
+          <p className="text-sm text-muted-foreground">per day</p>
           {product.description && (
             <ExpandableDescription
               text={product.description}
               clamp={2}
-              className="text-xs text-gray-500 mt-1"
+              className="text-xs text-muted-foreground mt-1"
             />
           )}
         </div>
       </div>
       <div className="text-right shrink-0">
         {hasDiscount && (
-          <p className="text-xs text-gray-400 line-through">
+          <p className="text-xs text-muted-foreground line-through">
             ${comparePrice?.toLocaleString()}
           </p>
         )}
         <p
           className={cn(
             "font-semibold",
-            hasQuantity ? "text-blue-600" : "text-gray-900",
+            hasQuantity ? "text-primary" : "text-foreground",
           )}
         >
           ${product.price.toLocaleString()}
@@ -766,7 +766,7 @@ function CompactAttendeeCard({
   return (
     <div
       className={cn(
-        "bg-checkout-card-bg rounded-xl border border-gray-100 shadow-sm p-3 border-l-2",
+        "bg-checkout-card-bg rounded-xl border border-border shadow-sm p-3 border-l-2",
         meta.accent,
       )}
     >
@@ -780,13 +780,13 @@ function CompactAttendeeCard({
         >
           {meta.label}
         </div>
-        <span className="text-sm font-medium text-gray-700">
+        <span className="text-sm font-medium text-foreground">
           {attendee.name}
         </span>
       </div>
 
       {visibleProducts.length === 0 ? (
-        <p className="text-xs text-gray-400">No passes available.</p>
+        <p className="text-xs text-muted-foreground">No passes available.</p>
       ) : (
         <div className="flex flex-wrap gap-2">
           {visibleProducts.map((p) => {
@@ -824,8 +824,8 @@ function CompactAttendeeCard({
                   className={cn(
                     "flex items-center gap-1 px-2 py-1.5 rounded-lg border text-xs font-medium transition-all",
                     qty > 0
-                      ? "bg-blue-50 border-blue-300"
-                      : "bg-checkout-card-bg border-gray-200",
+                      ? "bg-primary/10 border-primary/30"
+                      : "bg-checkout-card-bg border-border",
                     tileDisabled && "opacity-40",
                   )}
                 >
@@ -848,16 +848,16 @@ function CompactAttendeeCard({
                   <Ticket
                     className={cn(
                       "w-3 h-3 ml-0.5",
-                      qty > 0 ? "text-blue-500" : "text-gray-300",
+                      qty > 0 ? "text-primary" : "text-muted-foreground",
                     )}
                   />
-                  <span className={qty > 0 ? "text-blue-700" : "text-gray-600"}>
+                  <span className={qty > 0 ? "text-primary" : "text-muted-foreground"}>
                     {p.name}
                   </span>
                   <span
                     className={cn(
                       "font-semibold ml-0.5",
-                      qty > 0 ? "text-blue-600" : "text-gray-500",
+                      qty > 0 ? "text-primary" : "text-muted-foreground",
                     )}
                   >
                     {formatCurrency(p.price)}
@@ -890,12 +890,12 @@ function CompactAttendeeCard({
                 className={cn(
                   "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all",
                   p.purchased && !isEditing
-                    ? "bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed"
+                    ? "bg-muted border-border text-muted-foreground cursor-not-allowed"
                     : isSelected
-                      ? "bg-blue-600 border-blue-600 text-white shadow-sm"
+                      ? "bg-primary border-primary text-primary-foreground shadow-sm"
                       : isDisabled
-                        ? "bg-gray-50 border-gray-100 text-gray-300 cursor-not-allowed opacity-50"
-                        : "bg-checkout-card-bg border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50",
+                        ? "bg-muted border-border text-muted-foreground cursor-not-allowed opacity-50"
+                        : "bg-checkout-card-bg border-border text-foreground hover:border-muted-foreground/40 hover:bg-muted",
                 )}
               >
                 {isSelected && <Check className="w-3 h-3" />}
@@ -944,7 +944,7 @@ function StackedLayout({
         <div
           key={attendee.id}
           id={`attendee-card-${attendee.id}`}
-          className="bg-checkout-card-bg rounded-2xl shadow-sm border border-gray-100 overflow-hidden"
+          className="bg-checkout-card-bg rounded-2xl shadow-sm border border-border overflow-hidden"
         >
           <AttendeeHeader attendee={attendee} />
           <AttendeePassRows
@@ -983,9 +983,9 @@ function TabsLayout({
   }, [focusedAttendeeId, attendees])
 
   return (
-    <div className="bg-checkout-card-bg rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+    <div className="bg-checkout-card-bg rounded-2xl shadow-sm border border-border overflow-hidden">
       {/* Tab bar */}
-      <div className="flex border-b border-gray-100 bg-gray-50/50 overflow-x-auto">
+      <div className="flex border-b border-border bg-muted/50 overflow-x-auto">
         {attendees.map((a, idx) => {
           const meta = getCategoryMeta(a.category)
           const isActive = idx === activeIdx
@@ -998,8 +998,8 @@ function TabsLayout({
               className={cn(
                 "flex-1 min-w-max flex flex-col items-center px-4 py-2.5 text-xs font-medium transition-all border-b-2 whitespace-nowrap",
                 isActive
-                  ? cn(meta.tab, "bg-white")
-                  : "text-gray-500 border-transparent hover:text-gray-700 hover:bg-gray-50",
+                  ? cn(meta.tab, "bg-card")
+                  : "text-muted-foreground border-transparent hover:text-foreground hover:bg-muted",
               )}
             >
               <span className="font-semibold text-sm leading-tight">
@@ -1010,7 +1010,7 @@ function TabsLayout({
                 <span
                   className={cn(
                     "mt-0.5 text-[10px] px-1.5 py-0.5 rounded-full font-semibold",
-                    isActive ? meta.badge : "bg-gray-100 text-gray-500",
+                    isActive ? meta.badge : "bg-muted text-muted-foreground",
                   )}
                 >
                   {selected} selected
@@ -1113,12 +1113,12 @@ function AccordionLayout({
           <div
             key={attendee.id}
             id={`attendee-card-${attendee.id}`}
-            className="bg-checkout-card-bg rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
+            className="bg-checkout-card-bg rounded-2xl border border-border shadow-sm overflow-hidden"
           >
             <button
               type="button"
               onClick={() => toggleOpen(attendee.id)}
-              className="w-full flex items-center gap-3 px-5 py-4 hover:bg-gray-50/80 transition-colors"
+              className="w-full flex items-center gap-3 px-5 py-4 hover:bg-muted/80 transition-colors"
             >
               {/* Color dot */}
               <div
@@ -1130,10 +1130,10 @@ function AccordionLayout({
                 {attendee.name.charAt(0).toUpperCase()}
               </div>
               <div className="flex-1 text-left min-w-0">
-                <p className="font-semibold text-gray-900 text-sm truncate">
+                <p className="font-semibold text-foreground text-sm truncate">
                   {attendee.name}
                 </p>
-                <p className="text-xs text-gray-400">{meta.label}</p>
+                <p className="text-xs text-muted-foreground">{meta.label}</p>
               </div>
               {selected > 0 && (
                 <span
@@ -1147,14 +1147,14 @@ function AccordionLayout({
               )}
               <ChevronDown
                 className={cn(
-                  "w-4 h-4 text-gray-400 transition-transform duration-200 shrink-0",
+                  "w-4 h-4 text-muted-foreground transition-transform duration-200 shrink-0",
                   isOpen && "rotate-180",
                 )}
               />
             </button>
 
             {isOpen && (
-              <div className="border-t border-gray-100">
+              <div className="border-t border-border">
                 <AttendeePassRows
                   attendee={attendee}
                   toggleProduct={toggleProduct}
@@ -1238,28 +1238,28 @@ function LegacySectionLayout({
         onClick={() => toggle(p)}
         className={cn(
           "w-full p-4 flex items-center gap-3 text-left transition-colors",
-          selected ? "bg-blue-50/50" : "hover:bg-gray-50",
+          selected ? "bg-primary/10" : "hover:bg-muted",
         )}
       >
         <div
           className={cn(
             "w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors",
-            selected ? "border-blue-600 bg-blue-600" : "border-gray-300",
+            selected ? "border-primary bg-primary" : "border-border",
           )}
         >
-          {selected && <Check className="w-3 h-3 text-white" />}
+          {selected && <Check className="w-3 h-3 text-primary-foreground" />}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-medium text-gray-900 text-sm">{p.name}</p>
+          <p className="font-medium text-foreground text-sm">{p.name}</p>
           {p.description && (
             <ExpandableDescription
               text={p.description}
               clamp={2}
-              className="text-xs text-gray-500 mt-0.5"
+              className="text-xs text-muted-foreground mt-0.5"
             />
           )}
           {(p.start_date || p.end_date) && (
-            <p className="text-xs text-gray-400 mt-0.5">
+            <p className="text-xs text-muted-foreground mt-0.5">
               {p.start_date && formatCheckoutDate(p.start_date)}
               {p.start_date && p.end_date && " – "}
               {p.end_date && formatCheckoutDate(p.end_date)}
@@ -1268,14 +1268,14 @@ function LegacySectionLayout({
         </div>
         <div className="text-right shrink-0">
           {p.compare_price != null && p.compare_price > p.price && (
-            <p className="text-xs text-gray-400 line-through">
+            <p className="text-xs text-muted-foreground line-through">
               {formatCurrency(p.compare_price)}
             </p>
           )}
           <span
             className={cn(
               "font-semibold text-sm",
-              selected ? "text-blue-600" : "text-gray-700",
+              selected ? "text-primary" : "text-foreground",
             )}
           >
             {formatCurrency(p.price)}
@@ -1292,24 +1292,24 @@ function LegacySectionLayout({
           {groups.map(({ section, products: sp }) => (
             <div
               key={section.key}
-              className="bg-checkout-card-bg rounded-2xl shadow-sm border border-gray-100 overflow-hidden"
+              className="bg-checkout-card-bg rounded-2xl shadow-sm border border-border overflow-hidden"
             >
               <div
                 className="relative px-5 py-2 bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100 overflow-hidden"
                 style={stripedStyle}
               >
-                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide relative">
+                <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wide relative">
                   {section.label}
                 </h4>
               </div>
-              <div className="divide-y divide-gray-100">
+              <div className="divide-y divide-border">
                 {sp.map(renderRow)}
               </div>
             </div>
           ))}
         </div>
       ) : (
-        <div className="bg-checkout-card-bg rounded-2xl shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-100">
+        <div className="bg-checkout-card-bg rounded-2xl shadow-sm border border-border overflow-hidden divide-y divide-border">
           {products.map(renderRow)}
         </div>
       )}

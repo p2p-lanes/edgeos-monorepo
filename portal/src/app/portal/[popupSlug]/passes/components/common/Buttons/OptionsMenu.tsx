@@ -32,8 +32,8 @@ const OptionsMenu = ({
   return (
     <div className={className}>
       <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
-        <DropdownMenuTrigger asChild className="hover:bg-gray-100 rounded-md">
-          <MoreVertical className="w-5 h-5 my-2 text-pass-text cursor-pointer hover:bg-gray-100 rounded-md" />
+        <DropdownMenuTrigger asChild className="hover:bg-muted rounded-md">
+          <MoreVertical className="w-5 h-5 my-2 text-pass-text cursor-pointer hover:bg-muted rounded-md" />
         </DropdownMenuTrigger>
         <DropdownMenuContent className="w-fit">
           <DropdownMenuGroup className="flex flex-col gap-2">
@@ -51,7 +51,7 @@ const OptionsMenu = ({
                 className="cursor-pointer justify-between"
               >
                 Delete
-                <Trash className="w-4 h-4 text-red-500" />
+                <Trash className="w-4 h-4 text-destructive" />
               </DropdownMenuItem>
             )}
           </DropdownMenuGroup>

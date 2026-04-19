@@ -65,11 +65,11 @@ export default function SuccessStep({
           transition={{ duration: 0.4 }}
           className="flex flex-col items-center"
         >
-          <Loader2 className="w-16 h-16 text-blue-500 animate-spin mb-6" />
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">
+          <Loader2 className="w-16 h-16 text-primary animate-spin mb-6" />
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">
             Verifying your payment...
           </h1>
-          <p className="text-gray-500 max-w-xs">
+          <p className="text-muted-foreground max-w-xs">
             Please wait while we confirm your payment with the provider.
           </p>
         </motion.div>
@@ -90,10 +90,10 @@ export default function SuccessStep({
           <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center mb-6">
             <Clock className="w-8 h-8 text-amber-600" />
           </div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">
             Payment Still Processing
           </h1>
-          <p className="text-gray-500 max-w-sm">
+          <p className="text-muted-foreground max-w-sm">
             Your payment is still being processed. You will receive a
             confirmation email shortly once it is completed.
           </p>
@@ -123,13 +123,13 @@ export default function SuccessStep({
           transition={{ duration: 0.4 }}
           className="flex flex-col items-center"
         >
-          <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mb-6">
-            <AlertCircle className="w-8 h-8 text-red-600" />
+          <div className="w-16 h-16 rounded-full bg-destructive/20 flex items-center justify-center mb-6">
+            <AlertCircle className="w-8 h-8 text-destructive" />
           </div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">
             Payment was not completed
           </h1>
-          <p className="text-gray-500 max-w-sm">
+          <p className="text-muted-foreground max-w-sm">
             {paymentStatus === "error"
               ? "We could not verify your payment status. Please check your email or try again."
               : "Your payment was not processed successfully. Please try again."}
@@ -195,7 +195,7 @@ export default function SuccessStep({
 
       {/* Title */}
       <motion.h1
-        className="text-2xl md:text-3xl font-bold text-gray-900 mb-2"
+        className="text-2xl md:text-3xl font-bold text-foreground mb-2"
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.9, duration: 0.4 }}
@@ -205,7 +205,7 @@ export default function SuccessStep({
 
       {/* Subtitle */}
       <motion.p
-        className="text-gray-500 max-w-xs"
+        className="text-muted-foreground max-w-xs"
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 1.1, duration: 0.4 }}
@@ -220,7 +220,7 @@ export default function SuccessStep({
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 1.8, duration: 0.4 }}
       >
-        <p className={cn("text-sm", "text-gray-500")}>
+        <p className={cn("text-sm", "text-muted-foreground")}>
           Redirecting in {countdown}s...
         </p>
         <Button onClick={handleGoToPasses}>
