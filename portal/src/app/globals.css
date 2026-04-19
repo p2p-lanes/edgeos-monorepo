@@ -132,26 +132,13 @@
   --checkout-button-title: #1e2a4d;
   --checkout-bottom-bar-text: #ffffff;
   /* Disabled variants derived via color-mix (no editables del form). */
-  --checkout-button-disabled: color-mix(
-    in oklab,
-    var(--checkout-button) 35%,
-    white
-  );
-  --checkout-button-title-disabled: color-mix(
-    in oklab,
-    var(--checkout-button-title) 50%,
-    transparent
-  );
-  --checkout-badge-bg-disabled: color-mix(
-    in oklab,
-    var(--checkout-badge-bg) 25%,
-    white
-  );
-  --checkout-badge-title-disabled: color-mix(
-    in oklab,
-    var(--checkout-badge-title) 55%,
-    transparent
-  );
+  /* Disabled states ride the neutral muted palette so contrast holds in
+     both light and dark without depending on whatever brand color the
+     admin set for the active state. */
+  --checkout-button-disabled: var(--muted);
+  --checkout-button-title-disabled: var(--muted-foreground);
+  --checkout-badge-bg-disabled: var(--muted);
+  --checkout-badge-title-disabled: var(--muted-foreground);
   /* Legacy aliases — popups anteriores a la simplificación pueden tener
      checkout_nav_bg / checkout_nav_text en el JSON. themeProvider sigue
      mapeando 1:1 hacia estas vars, así que las dejamos como alias. */
@@ -183,7 +170,13 @@
   --sidebar-foreground: oklch(0.37 0.01 260);
   --sidebar-primary: oklch(0.205 0.015 260);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.965 0.005 260);
+  /* --sidebar-accent is the hover/active BG. Derived from --sidebar + its
+     foreground so it auto-adapts when the admin themes a dark sidebar. */
+  --sidebar-accent: color-mix(
+    in oklab,
+    var(--sidebar) 85%,
+    var(--sidebar-foreground) 15%
+  );
   --sidebar-accent-foreground: oklch(0.205 0.015 260);
   --sidebar-border: oklch(0.922 0.01 260);
   --sidebar-ring: oklch(0.548 0.22 260);
@@ -210,26 +203,13 @@
   --checkout-button: oklch(0.985 0 0);
   --checkout-button-title: oklch(0.145 0 0);
   --checkout-bottom-bar-text: oklch(0.985 0 0);
-  --checkout-button-disabled: color-mix(
-    in oklab,
-    var(--checkout-button) 35%,
-    black
-  );
-  --checkout-button-title-disabled: color-mix(
-    in oklab,
-    var(--checkout-button-title) 50%,
-    transparent
-  );
-  --checkout-badge-bg-disabled: color-mix(
-    in oklab,
-    var(--checkout-badge-bg) 25%,
-    black
-  );
-  --checkout-badge-title-disabled: color-mix(
-    in oklab,
-    var(--checkout-badge-title) 55%,
-    transparent
-  );
+  /* Same rationale as the light theme: disabled states ride the neutral
+     muted palette for consistent contrast regardless of the admin's
+     brand colors. */
+  --checkout-button-disabled: var(--muted);
+  --checkout-button-title-disabled: var(--muted-foreground);
+  --checkout-badge-bg-disabled: var(--muted);
+  --checkout-badge-title-disabled: var(--muted-foreground);
   --checkout-nav-bg: var(--checkout-navbar-bg);
   --checkout-nav-text: var(--checkout-badge-title);
   --card: oklch(0.205 0.015 285);
@@ -258,7 +238,13 @@
   --sidebar-foreground: oklch(0.965 0.005 260);
   --sidebar-primary: oklch(0.548 0.22 260);
   --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.27 0.01 260);
+  /* Same color-mix pattern as the light theme — adapts to the admin's
+     chosen sidebar bg + foreground. */
+  --sidebar-accent: color-mix(
+    in oklab,
+    var(--sidebar) 85%,
+    var(--sidebar-foreground) 15%
+  );
   --sidebar-accent-foreground: oklch(0.965 0.005 260);
   --sidebar-border: oklch(0.27 0.01 260);
   --sidebar-ring: oklch(0.548 0.22 260);
