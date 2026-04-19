@@ -17,6 +17,7 @@ import { Route as LayoutPaymentsRouteImport } from './routes/_layout/payments'
 import { Route as LayoutAttendeesRouteImport } from './routes/_layout/attendees'
 import { Route as LayoutAbandonedCartsRouteImport } from './routes/_layout/abandoned-carts'
 import { Route as LayoutTicketingStepsIndexRouteImport } from './routes/_layout/ticketing-steps/index'
+import { Route as LayoutThemeIndexRouteImport } from './routes/_layout/theme/index'
 import { Route as LayoutProductsIndexRouteImport } from './routes/_layout/products/index'
 import { Route as LayoutPopupsIndexRouteImport } from './routes/_layout/popups/index'
 import { Route as LayoutOrganizationsIndexRouteImport } from './routes/_layout/organizations/index'
@@ -91,6 +92,11 @@ const LayoutTicketingStepsIndexRoute =
     path: '/ticketing-steps/',
     getParentRoute: () => LayoutRoute,
   } as any)
+const LayoutThemeIndexRoute = LayoutThemeIndexRouteImport.update({
+  id: '/theme/',
+  path: '/theme/',
+  getParentRoute: () => LayoutRoute,
+} as any)
 const LayoutProductsIndexRoute = LayoutProductsIndexRouteImport.update({
   id: '/products/',
   path: '/products/',
@@ -294,6 +300,7 @@ export interface FileRoutesByFullPath {
   '/organizations/': typeof LayoutOrganizationsIndexRoute
   '/popups/': typeof LayoutPopupsIndexRoute
   '/products/': typeof LayoutProductsIndexRoute
+  '/theme/': typeof LayoutThemeIndexRoute
   '/ticketing-steps/': typeof LayoutTicketingStepsIndexRoute
   '/admin/$id/edit': typeof LayoutAdminIdEditRoute
   '/coupons/$id/edit': typeof LayoutCouponsIdEditRoute
@@ -336,6 +343,7 @@ export interface FileRoutesByTo {
   '/organizations': typeof LayoutOrganizationsIndexRoute
   '/popups': typeof LayoutPopupsIndexRoute
   '/products': typeof LayoutProductsIndexRoute
+  '/theme': typeof LayoutThemeIndexRoute
   '/ticketing-steps': typeof LayoutTicketingStepsIndexRoute
   '/admin/$id/edit': typeof LayoutAdminIdEditRoute
   '/coupons/$id/edit': typeof LayoutCouponsIdEditRoute
@@ -380,6 +388,7 @@ export interface FileRoutesById {
   '/_layout/organizations/': typeof LayoutOrganizationsIndexRoute
   '/_layout/popups/': typeof LayoutPopupsIndexRoute
   '/_layout/products/': typeof LayoutProductsIndexRoute
+  '/_layout/theme/': typeof LayoutThemeIndexRoute
   '/_layout/ticketing-steps/': typeof LayoutTicketingStepsIndexRoute
   '/_layout/admin/$id/edit': typeof LayoutAdminIdEditRoute
   '/_layout/coupons/$id/edit': typeof LayoutCouponsIdEditRoute
@@ -424,6 +433,7 @@ export interface FileRouteTypes {
     | '/organizations/'
     | '/popups/'
     | '/products/'
+    | '/theme/'
     | '/ticketing-steps/'
     | '/admin/$id/edit'
     | '/coupons/$id/edit'
@@ -466,6 +476,7 @@ export interface FileRouteTypes {
     | '/organizations'
     | '/popups'
     | '/products'
+    | '/theme'
     | '/ticketing-steps'
     | '/admin/$id/edit'
     | '/coupons/$id/edit'
@@ -509,6 +520,7 @@ export interface FileRouteTypes {
     | '/_layout/organizations/'
     | '/_layout/popups/'
     | '/_layout/products/'
+    | '/_layout/theme/'
     | '/_layout/ticketing-steps/'
     | '/_layout/admin/$id/edit'
     | '/_layout/coupons/$id/edit'
@@ -584,6 +596,13 @@ declare module '@tanstack/react-router' {
       path: '/ticketing-steps'
       fullPath: '/ticketing-steps/'
       preLoaderRoute: typeof LayoutTicketingStepsIndexRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/theme/': {
+      id: '/_layout/theme/'
+      path: '/theme'
+      fullPath: '/theme/'
+      preLoaderRoute: typeof LayoutThemeIndexRouteImport
       parentRoute: typeof LayoutRoute
     }
     '/_layout/products/': {
@@ -848,6 +867,7 @@ interface LayoutRouteChildren {
   LayoutOrganizationsIndexRoute: typeof LayoutOrganizationsIndexRoute
   LayoutPopupsIndexRoute: typeof LayoutPopupsIndexRoute
   LayoutProductsIndexRoute: typeof LayoutProductsIndexRoute
+  LayoutThemeIndexRoute: typeof LayoutThemeIndexRoute
   LayoutTicketingStepsIndexRoute: typeof LayoutTicketingStepsIndexRoute
   LayoutAdminIdEditRoute: typeof LayoutAdminIdEditRoute
   LayoutCouponsIdEditRoute: typeof LayoutCouponsIdEditRoute
@@ -890,6 +910,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutOrganizationsIndexRoute: LayoutOrganizationsIndexRoute,
   LayoutPopupsIndexRoute: LayoutPopupsIndexRoute,
   LayoutProductsIndexRoute: LayoutProductsIndexRoute,
+  LayoutThemeIndexRoute: LayoutThemeIndexRoute,
   LayoutTicketingStepsIndexRoute: LayoutTicketingStepsIndexRoute,
   LayoutAdminIdEditRoute: LayoutAdminIdEditRoute,
   LayoutCouponsIdEditRoute: LayoutCouponsIdEditRoute,

@@ -1,13 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import {
-  ChevronDown,
-  CreditCard,
-  Info,
-  LayoutPanelTop,
-  RotateCcw,
-  Type,
-} from "lucide-react"
-import type * as React from "react"
+import { ChevronDown, Info, RotateCcw, Type } from "lucide-react"
 import { useCallback, useMemo, useState } from "react"
 import { RgbaColorPicker } from "react-colorful"
 import { PopupsService, type PopupUpdate } from "@/client"
@@ -63,216 +55,6 @@ const EMPTY_PREVIEW_EVENT: PreviewEvent = {
   express_checkout_background: null,
 }
 
-// Defaults para los 9 campos editables. Mirror los defaults del portal.
-// Reexportados desde el helper compartido para que portal y backoffice
-// estén siempre sincronizados.
-const DEFAULT_COLORS: Record<string, string> = NEW_KEY_DEFAULTS
-
-interface ColorMeta {
-  label: string
-  description: string
-}
-
-const COLOR_LABELS: Record<string, ColorMeta> = {
-  // ─ portal
-  title_color: {
-    label: "Title color",
-    description:
-      "Applies to all titles in the portal: home, pass section, card titles, etc.",
-  },
-  subtitle_color: {
-    label: "Subtitle & body color",
-    description:
-      "Applies to subtitles, body text, descriptions, navigation and secondary text.",
-  },
-  button_color: {
-    label: "Button color",
-    description:
-      "Background color of regular action buttons (not errors or alerts).",
-  },
-  title_button_color: {
-    label: "Button text color",
-    description: "Text / label color of regular buttons.",
-  },
-  primary_background_color: {
-    label: "App background",
-    description:
-      "Background color of the whole app (behind cards and sections).",
-  },
-  sidebar_background_color: {
-    label: "Sidebar background",
-    description: "Background color of the navigation sidebar.",
-  },
-  card_background_color: {
-    label: "Card background",
-    description:
-      "Background color of cards (home, passes, popovers). Titles and subtitles inside the card inherit the Title and Subtitle colors.",
-  },
-  border_color: {
-    label: "Border color",
-    description: "Color of general borders (cards, inputs, separators).",
-  },
-  sidebar_border_color: {
-    label: "Sidebar border color",
-    description: "Color of borders and separators inside the sidebar.",
-  },
-  // ─ checkout
-  checkout_title_color: {
-    label: "Title color",
-    description:
-      "Applies to card and section titles in the checkout (attendee name, pass name, etc.).",
-  },
-  checkout_watermark_color: {
-    label: "Watermark color",
-    description:
-      "Large decorative text that appears behind each checkout step title (Passes, Details, etc.).",
-  },
-  checkout_subtitle_color: {
-    label: "Subtitle & body color",
-    description:
-      "Pass descriptions, body text and subtitles inside the checkout.",
-  },
-  checkout_navbar_bg_color: {
-    label: "Navbar background",
-    description:
-      "Background color of the sticky top navbar of the checkout (with translucent blur over the image).",
-  },
-  checkout_badge_bg_color: {
-    label: "Step badge background",
-    description:
-      "Color of the badge / pill indicating the active step in the checkout navbar.",
-  },
-  checkout_badge_title_color: {
-    label: "Badge text color",
-    description: "Text color inside the navbar step badge.",
-  },
-  checkout_card_bg_color: {
-    label: "Card background",
-    description:
-      "Background color of the checkout cards (passes, attendee, cart items).",
-  },
-  checkout_bottom_bar_bg_color: {
-    label: "Bottom bar background",
-    description:
-      "Background color of the floating bottom bar showing the total and continue button.",
-  },
-  checkout_button_color: {
-    label: "Button color",
-    description:
-      "Background color of the main checkout button (Continue, Pay) and the add-pass buttons.",
-  },
-  checkout_button_title_color: {
-    label: "Button text color",
-    description: "Text / label color of the checkout buttons.",
-  },
-  checkout_bottom_bar_text_color: {
-    label: "Bottom bar text color",
-    description:
-      'All text inside the floating bottom bar: "Total" label, total amount, item counters, and the back button label.',
-  },
-}
-
-// A subsection inside a main collapsible: title + description + list of
-// color keys. Rendered inline (no toggle) — the top-level card is what
-// collapses.
-interface SubGroup {
-  title: string
-  description: string
-  keys: string[]
-}
-
-// A top-level collapsible card grouping related subsections. One per tab of
-// the preview (Portal, Checkout).
-interface ThemeSection {
-  id: string
-  title: string
-  description: string
-  icon: React.ComponentType<{ className?: string }>
-  subgroups: SubGroup[]
-}
-
-const THEME_SECTIONS: ThemeSection[] = [
-  {
-    id: "portal",
-    title: "Portal",
-    description: "Home, passes and general app colors.",
-    icon: LayoutPanelTop,
-    subgroups: [
-      {
-        title: "Text",
-        description: "Title, subtitle and body text colors.",
-        keys: ["title_color", "subtitle_color"],
-      },
-      {
-        title: "Buttons",
-        description: "Background and text color of regular buttons.",
-        keys: ["button_color", "title_button_color"],
-      },
-      {
-        title: "Backgrounds",
-        description: "Main background, sidebar and cards.",
-        keys: [
-          "primary_background_color",
-          "sidebar_background_color",
-          "card_background_color",
-        ],
-      },
-      {
-        title: "Borders",
-        description: "General border and sidebar border colors.",
-        keys: ["border_color", "sidebar_border_color"],
-      },
-    ],
-  },
-  {
-    id: "checkout",
-    title: "Checkout",
-    description: "Colors applied to the purchase flow.",
-    icon: CreditCard,
-    subgroups: [
-      {
-        title: "Text & watermark",
-        description:
-          "Card titles, subtitles, watermark behind headers and bottom bar text.",
-        keys: [
-          "checkout_title_color",
-          "checkout_subtitle_color",
-          "checkout_watermark_color",
-          "checkout_bottom_bar_text_color",
-        ],
-      },
-      {
-        title: "Navbar & badge",
-        description: "Sticky navbar background and active step badge.",
-        keys: [
-          "checkout_navbar_bg_color",
-          "checkout_badge_bg_color",
-          "checkout_badge_title_color",
-        ],
-      },
-      {
-        title: "Backgrounds",
-        description: "Card backgrounds and the floating bottom bar.",
-        keys: ["checkout_card_bg_color", "checkout_bottom_bar_bg_color"],
-      },
-      {
-        title: "Buttons",
-        description: "Checkout button background and text color.",
-        keys: ["checkout_button_color", "checkout_button_title_color"],
-      },
-    ],
-  },
-]
-
-function getMeta(key: string): ColorMeta {
-  return (
-    COLOR_LABELS[key] ?? {
-      label: key,
-      description: "",
-    }
-  )
-}
-
 export function ThemeConfigForm({
   popupId,
   themeConfig,
@@ -294,9 +76,7 @@ export function ThemeConfigForm({
   const [borderRadius, setBorderRadius] = useState(
     themeConfig?.border_radius ?? "",
   )
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(
-    () => new Set(["portal"]),
-  )
+  const [typographyExpanded, setTypographyExpanded] = useState(false)
   const [highlightedKeys, setHighlightedKeys] = useState<Set<string>>(
     () => new Set(),
   )
@@ -312,18 +92,6 @@ export function ThemeConfigForm({
     onError: createErrorHandler(showErrorToast),
   })
 
-  const toggleSection = (sectionId: string) => {
-    setExpandedSections((prev) => {
-      const next = new Set(prev)
-      if (next.has(sectionId)) {
-        next.delete(sectionId)
-      } else {
-        next.add(sectionId)
-      }
-      return next
-    })
-  }
-
   const handleColorChange = useCallback((key: string, value: string) => {
     setColors((prev) => ({ ...prev, [key]: value }))
   }, [])
@@ -334,6 +102,10 @@ export function ThemeConfigForm({
       delete next[key]
       return next
     })
+  }, [])
+
+  const handleModeChange = useCallback((mode: "light" | "dark") => {
+    setColors((prev) => ({ ...prev, mode }))
   }, [])
 
   const handleHover = useCallback((keys: string[] | null) => {
@@ -384,50 +156,113 @@ export function ThemeConfigForm({
     radius !== (themeConfig?.radius ?? "") ||
     borderRadius !== (themeConfig?.border_radius ?? "")
 
-  // Effective values shown in the preview = user override OR default.
+  // Effective values = user override OR default.
   const effectiveColors = useMemo(() => {
-    const merged: Record<string, string> = { ...DEFAULT_COLORS }
+    const merged: Record<string, string> = { ...NEW_KEY_DEFAULTS }
     for (const [k, v] of Object.entries(colors)) {
       if (v) merged[k] = v
     }
     return merged
   }, [colors])
 
+  const mode: "light" | "dark" =
+    (colors.mode as "light" | "dark") === "dark" ? "dark" : "light"
+
   return (
     <InlineSection title="Portal Theme">
-      {/*
-        Two-column layout (lg+): form fields on the left, preview sticky on
-        the right. We don't need an IntersectionObserver to show/hide the
-        preview — `sticky` already pegs it to the viewport only while the
-        Portal Theme section is in flow, and it scrolls away naturally when
-        the user moves to other sections of the parent form.
-      */}
       <div className="py-3 lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-6">
-        <div className="space-y-3">
+        <div className="space-y-4">
           <p className="text-xs text-muted-foreground">
-            Customize the look of this event's portal and checkout. Hover over a
-            field to highlight where it applies in the preview on the right.
+            Pick a mode + brand colors. The portal derives every other surface
+            (backgrounds, borders, hovers, text) automatically for consistent
+            contrast. Hover a field to highlight where it applies in the preview.
           </p>
 
-          {/* Top-level collapsibles: one per preview tab (Portal, Checkout).
-              Subgroups render inline inside each, separated by small
-              heading/description blocks. */}
-          {THEME_SECTIONS.map((section) => (
-            <ThemeSectionCard
-              key={section.id}
-              section={section}
-              colors={colors}
-              highlightedKeys={highlightedKeys}
-              isExpanded={expandedSections.has(section.id)}
-              onToggle={() => toggleSection(section.id)}
-              onColorChange={handleColorChange}
-              onReset={handleResetColor}
-              onHover={handleHover}
-              readOnly={readOnly}
-            />
-          ))}
+          {/* Mode toggle */}
+          <div
+            className="flex items-center justify-between rounded-md border bg-background px-3 py-2.5"
+            onMouseEnter={() => handleHover(["mode"])}
+            onMouseLeave={() => handleHover(null)}
+          >
+            <div className="flex flex-col">
+              <Label className="text-sm font-medium">Mode</Label>
+              <span className="text-[11px] text-muted-foreground">
+                Light or dark neutrals as the canvas for your brand colors.
+              </span>
+            </div>
+            <div className="flex items-center gap-1 rounded-md border p-0.5">
+              {(["light", "dark"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => handleModeChange(m)}
+                  disabled={readOnly}
+                  className={cn(
+                    "rounded px-3 py-1 text-xs font-medium transition-colors",
+                    mode === m
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {m === "light" ? "Light" : "Dark"}
+                </button>
+              ))}
+            </div>
+          </div>
 
-          {/* Typography (applies to both portal and checkout). */}
+          {/* Color fields */}
+          <div className="rounded-md border bg-background p-1.5">
+            <ColorField
+              colorKey="primary_color"
+              label="Primary"
+              description="Brand color. Used for CTAs, active states, highlights and the sidebar active item."
+              value={colors.primary_color ?? ""}
+              defaultValue={NEW_KEY_DEFAULTS.primary_color}
+              onChange={(v) => handleColorChange("primary_color", v)}
+              onReset={() => handleResetColor("primary_color")}
+              onHover={handleHover}
+              isHighlighted={highlightedKeys.has("primary_color")}
+              disabled={readOnly}
+            />
+            <ColorField
+              colorKey="primary_foreground_color"
+              label="Primary text"
+              description="Text color on top of the primary color (usually white or black depending on contrast)."
+              value={colors.primary_foreground_color ?? ""}
+              defaultValue={NEW_KEY_DEFAULTS.primary_foreground_color}
+              onChange={(v) => handleColorChange("primary_foreground_color", v)}
+              onReset={() => handleResetColor("primary_foreground_color")}
+              onHover={handleHover}
+              isHighlighted={highlightedKeys.has("primary_foreground_color")}
+              disabled={readOnly}
+            />
+            <ColorField
+              colorKey="secondary_color"
+              label="Secondary"
+              description="Optional supporting brand color. Used for secondary buttons and badges. Leave empty for a neutral fallback."
+              value={colors.secondary_color ?? ""}
+              defaultValue=""
+              onChange={(v) => handleColorChange("secondary_color", v)}
+              onReset={() => handleResetColor("secondary_color")}
+              onHover={handleHover}
+              isHighlighted={highlightedKeys.has("secondary_color")}
+              disabled={readOnly}
+            />
+            <ColorField
+              colorKey="accent_color"
+              label="Accent"
+              description="Optional tint for hover states. Defaults to a subtle mix of primary and card background."
+              value={colors.accent_color ?? ""}
+              defaultValue=""
+              onChange={(v) => handleColorChange("accent_color", v)}
+              onReset={() => handleResetColor("accent_color")}
+              onHover={handleHover}
+              isHighlighted={highlightedKeys.has("accent_color")}
+              disabled={readOnly}
+            />
+          </div>
+
+          {/* Typography */}
           <TypographySection
             fontBaseSize={fontBaseSize}
             setFontBaseSize={setFontBaseSize}
@@ -437,14 +272,13 @@ export function ThemeConfigForm({
             setRadius={setRadius}
             borderRadius={borderRadius}
             setBorderRadius={setBorderRadius}
-            expanded={expandedSections.has("typography")}
-            onToggle={() => toggleSection("typography")}
+            expanded={typographyExpanded}
+            onToggle={() => setTypographyExpanded((v) => !v)}
             disabled={readOnly}
           />
 
           <Separator />
 
-          {/* Actions */}
           {!readOnly && (
             <div className="flex items-center justify-between">
               <Button
@@ -470,8 +304,6 @@ export function ThemeConfigForm({
           )}
         </div>
 
-        {/* Right column: live preview, sticky while the section is in view.
-            Hidden on <lg so the form stays single-column on mobile. */}
         <div className="hidden lg:block">
           <div className="sticky top-20">
             <ThemePreview
@@ -492,118 +324,11 @@ export function ThemeConfigForm({
   )
 }
 
-// ──────────────────────────────────────────────────────────────────────────
-// ThemeSectionCard — top-level collapsible grouping multiple subgroups
-// ──────────────────────────────────────────────────────────────────────────
-
-interface ThemeSectionCardProps {
-  section: ThemeSection
-  colors: Record<string, string>
-  highlightedKeys: Set<string>
-  isExpanded: boolean
-  onToggle: () => void
-  onColorChange: (key: string, value: string) => void
-  onReset: (key: string) => void
-  onHover: (keys: string[] | null) => void
-  readOnly?: boolean
-}
-
-function ThemeSectionCard({
-  section,
-  colors,
-  highlightedKeys,
-  isExpanded,
-  onToggle,
-  onColorChange,
-  onReset,
-  onHover,
-  readOnly,
-}: ThemeSectionCardProps) {
-  const Icon = section.icon
-  const allKeys = section.subgroups.flatMap((g) => g.keys)
-  const activeCount = allKeys.filter((k) => colors[k]).length
-
-  return (
-    <div className="rounded-lg border bg-background">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="flex w-full items-center justify-between px-3 py-2.5 text-left"
-      >
-        <div className="flex items-center gap-2">
-          <Icon className="h-4 w-4 text-muted-foreground" />
-          <div className="flex flex-col">
-            <span className="text-sm font-medium">{section.title}</span>
-            <span className="text-[11px] text-muted-foreground">
-              {section.description}
-            </span>
-          </div>
-          {activeCount > 0 && (
-            <span className="ml-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-xs text-primary">
-              {activeCount}
-            </span>
-          )}
-        </div>
-        <ChevronDown
-          className={cn(
-            "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
-            isExpanded && "rotate-180",
-          )}
-        />
-      </button>
-
-      {isExpanded && (
-        // biome-ignore lint/a11y/noStaticElementInteractions: hover handler clears the preview highlight; no keyboard equivalent needed since blur from each ColorField does the same
-        <div
-          className="space-y-5 border-t px-3 pb-4 pt-4"
-          onMouseLeave={() => onHover(null)}
-        >
-          {section.subgroups.map((subgroup, i) => (
-            <div key={subgroup.title} className="space-y-2">
-              {i > 0 && <Separator className="mb-3" />}
-              <div>
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-foreground">
-                  {subgroup.title}
-                </h4>
-                <p className="mt-0.5 text-[11px] text-muted-foreground">
-                  {subgroup.description}
-                </p>
-              </div>
-              <div className="grid gap-2">
-                {subgroup.keys.map((key) => {
-                  const meta = getMeta(key)
-                  return (
-                    <ColorField
-                      key={key}
-                      colorKey={key}
-                      label={meta.label}
-                      description={meta.description}
-                      value={colors[key] ?? ""}
-                      defaultValue={
-                        NEW_KEY_DEFAULTS[
-                          key as keyof typeof NEW_KEY_DEFAULTS
-                        ] ?? "#000000"
-                      }
-                      onChange={(v) => onColorChange(key, v)}
-                      onReset={() => onReset(key)}
-                      onHover={onHover}
-                      isHighlighted={highlightedKeys.has(key)}
-                      disabled={readOnly}
-                    />
-                  )
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ──────────────────────────────────────────────────────────────────────────
-// TypographySection — typography + radius with live samples beside each input
-// ──────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// TypographySection — unchanged from the previous iteration. Handles font
+// size, heading scale and radius. Collapsed by default since most admins
+// won't touch it.
+// ─────────────────────────────────────────────────────────────────────────────
 
 interface TypographySectionProps {
   fontBaseSize: string
@@ -674,7 +399,6 @@ function TypographySection({
 
       {expanded && (
         <div className="space-y-3 border-t px-3 pb-3 pt-3">
-          {/* Base font size */}
           <div className="flex items-center justify-between gap-3">
             <div className="flex flex-1 flex-col">
               <Label className="text-xs">Base font size</Label>
@@ -697,7 +421,6 @@ function TypographySection({
             />
           </div>
 
-          {/* Heading scale */}
           <div className="flex items-center justify-between gap-3">
             <div className="flex flex-1 flex-col">
               <Label className="text-xs">Heading scale</Label>
@@ -726,7 +449,6 @@ function TypographySection({
             />
           </div>
 
-          {/* Radius (buttons / inputs) */}
           <div className="flex items-center justify-between gap-3">
             <div className="flex flex-1 flex-col">
               <Label className="text-xs">Radius (buttons & inputs)</Label>
@@ -747,7 +469,6 @@ function TypographySection({
             />
           </div>
 
-          {/* Border radius (cards / containers) */}
           <div className="flex items-center justify-between gap-3">
             <div className="flex flex-1 flex-col">
               <Label className="text-xs">Border radius (cards)</Label>
@@ -773,9 +494,9 @@ function TypographySection({
   )
 }
 
-// ──────────────────────────────────────────────────────────────────────────
-// ColorField — single row with label, tooltip, swatch + popover picker, hex input
-// ──────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// ColorField — unchanged: hex input + RGBA picker + reset + hover highlight.
+// ─────────────────────────────────────────────────────────────────────────────
 
 interface ParsedColor {
   hex: string
@@ -796,6 +517,7 @@ function rgbToHex(r: number, g: number, b: number): string {
 }
 
 function parseColor(color: string): ParsedColor {
+  if (!color) return { hex: "#000000", alpha: 1, rgba: { r: 0, g: 0, b: 0, a: 1 } }
   const rgbaMatch = color.match(
     /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+))?\s*\)$/,
   )
@@ -866,7 +588,7 @@ function ColorField({
   )
 
   return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: pointer/focus handlers feed the live preview highlight; the row itself is not a control, the inner picker button + input are the actual interactive elements
+    // biome-ignore lint/a11y/noStaticElementInteractions: hover feeds the preview highlight; the inner button + input are the real controls.
     <div
       className={cn(
         "flex items-center gap-2 rounded-md px-1.5 py-1 transition-colors",
@@ -874,6 +596,8 @@ function ColorField({
       )}
       onMouseEnter={() => onHover([colorKey])}
       onFocus={() => onHover([colorKey])}
+      onMouseLeave={() => onHover(null)}
+      onBlur={() => onHover(null)}
     >
       <div className="flex min-w-0 flex-1 items-center gap-1.5">
         <Label className="truncate text-xs text-foreground" title={label}>
@@ -914,7 +638,7 @@ function ColorField({
               />
               <div
                 className="absolute inset-0.5 rounded"
-                style={{ backgroundColor: displayValue }}
+                style={{ backgroundColor: displayValue || "transparent" }}
               />
             </button>
           </PopoverTrigger>
@@ -947,7 +671,7 @@ function ColorField({
         </Popover>
         <Input
           value={value}
-          placeholder={defaultValue}
+          placeholder={defaultValue || "optional"}
           onChange={(e) => onChange(e.target.value)}
           disabled={disabled}
           className={cn(
