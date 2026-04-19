@@ -35,7 +35,9 @@ async def get_tenant_by_domain(
     cached = domain_cache.get(domain)
     if cached is not None:
         if cached == "null":
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Not found"
+            )
         return TenantPublic.model_validate_json(cached)
 
     # DB lookup — resolves custom domains AND *.PORTAL_DOMAIN subdomains
@@ -151,7 +153,10 @@ async def update_tenant(
         )
 
     # 3. ADMIN cannot set custom_domain_active (only SUPERADMIN may)
-    if current_user.role == UserRole.ADMIN and tenant_in.custom_domain_active is not None:
+    if (
+        current_user.role == UserRole.ADMIN
+        and tenant_in.custom_domain_active is not None
+    ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only superadmin can modify custom_domain_active",
@@ -178,8 +183,13 @@ async def update_tenant(
             )
 
     # 6. Custom domain uniqueness check (don't reveal owner)
-    if tenant_in.custom_domain is not None and tenant_in.custom_domain != tenant.custom_domain:
-        existing_domain = crud.get_by_field(db, "custom_domain", tenant_in.custom_domain)
+    if (
+        tenant_in.custom_domain is not None
+        and tenant_in.custom_domain != tenant.custom_domain
+    ):
+        existing_domain = crud.get_by_field(
+            db, "custom_domain", tenant_in.custom_domain
+        )
         if existing_domain and existing_domain.id != tenant_id:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,

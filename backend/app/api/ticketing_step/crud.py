@@ -2,12 +2,14 @@ import uuid
 
 from sqlmodel import Session, func, select
 
+from app.api.shared.crud import BaseCRUD
 from app.api.ticketing_step.models import TicketingSteps
 from app.api.ticketing_step.schemas import TicketingStepCreate, TicketingStepUpdate
-from app.api.shared.crud import BaseCRUD
 
 
-class TicketingStepsCRUD(BaseCRUD[TicketingSteps, TicketingStepCreate, TicketingStepUpdate]):
+class TicketingStepsCRUD(
+    BaseCRUD[TicketingSteps, TicketingStepCreate, TicketingStepUpdate]
+):
     def __init__(self) -> None:
         super().__init__(TicketingSteps)
 

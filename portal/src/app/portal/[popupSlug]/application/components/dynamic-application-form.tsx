@@ -1,27 +1,25 @@
 "use client"
 
-import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { AnimatePresence, motion } from "framer-motion"
-import { Info } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { ChevronLeft, ChevronRight } from "lucide-react"
 import { memo, useCallback, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
-import { toast } from "sonner"
 import type { ApplicationPublic, PopupPublic } from "@/client"
-import { ApplicationsService } from "@/client"
 import { ButtonAnimated } from "@/components/ui/button"
 import InputForm, { AddonInputForm } from "@/components/ui/Form/Input"
 import SelectForm from "@/components/ui/Form/Select"
-import { useApplicationFee } from "@/hooks/useApplicationFee"
-import { splitForCreate, splitForUpdate } from "@/lib/form-data-splitter"
-import { queryKeys } from "@/lib/query-keys"
 import { useApplication } from "@/providers/applicationProvider"
 import type {
   ApplicationFormSchema,
   FormFieldSchema,
+  FormSectionKind,
 } from "@/types/form-schema"
+import { getBoolean, getString } from "../hooks/form-values"
 import { useApplicationForm } from "../hooks/use-application-form"
-import { CompanionsSection, type CompanionWithId } from "./companions-section"
+import { useCompanionsState } from "../hooks/use-companions-state"
+import { useSubmitApplication } from "../hooks/use-submit-application"
+import { ApplicationFeeNotice } from "./application-fee-notice"
+import { CompanionsSection } from "./companions-section"
 import { DynamicField } from "./fields/dynamic-field"
 import { ProgressBar } from "./progress-bar"
 import SectionWrapper from "./SectionWrapper"
@@ -75,7 +73,7 @@ const BaseField = memo(function BaseField({
       <AddonInputForm
         label={field.label}
         id="telegram"
-        value={(value as string) ?? ""}
+        value={typeof value === "string" ? value : ""}
         onChange={(v) => onChange("telegram", v)}
         error={error}
         isRequired={field.required}
@@ -142,33 +140,29 @@ export function DynamicApplicationForm({
   popup,
 }: DynamicApplicationFormProps) {
   const { t } = useTranslation()
-  const router = useRouter()
-  const queryClient = useQueryClient()
-  const { getRelevantApplication, updateApplication } = useApplication()
-  const { createOrResume, isPending: isFeePaymentPending } = useApplicationFee()
+  const { getRelevantApplication } = useApplication()
   const application = getRelevantApplication()
 
-  const { values, errors, handleChange, validate, setErrors, progress } =
+  const { values, errors, handleChange, validate, progress } =
     useApplicationForm(schema, existingApplication, popup.id)
 
-  // Companions are initialized from attendees. The form remounts via key
-  // whenever existingApplication changes, so useState initial value is correct.
-  const [companions, setCompanions] = useState<CompanionWithId[]>(() => {
-    if (!existingApplication?.attendees?.length) return []
-    return existingApplication.attendees
-      .filter((a) => a.category === "spouse" || a.category === "kid")
-      .map((a) => ({
-        _id: a.id,
-        name: a.name,
-        category: a.category,
-        email: a.email ?? undefined,
-        gender: a.gender ?? undefined,
-      }))
+  const [companions, setCompanions] = useCompanionsState(existingApplication)
+
+  const {
+    handleSubmit,
+    handleDraft,
+    isDraftPending,
+    isSubmitPending,
+    isFeePaymentPending,
+  } = useSubmitApplication({
+    popup,
+    schema,
+    values,
+    companions,
+    application,
+    validate,
   })
-  const [statusBtn, setStatusBtn] = useState({
-    loadingDraft: false,
-    loadingSubmit: false,
-  })
+
   const feeAlreadyPaid = Boolean(
     existingApplication &&
       popup.requires_application_fee &&
@@ -192,107 +186,8 @@ export function DynamicApplicationForm({
       })
     : t("common.submit")
 
-  const submitMutation = useMutation({
-    mutationFn: async (status: "draft" | "in review") => {
-      const companionPayload = companions.map(({ _id, ...rest }) => rest)
-
-      if (application?.id) {
-        return ApplicationsService.updateMyApplication({
-          popupId: popup.id,
-          requestBody: splitForUpdate({ values, status, schema }),
-        })
-      }
-
-      return ApplicationsService.createMyApplication({
-        requestBody: splitForCreate({
-          values,
-          popupId: popup.id,
-          companions: companionPayload,
-          status,
-          schema,
-        }),
-      })
-    },
-    onSuccess: (result) => {
-      updateApplication(result)
-      queryClient.invalidateQueries({ queryKey: queryKeys.applications.mine() })
-    },
-  })
-
-  const handleSubmit = async (
-    e: Parameters<NonNullable<React.ComponentProps<"form">["onSubmit"]>>[0],
-  ) => {
-    e.preventDefault()
-    if (statusBtn.loadingSubmit || isFeePaymentPending) return
-    setStatusBtn({ loadingDraft: false, loadingSubmit: true })
-
-    const { isValid, errors: validationErrors } = validate(false)
-
-    // Scholarship validation: details required when scholarship_request is true
-    // Uses schema presence (via _hasScholarshipSection) rather than popup flag directly
-    const scholarshipErrors: Record<string, string> = {}
-    if (_hasScholarshipSection && values.scholarship_request) {
-      const details = (values.scholarship_details as string) ?? ""
-      if (!details.trim()) {
-        scholarshipErrors.scholarship_details = t(
-          "application.scholarship.details_required_error",
-        )
-      }
-    }
-
-    if (!isValid || Object.keys(scholarshipErrors).length > 0) {
-      const allErrors = { ...validationErrors, ...scholarshipErrors }
-      const fields = Object.keys(allErrors).join(", ")
-      toast.error(t("application.error_title"), {
-        description: t("application.required_fields_error", { fields }),
-      })
-      if (Object.keys(scholarshipErrors).length > 0) {
-        setErrors(allErrors)
-      }
-      setStatusBtn({ loadingDraft: false, loadingSubmit: false })
-      return
-    }
-
-    try {
-      const result = await submitMutation.mutateAsync("in review")
-
-      if (result.status === "pending_fee") {
-        const feePayment = await createOrResume(result.id)
-
-        if (!feePayment.checkoutUrl) {
-          throw new Error(t("application.fee.missing_checkout_url"))
-        }
-
-        window.location.href = feePayment.checkoutUrl
-        return
-      }
-
-      toast.success(t("application.submitted_title"), {
-        description: t("application.submitted_description"),
-      })
-      router.push(`/portal/${popup.slug}`)
-    } catch {
-      toast.error(t("application.submit_error_title"), {
-        description: t("application.submit_error_description"),
-      })
-    }
-    setStatusBtn({ loadingDraft: false, loadingSubmit: false })
-  }
-
-  const handleDraft = async () => {
-    setStatusBtn({ loadingDraft: true, loadingSubmit: false })
-    try {
-      await submitMutation.mutateAsync("draft")
-      toast.success(t("application.draft_saved_title"), {
-        description: t("application.draft_saved_description"),
-      })
-    } catch {
-      toast.error(t("application.draft_error_title"), {
-        description: t("application.draft_error_description"),
-      })
-    }
-    setStatusBtn({ loadingDraft: false, loadingSubmit: false })
-  }
+  const isMultiStep = popup.application_layout === "multi_step"
+  const [currentStep, setCurrentStep] = useState(0)
 
   // Handle gender specify logic
   const handleGenderChange = useCallback(
@@ -307,18 +202,19 @@ export function DynamicApplicationForm({
 
   // Resolve display gender for select
   const displayGender = useMemo(() => {
-    const g = values.gender as string
+    const g = getString(values, "gender")
     const genderField = schema.base_fields.gender
     if (g && genderField?.options && !genderField.options.includes(g))
       return "Specify"
-    return g ?? ""
-  }, [values.gender, schema.base_fields])
+    return g
+  }, [values, schema.base_fields])
 
   // Single ordered list of sections: each block has base + custom fields, order follows schema.sections
   type SectionBlock = {
     id: string
     title: string
     subtitle?: string
+    kind: FormSectionKind
     baseFields: [string, FormFieldSchema][]
     customFields: [string, FormFieldSchema][]
   }
@@ -355,6 +251,7 @@ export function DynamicApplicationForm({
         id: "_unsectioned_base",
         title: t("form.personal_info"),
         subtitle: t("form.personal_info_description"),
+        kind: "standard",
         baseFields: bySectionIdBase._unsectioned,
         customFields: [],
       })
@@ -370,6 +267,7 @@ export function DynamicApplicationForm({
         id: section.id,
         title: section.label,
         subtitle: section.description ?? undefined,
+        kind: section.kind,
         baseFields,
         customFields,
       })
@@ -382,6 +280,7 @@ export function DynamicApplicationForm({
       result.push({
         id: "_unsectioned_custom",
         title: t("form.additional_info"),
+        kind: "standard",
         baseFields: [],
         customFields: bySectionIdCustom._unsectioned,
       })
@@ -400,6 +299,7 @@ export function DynamicApplicationForm({
       result.push({
         id,
         title: t("form.other"),
+        kind: "standard",
         baseFields,
         customFields,
       })
@@ -408,34 +308,33 @@ export function DynamicApplicationForm({
     return result
   }, [schema, t])
 
-  const _hasChildrenSection = useMemo(
-    () =>
-      mergedSections.some((block) =>
-        block.title.toLowerCase().includes("children"),
-      ),
-    [mergedSections],
-  )
-
-  const _hasScholarshipSection = useMemo(
-    () =>
-      mergedSections.some((block) =>
-        block.title.toLowerCase().includes("scholarship"),
-      ),
-    [mergedSections],
-  )
+  const boundedStep = Math.min(currentStep, Math.max(mergedSections.length - 1, 0))
+  const visibleSections = isMultiStep
+    ? mergedSections.slice(boundedStep, boundedStep + 1)
+    : mergedSections
+  const isLastStep = boundedStep >= mergedSections.length - 1
+  const isFirstStep = boundedStep === 0
 
   return (
     <>
       <form
         noValidate
         onSubmit={handleSubmit}
-        className="space-y-8 px-8 md:px-12"
+        className="rounded-2xl border border-border bg-card text-card-foreground shadow-sm space-y-8 p-6 md:p-10"
       >
+        {isMultiStep && mergedSections.length > 1 && (
+          <p className="text-sm text-heading-secondary text-center">
+            {t("application.step_of", {
+              current: boundedStep + 1,
+              total: mergedSections.length,
+            })}
+          </p>
+        )}
+
         {/* Sections in schema order (base + custom fields per section) */}
-        {mergedSections.map(
-          ({ id, title, subtitle, baseFields, customFields }) => {
-            const isChildrenSection = title.toLowerCase().includes("children")
-            if (isChildrenSection) {
+        {visibleSections.map(
+          ({ id, title, subtitle, kind, baseFields, customFields }) => {
+            if (kind === "companions") {
               return (
                 <div key={id}>
                   <CompanionsSection
@@ -447,10 +346,7 @@ export function DynamicApplicationForm({
                 </div>
               )
             }
-            const isScholarshipSection = title
-              .toLowerCase()
-              .includes("scholarship")
-            if (isScholarshipSection) {
+            if (kind === "scholarship") {
               const scholarshipFields = Object.fromEntries(
                 baseFields.map(([name, field]) => [name, field]),
               )
@@ -459,15 +355,12 @@ export function DynamicApplicationForm({
                   key={id}
                   section={{ id, label: title, description: subtitle }}
                   fields={scholarshipFields}
-                  scholarshipRequest={
-                    (values.scholarship_request as boolean) ?? false
-                  }
-                  scholarshipDetails={
-                    (values.scholarship_details as string) ?? ""
-                  }
-                  scholarshipVideoUrl={
-                    (values.scholarship_video_url as string) ?? ""
-                  }
+                  scholarshipRequest={getBoolean(values, "scholarship_request")}
+                  scholarshipDetails={getString(values, "scholarship_details")}
+                  scholarshipVideoUrl={getString(
+                    values,
+                    "scholarship_video_url",
+                  )}
                   detailsError={errors.scholarship_details}
                   videoUrlError={errors.scholarship_video_url}
                   onScholarshipRequestChange={(checked) => {
@@ -500,9 +393,7 @@ export function DynamicApplicationForm({
                         onChange={handleChange}
                         displayGender={displayGender}
                         handleGenderChange={handleGenderChange}
-                        genderSpecifyValue={
-                          (values.gender_specify as string) ?? ""
-                        }
+                        genderSpecifyValue={getString(values, "gender_specify")}
                         genderSpecifyError={errors.gender_specify}
                       />
                     ))}
@@ -532,37 +423,15 @@ export function DynamicApplicationForm({
           },
         )}
 
-        {/* Companions section (only when no "Children" section from API) */}
-        {/* {!hasChildrenSection && (
-          <CompanionsSection
-            allowsSpouse={popup.allows_spouse ?? false}
-            allowsChildren={popup.allows_children ?? false}
-            companions={companions}
-            onCompanionsChange={setCompanions}
-          />
-        )} */}
-
         {/* Submit buttons */}
         <div className="flex w-full flex-col gap-6 pt-6">
           {showFeeNotice && formattedApplicationFee && (
-            <div className="flex w-full items-start gap-3 rounded-lg border border-border bg-muted/40 p-4 text-sm text-foreground">
-              <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-              <div>
-                <p className="font-semibold">
-                  {t("application.fee.required_title")}
-                </p>
-                <p className="mt-1 text-muted-foreground">
-                  {t("application.fee.required_description", {
-                    amount: formattedApplicationFee,
-                  })}
-                </p>
-              </div>
-            </div>
+            <ApplicationFeeNotice amount={formattedApplicationFee} />
           )}
           <div className="flex w-full flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <ButtonAnimated
-              loading={statusBtn.loadingDraft}
-              disabled={statusBtn.loadingSubmit}
+              loading={isDraftPending}
+              disabled={isSubmitPending}
               variant="outline"
               type="button"
               onClick={handleDraft}
@@ -570,14 +439,53 @@ export function DynamicApplicationForm({
             >
               {t("form.save_draft")}
             </ButtonAnimated>
-            <ButtonAnimated
-              loading={statusBtn.loadingSubmit}
-              disabled={statusBtn.loadingDraft || isFeePaymentPending}
-              type="submit"
-              className="w-full md:min-w-[11rem] md:w-auto"
-            >
-              {submitLabel}
-            </ButtonAnimated>
+            {isMultiStep && mergedSections.length > 1 ? (
+              <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+                <ButtonAnimated
+                  type="button"
+                  variant="outline"
+                  disabled={isFirstStep || isSubmitPending || isDraftPending}
+                  onClick={() => setCurrentStep((s) => Math.max(s - 1, 0))}
+                  className="w-full sm:w-auto"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  {t("common.back")}
+                </ButtonAnimated>
+                {isLastStep ? (
+                  <ButtonAnimated
+                    loading={isSubmitPending}
+                    disabled={isDraftPending || isFeePaymentPending}
+                    type="submit"
+                    className="w-full sm:min-w-[11rem] sm:w-auto"
+                  >
+                    {submitLabel}
+                  </ButtonAnimated>
+                ) : (
+                  <ButtonAnimated
+                    type="button"
+                    disabled={isSubmitPending || isDraftPending}
+                    onClick={() =>
+                      setCurrentStep((s) =>
+                        Math.min(s + 1, mergedSections.length - 1),
+                      )
+                    }
+                    className="w-full sm:w-auto"
+                  >
+                    {t("common.continue")}
+                    <ChevronRight className="h-4 w-4" />
+                  </ButtonAnimated>
+                )}
+              </div>
+            ) : (
+              <ButtonAnimated
+                loading={isSubmitPending}
+                disabled={isDraftPending || isFeePaymentPending}
+                type="submit"
+                className="w-full md:min-w-[11rem] md:w-auto"
+              >
+                {submitLabel}
+              </ButtonAnimated>
+            )}
           </div>
         </div>
       </form>

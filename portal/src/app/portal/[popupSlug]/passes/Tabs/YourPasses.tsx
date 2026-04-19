@@ -94,8 +94,8 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
                   className={cn(
                     "p-0.5 rounded-full transition-colors",
                     hasSpouse
-                      ? "bg-gray-100"
-                      : "bg-gray-100 group-hover:bg-gray-200",
+                      ? "bg-muted"
+                      : "bg-muted group-hover:bg-muted",
                   )}
                 >
                   <Plus className="w-3 h-3" />
@@ -113,7 +113,7 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
                 onClick={() => handleOpenModal("kid")}
                 disabled={!applicationAttendees.length}
               >
-                <div className="bg-gray-100 p-0.5 rounded-full group-hover:bg-gray-200 transition-colors">
+                <div className="bg-muted p-0.5 rounded-full group-hover:bg-muted transition-colors">
                   <Plus className="w-3 h-3" />
                 </div>
                 <span>{t("passes.add_children")}</span>
@@ -178,6 +178,10 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
             />
             <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/10 via-transparent to-purple-600/10" />
 
+            {/* Hero CTA sits on a fixed dark gradient (lines above) that is
+                intentional brand art, not derived from the theme. Text and
+                the pill button stay on literal white/neutral so contrast
+                holds regardless of the popup's light/dark mode. */}
             <div className="relative z-10 p-6">
               <div className="flex items-center justify-between gap-5">
                 <div className="flex-1 min-w-0">
@@ -203,7 +207,7 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
                     <ArrowRight className="w-5 h-5" />
                   </Button>
                   {minPrice != null && (
-                    <p className="text-center text-gray-400 text-xs">
+                    <p className="text-center text-gray-300 text-xs">
                       {t("passes.starting_at", {
                         price: formatCurrency(minPrice),
                       })}
@@ -214,7 +218,7 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
             </div>
           </div>
         ) : (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
+          <div className="bg-card rounded-2xl shadow-sm border border-border p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-pass-title font-medium">
@@ -226,7 +230,7 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
               </div>
               <Button
                 onClick={onSwitchToBuy}
-                className="flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-all whitespace-nowrap active:scale-95"
+                className="flex items-center gap-2 bg-foreground hover:bg-foreground text-background px-5 py-2.5 rounded-lg text-sm font-semibold transition-all whitespace-nowrap active:scale-95"
               >
                 {t("passes.buy_passes")}
                 <ArrowRight className="w-4 h-4" />
@@ -236,7 +240,9 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
         )}
       </div>
 
-      {/* Mobile Sticky Footer */}
+      {/* Mobile Sticky Footer — same fixed-dark treatment as the desktop
+          hero above: the footer stays dark regardless of theme, so its
+          text and the pill button use literal white/neutral. */}
       <div className="fixed bottom-0 left-0 right-0 z-30 lg:hidden">
         {!hasPurchasedPasses ? (
           <div className="bg-gray-900 border-t border-gray-800 px-4 py-3">
@@ -262,7 +268,7 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
             </div>
           </div>
         ) : (
-          <div className="bg-white border-t border-gray-200 px-4 py-3">
+          <div className="bg-card border-t border-border px-4 py-3">
             <div className="flex items-center justify-between gap-3">
               <div className="flex-1 min-w-0">
                 <p className="text-pass-title font-semibold text-sm">
@@ -274,7 +280,7 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
               </div>
               <Button
                 onClick={onSwitchToBuy}
-                className="flex items-center justify-center gap-1.5 bg-gray-900 hover:bg-gray-800 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-all shadow-lg whitespace-nowrap active:scale-95"
+                className="flex items-center justify-center gap-1.5 bg-foreground hover:bg-foreground text-background px-5 py-2.5 rounded-xl text-sm font-bold transition-all shadow-lg whitespace-nowrap active:scale-95"
               >
                 {t("passes.buy")}
                 <ArrowRight className="w-4 h-4" />

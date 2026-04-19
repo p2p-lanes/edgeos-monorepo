@@ -20,15 +20,15 @@ const HeaderProfile = () => {
   const hasInvoiceFields = !!city?.invoice_company_name
 
   return (
-    <div className="p-4 md:p-6 border-b border-gray-200 bg-white">
+    <div className="p-4 md:p-6 border-b border-border bg-card">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-2">
           <SidebarTrigger className="xl:hidden" />
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">
+            <h1 className="text-2xl font-bold text-foreground">
               {t("profile.my_profile")}
             </h1>
-            <p className="text-gray-600">
+            <p className="text-muted-foreground">
               {t("profile.header_subtitle", { tenant: tenant?.name })}
             </p>
           </div>
@@ -36,7 +36,7 @@ const HeaderProfile = () => {
         <div className="flex flex-wrap items-center gap-3">
           <Button
             variant="outline"
-            className="text-gray-700 border-gray-300 bg-transparent"
+            className="text-foreground border-border bg-transparent"
             onClick={() => router.push("/portal/poaps")}
           >
             <Medal className="mr-2 size-4" />
@@ -46,7 +46,7 @@ const HeaderProfile = () => {
             <>
               <Button
                 variant="outline"
-                className="text-gray-700 border-gray-300 hover:bg-gray-50 bg-transparent"
+                className="text-foreground border-border hover:bg-muted bg-transparent"
                 onClick={() => setIsInvoiceModalOpen(true)}
               >
                 <Newspaper className="h-4 w-4" />
@@ -59,11 +59,11 @@ const HeaderProfile = () => {
             </>
           )}
 
-          <div className="hidden md:block h-6 w-px bg-gray-300" />
+          <div className="hidden md:block h-6 w-px bg-muted" />
 
           <Button
             variant="outline"
-            className="text-gray-700 border-gray-300 hover:bg-gray-50 bg-transparent"
+            className="text-foreground border-border hover:bg-muted bg-transparent"
             onClick={() => logout()}
           >
             <LogOut className="h-4 w-4" />

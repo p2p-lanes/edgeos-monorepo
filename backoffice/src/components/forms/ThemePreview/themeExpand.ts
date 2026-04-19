@@ -1,186 +1,202 @@
-// Source-of-truth para mapear las claves del theme_config a CSS variables.
+// Design-token theme system — keep in sync with
+// portal/src/providers/themeProvider.tsx.
 //
-// Una clave del usuario puede expandirse a varias CSS variables (fan-out).
-// Las claves "nuevas" (semánticas) cubren los campos editables del form;
-// las claves "legacy" se siguen aceptando 1:1 para popups guardados antes
-// de la simplificación.
-//
-// Mantener sincronizado con portal/src/providers/themeProvider.tsx.
+// The admin picks a mode + primary + optional secondary/accent. Every other
+// surface-level CSS variable is derived from those via color-mix.
 
+export type ThemeMode = "light" | "dark"
+
+export interface ThemeColors {
+  mode?: ThemeMode
+  primary_color?: string
+  primary_foreground_color?: string
+  secondary_color?: string
+  accent_color?: string
+}
+
+// Editable keys shown in the backoffice form. Anything else in
+// colors.* is ignored (old popups still have legacy keys in their JSONB
+// blob — we don't migrate, just stop reading them).
 export const NEW_THEME_KEYS = [
-  // ─ portal
-  "title_color",
-  "subtitle_color",
-  "button_color",
-  "title_button_color",
-  "primary_background_color",
-  "sidebar_background_color",
-  "card_background_color",
-  "border_color",
-  "sidebar_border_color",
-  // ─ checkout
-  "checkout_title_color",
-  "checkout_watermark_color",
-  "checkout_subtitle_color",
-  "checkout_navbar_bg_color",
-  "checkout_badge_bg_color",
-  "checkout_badge_title_color",
-  "checkout_card_bg_color",
-  "checkout_bottom_bar_bg_color",
-  "checkout_button_color",
-  "checkout_button_title_color",
-  "checkout_bottom_bar_text_color",
+  "mode",
+  "primary_color",
+  "primary_foreground_color",
+  "secondary_color",
+  "accent_color",
 ] as const
 
 export type NewThemeKey = (typeof NEW_THEME_KEYS)[number]
 
 export const NEW_KEY_DEFAULTS: Record<NewThemeKey, string> = {
-  title_color: "#1a1a1a",
-  subtitle_color: "#6b6b8a",
-  button_color: "#2d3a6e",
-  title_button_color: "#f5f5ff",
-  primary_background_color: "#f5f5f5",
-  sidebar_background_color: "#fafafa",
-  card_background_color: "#ffffff",
-  border_color: "#e5e5ee",
-  sidebar_border_color: "#e5e5ee",
-  // ─ checkout
-  checkout_title_color: "#1a1a1a",
-  checkout_watermark_color: "rgba(255, 255, 255, 0.85)",
-  checkout_subtitle_color: "#6b6b8a",
-  checkout_navbar_bg_color: "rgba(255, 255, 255, 0.85)",
-  checkout_badge_bg_color: "#2d3a6e",
-  checkout_badge_title_color: "#ffffff",
-  checkout_card_bg_color: "#ffffff",
-  checkout_bottom_bar_bg_color: "#1e2a4d",
-  checkout_button_color: "#ffffff",
-  checkout_button_title_color: "#1e2a4d",
-  checkout_bottom_bar_text_color: "#ffffff",
+  mode: "light",
+  primary_color: "#2d3a6e",
+  primary_foreground_color: "#ffffff",
+  secondary_color: "",
+  accent_color: "",
 }
 
-// key -> [cssVar, ...]. Las nuevas claves son fan-out, las legacy 1:1.
-export const THEME_KEY_EXPAND: Record<string, string[]> = {
-  // ─ nuevas (semánticas) — portal
-  title_color: ["--heading", "--pass-title"],
-  subtitle_color: [
-    "--heading-secondary",
-    "--body",
-    "--nav-text",
-    "--nav-text-secondary",
-    "--pass-text",
-  ],
-  button_color: ["--primary"],
-  title_button_color: ["--primary-foreground"],
-  primary_background_color: ["--background"],
-  sidebar_background_color: ["--sidebar"],
-  card_background_color: ["--card", "--popover"],
-  border_color: ["--border", "--input"],
-  sidebar_border_color: ["--sidebar-border"],
-
-  // ─ nuevas (semánticas) — checkout
-  checkout_title_color: ["--checkout-title"],
-  checkout_watermark_color: ["--checkout-watermark"],
-  checkout_subtitle_color: ["--checkout-subtitle"],
-  checkout_navbar_bg_color: ["--checkout-navbar-bg", "--checkout-nav-bg"],
-  checkout_badge_bg_color: ["--checkout-badge-bg"],
-  checkout_badge_title_color: ["--checkout-badge-title", "--checkout-nav-text"],
-  checkout_card_bg_color: ["--checkout-card-bg"],
-  checkout_bottom_bar_bg_color: ["--checkout-bottom-bar-bg"],
-  checkout_button_color: ["--checkout-button"],
-  checkout_button_title_color: ["--checkout-button-title"],
-  checkout_bottom_bar_text_color: ["--checkout-bottom-bar-text"],
-
-  // ─ legacy (1:1) — backwards compatibility para popups antiguos
-  background: ["--background"],
-  foreground: ["--foreground"],
-  heading: ["--heading"],
-  heading_secondary: ["--heading-secondary"],
-  body: ["--body"],
-  nav_text: ["--nav-text"],
-  nav_text_secondary: ["--nav-text-secondary"],
-  pass_title: ["--pass-title"],
-  pass_text: ["--pass-text"],
-  checkout_nav_bg: ["--checkout-nav-bg"],
-  checkout_nav_text: ["--checkout-nav-text"],
-  primary: ["--primary"],
-  primary_foreground: ["--primary-foreground"],
-  secondary: ["--secondary"],
-  secondary_foreground: ["--secondary-foreground"],
-  card: ["--card"],
-  card_foreground: ["--card-foreground"],
-  popover: ["--popover"],
-  popover_foreground: ["--popover-foreground"],
-  muted: ["--muted"],
-  muted_foreground: ["--muted-foreground"],
-  accent: ["--accent"],
-  accent_foreground: ["--accent-foreground"],
-  destructive: ["--destructive"],
-  destructive_foreground: ["--destructive-foreground"],
-  border: ["--border"],
-  input: ["--input"],
-  ring: ["--ring"],
-  sidebar: ["--sidebar"],
-  sidebar_foreground: ["--sidebar-foreground"],
-  sidebar_primary: ["--sidebar-primary"],
-  sidebar_primary_foreground: ["--sidebar-primary-foreground"],
-  sidebar_accent: ["--sidebar-accent"],
-  sidebar_accent_foreground: ["--sidebar-accent-foreground"],
-  sidebar_border: ["--sidebar-border"],
-  sidebar_ring: ["--sidebar-ring"],
+const LIGHT = {
+  background: "oklch(1 0 0)",
+  foreground: "oklch(0.145 0 0)",
+  foregroundSecondary: "oklch(0.556 0.01 260)",
+  card: "oklch(1 0 0)",
+  popover: "oklch(1 0 0)",
+  muted: "oklch(0.965 0.005 285)",
+  mutedForeground: "oklch(0.556 0.01 260)",
+  border: "oklch(0.922 0.005 285)",
+  sidebar: "oklch(0.985 0 0)",
+  sidebarForeground: "oklch(0.37 0.01 260)",
+  sidebarBorder: "oklch(0.922 0.01 260)",
 }
 
-const NEW_KEY_SET: ReadonlySet<string> = new Set(NEW_THEME_KEYS)
+const DARK = {
+  background: "oklch(0.145 0 0)",
+  foreground: "oklch(0.985 0 0)",
+  foregroundSecondary: "oklch(0.7 0.02 260)",
+  card: "oklch(0.205 0.015 285)",
+  popover: "oklch(0.205 0.015 285)",
+  muted: "oklch(0.26 0.005 285)",
+  mutedForeground: "oklch(0.7 0.02 260)",
+  border: "oklch(0.3 0.005 285)",
+  sidebar: "oklch(0.205 0.015 260)",
+  sidebarForeground: "oklch(0.965 0.005 260)",
+  sidebarBorder: "oklch(0.3 0.01 260)",
+}
 
-// Aplica las claves del theme a CSS variables. Las legacy van primero;
-// las nuevas ganan en caso de colisión, así un popup que tiene ambas
-// formas en el JSON se renderiza con la nueva como autoridad.
-export function expandThemeColors(
-  colors: Record<string, string> | undefined,
+const mix = (a: string, b: string, pctA: number): string =>
+  `color-mix(in oklab, ${a} ${pctA}%, ${b} ${100 - pctA}%)`
+
+export function computeThemeVars(
+  colors: ThemeColors | undefined,
 ): Record<string, string> {
-  const out: Record<string, string> = {}
-  if (!colors) return out
+  if (!colors) return {}
+  if (!colors.mode && !colors.primary_color) return {}
 
-  for (const [key, value] of Object.entries(colors)) {
-    if (NEW_KEY_SET.has(key)) continue
-    if (!value) continue
-    const vars = THEME_KEY_EXPAND[key]
-    if (!vars) continue
-    for (const v of vars) out[v] = value
+  const mode: ThemeMode = colors.mode === "dark" ? "dark" : "light"
+  const palette = mode === "dark" ? DARK : LIGHT
+  const primary = colors.primary_color
+  const primaryFg = colors.primary_foreground_color || "oklch(1 0 0)"
+
+  const vars: Record<string, string> = {
+    "--background": palette.background,
+    "--foreground": palette.foreground,
+    "--card": palette.card,
+    "--card-foreground": palette.foreground,
+    "--popover": palette.popover,
+    "--popover-foreground": palette.foreground,
+    "--muted": palette.muted,
+    "--muted-foreground": palette.mutedForeground,
+    "--border": palette.border,
+    "--input": palette.border,
+
+    "--heading": palette.foreground,
+    "--heading-secondary": palette.foregroundSecondary,
+    "--body": palette.foreground,
+    "--pass-title": palette.foreground,
+    "--pass-text": palette.foregroundSecondary,
+    "--nav-text": palette.sidebarForeground,
+    "--nav-text-secondary": palette.foregroundSecondary,
+
+    "--sidebar": palette.sidebar,
+    "--sidebar-foreground": palette.sidebarForeground,
+    "--sidebar-accent": mix(palette.sidebar, palette.sidebarForeground, 88),
+    "--sidebar-accent-foreground": palette.sidebarForeground,
+    "--sidebar-border": palette.sidebarBorder,
+
+    "--checkout-title": palette.foreground,
+    "--checkout-subtitle": palette.foregroundSecondary,
+    "--checkout-watermark": mix(palette.background, palette.foreground, 92),
+    "--checkout-navbar-bg": mix(palette.background, "transparent", 85),
+    "--checkout-nav-bg": mix(palette.background, "transparent", 85),
+    "--checkout-card-bg": palette.card,
+    "--checkout-bottom-bar-bg": palette.sidebar,
+    "--checkout-bottom-bar-text": palette.foreground,
   }
 
-  for (const key of NEW_THEME_KEYS) {
-    const value = colors[key]
-    if (!value) continue
-    const vars = THEME_KEY_EXPAND[key]
-    if (!vars) continue
-    for (const v of vars) out[v] = value
+  if (primary) {
+    const secondary = colors.secondary_color || palette.muted
+    const hasSecondaryBrand = Boolean(colors.secondary_color)
+    const accent = colors.accent_color || mix(palette.card, primary, 90)
+
+    vars["--primary"] = primary
+    vars["--primary-foreground"] = primaryFg
+    vars["--secondary"] = secondary
+    vars["--secondary-foreground"] = hasSecondaryBrand
+      ? primaryFg
+      : palette.foreground
+    vars["--accent"] = accent
+    vars["--accent-foreground"] = palette.foreground
+    vars["--ring"] = primary
+    vars["--sidebar-primary"] = primary
+    vars["--sidebar-primary-foreground"] = primaryFg
+    vars["--sidebar-ring"] = primary
+    vars["--checkout-badge-bg"] = primary
+    vars["--checkout-badge-title"] = primaryFg
+    vars["--checkout-nav-text"] = primaryFg
+    vars["--checkout-button"] = primary
+    vars["--checkout-button-title"] = primaryFg
   }
 
-  return out
+  return vars
 }
 
-// Reverse map: legacy_key -> new_keys que lo afectan. Lo usa el ring de
-// highlight del preview: cuando el usuario hace hover sobre `subtitle_color`
-// queremos que se prendan los anillos de los componentes que internamente
-// chequean por `heading_secondary`, `body`, `nav_text`, etc.
+// Back-compat shim for the existing preview hook — it used to merge legacy
+// keys + new keys into a single CSS var map. Now it's just computeThemeVars.
+export function expandThemeColors(
+  colors: Record<string, string | undefined> | undefined,
+): Record<string, string> {
+  return computeThemeVars(colors as ThemeColors | undefined)
+}
+
+// Preview components ring by internal token names ("primary", "heading",
+// "checkout_button", …). Hovering any brand field should light those up.
+// Map token → which editable key drives it so hover state propagates.
 export const LEGACY_HIGHLIGHT_FROM_NEW: Record<string, string[]> = {
-  heading: ["title_color"],
-  pass_title: ["title_color"],
-  heading_secondary: ["subtitle_color"],
-  body: ["subtitle_color"],
-  nav_text: ["subtitle_color"],
-  nav_text_secondary: ["subtitle_color"],
-  pass_text: ["subtitle_color"],
-  primary: ["button_color"],
-  primary_foreground: ["title_button_color"],
-  background: ["primary_background_color"],
-  sidebar: ["sidebar_background_color"],
-  card: ["card_background_color"],
-  popover: ["card_background_color"],
-  border: ["border_color"],
-  input: ["border_color"],
-  sidebar_border: ["sidebar_border_color"],
-  // ─ legacy checkout → new checkout
-  checkout_nav_bg: ["checkout_navbar_bg_color"],
-  checkout_nav_text: ["checkout_badge_title_color"],
+  // Brand tokens
+  primary: ["primary_color"],
+  primary_foreground: ["primary_foreground_color"],
+  secondary: ["secondary_color"],
+  secondary_foreground: ["primary_foreground_color"],
+  accent: ["accent_color"],
+  accent_foreground: ["mode"],
+  ring: ["primary_color"],
+  // Portal surfaces derived from mode
+  heading: ["mode"],
+  heading_secondary: ["mode"],
+  body: ["mode"],
+  nav_text: ["mode"],
+  nav_text_secondary: ["mode"],
+  pass_title: ["mode"],
+  pass_text: ["mode"],
+  background: ["mode"],
+  foreground: ["mode"],
+  card: ["mode"],
+  card_foreground: ["mode"],
+  popover: ["mode"],
+  popover_foreground: ["mode"],
+  muted: ["mode"],
+  muted_foreground: ["mode"],
+  border: ["mode"],
+  input: ["mode"],
+  sidebar: ["mode"],
+  sidebar_foreground: ["mode"],
+  sidebar_primary: ["primary_color"],
+  sidebar_primary_foreground: ["primary_foreground_color"],
+  sidebar_accent: ["mode"],
+  sidebar_accent_foreground: ["mode"],
+  sidebar_border: ["mode"],
+  // Checkout
+  checkout_title: ["mode"],
+  checkout_subtitle: ["mode"],
+  checkout_watermark: ["mode"],
+  checkout_navbar_bg: ["mode"],
+  checkout_nav_bg: ["mode"],
+  checkout_nav_text: ["primary_foreground_color"],
+  checkout_badge_bg: ["primary_color"],
+  checkout_badge_title: ["primary_foreground_color"],
+  checkout_card_bg: ["mode"],
+  checkout_bottom_bar_bg: ["mode"],
+  checkout_bottom_bar_text: ["mode"],
+  checkout_button: ["primary_color"],
+  checkout_button_title: ["primary_foreground_color"],
 }

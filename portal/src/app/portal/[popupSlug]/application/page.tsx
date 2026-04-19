@@ -135,7 +135,7 @@ export default function FormPage() {
       <main className="container py-6 md:py-12 mb-8">
         <div className="text-center space-y-4 px-8">
           <h2 className="text-2xl font-bold">{t("application.unavailable")}</h2>
-          <p className="text-muted-foreground">
+          <p className="text-heading-secondary">
             {t("application.unavailable_description")}
           </p>
         </div>

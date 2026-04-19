@@ -29,6 +29,17 @@ class CheckoutMode(StrEnum):
     simple_quantity = "simple_quantity"
 
 
+class ApplicationLayout(StrEnum):
+    """How the portal renders the application form for a popup.
+
+    - single_page: all sections stacked on one page (legacy behavior).
+    - multi_step: one section per step, with Next/Back navigation.
+    """
+
+    single_page = "single_page"
+    multi_step = "multi_step"
+
+
 def derive_checkout_mode(sale_type: SaleType) -> CheckoutMode:
     if sale_type == SaleType.direct:
         return CheckoutMode.simple_quantity

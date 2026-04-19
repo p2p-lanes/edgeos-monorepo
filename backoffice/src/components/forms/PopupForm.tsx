@@ -36,7 +36,6 @@ import { FieldError } from "@/components/Common/FieldError"
 import { FormErrorSummary } from "@/components/Common/FormErrorSummary"
 import { ApprovalStrategyForm } from "@/components/forms/ApprovalStrategyForm"
 import { ReviewersManager } from "@/components/forms/ReviewersManager"
-import { ThemeConfigForm } from "@/components/forms/ThemeConfigForm"
 import { TranslationManager } from "@/components/translations/TranslationManager"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -837,53 +836,6 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
             )}
           </form.Field>
         </InlineSection>
-
-        {/* Portal Theme (edit only). The form is `mx-auto max-w-2xl` (672px),
-            but the theme section needs more horizontal room for the side-by-side
-            preview panel. Negative margins on lg+ widen this single section
-            without breaking the rest of the form's column. The parent route
-            container is `max-w-7xl` with `p-6 md:p-8`, so -mx-32 (128px) at lg
-            and -mx-48 (192px) at xl stay safely inside the page padding. */}
-        {isEdit && (
-          <>
-            <Separator />
-            <div className="lg:-mx-32 xl:-mx-48">
-              <form.Subscribe
-                selector={(state) => ({
-                  name: state.values.name,
-                  tagline: state.values.tagline,
-                  location: state.values.location,
-                  start_date: state.values.start_date,
-                  end_date: state.values.end_date,
-                  express_checkout_background:
-                    state.values.express_checkout_background,
-                })}
-              >
-                {(event) => (
-                  <ThemeConfigForm
-                    popupId={defaultValues!.id}
-                    themeConfig={
-                      defaultValues!.theme_config as Record<
-                        string,
-                        unknown
-                      > | null
-                    }
-                    readOnly={readOnly}
-                    previewEvent={{
-                      name: event.name,
-                      tagline: event.tagline || null,
-                      location: event.location || null,
-                      start_date: event.start_date || null,
-                      end_date: event.end_date || null,
-                      express_checkout_background:
-                        event.express_checkout_background || null,
-                    }}
-                  />
-                )}
-              </form.Subscribe>
-            </div>
-          </>
-        )}
 
         <Separator />
 

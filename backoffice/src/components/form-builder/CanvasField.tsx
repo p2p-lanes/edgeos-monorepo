@@ -5,6 +5,7 @@ import { GripVertical, Trash2 } from "lucide-react"
 import type { FormFieldPublic } from "@/client"
 import { Badge } from "@/components/ui/badge"
 import {
+  canRemoveField,
   FIELD_TYPES,
   FULL_WIDTH_TYPES,
   formFieldPublicToFormFieldSchema,
@@ -150,7 +151,7 @@ export function CanvasField({
                 </p>
               )}
             </div>
-            {!isSpecial && (
+            {canRemoveField(field) && (
               <button
                 type="button"
                 className="ml-2 mt-0.5 h-6 w-6 shrink-0 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive hover:bg-destructive/10"

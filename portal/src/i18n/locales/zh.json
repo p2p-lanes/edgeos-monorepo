@@ -103,6 +103,7 @@
   "application": {
     "unavailable": "申请不可用",
     "unavailable_description": "此活动的申请表尚未配置。",
+    "step_of": "第 {{current}} 步，共 {{total}} 步",
     "existing_found": "发现已有申请",
     "existing_description": "我们发现了与您电子邮件关联的先前申请。",
     "applicant": "申请人：",

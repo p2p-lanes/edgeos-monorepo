@@ -77,7 +77,7 @@ const QRcode = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md bg-white">
+      <DialogContent className="sm:max-w-md bg-card">
         <DialogHeader>
           <DialogTitle>Check-in Code</DialogTitle>
         </DialogHeader>
@@ -86,7 +86,7 @@ const QRcode = ({
             <div className="flex flex-col items-center gap-4">
               <div
                 ref={qrCodeRef}
-                className="bg-white p-4 rounded-md border border-gray-200"
+                className="bg-white p-4 rounded-md border border-border"
               >
                 <QRCodeReact value={qrValue} size={200} level="H" />
               </div>

@@ -13,13 +13,13 @@ const AttendeeCell = ({
     <TableCell className={className}>
       <div className="flex items-center gap-1">
         <CellControl
-          className="font-medium text-gray-900"
+          className="font-medium text-foreground"
           value={attendee.first_name ?? ""}
         >
           {attendee.first_name}
         </CellControl>
         <CellControl
-          className="font-medium text-gray-900"
+          className="font-medium text-foreground"
           value={attendee.last_name ?? ""}
         >
           {attendee.last_name}

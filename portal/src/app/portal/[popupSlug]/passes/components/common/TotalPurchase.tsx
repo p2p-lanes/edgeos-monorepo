@@ -70,7 +70,7 @@ const TotalPurchase = ({
     >
       <CollapsibleTrigger
         className={cn(
-          "w-full bg-neutral-200 rounded-md",
+          "w-full bg-muted rounded-md",
           isModal && "bg-transparent",
         )}
       >

@@ -14,6 +14,7 @@ class BaseFieldConfigBase(SQLModel):
         default=None, nullable=True, foreign_key="formsections.id"
     )
     position: int = Field(default=0)
+    required: bool = Field(default=False)
     label: str | None = Field(default=None, nullable=True)
     placeholder: str | None = Field(default=None, nullable=True)
     help_text: str | None = Field(default=None, nullable=True)
@@ -29,6 +30,7 @@ class BaseFieldConfigPublic(BaseModel):
     field_name: str
     section_id: uuid.UUID | None = None
     position: int = 0
+    required: bool = False
     label: str | None = None
     placeholder: str | None = None
     help_text: str | None = None
@@ -40,7 +42,19 @@ class BaseFieldConfigPublic(BaseModel):
 class BaseFieldConfigUpdate(BaseModel):
     section_id: uuid.UUID | None = None
     position: int | None = None
+    required: bool | None = None
     label: str | None = None
     placeholder: str | None = None
     help_text: str | None = None
     options: list[str] | None = None
+
+
+class CatalogField(BaseModel):
+    """A base field from BASE_FIELD_DEFINITIONS that is available to add to a popup."""
+
+    field_name: str
+    type: str
+    label: str
+    required: bool
+    target: str
+    default_section_key: str | None = None

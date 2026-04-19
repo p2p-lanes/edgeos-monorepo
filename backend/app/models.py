@@ -50,14 +50,6 @@ from app.api.form_section.schemas import (
     FormSectionUpdate,
 )
 
-# Ticketing steps
-from app.api.ticketing_step.models import TicketingSteps
-from app.api.ticketing_step.schemas import (
-    TicketingStepCreate,
-    TicketingStepPublic,
-    TicketingStepUpdate,
-)
-
 # Group models
 from app.api.group.models import (
     GroupLeaders,
@@ -85,11 +77,19 @@ from app.api.popup_reviewer.schemas import (
 )
 from app.api.product.models import Products
 from app.api.product.schemas import ProductCreate, ProductPublic, ProductUpdate
-from app.api.translation.models import Translations
-from app.api.translation.schemas import TranslationCreate, TranslationPublic
 from app.api.tenant.credential_models import TenantCredentials
 from app.api.tenant.models import Tenants
 from app.api.tenant.schemas import TenantCreate, TenantPublic, TenantUpdate
+
+# Ticketing steps
+from app.api.ticketing_step.models import TicketingSteps
+from app.api.ticketing_step.schemas import (
+    TicketingStepCreate,
+    TicketingStepPublic,
+    TicketingStepUpdate,
+)
+from app.api.translation.models import Translations
+from app.api.translation.schemas import TranslationCreate, TranslationPublic
 from app.api.user.models import Users
 from app.api.user.schemas import UserCreate, UserPublic, UserUpdate
 

@@ -22,7 +22,7 @@ const InvoiceModal = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-white rounded-lg p-0 max-w-2xl">
+      <DialogContent className="bg-card rounded-lg p-0 max-w-2xl">
         <DialogHeader className="px-6 pt-6 pb-0">
           <div className="flex items-center gap-2">
             <FileText className="h-5 w-5 text-primary" />

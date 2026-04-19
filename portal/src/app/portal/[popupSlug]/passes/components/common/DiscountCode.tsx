@@ -60,7 +60,7 @@ const DiscountCode = ({
                   : ""
               }
               placeholder={t("passes.coupon_placeholder")}
-              className="bg-white text-black"
+              className="bg-card text-foreground"
               data-discount-code={discountCode}
               value={discountCode.toUpperCase()}
               onChange={handleDiscountChange}
@@ -83,12 +83,12 @@ const DiscountCode = ({
           </div>
           {!loading && discountCode.length > 0 && (discountMsg || isValid) && (
             <p
-              className={`flex items-center gap-1 text-xs ${isValid ? "text-green-500" : "text-red-500"}`}
+              className={`flex items-center gap-1 text-xs ${isValid ? "text-green-500" : "text-destructive"}`}
             >
               {isValid ? (
                 <CheckCircle className="w-4 h-4 text-green-500" />
               ) : (
-                <XCircle className="w-4 h-4 text-red-500" />
+                <XCircle className="w-4 h-4 text-destructive" />
               )}
               {isValid ? t("passes.coupon_applied") : discountMsg}
             </p>

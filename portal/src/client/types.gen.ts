@@ -102,6 +102,14 @@ export type ApplicationFunnel = {
 };
 
 /**
+ * How the portal renders the application form for a popup.
+ *
+ * - single_page: all sections stacked on one page (legacy behavior).
+ * - multi_step: one section per step, with Next/Back navigation.
+ */
+export type ApplicationLayout = 'single_page' | 'multi_step';
+
+/**
  * Application schema for API responses.
  */
 export type ApplicationPublic = {
@@ -398,6 +406,7 @@ export type BaseFieldConfigPublic = {
     field_name: string;
     section_id?: (string | null);
     position?: number;
+    required?: boolean;
     label?: (string | null);
     placeholder?: (string | null);
     help_text?: (string | null);
@@ -407,6 +416,7 @@ export type BaseFieldConfigPublic = {
 export type BaseFieldConfigUpdate = {
     section_id?: (string | null);
     position?: (number | null);
+    required?: (boolean | null);
     label?: (string | null);
     placeholder?: (string | null);
     help_text?: (string | null);
@@ -508,6 +518,18 @@ export type CartState = {
  */
 export type CartUpdate = {
     items: CartState;
+};
+
+/**
+ * A base field from BASE_FIELD_DEFINITIONS that is available to add to a popup.
+ */
+export type CatalogField = {
+    field_name: string;
+    type: string;
+    label: string;
+    required: boolean;
+    target: string;
+    default_section_key?: (string | null);
 };
 
 /**
@@ -738,6 +760,7 @@ export type FormFieldPublic = {
     placeholder?: (string | null);
     help_text?: (string | null);
     protected?: boolean;
+    removable?: boolean;
     target?: (string | null);
 };
 
@@ -757,6 +780,7 @@ export type FormSectionCreate = {
     label: string;
     description?: (string | null);
     order?: number;
+    kind?: string;
 };
 
 export type FormSectionPublic = {
@@ -767,6 +791,7 @@ export type FormSectionPublic = {
     description?: (string | null);
     order?: number;
     protected?: boolean;
+    kind?: string;
 };
 
 export type FormSectionUpdate = {
@@ -1315,6 +1340,7 @@ export type PopupAdmin = {
     supported_languages?: Array<(string)>;
     insurance_enabled?: boolean;
     insurance_percentage?: (string | null);
+    application_layout?: ApplicationLayout;
     id: string;
 };
 
@@ -1355,6 +1381,7 @@ export type PopupCreate = {
     supported_languages?: Array<(string)>;
     insurance_enabled?: boolean;
     insurance_percentage?: (number | string | null);
+    application_layout?: ApplicationLayout;
 };
 
 /**
@@ -1393,6 +1420,7 @@ export type PopupPublic = {
     supported_languages?: Array<(string)>;
     insurance_enabled?: boolean;
     insurance_percentage?: (string | null);
+    application_layout?: ApplicationLayout;
 };
 
 /**
@@ -1465,6 +1493,7 @@ export type PopupUpdate = {
     supported_languages?: (Array<(string)> | null);
     insurance_enabled?: (boolean | null);
     insurance_percentage?: (number | string | null);
+    application_layout?: (ApplicationLayout | null);
 };
 
 /**
@@ -2487,6 +2516,21 @@ export type FormFieldsCreateFormFieldData = {
 };
 
 export type FormFieldsCreateFormFieldResponse = (FormFieldPublic);
+
+export type FormFieldsListAvailableBaseFieldsData = {
+    popupId: string;
+    xTenantId?: (string | null);
+};
+
+export type FormFieldsListAvailableBaseFieldsResponse = (Array<CatalogField>);
+
+export type FormFieldsCreateBaseFieldConfigData = {
+    fieldName: string;
+    popupId: string;
+    xTenantId?: (string | null);
+};
+
+export type FormFieldsCreateBaseFieldConfigResponse = (FormFieldPublic);
 
 export type FormFieldsGetFormFieldData = {
     fieldId: string;

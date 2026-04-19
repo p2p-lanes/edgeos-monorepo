@@ -58,6 +58,7 @@ def _create_form_section(
         label=section_def["label"],
         order=section_def["order"],
         protected=True,
+        kind=section_def["kind"],
     )
     db.add(section)
     db.commit()
@@ -107,6 +108,8 @@ def _seed_application_defaults(db: TenantSession, popup: Popups) -> None:
                 field_name=field_name,
                 section_id=section_map[section_key],
                 position=definition.get("default_position", 0),
+                required=definition.get("required", False),
+                label=definition.get("label"),
                 placeholder=definition.get("default_placeholder"),
                 help_text=definition.get("default_help_text"),
                 options=definition.get("default_options"),
@@ -257,7 +260,9 @@ async def update_popup(
     if updated.sale_type == SaleType.application.value:
         _seed_application_defaults(db, updated)
 
-    # Create gated sections and base field configs on first enable
+    # Create gated sections and base field configs on first enable.
+    # Section and config creation are both idempotent: re-enabling a flag
+    # reuses any row left over from a previous enable cycle.
     section_map: dict[str, uuid.UUID] = {}
     for key, should_create in [
         ("scholarship", scholarship_enabling),
@@ -266,12 +271,24 @@ async def update_popup(
         if not should_create:
             continue
         section_def = DEFAULT_SECTIONS[key]
+        existing_section = next(
+            (
+                s
+                for s in updated.form_sections
+                if s.kind == section_def["kind"] or s.label == section_def["label"]
+            ),
+            None,
+        )
+        if existing_section is not None:
+            section_map[key] = existing_section.id
+            continue
         section = FormSections(
             tenant_id=updated.tenant_id,
             popup_id=updated.id,
             label=section_def["label"],
             order=section_def["order"],
             protected=True,
+            kind=section_def["kind"],
         )
         db.add(section)
         db.commit()

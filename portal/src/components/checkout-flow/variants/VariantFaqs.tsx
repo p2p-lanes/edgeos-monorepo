@@ -30,7 +30,7 @@ function parseFaqs(templateConfig: VariantProps["templateConfig"]): FaqItem[] {
 function SectionTitle({ title }: { title?: string }) {
   if (!title) return null
   return (
-    <h3 className="text-xl font-semibold text-gray-900 text-center">{title}</h3>
+    <h3 className="text-xl font-semibold text-foreground text-center">{title}</h3>
   )
 }
 
@@ -63,28 +63,28 @@ function AccordionFaqs({
             >
               <div
                 className={cn(
-                  "rounded-xl border border-gray-200 bg-white overflow-hidden transition-shadow",
+                  "rounded-xl border border-border bg-card overflow-hidden transition-shadow",
                   isOpen && "shadow-sm",
                 )}
               >
                 <CollapsibleTrigger asChild>
                   <button
                     type="button"
-                    className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+                    className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-muted transition-colors"
                   >
-                    <span className="text-sm font-medium text-gray-900">
+                    <span className="text-sm font-medium text-foreground">
                       {item.question || "Untitled question"}
                     </span>
                     <ChevronDown
                       className={cn(
-                        "w-4 h-4 text-gray-500 shrink-0 transition-transform duration-200",
+                        "w-4 h-4 text-muted-foreground shrink-0 transition-transform duration-200",
                         isOpen && "rotate-180",
                       )}
                     />
                   </button>
                 </CollapsibleTrigger>
                 <CollapsibleContent>
-                  <div className="px-4 pb-4 pt-1 text-sm text-gray-600 whitespace-pre-line">
+                  <div className="px-4 pb-4 pt-1 text-sm text-muted-foreground whitespace-pre-line">
                     {item.answer}
                   </div>
                 </CollapsibleContent>
@@ -116,10 +116,10 @@ function ListFaqs({
       <div className="space-y-5">
         {items.map((item) => (
           <div key={item.id} className="space-y-1">
-            <h4 className="text-sm font-semibold text-gray-900">
+            <h4 className="text-sm font-semibold text-foreground">
               {item.question || "Untitled question"}
             </h4>
-            <p className="text-sm text-gray-600 whitespace-pre-line leading-relaxed">
+            <p className="text-sm text-muted-foreground whitespace-pre-line leading-relaxed">
               {item.answer}
             </p>
           </div>
@@ -149,12 +149,12 @@ function TwoColumnFaqs({
         {items.map((item) => (
           <div
             key={item.id}
-            className="rounded-xl border border-gray-200 bg-white p-4 space-y-1.5"
+            className="rounded-xl border border-border bg-card p-4 space-y-1.5"
           >
-            <h4 className="text-sm font-semibold text-gray-900">
+            <h4 className="text-sm font-semibold text-foreground">
               {item.question || "Untitled question"}
             </h4>
-            <p className="text-sm text-gray-600 whitespace-pre-line leading-relaxed">
+            <p className="text-sm text-muted-foreground whitespace-pre-line leading-relaxed">
               {item.answer}
             </p>
           </div>
@@ -184,16 +184,16 @@ function CardsFaqs({
         {items.map((item) => (
           <div
             key={item.id}
-            className="flex gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm"
+            className="flex gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm"
           >
-            <div className="shrink-0 w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center">
-              <HelpCircle className="w-4 h-4 text-gray-600" />
+            <div className="shrink-0 w-9 h-9 rounded-full bg-muted flex items-center justify-center">
+              <HelpCircle className="w-4 h-4 text-muted-foreground" />
             </div>
             <div className="flex-1 space-y-1">
-              <h4 className="text-sm font-semibold text-gray-900">
+              <h4 className="text-sm font-semibold text-foreground">
                 {item.question || "Untitled question"}
               </h4>
-              <p className="text-sm text-gray-600 whitespace-pre-line leading-relaxed">
+              <p className="text-sm text-muted-foreground whitespace-pre-line leading-relaxed">
                 {item.answer}
               </p>
             </div>
@@ -223,8 +223,8 @@ export default function VariantFaqs({ onSkip, templateConfig }: VariantProps) {
   if (items.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
-        <HelpCircle className="w-12 h-12 text-gray-300 mb-4" />
-        <p className="text-gray-500 mb-6">No frequently asked questions yet.</p>
+        <HelpCircle className="w-12 h-12 text-muted-foreground mb-4" />
+        <p className="text-muted-foreground mb-6">No frequently asked questions yet.</p>
         <Button variant="outline" onClick={onSkip}>
           Continue
         </Button>

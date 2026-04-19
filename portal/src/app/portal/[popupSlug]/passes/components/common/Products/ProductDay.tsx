@@ -21,7 +21,7 @@ type VariantStyles = "selected" | "purchased" | "edit" | "disabled" | "default"
 const variants: Record<VariantStyles, string> = {
   selected:
     "bg-green-200 border-green-400 text-green-800 hover:bg-green-200/80",
-  purchased: "bg-slate-800 text-white border-neutral-700",
+  purchased: "bg-slate-800 text-primary-foreground border-neutral-700",
   edit: "bg-slate-800/30 border-dashed border-slate-200 text-neutral-700 border",
   disabled: "bg-neutral-0 text-neutral-300 cursor-not-allowed ",
   default:
@@ -175,7 +175,7 @@ const Product = ({
     return (
       <Tooltip>
         <TooltipTrigger asChild>{buttonNode}</TooltipTrigger>
-        <TooltipContent className="bg-white text-black shadow-md border border-gray-200 max-w-sm">
+        <TooltipContent className="bg-card text-foreground shadow-md border border-border max-w-sm">
           {t("passes.monthly_pass_collision")}
         </TooltipContent>
       </Tooltip>

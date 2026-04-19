@@ -960,7 +960,9 @@ def run_import(
 
             if new_ffs:
                 session.add_all(new_ffs)
-            logger.info(f"  FormFields: {stats.data['FormFields']['imported']} imported")
+            logger.info(
+                f"  FormFields: {stats.data['FormFields']['imported']} imported"
+            )
 
         # ===============================================================
         # Step 5: Import Applications
@@ -1105,11 +1107,15 @@ def run_import(
         if "approval_strategies" in skip_tables:
             logger.info("  Skipping approval strategies (--skip-tables)")
             strategy = session.exec(
-                select(ApprovalStrategies).where(ApprovalStrategies.popup_id == popup_id)
+                select(ApprovalStrategies).where(
+                    ApprovalStrategies.popup_id == popup_id
+                )
             ).first()
         else:
             existing_strategy = session.exec(
-                select(ApprovalStrategies).where(ApprovalStrategies.popup_id == popup_id)
+                select(ApprovalStrategies).where(
+                    ApprovalStrategies.popup_id == popup_id
+                )
             ).first()
             if existing_strategy:
                 strategy = existing_strategy

@@ -77,7 +77,7 @@ const ButtonAnimated: React.FC<ButtonAnimatedProps> = ({
         {
           "bg-primary text-primary-foreground hover:bg-primary/90":
             variant === "default",
-          "border border-input hover:bg-accent hover:text-accent-foreground":
+          "border border-input bg-card text-card-foreground hover:bg-accent hover:text-accent-foreground":
             variant === "outline",
           "hover:bg-accent hover:text-accent-foreground": variant === "ghost",
           "bg-secondary text-secondary-foreground hover:bg-secondary/80":

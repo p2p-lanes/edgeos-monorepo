@@ -10,10 +10,10 @@ from typing import Any
 # Default sections created for every popup.Z
 # Keys are used as identifiers during creation; values define the section.
 DEFAULT_SECTIONS: dict[str, dict[str, Any]] = {
-    "profile": {"label": "Personal Information", "order": 0},
-    "info_not_shared": {"label": "Info not shared", "order": 1},
-    "companions": {"label": "Children and +1s", "order": 2},
-    "scholarship": {"label": "Scholarship", "order": 3},
+    "profile": {"label": "Personal Information", "order": 0, "kind": "standard"},
+    "info_not_shared": {"label": "Info not shared", "order": 1, "kind": "standard"},
+    "companions": {"label": "Children and +1s", "order": 2, "kind": "companions"},
+    "scholarship": {"label": "Scholarship", "order": 3, "kind": "scholarship"},
 }
 
 # Each entry defines:
@@ -27,6 +27,7 @@ BASE_FIELD_DEFINITIONS: dict[str, dict[str, Any]] = {
         "type": "text",
         "label": "First name",
         "required": True,
+        "removable": False,
         "target": "human",
         "default_section_key": "profile",
         "default_position": 0,
@@ -35,6 +36,7 @@ BASE_FIELD_DEFINITIONS: dict[str, dict[str, Any]] = {
         "type": "text",
         "label": "Last name",
         "required": True,
+        "removable": False,
         "target": "human",
         "default_section_key": "profile",
         "default_position": 1,

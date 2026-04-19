@@ -494,6 +494,16 @@ export const ApplicationFunnelSchema = {
     description: 'Application pipeline as a funnel.'
 } as const;
 
+export const ApplicationLayoutSchema = {
+    type: 'string',
+    enum: ['single_page', 'multi_step'],
+    title: 'ApplicationLayout',
+    description: `How the portal renders the application form for a popup.
+
+- single_page: all sections stacked on one page (legacy behavior).
+- multi_step: one section per step, with Next/Back navigation.`
+} as const;
+
 export const ApplicationPublicSchema = {
     properties: {
         id: {
@@ -1949,6 +1959,11 @@ export const BaseFieldConfigPublicSchema = {
             title: 'Position',
             default: 0
         },
+        required: {
+            type: 'boolean',
+            title: 'Required',
+            default: false
+        },
         label: {
             anyOf: [
                 {
@@ -2026,6 +2041,17 @@ export const BaseFieldConfigUpdateSchema = {
                 }
             ],
             title: 'Position'
+        },
+        required: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Required'
         },
         label: {
             anyOf: [
@@ -2394,6 +2420,46 @@ export const CartUpdateSchema = {
     required: ['items'],
     title: 'CartUpdate',
     description: 'Schema for updating cart items.'
+} as const;
+
+export const CatalogFieldSchema = {
+    properties: {
+        field_name: {
+            type: 'string',
+            title: 'Field Name'
+        },
+        type: {
+            type: 'string',
+            title: 'Type'
+        },
+        label: {
+            type: 'string',
+            title: 'Label'
+        },
+        required: {
+            type: 'boolean',
+            title: 'Required'
+        },
+        target: {
+            type: 'string',
+            title: 'Target'
+        },
+        default_section_key: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Default Section Key'
+        }
+    },
+    type: 'object',
+    required: ['field_name', 'type', 'label', 'required', 'target'],
+    title: 'CatalogField',
+    description: 'A base field from BASE_FIELD_DEFINITIONS that is available to add to a popup.'
 } as const;
 
 export const CategoryBreakdownSchema = {
@@ -3340,6 +3406,11 @@ export const FormFieldPublicSchema = {
             title: 'Protected',
             default: false
         },
+        removable: {
+            type: 'boolean',
+            title: 'Removable',
+            default: true
+        },
         target: {
             anyOf: [
                 {
@@ -3482,6 +3553,11 @@ export const FormSectionCreateSchema = {
             type: 'integer',
             title: 'Order',
             default: 0
+        },
+        kind: {
+            type: 'string',
+            title: 'Kind',
+            default: 'standard'
         }
     },
     type: 'object',
@@ -3530,6 +3606,11 @@ export const FormSectionPublicSchema = {
             type: 'boolean',
             title: 'Protected',
             default: false
+        },
+        kind: {
+            type: 'string',
+            title: 'Kind',
+            default: 'standard'
         }
     },
     type: 'object',
@@ -6323,6 +6404,10 @@ export const PopupAdminSchema = {
             ],
             title: 'Insurance Percentage'
         },
+        application_layout: {
+            '$ref': '#/components/schemas/ApplicationLayout',
+            default: 'single_page'
+        },
         id: {
             type: 'string',
             format: 'uuid',
@@ -6674,6 +6759,10 @@ export const PopupCreateSchema = {
                 }
             ],
             title: 'Insurance Percentage'
+        },
+        application_layout: {
+            '$ref': '#/components/schemas/ApplicationLayout',
+            default: 'single_page'
         }
     },
     type: 'object',
@@ -6946,6 +7035,10 @@ export const PopupPublicSchema = {
                 }
             ],
             title: 'Insurance Percentage'
+        },
+        application_layout: {
+            '$ref': '#/components/schemas/ApplicationLayout',
+            default: 'single_page'
         }
     },
     type: 'object',
@@ -7461,6 +7554,16 @@ export const PopupUpdateSchema = {
                 }
             ],
             title: 'Insurance Percentage'
+        },
+        application_layout: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/ApplicationLayout'
+                },
+                {
+                    type: 'null'
+                }
+            ]
         }
     },
     type: 'object',

@@ -51,17 +51,17 @@ export default function CartItemList() {
       {/* Passes */}
       {cart.passes.length > 0 && (
         <div className="mb-4">
-          <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
             Passes
           </h4>
           <div className="space-y-2">
             {cart.passes.map((pass) => (
               <div
                 key={`${pass.attendeeId}-${pass.productId}`}
-                className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0"
+                className="flex items-center justify-between py-2 border-b border-border last:border-0"
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <Ticket className="w-4 h-4 text-gray-400 shrink-0" />
+                  <Ticket className="w-4 h-4 text-muted-foreground shrink-0" />
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-checkout-title truncate">
                       {getAttendeeName(pass.attendeeId)}
@@ -81,7 +81,7 @@ export default function CartItemList() {
                     onClick={() =>
                       handleRemovePass(pass.attendeeId, pass.productId)
                     }
-                    className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                    className="p-1 text-muted-foreground hover:text-destructive transition-colors"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -95,16 +95,16 @@ export default function CartItemList() {
       {/* Housing */}
       {cart.housing && (
         <div className="mb-4">
-          <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
             Housing
           </h4>
           <div className="flex items-center justify-between py-2">
             <div className="flex items-center gap-3 flex-1 min-w-0">
-              <Home className="w-4 h-4 text-gray-400 shrink-0" />
+              <Home className="w-4 h-4 text-muted-foreground shrink-0" />
               <div className="min-w-0">
                 <p className="text-sm font-medium text-checkout-title truncate">
                   {cart.housing.quantity > 1 && (
-                    <span className="text-gray-500">
+                    <span className="text-muted-foreground">
                       {cart.housing.quantity} ×{" "}
                     </span>
                   )}
@@ -124,7 +124,7 @@ export default function CartItemList() {
               <button
                 type="button"
                 onClick={clearHousing}
-                className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                className="p-1 text-muted-foreground hover:text-destructive transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -136,21 +136,21 @@ export default function CartItemList() {
       {/* Merch */}
       {cart.merch.length > 0 && (
         <div className="mb-4">
-          <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
             Merchandise
           </h4>
           <div className="space-y-2">
             {cart.merch.map((item) => (
               <div
                 key={item.productId}
-                className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0"
+                className="flex items-center justify-between py-2 border-b border-border last:border-0"
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <ShoppingBag className="w-4 h-4 text-gray-400 shrink-0" />
+                  <ShoppingBag className="w-4 h-4 text-muted-foreground shrink-0" />
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-checkout-title truncate">
                       {item.quantity > 1 && (
-                        <span className="text-gray-500">
+                        <span className="text-muted-foreground">
                           {item.quantity} ×{" "}
                         </span>
                       )}
@@ -165,7 +165,7 @@ export default function CartItemList() {
                   <button
                     type="button"
                     onClick={() => updateMerchQuantity(item.productId, 0)}
-                    className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                    className="p-1 text-muted-foreground hover:text-destructive transition-colors"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -179,12 +179,12 @@ export default function CartItemList() {
       {/* Patron */}
       {cart.patron && (
         <div className="mb-4">
-          <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
             Patron Contribution
           </h4>
           <div className="flex items-center justify-between py-2">
             <div className="flex items-center gap-3">
-              <Heart className="w-4 h-4 text-gray-400 shrink-0" />
+              <Heart className="w-4 h-4 text-muted-foreground shrink-0" />
               <span className="text-sm font-medium text-checkout-title">
                 Community Support
               </span>
@@ -196,7 +196,7 @@ export default function CartItemList() {
               <button
                 type="button"
                 onClick={clearPatron}
-                className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                className="p-1 text-muted-foreground hover:text-destructive transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -208,7 +208,7 @@ export default function CartItemList() {
       {/* Dynamic Items */}
       {hasDynamicItems && (
         <div className="mb-4">
-          <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
             Tickets
           </h4>
           <div className="space-y-2">
@@ -217,14 +217,14 @@ export default function CartItemList() {
               .map((item) => (
                 <div
                   key={item.productId}
-                  className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0"
+                  className="flex items-center justify-between py-2 border-b border-border last:border-0"
                 >
                   <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <Ticket className="w-4 h-4 text-gray-400 shrink-0" />
+                    <Ticket className="w-4 h-4 text-muted-foreground shrink-0" />
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-checkout-title truncate">
                         {item.quantity > 1 && (
-                          <span className="text-gray-500">
+                          <span className="text-muted-foreground">
                             {item.quantity} ×{" "}
                           </span>
                         )}
@@ -241,7 +241,7 @@ export default function CartItemList() {
                       onClick={() =>
                         removeDynamicItem(item.stepType, item.productId)
                       }
-                      className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                      className="p-1 text-muted-foreground hover:text-destructive transition-colors"
                     >
                       <X className="w-4 h-4" />
                     </button>
@@ -255,12 +255,12 @@ export default function CartItemList() {
       {/* Insurance */}
       {cart.insurance && summary.insuranceSubtotal > 0 && (
         <div className="mb-4">
-          <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
             Pass Protection
           </h4>
           <div className="flex items-center justify-between py-2">
             <div className="flex items-center gap-3">
-              <Shield className="w-4 h-4 text-gray-400 shrink-0" />
+              <Shield className="w-4 h-4 text-muted-foreground shrink-0" />
               <span className="text-sm font-medium text-checkout-title">
                 Coverage for all passes
               </span>
@@ -275,7 +275,7 @@ export default function CartItemList() {
       {/* Promo Code */}
       {cart.promoCodeValid && cart.promoCode && (
         <div className="mb-4">
-          <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
             Promo Code
           </h4>
           <div className="flex items-center justify-between py-2">
@@ -292,7 +292,7 @@ export default function CartItemList() {
               <button
                 type="button"
                 onClick={clearPromoCode}
-                className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                className="p-1 text-muted-foreground hover:text-destructive transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -303,7 +303,7 @@ export default function CartItemList() {
 
       {!hasItems && (
         <div className="py-8 text-center">
-          <p className="text-gray-500">{t("checkout.cart.empty_title")}</p>
+          <p className="text-muted-foreground">{t("checkout.cart.empty_title")}</p>
         </div>
       )}
     </>

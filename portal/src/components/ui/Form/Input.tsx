@@ -40,7 +40,7 @@ const InputForm = ({
           {label}
         </LabelRequired>
         {subtitle && (
-          <LabelMuted className="text-sm text-muted-foreground">
+          <LabelMuted className="text-sm text-heading-secondary">
             {subtitle}
           </LabelMuted>
         )}
@@ -77,7 +77,7 @@ export const AddonInputForm = ({
           {label}
         </LabelRequired>
         {subtitle && (
-          <LabelMuted className="text-sm text-muted-foreground">
+          <LabelMuted className="text-sm text-heading-secondary">
             {subtitle}
           </LabelMuted>
         )}
