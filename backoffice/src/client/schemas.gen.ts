@@ -10070,11 +10070,6 @@ export const TierPhaseCreateSchema = {
             format: 'uuid',
             title: 'Product Id'
         },
-        order: {
-            type: 'integer',
-            minimum: 1,
-            title: 'Order'
-        },
         label: {
             type: 'string',
             minLength: 1,
@@ -10106,12 +10101,15 @@ export const TierPhaseCreateSchema = {
         }
     },
     type: 'object',
-    required: ['product_id', 'order', 'label'],
+    required: ['product_id', 'label'],
     title: 'TierPhaseCreate',
     description: `Schema for creating a new ticket tier phase.
 
 group_id is optional here because the router endpoint at
-POST /ticket-tier-groups/{group_id}/phases injects it from the path param.`
+POST /ticket-tier-groups/{group_id}/phases injects it from the path param.
+
+\`order\` is not accepted on input: the backend derives it from
+\`sale_starts_at ASC\` (NULLS LAST) with a deterministic id tiebreak.`
 } as const;
 
 export const TierPhasePublicSchema = {
@@ -10190,18 +10188,6 @@ export const TierPhasePublicSchema = {
 
 export const TierPhaseUpdateSchema = {
     properties: {
-        order: {
-            anyOf: [
-                {
-                    type: 'integer',
-                    minimum: 1
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Order'
-        },
         label: {
             anyOf: [
                 {
@@ -10241,7 +10227,10 @@ export const TierPhaseUpdateSchema = {
     },
     type: 'object',
     title: 'TierPhaseUpdate',
-    description: 'Schema for updating a ticket tier phase (all fields optional).'
+    description: `Schema for updating a ticket tier phase (all fields optional).
+
+\`order\` is derived automatically; updates that change \`sale_starts_at\`
+trigger a full re-order of the group.`
 } as const;
 
 export const TimelinePointSchema = {

@@ -3662,7 +3662,8 @@ export class TicketTierGroupsService {
      * Create Tier Phase
      * Add a phase to a tier group (ADMIN only).
      *
-     * Returns HTTP 422 if (group_id, order) already exists.
+     * Returns HTTP 422 when the product is already bound to another phase.
+     * `order` is derived server-side from `sale_starts_at` ASC NULLS LAST.
      * @param data The data for the request.
      * @param data.groupId
      * @param data.requestBody

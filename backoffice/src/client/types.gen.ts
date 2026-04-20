@@ -1985,11 +1985,13 @@ export type TierGroupUpdate = {
  *
  * group_id is optional here because the router endpoint at
  * POST /ticket-tier-groups/{group_id}/phases injects it from the path param.
+ *
+ * `order` is not accepted on input: the backend derives it from
+ * `sale_starts_at ASC` (NULLS LAST) with a deterministic id tiebreak.
  */
 export type TierPhaseCreate = {
     group_id?: (string | null);
     product_id: string;
-    order: number;
     label: string;
     sale_starts_at?: (string | null);
     sale_ends_at?: (string | null);
@@ -2013,9 +2015,11 @@ export type TierPhasePublic = {
 
 /**
  * Schema for updating a ticket tier phase (all fields optional).
+ *
+ * `order` is derived automatically; updates that change `sale_starts_at`
+ * trigger a full re-order of the group.
  */
 export type TierPhaseUpdate = {
-    order?: (number | null);
     label?: (string | null);
     sale_starts_at?: (string | null);
     sale_ends_at?: (string | null);
