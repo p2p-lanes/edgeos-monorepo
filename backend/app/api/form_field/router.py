@@ -84,6 +84,7 @@ async def list_form_fields(
     limit: PaginationLimit = 100,
 ) -> ListModel[FormFieldPublic]:
     if popup_id:
+        from app.api.form_section.crud import form_sections_crud
         from app.api.popup.crud import popups_crud
 
         popup = popups_crud.get(db, popup_id)
@@ -97,8 +98,25 @@ async def list_form_fields(
             db, popup_id=popup_id, skip=skip, limit=limit, search=search
         )
         all_fields = base_fields + [_to_public(f) for f in custom_fields]
-        # Sort by position
-        all_fields.sort(key=lambda f: (f.position or 0))
+        # Sort by (section.order, position) so fields group by section and
+        # appear in their configured order. Sorting by position alone
+        # interleaves fields across sections (e.g. a position=0 field from
+        # section 2 lands between position=0 and position=1 of section 1).
+        sections, _section_total = form_sections_crud.find_by_popup(
+            db, popup_id, skip=0, limit=1000
+        )
+        # Unsectioned fields (section_id is None) sort last by using +inf.
+        section_order_by_id: dict[uuid.UUID, int] = {
+            s.id: s.order for s in sections
+        }
+        all_fields.sort(
+            key=lambda f: (
+                section_order_by_id.get(f.section_id, float("inf"))
+                if f.section_id
+                else float("inf"),
+                f.position or 0,
+            )
+        )
         total = len(base_fields) + custom_total
     else:
         custom_fields, total = crud.form_fields_crud.find(

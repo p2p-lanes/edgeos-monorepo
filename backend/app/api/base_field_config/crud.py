@@ -7,6 +7,7 @@ from sqlmodel import Session, select
 from app.api.base_field_config.constants import BASE_FIELD_DEFINITIONS
 from app.api.base_field_config.models import BaseFieldConfigs
 from app.api.base_field_config.schemas import BaseFieldConfigUpdate
+from app.api.form_section.models import FormSections
 from app.api.shared.crud import BaseCRUD
 
 if TYPE_CHECKING:
@@ -39,10 +40,17 @@ class BaseFieldConfigsCRUD(
     def find_by_popup(
         self, session: Session, popup_id: uuid.UUID
     ) -> list[BaseFieldConfigs]:
+        # Order by (section.order, position) so callers that don't regroup still
+        # render fields in the same visual order as the form builder: sections
+        # stay together instead of being interleaved by raw position value.
         statement = (
             select(BaseFieldConfigs)
+            .outerjoin(
+                FormSections,
+                BaseFieldConfigs.section_id == FormSections.id,  # type: ignore[arg-type]
+            )
             .where(BaseFieldConfigs.popup_id == popup_id)
-            .order_by(BaseFieldConfigs.position)
+            .order_by(FormSections.order, BaseFieldConfigs.position)  # type: ignore[arg-type]
         )
         return list(session.exec(statement).all())
 
