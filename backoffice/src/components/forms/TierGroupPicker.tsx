@@ -28,8 +28,7 @@ export function TierGroupPicker({
 
   const { data, isLoading } = useQuery({
     queryKey: ["tier-groups", popupId],
-    queryFn: () =>
-      TicketTierGroupsService.listTierGroups({ popupId }),
+    queryFn: () => TicketTierGroupsService.listTierGroups({ popupId }),
     enabled: !!popupId,
   })
 
@@ -40,7 +39,9 @@ export function TierGroupPicker({
       TicketTierGroupsService.createTierGroup({
         requestBody: {
           name,
-          shared_stock_cap: newGroupCap ? Number.parseInt(newGroupCap, 10) : null,
+          shared_stock_cap: newGroupCap
+            ? Number.parseInt(newGroupCap, 10)
+            : null,
           popup_id: popupId,
         },
       }),
@@ -90,7 +91,6 @@ export function TierGroupPicker({
             <button
               key={group.id}
               type="button"
-              role="button"
               aria-pressed={selected}
               onClick={() => handleGroupClick(group)}
               className={cn(

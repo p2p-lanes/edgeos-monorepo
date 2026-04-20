@@ -19,18 +19,18 @@ import {
   type ProductCreate,
   type ProductPublicWithTier,
   ProductsService,
-  TicketTierGroupsService,
   type ProductUpdate,
   type TicketAttendeeCategory,
   type TicketDuration,
+  TicketTierGroupsService,
 } from "@/client"
 
 type ProductCategory = string
 
-import { TierGroupPicker } from "@/components/forms/TierGroupPicker"
 import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
+import { TierGroupPicker } from "@/components/forms/TierGroupPicker"
 import { TranslationManager } from "@/components/translations/TranslationManager"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -751,14 +751,15 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
         {/* Tier Group Section — only for tickets when popup flag is on */}
         <form.Subscribe selector={(state) => state.values.category}>
           {(category) =>
-            popupData?.tier_progression_enabled && category === "ticket" && (
+            popupData?.tier_progression_enabled &&
+            category === "ticket" && (
               <>
                 <Separator />
                 <InlineSection title="Tier Group">
                   <div className="space-y-3">
                     <p className="px-1 text-xs text-muted-foreground">
-                      Assign this ticket to a tier group to enable early-bird
-                      / regular / late progression.
+                      Assign this ticket to a tier group to enable early-bird /
+                      regular / late progression.
                     </p>
                     <TierGroupPicker
                       popupId={popupId!}
@@ -809,9 +810,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
                           aria-label="Sale starts"
                           type="date"
                           value={phaseSaleStartsAt}
-                          onChange={(e) =>
-                            setPhaseSaleStartsAt(e.target.value)
-                          }
+                          onChange={(e) => setPhaseSaleStartsAt(e.target.value)}
                           disabled={readOnly}
                           className="max-w-44 text-sm"
                         />

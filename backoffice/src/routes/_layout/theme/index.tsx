@@ -60,8 +60,8 @@ function ThemePageContent({ popupId }: { popupId: string }) {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Theme</h1>
         <p className="text-muted-foreground">
-          Colors, typography and radius for the {popup.name} portal and
-          checkout flow.
+          Colors, typography and radius for the {popup.name} portal and checkout
+          flow.
         </p>
       </div>
       {/* Re-mount the form when the popup context changes so its internal
@@ -76,7 +76,8 @@ function ThemePageContent({ popupId }: { popupId: string }) {
           location: popup.location ?? null,
           start_date: popup.start_date ?? null,
           end_date: popup.end_date ?? null,
-          express_checkout_background: popup.express_checkout_background ?? null,
+          express_checkout_background:
+            popup.express_checkout_background ?? null,
         }}
       />
     </div>

@@ -175,7 +175,8 @@ export function ThemeConfigForm({
           <p className="text-xs text-muted-foreground">
             Pick a mode + brand colors. The portal derives every other surface
             (backgrounds, borders, hovers, text) automatically for consistent
-            contrast. Hover a field to highlight where it applies in the preview.
+            contrast. Hover a field to highlight where it applies in the
+            preview.
           </p>
 
           {/* Mode toggle */}
@@ -517,7 +518,8 @@ function rgbToHex(r: number, g: number, b: number): string {
 }
 
 function parseColor(color: string): ParsedColor {
-  if (!color) return { hex: "#000000", alpha: 1, rgba: { r: 0, g: 0, b: 0, a: 1 } }
+  if (!color)
+    return { hex: "#000000", alpha: 1, rgba: { r: 0, g: 0, b: 0, a: 1 } }
   const rgbaMatch = color.match(
     /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+))?\s*\)$/,
   )
