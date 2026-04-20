@@ -30,7 +30,9 @@ function parseFaqs(templateConfig: VariantProps["templateConfig"]): FaqItem[] {
 function SectionTitle({ title }: { title?: string }) {
   if (!title) return null
   return (
-    <h3 className="text-xl font-semibold text-foreground text-center">{title}</h3>
+    <h3 className="text-xl font-semibold text-foreground text-center">
+      {title}
+    </h3>
   )
 }
 
@@ -224,7 +226,9 @@ export default function VariantFaqs({ onSkip, templateConfig }: VariantProps) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <HelpCircle className="w-12 h-12 text-muted-foreground mb-4" />
-        <p className="text-muted-foreground mb-6">No frequently asked questions yet.</p>
+        <p className="text-muted-foreground mb-6">
+          No frequently asked questions yet.
+        </p>
         <Button variant="outline" onClick={onSkip}>
           Continue
         </Button>

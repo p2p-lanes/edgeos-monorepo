@@ -20,10 +20,7 @@ export default function BuyPassesContent() {
   return (
     <PassesProvider attendees={attendees} restoreFromCart>
       <CheckoutProvider initialStep="passes">
-        <ScrollyCheckoutFlow
-          onBack={handleBack}
-          onPaymentComplete={() => {}}
-        />
+        <ScrollyCheckoutFlow onBack={handleBack} onPaymentComplete={() => {}} />
       </CheckoutProvider>
     </PassesProvider>
   )

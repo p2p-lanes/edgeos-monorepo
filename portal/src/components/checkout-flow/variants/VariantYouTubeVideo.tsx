@@ -22,7 +22,9 @@ export default function VariantYouTubeVideo({
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <Play className="w-12 h-12 text-muted-foreground mb-4" />
-        <p className="text-muted-foreground mb-6">No video available for this step.</p>
+        <p className="text-muted-foreground mb-6">
+          No video available for this step.
+        </p>
         <Button variant="outline" onClick={onSkip}>
           Continue
         </Button>

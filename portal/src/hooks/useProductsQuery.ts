@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
-import { ProductsService } from "@/client"
 import type { TierGroupPublic, TierPhasePublic } from "@/client"
+import { ProductsService } from "@/client"
 import { useIsAuthenticated } from "@/hooks/useIsAuthenticated"
 import { queryKeys } from "@/lib/query-keys"
 import type { ProductsPass } from "@/types/Products"

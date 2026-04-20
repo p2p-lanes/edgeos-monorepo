@@ -23,6 +23,7 @@ import {
   CHECKOUT_MODE,
   resolvePopupCheckoutPolicy,
 } from "@/checkout/popupCheckoutPolicy"
+import type { TierGroupPublic } from "@/client"
 import AddAttendeeButtons from "@/components/checkout-flow/shared/AddAttendeeButtons"
 import {
   resolveMaxQuantity,
@@ -33,7 +34,6 @@ import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import { usePassesProvider } from "@/providers/passesProvider"
-import type { TierGroupPublic } from "@/client"
 import type { AttendeeCategory, AttendeePassState } from "@/types/Attendee"
 import type { ProductsPass } from "@/types/Products"
 
@@ -627,7 +627,8 @@ function AttendeePassCardBody({
     .sort(sortProductsByPriority)
 
   // Partition into tier-grouped and ungrouped
-  const { groups: tierGroups, ungrouped } = partitionByTierGroup(allStandardProducts)
+  const { groups: tierGroups, ungrouped } =
+    partitionByTierGroup(allStandardProducts)
 
   // Ungrouped products use the legacy layout by duration_type
   const standardProducts = ungrouped
@@ -679,16 +680,18 @@ function AttendeePassCardBody({
       {/* Tier group cards — rendered before ungrouped legacy products */}
       {tierGroups.size > 0 && (
         <div className="divide-y divide-border/50 px-4 py-3 space-y-2">
-          {[...tierGroups.values()].map(({ group, products: groupProducts }) => (
-            <TierGroupCard
-              key={group.id}
-              group={group}
-              products={groupProducts}
-              attendeeId={attendee.id}
-              toggleProduct={toggleProduct}
-              isEditing={isEditing}
-            />
-          ))}
+          {[...tierGroups.values()].map(
+            ({ group, products: groupProducts }) => (
+              <TierGroupCard
+                key={group.id}
+                group={group}
+                products={groupProducts}
+                attendeeId={attendee.id}
+                toggleProduct={toggleProduct}
+                isEditing={isEditing}
+              />
+            ),
+          )}
         </div>
       )}
 
@@ -899,7 +902,9 @@ function PassOption({
         <div className="flex-1 min-w-0 text-left">
           <div className="flex items-center gap-2">
             <Ticket className="w-4 h-4 text-muted-foreground" />
-            <span className="font-medium text-muted-foreground">{product.name}</span>
+            <span className="font-medium text-muted-foreground">
+              {product.name}
+            </span>
             <span className="px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-semibold uppercase rounded tracking-wide border border-slate-200">
               Owned
             </span>
@@ -947,7 +952,9 @@ function PassOption({
               <Ticket
                 className={cn(
                   "w-4 h-4",
-                  isEditedForCredit ? "text-orange-400" : "text-muted-foreground",
+                  isEditedForCredit
+                    ? "text-orange-400"
+                    : "text-muted-foreground",
                 )}
               />
               <span
@@ -1135,7 +1142,9 @@ function QuantityPassOption({
               <Ticket
                 className={cn(
                   "w-4 h-4",
-                  isEditedForCredit ? "text-orange-400" : "text-muted-foreground",
+                  isEditedForCredit
+                    ? "text-orange-400"
+                    : "text-muted-foreground",
                 )}
               />
               <span
@@ -1228,7 +1237,9 @@ function QuantityPassOption({
             <Ticket className="w-4 h-4 text-muted-foreground" />
             <span className="font-medium text-foreground">{product.name}</span>
           </div>
-          <p className="text-sm text-muted-foreground">quantity-based checkout</p>
+          <p className="text-sm text-muted-foreground">
+            quantity-based checkout
+          </p>
           {disabledReason && (
             <p className="text-xs text-amber-600 mt-1">{disabledReason}</p>
           )}
@@ -1324,7 +1335,9 @@ function DayPassOption({
               <Ticket
                 className={cn(
                   "w-4 h-4",
-                  isEditedForCredit ? "text-orange-400" : "text-muted-foreground",
+                  isEditedForCredit
+                    ? "text-orange-400"
+                    : "text-muted-foreground",
                 )}
               />
               <span

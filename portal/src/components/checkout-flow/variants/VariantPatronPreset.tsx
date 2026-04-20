@@ -99,7 +99,9 @@ export default function VariantPatronPreset({
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <Heart className="w-12 h-12 text-muted-foreground mb-4" />
-        <p className="text-muted-foreground mb-6">No contribution options available.</p>
+        <p className="text-muted-foreground mb-6">
+          No contribution options available.
+        </p>
         <Button variant="outline" onClick={onSkip}>
           Continue
         </Button>
@@ -166,7 +168,9 @@ function PatronDefault({
     <div className="space-y-4">
       <div className="bg-checkout-card-bg rounded-2xl shadow-sm border border-border overflow-hidden p-5">
         {product.description && (
-          <p className="text-sm text-muted-foreground mb-4">{product.description}</p>
+          <p className="text-sm text-muted-foreground mb-4">
+            {product.description}
+          </p>
         )}
 
         <div className="flex gap-2 mb-3">
@@ -253,7 +257,9 @@ function PatronCompact({
     <div className="space-y-3">
       <div className="bg-checkout-card-bg rounded-xl border border-border p-3">
         {product.description && (
-          <p className="text-xs text-muted-foreground mb-3">{product.description}</p>
+          <p className="text-xs text-muted-foreground mb-3">
+            {product.description}
+          </p>
         )}
 
         <div className="flex gap-1.5 mb-2">

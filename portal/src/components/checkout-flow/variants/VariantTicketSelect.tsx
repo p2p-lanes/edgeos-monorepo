@@ -470,7 +470,9 @@ function PassRow({
               <Ticket
                 className={cn(
                   "w-4 h-4",
-                  isEditedForCredit ? "text-orange-400" : "text-muted-foreground",
+                  isEditedForCredit
+                    ? "text-orange-400"
+                    : "text-muted-foreground",
                 )}
               />
               <span
@@ -561,7 +563,9 @@ function PassRow({
                   : "border-border",
             )}
           >
-            {isSelected && <Check className="w-3 h-3 text-primary-foreground" />}
+            {isSelected && (
+              <Check className="w-3 h-3 text-primary-foreground" />
+            )}
           </div>
         )}
         <div className="flex-1 min-w-0 text-left">
@@ -868,7 +872,11 @@ function CompactAttendeeCard({
                       qty > 0 ? "text-primary" : "text-muted-foreground",
                     )}
                   />
-                  <span className={qty > 0 ? "text-primary" : "text-muted-foreground"}>
+                  <span
+                    className={
+                      qty > 0 ? "text-primary" : "text-muted-foreground"
+                    }
+                  >
                     {p.name}
                   </span>
                   <span
@@ -1287,9 +1295,7 @@ function LegacySectionLayout({
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <p className="font-medium text-foreground text-sm">
-              {p.name}
-            </p>
+            <p className="font-medium text-foreground text-sm">{p.name}</p>
             {tierState.badge && (
               <span className="text-[10px] uppercase tracking-wide text-muted-foreground border border-border rounded px-1 py-0.5">
                 {tierState.badge}
@@ -1347,9 +1353,7 @@ function LegacySectionLayout({
                   {section.label}
                 </h4>
               </div>
-              <div className="divide-y divide-border">
-                {sp.map(renderRow)}
-              </div>
+              <div className="divide-y divide-border">{sp.map(renderRow)}</div>
             </div>
           ))}
         </div>

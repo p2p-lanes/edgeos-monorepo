@@ -210,9 +210,7 @@ export default function ConfirmStep() {
             const isFirstSection = cart.passes.length === 0 && groupIdx === 0
             return (
               <div key={stepType}>
-                {!isFirstSection && (
-                  <div className="border-t border-border" />
-                )}
+                {!isFirstSection && <div className="border-t border-border" />}
                 <div className="px-5 py-4">
                   <div className="flex items-center gap-2 mb-3">
                     <Ticket className="w-4 h-4 text-muted-foreground" />
@@ -332,7 +330,9 @@ export default function ConfirmStep() {
                 </span>
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Community contribution</span>
+                <span className="text-muted-foreground">
+                  Community contribution
+                </span>
                 <span className="font-medium text-foreground">
                   {formatCurrency(cart.patron.amount)}
                 </span>
@@ -353,7 +353,9 @@ export default function ConfirmStep() {
                 </span>
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Change of plans coverage</span>
+                <span className="text-muted-foreground">
+                  Change of plans coverage
+                </span>
                 <span className="font-medium text-foreground">
                   {formatCurrency(summary.insuranceSubtotal)}
                 </span>

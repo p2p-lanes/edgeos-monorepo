@@ -561,7 +561,9 @@ function DefaultSectionCard({
                         : "border-muted-foreground/40",
                     )}
                   >
-                    {isSelected && <Check className="w-3 h-3 text-primary-foreground" />}
+                    {isSelected && (
+                      <Check className="w-3 h-3 text-primary-foreground" />
+                    )}
                   </div>
                 )}
                 <div className="min-w-0">
@@ -800,7 +802,9 @@ function ShowcaseSectionCard({
                         : "border-muted-foreground/40 bg-checkout-card-bg",
                     )}
                   >
-                    {isSelected && <Check className="w-3 h-3 text-primary-foreground" />}
+                    {isSelected && (
+                      <Check className="w-3 h-3 text-primary-foreground" />
+                    )}
                   </div>
                 )}
               </button>

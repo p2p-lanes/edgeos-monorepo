@@ -34,7 +34,9 @@ function parseImages(
 
 function Caption({ text }: { text?: string }) {
   if (!text) return null
-  return <p className="text-sm text-muted-foreground text-center mt-2">{text}</p>
+  return (
+    <p className="text-sm text-muted-foreground text-center mt-2">{text}</p>
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -378,7 +380,9 @@ export default function VariantImageGallery({
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <ImageIcon className="w-12 h-12 text-muted-foreground mb-4" />
-        <p className="text-muted-foreground mb-6">No images available for this step.</p>
+        <p className="text-muted-foreground mb-6">
+          No images available for this step.
+        </p>
         <Button variant="outline" onClick={onSkip}>
           Continue
         </Button>

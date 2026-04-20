@@ -181,7 +181,9 @@ const HumanForm = ({
               <div className="flex items-start md:items-center gap-3">
                 <Mail className="w-5 h-5 text-muted-foreground mt-0.5 md:mt-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-muted-foreground">{t("common.email")}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {t("common.email")}
+                  </p>
                   <p className="text-foreground break-all">{userData?.email}</p>
                   {filteredLinkedEmails.length > 0 && (
                     <div className="mt-1">
@@ -235,7 +237,9 @@ const HumanForm = ({
               <div className="flex items-center gap-3">
                 <RiTelegram2Line className="w-5 h-5 text-muted-foreground" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm text-muted-foreground">{t("form.telegram")}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {t("form.telegram")}
+                  </p>
                   <p className="text-foreground break-words">
                     {userData?.telegram}
                   </p>
