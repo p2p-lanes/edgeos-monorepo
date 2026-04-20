@@ -32,6 +32,7 @@ interface ThemeColors {
   primary_foreground_color?: string
   secondary_color?: string
   accent_color?: string
+  checkout_navbar_bg?: string
 }
 
 interface ThemeConfig {
@@ -123,8 +124,11 @@ function computeThemeVars(
     "--checkout-title": palette.foreground,
     "--checkout-subtitle": palette.foregroundSecondary,
     "--checkout-watermark": mix(palette.background, palette.foreground, 92),
-    "--checkout-navbar-bg": mix(palette.background, "transparent", 85),
-    "--checkout-nav-bg": mix(palette.background, "transparent", 85),
+    "--checkout-navbar-bg":
+      colors.checkout_navbar_bg || mix(palette.background, "transparent", 85),
+    "--checkout-nav-bg":
+      colors.checkout_navbar_bg || mix(palette.background, "transparent", 85),
+    "--checkout-footer-bg": mix(palette.background, "transparent", 85),
     "--checkout-card-bg": palette.card,
     "--checkout-bottom-bar-bg": palette.sidebar,
     "--checkout-bottom-bar-text": palette.foreground,

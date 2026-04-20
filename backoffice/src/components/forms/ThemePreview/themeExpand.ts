@@ -12,6 +12,7 @@ export interface ThemeColors {
   primary_foreground_color?: string
   secondary_color?: string
   accent_color?: string
+  checkout_navbar_bg?: string
 }
 
 // Editable keys shown in the backoffice form. Anything else in
@@ -23,6 +24,7 @@ export const NEW_THEME_KEYS = [
   "primary_foreground_color",
   "secondary_color",
   "accent_color",
+  "checkout_navbar_bg",
 ] as const
 
 export type NewThemeKey = (typeof NEW_THEME_KEYS)[number]
@@ -33,6 +35,7 @@ export const NEW_KEY_DEFAULTS: Record<NewThemeKey, string> = {
   primary_foreground_color: "#ffffff",
   secondary_color: "",
   accent_color: "",
+  checkout_navbar_bg: "",
 }
 
 const LIGHT = {
@@ -106,8 +109,11 @@ export function computeThemeVars(
     "--checkout-title": palette.foreground,
     "--checkout-subtitle": palette.foregroundSecondary,
     "--checkout-watermark": mix(palette.background, palette.foreground, 92),
-    "--checkout-navbar-bg": mix(palette.background, "transparent", 85),
-    "--checkout-nav-bg": mix(palette.background, "transparent", 85),
+    "--checkout-navbar-bg":
+      colors.checkout_navbar_bg || mix(palette.background, "transparent", 85),
+    "--checkout-nav-bg":
+      colors.checkout_navbar_bg || mix(palette.background, "transparent", 85),
+    "--checkout-footer-bg": mix(palette.background, "transparent", 85),
     "--checkout-card-bg": palette.card,
     "--checkout-bottom-bar-bg": palette.sidebar,
     "--checkout-bottom-bar-text": palette.foreground,
@@ -189,8 +195,8 @@ export const LEGACY_HIGHLIGHT_FROM_NEW: Record<string, string[]> = {
   checkout_title: ["mode"],
   checkout_subtitle: ["mode"],
   checkout_watermark: ["mode"],
-  checkout_navbar_bg: ["mode"],
-  checkout_nav_bg: ["mode"],
+  checkout_navbar_bg: ["checkout_navbar_bg", "mode"],
+  checkout_nav_bg: ["checkout_navbar_bg", "mode"],
   checkout_nav_text: ["primary_foreground_color"],
   checkout_badge_bg: ["primary_color"],
   checkout_badge_title: ["primary_foreground_color"],

@@ -2,6 +2,7 @@
 
 import { useQueryClient } from "@tanstack/react-query"
 import { AnimatePresence, motion } from "framer-motion"
+import { UserRound } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { type CSSProperties, useEffect, useMemo, useRef } from "react"
 import { resolvePopupCheckoutPolicy } from "@/checkout/popupCheckoutPolicy"
@@ -10,6 +11,11 @@ import ScrollyCheckoutFlow from "@/components/checkout-flow/ScrollyCheckoutFlow"
 import { SidebarProvider } from "@/components/Sidebar/SidebarComponents"
 import { Button } from "@/components/ui/button"
 import { Loader } from "@/components/ui/Loader"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import useAuth from "@/hooks/useAuth"
 import {
   dispatchAuthChange,
@@ -122,25 +128,35 @@ export const PopupCheckoutContent = ({
 
   const directSessionBanner =
     policy.saleType === "direct" && user?.email ? (
-      <div className="flex items-center justify-between gap-3 rounded-full border border-gray-200/80 bg-white/70 px-3 py-1.5 shadow-sm backdrop-blur-sm">
-        <div className="min-w-0">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-            Signed in as
-          </p>
-          <p className="truncate text-sm font-medium text-foreground">
-            {user.email}
-          </p>
-        </div>
-
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="shrink-0"
-          onClick={handleChangeEmailForDirectCheckout}
-        >
-          Change email
-        </Button>
+      <div className="flex justify-end">
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              aria-label={`Signed in as ${user.email}`}
+              className="flex size-9 shrink-0 items-center justify-center rounded-full bg-checkout-badge-bg text-checkout-badge-title shadow-sm transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <UserRound className="size-4" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-auto max-w-[280px] p-3">
+            <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Signed in as
+            </p>
+            <p className="mt-0.5 truncate text-sm font-medium text-foreground">
+              {user.email}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mt-3 w-full"
+              onClick={handleChangeEmailForDirectCheckout}
+            >
+              Change email
+            </Button>
+          </PopoverContent>
+        </Popover>
       </div>
     ) : null
 

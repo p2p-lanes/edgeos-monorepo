@@ -261,6 +261,18 @@ export function ThemeConfigForm({
               isHighlighted={highlightedKeys.has("accent_color")}
               disabled={readOnly}
             />
+            <ColorField
+              colorKey="checkout_navbar_bg"
+              label="Checkout navbar"
+              description="Optional background color for the sticky navbar in the checkout flow. Leave empty to use a translucent mix derived from the mode."
+              value={colors.checkout_navbar_bg ?? ""}
+              defaultValue=""
+              onChange={(v) => handleColorChange("checkout_navbar_bg", v)}
+              onReset={() => handleResetColor("checkout_navbar_bg")}
+              onHover={handleHover}
+              isHighlighted={highlightedKeys.has("checkout_navbar_bg")}
+              disabled={readOnly}
+            />
           </div>
 
           {/* Typography */}

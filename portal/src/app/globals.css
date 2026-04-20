@@ -50,6 +50,7 @@
   --color-checkout-watermark: var(--checkout-watermark);
   --color-checkout-subtitle: var(--checkout-subtitle);
   --color-checkout-navbar-bg: var(--checkout-navbar-bg);
+  --color-checkout-footer-bg: var(--checkout-footer-bg);
   --color-checkout-badge-bg: var(--checkout-badge-bg);
   --color-checkout-badge-title: var(--checkout-badge-title);
   --color-checkout-card-bg: var(--checkout-card-bg);
@@ -124,6 +125,7 @@
   --checkout-watermark: rgba(255, 255, 255, 0.85);
   --checkout-subtitle: #6b6b8a;
   --checkout-navbar-bg: rgba(255, 255, 255, 0.85);
+  --checkout-footer-bg: rgba(255, 255, 255, 0.85);
   --checkout-badge-bg: #2d3a6e;
   --checkout-badge-title: #ffffff;
   --checkout-card-bg: #ffffff;
@@ -196,6 +198,7 @@
   --checkout-watermark: rgba(255, 255, 255, 0.12);
   --checkout-subtitle: oklch(0.7 0.02 260);
   --checkout-navbar-bg: oklch(0.205 0.015 285 / 0.85);
+  --checkout-footer-bg: oklch(0.205 0.015 285 / 0.85);
   --checkout-badge-bg: oklch(0.279 0.041 260);
   --checkout-badge-title: oklch(0.985 0 0);
   --checkout-card-bg: oklch(0.205 0.015 285);
