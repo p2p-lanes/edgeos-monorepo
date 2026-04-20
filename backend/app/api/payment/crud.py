@@ -1495,12 +1495,19 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         session: Session,
         payment: Payments,
     ) -> "Groups | None":
-        """Create an ambassador group when a payment is approved.
+        """Create an ambassador group when a payment with a patreon product is approved.
 
-        Returns the created group or None if the human already has an ambassador group
-        for this popup.
+        Returns the created group, or None if no patreon product was purchased or the
+        human already has an ambassador group for this popup.
         """
         from app.api.group.crud import groups_crud
+        from app.api.product.schemas import CATEGORY_PATREON
+
+        has_patreon_product = any(
+            ps.product_category == CATEGORY_PATREON for ps in payment.products_snapshot
+        )
+        if not has_patreon_product:
+            return None
 
         # Get application with popup
         application = session.get(Applications, payment.application_id)

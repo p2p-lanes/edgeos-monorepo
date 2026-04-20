@@ -18,15 +18,13 @@ export default function BuyPassesContent() {
   if (!attendees.length || !products.length) return <Loader />
 
   return (
-    <div className="w-full md:mt-0 mx-auto items-center max-w-3xl ">
-      <PassesProvider attendees={attendees} restoreFromCart>
-        <CheckoutProvider initialStep="passes">
-          <ScrollyCheckoutFlow
-            onBack={handleBack}
-            onPaymentComplete={() => {}}
-          />
-        </CheckoutProvider>
-      </PassesProvider>
-    </div>
+    <PassesProvider attendees={attendees} restoreFromCart>
+      <CheckoutProvider initialStep="passes">
+        <ScrollyCheckoutFlow
+          onBack={handleBack}
+          onPaymentComplete={() => {}}
+        />
+      </CheckoutProvider>
+    </PassesProvider>
   )
 }

@@ -34,7 +34,7 @@ function StripeFooter({
   const canPay = cart.passes.length > 0 && !requiresTerms && !isSubmitting
 
   return (
-    <div className="mb-4 bg-checkout-navbar-bg backdrop-blur-md border-t border-gray-200 rounded-2xl shadow-sm">
+    <div className="mb-4 bg-checkout-footer-bg backdrop-blur-md border-t border-gray-200 rounded-2xl shadow-sm">
       <div className="flex items-center gap-3 px-4 py-3">
         <button
           type="button"
