@@ -104,8 +104,14 @@ function SnapSectionHeader({
 
   return (
     <>
-      <div className="mb-8">
-        <div ref={wrapperRef} className="relative min-h-[2rem] sm:min-h-[3rem]">
+      <div className={cn(showWatermark ? "mb-8" : "mb-2")}>
+        <div
+          ref={wrapperRef}
+          className={cn(
+            "relative",
+            showWatermark && "min-h-[2rem] sm:min-h-[3rem]",
+          )}
+        >
           {showWatermark && (
             <p
               ref={watermarkRef}
