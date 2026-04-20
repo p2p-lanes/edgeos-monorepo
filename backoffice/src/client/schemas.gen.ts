@@ -5358,6 +5358,24 @@ export const ListModel_TicketingStepPublic_Schema = {
     title: 'ListModel[TicketingStepPublic]'
 } as const;
 
+export const ListModel_TierGroupPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/TierGroupPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[TierGroupPublic]'
+} as const;
+
 export const ListModel_UserPublic_Schema = {
     properties: {
         results: {
@@ -6099,6 +6117,15 @@ export const PaymentUpdateSchema = {
     description: 'Schema for updating a payment (mainly status updates).'
 } as const;
 
+export const PhaseStateSchema = {
+    type: 'string',
+    enum: ['upcoming', 'available', 'sold_out', 'expired'],
+    title: 'PhaseState',
+    description: `Derived sales state for a ticket tier phase.
+
+Computed server-side by the progression service at read time; never persisted.`
+} as const;
+
 export const PopupAdminSchema = {
     properties: {
         name: {
@@ -6407,6 +6434,11 @@ export const PopupAdminSchema = {
         application_layout: {
             '$ref': '#/components/schemas/ApplicationLayout',
             default: 'single_page'
+        },
+        tier_progression_enabled: {
+            type: 'boolean',
+            title: 'Tier Progression Enabled',
+            default: false
         },
         id: {
             type: 'string',
@@ -6763,6 +6795,11 @@ export const PopupCreateSchema = {
         application_layout: {
             '$ref': '#/components/schemas/ApplicationLayout',
             default: 'single_page'
+        },
+        tier_progression_enabled: {
+            type: 'boolean',
+            title: 'Tier Progression Enabled',
+            default: false
         }
     },
     type: 'object',
@@ -7039,6 +7076,11 @@ export const PopupPublicSchema = {
         application_layout: {
             '$ref': '#/components/schemas/ApplicationLayout',
             default: 'single_page'
+        },
+        tier_progression_enabled: {
+            type: 'boolean',
+            title: 'Tier Progression Enabled',
+            default: false
         }
     },
     type: 'object',
@@ -7564,6 +7606,17 @@ export const PopupUpdateSchema = {
                     type: 'null'
                 }
             ]
+        },
+        tier_progression_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Tier Progression Enabled'
         }
     },
     type: 'object',
@@ -8354,6 +8407,175 @@ export const ProductPublicSchema = {
     required: ['tenant_id', 'popup_id', 'name', 'slug', 'price', 'id'],
     title: 'ProductPublic',
     description: 'Product schema for API responses.'
+} as const;
+
+export const ProductPublicWithTierSchema = {
+    properties: {
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        slug: {
+            type: 'string',
+            title: 'Slug'
+        },
+        price: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Price'
+        },
+        compare_price: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Compare Price'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        image_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Image Url'
+        },
+        category: {
+            type: 'string',
+            title: 'Category',
+            default: 'ticket'
+        },
+        attendee_category: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TicketAttendeeCategory'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        duration_type: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TicketDuration'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        start_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Start Date'
+        },
+        end_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'End Date'
+        },
+        is_active: {
+            type: 'boolean',
+            title: 'Is Active',
+            default: true
+        },
+        exclusive: {
+            type: 'boolean',
+            title: 'Exclusive',
+            default: false
+        },
+        max_quantity: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Quantity'
+        },
+        insurance_eligible: {
+            type: 'boolean',
+            title: 'Insurance Eligible',
+            default: false
+        },
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        tier_group: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TierGroupPublic'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        phase: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TierPhasePublic'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    type: 'object',
+    required: ['tenant_id', 'popup_id', 'name', 'slug', 'price', 'id'],
+    title: 'ProductPublicWithTier',
+    description: `ProductPublic enriched with optional tier group and phase information.
+
+Additive delta over ProductPublic — both fields are null for products that
+are not assigned to any tier group (BC-2 / BC-3 backward-compat).`
 } as const;
 
 export const ProductUpdateSchema = {
@@ -9704,6 +9926,322 @@ export const TicketingStepUpdateSchema = {
     },
     type: 'object',
     title: 'TicketingStepUpdate'
+} as const;
+
+export const TierGroupCreateSchema = {
+    properties: {
+        name: {
+            type: 'string',
+            minLength: 1,
+            title: 'Name'
+        },
+        shared_stock_cap: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    minimum: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Shared Stock Cap'
+        },
+        popup_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Id'
+        }
+    },
+    type: 'object',
+    required: ['name'],
+    title: 'TierGroupCreate',
+    description: 'Schema for creating a new ticket tier group.'
+} as const;
+
+export const TierGroupPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        shared_stock_cap: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Shared Stock Cap'
+        },
+        shared_stock_remaining: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Shared Stock Remaining'
+        },
+        phases: {
+            items: {
+                '$ref': '#/components/schemas/TierPhasePublic'
+            },
+            type: 'array',
+            title: 'Phases',
+            default: []
+        }
+    },
+    type: 'object',
+    required: ['id', 'tenant_id', 'name'],
+    title: 'TierGroupPublic',
+    description: 'Public read schema for a ticket tier group, with embedded phases.'
+} as const;
+
+export const TierGroupUpdateSchema = {
+    properties: {
+        name: {
+            anyOf: [
+                {
+                    type: 'string',
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Name'
+        },
+        shared_stock_cap: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    minimum: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Shared Stock Cap'
+        }
+    },
+    type: 'object',
+    title: 'TierGroupUpdate',
+    description: 'Schema for updating a ticket tier group (all fields optional).'
+} as const;
+
+export const TierPhaseCreateSchema = {
+    properties: {
+        group_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Group Id'
+        },
+        product_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Product Id'
+        },
+        order: {
+            type: 'integer',
+            minimum: 1,
+            title: 'Order'
+        },
+        label: {
+            type: 'string',
+            minLength: 1,
+            title: 'Label'
+        },
+        sale_starts_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sale Starts At'
+        },
+        sale_ends_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sale Ends At'
+        }
+    },
+    type: 'object',
+    required: ['product_id', 'order', 'label'],
+    title: 'TierPhaseCreate',
+    description: `Schema for creating a new ticket tier phase.
+
+group_id is optional here because the router endpoint at
+POST /ticket-tier-groups/{group_id}/phases injects it from the path param.`
+} as const;
+
+export const TierPhasePublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        group_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Group Id'
+        },
+        product_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Product Id'
+        },
+        order: {
+            type: 'integer',
+            title: 'Order'
+        },
+        label: {
+            type: 'string',
+            title: 'Label'
+        },
+        sale_starts_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sale Starts At'
+        },
+        sale_ends_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sale Ends At'
+        },
+        sales_state: {
+            '$ref': '#/components/schemas/PhaseState'
+        },
+        is_purchasable: {
+            type: 'boolean',
+            title: 'Is Purchasable'
+        },
+        remaining: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Remaining'
+        }
+    },
+    type: 'object',
+    required: ['id', 'group_id', 'product_id', 'order', 'label', 'sales_state', 'is_purchasable'],
+    title: 'TierPhasePublic',
+    description: 'Public read schema for a ticket tier phase, with derived progression fields.'
+} as const;
+
+export const TierPhaseUpdateSchema = {
+    properties: {
+        order: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    minimum: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Order'
+        },
+        label: {
+            anyOf: [
+                {
+                    type: 'string',
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Label'
+        },
+        sale_starts_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sale Starts At'
+        },
+        sale_ends_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sale Ends At'
+        }
+    },
+    type: 'object',
+    title: 'TierPhaseUpdate',
+    description: 'Schema for updating a ticket tier phase (all fields optional).'
 } as const;
 
 export const TimelinePointSchema = {

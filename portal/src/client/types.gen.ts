@@ -1142,6 +1142,11 @@ export type ListModel_TicketingStepPublic_ = {
     paging: Paging;
 };
 
+export type ListModel_TierGroupPublic_ = {
+    results: Array<TierGroupPublic>;
+    paging: Paging;
+};
+
 export type ListModel_UserPublic_ = {
     results: Array<UserPublic>;
     paging: Paging;
@@ -1301,6 +1306,13 @@ export type PaymentUpdate = {
 };
 
 /**
+ * Derived sales state for a ticket tier phase.
+ *
+ * Computed server-side by the progression service at read time; never persisted.
+ */
+export type PhaseState = 'upcoming' | 'available' | 'sold_out' | 'expired';
+
+/**
  * Admin popup schema — all fields including sensitive ones.
  */
 export type PopupAdmin = {
@@ -1341,6 +1353,7 @@ export type PopupAdmin = {
     insurance_enabled?: boolean;
     insurance_percentage?: (string | null);
     application_layout?: ApplicationLayout;
+    tier_progression_enabled?: boolean;
     id: string;
 };
 
@@ -1382,6 +1395,7 @@ export type PopupCreate = {
     insurance_enabled?: boolean;
     insurance_percentage?: (number | string | null);
     application_layout?: ApplicationLayout;
+    tier_progression_enabled?: boolean;
 };
 
 /**
@@ -1421,6 +1435,7 @@ export type PopupPublic = {
     insurance_enabled?: boolean;
     insurance_percentage?: (string | null);
     application_layout?: ApplicationLayout;
+    tier_progression_enabled?: boolean;
 };
 
 /**
@@ -1494,6 +1509,7 @@ export type PopupUpdate = {
     insurance_enabled?: (boolean | null);
     insurance_percentage?: (number | string | null);
     application_layout?: (ApplicationLayout | null);
+    tier_progression_enabled?: (boolean | null);
 };
 
 /**
@@ -1654,6 +1670,35 @@ export type ProductPublic = {
     max_quantity?: (number | null);
     insurance_eligible?: boolean;
     id: string;
+};
+
+/**
+ * ProductPublic enriched with optional tier group and phase information.
+ *
+ * Additive delta over ProductPublic — both fields are null for products that
+ * are not assigned to any tier group (BC-2 / BC-3 backward-compat).
+ */
+export type ProductPublicWithTier = {
+    tenant_id: string;
+    popup_id: string;
+    name: string;
+    slug: string;
+    price: string;
+    compare_price?: (string | null);
+    description?: (string | null);
+    image_url?: (string | null);
+    category?: string;
+    attendee_category?: (TicketAttendeeCategory | null);
+    duration_type?: (TicketDuration | null);
+    start_date?: (string | null);
+    end_date?: (string | null);
+    is_active?: boolean;
+    exclusive?: boolean;
+    max_quantity?: (number | null);
+    insurance_eligible?: boolean;
+    id: string;
+    tier_group?: (TierGroupPublic | null);
+    phase?: (TierPhasePublic | null);
 };
 
 /**
@@ -1904,6 +1949,76 @@ export type TicketProduct = {
     start_date?: (string | null);
     end_date?: (string | null);
     quantity?: number;
+};
+
+/**
+ * Schema for creating a new ticket tier group.
+ */
+export type TierGroupCreate = {
+    name: string;
+    shared_stock_cap?: (number | null);
+    popup_id?: (string | null);
+};
+
+/**
+ * Public read schema for a ticket tier group, with embedded phases.
+ */
+export type TierGroupPublic = {
+    id: string;
+    tenant_id: string;
+    name: string;
+    shared_stock_cap?: (number | null);
+    shared_stock_remaining?: (number | null);
+    phases?: Array<TierPhasePublic>;
+};
+
+/**
+ * Schema for updating a ticket tier group (all fields optional).
+ */
+export type TierGroupUpdate = {
+    name?: (string | null);
+    shared_stock_cap?: (number | null);
+};
+
+/**
+ * Schema for creating a new ticket tier phase.
+ *
+ * group_id is optional here because the router endpoint at
+ * POST /ticket-tier-groups/{group_id}/phases injects it from the path param.
+ */
+export type TierPhaseCreate = {
+    group_id?: (string | null);
+    product_id: string;
+    order: number;
+    label: string;
+    sale_starts_at?: (string | null);
+    sale_ends_at?: (string | null);
+};
+
+/**
+ * Public read schema for a ticket tier phase, with derived progression fields.
+ */
+export type TierPhasePublic = {
+    id: string;
+    group_id: string;
+    product_id: string;
+    order: number;
+    label: string;
+    sale_starts_at?: (string | null);
+    sale_ends_at?: (string | null);
+    sales_state: PhaseState;
+    is_purchasable: boolean;
+    remaining?: (number | null);
+};
+
+/**
+ * Schema for updating a ticket tier phase (all fields optional).
+ */
+export type TierPhaseUpdate = {
+    order?: (number | null);
+    label?: (string | null);
+    sale_starts_at?: (string | null);
+    sale_ends_at?: (string | null);
 };
 
 /**
@@ -3017,7 +3132,7 @@ export type ProductsGetProductData = {
     xTenantId?: (string | null);
 };
 
-export type ProductsGetProductResponse = (ProductPublic);
+export type ProductsGetProductResponse = (ProductPublicWithTier);
 
 export type ProductsUpdateProductData = {
     productId: string;
@@ -3163,6 +3278,71 @@ export type TicketingStepsDeleteTicketingStepData = {
 };
 
 export type TicketingStepsDeleteTicketingStepResponse = (void);
+
+export type TicketTierGroupsCreateTierGroupData = {
+    requestBody: TierGroupCreate;
+    xTenantId?: (string | null);
+};
+
+export type TicketTierGroupsCreateTierGroupResponse = (TierGroupPublic);
+
+export type TicketTierGroupsListTierGroupsData = {
+    popupId?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type TicketTierGroupsListTierGroupsResponse = (ListModel_TierGroupPublic_);
+
+export type TicketTierGroupsGetTierGroupData = {
+    groupId: string;
+    xTenantId?: (string | null);
+};
+
+export type TicketTierGroupsGetTierGroupResponse = (TierGroupPublic);
+
+export type TicketTierGroupsUpdateTierGroupData = {
+    groupId: string;
+    requestBody: TierGroupUpdate;
+    xTenantId?: (string | null);
+};
+
+export type TicketTierGroupsUpdateTierGroupResponse = (TierGroupPublic);
+
+export type TicketTierGroupsDeleteTierGroupData = {
+    groupId: string;
+    xTenantId?: (string | null);
+};
+
+export type TicketTierGroupsDeleteTierGroupResponse = (void);
+
+export type TicketTierGroupsCreateTierPhaseData = {
+    groupId: string;
+    requestBody: TierPhaseCreate;
+    xTenantId?: (string | null);
+};
+
+export type TicketTierGroupsCreateTierPhaseResponse = ({
+    [key: string]: unknown;
+});
+
+export type TicketTierGroupsUpdateTierPhaseData = {
+    groupId: string;
+    phaseId: string;
+    requestBody: TierPhaseUpdate;
+    xTenantId?: (string | null);
+};
+
+export type TicketTierGroupsUpdateTierPhaseResponse = ({
+    [key: string]: unknown;
+});
+
+export type TicketTierGroupsDeleteTierPhaseData = {
+    groupId: string;
+    phaseId: string;
+    xTenantId?: (string | null);
+};
+
+export type TicketTierGroupsDeleteTierPhaseResponse = (void);
 
 export type TranslationsListTranslationsData = {
     entityId: string;
