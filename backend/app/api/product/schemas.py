@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from enum import Enum
+from enum import Enum, StrEnum
 
 from pydantic import BaseModel, ConfigDict, model_validator
 from sqlalchemy import Boolean, Numeric, Text
@@ -190,3 +190,104 @@ class ProductWithQuantity(ProductPublic):
     """Product with quantity for attendee products."""
 
     quantity: int = 1
+
+
+# ---------------------------------------------------------------------------
+# Ticket Tier Progression schemas
+# ---------------------------------------------------------------------------
+
+
+class PhaseState(StrEnum):
+    """Derived sales state for a ticket tier phase.
+
+    Computed server-side by the progression service at read time; never persisted.
+    """
+
+    upcoming = "upcoming"
+    available = "available"
+    sold_out = "sold_out"
+    expired = "expired"
+
+
+class TierPhaseCreate(BaseModel):
+    """Schema for creating a new ticket tier phase."""
+
+    group_id: uuid.UUID
+    product_id: uuid.UUID
+    order: int = Field(ge=1)
+    label: str = Field(min_length=1)
+    sale_starts_at: datetime | None = None
+    sale_ends_at: datetime | None = None
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+class TierPhaseUpdate(BaseModel):
+    """Schema for updating a ticket tier phase (all fields optional)."""
+
+    order: int | None = Field(default=None, ge=1)
+    label: str | None = Field(default=None, min_length=1)
+    sale_starts_at: datetime | None = None
+    sale_ends_at: datetime | None = None
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+class TierPhasePublic(BaseModel):
+    """Public read schema for a ticket tier phase, with derived progression fields."""
+
+    id: uuid.UUID
+    group_id: uuid.UUID
+    product_id: uuid.UUID
+    order: int
+    label: str
+    sale_starts_at: datetime | None = None
+    sale_ends_at: datetime | None = None
+    # Derived by the backend progression service — never persisted
+    sales_state: PhaseState
+    is_purchasable: bool
+    remaining: int | None = None  # min(phase cap remaining, shared remaining); null if both null
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TierGroupCreate(BaseModel):
+    """Schema for creating a new ticket tier group."""
+
+    name: str = Field(min_length=1)
+    shared_stock_cap: int | None = Field(default=None, ge=1)
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+class TierGroupUpdate(BaseModel):
+    """Schema for updating a ticket tier group (all fields optional)."""
+
+    name: str | None = Field(default=None, min_length=1)
+    shared_stock_cap: int | None = Field(default=None, ge=1)
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+class TierGroupPublic(BaseModel):
+    """Public read schema for a ticket tier group, with embedded phases."""
+
+    id: uuid.UUID
+    tenant_id: uuid.UUID
+    name: str
+    shared_stock_cap: int | None = None
+    shared_stock_remaining: int | None = None
+    phases: list[TierPhasePublic] = []  # sorted by order asc
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ProductPublicWithTier(ProductPublic):
+    """ProductPublic enriched with optional tier group and phase information.
+
+    Additive delta over ProductPublic — both fields are null for products that
+    are not assigned to any tier group (BC-2 / BC-3 backward-compat).
+    """
+
+    tier_group: TierGroupPublic | None = None
+    phase: TierPhasePublic | None = None

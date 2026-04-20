@@ -132,6 +132,10 @@ class PopupBase(SQLModel):
         default=ApplicationLayout.single_page,
         sa_column=Column(String, nullable=False, server_default="single_page"),
     )
+    tier_progression_enabled: bool = Field(
+        default=False,
+        sa_column=Column(Boolean, nullable=False, server_default="false"),
+    )
 
     @field_validator("currency")
     @classmethod
@@ -175,6 +179,7 @@ class PopupCreate(SQLModel):
     insurance_enabled: bool = False
     insurance_percentage: Decimal | None = None
     application_layout: ApplicationLayout = ApplicationLayout.single_page
+    tier_progression_enabled: bool = False
 
     @field_validator("currency")
     @classmethod
@@ -232,6 +237,7 @@ class PopupUpdate(SQLModel):
     insurance_enabled: bool | None = None
     insurance_percentage: Decimal | None = None
     application_layout: ApplicationLayout | None = None
+    tier_progression_enabled: bool | None = None
 
     @field_validator("currency")
     @classmethod
@@ -295,6 +301,7 @@ class PopupPublic(SQLModel):
     insurance_enabled: bool = False
     insurance_percentage: Decimal | None = None
     application_layout: ApplicationLayout = ApplicationLayout.single_page
+    tier_progression_enabled: bool = False
 
 
 class PopupAdmin(PopupBase):
