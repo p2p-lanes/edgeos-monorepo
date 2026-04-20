@@ -418,7 +418,44 @@ async def list_product_categories(
     return results
 
 
-@router.get("", response_model=ListModel[ProductPublic])
+def _load_tier_progression_flags(db: Any, products: list[Any]) -> dict[uuid.UUID, bool]:
+    """Bulk-fetch popups referenced by a product list and return their flag state.
+
+    Used by list endpoints to decide, per product, whether to run the tier
+    enrichment pass — avoids an N+1 popup lookup.
+    """
+    from sqlmodel import select as _select
+
+    from app.api.popup.models import Popups
+
+    popup_ids = {p.popup_id for p in products if getattr(p, "popup_id", None)}
+    if not popup_ids:
+        return {}
+    stmt = _select(Popups.id, Popups.tier_progression_enabled).where(
+        Popups.id.in_(popup_ids)  # type: ignore[attr-defined]
+    )
+    return {row.id: bool(row.tier_progression_enabled) for row in db.exec(stmt).all()}
+
+
+def _enrich_product_list(db: Any, products: list[Any]) -> list[ProductPublicWithTier]:
+    """Project a product list to ProductPublicWithTier, respecting popup flags.
+
+    Products whose popup has tier_progression_enabled=False (or no phase)
+    return with tier_group=None and phase=None — additive and backward-compat.
+    """
+    flag_by_popup = _load_tier_progression_flags(db, products)
+    out: list[ProductPublicWithTier] = []
+    for p in products:
+        base = ProductPublic.model_validate(p)
+        if flag_by_popup.get(p.popup_id):
+            tier_data = crud.enrich_product_with_tier(db, p)
+        else:
+            tier_data = {"tier_group": None, "phase": None}
+        out.append(ProductPublicWithTier(**base.model_dump(), **tier_data))
+    return out
+
+
+@router.get("", response_model=ListModel[ProductPublicWithTier])
 async def list_products(
     db: TenantSession,
     _: CurrentUser,
@@ -430,8 +467,12 @@ async def list_products(
     sort_order: Literal["asc", "desc"] = "desc",
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
-) -> ListModel[ProductPublic]:
-    """List all products with optional filters."""
+) -> ListModel[ProductPublicWithTier]:
+    """List all products with optional filters.
+
+    Response carries enriched tier_group/phase fields for products whose popup
+    has tier_progression_enabled=True; null otherwise (BC-2 additive).
+    """
     if popup_id:
         products, total = crud.products_crud.find_by_popup(
             db,
@@ -455,8 +496,8 @@ async def list_products(
             sort_order=sort_order,
         )
 
-    return ListModel[ProductPublic](
-        results=[ProductPublic.model_validate(p) for p in products],
+    return ListModel[ProductPublicWithTier](
+        results=_enrich_product_list(db, products),
         paging=Paging(offset=skip, limit=limit, total=total),
     )
 
@@ -656,7 +697,7 @@ async def delete_product(
     crud.products_crud.delete(db, product)
 
 
-@router.get("/portal/products", response_model=ListModel[ProductPublic])
+@router.get("/portal/products", response_model=ListModel[ProductPublicWithTier])
 async def list_portal_products(
     db: HumanTenantSession,
     _: CurrentHuman,
@@ -666,8 +707,12 @@ async def list_portal_products(
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
     accept_language: Annotated[str | None, Header(alias="Accept-Language")] = None,
-) -> ListModel[ProductPublic]:
-    """List products visible to the current human (Portal)."""
+) -> ListModel[ProductPublicWithTier]:
+    """List products visible to the current human (Portal).
+
+    Response carries enriched tier_group/phase fields for products whose popup
+    has tier_progression_enabled=True; null otherwise (BC-2 additive).
+    """
     if popup_id:
         products, total = crud.products_crud.find_by_popup(
             db,
@@ -688,20 +733,29 @@ async def list_portal_products(
     if accept_language and accept_language != "en":
         lang = accept_language.split(",")[0].split("-")[0].strip()
 
+    flag_by_popup = _load_tier_progression_flags(db, products)
+    translations_map: dict[uuid.UUID, Any] = {}
     if lang:
-        product_ids = [p.id for p in products]
-        translations_map = get_translations_bulk(db, "product", product_ids, lang)
-        results = []
-        for p in products:
-            data = ProductPublic.model_validate(p).model_dump()
-            data = apply_translation_overlay(
-                data, translations_map.get(p.id), TRANSLATABLE_FIELDS["product"]
-            )
-            results.append(ProductPublic.model_validate(data))
-    else:
-        results = [ProductPublic.model_validate(p) for p in products]
+        translations_map = get_translations_bulk(
+            db, "product", [p.id for p in products], lang
+        )
 
-    return ListModel[ProductPublic](
+    results: list[ProductPublicWithTier] = []
+    for p in products:
+        base_data = ProductPublic.model_validate(p).model_dump()
+        if lang:
+            base_data = apply_translation_overlay(
+                base_data,
+                translations_map.get(p.id),
+                TRANSLATABLE_FIELDS["product"],
+            )
+        if flag_by_popup.get(p.popup_id):
+            tier_data = crud.enrich_product_with_tier(db, p)
+        else:
+            tier_data = {"tier_group": None, "phase": None}
+        results.append(ProductPublicWithTier(**base_data, **tier_data))
+
+    return ListModel[ProductPublicWithTier](
         results=results,
         paging=Paging(offset=skip, limit=limit, total=total),
     )
