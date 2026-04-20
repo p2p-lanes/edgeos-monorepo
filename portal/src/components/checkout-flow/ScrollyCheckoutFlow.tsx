@@ -85,7 +85,7 @@ function ScrollyCheckoutFlowInner({
   const [activeSection, setActiveSection] = useState<string>("passes")
   const scrollToIndexRef = useRef<((index: number) => void) | null>(null)
 
-  const footerDesign = "stripe" as const
+  const footerDesign = "pill" as const
   const navDesign = "pills" as const
   const watermarkStyle: WatermarkStyle = "bold"
 
