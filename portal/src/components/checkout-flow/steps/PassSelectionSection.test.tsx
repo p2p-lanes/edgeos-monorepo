@@ -80,7 +80,10 @@ vi.mock("@/providers/cityProvider", () => ({
 }))
 
 vi.mock("@/checkout/popupCheckoutPolicy", () => ({
-  CHECKOUT_MODE: { PASS_SYSTEM: "pass_system", SIMPLE_QUANTITY: "simple_quantity" },
+  CHECKOUT_MODE: {
+    PASS_SYSTEM: "pass_system",
+    SIMPLE_QUANTITY: "simple_quantity",
+  },
   resolvePopupCheckoutPolicy: () => ({ checkoutMode: "pass_system" }),
 }))
 
@@ -172,10 +175,7 @@ function makeProduct(
   }
 }
 
-function makeAttendee(
-  id: string,
-  products: ProductsPass[],
-): AttendeePassState {
+function makeAttendee(id: string, products: ProductsPass[]): AttendeePassState {
   return {
     id,
     name: "Test Attendee",
@@ -353,8 +353,18 @@ describe("PassSelectionSection — tier group rendering", () => {
       is_purchasable: false,
     })
 
-    const productA = makeProduct({ id: "prod-a", name: "Regular Pass", tier_group: TIER_GROUP_X, phase: phase1 })
-    const productB = makeProduct({ id: "prod-b", name: "Early Bird Pass", tier_group: TIER_GROUP_X, phase: phase2 })
+    const productA = makeProduct({
+      id: "prod-a",
+      name: "Regular Pass",
+      tier_group: TIER_GROUP_X,
+      phase: phase1,
+    })
+    const productB = makeProduct({
+      id: "prod-b",
+      name: "Early Bird Pass",
+      tier_group: TIER_GROUP_X,
+      phase: phase2,
+    })
 
     setMockAttendees([makeAttendee("attendee-1", [productA, productB])])
     render(<PassSelectionSection />)

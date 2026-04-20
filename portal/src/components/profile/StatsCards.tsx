@@ -15,7 +15,9 @@ const StatsCards = ({
       <Card className="p-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-muted-foreground mb-1">Pop-ups attended</p>
+            <p className="text-sm text-muted-foreground mb-1">
+              Pop-ups attended
+            </p>
             <p className="text-3xl font-bold text-foreground">—</p>
           </div>
           <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center">
@@ -27,7 +29,9 @@ const StatsCards = ({
       <Card className="p-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-muted-foreground mb-1">Days at {tenant?.name}</p>
+            <p className="text-sm text-muted-foreground mb-1">
+              Days at {tenant?.name}
+            </p>
             <p className="text-3xl font-bold text-foreground">—</p>
           </div>
           <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">

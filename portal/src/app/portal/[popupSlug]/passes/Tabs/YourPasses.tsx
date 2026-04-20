@@ -93,9 +93,7 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
                 <div
                   className={cn(
                     "p-0.5 rounded-full transition-colors",
-                    hasSpouse
-                      ? "bg-muted"
-                      : "bg-muted group-hover:bg-muted",
+                    hasSpouse ? "bg-muted" : "bg-muted group-hover:bg-muted",
                   )}
                 >
                   <Plus className="w-3 h-3" />

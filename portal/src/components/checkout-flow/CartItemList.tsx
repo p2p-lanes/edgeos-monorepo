@@ -303,7 +303,9 @@ export default function CartItemList() {
 
       {!hasItems && (
         <div className="py-8 text-center">
-          <p className="text-muted-foreground">{t("checkout.cart.empty_title")}</p>
+          <p className="text-muted-foreground">
+            {t("checkout.cart.empty_title")}
+          </p>
         </div>
       )}
     </>

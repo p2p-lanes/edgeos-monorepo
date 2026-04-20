@@ -173,7 +173,9 @@ const TopMatchStats = ({
             // No matches state
             <div className="flex flex-col items-center justify-center flex-1 text-center py-4">
               <Users className="w-8 h-8 text-gray-300 mb-2" />
-              <p className="text-sm text-muted-foreground">No shared events found</p>
+              <p className="text-sm text-muted-foreground">
+                No shared events found
+              </p>
               <p className="text-xs text-muted-foreground">
                 Attend more events to find matches
               </p>

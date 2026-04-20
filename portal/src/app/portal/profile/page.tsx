@@ -87,7 +87,9 @@ export default function ProfileContent() {
     return (
       <div className="flex-1 flex flex-col items-center justify-center h-full">
         <Card className="p-6 bg-card gap-2">
-          <p className="text-muted-foreground text-center">{t("portal.no_profile")}</p>
+          <p className="text-muted-foreground text-center">
+            {t("portal.no_profile")}
+          </p>
           <p className="text-muted-foreground text-center">
             {t("portal.no_profile_contact")}
           </p>

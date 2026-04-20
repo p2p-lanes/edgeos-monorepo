@@ -2,6 +2,7 @@
 
 import { ArrowLeft, ArrowRight, Loader2, ShoppingBag } from "lucide-react"
 import { useState } from "react"
+import { useTranslation } from "react-i18next"
 import { useSidebar } from "@/components/Sidebar/SidebarComponents"
 import { useIsMobile } from "@/hooks/useIsMobile"
 import { cn } from "@/lib/utils"
@@ -12,6 +13,11 @@ import CartFooter from "./CartFooter"
 import CartItemList from "./CartItemList"
 import type { FooterDesign } from "./ScrollySectionNav"
 
+interface SnapFooterSection {
+  id: string
+  label: string
+}
+
 function StripeFooter({
   onPay,
   onBack,
@@ -19,6 +25,8 @@ function StripeFooter({
   itemCount = 0,
   isOnConfirm,
   onGoToConfirm,
+  onGoToNextSection,
+  nextSectionLabel,
 }: {
   onPay?: () => void
   onBack?: () => void
@@ -26,7 +34,10 @@ function StripeFooter({
   itemCount?: number
   isOnConfirm?: boolean
   onGoToConfirm?: () => void
+  onGoToNextSection?: () => void
+  nextSectionLabel?: string
 }) {
+  const { t } = useTranslation()
   const { cart, summary, isSubmitting, termsAccepted } = useCheckout()
   const { getCity } = useCityProvider()
   const popup = getCity()
@@ -66,10 +77,10 @@ function StripeFooter({
         {!isOnConfirm && cart.passes.length > 0 ? (
           <button
             type="button"
-            onClick={onGoToConfirm}
+            onClick={nextSectionLabel ? onGoToNextSection : onGoToConfirm}
             className="px-5 py-2 rounded-xl text-sm font-semibold bg-checkout-badge-bg text-checkout-badge-title hover:opacity-90 shrink-0"
           >
-            Review
+            {nextSectionLabel ?? t("checkout.actions.review")}
           </button>
         ) : (
           <button
@@ -188,14 +199,19 @@ export default function SnapFooter({
   onPay,
   onBack,
   activeSection,
+  sections,
   onGoToConfirm,
+  onGoToNextSection,
 }: {
   footerDesign: FooterDesign
   onPay?: () => void
   onBack?: () => void
   activeSection?: string
+  sections?: SnapFooterSection[]
   onGoToConfirm?: () => void
+  onGoToNextSection?: () => void
 }) {
+  const { t } = useTranslation()
   const isMobile = useIsMobile()
   const { state: sidebarState } = useSidebar()
   const { cart } = useCheckout()
@@ -215,8 +231,33 @@ export default function SnapFooter({
 
   const isOnConfirm = activeSection === "confirm"
 
+  // Derive the label of the next section relative to the current activeSection,
+  // falling back to the config title, and then to a localized short label.
+  const getStepShortLabel = (id?: string): string | undefined => {
+    if (!id) return undefined
+    const key = `checkout.step_short.${id}`
+    const translated = t(key)
+    return translated === key ? undefined : translated
+  }
+
+  const activeIndex = sections?.findIndex((s) => s.id === activeSection) ?? -1
+  const nextSection =
+    sections && activeIndex >= 0 && activeIndex < sections.length - 1
+      ? sections[activeIndex + 1]
+      : undefined
+  const nextSectionLabel = nextSection
+    ? (getStepShortLabel(nextSection.id) ?? nextSection.label)
+    : undefined
+
   const footer = {
-    pill: <CartFooter onPay={onPay} onBack={onBack} />,
+    pill: (
+      <CartFooter
+        onPay={onPay}
+        onBack={onBack}
+        nextSectionLabel={nextSectionLabel}
+        onContinue={onGoToNextSection}
+      />
+    ),
     stripe: (
       <StripeFooter
         onPay={onPay}
@@ -225,6 +266,8 @@ export default function SnapFooter({
         itemCount={itemCount}
         isOnConfirm={isOnConfirm}
         onGoToConfirm={onGoToConfirm}
+        onGoToNextSection={onGoToNextSection}
+        nextSectionLabel={nextSectionLabel}
       />
     ),
     dock: (

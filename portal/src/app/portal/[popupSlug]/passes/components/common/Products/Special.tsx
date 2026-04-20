@@ -77,7 +77,10 @@ const TooltipPatreon = ({ purchased }: { purchased?: boolean }) => (
     <TooltipTrigger asChild>
       <div className="cursor-pointer">
         <Info
-          className={cn("w-4 h-4 text-neutral-400", purchased && "text-primary-foreground")}
+          className={cn(
+            "w-4 h-4 text-neutral-400",
+            purchased && "text-primary-foreground",
+          )}
         />
       </div>
     </TooltipTrigger>
@@ -100,7 +103,8 @@ type VariantStyles = "selected" | "purchased" | "edit" | "disabled" | "default"
 const variants: Record<VariantStyles, string> = {
   selected:
     "bg-gradient-to-r from-[#FF7B7B]/30 to-[#E040FB]/30 border-neutral-300",
-  purchased: "bg-slate-800 text-primary-foreground border-neutral-700 cursor-not-allowed",
+  purchased:
+    "bg-slate-800 text-primary-foreground border-neutral-700 cursor-not-allowed",
   edit: "bg-slate-800/30 border-dashed border-slate-200 text-neutral-700",
   disabled: "bg-neutral-0 text-neutral-300 cursor-not-allowed ",
   default:

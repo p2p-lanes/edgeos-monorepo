@@ -204,7 +204,17 @@
       "pay": "支付",
       "claim_pass": "领取通行证",
       "confirm_edit": "确认编辑",
-      "pay_and_confirm_edit": "支付并确认编辑"
+      "pay_and_confirm_edit": "支付并确认编辑",
+      "continue_to": "继续到 {{step}}",
+      "review": "审核"
+    },
+    "step_short": {
+      "passes": "通行证",
+      "tickets": "通行证",
+      "housing": "住宿",
+      "merch": "周边",
+      "patron": "赞助人",
+      "confirm": "审核并确认"
     }
   },
   "passes": {

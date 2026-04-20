@@ -31,7 +31,11 @@ const LabelMuted = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <LabelPrimitive.Root
     ref={ref}
-    className={cn(labelVariants(), "text-heading-secondary font-normal", className)}
+    className={cn(
+      labelVariants(),
+      "text-heading-secondary font-normal",
+      className,
+    )}
     {...props}
   />
 ))

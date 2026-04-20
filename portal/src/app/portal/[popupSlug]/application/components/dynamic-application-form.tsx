@@ -210,35 +210,40 @@ export function DynamicApplicationForm({
   }, [values, schema.base_fields])
 
   // Single ordered list of sections: each block has base + custom fields, order follows schema.sections
+  type SectionField = {
+    name: string
+    field: FormFieldSchema
+    isCustom: boolean
+  }
   type SectionBlock = {
     id: string
     title: string
     subtitle?: string
     kind: FormSectionKind
-    baseFields: [string, FormFieldSchema][]
-    customFields: [string, FormFieldSchema][]
+    fields: SectionField[]
   }
 
   const mergedSections = useMemo(() => {
-    const bySectionIdBase: Record<string, [string, FormFieldSchema][]> = {}
-    const bySectionIdCustom: Record<string, [string, FormFieldSchema][]> = {}
+    const bySectionId: Record<string, SectionField[]> = {}
 
     for (const [name, field] of Object.entries(schema.base_fields)) {
-      const sectionId = field.section_id || "_unsectioned"
-      if (!bySectionIdBase[sectionId]) bySectionIdBase[sectionId] = []
-      bySectionIdBase[sectionId].push([name, field])
+      const sectionId = field.section_id || "_unsectioned_base"
+      if (!bySectionId[sectionId]) bySectionId[sectionId] = []
+      bySectionId[sectionId].push({ name, field, isCustom: false })
     }
     for (const [name, field] of Object.entries(schema.custom_fields)) {
-      const sectionId = field.section_id || "_unsectioned"
-      if (!bySectionIdCustom[sectionId]) bySectionIdCustom[sectionId] = []
-      bySectionIdCustom[sectionId].push([`custom_${name}`, field])
+      const sectionId = field.section_id || "_unsectioned_custom"
+      if (!bySectionId[sectionId]) bySectionId[sectionId] = []
+      bySectionId[sectionId].push({
+        name: `custom_${name}`,
+        field,
+        isCustom: true,
+      })
     }
 
-    const sortByPosition = (fields: [string, FormFieldSchema][]) =>
-      fields.sort(([, a], [, b]) => (a.position ?? 0) - (b.position ?? 0))
-    for (const fields of Object.values(bySectionIdBase)) sortByPosition(fields)
-    for (const fields of Object.values(bySectionIdCustom))
-      sortByPosition(fields)
+    for (const fields of Object.values(bySectionId)) {
+      fields.sort((a, b) => (a.field.position ?? 0) - (b.field.position ?? 0))
+    }
 
     const result: SectionBlock[] = []
     const sortedSections = [...(schema.sections ?? [])].sort(
@@ -246,69 +251,60 @@ export function DynamicApplicationForm({
     )
 
     // 1. Unsectioned base first
-    if (bySectionIdBase._unsectioned?.length) {
+    if (bySectionId._unsectioned_base?.length) {
       result.push({
         id: "_unsectioned_base",
         title: t("form.personal_info"),
         subtitle: t("form.personal_info_description"),
         kind: "standard",
-        baseFields: bySectionIdBase._unsectioned,
-        customFields: [],
+        fields: bySectionId._unsectioned_base,
       })
-      delete bySectionIdBase._unsectioned
+      delete bySectionId._unsectioned_base
     }
 
-    // 2. Schema sections in order (only include if has base or custom fields)
+    // 2. Schema sections in order (only include if has fields)
     for (const section of sortedSections) {
-      const baseFields = bySectionIdBase[section.id] ?? []
-      const customFields = bySectionIdCustom[section.id] ?? []
-      if (baseFields.length === 0 && customFields.length === 0) continue
+      const fields = bySectionId[section.id] ?? []
+      if (fields.length === 0) continue
       result.push({
         id: section.id,
         title: section.label,
         subtitle: section.description ?? undefined,
         kind: section.kind,
-        baseFields,
-        customFields,
+        fields,
       })
-      delete bySectionIdBase[section.id]
-      delete bySectionIdCustom[section.id]
+      delete bySectionId[section.id]
     }
 
     // 3. Unsectioned custom
-    if (bySectionIdCustom._unsectioned?.length) {
+    if (bySectionId._unsectioned_custom?.length) {
       result.push({
         id: "_unsectioned_custom",
         title: t("form.additional_info"),
         kind: "standard",
-        baseFields: [],
-        customFields: bySectionIdCustom._unsectioned,
+        fields: bySectionId._unsectioned_custom,
       })
-      delete bySectionIdCustom._unsectioned
+      delete bySectionId._unsectioned_custom
     }
 
     // 4. Remaining (section_id not in schema.sections)
-    const remainingIds = new Set([
-      ...Object.keys(bySectionIdBase),
-      ...Object.keys(bySectionIdCustom),
-    ])
-    for (const id of remainingIds) {
-      const baseFields = bySectionIdBase[id] ?? []
-      const customFields = bySectionIdCustom[id] ?? []
-      if (baseFields.length === 0 && customFields.length === 0) continue
+    for (const [id, fields] of Object.entries(bySectionId)) {
+      if (fields.length === 0) continue
       result.push({
         id,
         title: t("form.other"),
         kind: "standard",
-        baseFields,
-        customFields,
+        fields,
       })
     }
 
     return result
   }, [schema, t])
 
-  const boundedStep = Math.min(currentStep, Math.max(mergedSections.length - 1, 0))
+  const boundedStep = Math.min(
+    currentStep,
+    Math.max(mergedSections.length - 1, 0),
+  )
   const visibleSections = isMultiStep
     ? mergedSections.slice(boundedStep, boundedStep + 1)
     : mergedSections
@@ -331,73 +327,61 @@ export function DynamicApplicationForm({
           </p>
         )}
 
-        {/* Sections in schema order (base + custom fields per section) */}
-        {visibleSections.map(
-          ({ id, title, subtitle, kind, baseFields, customFields }) => {
-            if (kind === "companions") {
-              return (
-                <div key={id}>
-                  <CompanionsSection
-                    allowsSpouse={popup.allows_spouse ?? false}
-                    allowsChildren={popup.allows_children ?? false}
-                    companions={companions}
-                    onCompanionsChange={setCompanions}
-                  />
-                </div>
-              )
-            }
-            if (kind === "scholarship") {
-              const scholarshipFields = Object.fromEntries(
-                baseFields.map(([name, field]) => [name, field]),
-              )
-              return (
-                <ScholarshipSection
-                  key={id}
-                  section={{ id, label: title, description: subtitle }}
-                  fields={scholarshipFields}
-                  scholarshipRequest={getBoolean(values, "scholarship_request")}
-                  scholarshipDetails={getString(values, "scholarship_details")}
-                  scholarshipVideoUrl={getString(
-                    values,
-                    "scholarship_video_url",
-                  )}
-                  detailsError={errors.scholarship_details}
-                  videoUrlError={errors.scholarship_video_url}
-                  onScholarshipRequestChange={(checked) => {
-                    handleChange("scholarship_request", checked)
-                    if (!checked) {
-                      handleChange("scholarship_details", "")
-                      handleChange("scholarship_video_url", "")
-                    }
-                  }}
-                  onDetailsChange={(value) =>
-                    handleChange("scholarship_details", value)
-                  }
-                  onVideoUrlChange={(value) =>
-                    handleChange("scholarship_video_url", value)
-                  }
-                />
-              )
-            }
+        {/* Sections in schema order (base + custom fields merged by position) */}
+        {visibleSections.map(({ id, title, subtitle, kind, fields }) => {
+          if (kind === "companions") {
             return (
               <div key={id}>
-                <SectionWrapper title={title} subtitle={subtitle}>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    {baseFields.map(([name, field]) => (
-                      <BaseField
-                        key={name}
-                        name={name}
-                        field={field}
-                        value={values[name]}
-                        error={errors[name]}
-                        onChange={handleChange}
-                        displayGender={displayGender}
-                        handleGenderChange={handleGenderChange}
-                        genderSpecifyValue={getString(values, "gender_specify")}
-                        genderSpecifyError={errors.gender_specify}
-                      />
-                    ))}
-                    {customFields.map(([name, field]) => (
+                <CompanionsSection
+                  allowsSpouse={popup.allows_spouse ?? false}
+                  allowsChildren={popup.allows_children ?? false}
+                  companions={companions}
+                  onCompanionsChange={setCompanions}
+                />
+              </div>
+            )
+          }
+          if (kind === "scholarship") {
+            const scholarshipFields = Object.fromEntries(
+              fields
+                .filter((f) => !f.isCustom)
+                .map((f) => [f.name, f.field]),
+            )
+            return (
+              <ScholarshipSection
+                key={id}
+                section={{ id, label: title, description: subtitle }}
+                fields={scholarshipFields}
+                scholarshipRequest={getBoolean(values, "scholarship_request")}
+                scholarshipDetails={getString(values, "scholarship_details")}
+                scholarshipVideoUrl={getString(
+                  values,
+                  "scholarship_video_url",
+                )}
+                detailsError={errors.scholarship_details}
+                videoUrlError={errors.scholarship_video_url}
+                onScholarshipRequestChange={(checked) => {
+                  handleChange("scholarship_request", checked)
+                  if (!checked) {
+                    handleChange("scholarship_details", "")
+                    handleChange("scholarship_video_url", "")
+                  }
+                }}
+                onDetailsChange={(value) =>
+                  handleChange("scholarship_details", value)
+                }
+                onVideoUrlChange={(value) =>
+                  handleChange("scholarship_video_url", value)
+                }
+              />
+            )
+          }
+          return (
+            <div key={id}>
+              <SectionWrapper title={title} subtitle={subtitle}>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {fields.map(({ name, field, isCustom }) =>
+                    isCustom ? (
                       <div
                         key={name}
                         className={
@@ -414,14 +398,27 @@ export function DynamicApplicationForm({
                           onChange={handleChange}
                         />
                       </div>
-                    ))}
-                  </div>
-                </SectionWrapper>
-                <SectionSeparator />
-              </div>
-            )
-          },
-        )}
+                    ) : (
+                      <BaseField
+                        key={name}
+                        name={name}
+                        field={field}
+                        value={values[name]}
+                        error={errors[name]}
+                        onChange={handleChange}
+                        displayGender={displayGender}
+                        handleGenderChange={handleGenderChange}
+                        genderSpecifyValue={getString(values, "gender_specify")}
+                        genderSpecifyError={errors.gender_specify}
+                      />
+                    ),
+                  )}
+                </div>
+              </SectionWrapper>
+              <SectionSeparator />
+            </div>
+          )
+        })}
 
         {/* Submit buttons */}
         <div className="flex w-full flex-col gap-6 pt-6">

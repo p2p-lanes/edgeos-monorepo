@@ -119,6 +119,13 @@ function ScrollyCheckoutFlowInner({
     scrollToIndexRef.current?.(idx)
   }, [allSections])
 
+  const goToNextSection = useCallback(() => {
+    const idx = allSections.findIndex((s) => s.id === activeSection)
+    if (idx >= 0 && idx < allSections.length - 1) {
+      scrollToIndexRef.current?.(idx + 1)
+    }
+  }, [allSections, activeSection])
+
   useEffect(() => {
     const findScrollContainer = (): HTMLElement | null => {
       const anchor = document.getElementById(allSections[0]?.id ?? "passes")
@@ -313,7 +320,9 @@ function ScrollyCheckoutFlowInner({
         onPay={handlePayment}
         onBack={onBack}
         activeSection={activeSection}
+        sections={allSections}
         onGoToConfirm={goToConfirm}
+        onGoToNextSection={goToNextSection}
       />
     </div>
   )

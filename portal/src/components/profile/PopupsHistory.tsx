@@ -134,7 +134,9 @@ const PopupsHistory = ({ popups }: { popups: LegacyProfilePopup[] }) => {
         <h2 className="text-xl font-semibold text-foreground">
           {t("profile.popups_title")}
         </h2>
-        <p className="text-sm text-muted-foreground">{t("profile.popups_subtitle")}</p>
+        <p className="text-sm text-muted-foreground">
+          {t("profile.popups_subtitle")}
+        </p>
       </div>
 
       <div className="py-2">

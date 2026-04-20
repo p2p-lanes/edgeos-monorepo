@@ -73,7 +73,9 @@ export default function MultiSelectDropdown({
           >
             <div className="flex flex-wrap gap-1 flex-1">
               {selectedValues.length === 0 ? (
-                <span className="text-heading-secondary">Select options...</span>
+                <span className="text-heading-secondary">
+                  Select options...
+                </span>
               ) : (
                 selectedOptions.map((option) => (
                   <Badge

@@ -125,7 +125,9 @@ function MerchDefaultItem({
           )}
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="font-medium text-foreground text-sm">{product.name}</h3>
+          <h3 className="font-medium text-foreground text-sm">
+            {product.name}
+          </h3>
           {product.description && (
             <ExpandableDescription
               text={product.description}

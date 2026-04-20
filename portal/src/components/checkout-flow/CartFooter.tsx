@@ -18,9 +18,16 @@ import CartItemList from "./CartItemList"
 interface CartFooterProps {
   onPay?: () => void
   onBack?: () => void
+  nextSectionLabel?: string
+  onContinue?: () => void
 }
 
-export default function CartFooter({ onPay, onBack }: CartFooterProps) {
+export default function CartFooter({
+  onPay,
+  onBack,
+  nextSectionLabel,
+  onContinue,
+}: CartFooterProps) {
   const { t } = useTranslation()
   const {
     cart,
@@ -76,6 +83,8 @@ export default function CartFooter({ onPay, onBack }: CartFooterProps) {
   const handleContinue = () => {
     if (isConfirmStep && onPay) {
       onPay()
+    } else if (onContinue) {
+      onContinue()
     } else {
       goToNextStep()
     }
@@ -176,12 +185,12 @@ export default function CartFooter({ onPay, onBack }: CartFooterProps) {
                         ? summary.grandTotal === 0
                           ? t("checkout.actions.confirm_edit")
                           : t("checkout.actions.pay_and_confirm_edit")
-                        : t("common.continue")
+                        : (nextSectionLabel ?? t("common.continue"))
                       : isConfirmStep
                         ? summary.grandTotal === 0
                           ? t("checkout.actions.claim_pass")
                           : t("checkout.actions.pay")
-                        : t("common.continue")}
+                        : (nextSectionLabel ?? t("common.continue"))}
                   </span>
                   <ArrowRight className="w-4 h-4 shrink-0" />
                 </>

@@ -204,7 +204,17 @@
       "pay": "Pay",
       "claim_pass": "Claim Pass",
       "confirm_edit": "Confirm Edit",
-      "pay_and_confirm_edit": "Pay & Confirm Edit"
+      "pay_and_confirm_edit": "Pay & Confirm Edit",
+      "continue_to": "Continue to {{step}}",
+      "review": "Review"
+    },
+    "step_short": {
+      "passes": "Passes",
+      "tickets": "Passes",
+      "housing": "Housing",
+      "merch": "Merch",
+      "patron": "Patron",
+      "confirm": "Review & Confirm"
     }
   },
   "passes": {
