@@ -1,5 +1,5 @@
 import uuid
-from datetime import UTC
+from datetime import UTC, datetime
 
 from fastapi import HTTPException, status
 from sqlalchemy import text
@@ -25,12 +25,58 @@ class ProductsCRUD(BaseCRUD[Products, ProductCreate, ProductUpdate]):
     def __init__(self) -> None:
         super().__init__(Products)
 
+    def get(self, session: Session, id: uuid.UUID) -> Products | None:
+        statement = select(Products).where(
+            Products.id == id, col(Products.deleted_at).is_(None)
+        )
+        return session.exec(statement).first()
+
+    def find(
+        self,
+        session: Session,
+        skip: int = 0,
+        limit: int = 100,
+        search: str | None = None,
+        search_fields: list[str] | None = None,
+        sort_by: str | None = None,
+        sort_order: str = "desc",
+        **filters: object,
+    ) -> tuple[list[Products], int]:
+        """Override base find to always exclude soft-deleted rows."""
+        from sqlalchemy import or_
+        from sqlmodel import func
+
+        statement = select(Products).where(col(Products.deleted_at).is_(None))
+        for field, value in filters.items():
+            if value is not None:
+                statement = statement.where(getattr(Products, field) == value)
+
+        if search and search_fields:
+            search_term = f"%{search}%"
+            search_conditions = [
+                getattr(Products, field).ilike(search_term)
+                for field in search_fields
+                if hasattr(Products, field)
+            ]
+            if search_conditions:
+                statement = statement.where(or_(*search_conditions))
+
+        count_statement = select(func.count()).select_from(statement.subquery())
+        total = session.exec(count_statement).one()
+
+        statement = self._apply_sorting(statement, sort_by, sort_order)
+        statement = statement.offset(skip).limit(limit)
+        results = list(session.exec(statement).all())
+        return results, total
+
     def get_by_slug(
         self, session: Session, slug: str, popup_id: uuid.UUID
     ) -> Products | None:
-        """Get a product by slug and popup_id."""
+        """Get a live (non-deleted) product by slug and popup_id."""
         statement = select(Products).where(
-            Products.slug == slug, Products.popup_id == popup_id
+            Products.slug == slug,
+            Products.popup_id == popup_id,
+            col(Products.deleted_at).is_(None),
         )
         return session.exec(statement).first()
 
@@ -60,8 +106,11 @@ class ProductsCRUD(BaseCRUD[Products, ProductCreate, ProductUpdate]):
         sort_by: str | None = None,
         sort_order: str = "desc",
     ) -> tuple[list[Products], int]:
-        """Find products by popup_id with optional filters."""
-        statement = select(Products).where(Products.popup_id == popup_id)
+        """Find live (non-deleted) products by popup_id with optional filters."""
+        statement = select(Products).where(
+            Products.popup_id == popup_id,
+            col(Products.deleted_at).is_(None),
+        )
 
         if is_active is not None:
             statement = statement.where(Products.is_active == is_active)
@@ -89,12 +138,23 @@ class ProductsCRUD(BaseCRUD[Products, ProductCreate, ProductUpdate]):
     def get_by_ids(
         self, session: Session, ids: list[uuid.UUID]
     ) -> dict[uuid.UUID, Products]:
-        """Get multiple products by their IDs and return as a dict."""
+        """Get multiple live (non-deleted) products by their IDs and return as a dict."""
         if not ids:
             return {}
-        statement = select(Products).where(Products.id.in_(ids))  # type: ignore[attr-defined]
+        statement = select(Products).where(
+            Products.id.in_(ids),  # type: ignore[attr-defined]
+            col(Products.deleted_at).is_(None),
+        )
         products = session.exec(statement).all()
         return {p.id: p for p in products}
+
+    def soft_delete(self, session: Session, db_obj: Products) -> Products:
+        """Mark a product as logically deleted. Preserves FK history."""
+        db_obj.deleted_at = datetime.now(UTC)
+        session.add(db_obj)
+        session.commit()
+        session.refresh(db_obj)
+        return db_obj
 
 
 products_crud = ProductsCRUD()

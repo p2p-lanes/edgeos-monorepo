@@ -113,7 +113,10 @@ def _calculate_amounts(
     Returns: (standard_amount, supporter_amount, patreon_amount)
     """
     product_ids = list({rp.product_id for rp in requested_products})
-    statement = select(Products).where(Products.id.in_(product_ids))  # type: ignore[attr-defined]
+    statement = select(Products).where(
+        Products.id.in_(product_ids),  # type: ignore[attr-defined]
+        Products.deleted_at.is_(None),  # type: ignore[attr-defined]
+    )
     product_models = {p.id: p for p in session.exec(statement).all()}
 
     attendees: dict[uuid.UUID, dict[str, Decimal]] = {}
@@ -530,6 +533,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             Products.id.in_(product_ids),  # type: ignore[attr-defined]
             Products.popup_id == application.popup_id,
             Products.is_active == True,  # noqa: E712
+            Products.deleted_at.is_(None),  # type: ignore[attr-defined]
         )
         valid_products = list(session.exec(statement).all())
 
@@ -734,7 +738,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             return Decimal("0")
 
         product_ids = list({rp.product_id for rp in requested_products})
-        statement = select(Products).where(Products.id.in_(product_ids))  # type: ignore[attr-defined]
+        statement = select(Products).where(
+            Products.id.in_(product_ids),  # type: ignore[attr-defined]
+            Products.deleted_at.is_(None),  # type: ignore[attr-defined]
+        )
         product_models = {p.id: p for p in session.exec(statement).all()}
 
         product_quantity_pairs = [
@@ -957,7 +964,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
             # Get product details for snapshot
             product_ids = [p.product_id for p in obj.products]
-            prod_statement = select(Products).where(Products.id.in_(product_ids))  # type: ignore[attr-defined]
+            prod_statement = select(Products).where(
+                Products.id.in_(product_ids),  # type: ignore[attr-defined]
+                Products.deleted_at.is_(None),  # type: ignore[attr-defined]
+            )
             products_map = {p.id: p for p in session.exec(prod_statement).all()}
 
             # Create payment record for audit trail
@@ -1029,7 +1039,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         # Get product details for snapshot and SimpleFI reference
         product_ids = [p.product_id for p in obj.products]
-        statement = select(Products).where(Products.id.in_(product_ids))  # type: ignore[attr-defined]
+        statement = select(Products).where(
+            Products.id.in_(product_ids),  # type: ignore[attr-defined]
+            Products.deleted_at.is_(None),  # type: ignore[attr-defined]
+        )
         products_map = {p.id: p for p in session.exec(statement).all()}
 
         # Create SimpleFI payment request
@@ -1175,6 +1188,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             Products.id.in_(product_ids),  # type: ignore[attr-defined]
             Products.popup_id == popup.id,
             Products.is_active == True,  # noqa: E712
+            Products.deleted_at.is_(None),  # type: ignore[attr-defined]
         )
         valid_products = list(session.exec(statement).all())
         if {p.id for p in valid_products} != set(product_ids):

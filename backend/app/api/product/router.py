@@ -406,7 +406,11 @@ async def list_product_categories(
 
     statement = (
         select(distinct(Products.category))
-        .where(Products.popup_id == popup_id, Products.is_active == True)  # noqa: E712
+        .where(
+            Products.popup_id == popup_id,
+            Products.is_active == True,  # noqa: E712
+            Products.deleted_at.is_(None),  # type: ignore[attr-defined]
+        )
         .order_by(Products.category)
     )
     results = list(db.exec(statement).all())
@@ -678,7 +682,18 @@ async def delete_product(
     db: TenantSession,
     _current_user: CurrentWriter,
 ) -> None:
-    """Delete a product."""
+    """Delete a product.
+
+    Hard deletes when the product has no historical ties. If the product is
+    referenced by attendee_products, payment_products, or a tier phase, a
+    soft-delete is performed instead (`deleted_at` is set). The partial unique
+    index releases the slug so it can be reused by a new product.
+    """
+    from sqlmodel import func, select
+
+    from app.api.attendee.models import AttendeeProducts
+    from app.api.payment.models import PaymentProducts
+    from app.api.product.models import TicketTierPhase
 
     product = crud.products_crud.get(db, product_id)
 
@@ -688,8 +703,25 @@ async def delete_product(
             detail="Product not found",
         )
 
-    delete_translations_for_entity(db, "product", product.id)
-    crud.products_crud.delete(db, product)
+    has_history = db.exec(
+        select(func.count())
+        .select_from(AttendeeProducts)
+        .where(AttendeeProducts.product_id == product.id)
+    ).one() > 0 or db.exec(
+        select(func.count())
+        .select_from(PaymentProducts)
+        .where(PaymentProducts.product_id == product.id)
+    ).one() > 0 or db.exec(
+        select(func.count())
+        .select_from(TicketTierPhase)
+        .where(TicketTierPhase.product_id == product.id)
+    ).one() > 0
+
+    if has_history:
+        crud.products_crud.soft_delete(db, product)
+    else:
+        delete_translations_for_entity(db, "product", product.id)
+        crud.products_crud.delete(db, product)
 
 
 @router.get("/portal/products", response_model=ListModel[ProductPublicWithTier])

@@ -3125,6 +3125,11 @@ export class ProductsService {
     /**
      * Delete Product
      * Delete a product.
+     *
+     * Hard deletes when the product has no historical ties. If the product is
+     * referenced by attendee_products, payment_products, or a tier phase, a
+     * soft-delete is performed instead (`deleted_at` is set). The partial unique
+     * index releases the slug so it can be reused by a new product.
      * @param data The data for the request.
      * @param data.productId
      * @param data.xTenantId

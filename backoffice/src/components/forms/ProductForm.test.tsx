@@ -142,7 +142,9 @@ describe("ProductForm — tier group integration", () => {
     } as Awaited<ReturnType<typeof TicketTierGroupsService.listTierGroups>>)
 
     mockGetTierGroup.mockResolvedValue(
-      GROUP_A as Awaited<ReturnType<typeof TicketTierGroupsService.getTierGroup>>,
+      GROUP_A as Awaited<
+        ReturnType<typeof TicketTierGroupsService.getTierGroup>
+      >,
     )
 
     mockCreateProduct.mockResolvedValue({
@@ -202,10 +204,9 @@ describe("ProductForm — tier group integration", () => {
       })
 
       // Wait for form to render (the name input is always present)
-      await waitFor(
-        () => screen.getByPlaceholderText(/product name/i),
-        { timeout: 3000 },
-      )
+      await waitFor(() => screen.getByPlaceholderText(/product name/i), {
+        timeout: 3000,
+      })
 
       // listTierGroups should not have been called (no TierGroupPicker mounted)
       expect(mockListTierGroups).not.toHaveBeenCalled()
@@ -227,7 +228,8 @@ describe("ProductForm — tier group integration", () => {
 
       // Radix Select renders a hidden native <select> for accessibility.
       // Use that to change the category in jsdom.
-      const nativeSelects = document.querySelectorAll<HTMLSelectElement>("select")
+      const nativeSelects =
+        document.querySelectorAll<HTMLSelectElement>("select")
       const categorySelect = Array.from(nativeSelects).find((s) =>
         Array.from(s.options).some((o) => o.value === "ticket"),
       )
@@ -262,20 +264,12 @@ describe("ProductForm — tier group integration", () => {
       // Phase fields should appear (order is derived server-side,
       // so only label + sale window inputs are surfaced)
       await waitFor(() => {
-        expect(
-          screen.getByLabelText(/phase label/i),
-        ).toBeInTheDocument()
-        expect(
-          screen.getByLabelText(/sale starts/i),
-        ).toBeInTheDocument()
-        expect(
-          screen.getByLabelText(/sale ends/i),
-        ).toBeInTheDocument()
+        expect(screen.getByLabelText(/phase label/i)).toBeInTheDocument()
+        expect(screen.getByLabelText(/sale starts/i)).toBeInTheDocument()
+        expect(screen.getByLabelText(/sale ends/i)).toBeInTheDocument()
       })
       // `order` should no longer be an input.
-      expect(
-        screen.queryByLabelText(/phase order/i),
-      ).not.toBeInTheDocument()
+      expect(screen.queryByLabelText(/phase order/i)).not.toBeInTheDocument()
     })
 
     it("hides phase fields when no group is selected", async () => {
@@ -307,7 +301,10 @@ describe("ProductForm — tier group integration", () => {
 
       // Fill product name
       await waitFor(() => screen.getByPlaceholderText(/product name/i))
-      await user.type(screen.getByPlaceholderText(/product name/i), "Test Ticket")
+      await user.type(
+        screen.getByPlaceholderText(/product name/i),
+        "Test Ticket",
+      )
 
       // Fill price
       const priceInput = screen.getByPlaceholderText("100.00")
@@ -353,7 +350,10 @@ describe("ProductForm — tier group integration", () => {
 
       // Fill product name
       await waitFor(() => screen.getByPlaceholderText(/product name/i))
-      await user.type(screen.getByPlaceholderText(/product name/i), "Test Ticket")
+      await user.type(
+        screen.getByPlaceholderText(/product name/i),
+        "Test Ticket",
+      )
 
       // Fill price
       await user.type(screen.getByPlaceholderText("100.00"), "150")

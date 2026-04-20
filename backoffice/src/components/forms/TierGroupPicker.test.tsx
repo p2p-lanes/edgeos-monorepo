@@ -91,7 +91,11 @@ describe("TierGroupPicker", () => {
 
     it("shows loading state while query is in flight", () => {
       // Never resolve so loading persists
-      mockListTierGroups.mockReturnValue(new Promise(() => {}) as ReturnType<typeof TicketTierGroupsService.listTierGroups>)
+      mockListTierGroups.mockReturnValue(
+        new Promise(() => {}) as ReturnType<
+          typeof TicketTierGroupsService.listTierGroups
+        >,
+      )
 
       render(<TierGroupPicker {...defaultProps} />, {
         wrapper: makeWrapper(),
@@ -131,9 +135,7 @@ describe("TierGroupPicker", () => {
         wrapper: makeWrapper(),
       })
 
-      await waitFor(() =>
-        screen.getByRole("button", { name: /create new/i }),
-      )
+      await waitFor(() => screen.getByRole("button", { name: /create new/i }))
 
       await user.click(screen.getByRole("button", { name: /create new/i }))
 
@@ -149,16 +151,16 @@ describe("TierGroupPicker", () => {
       const newGroup = { ...GROUP_A, id: "group-new", name: "Late Bird" }
 
       mockCreateTierGroup.mockResolvedValue(
-        newGroup as Awaited<ReturnType<typeof TicketTierGroupsService.createTierGroup>>,
+        newGroup as Awaited<
+          ReturnType<typeof TicketTierGroupsService.createTierGroup>
+        >,
       )
 
       render(<TierGroupPicker {...defaultProps} onChange={onChange} />, {
         wrapper: makeWrapper(),
       })
 
-      await waitFor(() =>
-        screen.getByRole("button", { name: /create new/i }),
-      )
+      await waitFor(() => screen.getByRole("button", { name: /create new/i }))
 
       await user.click(screen.getByRole("button", { name: /create new/i }))
       await user.type(screen.getByPlaceholderText(/group name/i), "Late Bird")
@@ -176,9 +178,7 @@ describe("TierGroupPicker", () => {
         wrapper: makeWrapper(),
       })
 
-      await waitFor(() =>
-        screen.getByRole("button", { name: /create new/i }),
-      )
+      await waitFor(() => screen.getByRole("button", { name: /create new/i }))
 
       await user.click(screen.getByRole("button", { name: /create new/i }))
       await user.click(screen.getByRole("button", { name: /cancel/i }))

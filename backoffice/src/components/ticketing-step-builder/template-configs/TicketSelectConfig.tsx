@@ -164,7 +164,8 @@ export function TicketSelectConfig({
   })
 
   // Cast to enriched shape — fields are optional and null for non-grouped products (BC-2)
-  const enrichedProducts = (productsData?.results ?? []) as unknown as EnrichedProduct[]
+  const enrichedProducts = (productsData?.results ??
+    []) as unknown as EnrichedProduct[]
 
   const products = enrichedProducts.map((p) => ({
     id: p.id,

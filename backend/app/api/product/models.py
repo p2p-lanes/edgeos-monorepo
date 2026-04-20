@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Optional
 from sqlalchemy import Index, UniqueConstraint, text
 from sqlalchemy import Numeric as SaNumerical
 from sqlalchemy.dialects.postgresql import UUID
-from sqlmodel import Column, Field, Relationship, SQLModel
+from sqlmodel import Column, DateTime, Field, Relationship, SQLModel
 
 from app.api.product.schemas import ProductBase
 
@@ -68,7 +68,13 @@ class Products(ProductBase, table=True):
     """Product model for tickets, passes, and other purchasable items."""
 
     __table_args__ = (
-        UniqueConstraint("slug", "popup_id", name="uq_product_slug_popup_id"),
+        Index(
+            "uq_product_slug_popup_id_active",
+            "slug",
+            "popup_id",
+            unique=True,
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
         Index("ix_products_popup_active", "popup_id", "is_active"),
         Index(
             "ix_products_active_lookup",
@@ -84,6 +90,13 @@ class Products(ProductBase, table=True):
             UUID(as_uuid=True),
             primary_key=True,
         ),
+    )
+
+    # Soft-delete marker. When set, the row is hidden from all user-facing queries
+    # and its slug is released by the partial unique index above.
+    deleted_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), nullable=True),
     )
 
     # Deprecated: product-level insurance percentage, kept in DB for one release window.
