@@ -37,6 +37,7 @@ api_router.include_router(popup.router)
 
 # Popup-related resources
 api_router.include_router(product.router)
+api_router.include_router(product.tier_router)
 api_router.include_router(coupon.router)
 api_router.include_router(group.router)
 api_router.include_router(form_section.router)

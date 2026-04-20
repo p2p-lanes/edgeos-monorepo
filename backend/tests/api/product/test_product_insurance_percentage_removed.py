@@ -5,14 +5,11 @@ POPUP-B1: The API must:
   - Reject/ignore insurance_percentage on UPDATE
   - Not return insurance_percentage in ProductPublic responses
 """
-import uuid
-from decimal import Decimal
 
-import pytest
+import uuid
+
 from fastapi.testclient import TestClient
 from sqlmodel import Session
-
-from app.api.product.models import Products
 
 
 def _admin_headers(token: str) -> dict[str, str]:

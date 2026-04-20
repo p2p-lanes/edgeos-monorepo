@@ -617,6 +617,62 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     f"Requested: {requested_qty}, Available: {available_qty}",
                 )
 
+    def _decrement_shared_tier_stocks(
+        self,
+        session: Session,
+        requested_products: list[PaymentProductRequest],
+    ) -> None:
+        """Atomically decrement shared_stock_remaining for any tier groups
+        that own the requested products.
+
+        Aggregates quantities per tier group, then issues one atomic UPDATE
+        per group via `tier_groups_crud.decrement_shared_stock`. If any group
+        has exhausted its shared cap, the method raises HTTP 409 and the
+        caller's transaction must roll back.
+
+        No-op for requests that touch no tier-managed products or only groups
+        without a shared cap.
+        """
+        from app.api.product.crud import tier_groups_crud
+        from app.api.product.models import TicketTierGroup, TicketTierPhase
+
+        product_ids = {p.product_id for p in requested_products}
+        if not product_ids:
+            return
+
+        phases_statement = select(TicketTierPhase).where(
+            TicketTierPhase.product_id.in_(product_ids)  # type: ignore[attr-defined]
+        )
+        phases = list(session.exec(phases_statement).all())
+        if not phases:
+            return
+
+        product_to_group: dict[uuid.UUID, uuid.UUID] = {
+            ph.product_id: ph.group_id for ph in phases
+        }
+
+        group_quantities: dict[uuid.UUID, int] = {}
+        for rp in requested_products:
+            group_id = product_to_group.get(rp.product_id)
+            if group_id is not None:
+                group_quantities[group_id] = (
+                    group_quantities.get(group_id, 0) + rp.quantity
+                )
+
+        if not group_quantities:
+            return
+
+        group_ids = list(group_quantities.keys())
+        groups_statement = select(TicketTierGroup).where(
+            TicketTierGroup.id.in_(group_ids),  # type: ignore[attr-defined]
+            TicketTierGroup.shared_stock_remaining.is_not(None),  # type: ignore[union-attr]
+        )
+        groups_with_cap = list(session.exec(groups_statement).all())
+
+        for group in groups_with_cap:
+            qty = group_quantities[group.id]
+            tier_groups_crud.decrement_shared_stock(session, group.id, qty)
+
     def _validate_attendees(
         self,
         session: Session,
@@ -857,6 +913,12 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         For paid payments, returns payment with checkout info from SimpleFI.
         """
         preview = self.preview_payment(session, obj)
+
+        # Reserve shared tier-group stock atomically before taking any
+        # irreversible action (creating payment rows, calling SimpleFI). If a
+        # linked group is sold out the 409 propagates and the transaction
+        # rolls back cleanly.
+        self._decrement_shared_tier_stocks(session, obj.products)
 
         # Use eager loading to avoid N+1 when accessing application relationships
         application = self._get_application_with_products(
@@ -1124,21 +1186,27 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         products_map = {p.id: p for p in valid_products}
 
         # 3. Validate availability (max_quantity vs sold+pending)
+        fabricated_requests = [
+            # reuse existing helpers which expect PaymentProductRequest —
+            # we fabricate one with a placeholder attendee_id since the
+            # helper only reads product_id and quantity.
+            PaymentProductRequest(
+                product_id=p.product_id,
+                attendee_id=uuid.uuid4(),
+                quantity=p.quantity,
+            )
+            for p in obj.products
+        ]
         self._validate_product_availability(
             session,
-            [
-                # reuse existing helper which expects PaymentProductRequest —
-                # we fabricate one with a placeholder attendee_id since the
-                # helper only reads product_id and quantity.
-                PaymentProductRequest(
-                    product_id=p.product_id,
-                    attendee_id=uuid.uuid4(),
-                    quantity=p.quantity,
-                )
-                for p in obj.products
-            ],
+            fabricated_requests,
             valid_products,
         )
+
+        # 3b. Reserve shared tier-group stock atomically before creating
+        # payment rows or calling SimpleFI. A 409 from a sold-out group
+        # rolls the whole transaction back.
+        self._decrement_shared_tier_stocks(session, fabricated_requests)
 
         # 4. Get or create the direct-sale attendee
         attendee = attendees_crud.find_direct_attendee(

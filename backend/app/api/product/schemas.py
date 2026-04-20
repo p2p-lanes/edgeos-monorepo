@@ -210,9 +210,13 @@ class PhaseState(StrEnum):
 
 
 class TierPhaseCreate(BaseModel):
-    """Schema for creating a new ticket tier phase."""
+    """Schema for creating a new ticket tier phase.
 
-    group_id: uuid.UUID
+    group_id is optional here because the router endpoint at
+    POST /ticket-tier-groups/{group_id}/phases injects it from the path param.
+    """
+
+    group_id: uuid.UUID | None = None  # injected from path param when None
     product_id: uuid.UUID
     order: int = Field(ge=1)
     label: str = Field(min_length=1)
@@ -246,7 +250,9 @@ class TierPhasePublic(BaseModel):
     # Derived by the backend progression service — never persisted
     sales_state: PhaseState
     is_purchasable: bool
-    remaining: int | None = None  # min(phase cap remaining, shared remaining); null if both null
+    remaining: int | None = (
+        None  # min(phase cap remaining, shared remaining); null if both null
+    )
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -256,6 +262,8 @@ class TierGroupCreate(BaseModel):
 
     name: str = Field(min_length=1)
     shared_stock_cap: int | None = Field(default=None, ge=1)
+    # popup_id is used by the router to check tier_progression_enabled; not persisted on group
+    popup_id: uuid.UUID | None = None
 
     model_config = ConfigDict(str_strip_whitespace=True)
 

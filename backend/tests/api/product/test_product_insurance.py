@@ -5,6 +5,7 @@ Scenarios:
   - insurance_eligible persisted as false when sent
   - insurance_eligible defaults to false when omitted
 """
+
 import uuid
 
 from fastapi.testclient import TestClient

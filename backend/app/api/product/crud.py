@@ -1,9 +1,19 @@
 import uuid
+from datetime import UTC
 
+from fastapi import HTTPException, status
+from sqlalchemy import text
 from sqlmodel import Session, col, select
 
-from app.api.product.models import Products
-from app.api.product.schemas import ProductCreate, ProductUpdate
+from app.api.product.models import Products, TicketTierGroup, TicketTierPhase
+from app.api.product.schemas import (
+    ProductCreate,
+    ProductUpdate,
+    TierGroupCreate,
+    TierGroupUpdate,
+    TierPhaseCreate,
+    TierPhaseUpdate,
+)
 from app.api.shared.crud import BaseCRUD
 
 SORT_FIELDS = {"name", "price", "attendee_category", "is_active"}
@@ -88,3 +98,289 @@ class ProductsCRUD(BaseCRUD[Products, ProductCreate, ProductUpdate]):
 
 
 products_crud = ProductsCRUD()
+
+
+# ---------------------------------------------------------------------------
+# Tier Group CRUD
+# ---------------------------------------------------------------------------
+
+
+class TierGroupsCRUD(BaseCRUD[TicketTierGroup, TierGroupCreate, TierGroupUpdate]):
+    """CRUD operations for TicketTierGroup."""
+
+    def __init__(self) -> None:
+        super().__init__(TicketTierGroup)
+
+    def find_by_popup(
+        self,
+        session: Session,
+        popup_id: uuid.UUID,
+    ) -> list[TicketTierGroup]:
+        """Return all tier groups whose phases include at least one product from this popup.
+
+        Because TicketTierGroup is tenant-scoped (not popup-scoped), we expose a
+        popup-filtered view by joining through TicketTierPhase → Products.popup_id.
+        """
+        from sqlmodel import func as _func  # noqa: F401
+
+        stmt = (
+            select(TicketTierGroup)
+            .join(
+                TicketTierPhase,
+                TicketTierPhase.group_id == TicketTierGroup.id,
+                isouter=True,
+            )
+            .join(
+                Products,
+                Products.id == TicketTierPhase.product_id,
+                isouter=True,
+            )
+            .where(Products.popup_id == popup_id)
+            .distinct()
+        )
+        return list(session.exec(stmt).all())
+
+    def create_for_tenant(
+        self,
+        session: Session,
+        obj_in: TierGroupCreate,
+        tenant_id: uuid.UUID,
+    ) -> TicketTierGroup:
+        """Create a tier group scoped to the given tenant."""
+        group = TicketTierGroup(
+            tenant_id=tenant_id,
+            name=obj_in.name,
+            shared_stock_cap=obj_in.shared_stock_cap,
+            shared_stock_remaining=obj_in.shared_stock_cap,  # initialise remaining = cap
+        )
+        session.add(group)
+        session.commit()
+        session.refresh(group)
+        return group
+
+    def decrement_shared_stock(
+        self,
+        session: Session,
+        group_id: uuid.UUID,
+        quantity: int = 1,
+    ) -> TicketTierGroup:
+        """Atomically decrement shared_stock_remaining by quantity.
+
+        Uses a single UPDATE ... WHERE shared_stock_remaining >= :n RETURNING
+        statement — race-free under PostgreSQL MVCC (SI-3). The caller owns
+        the transaction; this method does NOT commit, so it can participate
+        in a larger purchase transaction that rolls back on failure.
+
+        Raises HTTP 404 if the group does not exist, or 409 if the group has
+        no shared cap or the counter would go below zero.
+        """
+        result = session.exec(  # type: ignore[call-overload]
+            text(
+                "UPDATE ticket_tier_group "
+                "SET shared_stock_remaining = shared_stock_remaining - :qty "
+                "WHERE id = :id AND shared_stock_remaining >= :qty "
+                "RETURNING shared_stock_remaining"
+            ).bindparams(qty=quantity, id=group_id)
+        ).first()
+
+        if result is None:
+            group = session.get(TicketTierGroup, group_id)
+            if group is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Tier group not found",
+                )
+            if group.shared_stock_remaining is None:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="This tier group does not use a shared stock cap",
+                )
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Sold out — shared stock cap reached",
+            )
+
+        session.flush()
+        group = session.get(TicketTierGroup, group_id)
+        if group is not None:
+            session.refresh(group)
+        return group  # type: ignore[return-value]
+
+
+tier_groups_crud = TierGroupsCRUD()
+
+
+# ---------------------------------------------------------------------------
+# Tier Phase CRUD
+# ---------------------------------------------------------------------------
+
+
+class TierPhasesCRUD(BaseCRUD[TicketTierPhase, TierPhaseCreate, TierPhaseUpdate]):
+    """CRUD operations for TicketTierPhase."""
+
+    def __init__(self) -> None:
+        super().__init__(TicketTierPhase)
+
+    def create_for_group(
+        self,
+        session: Session,
+        obj_in: TierPhaseCreate,
+    ) -> TicketTierPhase:
+        """Create a phase row, honouring the (group_id, order) unique constraint.
+
+        SQLAlchemy raises IntegrityError on duplicate — the router converts to 422.
+        """
+        phase = TicketTierPhase(
+            group_id=obj_in.group_id,
+            product_id=obj_in.product_id,
+            order=obj_in.order,
+            label=obj_in.label,
+            sale_starts_at=obj_in.sale_starts_at,
+            sale_ends_at=obj_in.sale_ends_at,
+        )
+        session.add(phase)
+        session.commit()
+        session.refresh(phase)
+        return phase
+
+    def get_by_product(
+        self, session: Session, product_id: uuid.UUID
+    ) -> TicketTierPhase | None:
+        """Return the phase row for a given product, or None."""
+        return session.exec(
+            select(TicketTierPhase).where(TicketTierPhase.product_id == product_id)
+        ).first()
+
+    def get_sold_count(self, session: Session, phase_id: uuid.UUID) -> int:
+        """Count approved+pending PaymentProducts for the product linked to this phase.
+
+        Note: we join through the phase's product_id — so sold is per-product.
+        """
+        from app.api.payment.models import PaymentProducts, Payments
+        from app.api.payment.schemas import PaymentStatus
+
+        phase = session.get(TicketTierPhase, phase_id)
+        if phase is None:
+            return 0
+
+        from sqlmodel import func
+
+        stmt = (
+            select(func.coalesce(func.sum(PaymentProducts.quantity), 0))
+            .join(Payments, PaymentProducts.payment_id == Payments.id)
+            .where(
+                PaymentProducts.product_id == phase.product_id,
+                Payments.status.in_(  # type: ignore[attr-defined]
+                    [PaymentStatus.APPROVED.value, PaymentStatus.PENDING.value]
+                ),
+            )
+        )
+        result = session.exec(stmt).one()
+        return int(result)
+
+
+tier_phases_crud = TierPhasesCRUD()
+
+
+# ---------------------------------------------------------------------------
+# Enrichment helpers
+# ---------------------------------------------------------------------------
+
+
+def enrich_product_with_tier(
+    session: Session,
+    product: Products,
+) -> dict:
+    """Return a dict with tier_group and phase keys populated from progression service.
+
+    Called from the router when tier_progression_enabled=True on the popup.
+    Returns {"tier_group": None, "phase": None} for ungrouped products (BC-2).
+    """
+    from datetime import datetime
+
+    from app.api.product.tier_progression import derive_phase_states
+
+    phase_row = tier_phases_crud.get_by_product(session, product.id)
+    if phase_row is None:
+        return {"tier_group": None, "phase": None}
+
+    group = session.get(TicketTierGroup, phase_row.group_id)
+    if group is None:
+        return {"tier_group": None, "phase": None}
+
+    # Collect sold counts for all phases in the group
+    all_phases = list(
+        session.exec(
+            select(TicketTierPhase).where(TicketTierPhase.group_id == group.id)
+        ).all()
+    )
+    sold_counts: dict[uuid.UUID, int] = {
+        p.id: tier_phases_crud.get_sold_count(session, p.id) for p in all_phases
+    }
+
+    # Resolve max_quantity per phase via the linked product (avoids relationship load)
+    product_ids_for_phases = [p.product_id for p in all_phases]
+    products_map = products_crud.get_by_ids(session, product_ids_for_phases)
+    max_quantities: dict[uuid.UUID, int | None] = {
+        p.id: products_map[p.product_id].max_quantity
+        if p.product_id in products_map
+        else None
+        for p in all_phases
+    }
+
+    now = datetime.now(UTC)
+    phase_results = derive_phase_states(
+        group,
+        all_phases,
+        now=now,
+        sold_counts=sold_counts,
+        max_quantities=max_quantities,
+    )
+
+    # Find result for this product's phase
+    this_result = next((r for r in phase_results if r.id == phase_row.id), None)
+    if this_result is None:
+        return {"tier_group": None, "phase": None}
+
+    # Build tier_group dict (phases sorted by order, each with derived state)
+    sorted_phases = sorted(all_phases, key=lambda p: p.order)
+    result_by_id = {r.id: r for r in phase_results}
+
+    phases_public = []
+    for ph in sorted_phases:
+        r = result_by_id.get(ph.id)
+        if r is None:
+            continue
+        phases_public.append(
+            {
+                "id": str(ph.id),
+                "group_id": str(ph.group_id),
+                "product_id": str(ph.product_id),
+                "order": ph.order,
+                "label": ph.label,
+                "sale_starts_at": ph.sale_starts_at.isoformat()
+                if ph.sale_starts_at
+                else None,
+                "sale_ends_at": ph.sale_ends_at.isoformat()
+                if ph.sale_ends_at
+                else None,
+                "sales_state": r.sales_state,
+                "is_purchasable": r.is_purchasable,
+                "remaining": r.remaining,
+            }
+        )
+
+    tier_group_dict = {
+        "id": str(group.id),
+        "tenant_id": str(group.tenant_id),
+        "name": group.name,
+        "shared_stock_cap": group.shared_stock_cap,
+        "shared_stock_remaining": group.shared_stock_remaining,
+        "phases": phases_public,
+    }
+
+    this_phase_dict = next(
+        (p for p in phases_public if p["id"] == str(phase_row.id)), None
+    )
+
+    return {"tier_group": tier_group_dict, "phase": this_phase_dict}
