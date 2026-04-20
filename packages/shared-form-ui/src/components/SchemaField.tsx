@@ -117,6 +117,8 @@ export function SchemaField({
           subtitle={displayHelpText}
           disabled={isDisabled}
           readOnly={readOnly}
+          min={field.min_date ?? undefined}
+          max={field.max_date ?? undefined}
         />
       )
 

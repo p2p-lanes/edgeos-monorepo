@@ -28,6 +28,8 @@ export function formFieldPublicToFormFieldSchema(
     placeholder: f.placeholder ?? undefined,
     help_text: f.help_text ?? undefined,
     target: (f.target as "human" | "application") ?? undefined,
+    min_date: f.min_date ?? null,
+    max_date: f.max_date ?? null,
   }
 }
 

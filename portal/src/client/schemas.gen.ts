@@ -3296,6 +3296,28 @@ export const FormFieldCreateSchema = {
                 }
             ],
             title: 'Help Text'
+        },
+        min_date: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Min Date'
+        },
+        max_date: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Date'
         }
     },
     type: 'object',
@@ -3400,6 +3422,28 @@ export const FormFieldPublicSchema = {
                 }
             ],
             title: 'Help Text'
+        },
+        min_date: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Min Date'
+        },
+        max_date: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Date'
         },
         protected: {
             type: 'boolean',
@@ -3521,6 +3565,28 @@ export const FormFieldUpdateSchema = {
                 }
             ],
             title: 'Help Text'
+        },
+        min_date: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Min Date'
+        },
+        max_date: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Date'
         }
     },
     type: 'object',

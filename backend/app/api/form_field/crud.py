@@ -209,6 +209,19 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
                 ):
                     errors.append(f"Field '{field.label}' must be a valid URL")
 
+            elif field_type == FormFieldType.DATE.value:
+                if isinstance(value, str) and value:
+                    min_d = field.min_date
+                    max_d = field.max_date
+                    if min_d and value < min_d:
+                        errors.append(
+                            f"'{field.label}': date must be on or after {min_d}"
+                        )
+                    if max_d and value > max_d:
+                        errors.append(
+                            f"'{field.label}': date must be on or before {max_d}"
+                        )
+
         return len(errors) == 0, errors
 
     def build_schema_for_popup(
@@ -286,6 +299,8 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
                 "required": field.required,
                 "section_id": str(field.section_id) if field.section_id else None,
                 "position": field.position,
+                "min_date": field.min_date,
+                "max_date": field.max_date,
             }
             if field.options:
                 custom_entry["options"] = field.options

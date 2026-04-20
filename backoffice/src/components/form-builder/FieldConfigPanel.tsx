@@ -43,6 +43,8 @@ export function FieldConfigPanel({
     help_text: "",
     required: false,
     options: "",
+    min_date: "",
+    max_date: "",
   })
 
   useEffect(() => {
@@ -53,6 +55,8 @@ export function FieldConfigPanel({
       help_text: field.help_text ?? "",
       required: field.required ?? false,
       options: field.options?.join("\n") ?? "",
+      min_date: field.min_date ?? "",
+      max_date: field.max_date ?? "",
     })
   }, [field])
 
@@ -84,6 +88,8 @@ export function FieldConfigPanel({
       label: localValues.label || undefined,
       help_text: localValues.help_text || undefined,
       options: optionsArray.length > 0 ? optionsArray : undefined,
+      min_date: localValues.min_date || null,
+      max_date: localValues.max_date || null,
     }
 
     // Elementals cannot change required; everyone else can.
@@ -107,6 +113,8 @@ export function FieldConfigPanel({
     localValues.field_type === "select" ||
     localValues.field_type === "select_cards" ||
     localValues.field_type === "multiselect"
+
+  const showDateRange = localValues.field_type === "date"
 
   const showPlaceholder = localValues.field_type !== "select_cards"
 
@@ -187,6 +195,29 @@ export function FieldConfigPanel({
             rows={4}
           />
           <p className="text-xs text-muted-foreground">One option per line</p>
+        </div>
+      )}
+
+      {showDateRange && (
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="config-min-date">Minimum date</Label>
+            <Input
+              id="config-min-date"
+              type="date"
+              value={localValues.min_date}
+              onChange={(e) => handleChange("min_date", e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="config-max-date">Maximum date</Label>
+            <Input
+              id="config-max-date"
+              type="date"
+              value={localValues.max_date}
+              onChange={(e) => handleChange("max_date", e.target.value)}
+            />
+          </div>
         </div>
       )}
 

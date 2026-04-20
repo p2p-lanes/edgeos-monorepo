@@ -16,6 +16,8 @@ export interface InputFormProps {
   readOnly?: boolean
   maxLength?: number
   className?: string
+  min?: string
+  max?: string
 }
 
 export const InputForm = ({
