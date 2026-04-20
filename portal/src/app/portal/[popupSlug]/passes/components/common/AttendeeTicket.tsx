@@ -57,6 +57,7 @@ const AttendeeTicket = ({
   const { handleEdit, handleCloseModal, modal, handleDelete } = useModal()
   const { removeAttendee, editAttendee } = useAttendee()
   const hasPurchased = attendee.products.some((product) => product.purchased)
+  const isMainAttendee = attendee.category === "main"
   const [isQrModalOpen, setIsQrModalOpen] = useState(false)
 
   const hasMonthPurchased = attendee.products.some(
@@ -156,11 +157,13 @@ const AttendeeTicket = ({
                     </span>
                   </div>
                 </div>
-                <OptionsMenu
-                  onEdit={handleEditAttendee}
-                  onDelete={hasPurchased ? undefined : handleRemoveAttendee}
-                  className="lg:hidden"
-                />
+                {!isMainAttendee && (
+                  <OptionsMenu
+                    onEdit={handleEditAttendee}
+                    onDelete={hasPurchased ? undefined : handleRemoveAttendee}
+                    className="lg:hidden"
+                  />
+                )}
               </div>
             </div>
           </div>
@@ -187,7 +190,7 @@ const AttendeeTicket = ({
             )}
           >
             {/* Options menu - desktop only */}
-            {!hasPurchased && (
+            {!hasPurchased && !isMainAttendee && (
               <OptionsMenu
                 onEdit={handleEditAttendee}
                 onDelete={handleRemoveAttendee}
