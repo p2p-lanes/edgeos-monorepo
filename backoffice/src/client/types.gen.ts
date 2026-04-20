@@ -743,6 +743,8 @@ export type FormFieldCreate = {
     options?: (Array<(string)> | null);
     placeholder?: (string | null);
     help_text?: (string | null);
+    min_date?: (string | null);
+    max_date?: (string | null);
 };
 
 export type FormFieldPublic = {
@@ -759,6 +761,8 @@ export type FormFieldPublic = {
     options?: (Array<(string)> | null);
     placeholder?: (string | null);
     help_text?: (string | null);
+    min_date?: (string | null);
+    max_date?: (string | null);
     protected?: boolean;
     removable?: boolean;
     target?: (string | null);
@@ -773,6 +777,8 @@ export type FormFieldUpdate = {
     options?: (Array<(string)> | null);
     placeholder?: (string | null);
     help_text?: (string | null);
+    min_date?: (string | null);
+    max_date?: (string | null);
 };
 
 export type FormSectionCreate = {

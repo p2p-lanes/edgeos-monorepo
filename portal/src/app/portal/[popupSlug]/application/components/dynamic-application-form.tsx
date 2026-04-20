@@ -343,9 +343,7 @@ export function DynamicApplicationForm({
           }
           if (kind === "scholarship") {
             const scholarshipFields = Object.fromEntries(
-              fields
-                .filter((f) => !f.isCustom)
-                .map((f) => [f.name, f.field]),
+              fields.filter((f) => !f.isCustom).map((f) => [f.name, f.field]),
             )
             return (
               <ScholarshipSection
@@ -354,10 +352,7 @@ export function DynamicApplicationForm({
                 fields={scholarshipFields}
                 scholarshipRequest={getBoolean(values, "scholarship_request")}
                 scholarshipDetails={getString(values, "scholarship_details")}
-                scholarshipVideoUrl={getString(
-                  values,
-                  "scholarship_video_url",
-                )}
+                scholarshipVideoUrl={getString(values, "scholarship_video_url")}
                 detailsError={errors.scholarship_details}
                 videoUrlError={errors.scholarship_video_url}
                 onScholarshipRequestChange={(checked) => {
