@@ -2979,6 +2979,9 @@ export class ProductsService {
     /**
      * List Products
      * List all products with optional filters.
+     *
+     * Response carries enriched tier_group/phase fields for products whose popup
+     * has tier_progression_enabled=True; null otherwise (BC-2 additive).
      * @param data The data for the request.
      * @param data.popupId
      * @param data.isActive
@@ -2989,7 +2992,7 @@ export class ProductsService {
      * @param data.skip Number of items to skip
      * @param data.limit Maximum number of items to return
      * @param data.xTenantId
-     * @returns ListModel_ProductPublic_ Successful Response
+     * @returns ListModel_ProductPublicWithTier_ Successful Response
      * @throws ApiError
      */
     public static listProducts(data: ProductsListProductsData = {}): CancelablePromise<ProductsListProductsResponse> {
@@ -3147,6 +3150,9 @@ export class ProductsService {
     /**
      * List Portal Products
      * List products visible to the current human (Portal).
+     *
+     * Response carries enriched tier_group/phase fields for products whose popup
+     * has tier_progression_enabled=True; null otherwise (BC-2 additive).
      * @param data The data for the request.
      * @param data.popupId
      * @param data.isActive
@@ -3154,7 +3160,7 @@ export class ProductsService {
      * @param data.skip Number of items to skip
      * @param data.limit Maximum number of items to return
      * @param data.acceptLanguage
-     * @returns ListModel_ProductPublic_ Successful Response
+     * @returns ListModel_ProductPublicWithTier_ Successful Response
      * @throws ApiError
      */
     public static listPortalProducts(data: ProductsListPortalProductsData = {}): CancelablePromise<ProductsListPortalProductsResponse> {

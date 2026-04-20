@@ -1127,8 +1127,8 @@ export type ListModel_PopupReviewerPublic_ = {
     paging: Paging;
 };
 
-export type ListModel_ProductPublic_ = {
-    results: Array<ProductPublic>;
+export type ListModel_ProductPublicWithTier_ = {
+    results: Array<ProductPublicWithTier>;
     paging: Paging;
 };
 
@@ -3111,7 +3111,7 @@ export type ProductsListProductsData = {
     xTenantId?: (string | null);
 };
 
-export type ProductsListProductsResponse = (ListModel_ProductPublic_);
+export type ProductsListProductsResponse = (ListModel_ProductPublicWithTier_);
 
 export type ProductsCreateProductData = {
     requestBody: ProductCreate;
@@ -3164,7 +3164,7 @@ export type ProductsListPortalProductsData = {
     skip?: number;
 };
 
-export type ProductsListPortalProductsResponse = (ListModel_ProductPublic_);
+export type ProductsListPortalProductsResponse = (ListModel_ProductPublicWithTier_);
 
 export type TenantsGetTenantByDomainData = {
     domain: string;

@@ -5304,11 +5304,11 @@ export const ListModel_PopupReviewerPublic_Schema = {
     title: 'ListModel[PopupReviewerPublic]'
 } as const;
 
-export const ListModel_ProductPublic_Schema = {
+export const ListModel_ProductPublicWithTier_Schema = {
     properties: {
         results: {
             items: {
-                '$ref': '#/components/schemas/ProductPublic'
+                '$ref': '#/components/schemas/ProductPublicWithTier'
             },
             type: 'array',
             title: 'Results'
@@ -5319,7 +5319,7 @@ export const ListModel_ProductPublic_Schema = {
     },
     type: 'object',
     required: ['results', 'paging'],
-    title: 'ListModel[ProductPublic]'
+    title: 'ListModel[ProductPublicWithTier]'
 } as const;
 
 export const ListModel_TenantPublic_Schema = {
