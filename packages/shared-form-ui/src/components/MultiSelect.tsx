@@ -1,6 +1,6 @@
 "use client"
 
-import { Eye, EyeOff } from "lucide-react"
+import { Check } from "lucide-react"
 import React, { useEffect, useState } from "react"
 import { cn } from "../utils"
 
@@ -74,18 +74,22 @@ export function MultiSelect({
               aria-label={`${option.label}, ${isSelected ? "selected" : "not selected"}`}
               tabIndex={0}
               className={cn(
-                "inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium cursor-pointer transition-colors border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium cursor-pointer transition-colors border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                 isSelected
                   ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
-                  : "border-input bg-white text-gray-700 hover:bg-muted hover:text-foreground",
+                  : "border-input bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground",
               )}
             >
               <span>{option.label}</span>
-              {isSelected ? (
-                <EyeOff className="h-4 w-4 shrink-0" aria-hidden />
-              ) : (
-                <Eye className="h-4 w-4 shrink-0" aria-hidden />
-              )}
+              <span className="inline-flex h-3.5 w-3.5 shrink-0">
+                <Check
+                  className={cn(
+                    "h-3.5 w-3.5 transition-opacity",
+                    isSelected ? "opacity-100" : "opacity-0",
+                  )}
+                  aria-hidden
+                />
+              </span>
             </button>
           )
         })}
