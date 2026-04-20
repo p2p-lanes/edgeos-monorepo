@@ -9,6 +9,7 @@ import QuantitySelector, {
   supportsQuantitySelector,
 } from "@/components/ui/QuantitySelector"
 import { formatDate } from "@/helpers/dates"
+import { resolveTierPhaseState } from "@/helpers/tierPhaseState"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
 import { usePassesProvider } from "@/providers/passesProvider"
@@ -406,7 +407,9 @@ function PassRow({
   const comparePrice = product.compare_price ?? product.original_price
   const hasDiscount = comparePrice && comparePrice > product.price
   const isSelected = selected && !purchased
-  const isClickable = !disabled && (!purchased || isEditing)
+  const tierState = resolveTierPhaseState(product)
+  const effectiveDisabled = disabled || tierState.blocked
+  const isClickable = !effectiveDisabled && (!purchased || isEditing)
   // Multi-unit stepper mode — editing of purchased multi-unit passes is out
   // of scope (plan decision), so we only show the stepper for non-purchased rows.
   const showStepper =
@@ -527,7 +530,7 @@ function PassRow({
       disabled={!isClickable}
       className={cn(
         "w-full px-5 py-3 flex items-center justify-between gap-4 transition-all",
-        disabled
+        effectiveDisabled
           ? "opacity-40 cursor-not-allowed bg-muted"
           : rowIsActive
             ? "bg-primary/10"
@@ -541,7 +544,7 @@ function PassRow({
             value={currentQuantity}
             min={0}
             max={maxQuantity}
-            disabled={!!disabled}
+            disabled={effectiveDisabled}
             onIncrement={() => onQuantityChange(currentQuantity + 1)}
             onDecrement={() => onQuantityChange(currentQuantity - 1)}
             onAdd={() => onQuantityChange(1)}
@@ -553,7 +556,7 @@ function PassRow({
               "w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all",
               isSelected
                 ? "bg-primary border-primary"
-                : disabled
+                : effectiveDisabled
                   ? "border-border"
                   : "border-border",
             )}
@@ -565,6 +568,11 @@ function PassRow({
           <div className="flex items-center gap-2">
             <Ticket className="w-4 h-4 text-muted-foreground" />
             <span className="font-medium text-foreground">{product.name}</span>
+            {tierState.badge && (
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground border border-border rounded px-1 py-0.5">
+                {tierState.badge}
+              </span>
+            )}
           </div>
           {product.start_date && product.end_date && (
             <p className="text-sm text-muted-foreground">
@@ -626,6 +634,8 @@ function DayPassRow({
   const comparePrice = product.compare_price ?? product.price
   const hasDiscount = comparePrice != null && comparePrice > product.price
   const hasQuantity = quantity > 0
+  const tierState = resolveTierPhaseState(product)
+  const effectiveDisabled = disabled || tierState.blocked
 
   const maxQuantity = resolveMaxQuantity(product, {
     dayPassFallbackToDateRange: true,
@@ -689,7 +699,7 @@ function DayPassRow({
     <div
       className={cn(
         "px-5 py-3 flex items-center justify-between gap-4",
-        disabled ? "opacity-40" : hasQuantity ? "bg-primary/10" : "",
+        effectiveDisabled ? "opacity-40" : hasQuantity ? "bg-primary/10" : "",
       )}
     >
       <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -698,7 +708,7 @@ function DayPassRow({
           value={quantity}
           min={minQuantity}
           max={maxQuantity}
-          disabled={!!disabled}
+          disabled={effectiveDisabled}
           onIncrement={() => onQuantityChange(quantity + 1)}
           onDecrement={() => onQuantityChange(quantity - 1)}
           onAdd={() => onQuantityChange(1)}
@@ -708,6 +718,11 @@ function DayPassRow({
           <div className="flex items-center gap-2">
             <Ticket className="w-4 h-4 text-muted-foreground" />
             <span className="font-medium text-foreground">{product.name}</span>
+            {tierState.badge && (
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground border border-border rounded px-1 py-0.5">
+                {tierState.badge}
+              </span>
+            )}
           </div>
           <p className="text-sm text-muted-foreground">per day</p>
           {product.description && (
@@ -808,8 +823,10 @@ function CompactAttendeeCard({
                 attendee.category === "kid" ||
                 attendee.category === "teen" ||
                 attendee.category === "baby"
+              const tierState = resolveTierPhaseState(p)
               const tileDisabled =
                 !!p.disabled ||
+                tierState.blocked ||
                 (!isDayPass &&
                   isChild &&
                   (p.duration_type === "full" ||
@@ -862,6 +879,11 @@ function CompactAttendeeCard({
                   >
                     {formatCurrency(p.price)}
                   </span>
+                  {tierState.badge && (
+                    <span className="ml-1 text-[10px] uppercase tracking-wide text-muted-foreground border border-border rounded px-1 py-0.5">
+                      {tierState.badge}
+                    </span>
+                  )}
                 </div>
               )
             }
@@ -870,8 +892,10 @@ function CompactAttendeeCard({
               attendee.category === "kid" ||
               attendee.category === "teen" ||
               attendee.category === "baby"
+            const tierState = resolveTierPhaseState(p)
             const isDisabled =
               p.disabled ||
+              tierState.blocked ||
               (isChild &&
                 (p.duration_type === "full" || p.duration_type === "month")) ||
               (p.duration_type === "week" && hasFullOrMonthSelected) ||
@@ -912,6 +936,11 @@ function CompactAttendeeCard({
                 {p.purchased && !isEditing && (
                   <span className="text-[10px] uppercase tracking-wide opacity-60">
                     owned
+                  </span>
+                )}
+                {tierState.badge && (
+                  <span className="text-[10px] uppercase tracking-wide opacity-70 border border-current rounded px-1 py-0.5">
+                    {tierState.badge}
                   </span>
                 )}
               </button>
@@ -1231,14 +1260,21 @@ function LegacySectionLayout({
 
   const renderRow = (p: ProductsPass) => {
     const selected = isSelected(p.id)
+    const tierState = resolveTierPhaseState(p)
+    const rowDisabled = tierState.blocked && !selected
     return (
       <button
         key={p.id}
         type="button"
-        onClick={() => toggle(p)}
+        onClick={rowDisabled ? undefined : () => toggle(p)}
+        disabled={rowDisabled}
         className={cn(
           "w-full p-4 flex items-center gap-3 text-left transition-colors",
-          selected ? "bg-primary/10" : "hover:bg-muted",
+          rowDisabled
+            ? "opacity-40 cursor-not-allowed"
+            : selected
+              ? "bg-primary/10"
+              : "hover:bg-muted",
         )}
       >
         <div
@@ -1250,7 +1286,16 @@ function LegacySectionLayout({
           {selected && <Check className="w-3 h-3 text-primary-foreground" />}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-medium text-foreground text-sm">{p.name}</p>
+          <div className="flex items-center gap-2">
+            <p className="font-medium text-foreground text-sm">
+              {p.name}
+            </p>
+            {tierState.badge && (
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground border border-border rounded px-1 py-0.5">
+                {tierState.badge}
+              </span>
+            )}
+          </div>
           {p.description && (
             <ExpandableDescription
               text={p.description}

@@ -223,7 +223,8 @@ async def create_tier_phase(
 ) -> dict:
     """Add a phase to a tier group (ADMIN only).
 
-    Returns HTTP 422 if (group_id, order) already exists.
+    Returns HTTP 422 when the product is already bound to another phase.
+    `order` is derived server-side from `sale_starts_at` ASC NULLS LAST.
     """
     group = crud.tier_groups_crud.get(db, group_id)
     if group is None:
@@ -233,7 +234,6 @@ async def create_tier_phase(
     create_obj = TierPhaseCreate(
         group_id=group_id,
         product_id=obj_in.product_id,
-        order=obj_in.order,
         label=obj_in.label,
         sale_starts_at=obj_in.sale_starts_at,
         sale_ends_at=obj_in.sale_ends_at,
@@ -244,12 +244,7 @@ async def create_tier_phase(
     except IntegrityError as e:
         db.rollback()
         err = str(e.orig) if e.orig else str(e)
-        if "uq_ticket_tier_phase_group_order" in err:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"A phase with order={obj_in.order} already exists in this group",
-            )
-        if "uq_ticket_tier_phase_product_id" in err or "unique" in err.lower():
+        if "uq_ticket_tier_phase_product_id" in err:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="This product is already assigned to a tier phase",
@@ -290,7 +285,7 @@ async def update_tier_phase(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Duplicate (group_id, order) — that order already exists in this group",
+            detail="Integrity constraint violation while updating phase",
         )
     return {
         "id": str(phase.id),

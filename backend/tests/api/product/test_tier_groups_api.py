@@ -193,10 +193,12 @@ class TestTierGroupFeatureFlag:
 # ---------------------------------------------------------------------------
 
 
-class TestTierGroupDuplicateOrder:
-    """TG-4: duplicate (group_id, order) → 422."""
+class TestTierGroupAutoOrdering:
+    """Order is derived automatically from sale_starts_at ASC NULLS LAST,
+    with id as a deterministic tiebreak. Admins do not pass `order` on input.
+    """
 
-    def test_duplicate_phase_order_returns_422(
+    def test_order_reflects_sale_starts_at_ascending(
         self,
         client: TestClient,
         admin_token_tenant_a: str,
@@ -206,46 +208,122 @@ class TestTierGroupDuplicateOrder:
     ) -> None:
         _enable_tier_progression(db, popup_tenant_a)
         try:
-            # Create group
             grp_resp = client.post(
                 "/api/v1/ticket-tier-groups",
-                json={"name": "Dup-order group", "popup_id": str(popup_tenant_a.id)},
+                json={
+                    "name": "Auto-order group",
+                    "popup_id": str(popup_tenant_a.id),
+                },
                 headers=_auth(admin_token_tenant_a),
             )
             assert grp_resp.status_code in (200, 201), grp_resp.text
             group_id = grp_resp.json()["id"]
 
-            # Create two products
-            prod1 = _create_product(
-                client, admin_token_tenant_a, str(popup_tenant_a.id)
+            late = _create_product(
+                client,
+                admin_token_tenant_a,
+                str(popup_tenant_a.id),
+                name=f"Late-{uuid.uuid4().hex[:6]}",
             )
-            prod2 = _create_product(
-                client, admin_token_tenant_a, str(popup_tenant_a.id)
+            early = _create_product(
+                client,
+                admin_token_tenant_a,
+                str(popup_tenant_a.id),
+                name=f"Early-{uuid.uuid4().hex[:6]}",
             )
 
-            # Assign phase order=1 to prod1
-            phase1_resp = client.post(
+            # Insert LATE first with a later sale_starts_at, then EARLY with
+            # an earlier one — final ordering must still be Early=1, Late=2.
+            late_resp = client.post(
                 f"/api/v1/ticket-tier-groups/{group_id}/phases",
                 json={
-                    "product_id": prod1["id"],
-                    "order": 1,
+                    "product_id": late["id"],
+                    "label": "Late",
+                    "sale_starts_at": "2026-06-01T00:00:00Z",
+                },
+                headers=_auth(admin_token_tenant_a),
+            )
+            assert late_resp.status_code in (200, 201), late_resp.text
+
+            early_resp = client.post(
+                f"/api/v1/ticket-tier-groups/{group_id}/phases",
+                json={
+                    "product_id": early["id"],
                     "label": "Early Bird",
+                    "sale_starts_at": "2026-04-01T00:00:00Z",
                 },
                 headers=_auth(admin_token_tenant_a),
             )
-            assert phase1_resp.status_code in (200, 201), phase1_resp.text
+            assert early_resp.status_code in (200, 201), early_resp.text
 
-            # Attempt to assign phase order=1 again (different product, same order)
-            phase2_resp = client.post(
+            group = client.get(
+                f"/api/v1/ticket-tier-groups/{group_id}",
+                headers=_auth(admin_token_tenant_a),
+            ).json()
+            phases_by_label = {p["label"]: p for p in group["phases"]}
+            assert phases_by_label["Early Bird"]["order"] == 1
+            assert phases_by_label["Late"]["order"] == 2
+
+        finally:
+            _disable_tier_progression(db, popup_tenant_a)
+
+    def test_null_sale_starts_at_ranks_last(
+        self,
+        client: TestClient,
+        admin_token_tenant_a: str,
+        popup_tenant_a: Popups,
+        db: Session,
+        tenant_a,
+    ) -> None:
+        _enable_tier_progression(db, popup_tenant_a)
+        try:
+            grp_resp = client.post(
+                "/api/v1/ticket-tier-groups",
+                json={
+                    "name": "Null-date group",
+                    "popup_id": str(popup_tenant_a.id),
+                },
+                headers=_auth(admin_token_tenant_a),
+            )
+            assert grp_resp.status_code in (200, 201), grp_resp.text
+            group_id = grp_resp.json()["id"]
+
+            undated = _create_product(
+                client,
+                admin_token_tenant_a,
+                str(popup_tenant_a.id),
+                name=f"Undated-{uuid.uuid4().hex[:6]}",
+            )
+            dated = _create_product(
+                client,
+                admin_token_tenant_a,
+                str(popup_tenant_a.id),
+                name=f"Dated-{uuid.uuid4().hex[:6]}",
+            )
+
+            # Insert the undated phase FIRST; it must still rank AFTER the dated one.
+            client.post(
+                f"/api/v1/ticket-tier-groups/{group_id}/phases",
+                json={"product_id": undated["id"], "label": "No date"},
+                headers=_auth(admin_token_tenant_a),
+            )
+            client.post(
                 f"/api/v1/ticket-tier-groups/{group_id}/phases",
                 json={
-                    "product_id": prod2["id"],
-                    "order": 1,
-                    "label": "Early Bird Dupe",
+                    "product_id": dated["id"],
+                    "label": "Has date",
+                    "sale_starts_at": "2026-05-01T00:00:00Z",
                 },
                 headers=_auth(admin_token_tenant_a),
             )
-            assert phase2_resp.status_code == 422, phase2_resp.text
+
+            group = client.get(
+                f"/api/v1/ticket-tier-groups/{group_id}",
+                headers=_auth(admin_token_tenant_a),
+            ).json()
+            phases_by_label = {p["label"]: p for p in group["phases"]}
+            assert phases_by_label["Has date"]["order"] == 1
+            assert phases_by_label["No date"]["order"] == 2
         finally:
             _disable_tier_progression(db, popup_tenant_a)
 

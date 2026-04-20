@@ -221,27 +221,106 @@ class TierPhasesCRUD(BaseCRUD[TicketTierPhase, TierPhaseCreate, TierPhaseUpdate]
     def __init__(self) -> None:
         super().__init__(TicketTierPhase)
 
+    def _rebalance_order(self, session: Session, group_id: uuid.UUID) -> None:
+        """Recompute `order` for every phase in the group based on
+        `sale_starts_at ASC NULLS LAST` with `id ASC` as a deterministic tiebreak.
+
+        Runs as a two-step update so the UNIQUE(group_id, order) constraint
+        is never violated mid-statement: step 1 parks every row at a negative
+        order (out of the positive range used by real data), step 2 assigns
+        the final 1..N ordering.
+        """
+        session.exec(  # type: ignore[call-overload]
+            text(
+                """
+                UPDATE ticket_tier_phase AS p
+                SET "order" = -ranked.new_order
+                FROM (
+                    SELECT id,
+                           ROW_NUMBER() OVER (
+                               ORDER BY sale_starts_at ASC NULLS LAST, id ASC
+                           ) AS new_order
+                    FROM ticket_tier_phase
+                    WHERE group_id = :group_id
+                ) AS ranked
+                WHERE p.id = ranked.id
+                """
+            ).bindparams(group_id=group_id)
+        )
+        session.exec(  # type: ignore[call-overload]
+            text(
+                """
+                UPDATE ticket_tier_phase
+                SET "order" = -"order"
+                WHERE group_id = :group_id AND "order" < 0
+                """
+            ).bindparams(group_id=group_id)
+        )
+        session.flush()
+
+    def _next_placeholder_order(
+        self, session: Session, group_id: uuid.UUID
+    ) -> int:
+        """Return MAX(order)+1 for a group, used as a temporary value during
+        insert. `_rebalance_order` overwrites it right after."""
+        row = session.exec(  # type: ignore[call-overload]
+            text(
+                "SELECT COALESCE(MAX(\"order\"), 0) + 1 AS next_order "
+                "FROM ticket_tier_phase WHERE group_id = :group_id"
+            ).bindparams(group_id=group_id)
+        ).first()
+        if row is None:
+            return 1
+        return int(row[0])
+
     def create_for_group(
         self,
         session: Session,
         obj_in: TierPhaseCreate,
     ) -> TicketTierPhase:
-        """Create a phase row, honouring the (group_id, order) unique constraint.
+        """Create a phase row with an automatic `order`.
 
-        SQLAlchemy raises IntegrityError on duplicate — the router converts to 422.
+        A placeholder order (max+1) is used during insert to respect the
+        (group_id, order) UNIQUE constraint; `_rebalance_order` then
+        assigns the final ordering based on `sale_starts_at` ASC NULLS LAST.
         """
+        assert obj_in.group_id is not None, "group_id must be injected by the router"
+        placeholder_order = self._next_placeholder_order(session, obj_in.group_id)
         phase = TicketTierPhase(
             group_id=obj_in.group_id,
             product_id=obj_in.product_id,
-            order=obj_in.order,
+            order=placeholder_order,
             label=obj_in.label,
             sale_starts_at=obj_in.sale_starts_at,
             sale_ends_at=obj_in.sale_ends_at,
         )
         session.add(phase)
+        session.flush()
+        self._rebalance_order(session, obj_in.group_id)
         session.commit()
         session.refresh(phase)
         return phase
+
+    def update(
+        self,
+        session: Session,
+        db_obj: TicketTierPhase,
+        obj_in: TierPhaseUpdate,
+    ) -> TicketTierPhase:
+        """Update phase fields and rebalance order if `sale_starts_at` changed."""
+        data = obj_in.model_dump(exclude_unset=True)
+        sale_starts_changed = (
+            "sale_starts_at" in data and data["sale_starts_at"] != db_obj.sale_starts_at
+        )
+        for key, value in data.items():
+            setattr(db_obj, key, value)
+        session.add(db_obj)
+        session.flush()
+        if sale_starts_changed:
+            self._rebalance_order(session, db_obj.group_id)
+        session.commit()
+        session.refresh(db_obj)
+        return db_obj
 
     def get_by_product(
         self, session: Session, product_id: uuid.UUID

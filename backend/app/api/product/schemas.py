@@ -214,11 +214,13 @@ class TierPhaseCreate(BaseModel):
 
     group_id is optional here because the router endpoint at
     POST /ticket-tier-groups/{group_id}/phases injects it from the path param.
+
+    `order` is not accepted on input: the backend derives it from
+    `sale_starts_at ASC` (NULLS LAST) with a deterministic id tiebreak.
     """
 
     group_id: uuid.UUID | None = None  # injected from path param when None
     product_id: uuid.UUID
-    order: int = Field(ge=1)
     label: str = Field(min_length=1)
     sale_starts_at: datetime | None = None
     sale_ends_at: datetime | None = None
@@ -227,9 +229,12 @@ class TierPhaseCreate(BaseModel):
 
 
 class TierPhaseUpdate(BaseModel):
-    """Schema for updating a ticket tier phase (all fields optional)."""
+    """Schema for updating a ticket tier phase (all fields optional).
 
-    order: int | None = Field(default=None, ge=1)
+    `order` is derived automatically; updates that change `sale_starts_at`
+    trigger a full re-order of the group.
+    """
+
     label: str | None = Field(default=None, min_length=1)
     sale_starts_at: datetime | None = None
     sale_ends_at: datetime | None = None
