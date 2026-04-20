@@ -1,6 +1,11 @@
+import {
+  CHECKOUT_MODE,
+  type CheckoutMode,
+} from "@/checkout/popupCheckoutPolicy"
 import type { PaymentProductRequest } from "@/client"
 import type { AttendeePassState } from "@/types/Attendee"
 import type {
+  SelectedDynamicItem,
   SelectedHousingItem,
   SelectedMerchItem,
   SelectedPassItem,
@@ -13,8 +18,10 @@ interface BuildPaymentProductsParams {
   housing: SelectedHousingItem | null
   merch: SelectedMerchItem[]
   patron: SelectedPatronItem | null
+  dynamicItems: Record<string, SelectedDynamicItem[]>
   isEditing: boolean
   appCredit: string | number | null | undefined
+  checkoutMode?: CheckoutMode
 }
 
 interface BuildPaymentProductsResult {
@@ -25,6 +32,10 @@ interface BuildPaymentProductsResult {
 /**
  * Detects whether a month/full upgrade is happening (month or full selected
  * with existing week/day purchased, and no patron selected).
+ *
+ * No category guard needed here: duration_type "month"/"full" is exclusively
+ * used by ticket products. Non-ticket products (housing, merch, etc.) never
+ * carry these duration types, so this filter is already ticket-scoped.
  */
 function detectMonthUpgrade(attendeePasses: AttendeePassState[]): boolean {
   const fullOrMonthSelectedWithWeekOrDay = attendeePasses.some(
@@ -61,10 +72,14 @@ export function buildPaymentProducts({
   housing,
   merch,
   patron,
+  dynamicItems,
   isEditing,
   appCredit,
+  checkoutMode = CHECKOUT_MODE.PASS_SYSTEM,
 }: BuildPaymentProductsParams): BuildPaymentProductsResult {
-  const isMonthUpgrade = detectMonthUpgrade(attendeePasses)
+  const isMonthUpgrade =
+    checkoutMode === CHECKOUT_MODE.PASS_SYSTEM &&
+    detectMonthUpgrade(attendeePasses)
   const products: PaymentProductRequest[] = []
 
   if (isEditing) {
@@ -148,10 +163,11 @@ export function buildPaymentProducts({
     // Add housing
     if (housing) {
       const firstAttendeeId = selectedPasses[0]?.attendeeId ?? ""
+      const baseQty = housing.pricePerDay ? housing.nights : 1
       products.push({
         product_id: housing.productId,
         attendee_id: firstAttendeeId,
-        quantity: housing.nights,
+        quantity: baseQty * (housing.quantity ?? 1),
       })
     }
 
@@ -163,6 +179,20 @@ export function buildPaymentProducts({
         attendee_id: firstAttendeeId,
         quantity: 1,
       })
+    }
+
+    // Add dynamic step items
+    const firstAttendeeId = selectedPasses[0]?.attendeeId ?? ""
+    for (const items of Object.values(dynamicItems)) {
+      for (const item of items) {
+        if (item.quantity > 0) {
+          products.push({
+            product_id: item.productId,
+            attendee_id: firstAttendeeId,
+            quantity: item.quantity,
+          })
+        }
+      }
     }
   }
 

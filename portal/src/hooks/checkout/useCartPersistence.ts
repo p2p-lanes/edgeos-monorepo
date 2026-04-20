@@ -39,6 +39,7 @@ interface UseCartPersistenceParams {
   cityId: string | null
   initialStep: CheckoutStep
   products: ProductsPass[]
+  housingPricePerDay: boolean
   /** Ref to the latest selection state — updated by the provider each render */
   selectionStateRef: MutableRefObject<CartSelectionState>
   restorationSetters: RestorationSetters
@@ -50,6 +51,7 @@ export function useCartPersistence({
   cityId,
   initialStep,
   products,
+  housingPricePerDay,
   selectionStateRef,
   restorationSetters,
   hasRestoredCheckoutRef,
@@ -59,7 +61,7 @@ export function useCartPersistence({
 
   // Cart API hooks (internalized)
   const { data: savedCart, isSuccess: cartLoaded } = useCart(cityId)
-  const { saveImmediate, cancelPendingSave } = useSaveCart(cityId)
+  const { save, saveImmediate, cancelPendingSave } = useSaveCart(cityId)
   const clearCartMutation = useClearCart(cityId)
 
   // --- Build CartState from the ref's current value ---
@@ -76,6 +78,7 @@ export function useCartPersistence({
             product_id: s.housing.productId,
             check_in: s.housing.checkIn,
             check_out: s.housing.checkOut,
+            quantity: s.housing.quantity,
           }
         : null,
       merch: s.merch.map((m) => ({
@@ -113,6 +116,18 @@ export function useCartPersistence({
     hasRestoredCheckoutRef,
     paymentCompleteRef,
   ])
+
+  // --- Schedule a debounced save (for auto-save on state changes) ---
+  const scheduleSave = useCallback(() => {
+    if (
+      !cityId ||
+      !hasRestoredCheckoutRef.current ||
+      paymentCompleteRef.current
+    )
+      return
+
+    save(buildCartState())
+  }, [cityId, save, buildCartState, hasRestoredCheckoutRef, paymentCompleteRef])
 
   // --- Clear cart ---
   const clearCart = useCallback(() => {
@@ -173,6 +188,12 @@ export function useCartPersistence({
           1,
           Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)),
         )
+        const savedQuantity = savedCart.housing.quantity ?? 1
+        const maxQty = product.max_quantity ?? Number.POSITIVE_INFINITY
+        const quantity = Math.max(1, Math.min(savedQuantity, maxQty))
+        const basePrice = housingPricePerDay
+          ? product.price * nights
+          : product.price
         setHousing({
           productId: product.id,
           product,
@@ -180,7 +201,9 @@ export function useCartPersistence({
           checkOut: savedCart.housing.check_out,
           nights,
           pricePerNight: product.price,
-          totalPrice: product.price * nights,
+          totalPrice: basePrice * quantity,
+          pricePerDay: housingPricePerDay,
+          quantity,
         })
       }
     }
@@ -241,6 +264,7 @@ export function useCartPersistence({
     queryClient.invalidateQueries,
     queryClient.setQueryData,
     restorationSetters,
+    housingPricePerDay,
   ])
 
   // --- Save on page visibility change (tab switch / minimize) ---
@@ -261,6 +285,7 @@ export function useCartPersistence({
     savedCart,
     cartLoaded,
     saveCart,
+    scheduleSave,
     clearCart,
     cancelPendingSave,
   }

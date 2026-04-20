@@ -1,4 +1,10 @@
 import {
+  CHECKOUT_MODE,
+  type CheckoutMode,
+  getEffectiveCheckoutMode,
+} from "@/checkout/popupCheckoutPolicy"
+import { supportsQuantitySelector } from "@/components/ui/QuantitySelector"
+import {
   getPriceStrategy,
   type PriceStrategy,
 } from "@/strategies/PriceStrategy"
@@ -15,38 +21,11 @@ interface ProductStrategy {
   ) => AttendeePassState[]
 }
 
-class ExclusiveProductStrategy implements ProductStrategy {
-  handleSelection(
-    attendees: AttendeePassState[],
-    attendeeId: string,
-    product: ProductsPass,
-  ): AttendeePassState[] {
-    return attendees.map((attendee) => {
-      if (attendee.id !== attendeeId) return attendee
-
-      const willBeSelected = !product?.selected
-
-      return {
-        ...attendee,
-        products: attendee.products.map((p) => ({
-          ...p,
-          selected:
-            p.id === product.id
-              ? !p.selected
-              : willBeSelected && !p.purchased
-                ? false
-                : p.selected,
-        })),
-      }
-    })
-  }
-}
-
 class PatreonProductStrategy implements ProductStrategy {
   private priceStrategy: PriceStrategy
 
-  constructor() {
-    this.priceStrategy = getPriceStrategy()
+  constructor(checkoutMode: CheckoutMode) {
+    this.priceStrategy = getPriceStrategy(checkoutMode)
   }
 
   handleSelection(
@@ -85,27 +64,42 @@ class MonthProductStrategy implements ProductStrategy {
     attendeeId: string,
     product: ProductsPass,
   ): AttendeePassState[] {
-    const isMonthSelected = product?.selected
-    const willSelectMonth = !isMonthSelected
+    const isMultiUnit = supportsQuantitySelector(product.max_quantity)
+    // For multi-unit products, the caller passes the NEW desired quantity in
+    // `product.quantity`. The selection is active when quantity > 0.
+    const willSelectMonth = isMultiUnit
+      ? (product.quantity ?? 0) > 0
+      : !product?.selected
 
     return attendees.map((attendee) => {
       if (attendee.id !== attendeeId) return attendee
 
       return {
         ...attendee,
-        products: attendee.products.map((p) => ({
-          ...p,
-          selected:
-            p.id === product.id
-              ? !p.selected
-              : p.duration_type === "week" && !p.purchased && willSelectMonth
+        products: attendee.products.map((p) => {
+          if (p.id === product.id) {
+            if (isMultiUnit) {
+              const nextQuantity = Math.max(0, product.quantity ?? 0)
+              return {
+                ...p,
+                quantity: nextQuantity,
+                selected: nextQuantity > 0,
+              }
+            }
+            return { ...p, selected: !p.selected }
+          }
+          return {
+            ...p,
+            selected:
+              p.duration_type === "week" && !p.purchased && willSelectMonth
                 ? false
                 : p.selected,
-          quantity:
-            p.duration_type === "day" && !p.purchased && willSelectMonth
-              ? 0
-              : p.quantity,
-        })),
+            quantity:
+              p.duration_type === "day" && !p.purchased && willSelectMonth
+                ? 0
+                : p.quantity,
+          }
+        }),
       }
     })
   }
@@ -138,20 +132,34 @@ class WeekProductStrategy implements ProductStrategy {
     attendeeId: string,
     product: ProductsPass,
   ): AttendeePassState[] {
+    const isMultiUnit = supportsQuantitySelector(product.max_quantity)
+
     return attendees.map((attendee) => {
       if (attendee.id !== attendeeId) return attendee
 
-      const willBeSelected = !product.selected
+      const willBeSelected = isMultiUnit
+        ? (product.quantity ?? 0) > 0
+        : !product.selected
       const monthProduct = attendee.products.find(
         (p) => p.duration_type === "month",
       )
 
-      const updatedProducts = attendee.products.map((p) => ({
-        ...p,
-        selected: p.id === product.id ? willBeSelected : p.selected,
-        edit:
-          p.id === product.id ? product.purchased && willBeSelected : p.edit,
-      }))
+      const updatedProducts = attendee.products.map((p) => {
+        if (p.id !== product.id) return p
+        if (isMultiUnit) {
+          const nextQuantity = Math.max(0, product.quantity ?? 0)
+          return {
+            ...p,
+            quantity: nextQuantity,
+            selected: nextQuantity > 0,
+          }
+        }
+        return {
+          ...p,
+          selected: willBeSelected,
+          edit: product.purchased && willBeSelected ? true : p.edit,
+        }
+      })
 
       const activeWeeks = this.countActiveWeeks(updatedProducts)
       const hasEdited = this.hasEditedWeeks(updatedProducts)
@@ -188,15 +196,25 @@ class FullProductStrategy implements ProductStrategy {
     attendeeId: string,
     product: ProductsPass,
   ): AttendeePassState[] {
+    const isMultiUnit = supportsQuantitySelector(product.max_quantity)
+
     return attendees.map((attendee) => {
       if (attendee.id !== attendeeId) return attendee
 
       return {
         ...attendee,
-        products: attendee.products.map((p) => ({
-          ...p,
-          selected: p.id === product.id ? !p.selected : p.selected,
-        })),
+        products: attendee.products.map((p) => {
+          if (p.id !== product.id) return p
+          if (isMultiUnit) {
+            const nextQuantity = Math.max(0, product.quantity ?? 0)
+            return {
+              ...p,
+              quantity: nextQuantity,
+              selected: nextQuantity > 0,
+            }
+          }
+          return { ...p, selected: !p.selected }
+        }),
       }
     })
   }
@@ -229,12 +247,32 @@ class DayProductStrategy implements ProductStrategy {
   }
 }
 
-/**
- * Wraps any strategy to deselect exclusive products when a non-exclusive
- * product is selected, ensuring mutual exclusivity works both ways.
- */
 class ExclusivityGuard implements ProductStrategy {
   constructor(private inner: ProductStrategy) {}
+
+  private isActive(product: ProductsPass): boolean {
+    if (product.purchased) return true
+    if (product.selected) return true
+    if (
+      product.duration_type === "day" ||
+      supportsQuantitySelector(product.max_quantity)
+    ) {
+      return (product.quantity ?? 0) > 0
+    }
+    return false
+  }
+
+  private clearSelection(product: ProductsPass): ProductsPass {
+    const usesQuantity =
+      product.duration_type === "day" ||
+      supportsQuantitySelector(product.max_quantity)
+
+    return {
+      ...product,
+      selected: false,
+      quantity: usesQuantity ? 0 : product.quantity,
+    }
+  }
 
   handleSelection(
     attendees: AttendeePassState[],
@@ -249,17 +287,27 @@ class ExclusivityGuard implements ProductStrategy {
       discount,
     )
 
-    const willBeSelected = !product.selected
-    if (!willBeSelected) return result
-
     return result.map((attendee) => {
       if (attendee.id !== attendeeId) return attendee
+
+      const updatedTarget = attendee.products.find((p) => p.id === product.id)
+      if (!updatedTarget || !this.isActive(updatedTarget)) return attendee
+
       return {
         ...attendee,
-        products: attendee.products.map((p) => ({
-          ...p,
-          selected: p.exclusive && !p.purchased ? false : p.selected,
-        })),
+        products: attendee.products.map((p) => {
+          if (p.id === updatedTarget.id || p.purchased) return p
+
+          if (updatedTarget.exclusive) {
+            return this.clearSelection(p)
+          }
+
+          if (p.exclusive) {
+            return this.clearSelection(p)
+          }
+
+          return p
+        }),
       }
     })
   }
@@ -292,17 +340,61 @@ class EditProductStrategy implements ProductStrategy {
   }
 }
 
+class SimpleQuantityProductStrategy implements ProductStrategy {
+  handleSelection(
+    attendees: AttendeePassState[],
+    attendeeId: string,
+    product: ProductsPass,
+  ): AttendeePassState[] {
+    const usesQuantity =
+      product.duration_type === "day" ||
+      supportsQuantitySelector(product.max_quantity)
+
+    return attendees.map((attendee) => {
+      if (attendee.id !== attendeeId) return attendee
+
+      return {
+        ...attendee,
+        products: attendee.products.map((currentProduct) => {
+          if (currentProduct.id !== product.id) return currentProduct
+
+          if (usesQuantity) {
+            const nextQuantity = Math.max(0, product.quantity ?? 0)
+            return {
+              ...currentProduct,
+              quantity: nextQuantity,
+              selected: nextQuantity > 0,
+            }
+          }
+
+          return {
+            ...currentProduct,
+            selected: !currentProduct.selected,
+          }
+        }),
+      }
+    })
+  }
+}
+
 export const getProductStrategy = (
   product: ProductsPass,
   isEditing: boolean,
+  checkoutMode: CheckoutMode = CHECKOUT_MODE.PASS_SYSTEM,
 ): ProductStrategy => {
   if (isEditing) return new EditProductStrategy()
 
-  if (product.exclusive) return new ExclusiveProductStrategy()
+  const effective = getEffectiveCheckoutMode(product.category, checkoutMode)
 
-  if (product.category === "patreon") return new PatreonProductStrategy()
+  if (effective === CHECKOUT_MODE.SIMPLE_QUANTITY) {
+    return new SimpleQuantityProductStrategy()
+  }
 
   const baseStrategy = (() => {
+    if (product.category === "patreon") {
+      return new PatreonProductStrategy(checkoutMode)
+    }
+
     switch (product.duration_type) {
       case "month":
         return new MonthProductStrategy()

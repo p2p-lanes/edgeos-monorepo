@@ -1,7 +1,12 @@
 "use client"
 
-import { Info, Minus, Plus, Ticket } from "lucide-react"
-import { useEffect } from "react"
+import { Ticket } from "lucide-react"
+import { useTranslation } from "react-i18next"
+import ExpandableDescription from "@/components/ui/ExpandableDescription"
+import QuantitySelector, {
+  resolveMaxQuantity,
+  supportsQuantitySelector,
+} from "@/components/ui/QuantitySelector"
 import {
   Tooltip,
   TooltipContent,
@@ -16,10 +21,11 @@ type VariantStyles = "selected" | "purchased" | "edit" | "disabled" | "default"
 const variants: Record<VariantStyles, string> = {
   selected:
     "bg-green-200 border-green-400 text-green-800 hover:bg-green-200/80",
-  purchased: "bg-slate-800 text-white border-neutral-700",
+  purchased: "bg-slate-800 text-primary-foreground border-neutral-700",
   edit: "bg-slate-800/30 border-dashed border-slate-200 text-neutral-700 border",
   disabled: "bg-neutral-0 text-neutral-300 cursor-not-allowed ",
-  default: "bg-white border-neutral-300 text-neutral-700 hover:bg-slate-100",
+  default:
+    "bg-checkout-card-bg border-neutral-300 text-checkout-title hover:bg-slate-100",
 }
 
 const Product = ({
@@ -33,290 +39,150 @@ const Product = ({
   defaultDisabled?: boolean
   hasMonthPurchased?: boolean
 }) => {
+  const { t } = useTranslation()
   const { isEditing } = usePassesProvider()
   const disabled =
     product.disabled || defaultDisabled || hasMonthPurchased || isEditing
   const originalPrice = product.compare_price ?? product.price
   const { purchased, selected } = product
 
-  // A├▒adimos las clases de animaci├│n a Tailwind mediante CSS
-  useEffect(() => {
-    const style = document.createElement("style")
-    style.textContent = `
-      @keyframes fadeInRight {
-        from {
-          opacity: 0;
-          transform: translateX(10px);
-        }
-        to {
-          opacity: 1;
-          transform: translateX(0);
-        }
-      }
-      
-      .animate-fade-in-right {
-        animation: fadeInRight 0.3s ease-out forwards;
-      }
-    `
+  const showStepper = supportsQuantitySelector(product.max_quantity)
+  const maxQuantity = resolveMaxQuantity(product, {
+    dayPassFallbackToDateRange: true,
+  })
 
-    // Verificamos si el estilo ya existe para evitar duplicados
-    const existingStyle = document.querySelector("style[data-fade-animation]")
-    if (!existingStyle) {
-      style.setAttribute("data-fade-animation", "true")
-      document.head.appendChild(style)
-    }
-
-    // Limpieza al desmontar
-    return () => {
-      const styleToRemove = document.querySelector("style[data-fade-animation]")
-      if (styleToRemove?.parentNode) {
-        styleToRemove.parentNode.removeChild(styleToRemove)
-      }
-    }
-  }, [])
-
-  const calculateMaxQuantity = () => {
-    if (product.max_quantity) return product.max_quantity
-    if (!product.start_date || !product.end_date) return 30
-    const startDate = new Date(product.start_date)
-    const endDate = new Date(product.end_date)
-    const diffTime = Math.abs(endDate.getTime() - startDate.getTime())
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    return diffDays + 1
-  }
-
-  const maxQuantity = calculateMaxQuantity()
+  const currentQuantity = product.quantity ?? 0
+  const minQuantity = purchased ? (product.original_quantity ?? 1) : 0
 
   const handleSumQuantity = () => {
-    if (product.quantity && product.quantity >= maxQuantity) {
-      return
-    }
-
-    const productAux = {
-      ...product,
-      quantity: product.quantity ? product.quantity + 1 : 1,
-    }
-    onClick(productAux.attendee_id, productAux)
+    if (currentQuantity >= maxQuantity) return
+    onClick(product.attendee_id, { ...product, quantity: currentQuantity + 1 })
   }
 
   const handleSubtractQuantity = () => {
-    const currentQuantity = product.quantity || 0
+    if (currentQuantity <= minQuantity) return
+    onClick(product.attendee_id, { ...product, quantity: currentQuantity - 1 })
+  }
 
-    const productAux = { ...product, quantity: currentQuantity - 1 }
-    onClick(productAux.attendee_id, productAux)
+  const handleToggleClick = () => {
+    // max_quantity === 1 path — behaves as a toggle.
+    onClick(product.attendee_id, {
+      ...product,
+      quantity: selected ? 0 : 1,
+    })
   }
 
   const handleMainClick = () => {
-    if (!disabled && !showQuantityControls) {
-      handleSumQuantity()
+    if (disabled) return
+    if (!showStepper) {
+      handleToggleClick()
+      return
     }
+    // Stepper path — clicking the card body adds one unit when empty.
+    if (currentQuantity === 0) handleSumQuantity()
   }
 
-  const showQuantityControls = product.quantity && product.quantity > 0
-  const isMaxQuantityReached = !!(
-    product.quantity && product.quantity >= maxQuantity
-  )
-  // Determinar si el bot├│n de reducir cantidad debe estar deshabilitado
-  const isMinQuantityReached =
-    purchased &&
-    product.quantity &&
-    product.quantity <= (product.original_quantity ?? 1)
+  const hasDescription = !!product.description && !purchased
 
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          type="button"
-          onClick={handleMainClick}
-          className={cn(
-            "flex items-center gap-2 border border-neutral-200 rounded-md p-2 relative cursor-pointer w-full text-left",
-            variants[
-              purchased
-                ? "purchased"
-                : disabled
-                  ? "disabled"
-                  : selected
-                    ? "selected"
-                    : "default"
-            ],
-            disabled && "cursor-not-allowed",
-          )}
-          tabIndex={disabled ? -1 : 0}
-          aria-disabled={disabled}
-          disabled={disabled}
-        >
-          <div className="flex justify-between w-full flex-wrap">
-            <div className="flex md:items-center md:gap-2 flex-col md:flex-row">
-              <div className="flex items-center pl-2">
-                <Ticket className="w-4 h-4 hidden md:block" />
-                <p className="font-semibold text-sm md:pl-3">{product.name}</p>
-              </div>
-            </div>
-
-            {/* Right Side: This container will manage Price/Info and QuantityControls layout */}
-            {/* On mobile: column, items aligned to end (right). On desktop: row, items centered vertically. */}
-            <div className="flex flex-col items-end justify-center md:flex-row md:items-center md:gap-2">
-              {/* Sub-container for Info Icon and Price to keep them in a row and allow them to be a single item in the flex-col layout for mobile */}
-              <div className="flex items-center gap-2">
-                {product.description && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Info
-                        className={cn(
-                          `w-4 h-4 text-slate-500 hover:text-slate-700`,
-                          product.purchased && "text-white hover:text-white",
-                        )}
-                      />
-                    </TooltipTrigger>
-                    <TooltipContent className="bg-white text-black shadow-md border border-gray-200 max-w-sm">
-                      {product.description}
-                    </TooltipContent>
-                  </Tooltip>
-                )}
-
-                {!disabled && (
-                  <>
-                    {originalPrice !== product.price && (
-                      <p
-                        className={cn(
-                          "text-xs text-muted-foreground line-through",
-                          disabled && "text-neutral-300",
-                        )}
-                      >
-                        ${originalPrice.toLocaleString()}
-                      </p>
-                    )}
-                    <p
-                      className={cn(
-                        "text-md font-medium",
-                        disabled && "text-neutral-300",
-                      )}
-                    >
-                      $ {product.price.toLocaleString()}
-                    </p>
-                  </>
-                )}
-              </div>
-
-              {/* Container for both Desktop and Mobile QuantityControls */}
-              {/* This div ensures quantity controls are treated as a distinct block for flex layout */}
-              <div className={cn(!showQuantityControls && "hidden")}>
-                <div className="hidden md:block">
-                  <QuantityControls
-                    product={product}
-                    handleSumQuantity={handleSumQuantity}
-                    handleSubtractQuantity={handleSubtractQuantity}
-                    disabled={disabled}
-                    isMinQuantityReached={!!isMinQuantityReached}
-                    isMaxQuantityReached={!!isMaxQuantityReached}
-                  />
-                </div>
-                <div className="flex justify-center md:hidden">
-                  <QuantityControls
-                    product={product}
-                    handleSumQuantity={handleSumQuantity}
-                    handleSubtractQuantity={handleSubtractQuantity}
-                    disabled={disabled}
-                    isMinQuantityReached={!!isMinQuantityReached}
-                    isMaxQuantityReached={!!isMaxQuantityReached}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </button>
-      </TooltipTrigger>
-      {hasMonthPurchased && (
-        <TooltipContent className="bg-white text-black shadow-md border border-gray-200 max-w-sm">
-          You already have a monthly pass. No need to buy a day ticket.
-        </TooltipContent>
+  const buttonNode = (
+    <button
+      type="button"
+      onClick={handleMainClick}
+      className={cn(
+        "border border-neutral-200 rounded-md p-2 relative cursor-pointer w-full text-left",
+        hasDescription ? "flex flex-col gap-2" : "flex items-center gap-2",
+        variants[
+          purchased
+            ? "purchased"
+            : disabled
+              ? "disabled"
+              : selected
+                ? "selected"
+                : "default"
+        ],
+        disabled && "cursor-not-allowed",
       )}
-    </Tooltip>
-  )
-}
-
-const QuantityControls = ({
-  product,
-  handleSumQuantity,
-  handleSubtractQuantity,
-  disabled,
-  isMinQuantityReached,
-  isMaxQuantityReached,
-}: {
-  product: ProductsPass
-  handleSumQuantity: () => void
-  handleSubtractQuantity: () => void
-  disabled: boolean
-  isMinQuantityReached: boolean
-  isMaxQuantityReached: boolean
-}) => {
-  const showQuantityControls = product.quantity && product.quantity > 0
-  return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: stopPropagation container for quantity buttons
-    <div
-      className="flex items-center relative h-6 overflow-hidden"
-      onClick={(e) => e.stopPropagation()}
-      onKeyDown={(e) => e.stopPropagation()}
+      tabIndex={disabled ? -1 : 0}
+      aria-disabled={disabled}
+      disabled={disabled}
     >
-      {showQuantityControls ? (
-        <div className="flex items-center animate-fade-in-right">
-          {!disabled && (
-            <button
-              type="button"
-              onClick={() => {
-                handleSubtractQuantity()
-              }}
-              className={cn(
-                "transition-all duration-300 ease-in-out transform hover:scale-110 flex items-center justify-center w-6 h-6 rounded",
-                isMinQuantityReached && "opacity-50 cursor-not-allowed",
-              )}
-              disabled={disabled || !!isMinQuantityReached}
-              aria-label="Decrease quantity"
-              tabIndex={0}
-            >
-              <Minus className="w-4 h-4" />
-            </button>
-          )}
-          <span className="transition-all duration-300 ease-in-out w-6 text-center font-medium">
-            {product.quantity || 0}
-          </span>
+      <div className="flex justify-between w-full flex-wrap">
+        <div className="flex md:items-center md:gap-2 flex-col md:flex-row">
+          <div className="flex items-center pl-2">
+            <Ticket className="w-4 h-4 hidden md:block" />
+            <p className="font-semibold text-sm md:pl-3">{product.name}</p>
+          </div>
+        </div>
 
-          {!disabled && (
-            <button
-              type="button"
-              onClick={() => {
-                handleSumQuantity()
-              }}
-              className={cn(
-                "transition-all duration-300 ease-in-out transform hover:scale-110 flex items-center justify-center w-6 h-6 rounded",
-                isMaxQuantityReached && "opacity-50 cursor-not-allowed",
-              )}
-              disabled={disabled || isMaxQuantityReached}
-              aria-label="Increase quantity"
-              tabIndex={0}
-            >
-              <Plus className="w-4 h-4" />
-            </button>
+        {/* Right Side: Price and optional QuantitySelector */}
+        <div className="flex flex-col items-end justify-center md:flex-row md:items-center md:gap-2">
+          <div className="flex items-center gap-2">
+            {!disabled && (
+              <>
+                {originalPrice !== product.price && (
+                  <p
+                    className={cn(
+                      "text-xs text-muted-foreground line-through",
+                      disabled && "text-neutral-300",
+                    )}
+                  >
+                    ${originalPrice.toLocaleString()}
+                  </p>
+                )}
+                <p
+                  className={cn(
+                    "text-md font-medium",
+                    disabled && "text-neutral-300",
+                  )}
+                >
+                  $ {product.price.toLocaleString()}
+                </p>
+              </>
+            )}
+          </div>
+
+          {showStepper && !disabled && (
+            <QuantitySelector
+              size="md"
+              value={currentQuantity}
+              min={minQuantity}
+              max={maxQuantity}
+              disabled={disabled}
+              onIncrement={handleSumQuantity}
+              onDecrement={handleSubtractQuantity}
+              onAdd={handleSumQuantity}
+            />
           )}
         </div>
-      ) : (
-        !disabled && (
-          <button
-            type="button"
-            onClick={() => {
-              handleSumQuantity()
-            }}
-            className="hidden transition-all duration-300 ease-in-out transform hover:scale-110 md:flex items-center justify-center w-6 h-6 rounded"
-            disabled={disabled}
-            aria-label="Add item"
-            tabIndex={0}
-          >
-            <Plus className="w-4 h-4" />
-          </button>
-        )
+      </div>
+
+      {hasDescription && product.description && (
+        <div className="w-full pl-2 pr-1">
+          <ExpandableDescription
+            text={product.description}
+            clamp={2}
+            className={cn(
+              "text-xs text-left text-muted-foreground",
+              disabled && "text-neutral-300",
+            )}
+          />
+        </div>
       )}
-    </div>
+    </button>
   )
+
+  if (hasMonthPurchased) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>{buttonNode}</TooltipTrigger>
+        <TooltipContent className="bg-card text-foreground shadow-md border border-border max-w-sm">
+          {t("passes.monthly_pass_collision")}
+        </TooltipContent>
+      </Tooltip>
+    )
+  }
+
+  return buttonNode
 }
 
 export default Product

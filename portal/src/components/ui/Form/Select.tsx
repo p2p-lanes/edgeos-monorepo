@@ -35,7 +35,7 @@ const SelectForm = ({
               {value ? (
                 (options.find((o) => o.value === value)?.label ?? value)
               ) : (
-                <span className="text-muted-foreground">{placeholder}</span>
+                <span className="text-heading-secondary">{placeholder}</span>
               )}
             </span>
           </SelectTrigger>

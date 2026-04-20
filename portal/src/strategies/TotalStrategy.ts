@@ -1,3 +1,8 @@
+import {
+  CHECKOUT_MODE,
+  type CheckoutMode,
+  TICKET_CATEGORY,
+} from "@/checkout/popupCheckoutPolicy"
 import type { AttendeePassState } from "@/types/Attendee"
 import type { DiscountProps } from "@/types/discounts"
 import type { ProductsPass } from "@/types/Products"
@@ -181,8 +186,39 @@ class MonthlyPurchasedPriceStrategy extends BasePriceStrategy {
   }
 }
 
+class SimpleQuantityPriceStrategy extends BasePriceStrategy {
+  calculate(products: ProductsPass[], _discount: DiscountProps): TotalResult {
+    const total = products
+      .filter((product) => product.selected)
+      .reduce((sum, product) => {
+        const quantity = product.quantity ?? 1
+        const originalQuantity = product.original_quantity ?? 0
+
+        if (product.purchased && product.duration_type === "day") {
+          return sum + product.price * Math.max(0, quantity - originalQuantity)
+        }
+
+        if (product.purchased && !product.edit) {
+          return sum
+        }
+
+        return sum + product.price * quantity
+      }, 0)
+
+    return {
+      total,
+      originalTotal: total,
+      discountAmount: 0,
+    }
+  }
+}
+
 // Calculadora de totales
 export class TotalCalculator {
+  constructor(
+    private readonly checkoutMode: CheckoutMode = CHECKOUT_MODE.PASS_SYSTEM,
+  ) {}
+
   calculate(
     attendees: AttendeePassState[],
     discount: DiscountProps,
@@ -190,13 +226,34 @@ export class TotalCalculator {
   ): TotalResult {
     const baseResult = attendees.reduce(
       (total, attendee) => {
-        const strategy = this.getStrategy(attendee.products)
-        const result = strategy.calculate(attendee.products, discount)
+        const ticketProducts = attendee.products.filter(
+          (p) => p.category === TICKET_CATEGORY || p.category === "patreon",
+        )
+        const nonTicketProducts = attendee.products.filter(
+          (p) => p.category !== TICKET_CATEGORY && p.category !== "patreon",
+        )
+
+        const ticketStrategy = this.getStrategy(ticketProducts)
+        const ticketResult = ticketStrategy.calculate(ticketProducts, discount)
+
+        const nonTicketResult =
+          nonTicketProducts.length > 0
+            ? new SimpleQuantityPriceStrategy().calculate(
+                nonTicketProducts,
+                discount,
+              )
+            : { total: 0, originalTotal: 0, discountAmount: 0 }
 
         return {
-          total: total.total + result.total,
-          originalTotal: total.originalTotal + result.originalTotal,
-          discountAmount: total.discountAmount + result.discountAmount,
+          total: total.total + ticketResult.total + nonTicketResult.total,
+          originalTotal:
+            total.originalTotal +
+            ticketResult.originalTotal +
+            nonTicketResult.originalTotal,
+          discountAmount:
+            total.discountAmount +
+            ticketResult.discountAmount +
+            nonTicketResult.discountAmount,
         }
       },
       { total: 0, originalTotal: 0, discountAmount: 0 },
@@ -220,6 +277,10 @@ export class TotalCalculator {
   }
 
   private getStrategy(products: ProductsPass[]): PriceCalculationStrategy {
+    if (this.checkoutMode === CHECKOUT_MODE.SIMPLE_QUANTITY) {
+      return new SimpleQuantityPriceStrategy()
+    }
+
     const hasPatreon = products.some(
       (p) => p.category === "patreon" && p.selected,
     )

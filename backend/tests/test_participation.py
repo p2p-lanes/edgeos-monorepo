@@ -87,6 +87,7 @@ def _make_attendee(
     attendee = Attendees(
         tenant_id=tenant.id,
         application_id=application.id,
+        popup_id=application.popup_id,
         name=name,
         category=category,
         check_in_code=f"P{uuid.uuid4().hex[:5].upper()}",
@@ -161,6 +162,7 @@ class TestFindCompanionForPopup:
             id=uuid.uuid4(),
             tenant_id=tenant_id,
             application_id=application.id,
+            popup_id=popup.id,
             name="Companion Spouse",
             category="spouse",
             check_in_code=f"C{uuid.uuid4().hex[:5].upper()}",
@@ -227,6 +229,7 @@ class TestFindCompanionForPopup:
             id=uuid.uuid4(),
             tenant_id=tenant_id,
             application_id=application.id,
+            popup_id=popup.id,
             name="Self",
             category="main",
             check_in_code=f"S{uuid.uuid4().hex[:5].upper()}",

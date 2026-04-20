@@ -1,4 +1,5 @@
 import { Users } from "lucide-react"
+import { useTranslation } from "react-i18next"
 import { useCityProvider } from "@/providers/cityProvider"
 import useGetGroups from "../hooks/useGetGroups"
 import ResourceMenuItem from "../StatusResource/ResourceMenuItem"
@@ -8,6 +9,7 @@ const GroupsResources = ({
 }: {
   onNavigate: (path: string) => void
 }) => {
+  const { t } = useTranslation()
   const { data: groups = [], isLoading } = useGetGroups()
   const { getCity } = useCityProvider()
   const city = getCity()
@@ -19,7 +21,9 @@ const GroupsResources = ({
   return (
     <div className="ml-2 flex flex-col">
       {filteredGroups.length > 0 && (
-        <p className="mb-2 text-xs font-medium text-gray-500">Groups</p>
+        <p className="mb-2 text-xs font-medium text-nav-text-secondary">
+          {t("sidebar.groups")}
+        </p>
       )}
       {filteredGroups.map((group) => (
         <ResourceMenuItem

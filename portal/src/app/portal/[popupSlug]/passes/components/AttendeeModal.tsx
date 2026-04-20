@@ -129,7 +129,7 @@ export function AttendeeModal({
       >
         <DialogFooter>
           <Button
-            className="bg-red-500 hover:bg-red-600 text-white"
+            className="bg-destructive hover:bg-destructive/90 text-primary-foreground"
             disabled={loading}
             onClick={handleSubmit}
           >
@@ -151,7 +151,7 @@ export function AttendeeModal({
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="name" className="text-right">
-              Full Name <span className="text-red-500">*</span>
+              Full Name <span className="text-destructive">*</span>
             </Label>
             <Input
               id="name"
@@ -159,14 +159,14 @@ export function AttendeeModal({
               onChange={(e) =>
                 setFormData((prev) => ({ ...prev, name: e.target.value }))
               }
-              className={`col-span-3 ${errors.name ? "border-red-500" : ""}`}
+              className={`col-span-3 ${errors.name ? "border-destructive" : ""}`}
               required
             />
           </div>
           {isChildCategory && (
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="age" className="text-right">
-                Age <span className="text-red-500">*</span>
+                Age <span className="text-destructive">*</span>
               </Label>
               <Select
                 value={formData.category}
@@ -176,7 +176,7 @@ export function AttendeeModal({
                 }
               >
                 <SelectTrigger
-                  className={`col-span-3 ${errors.category ? "border-red-500" : ""}`}
+                  className={`col-span-3 ${errors.category ? "border-destructive" : ""}`}
                 >
                   <SelectValue placeholder="Select age" />
                 </SelectTrigger>
@@ -193,7 +193,7 @@ export function AttendeeModal({
           {category === "spouse" && (
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="email" className="text-right">
-                Email <span className="text-red-500">*</span>
+                Email <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="email"
@@ -202,14 +202,14 @@ export function AttendeeModal({
                 onChange={(e) =>
                   setFormData((prev) => ({ ...prev, email: e.target.value }))
                 }
-                className={`col-span-3 ${errors.email ? "border-red-500" : ""}`}
+                className={`col-span-3 ${errors.email ? "border-destructive" : ""}`}
                 required
               />
             </div>
           )}
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="gender" className="text-right">
-              Gender <span className="text-red-500">*</span>
+              Gender <span className="text-destructive">*</span>
             </Label>
             <Select
               value={formData.gender}
@@ -219,7 +219,7 @@ export function AttendeeModal({
               required
             >
               <SelectTrigger
-                className={`col-span-3 ${errors.gender ? "border-red-500" : ""}`}
+                className={`col-span-3 ${errors.gender ? "border-destructive" : ""}`}
               >
                 <SelectValue placeholder="Select gender" />
               </SelectTrigger>

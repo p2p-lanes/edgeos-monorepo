@@ -1,6 +1,6 @@
 import uuid
 from decimal import ROUND_HALF_UP, Decimal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from fastapi import HTTPException, status
 from loguru import logger
@@ -12,6 +12,10 @@ from app.api.application.models import Applications
 
 if TYPE_CHECKING:
     from app.api.group.models import Groups
+    from app.api.human.models import Humans
+    from app.api.payment.schemas import DirectPurchaseCreate
+    from app.api.popup.models import Popups
+    from app.api.tenant.models import Tenants
 from app.api.application.schemas import ApplicationStatus, ScholarshipStatus
 from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.coupon.crud import coupons_crud
@@ -30,6 +34,46 @@ from app.api.shared.crud import BaseCRUD
 
 # Decimal precision for money calculations
 MONEY_PRECISION = Decimal("0.01")
+
+
+def calculate_insurance_amount(
+    popup: "Any",
+    product_quantity_pairs: "list[tuple[Any, int]]",
+) -> Decimal:
+    """Pure function: compute insurance amount from popup settings + eligible products.
+
+    Args:
+        popup: Object with .insurance_enabled (bool) and .insurance_percentage (Decimal|None).
+        product_quantity_pairs: List of (product, quantity) where product has
+            .price (Decimal) and .insurance_eligible (bool).
+
+    Returns:
+        Total insurance amount rounded to 2 decimal places.
+        Returns Decimal("0") if insurance is disabled or percentage is None.
+    """
+    if not popup.insurance_enabled:
+        return Decimal("0")
+    if popup.insurance_percentage is None:
+        return Decimal("0")
+
+    eligible_subtotal = Decimal("0")
+    for product, quantity in product_quantity_pairs:
+        if product.insurance_eligible:
+            eligible_subtotal += product.price * quantity
+
+    return (eligible_subtotal * popup.insurance_percentage / 100).quantize(
+        MONEY_PRECISION, rounding=ROUND_HALF_UP
+    )
+
+
+def _require_application_id(application_id: uuid.UUID | None) -> uuid.UUID:
+    """Narrow optional application ids for application-based flows."""
+    if application_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Application id is required",
+        )
+    return application_id
 
 
 def _get_discounted_price(price: Decimal, discount_value: Decimal) -> Decimal:
@@ -200,11 +244,52 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         )
         return session.exec(statement).first()
 
+    def get_portal_owned_payment(
+        self,
+        session: Session,
+        payment_id: uuid.UUID,
+        current_human_id: uuid.UUID,
+    ) -> Payments | None:
+        """Get a payment owned by the current portal human.
+
+        Ownership rules:
+        - Application payment: application.human_id matches current human.
+        - Direct-sale payment: any snapshot attendee human_id matches current human.
+        """
+        statement = (
+            select(Payments)
+            .where(Payments.id == payment_id)
+            .options(
+                selectinload(Payments.application).selectinload(Applications.human),  # ty: ignore[invalid-argument-type]
+                selectinload(Payments.application).selectinload(Applications.popup),  # ty: ignore[invalid-argument-type]
+                selectinload(Payments.popup),  # ty: ignore[invalid-argument-type]
+                selectinload(Payments.products_snapshot)  # ty: ignore[invalid-argument-type]
+                .selectinload(PaymentProducts.attendee)  # ty: ignore[invalid-argument-type]
+                .selectinload(Attendees.human),  # ty: ignore[invalid-argument-type]
+            )
+        )
+        payment = session.exec(statement).first()
+        if payment is None:
+            return None
+
+        if (
+            payment.application is not None
+            and payment.application.human_id == current_human_id
+        ):
+            return payment
+
+        for product_snapshot in payment.products_snapshot:
+            attendee = product_snapshot.attendee
+            if attendee is not None and attendee.human_id == current_human_id:
+                return payment
+
+        return None
+
     def create_fee_payment(
         self,
         session: Session,
         application: "Applications",
-        popup: object,
+        popup: "Popups",
     ) -> Payments:
         """Create an application fee payment for an application in PENDING_FEE status.
 
@@ -223,7 +308,12 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             )
 
         # 2. Validate popup is configured for fee
-        if not getattr(popup, "requires_application_fee", False) or not getattr(popup, "application_fee_amount", None) or popup.application_fee_amount <= 0:
+        application_fee_amount = popup.application_fee_amount
+        if (
+            not popup.requires_application_fee
+            or application_fee_amount is None
+            or application_fee_amount <= 0
+        ):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Popup is not configured to require an application fee",
@@ -232,7 +322,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         # 3. Check for existing pending fee payment
         existing = self.get_latest_fee_payment(session, application.id)
         if existing and existing.status == PaymentStatus.PENDING.value:
-            if not getattr(popup, "simplefi_api_key", None):
+            simplefi_api_key = popup.simplefi_api_key
+            if not simplefi_api_key:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Payment provider not configured for this popup",
@@ -240,7 +331,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
             from app.services.simplefi import get_simplefi_client
 
-            simplefi_client = get_simplefi_client(popup.simplefi_api_key)
+            simplefi_client = get_simplefi_client(simplefi_api_key)
 
             if existing.external_id:
                 try:
@@ -282,10 +373,11 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     session.refresh(existing)
 
         # 4. Snapshot fee amount from popup
-        fee_amount = Decimal(str(popup.application_fee_amount))
+        fee_amount = Decimal(str(application_fee_amount))
 
         # 5. Validate SimpleFI is configured
-        if not getattr(popup, "simplefi_api_key", None):
+        simplefi_api_key = popup.simplefi_api_key
+        if not simplefi_api_key:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Payment provider not configured for this popup",
@@ -293,7 +385,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         from app.services.simplefi import get_simplefi_client
 
-        simplefi_client = get_simplefi_client(popup.simplefi_api_key)
+        simplefi_client = get_simplefi_client(simplefi_api_key)
 
         # Build success/cancel paths for fee flow
         portal_base = get_portal_url(popup.tenant)
@@ -311,6 +403,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 amount=fee_amount,
                 popup_slug=popup.slug,
                 tenant_slug=popup.tenant.slug,
+                currency=popup.currency,
                 reference=reference,
                 memo=f"Application fee – {popup.name}",
                 portal_base_override=portal_base,
@@ -328,9 +421,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         payment = Payments(
             tenant_id=application.tenant_id,
             application_id=application.id,
+            popup_id=application.popup_id,
             status=simplefi_response.status,
             amount=fee_amount,
-            currency="USD",
+            currency=popup.currency,
             external_id=simplefi_response.id,
             checkout_url=simplefi_response.checkout_url,
             source=PaymentSource.SIMPLEFI.value,
@@ -350,12 +444,12 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         limit: int = 100,
         status_filter: PaymentStatus | None = None,
     ) -> tuple[list[Payments], int]:
-        """Find payments by popup_id via their applications."""
-        statement = (
-            select(Payments)
-            .join(Applications, Payments.application_id == Applications.id)  # type: ignore[arg-type]
-            .where(Applications.popup_id == popup_id)
-        )
+        """Find payments by popup_id via the denormalized popup_id column.
+
+        Covers both application-based payments (popup_id backfilled) and
+        direct-sale payments (popup_id set at creation, no application_id).
+        """
+        statement = select(Payments).where(Payments.popup_id == popup_id)
         if status_filter:
             statement = statement.where(Payments.status == status_filter.value)
 
@@ -365,9 +459,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         statement = statement.order_by(desc(Payments.created_at))  # type: ignore[arg-type]
         statement = statement.offset(skip).limit(limit)
         statement = statement.options(
-            selectinload(Payments.products_snapshot).selectinload(
-                PaymentProducts.attendee
-            ),  # type: ignore[arg-type]
+            selectinload(Payments.products_snapshot).selectinload(  # ty: ignore[invalid-argument-type]
+                PaymentProducts.attendee  # ty: ignore[invalid-argument-type]
+            ),
         )
         results = list(session.exec(statement).all())
 
@@ -398,9 +492,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         statement = statement.order_by(desc(Payments.created_at))  # type: ignore[arg-type]
         statement = statement.offset(skip).limit(limit)
         statement = statement.options(
-            selectinload(Payments.products_snapshot).selectinload(
-                PaymentProducts.attendee
-            ),  # type: ignore[arg-type]
+            selectinload(Payments.products_snapshot).selectinload(  # ty: ignore[invalid-argument-type]
+                PaymentProducts.attendee  # ty: ignore[invalid-argument-type]
+            ),
         )
         results = list(session.exec(statement).all())
 
@@ -523,6 +617,62 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     f"Requested: {requested_qty}, Available: {available_qty}",
                 )
 
+    def _decrement_shared_tier_stocks(
+        self,
+        session: Session,
+        requested_products: list[PaymentProductRequest],
+    ) -> None:
+        """Atomically decrement shared_stock_remaining for any tier groups
+        that own the requested products.
+
+        Aggregates quantities per tier group, then issues one atomic UPDATE
+        per group via `tier_groups_crud.decrement_shared_stock`. If any group
+        has exhausted its shared cap, the method raises HTTP 409 and the
+        caller's transaction must roll back.
+
+        No-op for requests that touch no tier-managed products or only groups
+        without a shared cap.
+        """
+        from app.api.product.crud import tier_groups_crud
+        from app.api.product.models import TicketTierGroup, TicketTierPhase
+
+        product_ids = {p.product_id for p in requested_products}
+        if not product_ids:
+            return
+
+        phases_statement = select(TicketTierPhase).where(
+            TicketTierPhase.product_id.in_(product_ids)  # type: ignore[attr-defined]
+        )
+        phases = list(session.exec(phases_statement).all())
+        if not phases:
+            return
+
+        product_to_group: dict[uuid.UUID, uuid.UUID] = {
+            ph.product_id: ph.group_id for ph in phases
+        }
+
+        group_quantities: dict[uuid.UUID, int] = {}
+        for rp in requested_products:
+            group_id = product_to_group.get(rp.product_id)
+            if group_id is not None:
+                group_quantities[group_id] = (
+                    group_quantities.get(group_id, 0) + rp.quantity
+                )
+
+        if not group_quantities:
+            return
+
+        group_ids = list(group_quantities.keys())
+        groups_statement = select(TicketTierGroup).where(
+            TicketTierGroup.id.in_(group_ids),  # type: ignore[attr-defined]
+            TicketTierGroup.shared_stock_remaining.is_not(None),  # type: ignore[union-attr]
+        )
+        groups_with_cap = list(session.exec(groups_statement).all())
+
+        for group in groups_with_cap:
+            qty = group_quantities[group.id]
+            tier_groups_crud.decrement_shared_stock(session, group.id, qty)
+
     def _validate_attendees(
         self,
         session: Session,
@@ -572,22 +722,27 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         self,
         session: Session,
         requested_products: list[PaymentProductRequest],
+        popup: "Popups | None" = None,
     ) -> Decimal:
-        """Calculate insurance amount based on product insurance percentages."""
+        """Calculate insurance amount using popup.insurance_percentage and product.insurance_eligible.
+
+        Uses popup-level insurance settings (POPUP-6). Falls back to zero if popup is not provided
+        or popup insurance is disabled. The legacy per-product insurance_percentage field is no
+        longer read from this path.
+        """
+        if popup is None:
+            return Decimal("0")
+
         product_ids = list({rp.product_id for rp in requested_products})
         statement = select(Products).where(Products.id.in_(product_ids))  # type: ignore[attr-defined]
         product_models = {p.id: p for p in session.exec(statement).all()}
 
-        total = Decimal("0")
-        for req_prod in requested_products:
-            product = product_models.get(req_prod.product_id)
-            if not product or not product.insurance_percentage:
-                continue
-            total += (
-                product.price * req_prod.quantity * product.insurance_percentage / 100
-            ).quantize(MONEY_PRECISION, rounding=ROUND_HALF_UP)
-
-        return total
+        product_quantity_pairs = [
+            (product_models[rp.product_id], rp.quantity)
+            for rp in requested_products
+            if rp.product_id in product_models
+        ]
+        return calculate_insurance_amount(popup, product_quantity_pairs)
 
     def _apply_discounts(
         self,
@@ -604,7 +759,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             products=obj.products,
             original_amount=Decimal("0"),
             amount=Decimal("0"),
-            currency="USD",
+            currency=application.popup.currency if application.popup else "USD",
             edit_passes=obj.edit_passes,
             discount_value=discount_assigned,
         )
@@ -685,9 +840,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 response.group_id = None
                 response.scholarship_discount = True
 
-        # Calculate insurance if requested
+        # Calculate insurance if requested (application-flow only — POPUP-6)
         if obj.insurance:
-            insurance_amount = self._calculate_insurance(session, obj.products)
+            popup = application.popup if application else None
+            insurance_amount = self._calculate_insurance(session, obj.products, popup)
             response.insurance_amount = insurance_amount
             response.amount += insurance_amount
 
@@ -703,7 +859,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         Returns calculated amounts with discounts applied.
         """
-        application = self._get_application_with_products(session, obj.application_id)
+        application = self._get_application_with_products(
+            session,
+            _require_application_id(obj.application_id),
+        )
         if not application:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -755,8 +914,17 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         """
         preview = self.preview_payment(session, obj)
 
+        # Reserve shared tier-group stock atomically before taking any
+        # irreversible action (creating payment rows, calling SimpleFI). If a
+        # linked group is sold out the 409 propagates and the transaction
+        # rolls back cleanly.
+        self._decrement_shared_tier_stocks(session, obj.products)
+
         # Use eager loading to avoid N+1 when accessing application relationships
-        application = self._get_application_with_products(session, obj.application_id)
+        application = self._get_application_with_products(
+            session,
+            _require_application_id(obj.application_id),
+        )
         if not application:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -767,10 +935,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         if preview.amount <= 0:
             if preview.amount < 0:
                 # Store remaining credit
-                application.credit = float(-preview.amount)
+                application.credit = -preview.amount
                 preview.amount = Decimal("0")
             else:
-                application.credit = 0.0
+                application.credit = Decimal("0")
 
             # Clear existing products if editing passes
             if obj.edit_passes:
@@ -796,6 +964,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             payment = Payments(
                 tenant_id=application.tenant_id,
                 application_id=obj.application_id,
+                popup_id=application.popup_id,
                 status=PaymentStatus.APPROVED.value,
                 amount=preview.amount,
                 insurance_amount=preview.insurance_amount,
@@ -824,6 +993,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                         product_description=product.description,
                         product_price=product.price,
                         product_category=product.category or "",
+                        product_currency=preview.currency,
                     )
                     session.add(payment_product)
 
@@ -891,6 +1061,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 amount=preview.amount,
                 popup_slug=application.popup.slug,
                 tenant_slug=application.popup.tenant.slug,
+                currency=preview.currency,
                 reference=reference,
                 memo=application.popup.tenant.name,
                 portal_base_override=get_portal_url(application.popup.tenant),
@@ -906,6 +1077,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         payment = Payments(
             tenant_id=application.tenant_id,
             application_id=obj.application_id,
+            popup_id=application.popup_id,
             status=simplefi_response.status,
             amount=preview.amount,
             insurance_amount=preview.insurance_amount,
@@ -937,6 +1109,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     product_description=product.description,
                     product_price=product.price,
                     product_category=product.category or "",
+                    product_currency=preview.currency,
                 )
                 session.add(payment_product)
 
@@ -954,13 +1127,243 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         return payment, preview
 
+    def create_direct_payment(
+        self,
+        session: Session,
+        obj: "DirectPurchaseCreate",
+        human: "Humans",
+        tenant: "Tenants",
+    ) -> Payments:
+        """Create a payment for a direct-sale popup.
+
+        - Validates popup exists, is active, and has sale_type="direct".
+        - Validates requested products belong to the popup and are active.
+        - Reuses or creates the Attendee record bound to (human, popup).
+        - Calculates amount (no application-level discounts in v1 — no group,
+          no coupon, no scholarship).
+        - Zero-amount purchase: auto-approves, assigns products, no SimpleFI call.
+        - Non-zero: creates a SimpleFI payment request and stores the checkout_url.
+        """
+        from app.api.attendee.crud import attendees_crud
+        from app.api.popup.models import Popups
+        from app.api.popup.schemas import PopupStatus
+        from app.api.shared.enums import SaleType
+        from app.api.tenant.utils import get_portal_url
+        from app.services.simplefi import get_simplefi_client
+
+        # 1. Validate popup
+        popup = session.get(Popups, obj.popup_id)
+        if not popup:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Popup not found",
+            )
+        if popup.status != PopupStatus.active.value:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Popup is not active",
+            )
+        if popup.sale_type != SaleType.direct.value:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Popup does not support direct purchases",
+            )
+
+        # 2. Validate products belong to popup and are active
+        product_ids = [p.product_id for p in obj.products]
+        statement = select(Products).where(
+            Products.id.in_(product_ids),  # type: ignore[attr-defined]
+            Products.popup_id == popup.id,
+            Products.is_active == True,  # noqa: E712
+        )
+        valid_products = list(session.exec(statement).all())
+        if {p.id for p in valid_products} != set(product_ids):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Some products are not available or inactive",
+            )
+
+        products_map = {p.id: p for p in valid_products}
+
+        # 3. Validate availability (max_quantity vs sold+pending)
+        fabricated_requests = [
+            # reuse existing helpers which expect PaymentProductRequest —
+            # we fabricate one with a placeholder attendee_id since the
+            # helper only reads product_id and quantity.
+            PaymentProductRequest(
+                product_id=p.product_id,
+                attendee_id=uuid.uuid4(),
+                quantity=p.quantity,
+            )
+            for p in obj.products
+        ]
+        self._validate_product_availability(
+            session,
+            fabricated_requests,
+            valid_products,
+        )
+
+        # 3b. Reserve shared tier-group stock atomically before creating
+        # payment rows or calling SimpleFI. A 409 from a sold-out group
+        # rolls the whole transaction back.
+        self._decrement_shared_tier_stocks(session, fabricated_requests)
+
+        # 4. Get or create the direct-sale attendee
+        attendee = attendees_crud.find_direct_attendee(
+            session, human_id=human.id, popup_id=popup.id
+        )
+        if not attendee:
+            name = (
+                f"{human.first_name or ''} {human.last_name or ''}".strip()
+                or human.email
+            )
+            attendee = attendees_crud.create_direct_attendee(
+                session,
+                human_id=human.id,
+                popup_id=popup.id,
+                tenant_id=tenant.id,
+                name=name,
+                email=human.email,
+            )
+
+        # 5. Calculate amount (no discount pipeline in v1 for direct-sale)
+        amount = Decimal("0")
+        for req_prod in obj.products:
+            product = products_map[req_prod.product_id]
+            amount += product.price * req_prod.quantity
+        amount = amount.quantize(MONEY_PRECISION, rounding=ROUND_HALF_UP)
+
+        # 6. Zero-amount: auto-approve, assign products directly
+        if amount <= 0:
+            payment = Payments(
+                tenant_id=tenant.id,
+                application_id=None,
+                popup_id=popup.id,
+                status=PaymentStatus.APPROVED.value,
+                amount=Decimal("0"),
+                currency=popup.currency,
+                source=None,
+            )
+            session.add(payment)
+            session.flush()
+
+            for req_prod in obj.products:
+                product = products_map[req_prod.product_id]
+                pp = PaymentProducts(
+                    tenant_id=tenant.id,
+                    payment_id=payment.id,
+                    product_id=req_prod.product_id,
+                    attendee_id=attendee.id,
+                    quantity=req_prod.quantity,
+                    product_name=product.name,
+                    product_description=product.description,
+                    product_price=product.price,
+                    product_category=product.category or "",
+                    product_currency=popup.currency,
+                )
+                session.add(pp)
+
+            self._add_products_to_attendees(
+                session,
+                [
+                    PaymentProductRequest(
+                        product_id=rp.product_id,
+                        attendee_id=attendee.id,
+                        quantity=rp.quantity,
+                    )
+                    for rp in obj.products
+                ],
+            )
+
+            session.commit()
+            session.refresh(payment)
+            return payment
+
+        # 7. Non-zero: create SimpleFI payment request
+        if not popup.simplefi_api_key:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Payment provider not configured for this popup",
+            )
+
+        simplefi_client = get_simplefi_client(popup.simplefi_api_key)
+        reference = {
+            "email": human.email,
+            "human_id": str(human.id),
+            "popup_id": str(popup.id),
+            "type": "direct",
+            "products": [
+                {
+                    "product_id": str(rp.product_id),
+                    "name": products_map[rp.product_id].name,
+                    "quantity": rp.quantity,
+                    "attendee_id": str(attendee.id),
+                }
+                for rp in obj.products
+            ],
+        }
+
+        portal_base = get_portal_url(tenant)
+
+        try:
+            simplefi_response = simplefi_client.create_payment(
+                amount=amount,
+                popup_slug=popup.slug,
+                tenant_slug=tenant.slug,
+                currency=popup.currency,
+                reference=reference,
+                memo=f"{popup.name} — direct purchase",
+                portal_base_override=portal_base,
+            )
+        except Exception as e:
+            logger.error(f"Failed to create SimpleFI direct payment: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Failed to create payment with payment provider",
+            ) from e
+
+        payment = Payments(
+            tenant_id=tenant.id,
+            application_id=None,
+            popup_id=popup.id,
+            status=simplefi_response.status,
+            amount=amount,
+            currency=popup.currency,
+            external_id=simplefi_response.id,
+            checkout_url=simplefi_response.checkout_url,
+            source=PaymentSource.SIMPLEFI.value,
+        )
+        session.add(payment)
+        session.flush()
+
+        for req_prod in obj.products:
+            product = products_map[req_prod.product_id]
+            pp = PaymentProducts(
+                tenant_id=tenant.id,
+                payment_id=payment.id,
+                product_id=req_prod.product_id,
+                attendee_id=attendee.id,
+                quantity=req_prod.quantity,
+                product_name=product.name,
+                product_description=product.description,
+                product_price=product.price,
+                product_category=product.category or "",
+                product_currency=popup.currency,
+            )
+            session.add(pp)
+
+        session.commit()
+        session.refresh(payment)
+        return payment
+
     def approve_payment(
         self,
         session: Session,
         payment_id: uuid.UUID,
         *,
-        currency: str | None = None,
+        settlement_currency: str | None = None,
         rate: Decimal | None = None,
+        source: str | None = None,
     ) -> Payments:
         """
         Approve a payment and add products to attendees.
@@ -979,20 +1382,17 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             return payment  # Already approved
 
         try:
-            # Use existing currency or default to USD for manual approvals
-            final_currency = currency or payment.currency or "USD"
-            source = (
-                PaymentSource.STRIPE
-                if final_currency == "USD"
-                else PaymentSource.SIMPLEFI
-            )
-
             # Set payment fields directly (no intermediate commit)
             payment.status = PaymentStatus.APPROVED.value
-            payment.currency = final_currency
+            if not payment.currency:
+                payment.currency = "USD"
+            payment.settlement_currency = (
+                settlement_currency or payment.settlement_currency
+            )
             if rate is not None:
                 payment.rate = rate
-            payment.source = source.value
+            if source is not None:
+                payment.source = source
             session.add(payment)
 
             # Clear existing products if editing passes
@@ -1010,10 +1410,14 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             ]
             self._add_products_to_attendees(session, products_to_add)
 
-            # Create ambassador group if patreon product was purchased
-            self._create_ambassador_group(session, payment)
+            # Create ambassador group if patreon product was purchased.
+            # Direct-sale payments have no application — skip ambassador logic
+            # (it requires application.human_id for the group leader).
+            if payment.application_id is not None:
+                self._create_ambassador_group(session, payment)
 
-            # Clear cart after successful payment
+            # Clear cart after successful payment (application flow only —
+            # direct-sale payments don't use the cart).
             from app.api.cart.crud import carts_crud
 
             if payment.application:

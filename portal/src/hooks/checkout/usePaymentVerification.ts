@@ -8,7 +8,13 @@ import { PaymentsService } from "@/client"
 export type VerifiedPaymentStatus = "verifying" | PaymentStatus | "error"
 
 interface UsePaymentVerificationParams {
-  applicationId: string | undefined
+  applicationId?: string
+  /**
+   * Payment id used when there is no application (direct-sale flow).
+   * When `applicationId` is absent and `paymentId` is present the hook
+   * polls by payment id instead of by latest-for-application.
+   */
+  paymentId?: string
   enabled: boolean
 }
 
@@ -22,20 +28,41 @@ const POLL_INTERVAL_MS = 3_000
 
 export function usePaymentVerification({
   applicationId,
+  paymentId,
   enabled,
 }: UsePaymentVerificationParams): UsePaymentVerificationResult {
   const pollCountRef = useRef(0)
+  const identifierRef = useRef<string | null>(
+    applicationId ?? paymentId ?? null,
+  )
+
+  const currentIdentifier = applicationId ?? paymentId ?? null
+  if (identifierRef.current !== currentIdentifier) {
+    identifierRef.current = currentIdentifier
+    pollCountRef.current = 0
+  }
+
+  const useApplicationPath = enabled && !!applicationId
+  const usePaymentIdPath = enabled && !applicationId && !!paymentId
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["payment-verification", applicationId],
+    queryKey: [
+      "payment-verification",
+      applicationId ?? null,
+      applicationId ? null : (paymentId ?? null),
+    ],
     queryFn: async () => {
       pollCountRef.current += 1
-      const result = await PaymentsService.getMyLatestPayment({
-        applicationId: applicationId!,
+      if (useApplicationPath) {
+        return PaymentsService.getMyLatestPayment({
+          applicationId: applicationId!,
+        })
+      }
+      return PaymentsService.getMyPaymentStatus({
+        paymentId: paymentId!,
       })
-      return result
     },
-    enabled: enabled && !!applicationId,
+    enabled: useApplicationPath || usePaymentIdPath,
     refetchInterval: (query) => {
       const status = query.state.data?.status
       // Stop polling if status is resolved or max attempts reached
@@ -48,7 +75,8 @@ export function usePaymentVerification({
     gcTime: 0,
   })
 
-  if (!enabled) {
+  // Hook is disabled, OR no identifier at all — treat as no-op / approved.
+  if (!enabled || (!applicationId && !paymentId)) {
     return { paymentStatus: "approved", isVerifying: false }
   }
 

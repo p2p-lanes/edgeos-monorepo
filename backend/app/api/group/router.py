@@ -18,6 +18,7 @@ from app.api.group.schemas import (
 )
 from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
+from app.api.translation.service import delete_translations_for_entity
 from app.core.dependencies.users import (
     CurrentHuman,
     CurrentUser,
@@ -203,6 +204,7 @@ async def delete_group(
                     detail="Cannot delete group with members that have purchased products",
                 )
 
+    delete_translations_for_entity(db, "group", group.id)
     crud.groups_crud.delete(db, group)
 
 
@@ -368,7 +370,10 @@ async def add_group_member(
         try:
             applications_crud.accept(db, application)
         except Exception:
-            raise HTTPException(status_code=400, detail="Cannot accept application from a red-flagged human.")
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot accept application from a red-flagged human.",
+            )
         # Update human profile
         human.first_name = member_in.first_name
         human.last_name = member_in.last_name

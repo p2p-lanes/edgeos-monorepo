@@ -13,6 +13,12 @@ export type AbandonedCartPublic = {
     payments?: Array<CartPaymentInfo>;
 };
 
+export type AITranslateRequest = {
+    entity_type: string;
+    entity_id: string;
+    target_language: string;
+};
+
 /**
  * Response when human is the main applicant.
  */
@@ -83,6 +89,25 @@ export type ApplicationCreate = {
 export type ApplicationFeeCreate = {
     application_id: string;
 };
+
+/**
+ * Application pipeline as a funnel.
+ */
+export type ApplicationFunnel = {
+    draft?: number;
+    pending_fee?: number;
+    in_review?: number;
+    accepted?: number;
+    paid?: number;
+};
+
+/**
+ * How the portal renders the application form for a popup.
+ *
+ * - single_page: all sections stacked on one page (legacy behavior).
+ * - multi_step: one section per step, with Next/Back navigation.
+ */
+export type ApplicationLayout = 'single_page' | 'multi_step';
 
 /**
  * Application schema for API responses.
@@ -250,6 +275,16 @@ export type AssociatedAttendee = {
 };
 
 /**
+ * Accommodation attach rate per ticket type.
+ */
+export type AttachRateItem = {
+    ticket_type: string;
+    total_attendees?: number;
+    with_accommodation?: number;
+    rate?: string;
+};
+
+/**
  * Attendee schema for creation (by user).
  */
 export type AttendeeCreate = {
@@ -274,7 +309,8 @@ export type AttendeeInfo = {
  */
 export type AttendeePublic = {
     tenant_id: string;
-    application_id: string;
+    application_id?: (string | null);
+    popup_id: string;
     human_id?: (string | null);
     name: string;
     category: string;
@@ -370,6 +406,7 @@ export type BaseFieldConfigPublic = {
     field_name: string;
     section_id?: (string | null);
     position?: number;
+    required?: boolean;
     label?: (string | null);
     placeholder?: (string | null);
     help_text?: (string | null);
@@ -379,6 +416,7 @@ export type BaseFieldConfigPublic = {
 export type BaseFieldConfigUpdate = {
     section_id?: (string | null);
     position?: (number | null);
+    required?: (boolean | null);
     label?: (string | null);
     placeholder?: (string | null);
     help_text?: (string | null);
@@ -483,6 +521,30 @@ export type CartUpdate = {
 };
 
 /**
+ * A base field from BASE_FIELD_DEFINITIONS that is available to add to a popup.
+ */
+export type CatalogField = {
+    field_name: string;
+    type: string;
+    label: string;
+    required: boolean;
+    target: string;
+    default_section_key?: (string | null);
+};
+
+/**
+ * Aggregated breakdown by product category.
+ */
+export type CategoryBreakdown = {
+    category: string;
+    label: string;
+    quantity?: number;
+    revenue?: string;
+};
+
+export type CheckoutMode = 'pass_system' | 'simple_quantity';
+
+/**
  * Schema for creating companion attendees (spouse/kids) during application.
  *
  * Used when submitting an application with family members.
@@ -562,6 +624,14 @@ export type CredentialInfo = {
 export type CredentialType = 'crud' | 'readonly';
 
 /**
+ * Time series for cumulative charts.
+ */
+export type CumulativeTrends = {
+    tickets?: Array<TimelinePoint>;
+    revenue?: Array<RevenueTimelinePoint>;
+};
+
+/**
  * Complete dashboard statistics.
  */
 export type DashboardStats = {
@@ -581,6 +651,44 @@ export type DirectoryProduct = {
     duration_type?: (string | null);
     start_date?: (string | null);
     end_date?: (string | null);
+};
+
+/**
+ * Product selection for a direct purchase (no attendee_id — server creates).
+ */
+export type DirectProductRequest = {
+    product_id: string;
+    quantity?: number;
+};
+
+/**
+ * Schema for creating a direct-sale payment.
+ *
+ * Used for popups with sale_type="direct". Auth is via CurrentHuman — the
+ * server creates/reuses the Attendee from Human data automatically.
+ */
+export type DirectPurchaseCreate = {
+    popup_id: string;
+    products: Array<DirectProductRequest>;
+};
+
+/**
+ * Ticket and accommodation distribution.
+ */
+export type Distribution = {
+    tickets_by_duration?: Array<DistributionItem>;
+    tickets_by_attendee_type?: Array<DistributionItem>;
+    accommodation_by_product?: Array<DistributionItem>;
+    accommodation_attach_rate?: Array<AttachRateItem>;
+};
+
+/**
+ * Single slice in a distribution chart.
+ */
+export type DistributionItem = {
+    label: string;
+    value?: number;
+    percentage?: string;
 };
 
 export type EmailTemplateCreate = {
@@ -611,6 +719,20 @@ export type EmailTemplateUpdate = {
     is_active?: (boolean | null);
 };
 
+/**
+ * Full enriched dashboard response.
+ */
+export type EnrichedDashboardStats = {
+    key_metrics: KeyMetrics;
+    cumulative_trends: CumulativeTrends;
+    revenue_breakdown: RevenueBreakdown;
+    distribution: Distribution;
+    application_funnel: ApplicationFunnel;
+    applications: ApplicationStats;
+    attendees: AttendeeStats;
+    payments: PaymentStats;
+};
+
 export type FormFieldCreate = {
     popup_id: string;
     label: string;
@@ -638,6 +760,7 @@ export type FormFieldPublic = {
     placeholder?: (string | null);
     help_text?: (string | null);
     protected?: boolean;
+    removable?: boolean;
     target?: (string | null);
 };
 
@@ -657,6 +780,7 @@ export type FormSectionCreate = {
     label: string;
     description?: (string | null);
     order?: number;
+    kind?: string;
 };
 
 export type FormSectionPublic = {
@@ -667,6 +791,7 @@ export type FormSectionPublic = {
     description?: (string | null);
     order?: number;
     protected?: boolean;
+    kind?: string;
 };
 
 export type FormSectionUpdate = {
@@ -914,6 +1039,19 @@ export type HumanVerify = {
     code: string;
 };
 
+/**
+ * Top-level KPI cards with derived metrics.
+ */
+export type KeyMetrics = {
+    people?: number;
+    total_revenue?: string;
+    currency?: string;
+    avg_ticket_price?: string;
+    avg_revenue_per_person?: string;
+    accommodation_percentage?: string;
+    conversion_rate?: string;
+};
+
 export type ListModel = {
     results: Array<unknown>;
     paging: Paging;
@@ -989,13 +1127,23 @@ export type ListModel_PopupReviewerPublic_ = {
     paging: Paging;
 };
 
-export type ListModel_ProductPublic_ = {
-    results: Array<ProductPublic>;
+export type ListModel_ProductPublicWithTier_ = {
+    results: Array<ProductPublicWithTier>;
     paging: Paging;
 };
 
 export type ListModel_TenantPublic_ = {
     results: Array<TenantPublic>;
+    paging: Paging;
+};
+
+export type ListModel_TicketingStepPublic_ = {
+    results: Array<TicketingStepPublic>;
+    paging: Paging;
+};
+
+export type ListModel_TierGroupPublic_ = {
+    results: Array<TierGroupPublic>;
     paging: Paging;
 };
 
@@ -1019,9 +1167,15 @@ export type Paging = {
 
 /**
  * Schema for creating a payment.
+ *
+ * Either application_id (application-based flow) or popup_id (direct-sale)
+ * must be provided — at least one source is required. The existing
+ * application-based flow always passes application_id; direct-sale uses
+ * DirectPurchaseCreate, which is translated into this shape server-side.
  */
 export type PaymentCreate = {
-    application_id: string;
+    application_id?: (string | null);
+    popup_id?: (string | null);
     products: Array<PaymentProductRequest>;
     coupon_code?: (string | null);
     edit_passes?: boolean;
@@ -1069,6 +1223,7 @@ export type PaymentProductResponse = {
     product_description?: (string | null);
     product_price: string;
     product_category: string;
+    product_currency: string;
     attendee_name?: (string | null);
     created_at: string;
 };
@@ -1078,12 +1233,14 @@ export type PaymentProductResponse = {
  */
 export type PaymentPublic = {
     tenant_id: string;
-    application_id: string;
+    application_id?: (string | null);
+    popup_id: string;
     external_id?: (string | null);
     status?: string;
     amount?: string;
     insurance_amount?: string;
     currency?: string;
+    settlement_currency?: (string | null);
     rate?: (string | null);
     source?: (string | null);
     checkout_url?: (string | null);
@@ -1103,9 +1260,9 @@ export type PaymentPublic = {
 };
 
 /**
- * Payment source/provider.
+ * Settlement rail/provider shown to users.
  */
-export type PaymentSource = 'SimpleFI' | 'Stripe';
+export type PaymentSource = 'SimpleFI' | 'Stripe' | 'MercadoPago';
 
 /**
  * Statistics for payments.
@@ -1145,7 +1302,15 @@ export type PaymentUpdate = {
     source?: (PaymentSource | null);
     rate?: (number | string | null);
     currency?: (string | null);
+    settlement_currency?: (string | null);
 };
+
+/**
+ * Derived sales state for a ticket tier phase.
+ *
+ * Computed server-side by the progression service at read time; never persisted.
+ */
+export type PhaseState = 'upcoming' | 'available' | 'sold_out' | 'expired';
 
 /**
  * Admin popup schema — all fields including sensitive ones.
@@ -1159,6 +1324,8 @@ export type PopupAdmin = {
     start_date?: (string | null);
     end_date?: (string | null);
     status?: PopupStatus;
+    sale_type?: SaleType;
+    checkout_mode?: CheckoutMode;
     allows_spouse?: (boolean | null);
     allows_children?: (boolean | null);
     allows_coupons?: (boolean | null);
@@ -1175,8 +1342,18 @@ export type PopupAdmin = {
     invoice_company_name?: (string | null);
     invoice_company_address?: (string | null);
     invoice_company_email?: (string | null);
+    currency?: string;
     requires_application_fee?: boolean;
     application_fee_amount?: (string | null);
+    theme_config?: ({
+    [key: string]: unknown;
+} | null);
+    default_language?: string;
+    supported_languages?: Array<(string)>;
+    insurance_enabled?: boolean;
+    insurance_percentage?: (string | null);
+    application_layout?: ApplicationLayout;
+    tier_progression_enabled?: boolean;
     id: string;
 };
 
@@ -1189,6 +1366,8 @@ export type PopupCreate = {
     start_date?: (string | null);
     end_date?: (string | null);
     status?: PopupStatus;
+    sale_type?: SaleType;
+    checkout_mode?: (CheckoutMode | null);
     allows_spouse?: (boolean | null);
     allows_children?: (boolean | null);
     allows_coupons?: (boolean | null);
@@ -1205,8 +1384,18 @@ export type PopupCreate = {
     invoice_company_name?: (string | null);
     invoice_company_address?: (string | null);
     invoice_company_email?: (string | null);
+    currency?: string;
     requires_application_fee?: boolean;
     application_fee_amount?: (number | string | null);
+    theme_config?: ({
+    [key: string]: unknown;
+} | null);
+    default_language?: string;
+    supported_languages?: Array<(string)>;
+    insurance_enabled?: boolean;
+    insurance_percentage?: (number | string | null);
+    application_layout?: ApplicationLayout;
+    tier_progression_enabled?: boolean;
 };
 
 /**
@@ -1219,6 +1408,8 @@ export type PopupPublic = {
     location?: (string | null);
     slug: string;
     status?: PopupStatus;
+    sale_type?: SaleType;
+    checkout_mode?: CheckoutMode;
     start_date?: (string | null);
     end_date?: (string | null);
     image_url?: (string | null);
@@ -1231,10 +1422,20 @@ export type PopupPublic = {
     allows_children?: (boolean | null);
     allows_coupons?: (boolean | null);
     allows_scholarship?: boolean;
+    currency?: string;
     terms_and_conditions_url?: (string | null);
     invoice_company_name?: (string | null);
     requires_application_fee?: boolean;
     application_fee_amount?: (string | null);
+    theme_config?: ({
+    [key: string]: unknown;
+} | null);
+    default_language?: string;
+    supported_languages?: Array<(string)>;
+    insurance_enabled?: boolean;
+    insurance_percentage?: (string | null);
+    application_layout?: ApplicationLayout;
+    tier_progression_enabled?: boolean;
 };
 
 /**
@@ -1277,6 +1478,8 @@ export type PopupUpdate = {
     location?: (string | null);
     slug?: (string | null);
     status?: (PopupStatus | null);
+    sale_type?: (SaleType | null);
+    checkout_mode?: (CheckoutMode | null);
     start_date?: (string | null);
     end_date?: (string | null);
     allows_spouse?: (boolean | null);
@@ -1295,8 +1498,18 @@ export type PopupUpdate = {
     invoice_company_name?: (string | null);
     invoice_company_address?: (string | null);
     invoice_company_email?: (string | null);
+    currency?: (string | null);
     requires_application_fee?: (boolean | null);
     application_fee_amount?: (number | string | null);
+    theme_config?: ({
+    [key: string]: unknown;
+} | null);
+    default_language?: (string | null);
+    supported_languages?: (Array<(string)> | null);
+    insurance_enabled?: (boolean | null);
+    insurance_percentage?: (number | string | null);
+    application_layout?: (ApplicationLayout | null);
+    tier_progression_enabled?: (boolean | null);
 };
 
 /**
@@ -1364,7 +1577,7 @@ export type ProductBatchItem = {
     compare_price?: (number | string | null);
     description?: (string | null);
     image_url?: (string | null);
-    category?: ProductCategory;
+    category?: string;
     attendee_category?: (TicketAttendeeCategory | null);
     duration_type?: (TicketDuration | null);
     start_date?: (string | null);
@@ -1372,7 +1585,7 @@ export type ProductBatchItem = {
     is_active?: boolean;
     exclusive?: boolean;
     max_quantity?: (number | null);
-    insurance_percentage?: (number | string | null);
+    insurance_eligible?: boolean;
 };
 
 /**
@@ -1387,7 +1600,7 @@ export type ProductBatchResult = {
     compare_price?: (string | null);
     description?: (string | null);
     image_url?: (string | null);
-    category?: ProductCategory;
+    category?: string;
     attendee_category?: (TicketAttendeeCategory | null);
     duration_type?: (TicketDuration | null);
     start_date?: (string | null);
@@ -1395,7 +1608,7 @@ export type ProductBatchResult = {
     is_active?: boolean;
     exclusive?: boolean;
     max_quantity?: (number | null);
-    insurance_percentage?: (string | null);
+    insurance_eligible?: boolean;
     id: string;
     success: boolean;
     err_msg?: (string | null);
@@ -1403,9 +1616,15 @@ export type ProductBatchResult = {
 };
 
 /**
- * Product categories determining which fields are relevant.
+ * Revenue and quantity breakdown per product.
  */
-export type ProductCategory = 'ticket' | 'housing' | 'merch' | 'other' | 'patreon';
+export type ProductBreakdownItem = {
+    product_id: string;
+    product_name: string;
+    product_category: string;
+    quantity?: number;
+    revenue?: string;
+};
 
 /**
  * Product schema for creation.
@@ -1418,7 +1637,7 @@ export type ProductCreate = {
     compare_price?: (number | string | null);
     description?: (string | null);
     image_url?: (string | null);
-    category?: ProductCategory;
+    category?: string;
     attendee_category?: (TicketAttendeeCategory | null);
     duration_type?: (TicketDuration | null);
     start_date?: (string | null);
@@ -1426,7 +1645,7 @@ export type ProductCreate = {
     is_active?: boolean;
     exclusive?: boolean;
     max_quantity?: (number | null);
-    insurance_percentage?: (number | string | null);
+    insurance_eligible?: boolean;
 };
 
 /**
@@ -1441,7 +1660,7 @@ export type ProductPublic = {
     compare_price?: (string | null);
     description?: (string | null);
     image_url?: (string | null);
-    category?: ProductCategory;
+    category?: string;
     attendee_category?: (TicketAttendeeCategory | null);
     duration_type?: (TicketDuration | null);
     start_date?: (string | null);
@@ -1449,8 +1668,37 @@ export type ProductPublic = {
     is_active?: boolean;
     exclusive?: boolean;
     max_quantity?: (number | null);
-    insurance_percentage?: (string | null);
+    insurance_eligible?: boolean;
     id: string;
+};
+
+/**
+ * ProductPublic enriched with optional tier group and phase information.
+ *
+ * Additive delta over ProductPublic — both fields are null for products that
+ * are not assigned to any tier group (BC-2 / BC-3 backward-compat).
+ */
+export type ProductPublicWithTier = {
+    tenant_id: string;
+    popup_id: string;
+    name: string;
+    slug: string;
+    price: string;
+    compare_price?: (string | null);
+    description?: (string | null);
+    image_url?: (string | null);
+    category?: string;
+    attendee_category?: (TicketAttendeeCategory | null);
+    duration_type?: (TicketDuration | null);
+    start_date?: (string | null);
+    end_date?: (string | null);
+    is_active?: boolean;
+    exclusive?: boolean;
+    max_quantity?: (number | null);
+    insurance_eligible?: boolean;
+    id: string;
+    tier_group?: (TierGroupPublic | null);
+    phase?: (TierPhasePublic | null);
 };
 
 /**
@@ -1463,7 +1711,7 @@ export type ProductUpdate = {
     compare_price?: (number | string | null);
     description?: (string | null);
     image_url?: (string | null);
-    category?: (ProductCategory | null);
+    category?: (string | null);
     attendee_category?: (TicketAttendeeCategory | null);
     duration_type?: (TicketDuration | null);
     start_date?: (string | null);
@@ -1471,7 +1719,7 @@ export type ProductUpdate = {
     is_active?: (boolean | null);
     exclusive?: (boolean | null);
     max_quantity?: (number | null);
-    insurance_percentage?: (number | string | null);
+    insurance_eligible?: (boolean | null);
 };
 
 /**
@@ -1486,7 +1734,7 @@ export type ProductWithQuantity = {
     compare_price?: (string | null);
     description?: (string | null);
     image_url?: (string | null);
-    category?: ProductCategory;
+    category?: string;
     attendee_category?: (TicketAttendeeCategory | null);
     duration_type?: (TicketDuration | null);
     start_date?: (string | null);
@@ -1494,9 +1742,26 @@ export type ProductWithQuantity = {
     is_active?: boolean;
     exclusive?: boolean;
     max_quantity?: (number | null);
-    insurance_percentage?: (string | null);
+    insurance_eligible?: boolean;
     id: string;
     quantity?: number;
+};
+
+/**
+ * Revenue split by product and category.
+ */
+export type RevenueBreakdown = {
+    by_product?: Array<ProductBreakdownItem>;
+    by_category?: Array<CategoryBreakdown>;
+};
+
+/**
+ * Single data point for revenue time series.
+ */
+export type RevenueTimelinePoint = {
+    date: string;
+    value?: string;
+    cumulative?: string;
 };
 
 /**
@@ -1516,6 +1781,15 @@ export type ReviewSummary = {
     weighted_score?: (number | null);
     reviews: Array<ApplicationReviewPublic>;
 };
+
+/**
+ * Popup sale model.
+ *
+ * - application: traditional application-based flow (approval required).
+ * - direct: direct purchase by a logged-in Human, no application.
+ * Enum is extensible for future types (e.g. waitlist, lottery, registration).
+ */
+export type SaleType = 'application' | 'direct';
 
 /**
  * Admin request body for PATCH /applications/{id}/scholarship.
@@ -1614,6 +1888,58 @@ export type TicketAttendeeCategory = 'main' | 'spouse' | 'kid';
  */
 export type TicketDuration = 'day' | 'week' | 'month' | 'full';
 
+export type TicketingStepCreate = {
+    popup_id: string;
+    step_type: string;
+    title: string;
+    description?: (string | null);
+    order?: number;
+    is_enabled?: boolean;
+    product_category?: (string | null);
+    template?: (string | null);
+    template_config?: ({
+    [key: string]: unknown;
+} | null);
+    watermark?: (string | null);
+    show_title?: boolean;
+    show_watermark?: boolean;
+};
+
+export type TicketingStepPublic = {
+    id: string;
+    tenant_id: string;
+    popup_id: string;
+    step_type: string;
+    title: string;
+    description?: (string | null);
+    order?: number;
+    is_enabled?: boolean;
+    protected?: boolean;
+    product_category?: (string | null);
+    template?: (string | null);
+    template_config?: ({
+    [key: string]: unknown;
+} | null);
+    watermark?: (string | null);
+    show_title?: boolean;
+    show_watermark?: boolean;
+};
+
+export type TicketingStepUpdate = {
+    title?: (string | null);
+    description?: (string | null);
+    order?: (number | null);
+    is_enabled?: (boolean | null);
+    product_category?: (string | null);
+    template?: (string | null);
+    template_config?: ({
+    [key: string]: unknown;
+} | null);
+    watermark?: (string | null);
+    show_title?: (boolean | null);
+    show_watermark?: (boolean | null);
+};
+
 /**
  * Minimal product data for tickets.
  */
@@ -1625,9 +1951,114 @@ export type TicketProduct = {
     quantity?: number;
 };
 
+/**
+ * Schema for creating a new ticket tier group.
+ */
+export type TierGroupCreate = {
+    name: string;
+    shared_stock_cap?: (number | null);
+    popup_id?: (string | null);
+};
+
+/**
+ * Public read schema for a ticket tier group, with embedded phases.
+ */
+export type TierGroupPublic = {
+    id: string;
+    tenant_id: string;
+    name: string;
+    shared_stock_cap?: (number | null);
+    shared_stock_remaining?: (number | null);
+    phases?: Array<TierPhasePublic>;
+};
+
+/**
+ * Schema for updating a ticket tier group (all fields optional).
+ */
+export type TierGroupUpdate = {
+    name?: (string | null);
+    shared_stock_cap?: (number | null);
+};
+
+/**
+ * Schema for creating a new ticket tier phase.
+ *
+ * group_id is optional here because the router endpoint at
+ * POST /ticket-tier-groups/{group_id}/phases injects it from the path param.
+ *
+ * `order` is not accepted on input: the backend derives it from
+ * `sale_starts_at ASC` (NULLS LAST) with a deterministic id tiebreak.
+ */
+export type TierPhaseCreate = {
+    group_id?: (string | null);
+    product_id: string;
+    label: string;
+    sale_starts_at?: (string | null);
+    sale_ends_at?: (string | null);
+};
+
+/**
+ * Public read schema for a ticket tier phase, with derived progression fields.
+ */
+export type TierPhasePublic = {
+    id: string;
+    group_id: string;
+    product_id: string;
+    order: number;
+    label: string;
+    sale_starts_at?: (string | null);
+    sale_ends_at?: (string | null);
+    sales_state: PhaseState;
+    is_purchasable: boolean;
+    remaining?: (number | null);
+};
+
+/**
+ * Schema for updating a ticket tier phase (all fields optional).
+ *
+ * `order` is derived automatically; updates that change `sale_starts_at`
+ * trigger a full re-order of the group.
+ */
+export type TierPhaseUpdate = {
+    label?: (string | null);
+    sale_starts_at?: (string | null);
+    sale_ends_at?: (string | null);
+};
+
+/**
+ * Single data point in a time series.
+ */
+export type TimelinePoint = {
+    date: string;
+    value?: number;
+    cumulative?: number;
+};
+
 export type Token = {
     access_token: string;
     token_type?: string;
+};
+
+export type TranslationCreate = {
+    entity_type: string;
+    entity_id: string;
+    language: string;
+    data: {
+        [key: string]: unknown;
+    };
+};
+
+export type TranslationPublic = {
+    id: string;
+    tenant_id: string;
+    entity_type: string;
+    entity_id: string;
+    language: string;
+    data: {
+        [key: string]: unknown;
+    };
+    created_at?: (string | null);
+    updated_at?: (string | null);
 };
 
 /**
@@ -2102,6 +2533,16 @@ export type DashboardGetDashboardStatsData = {
 
 export type DashboardGetDashboardStatsResponse = (DashboardStats);
 
+export type DashboardGetEnrichedDashboardData = {
+    /**
+     * Popup ID to get stats for
+     */
+    popupId: string;
+    xTenantId?: (string | null);
+};
+
+export type DashboardGetEnrichedDashboardResponse = (EnrichedDashboardStats);
+
 export type EmailTemplatesListTemplateTypesResponse = (Array<TemplateTypeInfo>);
 
 export type EmailTemplatesGetDefaultTemplateData = {
@@ -2195,6 +2636,21 @@ export type FormFieldsCreateFormFieldData = {
 
 export type FormFieldsCreateFormFieldResponse = (FormFieldPublic);
 
+export type FormFieldsListAvailableBaseFieldsData = {
+    popupId: string;
+    xTenantId?: (string | null);
+};
+
+export type FormFieldsListAvailableBaseFieldsResponse = (Array<CatalogField>);
+
+export type FormFieldsCreateBaseFieldConfigData = {
+    fieldName: string;
+    popupId: string;
+    xTenantId?: (string | null);
+};
+
+export type FormFieldsCreateBaseFieldConfigResponse = (FormFieldPublic);
+
 export type FormFieldsGetFormFieldData = {
     fieldId: string;
     xTenantId?: (string | null);
@@ -2227,6 +2683,7 @@ export type FormFieldsGetApplicationSchemaResponse = ({
 });
 
 export type FormFieldsGetPortalApplicationSchemaData = {
+    acceptLanguage?: (string | null);
     popupId: string;
 };
 
@@ -2483,6 +2940,12 @@ export type PaymentsGetMyLatestPaymentData = {
 
 export type PaymentsGetMyLatestPaymentResponse = (PaymentStatusCheck);
 
+export type PaymentsGetMyPaymentStatusData = {
+    paymentId: string;
+};
+
+export type PaymentsGetMyPaymentStatusResponse = (PaymentStatusCheck);
+
 export type PaymentsListMyPaymentsData = {
     applicationId: string;
     /**
@@ -2514,6 +2977,12 @@ export type PaymentsCreateMyPaymentData = {
 };
 
 export type PaymentsCreateMyPaymentResponse = (PaymentPublic);
+
+export type PaymentsCreateDirectPaymentData = {
+    requestBody: DirectPurchaseCreate;
+};
+
+export type PaymentsCreateDirectPaymentResponse = (PaymentPublic);
 
 export type PaymentsSimplefiWebhookResponse = ({
     [key: string]: unknown;
@@ -2609,16 +3078,27 @@ export type PopupsDeletePopupData = {
 
 export type PopupsDeletePopupResponse = (void);
 
+export type PopupsListPortalPopupsData = {
+    acceptLanguage?: (string | null);
+};
+
 export type PopupsListPortalPopupsResponse = (Array<PopupPublic>);
 
 export type PopupsGetPortalPopupData = {
+    acceptLanguage?: (string | null);
     slug: string;
 };
 
 export type PopupsGetPortalPopupResponse = (PopupPublic);
 
+export type ProductsListProductCategoriesData = {
+    popupId: string;
+};
+
+export type ProductsListProductCategoriesResponse = (Array<(string)>);
+
 export type ProductsListProductsData = {
-    category?: (ProductCategory | null);
+    category?: (string | null);
     isActive?: (boolean | null);
     /**
      * Maximum number of items to return
@@ -2635,7 +3115,7 @@ export type ProductsListProductsData = {
     xTenantId?: (string | null);
 };
 
-export type ProductsListProductsResponse = (ListModel_ProductPublic_);
+export type ProductsListProductsResponse = (ListModel_ProductPublicWithTier_);
 
 export type ProductsCreateProductData = {
     requestBody: ProductCreate;
@@ -2656,7 +3136,7 @@ export type ProductsGetProductData = {
     xTenantId?: (string | null);
 };
 
-export type ProductsGetProductResponse = (ProductPublic);
+export type ProductsGetProductResponse = (ProductPublicWithTier);
 
 export type ProductsUpdateProductData = {
     productId: string;
@@ -2674,7 +3154,8 @@ export type ProductsDeleteProductData = {
 export type ProductsDeleteProductResponse = (void);
 
 export type ProductsListPortalProductsData = {
-    category?: (ProductCategory | null);
+    acceptLanguage?: (string | null);
+    category?: (string | null);
     isActive?: (boolean | null);
     /**
      * Maximum number of items to return
@@ -2687,7 +3168,7 @@ export type ProductsListPortalProductsData = {
     skip?: number;
 };
 
-export type ProductsListPortalProductsResponse = (ListModel_ProductPublic_);
+export type ProductsListPortalProductsResponse = (ListModel_ProductPublicWithTier_);
 
 export type TenantsGetTenantByDomainData = {
     domain: string;
@@ -2751,6 +3232,152 @@ export type TenantsDeleteCredentialsData = {
 };
 
 export type TenantsDeleteCredentialsResponse = (void);
+
+export type TicketingStepsListPortalTicketingStepsData = {
+    popupId: string;
+};
+
+export type TicketingStepsListPortalTicketingStepsResponse = (ListModel_TicketingStepPublic_);
+
+export type TicketingStepsListTicketingStepsData = {
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    popupId?: (string | null);
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+    xTenantId?: (string | null);
+};
+
+export type TicketingStepsListTicketingStepsResponse = (ListModel_TicketingStepPublic_);
+
+export type TicketingStepsCreateTicketingStepData = {
+    requestBody: TicketingStepCreate;
+    xTenantId?: (string | null);
+};
+
+export type TicketingStepsCreateTicketingStepResponse = (TicketingStepPublic);
+
+export type TicketingStepsGetTicketingStepData = {
+    stepId: string;
+    xTenantId?: (string | null);
+};
+
+export type TicketingStepsGetTicketingStepResponse = (TicketingStepPublic);
+
+export type TicketingStepsUpdateTicketingStepData = {
+    requestBody: TicketingStepUpdate;
+    stepId: string;
+    xTenantId?: (string | null);
+};
+
+export type TicketingStepsUpdateTicketingStepResponse = (TicketingStepPublic);
+
+export type TicketingStepsDeleteTicketingStepData = {
+    stepId: string;
+    xTenantId?: (string | null);
+};
+
+export type TicketingStepsDeleteTicketingStepResponse = (void);
+
+export type TicketTierGroupsCreateTierGroupData = {
+    requestBody: TierGroupCreate;
+    xTenantId?: (string | null);
+};
+
+export type TicketTierGroupsCreateTierGroupResponse = (TierGroupPublic);
+
+export type TicketTierGroupsListTierGroupsData = {
+    popupId?: (string | null);
+    xTenantId?: (string | null);
+};
+
+export type TicketTierGroupsListTierGroupsResponse = (ListModel_TierGroupPublic_);
+
+export type TicketTierGroupsGetTierGroupData = {
+    groupId: string;
+    xTenantId?: (string | null);
+};
+
+export type TicketTierGroupsGetTierGroupResponse = (TierGroupPublic);
+
+export type TicketTierGroupsUpdateTierGroupData = {
+    groupId: string;
+    requestBody: TierGroupUpdate;
+    xTenantId?: (string | null);
+};
+
+export type TicketTierGroupsUpdateTierGroupResponse = (TierGroupPublic);
+
+export type TicketTierGroupsDeleteTierGroupData = {
+    groupId: string;
+    xTenantId?: (string | null);
+};
+
+export type TicketTierGroupsDeleteTierGroupResponse = (void);
+
+export type TicketTierGroupsCreateTierPhaseData = {
+    groupId: string;
+    requestBody: TierPhaseCreate;
+    xTenantId?: (string | null);
+};
+
+export type TicketTierGroupsCreateTierPhaseResponse = ({
+    [key: string]: unknown;
+});
+
+export type TicketTierGroupsUpdateTierPhaseData = {
+    groupId: string;
+    phaseId: string;
+    requestBody: TierPhaseUpdate;
+    xTenantId?: (string | null);
+};
+
+export type TicketTierGroupsUpdateTierPhaseResponse = ({
+    [key: string]: unknown;
+});
+
+export type TicketTierGroupsDeleteTierPhaseData = {
+    groupId: string;
+    phaseId: string;
+    xTenantId?: (string | null);
+};
+
+export type TicketTierGroupsDeleteTierPhaseResponse = (void);
+
+export type TranslationsListTranslationsData = {
+    entityId: string;
+    entityType: string;
+    xTenantId?: (string | null);
+};
+
+export type TranslationsListTranslationsResponse = (Array<TranslationPublic>);
+
+export type TranslationsUpsertTranslationData = {
+    requestBody: TranslationCreate;
+    xTenantId?: (string | null);
+};
+
+export type TranslationsUpsertTranslationResponse = (TranslationPublic);
+
+export type TranslationsAiTranslateData = {
+    requestBody: AITranslateRequest;
+    xTenantId?: (string | null);
+};
+
+export type TranslationsAiTranslateResponse = ({
+    [key: string]: (string);
+});
+
+export type TranslationsDeleteTranslationData = {
+    translationId: string;
+    xTenantId?: (string | null);
+};
+
+export type TranslationsDeleteTranslationResponse = (void);
 
 export type UploadsGetPresignedUploadUrlData = {
     requestBody: PresignedUrlRequest;

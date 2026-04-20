@@ -165,6 +165,7 @@ def _seed_base_field_configs(session: Session, popup_map: dict, tenant_id) -> No
                     label=section_def["label"],
                     order=section_def["order"],
                     protected=True,
+                    kind=section_def["kind"],
                 )
                 session.add(section)
                 session.commit()
@@ -176,6 +177,21 @@ def _seed_base_field_configs(session: Session, popup_map: dict, tenant_id) -> No
             session, popup.id, tenant_id, default_section_map
         )
         logger.info(f"Base field configs created for {popup_key}")
+
+
+def _seed_ticketing_steps(session: Session, popup_map: dict, tenant_id) -> None:
+    from app.api.ticketing_step.constants import seed_ticketing_steps_for_popup
+    from app.models import TicketingSteps
+
+    for popup_key, popup in popup_map.items():
+        existing = session.exec(
+            select(TicketingSteps).where(TicketingSteps.popup_id == popup.id)
+        ).first()
+        if existing:
+            continue
+
+        seed_ticketing_steps_for_popup(session, popup_id=popup.id, tenant_id=tenant_id)
+        logger.info(f"Ticketing steps seeded for {popup_key}")
 
 
 def _seed_approval_strategies(session: Session, popup_map: dict, tenant_id) -> None:
@@ -612,6 +628,7 @@ def _seed_applications(
             attendee = Attendees(
                 tenant_id=tenant_id,
                 application_id=application.id,
+                popup_id=popup.id,
                 human_id=attendee_human_id,
                 name=attendee_data["name"],
                 category=attendee_data["category"],
@@ -701,9 +718,11 @@ def _seed_payments(
         payment = Payments(
             tenant_id=tenant_id,
             application_id=application.id,
+            popup_id=application.popup_id,
             status=payment_data.get("status", "pending"),
             amount=Decimal(payment_data.get("amount", "0")),
             currency=payment_data.get("currency", "USD"),
+            settlement_currency=payment_data.get("settlement_currency"),
             source=payment_data.get("source"),
             external_id=payment_data.get("external_id"),
             coupon_id=coupon_id,
@@ -761,6 +780,7 @@ def _seed_payments(
                 product_description=product.description,
                 product_price=product.price,
                 product_category=product.category,
+                product_currency="USD",
             )
             session.add(payment_product)
             session.commit()
@@ -777,6 +797,7 @@ def init_db(session: Session) -> None:
 
     popup_map = _seed_popups(session, seed_data, tenant_id)
     _seed_base_field_configs(session, popup_map, tenant_id)
+    _seed_ticketing_steps(session, popup_map, tenant_id)
     _seed_approval_strategies(session, popup_map, tenant_id)
 
     product_map = _seed_products(session, seed_data, popup_map, tenant_id)

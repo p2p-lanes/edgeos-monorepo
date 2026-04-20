@@ -2,8 +2,10 @@ import type { AttendeePassState } from "./Attendee"
 import type { ProductsPass } from "./Products"
 
 // --- Step Types ---
+// "tickets" is the API/DB step_type; "passes" is the legacy internal name (kept for compat)
 export type CheckoutStep =
   | "passes"
+  | "tickets"
   | "housing"
   | "merch"
   | "patron"
@@ -75,6 +77,8 @@ export interface SelectedHousingItem {
   nights: number
   pricePerNight: number
   totalPrice: number
+  pricePerDay: boolean
+  quantity: number
 }
 
 export interface SelectedMerchItem {
@@ -92,6 +96,14 @@ export interface SelectedPatronItem {
   isCustomAmount: boolean
 }
 
+export interface SelectedDynamicItem {
+  productId: string
+  product: ProductsPass
+  quantity: number
+  price: number
+  stepType: string
+}
+
 // --- Cart State ---
 export interface CheckoutCartState {
   passes: SelectedPassItem[]
@@ -104,6 +116,7 @@ export interface CheckoutCartState {
   insurance: boolean
   insurancePrice: number
   insurancePotentialPrice: number
+  dynamicItems: Record<string, SelectedDynamicItem[]>
 }
 
 // --- Cart Summary ---
@@ -113,6 +126,7 @@ export interface CheckoutCartSummary {
   merchSubtotal: number
   patronSubtotal: number
   insuranceSubtotal: number
+  dynamicSubtotal: number
   subtotal: number
   discount: number
   credit: number
@@ -123,6 +137,14 @@ export interface CheckoutCartSummary {
 // --- Patron Presets ---
 export const PATRON_PRESETS = [2500, 5000, 7500]
 export const PATRON_MINIMUM = 1000
+
+// --- Insurance Summary ---
+export interface CheckoutInsuranceSummary {
+  enabled: boolean
+  percentage: number | null
+  amount: number
+  eligibleProductIds: string[]
+}
 
 // --- Insurance ---
 export const INSURANCE_BENEFITS = [
@@ -192,6 +214,7 @@ export function createInitialCartState(): CheckoutCartState {
     insurance: false,
     insurancePrice: 0,
     insurancePotentialPrice: 0,
+    dynamicItems: {},
   }
 }
 
@@ -202,6 +225,7 @@ export function createInitialSummary(): CheckoutCartSummary {
     merchSubtotal: 0,
     patronSubtotal: 0,
     insuranceSubtotal: 0,
+    dynamicSubtotal: 0,
     subtotal: 0,
     discount: 0,
     credit: 0,

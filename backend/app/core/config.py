@@ -98,6 +98,9 @@ class Settings(BaseSettings):
 
     REDIS_URL: str | None = None
 
+    # AI Translation (Gemini)
+    GEMINI_API_KEY: str | None = None
+
     # SimpleFI payment provider
     BACKEND_URL: str = "http://localhost:8000"
     PORTAL_URL: str = "http://localhost:3000"
@@ -106,6 +109,7 @@ class Settings(BaseSettings):
     @property
     def PORTAL_DOMAIN(self) -> str:
         from urllib.parse import urlparse
+
         return urlparse(self.PORTAL_URL).hostname or ""
 
     @computed_field

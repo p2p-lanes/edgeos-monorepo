@@ -1,0 +1,243 @@
+"use client"
+
+import { useQueryClient } from "@tanstack/react-query"
+import { AnimatePresence, motion } from "framer-motion"
+import { useRouter } from "next/navigation"
+import { type CSSProperties, useEffect, useMemo, useRef } from "react"
+import { resolvePopupCheckoutPolicy } from "@/checkout/popupCheckoutPolicy"
+import type { PopupPublic } from "@/client"
+import ScrollyCheckoutFlow from "@/components/checkout-flow/ScrollyCheckoutFlow"
+import { SidebarProvider } from "@/components/Sidebar/SidebarComponents"
+import { Button } from "@/components/ui/button"
+import { Loader } from "@/components/ui/Loader"
+import useAuth from "@/hooks/useAuth"
+import {
+  dispatchAuthChange,
+  useIsAuthenticated,
+} from "@/hooks/useIsAuthenticated"
+import useResolvedAttendees from "@/hooks/useResolvedAttendees"
+import { queryKeys } from "@/lib/query-keys"
+import { useApplication } from "@/providers/applicationProvider"
+import { CheckoutProvider } from "@/providers/checkoutProvider"
+import { useCityProvider } from "@/providers/cityProvider"
+import PassesProvider from "@/providers/passesProvider"
+import useCheckoutState from "../hooks/useCheckoutState"
+import type { FormDataProps } from "../types"
+import CheckoutLoginGate from "./CheckoutLoginGate"
+import TransitionScreen from "./TransitionScreen"
+import UserInfoForm from "./UserInfoForm"
+
+export const PopupCheckoutContent = ({
+  popup,
+  background,
+  groupId = null,
+}: {
+  popup: PopupPublic
+  background: { className: string; style?: CSSProperties }
+  groupId?: string | null
+}) => {
+  const {
+    checkoutState,
+    isSubmitting,
+    errorMessage,
+    handleSubmit,
+    setCheckoutState,
+  } = useCheckoutState({
+    popupId: popup.id,
+    saleType: resolvePopupCheckoutPolicy(popup).saleType,
+    groupId,
+  })
+  const queryClient = useQueryClient()
+  const { user } = useAuth()
+  const { getRelevantApplication } = useApplication()
+  const { getCity, setCityPreselected } = useCityProvider()
+  const router = useRouter()
+  const isAuthenticated = useIsAuthenticated()
+  const hasSkippedForm = useRef(false)
+  const policy = useMemo(() => resolvePopupCheckoutPolicy(popup), [popup])
+  const attendees = useResolvedAttendees()
+
+  useEffect(() => {
+    setCityPreselected(popup.id)
+  }, [popup.id, setCityPreselected])
+
+  useEffect(() => {
+    if (checkoutState === "passes") {
+      hasSkippedForm.current = true
+    }
+  }, [checkoutState])
+
+  useEffect(() => {
+    if (hasSkippedForm.current) return
+    if (policy.saleType !== "direct") return
+    if (!isAuthenticated) return
+
+    hasSkippedForm.current = true
+    setCheckoutState("passes")
+  }, [policy.saleType, isAuthenticated, setCheckoutState])
+
+  useEffect(() => {
+    if (hasSkippedForm.current) return
+    if (policy.saleType !== "application") return
+    const existingApp = getRelevantApplication()
+    if (!existingApp || checkoutState !== "form") return
+
+    hasSkippedForm.current = true
+
+    const hasPurchasedPasses = existingApp.attendees?.some(
+      (a) => a.products && a.products.length > 0,
+    )
+    if (hasPurchasedPasses) {
+      const city = getCity()
+      router.replace(city?.slug ? `/portal/${city.slug}/passes` : "/portal")
+      return
+    }
+
+    setCheckoutState("passes")
+  }, [
+    policy.saleType,
+    getRelevantApplication,
+    checkoutState,
+    setCheckoutState,
+    getCity,
+    router,
+  ])
+
+  const handleFormSubmit = async (formData: FormDataProps): Promise<void> => {
+    await handleSubmit(formData)
+  }
+
+  const handleChangeEmailForDirectCheckout = () => {
+    localStorage.removeItem("token")
+    dispatchAuthChange()
+    queryClient.removeQueries({ queryKey: queryKeys.profile.current })
+    queryClient.removeQueries({ queryKey: queryKeys.applications.mine() })
+    queryClient.removeQueries({ queryKey: queryKeys.cart.byPopup(popup.id) })
+    queryClient.removeQueries({
+      queryKey: queryKeys.purchases.byPopup(popup.id),
+    })
+    hasSkippedForm.current = false
+    setCheckoutState("form")
+  }
+
+  const directSessionBanner =
+    policy.saleType === "direct" && user?.email ? (
+      <div className="flex items-center justify-between gap-3 rounded-full border border-gray-200/80 bg-white/70 px-3 py-1.5 shadow-sm backdrop-blur-sm">
+        <div className="min-w-0">
+          <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Signed in as
+          </p>
+          <p className="truncate text-sm font-medium text-foreground">
+            {user.email}
+          </p>
+        </div>
+
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="shrink-0"
+          onClick={handleChangeEmailForDirectCheckout}
+        >
+          Change email
+        </Button>
+      </div>
+    ) : null
+
+  if (policy.saleType === "application") {
+    if (!isAuthenticated) {
+      return (
+        <div
+          className={`min-h-screen w-full py-8 flex items-center justify-center ${background.className}`}
+          style={background.style}
+        >
+          <div className="container mx-auto">
+            <CheckoutLoginGate />
+          </div>
+        </div>
+      )
+    }
+  }
+
+  if (
+    policy.saleType === "direct" &&
+    checkoutState === "form" &&
+    isAuthenticated
+  ) {
+    return <Loader />
+  }
+
+  // Passes state: full-page scrollable layout for ScrollyCheckoutFlow
+  if (checkoutState === "passes") {
+    return (
+      <SidebarProvider
+        defaultOpen={false}
+        className="block min-h-0"
+        style={
+          {
+            "--sidebar-width": "0px",
+            "--sidebar-width-icon": "0px",
+          } as CSSProperties
+        }
+      >
+        <PassesProvider attendees={attendees} restoreFromCart>
+          <CheckoutProvider initialStep="passes">
+            <div
+              className={`h-svh overflow-y-auto ${background.className}`}
+              style={background.style}
+            >
+              <ScrollyCheckoutFlow
+                onBack={() => setCheckoutState("form")}
+                onPaymentComplete={() => {}}
+                navExtraContent={directSessionBanner}
+              />
+            </div>
+          </CheckoutProvider>
+        </PassesProvider>
+      </SidebarProvider>
+    )
+  }
+
+  // Form/processing states: centered card layout with background
+  return (
+    <div
+      className={`min-h-screen w-full py-8 flex items-center justify-center ${background.className}`}
+      style={background.style}
+    >
+      <div className="container mx-auto">
+        <AnimatePresence mode="wait">
+          {checkoutState === "form" && (
+            <motion.div
+              key="form"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.5 }}
+            >
+              <UserInfoForm
+                popupId={popup.id}
+                popupName={popup.name}
+                onSubmit={handleFormSubmit}
+                isSubmitting={isSubmitting}
+              />
+            </motion.div>
+          )}
+
+          {checkoutState === "processing" && (
+            <TransitionScreen
+              message="Processing your registration"
+              isPending={true}
+              isSuccess={false}
+            />
+          )}
+        </AnimatePresence>
+
+        {errorMessage && (
+          <div className="mt-4 p-4 bg-red-100 border border-red-300 text-red-800 rounded-md max-w-lg mx-auto">
+            {errorMessage}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

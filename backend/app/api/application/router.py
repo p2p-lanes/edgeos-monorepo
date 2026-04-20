@@ -494,9 +494,7 @@ async def update_my_application(
                 )
             else:
                 application.status = ApplicationStatus.PENDING_FEE.value
-                crud.applications_crud.create_snapshot(
-                    db, application, "pending_fee"
-                )
+                crud.applications_crud.create_snapshot(db, application, "pending_fee")
         else:
             crud.applications_crud._apply_approval_strategy(
                 db, application, application.human

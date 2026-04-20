@@ -1,6 +1,7 @@
 "use client"
 
 import { AnimatePresence, motion } from "framer-motion"
+import { useTranslation } from "react-i18next"
 import CheckboxForm from "@/components/ui/Form/Checkbox"
 import InputForm from "@/components/ui/Form/Input"
 import TextAreaForm from "@/components/ui/Form/TextArea"
@@ -46,7 +47,8 @@ export function ScholarshipSection({
   onDetailsChange,
   onVideoUrlChange,
 }: ScholarshipSectionProps) {
-  const title = section?.label ?? "Scholarship"
+  const { t } = useTranslation()
+  const title = section?.label ?? t("application.scholarship.fallback_title")
   const subtitle = section?.description ?? undefined
 
   const requestField = fields.scholarship_request
@@ -58,7 +60,10 @@ export function ScholarshipSection({
       <SectionWrapper title={title} subtitle={subtitle}>
         <div className="flex flex-col gap-4">
           <CheckboxForm
-            label={requestField?.label ?? "I am requesting a scholarship"}
+            label={
+              requestField?.label ??
+              t("application.scholarship.request_checkbox_fallback")
+            }
             id="scholarship_request"
             checked={scholarshipRequest}
             onCheckedChange={onScholarshipRequestChange}
@@ -69,19 +74,27 @@ export function ScholarshipSection({
               <motion.div {...animationProps}>
                 <div className="flex flex-col gap-6">
                   <InputForm
-                    label={videoField?.label ?? "Video URL (optional)"}
+                    label={
+                      videoField?.label ??
+                      t("application.scholarship.video_url_label_fallback")
+                    }
                     id="scholarship_video_url"
                     value={scholarshipVideoUrl}
                     onChange={onVideoUrlChange}
                     error={videoUrlError}
                     subtitle={videoField?.help_text ?? undefined}
                     type="url"
-                    placeholder={videoField?.placeholder ?? "https://..."}
+                    placeholder={
+                      videoField?.placeholder ??
+                      t(
+                        "application.scholarship.video_url_placeholder_fallback",
+                      )
+                    }
                   />
                   <TextAreaForm
                     label={
                       detailsField?.label ??
-                      "Please tell us why you need financial support"
+                      t("application.scholarship.details_label_fallback")
                     }
                     id="scholarship_details"
                     value={scholarshipDetails}
@@ -90,7 +103,7 @@ export function ScholarshipSection({
                     isRequired
                     placeholder={
                       detailsField?.placeholder ??
-                      "Describe your financial situation..."
+                      t("application.scholarship.details_placeholder_fallback")
                     }
                   />
                 </div>

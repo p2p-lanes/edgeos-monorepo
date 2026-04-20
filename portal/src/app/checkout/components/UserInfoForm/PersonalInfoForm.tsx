@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
 import InputForm, { AddonInputForm } from "@/components/ui/Form/Input"
 import RadioGroupForm from "@/components/ui/Form/RadioGroup"
@@ -27,6 +28,7 @@ const PersonalInfoForm = ({
   handleChangeEmail,
   errors,
 }: PersonalInfoFormProps) => {
+  const { t } = useTranslation()
   const { getCity } = useCityProvider()
   const _city = getCity()
   // Estado para almacenar el valor de género normalizado
@@ -55,7 +57,9 @@ const PersonalInfoForm = ({
       <div className="w-full flex items-center justify-between">
         <div className="w-full flex flex-col gap-2">
           <div className="flex flex-col gap-2">
-            <LabelRequired isRequired={false}>Email</LabelRequired>
+            <LabelRequired isRequired={false}>
+              {t("common.email")}
+            </LabelRequired>
           </div>
           <Input
             id="email-verified"
@@ -75,42 +79,42 @@ const PersonalInfoForm = ({
             className="mt-[21px]"
             onClick={handleChangeEmail}
           >
-            Change email
+            {t("form.change_email")}
           </Button>
         )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <InputForm
-          label="First Name"
+          label={t("form.first_name")}
           id="first_name"
           value={formData.first_name}
           onChange={(value) => handleInputChange("first_name", value)}
           error={errors.first_name}
           isRequired
-          placeholder="Enter your first name"
+          placeholder={t("form.first_name_placeholder")}
         />
 
         <InputForm
-          label="Last Name"
+          label={t("form.last_name")}
           id="last_name"
           value={formData.last_name}
           onChange={(value) => handleInputChange("last_name", value)}
           error={errors.last_name}
           isRequired
-          placeholder="Enter your last name"
+          placeholder={t("form.last_name_placeholder")}
         />
       </div>
 
       <AddonInputForm
-        label="Telegram"
+        label={t("form.telegram")}
         id="telegram"
         addon="@"
         value={formData.telegram}
         onChange={(value) => handleInputChange("telegram", value)}
         error={errors.telegram}
         isRequired
-        placeholder="username"
+        placeholder={t("form.telegram_placeholder")}
       />
 
       {/* <SelectForm
@@ -131,8 +135,8 @@ const PersonalInfoForm = ({
       />   */}
 
       <RadioGroupForm
-        label="Gender"
-        subtitle="Select your gender"
+        label={t("form.gender")}
+        subtitle={t("form.gender_select")}
         value={genderValue}
         onChange={(value) => {
           setGenderValue(value)
@@ -145,7 +149,7 @@ const PersonalInfoForm = ({
 
       {genderValue === "Specify" && (
         <InputForm
-          label="Specify gender"
+          label={t("form.gender_specify")}
           id="gender_specify"
           value={customGender}
           onChange={(value) => {
@@ -154,7 +158,7 @@ const PersonalInfoForm = ({
           }}
           error={errors.gender_specify}
           isRequired
-          placeholder="Specify your gender"
+          placeholder={t("form.gender_specify_placeholder")}
         />
       )}
     </div>

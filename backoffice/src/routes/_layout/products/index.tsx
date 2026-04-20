@@ -20,7 +20,7 @@ import { Suspense, useState } from "react"
 import {
   type ProductBatchItem,
   type ProductBatchResult,
-  type ProductPublic,
+  type ProductPublicWithTier,
   ProductsService,
 } from "@/client"
 import { CsvImportDialog } from "@/components/Common/CsvImportDialog"
@@ -102,7 +102,7 @@ function AddProductButton() {
   )
 }
 
-function ProductActionsMenu({ product }: { product: ProductPublic }) {
+function ProductActionsMenu({ product }: { product: ProductPublicWithTier }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const queryClient = useQueryClient()
@@ -187,11 +187,23 @@ function ProductActionsMenu({ product }: { product: ProductPublic }) {
   )
 }
 
-const columns: ColumnDef<ProductPublic>[] = [
+const columns: ColumnDef<ProductPublicWithTier>[] = [
   {
     accessorKey: "name",
     header: ({ column }) => <SortableHeader label="Name" column={column} />,
-    cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
+    cell: ({ row }) => {
+      const phaseLabel = row.original.phase?.label?.trim()
+      return (
+        <span className="font-medium">
+          {row.original.name}
+          {phaseLabel && (
+            <span className="ml-1.5 text-muted-foreground font-normal">
+              ({phaseLabel})
+            </span>
+          )}
+        </span>
+      )
+    },
   },
   {
     accessorKey: "price",
@@ -204,12 +216,11 @@ const columns: ColumnDef<ProductPublic>[] = [
     cell: ({ row }) => <StatusBadge status={row.original.category || "N/A"} />,
   },
   {
-    accessorKey: "insurance_percentage",
+    accessorKey: "insurance_eligible",
     header: "Insurance",
     cell: ({ row }) => {
-      const val = row.original.insurance_percentage
-      return val ? (
-        <span className="font-mono text-sm">{val}%</span>
+      return row.original.insurance_eligible ? (
+        <StatusBadge status="active" />
       ) : (
         <span className="text-muted-foreground">—</span>
       )
@@ -265,11 +276,7 @@ function ProductsTableContent() {
       columns={columns}
       data={products.results}
       searchPlaceholder="Search by name..."
-      hiddenOnMobile={[
-        "attendee_category",
-        "insurance_percentage",
-        "is_active",
-      ]}
+      hiddenOnMobile={["attendee_category", "insurance_eligible", "is_active"]}
       searchValue={search}
       onSearchChange={setSearch}
       serverPagination={{

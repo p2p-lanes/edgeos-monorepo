@@ -1,5 +1,6 @@
 import { useParams } from "next/navigation"
 import { useEffect, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import type { GroupMemberPublic } from "@/client"
 import { GroupsService } from "@/client"
@@ -38,6 +39,7 @@ const MemberFormModal = ({
   onSuccess,
   member,
 }: MemberFormModalProps) => {
+  const { t } = useTranslation()
   const { group_id } = useParams() as { group_id: string }
   const isEditMode = !!member
 
@@ -85,17 +87,17 @@ const MemberFormModal = ({
 
     // Validate required fields
     if (!formData.first_name.trim()) {
-      newErrors.first_name = "First name is required"
+      newErrors.first_name = t("form.first_name_required")
     }
 
     if (!formData.last_name.trim()) {
-      newErrors.last_name = "Last name is required"
+      newErrors.last_name = t("form.last_name_required")
     }
 
     if (!formData.email.trim()) {
-      newErrors.email = "Email is required"
+      newErrors.email = t("form.email_required")
     } else if (!/^\S+@\S+\.\S+$/.test(formData.email)) {
-      newErrors.email = "Please enter a valid email address"
+      newErrors.email = t("form.email_invalid_format")
     }
 
     setErrors(newErrors)
@@ -130,7 +132,7 @@ const MemberFormModal = ({
           humanId: member.id,
           requestBody: processedData,
         })
-        toast.success("Member updated successfully")
+        toast.success(t("groups.member_updated"))
       } else {
         await GroupsService.addGroupMember({
           groupId: group_id,
@@ -142,7 +144,7 @@ const MemberFormModal = ({
             gender: processedData.gender,
           },
         })
-        toast.success("Member added successfully")
+        toast.success(t("groups.member_added"))
       }
 
       // Reset form
@@ -168,7 +170,9 @@ const MemberFormModal = ({
         error,
       )
       toast.error(
-        `Failed to ${isEditMode ? "update" : "add"} member. Please try again.`,
+        isEditMode
+          ? t("groups.member_update_failed")
+          : t("groups.member_add_failed"),
       )
     } finally {
       setIsSubmitting(false)

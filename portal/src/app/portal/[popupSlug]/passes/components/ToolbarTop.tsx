@@ -1,5 +1,6 @@
 import { Newspaper, PlusIcon } from "lucide-react"
 import { useState } from "react"
+import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
 import useAttendee from "@/hooks/useAttendee"
 import { useApplication } from "@/providers/applicationProvider"
@@ -30,6 +31,7 @@ const ToolbarTop = ({
   canAddChildren = true,
   allows_coupons = true,
 }: ToolbarTopProps) => {
+  const { t } = useTranslation()
   const { getAttendees } = useApplication()
   const { handleOpenModal, handleCloseModal, modal } = useModal()
   const { addAttendee } = useAttendee()
@@ -63,24 +65,24 @@ const ToolbarTop = ({
         {canAddSpouse && !hasSpouse && (
           <Button
             variant="outline"
-            className="bg-white text-black hover:bg-white hover:shadow-md transition-all"
+            className="bg-card text-foreground hover:bg-card hover:shadow-md transition-all"
             disabled={!attendees.length}
             onClick={() => handleOpenModal("spouse")}
           >
             <PlusIcon className="h-4 w-4 mr-2" />
-            Add spouse
+            {t("passes.add_spouse")}
           </Button>
         )}
 
         {canAddChildren && (
           <Button
             variant="default"
-            className="bg-white text-black hover:bg-white hover:shadow-md transition-all"
+            className="bg-card text-foreground hover:bg-card hover:shadow-md transition-all"
             disabled={!attendees.length}
             onClick={() => handleOpenModal("kid")}
           >
             <PlusIcon className="h-4 w-4 mr-2" />
-            Add children
+            {t("passes.add_children")}
           </Button>
         )}
 
@@ -107,7 +109,7 @@ const ToolbarTop = ({
             >
               <Newspaper className="h-4 w-4" />
               <p className="text-sm font-medium hidden md:block">
-                View Invoices
+                {t("passes.view_invoices")}
               </p>
             </Button>
             <InvoiceModal

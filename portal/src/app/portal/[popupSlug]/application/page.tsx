@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import type { ApplicationPublic } from "@/client"
 import { Loader } from "@/components/ui/Loader"
@@ -55,6 +56,7 @@ function useFormInitData() {
 }
 
 export default function FormPage() {
+  const { t } = useTranslation()
   const { getCity } = useCityProvider()
   const { getRelevantApplication } = useApplication()
   const city = getCity()
@@ -102,11 +104,17 @@ export default function FormPage() {
     }
   }, [isReturnFromCheckout, city?.slug, router])
 
+  useEffect(() => {
+    if (city?.sale_type === "direct") {
+      router.replace(`/portal/${city.slug}`)
+    }
+  }, [city, router])
+
   const handleImport = () => {
     if (importSource) {
       setImportedData(importSource)
       setShowImport(false)
-      toast.success("Previous application data imported successfully")
+      toast.success(t("application.import_success"))
     }
   }
 
@@ -118,13 +126,17 @@ export default function FormPage() {
     return <Loader />
   }
 
+  if (city.sale_type === "direct") {
+    return <Loader />
+  }
+
   if (isError || !schema) {
     return (
       <main className="container py-6 md:py-12 mb-8">
         <div className="text-center space-y-4 px-8">
-          <h2 className="text-2xl font-bold">Application Unavailable</h2>
-          <p className="text-muted-foreground">
-            The application form for this event is not yet configured.
+          <h2 className="text-2xl font-bold">{t("application.unavailable")}</h2>
+          <p className="text-heading-secondary">
+            {t("application.unavailable_description")}
           </p>
         </div>
       </main>

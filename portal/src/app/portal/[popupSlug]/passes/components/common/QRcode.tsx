@@ -77,7 +77,7 @@ const QRcode = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md bg-white">
+      <DialogContent className="sm:max-w-md bg-card">
         <DialogHeader>
           <DialogTitle>Check-in Code</DialogTitle>
         </DialogHeader>
@@ -86,13 +86,13 @@ const QRcode = ({
             <div className="flex flex-col items-center gap-4">
               <div
                 ref={qrCodeRef}
-                className="bg-white p-4 rounded-md border border-gray-200"
+                className="bg-white p-4 rounded-md border border-border"
               >
                 <QRCodeReact value={qrValue} size={200} level="H" />
               </div>
               <div className="text-center space-y-2">
                 <p className="text-lg font-mono">{check_in_code}</p>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-pass-text">
                   Use this code to check in
                 </p>
               </div>
@@ -107,7 +107,7 @@ const QRcode = ({
               </Button>
             </div>
           ) : (
-            <p className="text-lg text-gray-500 text-center">
+            <p className="text-lg text-pass-text text-center">
               No code available
             </p>
           )}

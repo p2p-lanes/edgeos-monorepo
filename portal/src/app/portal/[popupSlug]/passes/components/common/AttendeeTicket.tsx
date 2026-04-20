@@ -1,5 +1,7 @@
 import { ChevronRight, QrCode, Ticket, User } from "lucide-react"
 import React, { useState } from "react"
+import { useTranslation } from "react-i18next"
+import { TICKET_CATEGORY } from "@/checkout/popupCheckoutPolicy"
 import {
   Collapsible,
   CollapsibleContent,
@@ -42,6 +44,7 @@ const AttendeeTicket = ({
   isDayCheckout?: boolean
   onSwitchToBuy?: () => void
 }) => {
+  const { t } = useTranslation()
   const standardProducts = attendee.products
     .filter(
       (product) =>
@@ -54,6 +57,7 @@ const AttendeeTicket = ({
   const { handleEdit, handleCloseModal, modal, handleDelete } = useModal()
   const { removeAttendee, editAttendee } = useAttendee()
   const hasPurchased = attendee.products.some((product) => product.purchased)
+  const isMainAttendee = attendee.category === "main"
   const [isQrModalOpen, setIsQrModalOpen] = useState(false)
 
   const hasMonthPurchased = attendee.products.some(
@@ -66,7 +70,9 @@ const AttendeeTicket = ({
 
   // All ticket products go into commonProducts (local categories no longer exist)
   const localProducts: ProductsPass[] = []
-  const commonProducts = standardProducts.filter((p) => p.category === "ticket")
+  const commonProducts = standardProducts.filter(
+    (p) => p.category === TICKET_CATEGORY,
+  )
 
   // Get purchased passes for view mode display
   const purchasedPasses = attendee.products
@@ -122,7 +128,7 @@ const AttendeeTicket = ({
   return (
     <div className="relative h-full w-full">
       <div className="w-full overflow-hidden">
-        <div className="w-full rounded-3xl border border-gray-200 h-full lg:grid lg:grid-cols-[1fr_2px_2fr] bg-white">
+        <div className="w-full rounded-3xl border border-border h-full lg:grid lg:grid-cols-[1fr_2px_2fr] bg-card">
           {/* Left panel - City & Attendee info */}
           <div className="relative flex flex-col p-6 overflow-hidden h-full min-h-[160px]">
             <div
@@ -136,13 +142,13 @@ const AttendeeTicket = ({
             <div className="relative z-10 h-full flex flex-col justify-between">
               <div className="flex justify-between items-start">
                 <div>
-                  <h2 className="text-xl font-bold text-gray-900">
+                  <h2 className="text-xl font-bold text-pass-title">
                     {city?.name}
                   </h2>
-                  <p className="text-gray-500 text-sm mt-1 lg:mt-2">
+                  <p className="text-pass-text text-sm mt-1 lg:mt-2">
                     {attendee.name}
                   </p>
-                  <div className="flex items-center gap-2 mt-0.5 lg:mt-1 text-gray-500 text-sm">
+                  <div className="flex items-center gap-2 mt-0.5 lg:mt-1 text-pass-text text-sm">
                     <User className="w-3 h-3" />
                     <span>
                       {(badgeName as Record<string, string>)[
@@ -151,25 +157,27 @@ const AttendeeTicket = ({
                     </span>
                   </div>
                 </div>
-                <OptionsMenu
-                  onEdit={handleEditAttendee}
-                  onDelete={hasPurchased ? undefined : handleRemoveAttendee}
-                  className="lg:hidden"
-                />
+                {!isMainAttendee && (
+                  <OptionsMenu
+                    onEdit={handleEditAttendee}
+                    onDelete={hasPurchased ? undefined : handleRemoveAttendee}
+                    className="lg:hidden"
+                  />
+                )}
               </div>
             </div>
           </div>
 
           {/* Mobile horizontal divider with hole punches */}
-          <div className="lg:hidden border-b-2 border-dashed border-gray-200 w-full relative">
+          <div className="lg:hidden border-b-2 border-dashed border-border w-full relative">
             <div className="absolute -top-[23px] -left-[23px] w-[48px] h-[46px] bg-[#F5F5F7] rounded-full" />
             <div className="absolute -top-[23px] -right-[23px] w-[48px] h-[46px] bg-[#F5F5F7] rounded-full" />
           </div>
 
           {/* Desktop vertical divider with hole punches */}
-          <div className="hidden lg:block border-r-2 border-dashed border-gray-200 self-stretch relative">
-            <div className="absolute -top-[23px] -left-[23px] w-[48px] h-[46px] bg-[#F5F5F7] rounded-full" />
-            <div className="absolute -bottom-[23px] -left-[23px] w-[48px] h-[46px] bg-[#F5F5F7] rounded-full" />
+          <div className="hidden lg:block border-r-2 border-dashed border-border self-stretch relative">
+            <div className="absolute -top-[23px] -left-[23px] w-[48px] h-[46px] bg-background rounded-full" />
+            <div className="absolute -bottom-[23px] -left-[23px] w-[48px] h-[46px] bg-background rounded-full" />
           </div>
 
           {/* Right panel */}
@@ -182,7 +190,7 @@ const AttendeeTicket = ({
             )}
           >
             {/* Options menu - desktop only */}
-            {!hasPurchased && (
+            {!hasPurchased && !isMainAttendee && (
               <OptionsMenu
                 onEdit={handleEditAttendee}
                 onDelete={handleRemoveAttendee}
@@ -192,20 +200,20 @@ const AttendeeTicket = ({
 
             {standardProducts.length === 0 ? (
               <p className="text-sm font-medium text-neutral-500">
-                Coming soon.
+                {t("passes.coming_soon")}
               </p>
             ) : !toggleProduct && !hasPurchased ? (
               /* View mode - no purchased passes */
-              <p className="text-gray-500 max-w-xs lg:max-w-sm leading-relaxed">
-                You do not yet have any passes for {city?.name}, please go to{" "}
+              <p className="text-pass-text max-w-xs lg:max-w-sm leading-relaxed">
+                {t("passes.no_passes_yet_prefix", { city: city?.name })}{" "}
                 <button
                   type="button"
                   onClick={onSwitchToBuy}
-                  className="font-bold text-gray-900 hover:underline cursor-pointer"
+                  className="font-bold text-pass-title hover:underline cursor-pointer"
                 >
-                  Buy Passes
+                  {t("passes.buy_passes")}
                 </button>{" "}
-                to purchase
+                {t("passes.no_passes_yet_suffix")}
               </p>
             ) : !toggleProduct && hasPurchased ? (
               /* View mode - with purchased passes - simple pass list */
@@ -217,16 +225,16 @@ const AttendeeTicket = ({
                       className={cn(
                         "flex items-center gap-2 py-3",
                         idx !== purchasedPasses.length - 1 &&
-                          "border-b border-dotted border-gray-300",
+                          "border-b border-dotted border-border",
                       )}
                     >
-                      <Ticket className="w-4 h-4 lg:w-5 lg:h-5 text-gray-700 flex-shrink-0" />
+                      <Ticket className="w-4 h-4 lg:w-5 lg:h-5 text-pass-text flex-shrink-0" />
                       <div className="flex items-baseline gap-1.5 flex-1 min-w-0">
-                        <span className="font-bold text-gray-900 text-sm lg:text-base whitespace-nowrap">
+                        <span className="font-bold text-pass-title text-sm lg:text-base whitespace-nowrap">
                           {pass.name}
                         </span>
                         {pass.start_date && pass.end_date && (
-                          <span className="text-gray-500 text-xs lg:text-sm truncate">
+                          <span className="text-pass-text text-xs lg:text-sm truncate">
                             {new Date(pass.start_date).toLocaleDateString(
                               "en-US",
                               { month: "short", day: "numeric" },
@@ -246,9 +254,9 @@ const AttendeeTicket = ({
                 <button
                   type="button"
                   onClick={handleOpenQrModal}
-                  className="flex items-center gap-1.5 mt-3 justify-end lg:absolute lg:bottom-6 lg:right-6 lg:mt-0 text-xs font-medium text-gray-400 uppercase tracking-wider hover:text-gray-600 transition-colors cursor-pointer"
+                  className="flex items-center gap-1.5 mt-3 justify-end lg:absolute lg:bottom-6 lg:right-6 lg:mt-0 text-xs font-medium text-pass-text uppercase tracking-wider hover:text-pass-title transition-colors cursor-pointer"
                 >
-                  <span>Check-in code</span>
+                  <span>{t("passes.check_in_code")}</span>
                   <QrCode className="w-4 h-4" />
                 </button>
               </>
@@ -263,7 +271,7 @@ const AttendeeTicket = ({
                   >
                     <CollapsibleTrigger
                       className="w-full bg-accent rounded-md"
-                      aria-label="Toggle Local Tickets"
+                      aria-label={t("passes.toggle_local_tickets")}
                     >
                       <div className="flex justify-between items-center p-3">
                         <div className="flex items-center gap-2">
@@ -273,7 +281,9 @@ const AttendeeTicket = ({
                               localOpen && "transform rotate-90",
                             )}
                           />
-                          <span className="font-medium">Latam Citizens</span>
+                          <span className="font-medium">
+                            {t("passes.latam_citizens")}
+                          </span>
                         </div>
                       </div>
                     </CollapsibleTrigger>
@@ -315,7 +325,7 @@ const AttendeeTicket = ({
                         })}
                       </div>
                       <p className="text-sm font-medium text-neutral-500 text-right mt-2">
-                        ID Required at check-in *
+                        {t("passes.id_required")}
                       </p>
                     </CollapsibleContent>
                   </Collapsible>
@@ -329,7 +339,7 @@ const AttendeeTicket = ({
                   >
                     <CollapsibleTrigger
                       className="w-full bg-accent rounded-md"
-                      aria-label="Toggle Common Tickets"
+                      aria-label={t("passes.toggle_common_tickets")}
                     >
                       <div className="flex justify-between items-center p-3">
                         <div className="flex items-center gap-2">
@@ -339,7 +349,9 @@ const AttendeeTicket = ({
                               commonOpen && "transform rotate-90",
                             )}
                           />
-                          <span className="font-medium">Standard</span>
+                          <span className="font-medium">
+                            {t("passes.standard")}
+                          </span>
                         </div>
                       </div>
                     </CollapsibleTrigger>

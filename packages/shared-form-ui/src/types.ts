@@ -21,11 +21,14 @@ export interface FormFieldSchema {
   target?: "human" | "application"
 }
 
+export type FormSectionKind = "standard" | "companions" | "scholarship"
+
 export interface FormSectionSchema {
   id: string
   label: string
   description: string | null
   order: number
+  kind: FormSectionKind
 }
 
 export interface ApplicationFormSchema {

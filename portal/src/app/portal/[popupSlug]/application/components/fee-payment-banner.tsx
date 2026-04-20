@@ -2,6 +2,7 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useEffect, useRef, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import type { ApplicationPublic } from "@/client"
 import { ApplicationsService } from "@/client"
@@ -18,6 +19,7 @@ export function FeePaymentBanner({
   application,
   isReturnFromCheckout,
 }: FeePaymentBannerProps) {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [isPolling, setIsPolling] = useState(isReturnFromCheckout)
   const [paymentConfirmed, setPaymentConfirmed] = useState(false)
@@ -44,15 +46,15 @@ export function FeePaymentBanner({
       setIsPolling(false)
       setPaymentConfirmed(true)
       queryClient.invalidateQueries({ queryKey: queryKeys.applications.mine() })
-      toast.success("Payment confirmed! Your application is now under review.")
+      toast.success(t("application.fee.confirmation_toast"))
       return
     }
 
     if (pollAttemptsRef.current >= MAX_POLL_ATTEMPTS) {
       setIsPolling(false)
-      toast.error("Could not confirm payment status. Please refresh the page.")
+      toast.error(t("application.fee.confirmation_error"))
     }
-  }, [polledApps, isPolling, application.id, queryClient])
+  }, [polledApps, isPolling, application.id, queryClient, t])
 
   // Polling view — returning from checkout, waiting for confirmation
   if (isReturnFromCheckout && isPolling) {
@@ -61,10 +63,10 @@ export function FeePaymentBanner({
         <div className="flex items-start gap-3">
           <div className="flex-1">
             <h3 className="font-semibold text-amber-900">
-              Processing payment...
+              {t("application.fee.processing_title")}
             </h3>
             <p className="mt-1 text-sm text-amber-700">
-              We are confirming your payment. This may take a few moments.
+              {t("application.fee.processing_description")}
             </p>
           </div>
           <div className="h-5 w-5 animate-spin rounded-full border-2 border-amber-400 border-t-transparent" />
@@ -79,9 +81,11 @@ export function FeePaymentBanner({
       <div className="mx-8 md:mx-12 mb-6 rounded-lg border border-green-200 bg-green-50 p-4">
         <div className="flex items-start gap-3">
           <div className="flex-1">
-            <h3 className="font-semibold text-green-900">Payment confirmed!</h3>
+            <h3 className="font-semibold text-green-900">
+              {t("application.fee.confirmed_title")}
+            </h3>
             <p className="mt-1 text-sm text-green-700">
-              Your application is now under review.
+              {t("application.fee.confirmed_description")}
             </p>
           </div>
         </div>

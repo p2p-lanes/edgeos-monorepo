@@ -1,4 +1,5 @@
 import { ChevronRight, Tag } from "lucide-react"
+import { useTranslation } from "react-i18next"
 import {
   Collapsible,
   CollapsibleContent,
@@ -23,6 +24,7 @@ const TotalPurchase = ({
   isOpen: boolean
   setIsOpen: (prev: boolean) => void
 }) => {
+  const { t } = useTranslation()
   const { discountApplied } = useDiscountCode()
   const {
     originalTotal,
@@ -68,7 +70,7 @@ const TotalPurchase = ({
     >
       <CollapsibleTrigger
         className={cn(
-          "w-full bg-neutral-200 rounded-md",
+          "w-full bg-muted rounded-md",
           isModal && "bg-transparent",
         )}
       >
@@ -80,7 +82,7 @@ const TotalPurchase = ({
                 isOpen && "transform rotate-90",
               )}
             />
-            <span className="font-medium">Total</span>
+            <span className="font-medium">{t("passes.total")}</span>
           </div>
 
           <div className="flex items-center gap-2">
@@ -127,7 +129,7 @@ const TotalPurchase = ({
           </div>
         ) : (
           <p className="text-sm text-muted-foreground px-3">
-            No passes selected
+            {t("passes.no_passes_selected")}
           </p>
         )}
       </CollapsibleContent>
@@ -146,16 +148,22 @@ const DiscountCouponTotal = ({
   patreonSelected: boolean
   products: ProductsPass[]
 }) => {
+  const { t } = useTranslation()
   if (!discountApplied.discount_value || discountAmount === 0) return null
 
   const getLabelDiscount = () => {
     if (patreonSelected) {
-      return "Patron Free Tickets"
+      return t("passes.discounts.patron_free")
     }
     if (discountApplied.discount_code) {
-      return `${discountApplied.discount_code} (${discountApplied.discount_value}% OFF)`
+      return t("passes.discounts.code", {
+        code: discountApplied.discount_code,
+        percent: discountApplied.discount_value,
+      })
     }
-    return `Discount ${discountApplied.discount_value}% OFF`
+    return t("passes.discounts.generic", {
+      percent: discountApplied.discount_value,
+    })
   }
 
   if (discountAmount > 0) {
@@ -229,6 +237,7 @@ const DiscountWeekPurchased = ({
   attendees: AttendeePassState[]
   hasMonthSelected: boolean
 }) => {
+  const { t } = useTranslation()
   if (!hasMonthSelected) return null
 
   const calculateWeekPurchasedDiscount = () => {
@@ -263,7 +272,9 @@ const DiscountWeekPurchased = ({
     <div className="flex justify-between text-sm text-muted-foreground">
       <div className="flex items-center gap-2">
         <Tag className="w-4 h-4" />
-        <span className="text-sm text-muted-foreground">Week Pass Credit</span>
+        <span className="text-sm text-muted-foreground">
+          {t("passes.discounts.week_credit")}
+        </span>
       </div>
       <span data-week-discount={weekDiscount.toFixed(0)}>
         {" "}
@@ -280,6 +291,7 @@ const GroupDiscountDisplay = ({
   groupDiscountPercentage: number
   groupName: string | null
 }) => {
+  const { t } = useTranslation()
   if (!groupDiscountPercentage || groupDiscountPercentage === 0) return null
 
   return (
@@ -288,11 +300,18 @@ const GroupDiscountDisplay = ({
         <Tag className="w-4 h-4" />
         <span className="text-sm text-muted-foreground">
           {groupName
-            ? `${groupName} Group (${groupDiscountPercentage}% OFF)`
-            : `Group Discount (${groupDiscountPercentage}% OFF)`}
+            ? t("passes.discounts.group_named", {
+                name: groupName,
+                percent: groupDiscountPercentage,
+              })
+            : t("passes.discounts.group_generic", {
+                percent: groupDiscountPercentage,
+              })}
         </span>
       </div>
-      <span className="text-green-600 font-medium">Applied</span>
+      <span className="text-green-600 font-medium">
+        {t("passes.discounts.applied")}
+      </span>
     </div>
   )
 }

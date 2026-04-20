@@ -1,44 +1,33 @@
 "use client"
 
-import { Suspense } from "react"
-import { getBackgroundProps } from "@/lib/background-image"
-import { useCityProvider } from "@/providers/cityProvider"
-import { useTenant } from "@/providers/tenantProvider"
-import { CheckoutContent } from "./components/CheckoutContent"
-import useGetCheckoutData from "./hooks/useGetCheckoutData"
-
-const LoadingFallback = () => (
-  <div className="flex items-center justify-center h-screen">
-    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500" />
-  </div>
-)
+import { useRouter, useSearchParams } from "next/navigation"
+import { useEffect } from "react"
+import { getPublicGroupPath } from "@/lib/group-route"
 
 const CheckoutPage = () => {
-  const { tenant } = useTenant()
-  const { getCity, popupsLoaded } = useCityProvider()
-  const {
-    data: { group },
-    error,
-    isLoading,
-  } = useGetCheckoutData()
+  const router = useRouter()
+  const searchParams = useSearchParams()
 
-  const popup = getCity()
-  const background = getBackgroundProps(popup, tenant)
+  useEffect(() => {
+    const popupSlug = searchParams.get("popup")
+    const groupSlug = searchParams.get("group")
 
-  if (isLoading || !popupsLoaded) {
-    return <LoadingFallback />
-  }
+    if (groupSlug) {
+      router.replace(getPublicGroupPath(groupSlug))
+      return
+    }
+
+    if (popupSlug) {
+      router.replace(`/checkout/${popupSlug}`)
+      return
+    }
+
+    router.replace("/portal")
+  }, [router, searchParams])
 
   return (
-    <div
-      className={`min-h-screen w-full py-8 flex items-center justify-center ${background.className}`}
-      style={background.style}
-    >
-      <div className="container mx-auto">
-        <Suspense fallback={<LoadingFallback />}>
-          <CheckoutContent group={group} isLoading={isLoading} error={error} />
-        </Suspense>
-      </div>
+    <div className="flex items-center justify-center h-screen">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500" />
     </div>
   )
 }

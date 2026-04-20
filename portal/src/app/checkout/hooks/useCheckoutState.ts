@@ -1,56 +1,68 @@
 "use client"
 
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { useParams, useSearchParams } from "next/navigation"
 import { useState } from "react"
-import { ApiError, type ApplicationPublic, ApplicationsService } from "@/client"
+import {
+  ApiError,
+  type ApplicationPublic,
+  ApplicationsService,
+  HumansService,
+} from "@/client"
 import { queryKeys } from "@/lib/query-keys"
 import type { CheckoutState, FormDataProps } from "../types"
 import useCookies from "./useCookies"
 
-const useCheckoutState = () => {
-  const searchParams = useSearchParams()
-  const groupParam = searchParams.get("group")
-  const { group } = useParams()
+interface UseCheckoutStateProps {
+  popupId: string
+  saleType: "application" | "direct"
+  groupId?: string | null
+}
+
+const useCheckoutState = ({
+  popupId,
+  saleType,
+  groupId,
+}: UseCheckoutStateProps) => {
   const queryClient = useQueryClient()
   const [checkoutState, setCheckoutState] = useState<CheckoutState>("form")
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const { setCookie } = useCookies()
 
   const submitMutation = useMutation({
-    mutationFn: async ({
-      formData,
-      groupData,
-    }: {
-      formData: FormDataProps
-      groupData: any
-    }) => {
-      const groupSlug = (groupParam || group) as string
-      if (!groupSlug) throw new Error("Invalid group")
-      if (!groupData?.id) throw new Error("Group data not loaded")
+    mutationFn: async ({ formData }: { formData: FormDataProps }) => {
+      if (!popupId) throw new Error("No popup selected")
 
       setCookie(
         JSON.stringify({
           ...formData,
           local_resident: formData.local_resident === "yes",
-          group_id: groupData.id,
-          popup_id: groupData.popup_id,
+          popup_id: popupId,
         }),
       )
+
+      if (saleType === "direct") {
+        await HumansService.updateCurrentHuman({
+          requestBody: {
+            first_name: formData.first_name,
+            last_name: formData.last_name,
+            telegram: formData.telegram,
+            gender: formData.gender || undefined,
+          },
+        })
+
+        return { matchingApp: null }
+      }
 
       // Check if an application already exists (e.g. user navigated back)
       const existingApps = queryClient.getQueryData<ApplicationPublic[]>(
         queryKeys.applications.mine(),
       )
-      const existingApp = existingApps?.find(
-        (app) => app.popup_id === groupData.popup_id,
-      )
+      const existingApp = existingApps?.find((app) => app.popup_id === popupId)
 
       let application: ApplicationPublic
       if (existingApp) {
-        // UPDATE existing application
         application = await ApplicationsService.updateMyApplication({
-          popupId: groupData.popup_id,
+          popupId,
           requestBody: {
             first_name: formData.first_name,
             last_name: formData.last_name,
@@ -59,49 +71,43 @@ const useCheckoutState = () => {
           },
         })
       } else {
-        // CREATE new application
         application = await ApplicationsService.createMyApplication({
           requestBody: {
-            popup_id: groupData.popup_id,
-            group_id: groupData.id,
+            popup_id: popupId,
             first_name: formData.first_name,
             last_name: formData.last_name,
             email: formData.email,
             telegram: formData.telegram,
             gender: formData.gender || undefined,
+            group_id: groupId ?? undefined,
           },
         })
       }
 
-      return { matchingApp: application, groupData }
+      return { matchingApp: application }
     },
     onMutate: () => {
       setCheckoutState("processing")
       setErrorMessage(null)
     },
-    onSuccess: ({ matchingApp, groupData }) => {
+    onSuccess: ({ matchingApp }) => {
       if (matchingApp) {
         queryClient.setQueryData(queryKeys.applications.mine(), [matchingApp])
-        // Also invalidate the checkout-specific query used by useApplicationData
-        // so it refetches with fresh data on back navigation
-        if (groupData?.popup_id) {
-          queryClient.invalidateQueries({
-            queryKey: [
-              ...queryKeys.applications.mine(),
-              "checkout",
-              groupData.popup_id,
-            ],
-            refetchType: "none",
-          })
-        }
+        queryClient.invalidateQueries({
+          queryKey: [...queryKeys.applications.mine(), "checkout", popupId],
+          refetchType: "none",
+        })
       }
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.profile.current,
+        refetchType: "active",
+      })
       setCheckoutState("passes")
       setErrorMessage(null)
     },
-    onError: async (error: any, variables) => {
-      const { groupData } = variables
-
+    onError: async (error: any) => {
       if (
+        saleType === "application" &&
         error instanceof ApiError &&
         (error.status === 400 ||
           error.status === 409 ||
@@ -112,9 +118,7 @@ const useCheckoutState = () => {
           if (token) {
             const result = await ApplicationsService.listMyApplications()
             const existingApp = result.results.find(
-              (app) =>
-                app.group_id === groupData.id ||
-                app.popup_id === groupData.popup_id,
+              (app) => app.popup_id === popupId,
             )
 
             if (existingApp) {
@@ -146,11 +150,8 @@ const useCheckoutState = () => {
     },
   })
 
-  const handleSubmit = async (
-    formData: FormDataProps,
-    groupData: any,
-  ): Promise<void> => {
-    await submitMutation.mutateAsync({ formData, groupData })
+  const handleSubmit = async (formData: FormDataProps): Promise<void> => {
+    await submitMutation.mutateAsync({ formData })
   }
 
   return {

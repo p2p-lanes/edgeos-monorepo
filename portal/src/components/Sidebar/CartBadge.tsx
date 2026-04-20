@@ -22,7 +22,7 @@ const CartBadge = () => {
   return (
     <Link
       href={`/portal/${city.slug}/passes/buy`}
-      className="relative flex items-center justify-center rounded-md p-1.5 text-neutral-600 transition-colors hover:text-neutral-900"
+      className="relative flex items-center justify-center rounded-md p-1.5 text-nav-text-secondary transition-colors hover:text-nav-text"
     >
       <ShoppingCart className="h-5 w-5" />
       <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-medium text-white">

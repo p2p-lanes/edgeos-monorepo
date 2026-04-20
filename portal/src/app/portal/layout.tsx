@@ -23,7 +23,7 @@ export default function PortalLayout({
         <BackofficeSidebar collapsible="icon" />
         <SidebarInset className="max-h-svh overflow-hidden">
           {!isProfilePage && <HeaderBar />}
-          <main className="flex-1 overflow-y-auto bg-neutral-100">
+          <main className="flex-1 overflow-y-auto bg-background">
             <ResumeCheckoutBanner />
             {children}
           </main>

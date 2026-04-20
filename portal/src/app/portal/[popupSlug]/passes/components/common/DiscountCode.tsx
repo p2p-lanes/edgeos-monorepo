@@ -1,5 +1,6 @@
 import { CheckCircle, Loader2, XCircle } from "lucide-react"
 import { useState } from "react"
+import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useDiscount } from "@/providers/discountProvider"
@@ -12,6 +13,7 @@ const DiscountCode = ({
   defaultOpen?: boolean
   label?: boolean
 }) => {
+  const { t } = useTranslation()
   const { discountApplied } = useDiscount()
   const hasPreAppliedCode = !!discountApplied.discount_code
   const [open, setOpen] = useState(defaultOpen || hasPreAppliedCode)
@@ -44,7 +46,7 @@ const DiscountCode = ({
           className="text-sm font-medium underline whitespace-nowrap cursor-pointer my-2"
           onClick={() => setOpen(!open)}
         >
-          Have a coupon?
+          {t("passes.have_coupon")}
         </button>
       )}
       {open ? (
@@ -57,8 +59,8 @@ const DiscountCode = ({
                   ? discountMsg
                   : ""
               }
-              placeholder="Enter coupon code"
-              className="bg-white text-black"
+              placeholder={t("passes.coupon_placeholder")}
+              className="bg-card text-foreground"
               data-discount-code={discountCode}
               value={discountCode.toUpperCase()}
               onChange={handleDiscountChange}
@@ -76,19 +78,19 @@ const DiscountCode = ({
               disabled={discountCode.length === 0 || loading || isValid}
             >
               {loading && <Loader2 className="size-4 animate-spin" />}
-              Apply
+              {t("common.apply")}
             </Button>
           </div>
           {!loading && discountCode.length > 0 && (discountMsg || isValid) && (
             <p
-              className={`flex items-center gap-1 text-xs ${isValid ? "text-green-500" : "text-red-500"}`}
+              className={`flex items-center gap-1 text-xs ${isValid ? "text-green-500" : "text-destructive"}`}
             >
               {isValid ? (
                 <CheckCircle className="w-4 h-4 text-green-500" />
               ) : (
-                <XCircle className="w-4 h-4 text-red-500" />
+                <XCircle className="w-4 h-4 text-destructive" />
               )}
-              {isValid ? "Coupon code applied successfully." : discountMsg}
+              {isValid ? t("passes.coupon_applied") : discountMsg}
             </p>
           )}
         </div>

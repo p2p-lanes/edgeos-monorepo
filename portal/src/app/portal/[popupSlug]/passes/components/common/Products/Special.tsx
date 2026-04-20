@@ -1,5 +1,6 @@
 import { Check, Crown, Info, Plus } from "lucide-react"
 import type React from "react"
+import ExpandableDescription from "@/components/ui/ExpandableDescription"
 import {
   Tooltip,
   TooltipContent,
@@ -47,11 +48,8 @@ const ProductTitle = ({ product, selected, disabled }: ProductTitleProps) => (
       className={cn("w-5 h-5 text-orange-500", disabled && "text-neutral-300")}
     />
     {product.name}
-    {!disabled && (
-      <TooltipPatreon
-        purchased={product.purchased}
-        description={product.description}
-      />
+    {!disabled && !product.description && (
+      <TooltipPatreon purchased={product.purchased} />
     )}
   </span>
 )
@@ -74,24 +72,18 @@ const ProductPrice = ({ product, selected, disabled }: ProductPriceProps) => (
   </span>
 )
 
-const TooltipPatreon = ({
-  purchased,
-  description,
-}: {
-  purchased?: boolean
-  description?: string | null
-}) => (
+const TooltipPatreon = ({ purchased }: { purchased?: boolean }) => (
   <Tooltip>
     <TooltipTrigger asChild>
       <div className="cursor-pointer">
         <Info
-          className={cn("w-4 h-4 text-neutral-400", purchased && "text-white")}
+          className={cn("w-4 h-4 text-neutral-400", purchased && "text-primary-foreground")}
         />
       </div>
     </TooltipTrigger>
-    <TooltipContent className="bg-white text-black max-w-[420px] border border-gray-200">
-      {description ||
-        "A patron pass supports the community and gives you access to the full event."}
+    <TooltipContent className="bg-card text-foreground max-w-[420px] border border-border">
+      A patron pass supports the community and gives you access to the full
+      event.
     </TooltipContent>
   </Tooltip>
 )
@@ -108,11 +100,11 @@ type VariantStyles = "selected" | "purchased" | "edit" | "disabled" | "default"
 const variants: Record<VariantStyles, string> = {
   selected:
     "bg-gradient-to-r from-[#FF7B7B]/30 to-[#E040FB]/30 border-neutral-300",
-  purchased: "bg-slate-800 text-white border-neutral-700 cursor-not-allowed",
+  purchased: "bg-slate-800 text-primary-foreground border-neutral-700 cursor-not-allowed",
   edit: "bg-slate-800/30 border-dashed border-slate-200 text-neutral-700",
   disabled: "bg-neutral-0 text-neutral-300 cursor-not-allowed ",
   default:
-    "bg-white border-neutral-300 text-neutral-700 hover:bg-gradient-to-r hover:from-[#FF7B7B]/10 hover:to-[#E040FB]/10",
+    "bg-checkout-card-bg border-neutral-300 text-checkout-title hover:bg-gradient-to-r hover:from-[#FF7B7B]/10 hover:to-[#E040FB]/10",
 }
 
 // Componente base
@@ -129,6 +121,7 @@ function SpecialBase({
 
   const isDisabled = disabled || productDisabled
   const hasOnClick = !isDisabled && onClick && !purchased
+  const hasDescription = !!product.description && !purchased
   return (
     <button
       type="button"
@@ -137,7 +130,10 @@ function SpecialBase({
       data-selected={selected}
       data-price={product.price}
       className={cn(
-        "w-full py-1 px-4 flex items-center justify-between gap-2 border border-neutral-200 rounded-md",
+        "w-full py-1 px-4 border border-neutral-200 rounded-md",
+        hasDescription
+          ? "flex flex-col gap-1"
+          : "flex items-center justify-between gap-2",
         variants[
           purchased
             ? "purchased"
@@ -149,26 +145,41 @@ function SpecialBase({
         ],
       )}
     >
-      <div className="flex items-center gap-2 py-2">
-        {getStatusIcon()}
-        <ProductTitle
-          product={product}
-          disabled={isDisabled || !onClick}
-          selected={selected ?? false}
-        />
+      <div className="flex items-center justify-between gap-2 w-full">
+        <div className="flex items-center gap-2 py-2">
+          {getStatusIcon()}
+          <ProductTitle
+            product={product}
+            disabled={isDisabled || !onClick}
+            selected={selected ?? false}
+          />
+        </div>
+
+        <div className="flex items-center gap-4">
+          {product.purchased ? (
+            <span className="text-sm font-medium text-[white]">Purchased</span>
+          ) : (
+            <ProductPrice
+              product={product}
+              selected={selected ?? false}
+              disabled={isDisabled || !onClick}
+            />
+          )}
+        </div>
       </div>
 
-      <div className="flex items-center gap-4">
-        {product.purchased ? (
-          <span className="text-sm font-medium text-[white]">Purchased</span>
-        ) : (
-          <ProductPrice
-            product={product}
-            selected={selected ?? false}
-            disabled={isDisabled || !onClick}
+      {hasDescription && product.description && (
+        <div className="w-full pb-2">
+          <ExpandableDescription
+            text={product.description}
+            clamp={2}
+            className={cn(
+              "text-xs text-left text-neutral-600",
+              (isDisabled || !onClick) && "text-neutral-300",
+            )}
           />
-        )}
-      </div>
+        </div>
+      )}
     </button>
   )
 }

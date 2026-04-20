@@ -53,6 +53,7 @@ class FormFieldPublic(BaseModel):
     placeholder: str | None = None
     help_text: str | None = None
     protected: bool = False
+    removable: bool = True
     target: str | None = None
 
     model_config = ConfigDict(from_attributes=True)

@@ -1,21 +1,27 @@
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from enum import Enum
+from enum import Enum, StrEnum
 
 from pydantic import BaseModel, ConfigDict, model_validator
-from sqlalchemy import Numeric, Text
+from sqlalchemy import Boolean, Numeric, Text
 from sqlmodel import Column, DateTime, Field, SQLModel
 
-
-class ProductCategory(str, Enum):
-    """Product categories determining which fields are relevant."""
-
-    TICKET = "ticket"
-    HOUSING = "housing"
-    MERCH = "merch"
-    OTHER = "other"
-    PATREON = "patreon"
+# ProductCategory is now a free-form string so admins can create custom categories.
+# Known built-in values are listed below for reference.
+ProductCategory = str
+CATEGORY_TICKET: ProductCategory = "ticket"
+CATEGORY_HOUSING: ProductCategory = "housing"
+CATEGORY_MERCH: ProductCategory = "merch"
+CATEGORY_OTHER: ProductCategory = "other"
+CATEGORY_PATREON: ProductCategory = "patreon"
+KNOWN_PRODUCT_CATEGORIES = [
+    CATEGORY_TICKET,
+    CATEGORY_HOUSING,
+    CATEGORY_MERCH,
+    CATEGORY_OTHER,
+    CATEGORY_PATREON,
+]
 
 
 class TicketDuration(str, Enum):
@@ -48,7 +54,7 @@ class ProductBase(SQLModel):
     )
     description: str | None = Field(default=None, nullable=True, sa_type=Text())
     image_url: str | None = Field(default=None, nullable=True)
-    category: ProductCategory = Field(default=ProductCategory.TICKET, index=True)
+    category: str = Field(default="ticket", index=True)
     attendee_category: TicketAttendeeCategory | None = Field(
         default=None, nullable=True
     )
@@ -62,8 +68,9 @@ class ProductBase(SQLModel):
     is_active: bool = Field(default=True)
     exclusive: bool = Field(default=False)
     max_quantity: int | None = Field(default=None, nullable=True)
-    insurance_percentage: Decimal | None = Field(
-        default=None, sa_column=Column(Numeric(5, 2), nullable=True)
+    insurance_eligible: bool = Field(
+        default=False,
+        sa_column=Column(Boolean, nullable=False, server_default="false"),
     )
 
 
@@ -85,7 +92,7 @@ class ProductCreate(BaseModel):
     compare_price: Decimal | None = Field(default=None, ge=0)
     description: str | None = None
     image_url: str | None = None
-    category: ProductCategory = ProductCategory.TICKET
+    category: str = "ticket"
     attendee_category: TicketAttendeeCategory | None = None
     duration_type: TicketDuration | None = None
     start_date: datetime | None = None
@@ -93,14 +100,14 @@ class ProductCreate(BaseModel):
     is_active: bool = True
     exclusive: bool = False
     max_quantity: int | None = None
-    insurance_percentage: Decimal | None = None
+    insurance_eligible: bool = False
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
     @model_validator(mode="after")
     def validate_ticket_fields(self) -> "ProductCreate":
         """Validate that ticket-specific fields are only set for tickets."""
-        if self.category != ProductCategory.TICKET:
+        if self.category != "ticket":
             if self.attendee_category is not None:
                 raise ValueError(
                     "attendee_category can only be set for ticket products"
@@ -119,7 +126,7 @@ class ProductUpdate(BaseModel):
     compare_price: Decimal | None = Field(default=None, ge=0)
     description: str | None = None
     image_url: str | None = None
-    category: ProductCategory | None = None
+    category: str | None = None
     attendee_category: TicketAttendeeCategory | None = None
     duration_type: TicketDuration | None = None
     start_date: datetime | None = None
@@ -127,7 +134,7 @@ class ProductUpdate(BaseModel):
     is_active: bool | None = None
     exclusive: bool | None = None
     max_quantity: int | None = None
-    insurance_percentage: Decimal | None = None
+    insurance_eligible: bool | None = None
 
 
 class ProductBatchItem(BaseModel):
@@ -139,7 +146,7 @@ class ProductBatchItem(BaseModel):
     compare_price: Decimal | None = Field(default=None, ge=0)
     description: str | None = None
     image_url: str | None = None
-    category: ProductCategory = ProductCategory.TICKET
+    category: str = "ticket"
     attendee_category: TicketAttendeeCategory | None = None
     duration_type: TicketDuration | None = None
     start_date: datetime | None = None
@@ -147,14 +154,14 @@ class ProductBatchItem(BaseModel):
     is_active: bool = True
     exclusive: bool = False
     max_quantity: int | None = None
-    insurance_percentage: Decimal | None = None
+    insurance_eligible: bool = False
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
     @model_validator(mode="after")
     def validate_ticket_fields(self) -> "ProductBatchItem":
         """Validate that ticket-specific fields are only set for tickets."""
-        if self.category != ProductCategory.TICKET:
+        if self.category != "ticket":
             if self.attendee_category is not None:
                 raise ValueError(
                     "attendee_category can only be set for ticket products"
@@ -183,3 +190,117 @@ class ProductWithQuantity(ProductPublic):
     """Product with quantity for attendee products."""
 
     quantity: int = 1
+
+
+# ---------------------------------------------------------------------------
+# Ticket Tier Progression schemas
+# ---------------------------------------------------------------------------
+
+
+class PhaseState(StrEnum):
+    """Derived sales state for a ticket tier phase.
+
+    Computed server-side by the progression service at read time; never persisted.
+    """
+
+    upcoming = "upcoming"
+    available = "available"
+    sold_out = "sold_out"
+    expired = "expired"
+
+
+class TierPhaseCreate(BaseModel):
+    """Schema for creating a new ticket tier phase.
+
+    group_id is optional here because the router endpoint at
+    POST /ticket-tier-groups/{group_id}/phases injects it from the path param.
+
+    `order` is not accepted on input: the backend derives it from
+    `sale_starts_at ASC` (NULLS LAST) with a deterministic id tiebreak.
+    """
+
+    group_id: uuid.UUID | None = None  # injected from path param when None
+    product_id: uuid.UUID
+    label: str = Field(min_length=1)
+    sale_starts_at: datetime | None = None
+    sale_ends_at: datetime | None = None
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+class TierPhaseUpdate(BaseModel):
+    """Schema for updating a ticket tier phase (all fields optional).
+
+    `order` is derived automatically; updates that change `sale_starts_at`
+    trigger a full re-order of the group.
+    """
+
+    label: str | None = Field(default=None, min_length=1)
+    sale_starts_at: datetime | None = None
+    sale_ends_at: datetime | None = None
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+class TierPhasePublic(BaseModel):
+    """Public read schema for a ticket tier phase, with derived progression fields."""
+
+    id: uuid.UUID
+    group_id: uuid.UUID
+    product_id: uuid.UUID
+    order: int
+    label: str
+    sale_starts_at: datetime | None = None
+    sale_ends_at: datetime | None = None
+    # Derived by the backend progression service — never persisted
+    sales_state: PhaseState
+    is_purchasable: bool
+    remaining: int | None = (
+        None  # min(phase cap remaining, shared remaining); null if both null
+    )
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TierGroupCreate(BaseModel):
+    """Schema for creating a new ticket tier group."""
+
+    name: str = Field(min_length=1)
+    shared_stock_cap: int | None = Field(default=None, ge=1)
+    # popup_id is used by the router to check tier_progression_enabled; not persisted on group
+    popup_id: uuid.UUID | None = None
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+class TierGroupUpdate(BaseModel):
+    """Schema for updating a ticket tier group (all fields optional)."""
+
+    name: str | None = Field(default=None, min_length=1)
+    shared_stock_cap: int | None = Field(default=None, ge=1)
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+class TierGroupPublic(BaseModel):
+    """Public read schema for a ticket tier group, with embedded phases."""
+
+    id: uuid.UUID
+    tenant_id: uuid.UUID
+    name: str
+    shared_stock_cap: int | None = None
+    shared_stock_remaining: int | None = None
+    phases: list[TierPhasePublic] = []  # sorted by order asc
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ProductPublicWithTier(ProductPublic):
+    """ProductPublic enriched with optional tier group and phase information.
+
+    Additive delta over ProductPublic — both fields are null for products that
+    are not assigned to any tier group (BC-2 / BC-3 backward-compat).
+    """
+
+    tier_group: TierGroupPublic | None = None
+    phase: TierPhasePublic | None = None

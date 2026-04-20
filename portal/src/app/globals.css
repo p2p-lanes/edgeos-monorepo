@@ -37,6 +37,30 @@
   --radius-4xl: calc(var(--radius) + 16px);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-heading: var(--heading);
+  --color-heading-secondary: var(--heading-secondary);
+  --color-body: var(--body);
+  --color-nav-text: var(--nav-text);
+  --color-nav-text-secondary: var(--nav-text-secondary);
+  --color-pass-title: var(--pass-title);
+  --color-pass-text: var(--pass-text);
+  --color-checkout-nav-bg: var(--checkout-nav-bg);
+  --color-checkout-nav-text: var(--checkout-nav-text);
+  --color-checkout-title: var(--checkout-title);
+  --color-checkout-watermark: var(--checkout-watermark);
+  --color-checkout-subtitle: var(--checkout-subtitle);
+  --color-checkout-navbar-bg: var(--checkout-navbar-bg);
+  --color-checkout-badge-bg: var(--checkout-badge-bg);
+  --color-checkout-badge-title: var(--checkout-badge-title);
+  --color-checkout-card-bg: var(--checkout-card-bg);
+  --color-checkout-bottom-bar-bg: var(--checkout-bottom-bar-bg);
+  --color-checkout-button: var(--checkout-button);
+  --color-checkout-button-title: var(--checkout-button-title);
+  --color-checkout-bottom-bar-text: var(--checkout-bottom-bar-text);
+  --color-checkout-button-disabled: var(--checkout-button-disabled);
+  --color-checkout-button-title-disabled: var(--checkout-button-title-disabled);
+  --color-checkout-badge-bg-disabled: var(--checkout-badge-bg-disabled);
+  --color-checkout-badge-title-disabled: var(--checkout-badge-title-disabled);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
@@ -85,8 +109,41 @@
 
 :root {
   --radius: 0.5rem;
+  --border-radius: 0.5rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
+  --heading: oklch(0.145 0 0);
+  --heading-secondary: oklch(0.556 0.01 260);
+  --body: oklch(0.145 0 0);
+  --nav-text: oklch(0.145 0 0);
+  --nav-text-secondary: oklch(0.556 0.01 260);
+  --pass-title: oklch(0.145 0 0);
+  --pass-text: oklch(0.556 0.01 260);
+  /* Checkout — nuevas vars (10 editables). Ver backoffice/src/components/forms/ThemeConfigForm.tsx */
+  --checkout-title: #1a1a1a;
+  --checkout-watermark: rgba(255, 255, 255, 0.85);
+  --checkout-subtitle: #6b6b8a;
+  --checkout-navbar-bg: rgba(255, 255, 255, 0.85);
+  --checkout-badge-bg: #2d3a6e;
+  --checkout-badge-title: #ffffff;
+  --checkout-card-bg: #ffffff;
+  --checkout-bottom-bar-bg: #1e2a4d;
+  --checkout-button: #ffffff;
+  --checkout-button-title: #1e2a4d;
+  --checkout-bottom-bar-text: #ffffff;
+  /* Disabled variants derived via color-mix (no editables del form). */
+  /* Disabled states ride the neutral muted palette so contrast holds in
+     both light and dark without depending on whatever brand color the
+     admin set for the active state. */
+  --checkout-button-disabled: var(--muted);
+  --checkout-button-title-disabled: var(--muted-foreground);
+  --checkout-badge-bg-disabled: var(--muted);
+  --checkout-badge-title-disabled: var(--muted-foreground);
+  /* Legacy aliases — popups anteriores a la simplificación pueden tener
+     checkout_nav_bg / checkout_nav_text en el JSON. themeProvider sigue
+     mapeando 1:1 hacia estas vars, así que las dejamos como alias. */
+  --checkout-nav-bg: var(--checkout-navbar-bg);
+  --checkout-nav-text: var(--checkout-badge-title);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.205 0.015 285);
   --popover: oklch(1 0 0);
@@ -113,7 +170,13 @@
   --sidebar-foreground: oklch(0.37 0.01 260);
   --sidebar-primary: oklch(0.205 0.015 260);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.965 0.005 260);
+  /* --sidebar-accent is the hover/active BG. Derived from --sidebar + its
+     foreground so it auto-adapts when the admin themes a dark sidebar. */
+  --sidebar-accent: color-mix(
+    in oklab,
+    var(--sidebar) 85%,
+    var(--sidebar-foreground) 15%
+  );
   --sidebar-accent-foreground: oklch(0.205 0.015 260);
   --sidebar-border: oklch(0.922 0.01 260);
   --sidebar-ring: oklch(0.548 0.22 260);
@@ -122,6 +185,33 @@
 .dark {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
+  --heading: oklch(0.985 0 0);
+  --heading-secondary: oklch(0.7 0.02 260);
+  --body: oklch(0.985 0 0);
+  --nav-text: oklch(0.985 0 0);
+  --nav-text-secondary: oklch(0.7 0.02 260);
+  --pass-title: oklch(0.985 0 0);
+  --pass-text: oklch(0.7 0.02 260);
+  --checkout-title: oklch(0.985 0 0);
+  --checkout-watermark: rgba(255, 255, 255, 0.12);
+  --checkout-subtitle: oklch(0.7 0.02 260);
+  --checkout-navbar-bg: oklch(0.205 0.015 285 / 0.85);
+  --checkout-badge-bg: oklch(0.279 0.041 260);
+  --checkout-badge-title: oklch(0.985 0 0);
+  --checkout-card-bg: oklch(0.205 0.015 285);
+  --checkout-bottom-bar-bg: oklch(0.145 0 0);
+  --checkout-button: oklch(0.985 0 0);
+  --checkout-button-title: oklch(0.145 0 0);
+  --checkout-bottom-bar-text: oklch(0.985 0 0);
+  /* Same rationale as the light theme: disabled states ride the neutral
+     muted palette for consistent contrast regardless of the admin's
+     brand colors. */
+  --checkout-button-disabled: var(--muted);
+  --checkout-button-title-disabled: var(--muted-foreground);
+  --checkout-badge-bg-disabled: var(--muted);
+  --checkout-badge-title-disabled: var(--muted-foreground);
+  --checkout-nav-bg: var(--checkout-navbar-bg);
+  --checkout-nav-text: var(--checkout-badge-title);
   --card: oklch(0.205 0.015 285);
   --card-foreground: oklch(0.975 0.005 285);
   --popover: oklch(0.205 0.015 285);
@@ -148,7 +238,13 @@
   --sidebar-foreground: oklch(0.965 0.005 260);
   --sidebar-primary: oklch(0.548 0.22 260);
   --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.27 0.01 260);
+  /* Same color-mix pattern as the light theme — adapts to the admin's
+     chosen sidebar bg + foreground. */
+  --sidebar-accent: color-mix(
+    in oklab,
+    var(--sidebar) 85%,
+    var(--sidebar-foreground) 15%
+  );
   --sidebar-accent-foreground: oklch(0.965 0.005 260);
   --sidebar-border: oklch(0.27 0.01 260);
   --sidebar-ring: oklch(0.548 0.22 260);
@@ -255,6 +351,21 @@
   &::-webkit-scrollbar {
     display: none;
   }
+}
+
+@keyframes fadeInRight {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-fade-in-right {
+  animation: fadeInRight 0.3s ease-out forwards;
 }
 
 @layer base {

@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next"
 import { cn } from "@/lib/utils"
 import type { Resource } from "@/types/resources"
 import { SidebarMenuButton } from "../SidebarComponents"
@@ -8,6 +9,7 @@ interface ResourceMenuItemProps {
   color: string
   onNavigate: (path: string) => void
   isGroup?: boolean
+  isActive?: boolean
 }
 
 const ResourceMenuItem = ({
@@ -16,11 +18,13 @@ const ResourceMenuItem = ({
   color,
   onNavigate,
   isGroup = false,
+  isActive = false,
 }: ResourceMenuItemProps) => {
+  const { t } = useTranslation()
   const { status } = resource
 
   const handleClick = () => {
-    if (status === "active" && resource.path) {
+    if (status === "active" && resource.path && !isActive) {
       onNavigate(resource.path)
     }
   }
@@ -52,6 +56,7 @@ const ResourceMenuItem = ({
   return (
     <SidebarMenuButton
       disabled={isDisabled}
+      isActive={isActive}
       onClick={handleClick}
       className={cn(isGroup ? "py-2" : "py-5", level > 0 && "pl-6")}
     >
@@ -61,7 +66,7 @@ const ResourceMenuItem = ({
       </span>
       {status === "soon" && (
         <span className="ml-auto rounded-md bg-muted px-1.5 py-0.5 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
-          Soon
+          {t("sidebar.soon_badge")}
         </span>
       )}
       {resource.value && (

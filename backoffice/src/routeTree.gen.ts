@@ -16,6 +16,8 @@ import { Route as LayoutSettingsRouteImport } from './routes/_layout/settings'
 import { Route as LayoutPaymentsRouteImport } from './routes/_layout/payments'
 import { Route as LayoutAttendeesRouteImport } from './routes/_layout/attendees'
 import { Route as LayoutAbandonedCartsRouteImport } from './routes/_layout/abandoned-carts'
+import { Route as LayoutTicketingStepsIndexRouteImport } from './routes/_layout/ticketing-steps/index'
+import { Route as LayoutThemeIndexRouteImport } from './routes/_layout/theme/index'
 import { Route as LayoutProductsIndexRouteImport } from './routes/_layout/products/index'
 import { Route as LayoutPopupsIndexRouteImport } from './routes/_layout/popups/index'
 import { Route as LayoutOrganizationsIndexRouteImport } from './routes/_layout/organizations/index'
@@ -26,6 +28,7 @@ import { Route as LayoutEmailTemplatesIndexRouteImport } from './routes/_layout/
 import { Route as LayoutCouponsIndexRouteImport } from './routes/_layout/coupons/index'
 import { Route as LayoutApplicationsIndexRouteImport } from './routes/_layout/applications/index'
 import { Route as LayoutAdminIndexRouteImport } from './routes/_layout/admin/index'
+import { Route as LayoutTicketingStepsStepIdRouteImport } from './routes/_layout/ticketing-steps/$stepId'
 import { Route as LayoutProductsNewRouteImport } from './routes/_layout/products/new'
 import { Route as LayoutPopupsNewRouteImport } from './routes/_layout/popups/new'
 import { Route as LayoutOrganizationsNewRouteImport } from './routes/_layout/organizations/new'
@@ -83,6 +86,17 @@ const LayoutAbandonedCartsRoute = LayoutAbandonedCartsRouteImport.update({
   path: '/abandoned-carts',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutTicketingStepsIndexRoute =
+  LayoutTicketingStepsIndexRouteImport.update({
+    id: '/ticketing-steps/',
+    path: '/ticketing-steps/',
+    getParentRoute: () => LayoutRoute,
+  } as any)
+const LayoutThemeIndexRoute = LayoutThemeIndexRouteImport.update({
+  id: '/theme/',
+  path: '/theme/',
+  getParentRoute: () => LayoutRoute,
+} as any)
 const LayoutProductsIndexRoute = LayoutProductsIndexRouteImport.update({
   id: '/products/',
   path: '/products/',
@@ -135,6 +149,12 @@ const LayoutAdminIndexRoute = LayoutAdminIndexRouteImport.update({
   path: '/admin/',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutTicketingStepsStepIdRoute =
+  LayoutTicketingStepsStepIdRouteImport.update({
+    id: '/ticketing-steps/$stepId',
+    path: '/ticketing-steps/$stepId',
+    getParentRoute: () => LayoutRoute,
+  } as any)
 const LayoutProductsNewRoute = LayoutProductsNewRouteImport.update({
   id: '/products/new',
   path: '/products/new',
@@ -269,6 +289,7 @@ export interface FileRoutesByFullPath {
   '/organizations/new': typeof LayoutOrganizationsNewRoute
   '/popups/new': typeof LayoutPopupsNewRoute
   '/products/new': typeof LayoutProductsNewRoute
+  '/ticketing-steps/$stepId': typeof LayoutTicketingStepsStepIdRoute
   '/admin/': typeof LayoutAdminIndexRoute
   '/applications/': typeof LayoutApplicationsIndexRoute
   '/coupons/': typeof LayoutCouponsIndexRoute
@@ -279,6 +300,8 @@ export interface FileRoutesByFullPath {
   '/organizations/': typeof LayoutOrganizationsIndexRoute
   '/popups/': typeof LayoutPopupsIndexRoute
   '/products/': typeof LayoutProductsIndexRoute
+  '/theme/': typeof LayoutThemeIndexRoute
+  '/ticketing-steps/': typeof LayoutTicketingStepsIndexRoute
   '/admin/$id/edit': typeof LayoutAdminIdEditRoute
   '/coupons/$id/edit': typeof LayoutCouponsIdEditRoute
   '/email-templates/$type/edit': typeof LayoutEmailTemplatesTypeEditRoute
@@ -309,6 +332,7 @@ export interface FileRoutesByTo {
   '/organizations/new': typeof LayoutOrganizationsNewRoute
   '/popups/new': typeof LayoutPopupsNewRoute
   '/products/new': typeof LayoutProductsNewRoute
+  '/ticketing-steps/$stepId': typeof LayoutTicketingStepsStepIdRoute
   '/admin': typeof LayoutAdminIndexRoute
   '/applications': typeof LayoutApplicationsIndexRoute
   '/coupons': typeof LayoutCouponsIndexRoute
@@ -319,6 +343,8 @@ export interface FileRoutesByTo {
   '/organizations': typeof LayoutOrganizationsIndexRoute
   '/popups': typeof LayoutPopupsIndexRoute
   '/products': typeof LayoutProductsIndexRoute
+  '/theme': typeof LayoutThemeIndexRoute
+  '/ticketing-steps': typeof LayoutTicketingStepsIndexRoute
   '/admin/$id/edit': typeof LayoutAdminIdEditRoute
   '/coupons/$id/edit': typeof LayoutCouponsIdEditRoute
   '/email-templates/$type/edit': typeof LayoutEmailTemplatesTypeEditRoute
@@ -351,6 +377,7 @@ export interface FileRoutesById {
   '/_layout/organizations/new': typeof LayoutOrganizationsNewRoute
   '/_layout/popups/new': typeof LayoutPopupsNewRoute
   '/_layout/products/new': typeof LayoutProductsNewRoute
+  '/_layout/ticketing-steps/$stepId': typeof LayoutTicketingStepsStepIdRoute
   '/_layout/admin/': typeof LayoutAdminIndexRoute
   '/_layout/applications/': typeof LayoutApplicationsIndexRoute
   '/_layout/coupons/': typeof LayoutCouponsIndexRoute
@@ -361,6 +388,8 @@ export interface FileRoutesById {
   '/_layout/organizations/': typeof LayoutOrganizationsIndexRoute
   '/_layout/popups/': typeof LayoutPopupsIndexRoute
   '/_layout/products/': typeof LayoutProductsIndexRoute
+  '/_layout/theme/': typeof LayoutThemeIndexRoute
+  '/_layout/ticketing-steps/': typeof LayoutTicketingStepsIndexRoute
   '/_layout/admin/$id/edit': typeof LayoutAdminIdEditRoute
   '/_layout/coupons/$id/edit': typeof LayoutCouponsIdEditRoute
   '/_layout/email-templates/$type/edit': typeof LayoutEmailTemplatesTypeEditRoute
@@ -393,6 +422,7 @@ export interface FileRouteTypes {
     | '/organizations/new'
     | '/popups/new'
     | '/products/new'
+    | '/ticketing-steps/$stepId'
     | '/admin/'
     | '/applications/'
     | '/coupons/'
@@ -403,6 +433,8 @@ export interface FileRouteTypes {
     | '/organizations/'
     | '/popups/'
     | '/products/'
+    | '/theme/'
+    | '/ticketing-steps/'
     | '/admin/$id/edit'
     | '/coupons/$id/edit'
     | '/email-templates/$type/edit'
@@ -433,6 +465,7 @@ export interface FileRouteTypes {
     | '/organizations/new'
     | '/popups/new'
     | '/products/new'
+    | '/ticketing-steps/$stepId'
     | '/admin'
     | '/applications'
     | '/coupons'
@@ -443,6 +476,8 @@ export interface FileRouteTypes {
     | '/organizations'
     | '/popups'
     | '/products'
+    | '/theme'
+    | '/ticketing-steps'
     | '/admin/$id/edit'
     | '/coupons/$id/edit'
     | '/email-templates/$type/edit'
@@ -474,6 +509,7 @@ export interface FileRouteTypes {
     | '/_layout/organizations/new'
     | '/_layout/popups/new'
     | '/_layout/products/new'
+    | '/_layout/ticketing-steps/$stepId'
     | '/_layout/admin/'
     | '/_layout/applications/'
     | '/_layout/coupons/'
@@ -484,6 +520,8 @@ export interface FileRouteTypes {
     | '/_layout/organizations/'
     | '/_layout/popups/'
     | '/_layout/products/'
+    | '/_layout/theme/'
+    | '/_layout/ticketing-steps/'
     | '/_layout/admin/$id/edit'
     | '/_layout/coupons/$id/edit'
     | '/_layout/email-templates/$type/edit'
@@ -551,6 +589,20 @@ declare module '@tanstack/react-router' {
       path: '/abandoned-carts'
       fullPath: '/abandoned-carts'
       preLoaderRoute: typeof LayoutAbandonedCartsRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/ticketing-steps/': {
+      id: '/_layout/ticketing-steps/'
+      path: '/ticketing-steps'
+      fullPath: '/ticketing-steps/'
+      preLoaderRoute: typeof LayoutTicketingStepsIndexRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/theme/': {
+      id: '/_layout/theme/'
+      path: '/theme'
+      fullPath: '/theme/'
+      preLoaderRoute: typeof LayoutThemeIndexRouteImport
       parentRoute: typeof LayoutRoute
     }
     '/_layout/products/': {
@@ -621,6 +673,13 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin/'
       preLoaderRoute: typeof LayoutAdminIndexRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/ticketing-steps/$stepId': {
+      id: '/_layout/ticketing-steps/$stepId'
+      path: '/ticketing-steps/$stepId'
+      fullPath: '/ticketing-steps/$stepId'
+      preLoaderRoute: typeof LayoutTicketingStepsStepIdRouteImport
       parentRoute: typeof LayoutRoute
     }
     '/_layout/products/new': {
@@ -797,6 +856,7 @@ interface LayoutRouteChildren {
   LayoutOrganizationsNewRoute: typeof LayoutOrganizationsNewRoute
   LayoutPopupsNewRoute: typeof LayoutPopupsNewRoute
   LayoutProductsNewRoute: typeof LayoutProductsNewRoute
+  LayoutTicketingStepsStepIdRoute: typeof LayoutTicketingStepsStepIdRoute
   LayoutAdminIndexRoute: typeof LayoutAdminIndexRoute
   LayoutApplicationsIndexRoute: typeof LayoutApplicationsIndexRoute
   LayoutCouponsIndexRoute: typeof LayoutCouponsIndexRoute
@@ -807,6 +867,8 @@ interface LayoutRouteChildren {
   LayoutOrganizationsIndexRoute: typeof LayoutOrganizationsIndexRoute
   LayoutPopupsIndexRoute: typeof LayoutPopupsIndexRoute
   LayoutProductsIndexRoute: typeof LayoutProductsIndexRoute
+  LayoutThemeIndexRoute: typeof LayoutThemeIndexRoute
+  LayoutTicketingStepsIndexRoute: typeof LayoutTicketingStepsIndexRoute
   LayoutAdminIdEditRoute: typeof LayoutAdminIdEditRoute
   LayoutCouponsIdEditRoute: typeof LayoutCouponsIdEditRoute
   LayoutEmailTemplatesTypeEditRoute: typeof LayoutEmailTemplatesTypeEditRoute
@@ -837,6 +899,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutOrganizationsNewRoute: LayoutOrganizationsNewRoute,
   LayoutPopupsNewRoute: LayoutPopupsNewRoute,
   LayoutProductsNewRoute: LayoutProductsNewRoute,
+  LayoutTicketingStepsStepIdRoute: LayoutTicketingStepsStepIdRoute,
   LayoutAdminIndexRoute: LayoutAdminIndexRoute,
   LayoutApplicationsIndexRoute: LayoutApplicationsIndexRoute,
   LayoutCouponsIndexRoute: LayoutCouponsIndexRoute,
@@ -847,6 +910,8 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutOrganizationsIndexRoute: LayoutOrganizationsIndexRoute,
   LayoutPopupsIndexRoute: LayoutPopupsIndexRoute,
   LayoutProductsIndexRoute: LayoutProductsIndexRoute,
+  LayoutThemeIndexRoute: LayoutThemeIndexRoute,
+  LayoutTicketingStepsIndexRoute: LayoutTicketingStepsIndexRoute,
   LayoutAdminIdEditRoute: LayoutAdminIdEditRoute,
   LayoutCouponsIdEditRoute: LayoutCouponsIdEditRoute,
   LayoutEmailTemplatesTypeEditRoute: LayoutEmailTemplatesTypeEditRoute,

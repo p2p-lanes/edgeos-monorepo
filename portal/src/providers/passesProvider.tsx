@@ -8,8 +8,13 @@ import {
   useRef,
   useState,
 } from "react"
+import {
+  CHECKOUT_MODE,
+  type CheckoutMode,
+  resolvePopupCheckoutPolicy,
+} from "@/checkout/popupCheckoutPolicy"
 import type { AttendeePurchases } from "@/client"
-import { sortAttendees } from "@/helpers/filters"
+import { supportsQuantitySelector } from "@/components/ui/QuantitySelector"
 import { useCart } from "@/hooks/useCartApi"
 import useGetPassesData from "@/hooks/useGetPassesData"
 import { usePurchasesQuery } from "@/hooks/useGetPurchases"
@@ -18,7 +23,6 @@ import { getProductStrategy } from "@/strategies/ProductStrategies"
 import { getPurchaseStrategy } from "@/strategies/PurchaseStrategy"
 import type { AttendeePassState } from "@/types/Attendee"
 import type { ProductsPass } from "@/types/Products"
-import { useApplication } from "./applicationProvider"
 import { useCityProvider } from "./cityProvider"
 import { useDiscount } from "./discountProvider"
 
@@ -34,6 +38,12 @@ export const PassesContext = createContext<PassesContext_interface | null>(null)
 
 interface PassesProviderProps {
   children: ReactNode
+  /**
+   * Attendees to drive the passes selection state off. Callers are
+   * responsible for sorting — see `useResolvedAttendees` for the canonical
+   * source that handles application vs direct-sale flows.
+   */
+  attendees: AttendeePassState[]
   restoreFromCart?: boolean
 }
 
@@ -68,9 +78,10 @@ function buildBaseAttendeePasses(
   products: ProductsPass[],
   discountValue: number,
   purchasesMap: Map<string, ProductsPass[]>,
+  checkoutMode: CheckoutMode = CHECKOUT_MODE.PASS_SYSTEM,
 ): AttendeePassState[] {
-  const priceStrategy = getPriceStrategy()
-  const purchaseStrategy = getPurchaseStrategy()
+  const priceStrategy = getPriceStrategy(checkoutMode)
+  const purchaseStrategy = getPurchaseStrategy(checkoutMode)
 
   return attendees.map((attendee) => {
     const purchased = purchasesMap.get(attendee.id) ?? []
@@ -83,15 +94,22 @@ function buildBaseAttendeePasses(
           product.attendee_category === attendee.category && product.is_active,
       )
       .map((product: ProductsPass) => {
+        const isMultiUnit =
+          product.duration_type !== "day" &&
+          supportsQuantitySelector(product.max_quantity)
         const originalQuantity =
           product.duration_type === "day"
             ? (purchased.find((p) => p.id === product.id)?.quantity ?? 0)
             : 1
+        // Multi-unit non-day products start at 0 so the UI shows them as "empty";
+        // single-unit non-day keep the legacy init of 1 so existing toggle code paths
+        // multiply by 1 and downstream totals remain unchanged.
+        const initialQuantity = isMultiUnit ? 0 : originalQuantity
 
         return {
           ...product,
           original_quantity: originalQuantity,
-          quantity: originalQuantity,
+          quantity: initialQuantity,
           selected: false,
           attendee_id: attendee.id,
           original_price: product.price,
@@ -138,12 +156,20 @@ function applyCartSelections(
       if (cartQuantity === undefined) return product
 
       const isDayPass = product.duration_type === "day"
+      if (isDayPass) {
+        return {
+          ...product,
+          selected: true,
+          quantity: (product.original_quantity ?? 0) + cartQuantity,
+        }
+      }
+      // Non-day: multi-unit products restore the persisted quantity;
+      // single-unit products stay at the legacy quantity of 1.
+      const isMultiUnit = supportsQuantitySelector(product.max_quantity)
       return {
         ...product,
         selected: true,
-        quantity: isDayPass
-          ? (product.original_quantity ?? 0) + cartQuantity
-          : product.quantity,
+        quantity: isMultiUnit ? cartQuantity : product.quantity,
       }
     }),
   }))
@@ -188,22 +214,17 @@ function preserveSelections(
 
 const PassesProvider = ({
   children,
+  attendees,
   restoreFromCart = false,
 }: PassesProviderProps) => {
-  const { getAttendees } = useApplication()
   const { discountApplied } = useDiscount()
   const [attendeePasses, setAttendeePasses] = useState<AttendeePassState[]>([])
-
-  const attendees = useMemo(
-    () => sortAttendees(getAttendees()),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [getAttendees],
-  )
 
   const [isEditing, setIsEditing] = useState(false)
   const { products } = useGetPassesData()
   const { getCity } = useCityProvider()
   const city = getCity()
+  const checkoutPolicy = resolvePopupCheckoutPolicy(city)
   const cityId = city?.id ? String(city.id) : null
   const previousCityIdRef = useRef(cityId)
   const hasInitializedRef = useRef(false)
@@ -243,7 +264,11 @@ const PassesProvider = ({
   const toggleProduct = useCallback(
     (attendeeId: string, product: ProductsPass) => {
       if (!product) return
-      const strategy = getProductStrategy(product, isEditingRef.current)
+      const strategy = getProductStrategy(
+        product,
+        isEditingRef.current,
+        checkoutPolicy.checkoutMode,
+      )
       setAttendeePasses((current) =>
         strategy.handleSelection(
           current,
@@ -253,7 +278,7 @@ const PassesProvider = ({
         ),
       )
     },
-    [],
+    [checkoutPolicy.checkoutMode],
   )
 
   // Ref to read savedCartPasses inside init effect without it being a dep
@@ -284,6 +309,7 @@ const PassesProvider = ({
         products,
         discountValue,
         purchasesMap,
+        checkoutPolicy.checkoutMode,
       )
 
       // Apply cart selections in the same tick if already available (avoids extra render cycle)
@@ -309,6 +335,7 @@ const PassesProvider = ({
         products,
         discountValue,
         purchasesMap,
+        checkoutPolicy.checkoutMode,
       )
       setAttendeePasses((current) => preserveSelections(basePasses, current))
       return
@@ -316,7 +343,7 @@ const PassesProvider = ({
 
     // Discount-only change — recalculate prices without rebuilding structure
     if (discountChanged) {
-      const priceStrategy = getPriceStrategy()
+      const priceStrategy = getPriceStrategy(checkoutPolicy.checkoutMode)
       setAttendeePasses((current) =>
         current.map((attendee) => {
           const hasPatreonPurchased = attendee.products.some(
@@ -342,6 +369,7 @@ const PassesProvider = ({
     purchasesMap,
     discountApplied.discount_value,
     restoreFromCart,
+    checkoutPolicy.checkoutMode,
   ])
 
   // Cart restoration for late-arriving cart data (cart loads after initialization)

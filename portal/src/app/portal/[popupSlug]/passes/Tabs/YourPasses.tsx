@@ -1,6 +1,8 @@
 import { ArrowRight, FileText, Plus, Sparkles, Ticket } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 import { useState } from "react"
+import { useTranslation } from "react-i18next"
+import { TICKET_CATEGORY } from "@/checkout/popupCheckoutPolicy"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -22,6 +24,7 @@ interface YourPassesProps {
 }
 
 const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
+  const { t } = useTranslation()
   const { attendeePasses: attendees, products } = usePassesProvider()
   const mainAttendee = attendees.find((a) => a.category === "main")
   const specialProduct = mainAttendee?.products.find(
@@ -43,7 +46,7 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
   )
 
   const mainTickets = products.filter(
-    (p) => p.category === "ticket" && p.attendee_category === "main",
+    (p) => p.category === TICKET_CATEGORY && p.attendee_category === "main",
   )
   const minPrice =
     mainTickets.length > 0 ? Math.min(...mainTickets.map((p) => p.price)) : null
@@ -65,13 +68,12 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
       {/* Heading with Ticket Icon */}
       <div className="flex flex-col gap-2 max-w-3xl">
         <div className="flex items-center gap-3">
-          <Ticket className="w-6 h-6 text-gray-700" />
-          <h1 className="text-3xl font-bold tracking-tight">Your Passes</h1>
+          <Ticket className="w-6 h-6 text-pass-text" />
+          <h1 className="text-3xl font-bold tracking-tight text-pass-title">
+            {t("passes.your_passes")}
+          </h1>
         </div>
-        <p className="text-muted-foreground/75">
-          View and manage your passes here. Need to make changes? You can switch
-          your week closer to the event to match your plans!
-        </p>
+        <p className="text-pass-text">{t("passes.your_passes_description")}</p>
 
         {/* Inline Text Links */}
         <div className="flex flex-wrap items-center gap-3 text-sm mt-2">
@@ -83,7 +85,7 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
                   "flex items-center gap-1.5 transition-colors whitespace-nowrap group",
                   hasSpouse
                     ? "text-gray-300 cursor-not-allowed"
-                    : "text-gray-500 hover:text-gray-900",
+                    : "text-pass-text hover:text-pass-title",
                 )}
                 onClick={() => !hasSpouse && handleOpenModal("spouse")}
                 disabled={!applicationAttendees.length || hasSpouse}
@@ -92,13 +94,13 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
                   className={cn(
                     "p-0.5 rounded-full transition-colors",
                     hasSpouse
-                      ? "bg-gray-100"
-                      : "bg-gray-100 group-hover:bg-gray-200",
+                      ? "bg-muted"
+                      : "bg-muted group-hover:bg-muted",
                   )}
                 >
                   <Plus className="w-3 h-3" />
                 </div>
-                <span>Add spouse</span>
+                <span>{t("passes.add_spouse")}</span>
               </button>
               <span className="text-gray-300">|</span>
             </>
@@ -107,14 +109,14 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
             <>
               <button
                 type="button"
-                className="flex items-center gap-1.5 text-gray-500 hover:text-gray-900 transition-colors whitespace-nowrap group"
+                className="flex items-center gap-1.5 text-pass-text hover:text-pass-title transition-colors whitespace-nowrap group"
                 onClick={() => handleOpenModal("kid")}
                 disabled={!applicationAttendees.length}
               >
-                <div className="bg-gray-100 p-0.5 rounded-full group-hover:bg-gray-200 transition-colors">
+                <div className="bg-muted p-0.5 rounded-full group-hover:bg-muted transition-colors">
                   <Plus className="w-3 h-3" />
                 </div>
-                <span>Add children</span>
+                <span>{t("passes.add_children")}</span>
               </button>
               <span className="text-gray-300">|</span>
             </>
@@ -122,11 +124,11 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
           {city?.invoice_company_name && (
             <button
               type="button"
-              className="flex items-center gap-1.5 text-gray-500 hover:text-gray-900 transition-colors whitespace-nowrap"
+              className="flex items-center gap-1.5 text-pass-text hover:text-pass-title transition-colors whitespace-nowrap"
               onClick={() => setIsInvoiceModalOpen(true)}
             >
               <FileText className="w-3.5 h-3.5" />
-              <span>View invoices</span>
+              <span>{t("passes.view_invoices")}</span>
             </button>
           )}
         </div>
@@ -176,20 +178,24 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
             />
             <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/10 via-transparent to-purple-600/10" />
 
+            {/* Hero CTA sits on a fixed dark gradient (lines above) that is
+                intentional brand art, not derived from the theme. Text and
+                the pill button stay on literal white/neutral so contrast
+                holds regardless of the popup's light/dark mode. */}
             <div className="relative z-10 p-6">
               <div className="flex items-center justify-between gap-5">
                 <div className="flex-1 min-w-0">
                   <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm px-2.5 py-1 rounded-full mb-3">
                     <Sparkles className="w-3.5 h-3.5 text-yellow-400" />
                     <span className="text-xs text-white/90 font-medium">
-                      100+ people already registered
+                      {t("passes.people_registered")}
                     </span>
                   </div>
                   <h3 className="text-white font-bold text-2xl">
-                    Your adventure awaits
+                    {t("passes.adventure_awaits")}
                   </h3>
                   <p className="text-gray-300 text-sm mt-1 max-w-md">
-                    Join the village for people building a brighter future.
+                    {t("passes.village_subtitle")}
                   </p>
                 </div>
                 <div className="flex flex-col gap-1.5 flex-shrink-0">
@@ -197,12 +203,14 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
                     onClick={onSwitchToBuy}
                     className="flex items-center justify-center gap-2 bg-white hover:bg-gray-100 text-gray-900 px-8 py-4 h-auto rounded-xl text-base font-bold transition-all shadow-xl whitespace-nowrap active:scale-95"
                   >
-                    Get Your Pass
+                    {t("passes.get_your_pass")}
                     <ArrowRight className="w-5 h-5" />
                   </Button>
                   {minPrice != null && (
-                    <p className="text-center text-gray-400 text-xs">
-                      Starting at {formatCurrency(minPrice)}
+                    <p className="text-center text-gray-300 text-xs">
+                      {t("passes.starting_at", {
+                        price: formatCurrency(minPrice),
+                      })}
                     </p>
                   )}
                 </div>
@@ -210,19 +218,21 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
             </div>
           </div>
         ) : (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
+          <div className="bg-card rounded-2xl shadow-sm border border-border p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-900 font-medium">Need more passes?</p>
-                <p className="text-gray-500 text-xs mt-0.5">
-                  Add family members or more weeks
+                <p className="text-pass-title font-medium">
+                  {t("passes.need_more_passes")}
+                </p>
+                <p className="text-pass-text text-xs mt-0.5">
+                  {t("passes.add_family_or_weeks")}
                 </p>
               </div>
               <Button
                 onClick={onSwitchToBuy}
-                className="flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-all whitespace-nowrap active:scale-95"
+                className="flex items-center gap-2 bg-foreground hover:bg-foreground text-background px-5 py-2.5 rounded-lg text-sm font-semibold transition-all whitespace-nowrap active:scale-95"
               >
-                Buy Passes
+                {t("passes.buy_passes")}
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </div>
@@ -230,7 +240,9 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
         )}
       </div>
 
-      {/* Mobile Sticky Footer */}
+      {/* Mobile Sticky Footer — same fixed-dark treatment as the desktop
+          hero above: the footer stays dark regardless of theme, so its
+          text and the pill button use literal white/neutral. */}
       <div className="fixed bottom-0 left-0 right-0 z-30 lg:hidden">
         {!hasPurchasedPasses ? (
           <div className="bg-gray-900 border-t border-gray-800 px-4 py-3">
@@ -239,38 +251,38 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
                 <div className="flex items-center gap-1.5 mb-0.5">
                   <Sparkles className="w-3 h-3 text-yellow-400" />
                   <span className="text-xs text-gray-400 font-medium">
-                    500+ builders registered
+                    {t("passes.builders_registered")}
                   </span>
                 </div>
                 <p className="text-white font-semibold text-sm">
-                  Your adventure awaits
+                  {t("passes.adventure_awaits")}
                 </p>
               </div>
               <Button
                 onClick={onSwitchToBuy}
                 className="flex items-center justify-center gap-1.5 bg-white hover:bg-gray-100 text-gray-900 px-5 py-2.5 rounded-xl text-sm font-bold transition-all shadow-lg whitespace-nowrap active:scale-95"
               >
-                Buy
+                {t("passes.buy")}
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </div>
           </div>
         ) : (
-          <div className="bg-white border-t border-gray-200 px-4 py-3">
+          <div className="bg-card border-t border-border px-4 py-3">
             <div className="flex items-center justify-between gap-3">
               <div className="flex-1 min-w-0">
-                <p className="text-gray-900 font-semibold text-sm">
-                  Need more passes?
+                <p className="text-pass-title font-semibold text-sm">
+                  {t("passes.need_more_passes")}
                 </p>
-                <p className="text-gray-500 text-xs mt-0.5">
-                  Add family members or more weeks
+                <p className="text-pass-text text-xs mt-0.5">
+                  {t("passes.add_family_or_weeks")}
                 </p>
               </div>
               <Button
                 onClick={onSwitchToBuy}
-                className="flex items-center justify-center gap-1.5 bg-gray-900 hover:bg-gray-800 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-all shadow-lg whitespace-nowrap active:scale-95"
+                className="flex items-center justify-center gap-1.5 bg-foreground hover:bg-foreground text-background px-5 py-2.5 rounded-xl text-sm font-bold transition-all shadow-lg whitespace-nowrap active:scale-95"
               >
-                Buy
+                {t("passes.buy")}
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </div>

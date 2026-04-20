@@ -1,7 +1,6 @@
 import uuid
 from typing import TYPE_CHECKING
 
-import sqlalchemy as sa
 from sqlalchemy import Index, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlmodel import Column, Field, Relationship
@@ -22,6 +21,8 @@ if TYPE_CHECKING:
     from app.api.popup.models import Popups
     from app.api.product.models import Products
     from app.api.tenant.credential_models import TenantCredentials
+    from app.api.ticketing_step.models import TicketingSteps
+    from app.api.translation.models import Translations
     from app.api.user.models import Users
 
 
@@ -75,5 +76,13 @@ class Tenants(TenantBase, table=True):
         back_populates="tenant", cascade_delete=True
     )
     base_field_configs: list["BaseFieldConfigs"] = Relationship(
+        back_populates="tenant", cascade_delete=True
+    )
+    ticketing_steps: list["TicketingSteps"] = Relationship(
+        back_populates="tenant", cascade_delete=True
+    )
+
+    # Translations
+    translations: list["Translations"] = Relationship(
         back_populates="tenant", cascade_delete=True
     )

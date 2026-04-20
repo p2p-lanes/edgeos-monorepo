@@ -1,6 +1,7 @@
 import { ChevronRight } from "lucide-react"
 import { usePathname, useRouter } from "next/navigation"
 import { Fragment } from "react"
+import { LanguageSwitcher } from "@/components/common/LanguageSwitcher"
 import { useCityProvider } from "@/providers/cityProvider"
 import {
   Breadcrumb,
@@ -26,11 +27,13 @@ const HeaderBar = () => {
   }
 
   const pathSegments = pathname.split("/").filter(Boolean).slice(2)
+  const fallbackSegments =
+    city?.sale_type === "direct" ? ["checkout"] : ["application"]
   const pathsToDisplay =
-    pathSegments.length > 0 ? pathSegments : ["application"]
+    pathSegments.length > 0 ? pathSegments : fallbackSegments
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-4 border-b bg-white px-6">
+    <header className="flex h-14 shrink-0 items-center gap-4 border-b bg-sidebar px-6 text-nav-text">
       <SidebarTrigger />
       <Breadcrumb>
         <BreadcrumbList>
@@ -56,8 +59,9 @@ const HeaderBar = () => {
           ))}
         </BreadcrumbList>
       </Breadcrumb>
-      <div className="ml-auto">
+      <div className="ml-auto flex items-center gap-2">
         <CartBadge />
+        <LanguageSwitcher />
       </div>
     </header>
   )

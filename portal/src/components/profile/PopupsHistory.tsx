@@ -1,5 +1,6 @@
 import { Calendar, Clock, MapPin } from "lucide-react"
 import Image from "next/image"
+import { useTranslation } from "react-i18next"
 import type { PopupPublic } from "@/client"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
@@ -22,6 +23,7 @@ interface PopupWithApplicationStatus extends LegacyProfilePopup {
 }
 
 const PopupsHistory = ({ popups }: { popups: LegacyProfilePopup[] }) => {
+  const { t } = useTranslation()
   const { applications } = useApplication()
   const { getPopups } = useCityProvider()
   const allPopups = getPopups()
@@ -40,33 +42,45 @@ const PopupsHistory = ({ popups }: { popups: LegacyProfilePopup[] }) => {
     const end = new Date(endDate)
 
     if (now > end) {
-      return { label: "Completed", className: "bg-green-100 text-green-800" }
+      return {
+        label: t("status.completed"),
+        className: "bg-green-100 text-green-800",
+      }
     }
     if (now >= start && now <= end) {
-      return { label: "In progress", className: "bg-blue-100 text-blue-800" }
+      return {
+        label: t("status.in_progress"),
+        className: "bg-primary/20 text-blue-800",
+      }
     }
-    return { label: "Upcoming", className: "bg-gray-100 text-gray-800" }
+    return {
+      label: t("status.upcoming"),
+      className: "bg-muted text-foreground",
+    }
   }
 
   const getApplicationStatusBadge = (status?: string) => {
     switch (status) {
       case "accepted":
         return {
-          label: "Application Approved",
+          label: t("status.application_approved"),
           className: "bg-green-100 text-green-800",
         }
       case "in review":
         return {
-          label: "Application Submitted",
-          className: "bg-blue-100 text-blue-800",
+          label: t("status.application_submitted"),
+          className: "bg-primary/20 text-blue-800",
         }
       case "draft":
         return {
-          label: "Application Draft",
-          className: "bg-gray-100 text-gray-800",
+          label: t("status.application_draft"),
+          className: "bg-muted text-foreground",
         }
       default:
-        return { label: "Upcoming", className: "bg-gray-100 text-gray-800" }
+        return {
+          label: t("status.upcoming"),
+          className: "bg-muted text-foreground",
+        }
     }
   }
 
@@ -117,25 +131,29 @@ const PopupsHistory = ({ popups }: { popups: LegacyProfilePopup[] }) => {
   return (
     <Card className="p-6">
       <div className="mb-4">
-        <h2 className="text-xl font-semibold text-gray-900">Pop-Ups</h2>
-        <p className="text-sm text-gray-600">Your upcoming and past Pop-Ups</p>
+        <h2 className="text-xl font-semibold text-foreground">
+          {t("profile.popups_title")}
+        </h2>
+        <p className="text-sm text-muted-foreground">{t("profile.popups_subtitle")}</p>
       </div>
 
       <div className="py-2">
         <div className="space-y-6">
           {popups.length === 0 && (
-            <div className="text-center text-gray-600 p-4">No events found</div>
+            <div className="text-center text-muted-foreground p-4">
+              {t("profile.no_events")}
+            </div>
           )}
           <div className="flex items-center gap-2 mb-4">
             <Calendar className="w-6 h-6 text-foreground" />
             <h4 className="text-md font-semibold text-foreground">
-              Upcoming Pop-Ups
+              {t("profile.upcoming_popups")}
             </h4>
           </div>
           <div className="space-y-4">
             {upcomingPopupsFromApplications.length === 0 && (
-              <div className="text-center text-gray-600 p-4">
-                No upcoming events found
+              <div className="text-center text-muted-foreground p-4">
+                {t("profile.no_upcoming_events")}
               </div>
             )}
             {upcomingPopupsFromApplications.map((popup, _index) => (
@@ -157,7 +175,7 @@ const PopupsHistory = ({ popups }: { popups: LegacyProfilePopup[] }) => {
                   <div className="flex items-center gap-4 text-xs text-[#64748b]">
                     {popup.location && (
                       <div className="flex items-center gap-1">
-                        <MapPin className="w-4 h-4 text-black" />
+                        <MapPin className="w-4 h-4 text-foreground" />
                         <span className="text-sm">
                           {popup.location?.charAt(0).toUpperCase() +
                             popup.location?.slice(1)}
@@ -166,7 +184,7 @@ const PopupsHistory = ({ popups }: { popups: LegacyProfilePopup[] }) => {
                     )}
 
                     <div className="flex items-center gap-1">
-                      <Calendar className="w-4 h-4 text-black" />
+                      <Calendar className="w-4 h-4 text-foreground" />
                       <span className="text-sm">
                         {formatDate(popup.start_date)} -{" "}
                         {formatDate(popup.end_date)}
@@ -183,19 +201,19 @@ const PopupsHistory = ({ popups }: { popups: LegacyProfilePopup[] }) => {
             ))}
           </div>
 
-          <div className="h-px w-full bg-gray-200" />
+          <div className="h-px w-full bg-muted" />
 
           <div>
             <div className="flex items-center gap-2 mb-4">
               <Clock className="w-6 h-6 text-foreground" />
               <h4 className="text-md font-semibold text-foreground">
-                Past Pop-Ups
+                {t("profile.past_popups")}
               </h4>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {pastPopups.length === 0 && (
-                <div className="text-center text-gray-600 p-4 col-span-3">
-                  No past events found
+                <div className="text-center text-muted-foreground p-4 col-span-3">
+                  {t("profile.no_past_events")}
                 </div>
               )}
               {pastPopups.map((popup) => (
@@ -213,17 +231,17 @@ const PopupsHistory = ({ popups }: { popups: LegacyProfilePopup[] }) => {
                     </div> */}
                   </div>
                   <div>
-                    <h5 className="text-lg font-semibold text-black mb-2">
+                    <h5 className="text-lg font-semibold text-foreground mb-2">
                       {popup.popup_name}
                     </h5>
                     <div className="space-y-2 text-xs text-[#64748b] mb-4">
                       <div className="flex items-center gap-2">
-                        <MapPin className="w-4 h-4 text-black" />
+                        <MapPin className="w-4 h-4 text-foreground" />
                         <span className="text-sm">{popup.location}</span>
                       </div>
 
                       <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-black" />
+                        <Calendar className="w-4 h-4 text-foreground" />
                         <span className="text-sm">
                           {formatDate(popup.start_date)} -{" "}
                           {formatDate(popup.end_date)}
@@ -231,9 +249,11 @@ const PopupsHistory = ({ popups }: { popups: LegacyProfilePopup[] }) => {
                       </div>
 
                       <div className="flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-black" />
+                        <Clock className="w-4 h-4 text-foreground" />
                         <span className="text-sm">
-                          {popup.total_days} days attended
+                          {t("profile.days_attended", {
+                            count: popup.total_days,
+                          })}
                         </span>
                       </div>
                     </div>

@@ -1,14 +1,20 @@
 "use client"
 
 import { useQueryClient } from "@tanstack/react-query"
+import { useParams } from "next/navigation"
 import { useCallback, useEffect, useState } from "react"
 import { toast } from "sonner"
+import type { CheckoutMode } from "@/checkout/popupCheckoutPolicy"
 import { PaymentsService } from "@/client"
-import { markPurchasePending } from "@/hooks/usePaymentRedirect"
+import {
+  markPurchasePending,
+  savePendingPaymentRedirectState,
+} from "@/hooks/usePaymentRedirect"
 import { queryKeys } from "@/lib/query-keys"
 import type { AttendeePassState } from "@/types/Attendee"
 import type {
   CheckoutStep,
+  SelectedDynamicItem,
   SelectedHousingItem,
   SelectedMerchItem,
   SelectedPassItem,
@@ -20,11 +26,13 @@ interface UsePaymentSubmitParams {
   applicationId: string | undefined
   popupId: string | null
   appCredit: string | number | null | undefined
+  checkoutMode: CheckoutMode
   attendeePasses: AttendeePassState[]
   selectedPasses: SelectedPassItem[]
   housing: SelectedHousingItem | null
   merch: SelectedMerchItem[]
   patron: SelectedPatronItem | null
+  dynamicItems: Record<string, SelectedDynamicItem[]>
   promoCode: string
   promoCodeValid: boolean
   insurance: boolean
@@ -45,11 +53,13 @@ export function usePaymentSubmit({
   applicationId,
   popupId,
   appCredit,
+  checkoutMode,
   attendeePasses,
   selectedPasses,
   housing,
   merch,
   patron,
+  dynamicItems,
   promoCode,
   promoCodeValid,
   insurance,
@@ -61,6 +71,7 @@ export function usePaymentSubmit({
   paymentCompleteRef,
 }: UsePaymentSubmitParams) {
   const queryClient = useQueryClient()
+  const params = useParams<{ popupSlug: string }>()
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Reset isSubmitting when page is restored from bfcache
@@ -76,7 +87,12 @@ export function usePaymentSubmit({
   }, [])
 
   const submitPayment = useCallback(async (): Promise<PaymentSubmitResult> => {
-    if (!applicationId) {
+    // Direct-sale flow: no application_id, but we do have a popup_id. We POST
+    // to /payments/direct with a minimal product list (no housing/merch/etc.
+    // in Feature 1 scope — those extras come with checkout_mode work).
+    const isDirectSale = !applicationId && !!popupId
+
+    if (!isDirectSale && !applicationId) {
       return { success: false, error: "Application not available" }
     }
 
@@ -100,27 +116,46 @@ export function usePaymentSubmit({
           housing,
           merch,
           patron,
+          dynamicItems,
           isEditing,
           appCredit,
+          checkoutMode,
         },
       )
 
-      const result = await PaymentsService.createMyPayment({
-        requestBody: {
-          application_id: applicationId,
-          products: productsToSend,
-          coupon_code: promoCodeValid ? promoCode : undefined,
-          edit_passes: isEditing || isMonthUpgrade ? true : undefined,
-          insurance: insurance || undefined,
-        },
-      })
+      const result = isDirectSale
+        ? await PaymentsService.createDirectPayment({
+            requestBody: {
+              popup_id: popupId!,
+              products: productsToSend.map((p) => ({
+                product_id: p.product_id,
+                quantity: p.quantity,
+              })),
+            },
+          })
+        : await PaymentsService.createMyPayment({
+            requestBody: {
+              application_id: applicationId!,
+              products: productsToSend,
+              coupon_code: promoCodeValid ? promoCode : undefined,
+              edit_passes: isEditing || isMonthUpgrade ? true : undefined,
+              insurance: insurance || undefined,
+            },
+          })
 
       const data = result as {
+        id?: string
         status?: string
         checkout_url?: string | null
       }
 
       if (data.status === "pending" && data.checkout_url) {
+        if (isDirectSale && data.id && params.popupSlug) {
+          savePendingPaymentRedirectState({
+            paymentId: data.id,
+            popupSlug: params.popupSlug,
+          })
+        }
         markPurchasePending()
         window.location.href = data.checkout_url
         return { success: true }
@@ -169,10 +204,12 @@ export function usePaymentSubmit({
   }, [
     applicationId,
     appCredit,
+    checkoutMode,
     selectedPasses,
     merch,
     housing,
     patron,
+    dynamicItems,
     promoCodeValid,
     promoCode,
     insurance,
@@ -185,6 +222,7 @@ export function usePaymentSubmit({
     setPromoError,
     paymentCompleteRef,
     popupId,
+    params.popupSlug,
   ])
 
   return { submitPayment, isSubmitting }

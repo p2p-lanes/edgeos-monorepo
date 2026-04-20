@@ -26,7 +26,7 @@ function useUnsavedChangesBlocker(
   }, [isDirty])
 
   const blocker = useBlocker({
-    shouldBlockFn,
+    shouldBlockFn: () => shouldBlockFn() && unsavedChangesRef.current,
     enableBeforeUnload: () => isDirty,
     disabled: !isDirty,
     withResolver: true,
@@ -50,7 +50,6 @@ function useUnsavedChangesBlocker(
 export function useUnsavedChanges(form: { store: any }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const isDirty = useStore(form.store, (s: any) => s.isDirty as boolean)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return useUnsavedChangesBlocker(
     isDirty,
     () => form.store.state.isDirty as boolean,

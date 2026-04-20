@@ -1,5 +1,6 @@
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { useCallback } from "react"
+import { useTranslation } from "react-i18next"
 import useResources from "@/hooks/useResources"
 import type { Resource } from "@/types/resources"
 import { Separator } from "../ui/separator"
@@ -29,7 +30,12 @@ const ResourceItem: React.FC<{
   resource: Resource
   level?: number
   onNavigate: (path: string) => void
-}> = ({ resource, level = 0, onNavigate }) => {
+  pathname: string
+}> = ({ resource, level = 0, onNavigate, pathname }) => {
+  const { t } = useTranslation()
+
+  const isActive = resource.path === pathname
+
   return (
     <SidebarMenuItem>
       <Tooltip>
@@ -39,13 +45,15 @@ const ResourceItem: React.FC<{
             level={level}
             color={statusColor(resource.value as string)}
             onNavigate={onNavigate}
+            isActive={isActive}
           />
         </TooltipTrigger>
         <TooltipContent
           side="right"
           className="hidden group-data-[collapsible=icon]:block"
         >
-          {resource.name} {resource.status === "soon" ? "(Coming Soon)" : ""}
+          {resource.name}{" "}
+          {resource.status === "soon" ? t("sidebar.coming_soon") : ""}
         </TooltipContent>
       </Tooltip>
 
@@ -57,6 +65,7 @@ const ResourceItem: React.FC<{
               resource={child}
               level={level + 1}
               onNavigate={onNavigate}
+              pathname={pathname}
             />
           ))}
         </SidebarMenuSub>
@@ -66,8 +75,10 @@ const ResourceItem: React.FC<{
 }
 
 const ResourcesMenu = () => {
+  const { t } = useTranslation()
   const { resources } = useResources()
   const router = useRouter()
+  const pathname = usePathname()
 
   const handleNavigate = useCallback(
     (path: string) => {
@@ -79,7 +90,7 @@ const ResourcesMenu = () => {
   return (
     <SidebarContent>
       <SidebarGroup>
-        <SidebarGroupLabel>Your Participation</SidebarGroupLabel>
+        <SidebarGroupLabel>{t("sidebar.your_participation")}</SidebarGroupLabel>
         <SidebarGroupContent>
           <SidebarMenu>
             {resources
@@ -89,6 +100,7 @@ const ResourcesMenu = () => {
                   key={resource.name}
                   resource={resource}
                   onNavigate={handleNavigate}
+                  pathname={pathname}
                 />
               ))}
             <Separator className="my-4" />

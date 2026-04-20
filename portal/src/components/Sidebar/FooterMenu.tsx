@@ -1,6 +1,7 @@
 import { Github, Star, User } from "lucide-react"
 import Link from "next/link"
 import { useEffect, useState } from "react"
+import { useTranslation } from "react-i18next"
 import {
   SidebarFooter,
   SidebarMenu,
@@ -24,6 +25,7 @@ async function getGitHubStars() {
 }
 
 const FooterMenu = () => {
+  const { t } = useTranslation()
   const [stars, setStars] = useState<number | null>(null)
 
   useEffect(() => {
@@ -42,8 +44,8 @@ const FooterMenu = () => {
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
               <a href={REPO_URL} target="_blank" rel="noopener noreferrer">
-                <Github className="size-4 text-muted-foreground" />
-                <span className="ml-3 text-xs font-semibold text-muted-foreground group-data-[collapsible=icon]:hidden">
+                <Github className="size-4 text-nav-text-secondary" />
+                <span className="ml-3 text-xs font-semibold text-nav-text-secondary group-data-[collapsible=icon]:hidden">
                   EdgeOS
                 </span>
                 <div className="ml-auto flex items-center gap-1 group-data-[collapsible=icon]:hidden">
@@ -58,10 +60,12 @@ const FooterMenu = () => {
           <SidebarMenuButton asChild>
             <Link
               href="/portal/profile"
-              className="mb-4 mt-4 text-muted-foreground"
+              className="mb-4 mt-4 text-nav-text-secondary"
             >
               <User className="size-4" />
-              <span className="text-sm font-medium">My Profile</span>
+              <span className="text-sm font-medium">
+                {t("profile.my_profile")}
+              </span>
             </Link>
           </SidebarMenuButton>
         </SidebarMenuItem>

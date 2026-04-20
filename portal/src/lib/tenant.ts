@@ -1,6 +1,16 @@
 import type { TenantPublic } from "@/client"
 
-export function extractSubdomain(hostname: string): string | null {
+export function extractSubdomain(
+  hostname: string,
+  searchParams?: string | null,
+): string | null {
+  // Check for ?tenant= query param (for Vercel preview deployments)
+  if (searchParams) {
+    const params = new URLSearchParams(searchParams)
+    const tenantParam = params.get("tenant")
+    if (tenantParam) return tenantParam
+  }
+
   const parts = hostname.split(".")
   if (parts.length >= 2 && parts[0] !== "www") {
     return parts[0]

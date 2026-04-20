@@ -8,7 +8,7 @@ export default function Quote() {
 
   return (
     <div
-      className="hidden md:flex md:w-1/2 relative p-8 items-center justify-center bg-gray-200"
+      className="hidden md:flex md:w-1/2 relative p-8 items-center justify-center bg-muted"
       style={
         tenant?.image_url
           ? {
@@ -30,10 +30,10 @@ export default function Quote() {
             priority
           />
         ) : (
-          <div className="w-[100px] h-[40px] rounded bg-gray-300/50 flex items-center justify-center">
+          <div className="w-[100px] h-[40px] rounded bg-muted/50 flex items-center justify-center">
             <svg
               aria-hidden="true"
-              className="size-6 text-gray-400"
+              className="size-6 text-muted-foreground"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -51,7 +51,7 @@ export default function Quote() {
       {!tenant?.image_url && (
         <svg
           aria-hidden="true"
-          className="size-24 text-gray-400"
+          className="size-24 text-muted-foreground"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"

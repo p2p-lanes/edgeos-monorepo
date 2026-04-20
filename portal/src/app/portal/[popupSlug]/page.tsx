@@ -1,6 +1,8 @@
 "use client"
 
 import { useRouter } from "next/navigation"
+import BuyPassesContent from "@/app/portal/[popupSlug]/passes/buy/components/BuyPassesContent"
+import { resolvePopupCheckoutPolicy } from "@/checkout/popupCheckoutPolicy"
 import type { CompanionParticipation } from "@/client"
 import { EventCard } from "@/components/Card/EventCard"
 import type { EventStatus } from "@/components/Card/EventProgressBar"
@@ -15,8 +17,13 @@ export default function Home() {
   const router = useRouter()
   const city = getCity()
   const relevantApplication = getRelevantApplication()
+  const policy = resolvePopupCheckoutPolicy(city)
 
   if (!city) return null
+
+  if (policy.saleType === "direct") {
+    return <BuyPassesContent />
+  }
 
   if (participation?.type === "companion") {
     return (

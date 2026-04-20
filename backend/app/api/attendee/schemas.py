@@ -20,7 +20,10 @@ class AttendeeBase(SQLModel):
     """Base attendee schema."""
 
     tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
-    application_id: uuid.UUID = Field(foreign_key="applications.id", index=True)
+    application_id: uuid.UUID | None = Field(
+        default=None, foreign_key="applications.id", index=True, nullable=True
+    )
+    popup_id: uuid.UUID = Field(foreign_key="popups.id", index=True)
     human_id: uuid.UUID | None = Field(
         default=None, foreign_key="humans.id", index=True, nullable=True
     )

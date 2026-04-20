@@ -80,7 +80,11 @@ class SimpleFIClient:
 
         with httpx.Client(timeout=self.timeout) as client:
             response = client.request(method, url, json=json, headers=headers)
-            logger.info("SimpleFI API response status: {}, body: {}", response.status_code, response.text)
+            logger.info(
+                "SimpleFI API response status: {}, body: {}",
+                response.status_code,
+                response.text,
+            )
             response.raise_for_status()
             return response.json()
 
@@ -89,6 +93,7 @@ class SimpleFIClient:
         amount: Decimal,
         popup_slug: str,
         tenant_slug: str,
+        currency: str = "USD",
         reference: dict[str, Any] | None = None,
         memo: str = "EdgeOS Payment",
         portal_base_override: str | None = None,
@@ -99,10 +104,11 @@ class SimpleFIClient:
         Create a payment request in SimpleFI.
 
         Args:
-            amount: The payment amount in USD
+            amount: The payment amount
             popup_slug: The popup slug for building portal redirect URLs
             tenant_slug: The tenant slug for the portal subdomain (used as
                 fallback when ``portal_base_override`` is not provided)
+            currency: The payment currency code (e.g. USD, ARS, EUR)
             reference: Optional reference data (application_id, email, products)
             portal_base_override: If provided, used as the portal base URL
                 instead of the default subdomain derivation.  Pass
@@ -121,12 +127,15 @@ class SimpleFIClient:
         )
 
         portal_base = portal_base_override or self._build_tenant_portal_url(tenant_slug)
-        success_url = success_path or f"{portal_base}/portal/{popup_slug}/passes/buy?checkout=success"
+        success_url = (
+            success_path
+            or f"{portal_base}/portal/{popup_slug}/passes/buy?checkout=success"
+        )
         cancel_url = cancel_path or f"{portal_base}/portal/{popup_slug}/passes/buy"
 
         body = {
             "amount": float(amount),
-            "currency": "USD",
+            "currency": currency,
             "reference": reference or {},
             "memo": memo,
             "notification_url": notification_url,
@@ -145,7 +154,9 @@ class SimpleFIClient:
             checkout_url=data["checkout_v2_url"],
         )
 
-    def get_payment_request_status(self, payment_request_id: str) -> SimpleFIPaymentRequestStatus:
+    def get_payment_request_status(
+        self, payment_request_id: str
+    ) -> SimpleFIPaymentRequestStatus:
         """Fetch the latest status for an existing SimpleFI payment request."""
 
         data = self._make_request("GET", f"/payment_requests/{payment_request_id}")

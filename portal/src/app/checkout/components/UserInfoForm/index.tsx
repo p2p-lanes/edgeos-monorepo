@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import type { GroupPublic } from "@/client"
+import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -19,29 +19,27 @@ import EmailVerification from "./EmailVerification"
 import PersonalInfoForm from "./PersonalInfoForm"
 
 interface UserInfoFormProps {
-  group: GroupPublic | null
-  isLoading: boolean
-  error: string | null
+  popupId: string
+  popupName: string
   onSubmit: (data: FormDataProps) => Promise<void>
   isSubmitting: boolean
 }
 
 const UserInfoForm = ({
-  group,
+  popupId,
+  popupName,
   onSubmit,
   isSubmitting,
-  isLoading: _isLoading,
-  error,
 }: UserInfoFormProps) => {
+  const { t } = useTranslation()
   const [_isAutoFilled, setIsAutoFilled] = useState(false)
 
-  // Get application data based on group's popup_id
   const {
     applicationData,
     isLoading: isLoadingApplication,
     refreshApplicationData,
   } = useApplicationData({
-    groupPopupCityId: group?.popup_id,
+    groupPopupCityId: popupId,
   })
 
   const {
@@ -83,33 +81,21 @@ const UserInfoForm = ({
   } = useEmailVerification({
     email: formData.email,
     onVerificationSuccess: (_token) => {
-      // After successful email verification, set the email as verified
       setEmailVerified(formData.email)
-
-      // Then, refresh application data to check if there's existing data for this email
       refreshApplicationData()
     },
   })
 
-  // Función para cambiar el email desde cualquier parte del formulario
   const handleEmailChange = () => {
-    // Resetear estado de verificación de email
     handleChangeEmail()
-
-    // Resetear datos del formulario
     resetForm()
-
-    // Resetear estado de autocompletado
     setIsAutoFilled(false)
-
-    // Eliminar token si existe
     window?.localStorage?.removeItem("token")
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // If not verified and has valid email, check format
     if (
       !formData.email_verified &&
       formData.email &&
@@ -117,30 +103,25 @@ const UserInfoForm = ({
     ) {
       setErrors((prev) => ({
         ...prev,
-        email: "Invalid email",
+        email: t("auth.invalid_email"),
       }))
       return
     }
 
-    // If not verified but has valid email, send code or verify code
     if (!formData.email_verified) {
       if (!showVerificationInput) {
-        // Send code
         await handleSendVerificationCode()
       } else {
-        // Verify code
         await handleVerifyCode()
       }
       return
     }
 
-    // If verified, validate and submit form
     if (validateForm()) {
       try {
         await onSubmit(formData)
       } catch (error: any) {
         console.error("Error submitting form:", error)
-        // Set general or specific error based on response
         if (error.response?.data?.message) {
           setErrors((prev) => ({
             ...prev,
@@ -149,36 +130,37 @@ const UserInfoForm = ({
         } else {
           setErrors((prev) => ({
             ...prev,
-            general:
-              "An error occurred while submitting the form. Please try again.",
+            general: t("checkout.submit_error"),
           }))
         }
       }
     }
   }
 
-  // If there's a general error, show only the card with the error
-  if (errors.general || error) {
+  if (errors.general) {
     return (
       <Card className="max-w-lg mx-auto backdrop-blur bg-white/90">
         <CardHeader>
-          <CardTitle className="text-2xl font-bold mb-2">Checkout</CardTitle>
+          <CardTitle className="text-2xl font-bold mb-2">
+            {t("checkout.title")}
+          </CardTitle>
+          <CardDescription>{popupName}</CardDescription>
           <div className="mt-6 p-3 bg-red-100 border border-red-300 text-red-800 rounded-md">
-            {errors.general || error}
+            {errors.general}
           </div>
         </CardHeader>
       </Card>
     )
   }
 
-  // Show loading state while fetching application data
   if (isLoadingApplication) {
     return (
       <Card className="max-w-lg mx-auto backdrop-blur bg-white/90">
         <CardHeader>
           <CardTitle className="text-2xl font-bold mb-2">
-            Loading your information
+            {t("checkout.loading_info")}
           </CardTitle>
+          <CardDescription>{popupName}</CardDescription>
         </CardHeader>
         <CardContent className="flex justify-center py-6">
           <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500" />
@@ -190,23 +172,13 @@ const UserInfoForm = ({
   return (
     <Card className="max-w-lg mx-auto backdrop-blur bg-white/90">
       <CardHeader>
-        <CardTitle className="text-2xl font-bold">Express Checkout</CardTitle>
-        {group?.welcome_message && (
-          <CardDescription className="bg-green-100 text-green-800 p-2 rounded-md radius-lg">
-            {group.welcome_message}
-          </CardDescription>
-        )}
-        {group?.description && (
-          <CardDescription
-            className="prose prose-sm max-w-none"
-            // biome-ignore lint/security/noDangerouslySetInnerHtml: Rich text content from admin CMS
-            dangerouslySetInnerHTML={{ __html: group.description }}
-          />
-        )}
+        <CardTitle className="text-2xl font-bold">
+          {t("checkout.express_title")}
+        </CardTitle>
+        <CardDescription>{popupName}</CardDescription>
       </CardHeader>
       <form noValidate onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
-          {/* Email section - visible only when not verified */}
           {!formData.email_verified && (
             <EmailVerification
               email={formData.email}
@@ -224,7 +196,6 @@ const UserInfoForm = ({
             />
           )}
 
-          {/* Additional fields - visible only after email verification */}
           {formData.email_verified && (
             <PersonalInfoForm
               formData={formData}
@@ -249,12 +220,12 @@ const UserInfoForm = ({
             }
           >
             {isSubmitting
-              ? "Processing..."
+              ? t("common.processing")
               : formData.email_verified
-                ? "Continue"
+                ? t("common.continue")
                 : showVerificationInput
-                  ? "Verify Code"
-                  : "Send Code"}
+                  ? t("checkout.verify_code")
+                  : t("checkout.send_code")}
           </Button>
         </CardFooter>
       </form>

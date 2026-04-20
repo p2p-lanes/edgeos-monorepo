@@ -10,6 +10,7 @@
 # OS
 .DS_Store
 Thumbs.db
+*.stackdump
 
 # AI Agents & Tools
 .agents

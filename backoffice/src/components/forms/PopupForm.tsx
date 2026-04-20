@@ -12,26 +12,34 @@ import {
   Heart,
   Image,
   Key,
+  Languages,
+  Lock,
   Mail,
   MapPin,
   Scale,
+  ShieldCheck,
+  ShoppingCart,
   Ticket,
   Twitter,
 } from "lucide-react"
 import {
   ApprovalStrategiesService,
+  type CheckoutMode,
   type PopupAdmin,
   type PopupCreate,
   PopupsService,
   type PopupUpdate,
+  type SaleType,
 } from "@/client"
 import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
 import { FormErrorSummary } from "@/components/Common/FormErrorSummary"
 import { ApprovalStrategyForm } from "@/components/forms/ApprovalStrategyForm"
 import { ReviewersManager } from "@/components/forms/ReviewersManager"
+import { TranslationManager } from "@/components/translations/TranslationManager"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { DatePicker } from "@/components/ui/date-picker"
 import { ImageUpload } from "@/components/ui/image-upload"
 import {
@@ -68,6 +76,51 @@ const POPUP_STATUSES = [
   { value: "draft", label: "Draft" },
   { value: "active", label: "Active" },
 ] as const
+
+const AVAILABLE_LANGUAGES = [
+  { value: "en", label: "English" },
+  { value: "es", label: "Español" },
+  { value: "zh", label: "中文" },
+] as const
+
+const CURRENCIES = [
+  { value: "USD", label: "USD — US Dollar" },
+  { value: "ARS", label: "ARS — Argentine Peso" },
+  { value: "EUR", label: "EUR — Euro" },
+] as const
+
+const SALE_TYPE_COPY = {
+  application: {
+    label: "Popup / application flow",
+    description:
+      "People apply first. Use this when you need review workflows, companions, or applicant-specific options.",
+  },
+  direct: {
+    label: "Festival / direct ticketing",
+    description:
+      "People buy directly. Use this when tickets behave like a shared catalog without family-specific attendee pricing.",
+  },
+} as const
+
+function getSaleTypeGuidance(saleType: SaleType) {
+  if (saleType === "application") {
+    return {
+      title: "Buyers will apply first",
+      description:
+        "Applicants go through a structured review flow. You'll be able to configure approval strategies, reviewers, companions, and applicant-specific options.",
+    }
+  }
+
+  return {
+    title: "Buyers will purchase tickets directly",
+    description:
+      "Tickets behave like a shared catalog. No application flow, no reviewers — logged-in buyers pick from your product list and pay.",
+  }
+}
+
+function deriveCheckoutMode(saleType: SaleType): CheckoutMode {
+  return saleType === "direct" ? "simple_quantity" : "pass_system"
+}
 
 export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
   const navigate = useNavigate()
@@ -131,6 +184,11 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
       tagline: defaultValues?.tagline ?? "",
       location: defaultValues?.location ?? "",
       status: defaultValues?.status ?? "draft",
+      sale_type: (defaultValues?.sale_type ?? "application") as SaleType,
+      checkout_mode: (defaultValues?.checkout_mode ??
+        deriveCheckoutMode(
+          defaultValues?.sale_type ?? "application",
+        )) as CheckoutMode,
       start_date: formatDateForInput(defaultValues?.start_date),
       end_date: formatDateForInput(defaultValues?.end_date),
       allows_spouse: defaultValues?.allows_spouse ?? false,
@@ -145,6 +203,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
       icon_url: defaultValues?.icon_url ?? "",
       express_checkout_background:
         defaultValues?.express_checkout_background ?? "",
+      currency: defaultValues?.currency ?? "USD",
       web_url: defaultValues?.web_url ?? "",
       blog_url: defaultValues?.blog_url ?? "",
       twitter_url: defaultValues?.twitter_url ?? "",
@@ -153,6 +212,13 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
       invoice_company_name: defaultValues?.invoice_company_name ?? "",
       invoice_company_address: defaultValues?.invoice_company_address ?? "",
       invoice_company_email: defaultValues?.invoice_company_email ?? "",
+      default_language: defaultValues?.default_language ?? "en",
+      supported_languages: defaultValues?.supported_languages ?? ["en"],
+      insurance_enabled: defaultValues?.insurance_enabled ?? false,
+      insurance_percentage:
+        defaultValues?.insurance_percentage?.toString() ?? "",
+      tier_progression_enabled:
+        defaultValues?.tier_progression_enabled ?? false,
     },
     onSubmit: ({ value }) => {
       if (readOnly) return
@@ -179,6 +245,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         image_url: value.image_url || null,
         icon_url: value.icon_url || null,
         express_checkout_background: value.express_checkout_background || null,
+        currency: value.currency,
         web_url: value.web_url || null,
         blog_url: value.blog_url || null,
         twitter_url: value.twitter_url || null,
@@ -187,6 +254,14 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         invoice_company_name: value.invoice_company_name || null,
         invoice_company_address: value.invoice_company_address || null,
         invoice_company_email: value.invoice_company_email || null,
+        default_language: value.default_language,
+        supported_languages: value.supported_languages,
+        sale_type: value.sale_type,
+        insurance_enabled: value.insurance_enabled,
+        insurance_percentage: value.insurance_enabled
+          ? value.insurance_percentage || null
+          : null,
+        tier_progression_enabled: value.tier_progression_enabled,
       }
       if (isEdit) {
         updateMutation.mutate(payload)
@@ -328,25 +403,116 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
 
         <Separator />
 
-        {/* Cover Image */}
-        <form.Field name="image_url">
-          {(field) => (
-            <div className="space-y-2">
-              <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Cover Image
-              </Label>
-              <p className="text-xs text-muted-foreground">
-                Main event image used in cards, tickets, application headers,
-                invoices, and emails
-              </p>
-              <ImageUpload
-                value={field.state.value || null}
-                onChange={(url) => field.handleChange(url ?? "")}
-                disabled={readOnly}
-              />
-            </div>
-          )}
-        </form.Field>
+        {/* Sale Model — keep commerce decisions near the event identity,
+            like the previous implementation. */}
+        <div className="space-y-3">
+          <div className="space-y-1 px-1">
+            <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Commerce setup
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Decide how people will access this event. This is the primary
+              identity of the popup. Checkout mode is always derived from this
+              choice by the backend.
+            </p>
+          </div>
+
+          <InlineSection title="How this event sells">
+            <form.Field name="sale_type">
+              {(field) => (
+                <InlineRow
+                  icon={
+                    isEdit ? (
+                      <Lock className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+                    )
+                  }
+                  label="Sale Type"
+                  description={
+                    isEdit
+                      ? "Change sale type only if this popup has no approved payments yet"
+                      : "Choose whether people apply first or buy tickets directly"
+                  }
+                >
+                  <Select
+                    value={field.state.value}
+                    onValueChange={(value) =>
+                      field.handleChange(value as SaleType)
+                    }
+                    disabled={readOnly}
+                  >
+                    <SelectTrigger className="w-[220px] text-sm" size="sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="application">
+                        {SALE_TYPE_COPY.application.label}
+                      </SelectItem>
+                      <SelectItem value="direct">
+                        {SALE_TYPE_COPY.direct.label}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </InlineRow>
+              )}
+            </form.Field>
+          </InlineSection>
+
+          <form.Subscribe selector={(state) => state.values.sale_type}>
+            {(saleType) => {
+              const copy = SALE_TYPE_COPY[saleType]
+              const guidance = getSaleTypeGuidance(saleType)
+              return (
+                <div className="rounded-xl border bg-muted/30 p-4">
+                  <p className="text-sm font-semibold">{copy.label}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {copy.description}
+                  </p>
+                  <div className="mt-3 border-t pt-3">
+                    <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      {guidance.title}
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {guidance.description}
+                    </p>
+                  </div>
+                </div>
+              )
+            }}
+          </form.Subscribe>
+
+          <InlineSection>
+            <form.Field name="currency">
+              {(field) => (
+                <InlineRow
+                  icon={
+                    <DollarSign className="h-4 w-4 text-muted-foreground" />
+                  }
+                  label="Currency"
+                  description="Currency used for products, fees, invoices, and checkout totals"
+                >
+                  <Select
+                    value={field.state.value}
+                    onValueChange={(value) => field.handleChange(value)}
+                    disabled={readOnly}
+                  >
+                    <SelectTrigger className="w-[220px] text-sm" size="sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CURRENCIES.map((currency) => (
+                        <SelectItem key={currency.value} value={currency.value}>
+                          {currency.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </InlineRow>
+              )}
+            </form.Field>
+          </InlineSection>
+        </div>
 
         <Separator />
 
@@ -563,9 +729,12 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
           </form.Field>
 
           <form.Subscribe
-            selector={(state) => state.values.requires_application_fee}
+            selector={(state) => ({
+              requiresFee: state.values.requires_application_fee,
+              currency: state.values.currency,
+            })}
           >
-            {(requiresFee) =>
+            {({ requiresFee, currency }) =>
               requiresFee ? (
                 <form.Field name="application_fee_amount">
                   {(field) => (
@@ -573,8 +742,8 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                       icon={
                         <DollarSign className="h-4 w-4 text-muted-foreground" />
                       }
-                      label="Fee Amount (USD)"
-                      description="Amount in USD that applicants must pay"
+                      label={`Fee Amount (${currency})`}
+                      description={`Amount in ${currency} that applicants must pay`}
                     >
                       <Input
                         id="application_fee_amount"
@@ -599,6 +768,30 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
 
         {/* Branding */}
         <InlineSection title="Branding">
+          <form.Field name="image_url">
+            {(field) => (
+              <div className="space-y-2 py-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+                    <Image className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Cover Image</p>
+                    <p className="text-xs text-muted-foreground">
+                      Main event image used in cards, tickets, application
+                      headers, invoices, and emails
+                    </p>
+                  </div>
+                </div>
+                <ImageUpload
+                  value={field.state.value || null}
+                  onChange={(url) => field.handleChange(url ?? "")}
+                  disabled={readOnly}
+                />
+              </div>
+            )}
+          </form.Field>
+
           <form.Field name="icon_url">
             {(field) => (
               <div className="space-y-2 py-3">
@@ -813,24 +1006,214 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
           </form.Field>
         </InlineSection>
 
-        {/* Approval strategy + Reviewers (edit only) */}
+        <Separator />
+
+        {/* Insurance */}
+        <InlineSection title="Insurance">
+          <form.Field name="insurance_enabled">
+            {(field) => (
+              <InlineRow
+                icon={<ShieldCheck className="h-4 w-4 text-muted-foreground" />}
+                label="Enable Insurance"
+                description="Offer insurance for eligible products during checkout"
+              >
+                <Switch
+                  id="insurance_enabled"
+                  checked={field.state.value}
+                  onCheckedChange={(checked) => field.handleChange(checked)}
+                  disabled={readOnly}
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+
+          <form.Subscribe selector={(state) => state.values.insurance_enabled}>
+            {(insuranceEnabled) => (
+              <form.Field
+                name="insurance_percentage"
+                validators={{
+                  onBlur: ({ value }) => {
+                    if (readOnly || !insuranceEnabled) return undefined
+                    const num = Number.parseFloat(value)
+                    if (!value || Number.isNaN(num) || num <= 0) {
+                      return "Insurance percentage must be greater than 0 when insurance is enabled"
+                    }
+                    if (num > 100) {
+                      return "Insurance percentage cannot exceed 100"
+                    }
+                    return undefined
+                  },
+                }}
+              >
+                {(field) => (
+                  <div>
+                    <InlineRow
+                      icon={
+                        <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+                      }
+                      label="Insurance Rate (%)"
+                      description="Percentage of eligible product price applied as insurance fee"
+                    >
+                      <Input
+                        id="insurance_percentage"
+                        type="number"
+                        min="0.01"
+                        max="100"
+                        step="0.01"
+                        placeholder="e.g. 5.00"
+                        value={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                        disabled={readOnly || !insuranceEnabled}
+                        className="max-w-[120px] text-sm"
+                      />
+                    </InlineRow>
+                    <FieldError errors={field.state.meta.errors} />
+                  </div>
+                )}
+              </form.Field>
+            )}
+          </form.Subscribe>
+        </InlineSection>
+
+        <Separator />
+
+        {/* Ticket tier progression */}
+        <InlineSection title="Ticket tier progression">
+          <form.Field name="tier_progression_enabled">
+            {(field) => (
+              <InlineRow
+                icon={<Ticket className="h-4 w-4 text-muted-foreground" />}
+                label="Enable tier progression"
+                description="Group tickets into tiers (Early Bird → Regular → Late) so the portal shows the active phase and keeps sold-out phases visible."
+              >
+                <Switch
+                  id="tier_progression_enabled"
+                  checked={field.state.value}
+                  onCheckedChange={(checked) => field.handleChange(checked)}
+                  disabled={readOnly}
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+        </InlineSection>
+
+        <Separator />
+
+        {/* Languages */}
+        <InlineSection title="Languages">
+          <form.Field name="default_language">
+            {(field) => (
+              <InlineRow
+                icon={<Languages className="h-4 w-4 text-muted-foreground" />}
+                label="Default Language"
+                description="The primary language for this event"
+              >
+                <Select
+                  value={field.state.value}
+                  onValueChange={(value) => field.handleChange(value)}
+                  disabled={readOnly}
+                >
+                  <SelectTrigger className="w-auto">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {AVAILABLE_LANGUAGES.map((lang) => (
+                      <SelectItem key={lang.value} value={lang.value}>
+                        {lang.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </InlineRow>
+            )}
+          </form.Field>
+
+          <form.Field name="supported_languages">
+            {(field) => (
+              <InlineRow
+                icon={<Globe className="h-4 w-4 text-muted-foreground" />}
+                label="Supported Languages"
+                description="Languages available in the portal"
+              >
+                <div className="flex flex-col gap-2">
+                  {AVAILABLE_LANGUAGES.map((lang) => (
+                    <div
+                      key={lang.value}
+                      className="flex items-center gap-2 text-sm"
+                    >
+                      <Checkbox
+                        id={`lang-${lang.value}`}
+                        checked={field.state.value.includes(lang.value)}
+                        disabled={readOnly}
+                        onCheckedChange={(checked) => {
+                          const current = field.state.value
+                          if (checked) {
+                            field.handleChange([...current, lang.value])
+                          } else {
+                            const defaultLang =
+                              form.getFieldValue("default_language")
+                            if (lang.value === defaultLang) return
+                            field.handleChange(
+                              current.filter((l: string) => l !== lang.value),
+                            )
+                          }
+                        }}
+                      />
+                      <Label htmlFor={`lang-${lang.value}`}>{lang.label}</Label>
+                    </div>
+                  ))}
+                </div>
+              </InlineRow>
+            )}
+          </form.Field>
+        </InlineSection>
+
+        <Separator />
+
+        {/* Approval strategy + Reviewers (edit only, application sale_type only —
+            direct-sale popups have no application flow, so these are meaningless) */}
         {isEdit && (
+          <form.Subscribe selector={(state) => state.values.sale_type}>
+            {(saleType) =>
+              saleType === "application" ? (
+                <>
+                  <Separator />
+
+                  <ApprovalStrategyForm
+                    popupId={defaultValues!.id}
+                    readOnly={readOnly}
+                    variant="inline"
+                  />
+
+                  <Separator />
+
+                  <ConditionalReviewersManager
+                    popupId={defaultValues!.id}
+                    tenantId={defaultValues!.tenant_id}
+                    readOnly={readOnly}
+                    variant="inline"
+                  />
+                </>
+              ) : null
+            }
+          </form.Subscribe>
+        )}
+
+        {isEdit && (defaultValues?.supported_languages?.length ?? 0) > 1 && (
           <>
             <Separator />
-
-            <ApprovalStrategyForm
-              popupId={defaultValues!.id}
-              readOnly={readOnly}
-              variant="inline"
-            />
-
-            <Separator />
-
-            <ConditionalReviewersManager
-              popupId={defaultValues!.id}
-              tenantId={defaultValues!.tenant_id}
-              readOnly={readOnly}
-              variant="inline"
+            <TranslationManager
+              entityType="popup"
+              entityId={defaultValues!.id}
+              translatableFields={["name", "tagline", "location"]}
+              sourceData={{
+                name: defaultValues!.name,
+                tagline: defaultValues!.tagline,
+                location: defaultValues!.location,
+              }}
+              supportedLanguages={defaultValues!.supported_languages!}
+              defaultLanguage={defaultValues!.default_language!}
             />
           </>
         )}
