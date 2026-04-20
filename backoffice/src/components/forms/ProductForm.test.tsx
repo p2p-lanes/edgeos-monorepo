@@ -259,13 +259,11 @@ describe("ProductForm — tier group integration", () => {
       // Click the group
       await userEvent.click(screen.getByRole("button", { name: /early bird/i }))
 
-      // Phase fields should appear
+      // Phase fields should appear (order is derived server-side,
+      // so only label + sale window inputs are surfaced)
       await waitFor(() => {
         expect(
           screen.getByLabelText(/phase label/i),
-        ).toBeInTheDocument()
-        expect(
-          screen.getByLabelText(/phase order/i),
         ).toBeInTheDocument()
         expect(
           screen.getByLabelText(/sale starts/i),
@@ -274,6 +272,10 @@ describe("ProductForm — tier group integration", () => {
           screen.getByLabelText(/sale ends/i),
         ).toBeInTheDocument()
       })
+      // `order` should no longer be an input.
+      expect(
+        screen.queryByLabelText(/phase order/i),
+      ).not.toBeInTheDocument()
     })
 
     it("hides phase fields when no group is selected", async () => {
@@ -366,10 +368,6 @@ describe("ProductForm — tier group integration", () => {
       const labelInput = screen.getByLabelText(/phase label/i)
       await user.clear(labelInput)
       await user.type(labelInput, "Regular")
-
-      const orderInput = screen.getByLabelText(/phase order/i)
-      await user.clear(orderInput)
-      await user.type(orderInput, "2")
 
       const saleStartInput = screen.getByLabelText(/sale starts/i)
       await user.clear(saleStartInput)

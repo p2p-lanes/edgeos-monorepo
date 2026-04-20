@@ -139,9 +139,6 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
   const [phaseLabel, setPhaseLabel] = useState(
     defaultValues?.phase?.label ?? "",
   )
-  const [phaseOrder, setPhaseOrder] = useState<number>(
-    defaultValues?.phase?.order ?? 1,
-  )
   const [phaseSaleStartsAt, setPhaseSaleStartsAt] = useState(
     defaultValues?.phase?.sale_starts_at?.slice(0, 10) ?? "",
   )
@@ -251,7 +248,6 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
           phaseId: existingPhaseId,
           requestBody: {
             label: phaseLabel || null,
-            order: phaseOrder || null,
             sale_starts_at: phaseSaleStartsAt || null,
             sale_ends_at: phaseSaleEndsAt || null,
           },
@@ -261,7 +257,6 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
         groupId: selectedGroupId!,
         requestBody: {
           product_id: productId,
-          order: phaseOrder,
           label: phaseLabel,
           sale_starts_at: phaseSaleStartsAt || null,
           sale_ends_at: phaseSaleEndsAt || null,
@@ -798,30 +793,6 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
                           onChange={(e) => setPhaseLabel(e.target.value)}
                           disabled={readOnly}
                           className="max-w-48 text-sm"
-                        />
-                      </InlineRow>
-
-                      {/* Phase Order */}
-                      <InlineRow
-                        icon={
-                          <Hash className="h-4 w-4 text-muted-foreground" />
-                        }
-                        label="Phase order"
-                        description="Ascending order within the group (1 = first)"
-                      >
-                        <Input
-                          id="phase-order"
-                          aria-label="Phase order"
-                          type="number"
-                          min="1"
-                          value={phaseOrder}
-                          onChange={(e) =>
-                            setPhaseOrder(
-                              Number.parseInt(e.target.value, 10) || 1,
-                            )
-                          }
-                          disabled={readOnly}
-                          className="max-w-24 text-sm"
                         />
                       </InlineRow>
 
