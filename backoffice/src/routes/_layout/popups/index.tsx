@@ -11,9 +11,11 @@ import {
   AlertCircle,
   CalendarDays,
   EllipsisVertical,
+  ExternalLink,
   Eye,
   Pencil,
   Plus,
+  ShoppingCart,
   Trash2,
 } from "lucide-react"
 import { Suspense, useState } from "react"
@@ -44,11 +46,17 @@ import { LoadingButton } from "@/components/ui/loading-button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
+import { useCurrentTenant } from "@/hooks/useCurrentTenant"
 import useCustomToast from "@/hooks/useCustomToast"
 import {
   useTableSearchParams,
   validateTableSearch,
 } from "@/hooks/useTableSearchParams"
+import {
+  getPopupCheckoutUrl,
+  getPopupPortalUrl,
+  getPortalBaseUrl,
+} from "@/lib/portal-urls"
 import { createErrorHandler } from "@/utils"
 
 function getPopupsQueryOptions(
@@ -146,6 +154,8 @@ function DeletePopup({
 function PopupActionsMenu({ popup }: { popup: PopupAdmin }) {
   const [open, setOpen] = useState(false)
   const { isAdmin } = useAuth()
+  const { data: tenant } = useCurrentTenant()
+  const baseUrl = getPortalBaseUrl(tenant)
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
@@ -170,6 +180,30 @@ function PopupActionsMenu({ popup }: { popup: PopupAdmin }) {
             )}
           </Link>
         </DropdownMenuItem>
+        {baseUrl && popup.slug && (
+          <>
+            <DropdownMenuItem asChild>
+              <a
+                href={getPopupPortalUrl(baseUrl, popup.slug)}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <ExternalLink className="mr-2 h-4 w-4" />
+                Open Portal
+              </a>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <a
+                href={getPopupCheckoutUrl(baseUrl, popup.slug)}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <ShoppingCart className="mr-2 h-4 w-4" />
+                Open checkout
+              </a>
+            </DropdownMenuItem>
+          </>
+        )}
         {isAdmin && (
           <DeletePopup popup={popup} onSuccess={() => setOpen(false)} />
         )}
