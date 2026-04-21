@@ -24,6 +24,10 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import { unsavedChangesRef } from "@/hooks/useUnsavedChanges"
+import {
+  getWorkspaceFallbackPath,
+  isWorkspaceExitRoute,
+} from "./workspaceRoute"
 
 export function TenantSelector() {
   const { selectedTenantId, setSelectedTenantId } = useWorkspace()
@@ -32,12 +36,8 @@ export function TenantSelector() {
 
   const [pendingTenantId, setPendingTenantId] = useState<string | null>(null)
 
-  /** Derive the list path from the current URL, e.g. /products/123/edit -> /products */
-  const getListPath = () =>
-    location.pathname.replace(/\/[^/]+(\/edit)?$/, "") || "/"
-
   const handleTenantChange = (value: string) => {
-    const isOnEditPage = /\/(new|edit)/.test(location.pathname)
+    const isOnEditPage = isWorkspaceExitRoute(location.pathname)
 
     if (isOnEditPage && unsavedChangesRef.current) {
       setPendingTenantId(value)
@@ -46,15 +46,18 @@ export function TenantSelector() {
 
     setSelectedTenantId(value)
     if (isOnEditPage) {
-      navigate({ to: getListPath() })
+      navigate({ to: getWorkspaceFallbackPath(location.pathname) })
     }
   }
 
   const confirmTenantChange = () => {
     if (pendingTenantId) {
+      // User already confirmed discard — suppress the form's router blocker
+      // so the navigate below doesn't trigger a second identical dialog.
+      unsavedChangesRef.current = false
       setSelectedTenantId(pendingTenantId)
       setPendingTenantId(null)
-      navigate({ to: getListPath() })
+      navigate({ to: getWorkspaceFallbackPath(location.pathname) })
     }
   }
 

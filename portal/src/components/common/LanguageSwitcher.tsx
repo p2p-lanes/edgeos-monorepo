@@ -12,7 +12,7 @@ import { SUPPORTED_LANGUAGES } from "@/i18n/config"
 import { useLanguage } from "@/providers/languageProvider"
 
 export function LanguageSwitcher() {
-  const { currentLanguage, setLanguage } = useLanguage()
+  const { currentLanguage, supportedLanguages, setLanguage } = useLanguage()
 
   return (
     <Select value={currentLanguage} onValueChange={setLanguage}>
@@ -21,11 +21,17 @@ export function LanguageSwitcher() {
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        {Object.entries(SUPPORTED_LANGUAGES).map(([code, label]) => (
-          <SelectItem key={code} value={code}>
-            {label}
-          </SelectItem>
-        ))}
+        {supportedLanguages.map((code) => {
+          const label =
+            SUPPORTED_LANGUAGES[code as keyof typeof SUPPORTED_LANGUAGES]
+          if (!label) return null
+
+          return (
+            <SelectItem key={code} value={code}>
+              {label}
+            </SelectItem>
+          )
+        })}
       </SelectContent>
     </Select>
   )

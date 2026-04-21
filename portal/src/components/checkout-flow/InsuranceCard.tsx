@@ -9,12 +9,24 @@ interface InsuranceCardProps {
   insurance: boolean
   price: number
   onToggle: () => void
+  /** Custom card title. Defaults to "Insurance". */
+  title?: string
+  /** Custom subtitle shown next to the price. Defaults to "Change of plans coverage". */
+  subtitle?: string
+  /** Accessible label for the toggle button. Defaults to "Toggle insurance". */
+  toggleLabel?: string
+  /** Custom benefits list. Defaults to INSURANCE_BENEFITS constant. */
+  benefits?: string[]
 }
 
 export default function InsuranceCard({
   insurance,
   price,
   onToggle,
+  title = "Insurance",
+  subtitle = "Change of plans coverage",
+  toggleLabel = "Toggle insurance",
+  benefits = INSURANCE_BENEFITS,
 }: InsuranceCardProps) {
   return (
     <motion.div
@@ -33,9 +45,9 @@ export default function InsuranceCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h3 className="font-semibold text-gray-900">Insurance</h3>
+              <h3 className="font-semibold text-gray-900">{title}</h3>
               <p className="text-sm text-gray-500 mt-0.5">
-                {formatCurrency(price)} · Change of plans coverage
+                {formatCurrency(price)} · {subtitle}
               </p>
             </div>
             <button
@@ -43,7 +55,7 @@ export default function InsuranceCard({
               onClick={onToggle}
               role="switch"
               aria-checked={insurance}
-              aria-label="Toggle insurance"
+              aria-label={toggleLabel}
               className={cn(
                 "relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0",
                 insurance ? "bg-amber-400" : "bg-gray-200",
@@ -61,7 +73,7 @@ export default function InsuranceCard({
           </div>
 
           <ul className="text-xs text-gray-500 mt-3 space-y-1">
-            {INSURANCE_BENEFITS.map((b) => (
+            {benefits.map((b) => (
               <li key={b} className="flex items-center gap-2">
                 <AnimatePresence mode="wait" initial={false}>
                   <motion.span

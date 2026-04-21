@@ -152,7 +152,8 @@ export function HousingDateConfig({
   productCategory,
 }: TemplateConfigProps) {
   const variant = (config?.variant as string) || "default"
-  const showDates = config?.show_dates !== false
+  const showDates =
+    config?.show_dates !== false && config?.price_per_day !== false
   const parsed = parseConfigSections(config)
 
   const { data: productsData } = useQuery({
@@ -219,6 +220,14 @@ export function HousingDateConfig({
     updateSections([...parsed.sections, newSection])
   }
 
+  const updateHousingDateMode = (enabled: boolean) => {
+    onChange({
+      ...config,
+      show_dates: enabled,
+      price_per_day: enabled,
+    })
+  }
+
   return (
     <div className="flex flex-col gap-5">
       {/* Design Variant */}
@@ -283,17 +292,12 @@ export function HousingDateConfig({
         <div>
           <Label className="text-sm font-medium">Show date picker</Label>
           <p className="text-xs text-muted-foreground">
-            When enabled, customers choose check-in/check-out dates and pricing
-            can be calculated per night. When disabled, housing options are
-            shown as flat-price tickets with no date selection.
+            This is tied to Price per night. If customers can choose dates, the
+            housing product is sold per night. If not, it behaves like a flat
+            price ticket with no stay selection.
           </p>
         </div>
-        <Switch
-          checked={showDates}
-          onCheckedChange={(checked) =>
-            onChange({ ...config, show_dates: checked })
-          }
-        />
+        <Switch checked={showDates} onCheckedChange={updateHousingDateMode} />
       </div>
 
       <Separator />
@@ -308,17 +312,12 @@ export function HousingDateConfig({
         <div>
           <Label className="text-sm font-medium">Price per night</Label>
           <p className="text-xs text-muted-foreground">
-            When enabled, the price is multiplied by the number of nights. When
-            disabled, the price is the total for the full stay.
+            This setting is tied to Show date picker. Disabling it also removes
+            date selection, since customers can no longer choose multiple
+            nights.
           </p>
         </div>
-        <Switch
-          checked={showDates && config?.price_per_day !== false}
-          disabled={!showDates}
-          onCheckedChange={(checked) =>
-            onChange({ ...config, price_per_day: checked })
-          }
-        />
+        <Switch checked={showDates} onCheckedChange={updateHousingDateMode} />
       </div>
 
       <Separator />

@@ -165,6 +165,7 @@ def _seed_base_field_configs(session: Session, popup_map: dict, tenant_id) -> No
                     label=section_def["label"],
                     order=section_def["order"],
                     protected=True,
+                    kind=section_def["kind"],
                 )
                 session.add(section)
                 session.commit()
@@ -232,7 +233,9 @@ def _seed_products(
 
         existing_product = session.exec(
             select(Products).where(
-                Products.slug == product_slug, Products.popup_id == popup.id
+                Products.slug == product_slug,
+                Products.popup_id == popup.id,
+                Products.deleted_at.is_(None),  # type: ignore[attr-defined]
             )
         ).first()
         if existing_product:

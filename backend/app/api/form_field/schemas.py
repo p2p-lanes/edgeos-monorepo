@@ -36,6 +36,8 @@ class FormFieldBase(SQLModel):
     )
     placeholder: str | None = Field(default=None, nullable=True)
     help_text: str | None = Field(default=None, nullable=True)
+    min_date: str | None = Field(default=None, nullable=True)
+    max_date: str | None = Field(default=None, nullable=True)
 
 
 class FormFieldPublic(BaseModel):
@@ -52,7 +54,10 @@ class FormFieldPublic(BaseModel):
     options: list[str] | None = None
     placeholder: str | None = None
     help_text: str | None = None
+    min_date: str | None = None
+    max_date: str | None = None
     protected: bool = False
+    removable: bool = True
     target: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
@@ -68,6 +73,8 @@ class FormFieldCreate(BaseModel):
     options: list[str] | None = None
     placeholder: str | None = None
     help_text: str | None = None
+    min_date: str | None = None
+    max_date: str | None = None
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -81,3 +88,5 @@ class FormFieldUpdate(BaseModel):
     options: list[str] | None = None
     placeholder: str | None = None
     help_text: str | None = None
+    min_date: str | None = None
+    max_date: str | None = None

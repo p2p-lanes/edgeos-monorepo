@@ -1,36 +1,16 @@
-import type { PopupPublic, TenantPublic } from "@/client"
+import type { PopupPublic } from "@/client"
 
-/**
- * Resolves the background image URL using a fallback chain:
- * 1. popup.express_checkout_background
- * 2. popup.image_url
- * 3. tenant.image_url
- * 4. null (falls back to CSS gradient placeholder)
- */
-export function resolveBackgroundImageUrl(
+export function resolveCheckoutBackgroundUrl(
   popup: PopupPublic | null | undefined,
-  tenant: TenantPublic | null | undefined,
 ): string | null {
-  return (
-    popup?.express_checkout_background ||
-    popup?.image_url ||
-    tenant?.image_url ||
-    null
-  )
+  return popup?.express_checkout_background || null
 }
 
-/**
- * Returns inline style + className for a full-page background image
- * with the standard fallback chain: popup → tenant → gradient placeholder.
- */
-export function getBackgroundProps(
-  popup: PopupPublic | null | undefined,
-  tenant: TenantPublic | null | undefined,
-): {
+export function getBackgroundProps(popup: PopupPublic | null | undefined): {
   className: string
   style: React.CSSProperties | undefined
 } {
-  const imageUrl = resolveBackgroundImageUrl(popup, tenant)
+  const imageUrl = resolveCheckoutBackgroundUrl(popup)
 
   if (imageUrl) {
     return {
@@ -46,7 +26,7 @@ export function getBackgroundProps(
   }
 
   return {
-    className: "bg-gradient-to-br from-neutral-100 to-neutral-300",
+    className: "bg-background",
     style: undefined,
   }
 }

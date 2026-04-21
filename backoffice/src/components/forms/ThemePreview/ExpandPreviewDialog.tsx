@@ -35,7 +35,7 @@ export function ExpandPreviewDialog({
           <div
             style={{
               width: NATIVE_WIDTH,
-              minHeight: NATIVE_HEIGHT,
+              height: NATIVE_HEIGHT,
               ...(cssVars as React.CSSProperties),
               backgroundColor: "var(--background)",
               color: "var(--body)",

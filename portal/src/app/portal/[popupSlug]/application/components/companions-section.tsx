@@ -185,7 +185,7 @@ export function CompanionsSection({
                 {hasKids && (
                   <motion.div {...animationProps}>
                     <div className="mt-4">
-                      <LabelMuted className="text-sm text-muted-foreground mb-4 block">
+                      <LabelMuted className="text-sm text-heading-secondary mb-4 block">
                         {t("companions.kids_approval")}
                       </LabelMuted>
 
@@ -194,7 +194,7 @@ export function CompanionsSection({
                           {kids.map((kid) => (
                             <div
                               key={kid._id}
-                              className="flex items-center justify-between bg-gray-50 p-3 rounded-lg"
+                              className="flex items-center justify-between bg-muted p-3 rounded-lg"
                             >
                               <span className="text-sm">
                                 {kid.name}
@@ -226,7 +226,7 @@ export function CompanionsSection({
                         open={showKidModal}
                         onOpenChange={setShowKidModal}
                       >
-                        <DialogContent className="sm:max-w-[425px] bg-white">
+                        <DialogContent className="sm:max-w-[425px]">
                           <DialogHeader>
                             <DialogTitle>
                               {t("companions.add_child")}

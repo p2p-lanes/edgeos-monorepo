@@ -184,10 +184,10 @@ export default function AuthForm() {
               sizes="180px"
             />
           ) : (
-            <div className="size-full rounded-lg bg-gray-200 flex items-center justify-center">
+            <div className="size-full rounded-lg bg-muted flex items-center justify-center">
               <svg
                 aria-hidden="true"
-                className="size-16 text-gray-400"
+                className="size-16 text-muted-foreground"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -210,7 +210,7 @@ export default function AuthForm() {
         >
           <div className="text-center max-w-md mx-auto mb-4">
             <h2
-              className="mt-6 text-3xl font-bold text-gray-900"
+              className="mt-6 text-3xl font-bold text-foreground"
               style={{ textWrap: "balance" }}
             >
               {step === "email"
@@ -218,7 +218,7 @@ export default function AuthForm() {
                 : t("auth.enter_verification_code")}
             </h2>
             <p
-              className="mt-2 text-sm text-gray-600"
+              className="mt-2 text-sm text-muted-foreground"
               style={{ textWrap: "balance" }}
             >
               {step === "email"
@@ -246,18 +246,18 @@ export default function AuthForm() {
                     setError("")
                   }}
                   disabled={isLoading}
-                  className="appearance-none rounded-md relative block w-full px-3 py-5 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                  className="appearance-none rounded-md relative block w-full px-3 py-5 border border-border placeholder-gray-500 text-foreground focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                 />
               </div>
               <ButtonAnimated
                 type="submit"
                 disabled={isLoading || !email}
-                className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-black hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-background bg-foreground hover:bg-foreground focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
               >
                 {isLoading ? (
                   <svg
                     aria-hidden="true"
-                    className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                    className="animate-spin -ml-1 mr-3 h-5 w-5 text-background"
                     xmlns="http://www.w3.org/2000/svg"
                     fill="none"
                     viewBox="0 0 24 24"
@@ -303,18 +303,18 @@ export default function AuthForm() {
                   }}
                   disabled={isLoading}
                   autoFocus
-                  className="appearance-none rounded-md relative block w-full px-3 py-5 border border-gray-300 placeholder-gray-500 text-gray-900 text-center text-2xl tracking-[0.5em] font-mono focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10"
+                  className="appearance-none rounded-md relative block w-full px-3 py-5 border border-border placeholder-gray-500 text-foreground text-center text-2xl tracking-[0.5em] font-mono focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10"
                 />
               </div>
               <ButtonAnimated
                 type="submit"
                 disabled={isLoading || code.length !== 6}
-                className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-black hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-background bg-foreground hover:bg-foreground focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
               >
                 {isLoading ? (
                   <svg
                     aria-hidden="true"
-                    className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                    className="animate-spin -ml-1 mr-3 h-5 w-5 text-background"
                     xmlns="http://www.w3.org/2000/svg"
                     fill="none"
                     viewBox="0 0 24 24"
@@ -337,7 +337,7 @@ export default function AuthForm() {
                   t("common.verify")
                 )}
               </ButtonAnimated>
-              <div className="flex flex-col items-center gap-2 text-sm text-gray-600">
+              <div className="flex flex-col items-center gap-2 text-sm text-muted-foreground">
                 {countdown > 0 ? (
                   <p>{t("auth.resend_code_countdown", { countdown })}</p>
                 ) : (
@@ -345,7 +345,7 @@ export default function AuthForm() {
                     type="button"
                     onClick={handleResend}
                     disabled={isLoading}
-                    className="text-black underline hover:text-gray-700 disabled:opacity-50"
+                    className="text-foreground underline hover:text-foreground disabled:opacity-50"
                   >
                     {t("auth.resend_code")}
                   </button>
@@ -354,7 +354,7 @@ export default function AuthForm() {
                   type="button"
                   onClick={handleChangeEmail}
                   disabled={isLoading}
-                  className="text-gray-500 hover:text-gray-700 disabled:opacity-50"
+                  className="text-muted-foreground hover:text-foreground disabled:opacity-50"
                 >
                   {t("auth.use_different_email")}
                 </button>
@@ -364,10 +364,10 @@ export default function AuthForm() {
         </motion.div>
       </div>
       {error && (
-        <div className="mt-6 max-w-md mx-auto mb-4 p-4 bg-red-100 border-l-4 border-red-500 rounded-md animate-fade-in-down">
+        <div className="mt-6 max-w-md mx-auto mb-4 p-4 bg-destructive/20 border-l-4 border-destructive rounded-md animate-fade-in-down">
           <div className="flex">
             <div className="ml-3">
-              <p className="text-sm text-red-700">{error}</p>
+              <p className="text-sm text-destructive">{error}</p>
             </div>
           </div>
         </div>

@@ -1,11 +1,12 @@
 import { useMemo } from "react"
+import { TICKET_CATEGORY } from "@/checkout/popupCheckoutPolicy"
 import type { ProductsPass } from "@/types/Products"
 
 export function useProductCategories(products: ProductsPass[]) {
   const passProducts = useMemo(
     () =>
       products.filter(
-        (p) => p.category.toLowerCase() === "ticket" && p.is_active,
+        (p) => p.category.toLowerCase() === TICKET_CATEGORY && p.is_active,
       ),
     [products],
   )

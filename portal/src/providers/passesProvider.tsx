@@ -8,6 +8,11 @@ import {
   useRef,
   useState,
 } from "react"
+import {
+  CHECKOUT_MODE,
+  type CheckoutMode,
+  resolvePopupCheckoutPolicy,
+} from "@/checkout/popupCheckoutPolicy"
 import type { AttendeePurchases } from "@/client"
 import { supportsQuantitySelector } from "@/components/ui/QuantitySelector"
 import { useCart } from "@/hooks/useCartApi"
@@ -73,9 +78,10 @@ function buildBaseAttendeePasses(
   products: ProductsPass[],
   discountValue: number,
   purchasesMap: Map<string, ProductsPass[]>,
+  checkoutMode: CheckoutMode = CHECKOUT_MODE.PASS_SYSTEM,
 ): AttendeePassState[] {
-  const priceStrategy = getPriceStrategy()
-  const purchaseStrategy = getPurchaseStrategy()
+  const priceStrategy = getPriceStrategy(checkoutMode)
+  const purchaseStrategy = getPurchaseStrategy(checkoutMode)
 
   return attendees.map((attendee) => {
     const purchased = purchasesMap.get(attendee.id) ?? []
@@ -218,6 +224,7 @@ const PassesProvider = ({
   const { products } = useGetPassesData()
   const { getCity } = useCityProvider()
   const city = getCity()
+  const checkoutPolicy = resolvePopupCheckoutPolicy(city)
   const cityId = city?.id ? String(city.id) : null
   const previousCityIdRef = useRef(cityId)
   const hasInitializedRef = useRef(false)
@@ -257,7 +264,11 @@ const PassesProvider = ({
   const toggleProduct = useCallback(
     (attendeeId: string, product: ProductsPass) => {
       if (!product) return
-      const strategy = getProductStrategy(product, isEditingRef.current)
+      const strategy = getProductStrategy(
+        product,
+        isEditingRef.current,
+        checkoutPolicy.checkoutMode,
+      )
       setAttendeePasses((current) =>
         strategy.handleSelection(
           current,
@@ -267,7 +278,7 @@ const PassesProvider = ({
         ),
       )
     },
-    [],
+    [checkoutPolicy.checkoutMode],
   )
 
   // Ref to read savedCartPasses inside init effect without it being a dep
@@ -298,6 +309,7 @@ const PassesProvider = ({
         products,
         discountValue,
         purchasesMap,
+        checkoutPolicy.checkoutMode,
       )
 
       // Apply cart selections in the same tick if already available (avoids extra render cycle)
@@ -323,6 +335,7 @@ const PassesProvider = ({
         products,
         discountValue,
         purchasesMap,
+        checkoutPolicy.checkoutMode,
       )
       setAttendeePasses((current) => preserveSelections(basePasses, current))
       return
@@ -330,7 +343,7 @@ const PassesProvider = ({
 
     // Discount-only change — recalculate prices without rebuilding structure
     if (discountChanged) {
-      const priceStrategy = getPriceStrategy()
+      const priceStrategy = getPriceStrategy(checkoutPolicy.checkoutMode)
       setAttendeePasses((current) =>
         current.map((attendee) => {
           const hasPatreonPurchased = attendee.products.some(
@@ -356,6 +369,7 @@ const PassesProvider = ({
     purchasesMap,
     discountApplied.discount_value,
     restoreFromCart,
+    checkoutPolicy.checkoutMode,
   ])
 
   // Cart restoration for late-arriving cart data (cart loads after initialization)

@@ -1,3 +1,7 @@
+import {
+  CHECKOUT_MODE,
+  type CheckoutMode,
+} from "@/checkout/popupCheckoutPolicy"
 import type { PaymentProductRequest } from "@/client"
 import type { AttendeePassState } from "@/types/Attendee"
 import type {
@@ -17,6 +21,7 @@ interface BuildPaymentProductsParams {
   dynamicItems: Record<string, SelectedDynamicItem[]>
   isEditing: boolean
   appCredit: string | number | null | undefined
+  checkoutMode?: CheckoutMode
 }
 
 interface BuildPaymentProductsResult {
@@ -27,6 +32,10 @@ interface BuildPaymentProductsResult {
 /**
  * Detects whether a month/full upgrade is happening (month or full selected
  * with existing week/day purchased, and no patron selected).
+ *
+ * No category guard needed here: duration_type "month"/"full" is exclusively
+ * used by ticket products. Non-ticket products (housing, merch, etc.) never
+ * carry these duration types, so this filter is already ticket-scoped.
  */
 function detectMonthUpgrade(attendeePasses: AttendeePassState[]): boolean {
   const fullOrMonthSelectedWithWeekOrDay = attendeePasses.some(
@@ -66,8 +75,11 @@ export function buildPaymentProducts({
   dynamicItems,
   isEditing,
   appCredit,
+  checkoutMode = CHECKOUT_MODE.PASS_SYSTEM,
 }: BuildPaymentProductsParams): BuildPaymentProductsResult {
-  const isMonthUpgrade = detectMonthUpgrade(attendeePasses)
+  const isMonthUpgrade =
+    checkoutMode === CHECKOUT_MODE.PASS_SYSTEM &&
+    detectMonthUpgrade(attendeePasses)
   const products: PaymentProductRequest[] = []
 
   if (isEditing) {

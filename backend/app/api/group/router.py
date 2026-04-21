@@ -370,7 +370,10 @@ async def add_group_member(
         try:
             applications_crud.accept(db, application)
         except Exception:
-            raise HTTPException(status_code=400, detail="Cannot accept application from a red-flagged human.")
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot accept application from a red-flagged human.",
+            )
         # Update human profile
         human.first_name = member_in.first_name
         human.last_name = member_in.last_name

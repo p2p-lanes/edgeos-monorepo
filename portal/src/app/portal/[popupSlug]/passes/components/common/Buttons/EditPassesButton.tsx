@@ -30,7 +30,7 @@ const EditPassesButton = ({ onSwitchToBuy }: EditPassesButtonProps) => {
     return (
       <Button
         variant="secondary"
-        className="bg-neutral-200 text-black hover:shadow-md hover:bg-neutral-300 transition-all"
+        className="bg-muted text-foreground hover:shadow-md hover:bg-neutral-300 transition-all"
         onClick={() => toggleEditing()}
       >
         <XIcon className="w-4 h-4" />
@@ -42,7 +42,7 @@ const EditPassesButton = ({ onSwitchToBuy }: EditPassesButtonProps) => {
   return (
     <Button
       variant="outline"
-      className="bg-white text-black hover:bg-white hover:shadow-md transition-all"
+      className="bg-card text-foreground hover:bg-card hover:shadow-md transition-all"
       onClick={handleEditClick}
     >
       <PencilIcon className="w-4 h-4" />

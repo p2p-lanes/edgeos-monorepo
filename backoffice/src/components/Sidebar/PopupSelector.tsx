@@ -24,6 +24,10 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import { unsavedChangesRef } from "@/hooks/useUnsavedChanges"
+import {
+  getWorkspaceFallbackPath,
+  isWorkspaceExitRoute,
+} from "./workspaceRoute"
 
 export function PopupSelector() {
   const {
@@ -37,12 +41,8 @@ export function PopupSelector() {
 
   const [pendingPopupId, setPendingPopupId] = useState<string | null>(null)
 
-  /** Derive the list path from the current URL, e.g. /products/123/edit -> /products */
-  const getListPath = () =>
-    location.pathname.replace(/\/[^/]+(\/edit)?$/, "") || "/"
-
   const handlePopupChange = (value: string) => {
-    const isOnEditPage = /\/(new|edit)/.test(location.pathname)
+    const isOnEditPage = isWorkspaceExitRoute(location.pathname)
 
     if (isOnEditPage && unsavedChangesRef.current) {
       setPendingPopupId(value)
@@ -51,15 +51,18 @@ export function PopupSelector() {
 
     setSelectedPopupId(value)
     if (isOnEditPage) {
-      navigate({ to: getListPath() })
+      navigate({ to: getWorkspaceFallbackPath(location.pathname) })
     }
   }
 
   const confirmPopupChange = () => {
     if (pendingPopupId) {
+      // User already confirmed discard — suppress the form's router blocker
+      // so the navigate below doesn't trigger a second identical dialog.
+      unsavedChangesRef.current = false
       setSelectedPopupId(pendingPopupId)
       setPendingPopupId(null)
-      navigate({ to: getListPath() })
+      navigate({ to: getWorkspaceFallbackPath(location.pathname) })
     }
   }
 

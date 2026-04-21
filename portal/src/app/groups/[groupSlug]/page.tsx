@@ -5,7 +5,6 @@ import { PopupCheckoutContent } from "@/app/checkout/components/PopupCheckoutCon
 import useGetPublicGroup from "@/hooks/useGetPublicGroup"
 import { getBackgroundProps } from "@/lib/background-image"
 import { useCityProvider } from "@/providers/cityProvider"
-import { useTenant } from "@/providers/tenantProvider"
 
 const LoadingFallback = () => (
   <div className="flex items-center justify-center h-screen">
@@ -15,7 +14,6 @@ const LoadingFallback = () => (
 
 const GroupCheckoutPage = () => {
   const params = useParams<{ groupSlug: string }>()
-  const { tenant } = useTenant()
   const { getPopups, popupsLoaded } = useCityProvider()
   const { group, loading, error } = useGetPublicGroup(params.groupSlug)
 
@@ -40,7 +38,7 @@ const GroupCheckoutPage = () => {
     )
   }
 
-  const background = getBackgroundProps(popup, tenant)
+  const background = getBackgroundProps(popup)
 
   return (
     <PopupCheckoutContent

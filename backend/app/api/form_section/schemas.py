@@ -1,7 +1,14 @@
 import uuid
+from enum import Enum
 
 from pydantic import BaseModel, ConfigDict
 from sqlmodel import Field, SQLModel
+
+
+class FormSectionKind(str, Enum):
+    STANDARD = "standard"
+    COMPANIONS = "companions"
+    SCHOLARSHIP = "scholarship"
 
 
 class FormSectionBase(SQLModel):
@@ -11,6 +18,7 @@ class FormSectionBase(SQLModel):
     description: str | None = Field(default=None, nullable=True)
     order: int = Field(default=0)
     protected: bool = Field(default=False)
+    kind: str = Field(default=FormSectionKind.STANDARD.value)
 
 
 class FormSectionPublic(BaseModel):
@@ -21,6 +29,7 @@ class FormSectionPublic(BaseModel):
     description: str | None = None
     order: int = 0
     protected: bool = False
+    kind: str = FormSectionKind.STANDARD.value
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -30,6 +39,7 @@ class FormSectionCreate(BaseModel):
     label: str
     description: str | None = None
     order: int = 0
+    kind: str = FormSectionKind.STANDARD.value
 
 
 class FormSectionUpdate(BaseModel):

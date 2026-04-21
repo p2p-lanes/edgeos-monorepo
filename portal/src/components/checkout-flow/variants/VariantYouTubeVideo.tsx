@@ -21,8 +21,10 @@ export default function VariantYouTubeVideo({
   if (!videoId) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
-        <Play className="w-12 h-12 text-gray-300 mb-4" />
-        <p className="text-gray-500 mb-6">No video available for this step.</p>
+        <Play className="w-12 h-12 text-muted-foreground mb-4" />
+        <p className="text-muted-foreground mb-6">
+          No video available for this step.
+        </p>
         <Button variant="outline" onClick={onSkip}>
           Continue
         </Button>
@@ -32,7 +34,7 @@ export default function VariantYouTubeVideo({
 
   return (
     <div className="space-y-6">
-      <div className="relative w-full aspect-video rounded-2xl overflow-hidden shadow-sm border border-gray-100 bg-black">
+      <div className="relative w-full aspect-video rounded-2xl overflow-hidden shadow-sm border border-border bg-black">
         <iframe
           src={`https://www.youtube.com/embed/${videoId}`}
           title="YouTube video"

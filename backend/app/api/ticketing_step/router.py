@@ -73,7 +73,9 @@ async def get_ticketing_step(
     return TicketingStepPublic.model_validate(step)
 
 
-@router.post("", response_model=TicketingStepPublic, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "", response_model=TicketingStepPublic, status_code=status.HTTP_201_CREATED
+)
 async def create_ticketing_step(
     step_in: TicketingStepCreate,
     db: TenantSession,

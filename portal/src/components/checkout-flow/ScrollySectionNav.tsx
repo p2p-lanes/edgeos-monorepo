@@ -137,11 +137,7 @@ function PillsNav({
               isActive &&
                 "bg-checkout-badge-bg text-checkout-badge-title shadow-sm",
               !isActive &&
-                !isComplete &&
                 "bg-checkout-badge-bg-disabled text-checkout-badge-title-disabled hover:opacity-80",
-              !isActive &&
-                isComplete &&
-                "bg-checkout-badge-bg-disabled text-checkout-badge-title",
             )}
           >
             <Icon className="size-4 shrink-0" />

@@ -108,6 +108,7 @@ export const TAB_OF_KEY: Record<string, PreviewTab> = {
   title_button_color: "home",
   primary_background_color: "home",
   sidebar_background_color: "home",
+  sidebar_text_color: "home",
   card_background_color: "home",
   border_color: "home",
   sidebar_border_color: "home",

@@ -440,7 +440,8 @@ def run_import(
 
     from app.api.approval_strategy.schemas import ApprovalStrategyType
     from app.api.product.schemas import (
-        ProductCategory,
+        CATEGORY_PATREON,
+        CATEGORY_TICKET,
         TicketAttendeeCategory,
         TicketDuration,
     )
@@ -783,21 +784,23 @@ def run_import(
         # ===============================================================
         logger.info("Step 3: Importing groups...")
 
+        # Only import groups that have at least one payment for a patreon product.
+        # Mirrors runtime behavior: ambassador groups are created only when a
+        # patreon product is purchased.
         src_groups = fetch_all(
             source_conn,
             """
             SELECT DISTINCT g.*
             FROM groups g
+            JOIN payments p ON p.group_id = g.id
+            JOIN payment_products pp ON pp.payment_id = p.id
+            JOIN products pr ON pr.id = pp.product_id
+            JOIN applications a ON a.id = p.application_id
             WHERE g.popup_city_id = %s
-              AND (
-                EXISTS (SELECT 1 FROM group_members gm WHERE gm.group_id = g.id)
-                OR EXISTS (SELECT 1 FROM group_leaders gl WHERE gl.group_id = g.id)
-                OR EXISTS (SELECT 1 FROM applications a WHERE a.group_id = g.id AND a.popup_city_id = %s)
-                OR EXISTS (SELECT 1 FROM payments p WHERE p.group_id = g.id
-                           AND p.application_id IN (SELECT id FROM applications WHERE popup_city_id = %s))
-              )
+              AND a.popup_city_id = %s
+              AND LOWER(pr.category) = 'patreon'
         """,
-            (source_popup_id, source_popup_id, source_popup_id),
+            (source_popup_id, source_popup_id),
             label="groups",
         )
         stats.set_source("Groups", len(src_groups))
@@ -960,7 +963,9 @@ def run_import(
 
             if new_ffs:
                 session.add_all(new_ffs)
-            logger.info(f"  FormFields: {stats.data['FormFields']['imported']} imported")
+            logger.info(
+                f"  FormFields: {stats.data['FormFields']['imported']} imported"
+            )
 
         # ===============================================================
         # Step 5: Import Applications
@@ -1077,6 +1082,7 @@ def run_import(
 
             attendee = Attendees(
                 tenant_id=tenant_id,
+                popup_id=popup_id,
                 application_id=application_uuid,
                 human_id=human_uuid,
                 name=parse_optional_str(row.get("name")) or "Unknown",
@@ -1105,11 +1111,15 @@ def run_import(
         if "approval_strategies" in skip_tables:
             logger.info("  Skipping approval strategies (--skip-tables)")
             strategy = session.exec(
-                select(ApprovalStrategies).where(ApprovalStrategies.popup_id == popup_id)
+                select(ApprovalStrategies).where(
+                    ApprovalStrategies.popup_id == popup_id
+                )
             ).first()
         else:
             existing_strategy = session.exec(
-                select(ApprovalStrategies).where(ApprovalStrategies.popup_id == popup_id)
+                select(ApprovalStrategies).where(
+                    ApprovalStrategies.popup_id == popup_id
+                )
             ).first()
             if existing_strategy:
                 strategy = existing_strategy
@@ -1287,14 +1297,14 @@ def run_import(
             # Category: patreon stays patreon, everything else → ticket
             src_category = (row.get("category") or "ticket").strip().lower()
             if src_category == "patreon":
-                category = ProductCategory.PATREON
+                category = CATEGORY_PATREON
             else:
-                category = ProductCategory.TICKET
+                category = CATEGORY_TICKET
 
             # Duration type from source category
             duration_type = (
                 duration_map.get(src_category)
-                if category == ProductCategory.TICKET
+                if category == CATEGORY_TICKET
                 else None
             )
 
@@ -1453,6 +1463,7 @@ def run_import(
 
             payment = Payments(
                 tenant_id=tenant_id,
+                popup_id=popup_id,
                 application_id=application_uuid,
                 coupon_id=coupon_uuid,
                 group_id=group_uuid,

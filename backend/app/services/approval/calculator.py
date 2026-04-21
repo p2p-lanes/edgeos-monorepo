@@ -57,7 +57,9 @@ class ApprovalCalculator:
             case ApprovalStrategyType.ALL_REVIEWERS:
                 return self._calc_all_reviewers(reviews, designated_reviewers)
             case ApprovalStrategyType.THRESHOLD:
-                return self._calc_threshold(reviews, strategy.required_approvals, designated_reviewers)
+                return self._calc_threshold(
+                    reviews, strategy.required_approvals, designated_reviewers
+                )
             case ApprovalStrategyType.WEIGHTED:
                 return self._calc_weighted(reviews, strategy)
 
@@ -192,7 +194,9 @@ class ApprovalCalculator:
 
         # Lock the application row to prevent concurrent recalculations
         session.exec(
-            sm_select(Applications).where(col(Applications.id) == application.id).with_for_update()
+            sm_select(Applications)
+            .where(col(Applications.id) == application.id)
+            .with_for_update()
         )
 
         # Skip if already in a final state (accepted, rejected, withdrawn)

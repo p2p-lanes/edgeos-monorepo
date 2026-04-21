@@ -1,6 +1,7 @@
 import { ChevronRight, QrCode, Ticket, User } from "lucide-react"
 import React, { useState } from "react"
 import { useTranslation } from "react-i18next"
+import { TICKET_CATEGORY } from "@/checkout/popupCheckoutPolicy"
 import {
   Collapsible,
   CollapsibleContent,
@@ -56,6 +57,7 @@ const AttendeeTicket = ({
   const { handleEdit, handleCloseModal, modal, handleDelete } = useModal()
   const { removeAttendee, editAttendee } = useAttendee()
   const hasPurchased = attendee.products.some((product) => product.purchased)
+  const isMainAttendee = attendee.category === "main"
   const [isQrModalOpen, setIsQrModalOpen] = useState(false)
 
   const hasMonthPurchased = attendee.products.some(
@@ -68,7 +70,9 @@ const AttendeeTicket = ({
 
   // All ticket products go into commonProducts (local categories no longer exist)
   const localProducts: ProductsPass[] = []
-  const commonProducts = standardProducts.filter((p) => p.category === "ticket")
+  const commonProducts = standardProducts.filter(
+    (p) => p.category === TICKET_CATEGORY,
+  )
 
   // Get purchased passes for view mode display
   const purchasedPasses = attendee.products
@@ -124,7 +128,7 @@ const AttendeeTicket = ({
   return (
     <div className="relative h-full w-full">
       <div className="w-full overflow-hidden">
-        <div className="w-full rounded-3xl border border-gray-200 h-full lg:grid lg:grid-cols-[1fr_2px_2fr] bg-white">
+        <div className="w-full rounded-3xl border border-border h-full lg:grid lg:grid-cols-[1fr_2px_2fr] bg-card">
           {/* Left panel - City & Attendee info */}
           <div className="relative flex flex-col p-6 overflow-hidden h-full min-h-[160px]">
             <div
@@ -153,23 +157,25 @@ const AttendeeTicket = ({
                     </span>
                   </div>
                 </div>
-                <OptionsMenu
-                  onEdit={handleEditAttendee}
-                  onDelete={hasPurchased ? undefined : handleRemoveAttendee}
-                  className="lg:hidden"
-                />
+                {!isMainAttendee && (
+                  <OptionsMenu
+                    onEdit={handleEditAttendee}
+                    onDelete={hasPurchased ? undefined : handleRemoveAttendee}
+                    className="lg:hidden"
+                  />
+                )}
               </div>
             </div>
           </div>
 
           {/* Mobile horizontal divider with hole punches */}
-          <div className="lg:hidden border-b-2 border-dashed border-gray-200 w-full relative">
+          <div className="lg:hidden border-b-2 border-dashed border-border w-full relative">
             <div className="absolute -top-[23px] -left-[23px] w-[48px] h-[46px] bg-[#F5F5F7] rounded-full" />
             <div className="absolute -top-[23px] -right-[23px] w-[48px] h-[46px] bg-[#F5F5F7] rounded-full" />
           </div>
 
           {/* Desktop vertical divider with hole punches */}
-          <div className="hidden lg:block border-r-2 border-dashed border-gray-200 self-stretch relative">
+          <div className="hidden lg:block border-r-2 border-dashed border-border self-stretch relative">
             <div className="absolute -top-[23px] -left-[23px] w-[48px] h-[46px] bg-background rounded-full" />
             <div className="absolute -bottom-[23px] -left-[23px] w-[48px] h-[46px] bg-background rounded-full" />
           </div>
@@ -184,7 +190,7 @@ const AttendeeTicket = ({
             )}
           >
             {/* Options menu - desktop only */}
-            {!hasPurchased && (
+            {!hasPurchased && !isMainAttendee && (
               <OptionsMenu
                 onEdit={handleEditAttendee}
                 onDelete={handleRemoveAttendee}
@@ -219,7 +225,7 @@ const AttendeeTicket = ({
                       className={cn(
                         "flex items-center gap-2 py-3",
                         idx !== purchasedPasses.length - 1 &&
-                          "border-b border-dotted border-gray-300",
+                          "border-b border-dotted border-border",
                       )}
                     >
                       <Ticket className="w-4 h-4 lg:w-5 lg:h-5 text-pass-text flex-shrink-0" />

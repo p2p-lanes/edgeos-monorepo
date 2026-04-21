@@ -28,6 +28,8 @@ export function formFieldPublicToFormFieldSchema(
     placeholder: f.placeholder ?? undefined,
     help_text: f.help_text ?? undefined,
     target: (f.target as "human" | "application") ?? undefined,
+    min_date: f.min_date ?? null,
+    max_date: f.max_date ?? null,
   }
 }
 
@@ -109,6 +111,10 @@ export const slugify = (...parts: string[]): string =>
 export const isSpecialSection = (section: FormSectionPublic | null): boolean =>
   !!section && section.protected === true
 
-/** Field is protected when API returns protected: true (cannot delete, only placeholder/help text editable). */
+/** Field is protected when API returns protected: true (originates from the base catalog). */
 export const isSpecialField = (field: FormFieldPublic): boolean =>
   field.protected === true
+
+/** A protected field can still be removed from the popup when the catalog marks it as removable. */
+export const canRemoveField = (field: FormFieldPublic): boolean =>
+  !isSpecialField(field) || (field.removable ?? true)

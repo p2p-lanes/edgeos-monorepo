@@ -494,6 +494,16 @@ export const ApplicationFunnelSchema = {
     description: 'Application pipeline as a funnel.'
 } as const;
 
+export const ApplicationLayoutSchema = {
+    type: 'string',
+    enum: ['single_page', 'multi_step'],
+    title: 'ApplicationLayout',
+    description: `How the portal renders the application form for a popup.
+
+- single_page: all sections stacked on one page (legacy behavior).
+- multi_step: one section per step, with Next/Back navigation.`
+} as const;
+
 export const ApplicationPublicSchema = {
     properties: {
         id: {
@@ -1949,6 +1959,11 @@ export const BaseFieldConfigPublicSchema = {
             title: 'Position',
             default: 0
         },
+        required: {
+            type: 'boolean',
+            title: 'Required',
+            default: false
+        },
         label: {
             anyOf: [
                 {
@@ -2026,6 +2041,17 @@ export const BaseFieldConfigUpdateSchema = {
                 }
             ],
             title: 'Position'
+        },
+        required: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Required'
         },
         label: {
             anyOf: [
@@ -2396,6 +2422,46 @@ export const CartUpdateSchema = {
     description: 'Schema for updating cart items.'
 } as const;
 
+export const CatalogFieldSchema = {
+    properties: {
+        field_name: {
+            type: 'string',
+            title: 'Field Name'
+        },
+        type: {
+            type: 'string',
+            title: 'Type'
+        },
+        label: {
+            type: 'string',
+            title: 'Label'
+        },
+        required: {
+            type: 'boolean',
+            title: 'Required'
+        },
+        target: {
+            type: 'string',
+            title: 'Target'
+        },
+        default_section_key: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Default Section Key'
+        }
+    },
+    type: 'object',
+    required: ['field_name', 'type', 'label', 'required', 'target'],
+    title: 'CatalogField',
+    description: 'A base field from BASE_FIELD_DEFINITIONS that is available to add to a popup.'
+} as const;
+
 export const CategoryBreakdownSchema = {
     properties: {
         category: {
@@ -2422,6 +2488,12 @@ export const CategoryBreakdownSchema = {
     required: ['category', 'label'],
     title: 'CategoryBreakdown',
     description: 'Aggregated breakdown by product category.'
+} as const;
+
+export const CheckoutModeSchema = {
+    type: 'string',
+    enum: ['pass_system', 'simple_quantity'],
+    title: 'CheckoutMode'
 } as const;
 
 export const CompanionCreateSchema = {
@@ -4965,6 +5037,28 @@ export const FormFieldCreateSchema = {
                 }
             ],
             title: 'Help Text'
+        },
+        min_date: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Min Date'
+        },
+        max_date: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Date'
         }
     },
     type: 'object',
@@ -5070,10 +5164,37 @@ export const FormFieldPublicSchema = {
             ],
             title: 'Help Text'
         },
+        min_date: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Min Date'
+        },
+        max_date: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Date'
+        },
         protected: {
             type: 'boolean',
             title: 'Protected',
             default: false
+        },
+        removable: {
+            type: 'boolean',
+            title: 'Removable',
+            default: true
         },
         target: {
             anyOf: [
@@ -5185,6 +5306,28 @@ export const FormFieldUpdateSchema = {
                 }
             ],
             title: 'Help Text'
+        },
+        min_date: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Min Date'
+        },
+        max_date: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Date'
         }
     },
     type: 'object',
@@ -5217,6 +5360,11 @@ export const FormSectionCreateSchema = {
             type: 'integer',
             title: 'Order',
             default: 0
+        },
+        kind: {
+            type: 'string',
+            title: 'Kind',
+            default: 'standard'
         }
     },
     type: 'object',
@@ -5265,6 +5413,11 @@ export const FormSectionPublicSchema = {
             type: 'boolean',
             title: 'Protected',
             default: false
+        },
+        kind: {
+            type: 'string',
+            title: 'Kind',
+            default: 'standard'
         }
     },
     type: 'object',
@@ -7012,11 +7165,11 @@ export const ListModel_PopupReviewerPublic_Schema = {
     title: 'ListModel[PopupReviewerPublic]'
 } as const;
 
-export const ListModel_ProductPublic_Schema = {
+export const ListModel_ProductPublicWithTier_Schema = {
     properties: {
         results: {
             items: {
-                '$ref': '#/components/schemas/ProductPublic'
+                '$ref': '#/components/schemas/ProductPublicWithTier'
             },
             type: 'array',
             title: 'Results'
@@ -7027,7 +7180,7 @@ export const ListModel_ProductPublic_Schema = {
     },
     type: 'object',
     required: ['results', 'paging'],
-    title: 'ListModel[ProductPublic]'
+    title: 'ListModel[ProductPublicWithTier]'
 } as const;
 
 export const ListModel_TenantPublic_Schema = {
@@ -7064,6 +7217,24 @@ export const ListModel_TicketingStepPublic_Schema = {
     type: 'object',
     required: ['results', 'paging'],
     title: 'ListModel[TicketingStepPublic]'
+} as const;
+
+export const ListModel_TierGroupPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/TierGroupPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[TierGroupPublic]'
 } as const;
 
 export const ListModel_TrackPublic_Schema = {
@@ -7851,6 +8022,15 @@ export const PaymentUpdateSchema = {
     description: 'Schema for updating a payment (mainly status updates).'
 } as const;
 
+export const PhaseStateSchema = {
+    type: 'string',
+    enum: ['upcoming', 'available', 'sold_out', 'expired'],
+    title: 'PhaseState',
+    description: `Derived sales state for a ticket tier phase.
+
+Computed server-side by the progression service at read time; never persisted.`
+} as const;
+
 export const PopupAdminSchema = {
     properties: {
         name: {
@@ -7919,6 +8099,10 @@ export const PopupAdminSchema = {
         sale_type: {
             '$ref': '#/components/schemas/SaleType',
             default: 'application'
+        },
+        checkout_mode: {
+            '$ref': '#/components/schemas/CheckoutMode',
+            default: 'pass_system'
         },
         allows_spouse: {
             anyOf: [
@@ -8135,6 +8319,32 @@ export const PopupAdminSchema = {
             title: 'Supported Languages',
             default: ['en']
         },
+        insurance_enabled: {
+            type: 'boolean',
+            title: 'Insurance Enabled',
+            default: false
+        },
+        insurance_percentage: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Insurance Percentage'
+        },
+        application_layout: {
+            '$ref': '#/components/schemas/ApplicationLayout',
+            default: 'single_page'
+        },
+        tier_progression_enabled: {
+            type: 'boolean',
+            title: 'Tier Progression Enabled',
+            default: false
+        },
         id: {
             type: 'string',
             format: 'uuid',
@@ -8224,6 +8434,16 @@ export const PopupCreateSchema = {
         sale_type: {
             '$ref': '#/components/schemas/SaleType',
             default: 'application'
+        },
+        checkout_mode: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/CheckoutMode'
+                },
+                {
+                    type: 'null'
+                }
+            ]
         },
         allows_spouse: {
             anyOf: [
@@ -8456,6 +8676,35 @@ export const PopupCreateSchema = {
             type: 'array',
             title: 'Supported Languages',
             default: ['en']
+        },
+        insurance_enabled: {
+            type: 'boolean',
+            title: 'Insurance Enabled',
+            default: false
+        },
+        insurance_percentage: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Insurance Percentage'
+        },
+        application_layout: {
+            '$ref': '#/components/schemas/ApplicationLayout',
+            default: 'single_page'
+        },
+        tier_progression_enabled: {
+            type: 'boolean',
+            title: 'Tier Progression Enabled',
+            default: false
         }
     },
     type: 'object',
@@ -8507,6 +8756,10 @@ export const PopupPublicSchema = {
         sale_type: {
             '$ref': '#/components/schemas/SaleType',
             default: 'application'
+        },
+        checkout_mode: {
+            '$ref': '#/components/schemas/CheckoutMode',
+            default: 'pass_system'
         },
         start_date: {
             anyOf: [
@@ -8694,6 +8947,45 @@ export const PopupPublicSchema = {
                 }
             ],
             title: 'Theme Config'
+        },
+        default_language: {
+            type: 'string',
+            title: 'Default Language',
+            default: 'en'
+        },
+        supported_languages: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Supported Languages',
+            default: ['en']
+        },
+        insurance_enabled: {
+            type: 'boolean',
+            title: 'Insurance Enabled',
+            default: false
+        },
+        insurance_percentage: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Insurance Percentage'
+        },
+        application_layout: {
+            '$ref': '#/components/schemas/ApplicationLayout',
+            default: 'single_page'
+        },
+        tier_progression_enabled: {
+            type: 'boolean',
+            title: 'Tier Progression Enabled',
+            default: false
         }
     },
     type: 'object',
@@ -8883,6 +9175,26 @@ export const PopupUpdateSchema = {
             anyOf: [
                 {
                     '$ref': '#/components/schemas/PopupStatus'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        sale_type: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/SaleType'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        checkout_mode: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/CheckoutMode'
                 },
                 {
                     type: 'null'
@@ -9163,6 +9475,53 @@ export const PopupUpdateSchema = {
                 }
             ],
             title: 'Supported Languages'
+        },
+        insurance_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Insurance Enabled'
+        },
+        insurance_percentage: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Insurance Percentage'
+        },
+        application_layout: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/ApplicationLayout'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        tier_progression_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Tier Progression Enabled'
         }
     },
     type: 'object',
@@ -9445,20 +9804,10 @@ export const ProductBatchItemSchema = {
             ],
             title: 'Max Quantity'
         },
-        insurance_percentage: {
-            anyOf: [
-                {
-                    type: 'number'
-                },
-                {
-                    type: 'string',
-                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Insurance Percentage'
+        insurance_eligible: {
+            type: 'boolean',
+            title: 'Insurance Eligible',
+            default: false
         }
     },
     type: 'object',
@@ -9596,17 +9945,10 @@ export const ProductBatchResultSchema = {
             ],
             title: 'Max Quantity'
         },
-        insurance_percentage: {
-            anyOf: [
-                {
-                    type: 'string',
-                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Insurance Percentage'
+        insurance_eligible: {
+            type: 'boolean',
+            title: 'Insurance Eligible',
+            default: false
         },
         id: {
             type: 'string',
@@ -9814,20 +10156,10 @@ export const ProductCreateSchema = {
             ],
             title: 'Max Quantity'
         },
-        insurance_percentage: {
-            anyOf: [
-                {
-                    type: 'number'
-                },
-                {
-                    type: 'string',
-                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Insurance Percentage'
+        insurance_eligible: {
+            type: 'boolean',
+            title: 'Insurance Eligible',
+            default: false
         }
     },
     type: 'object',
@@ -9965,17 +10297,10 @@ export const ProductPublicSchema = {
             ],
             title: 'Max Quantity'
         },
-        insurance_percentage: {
-            anyOf: [
-                {
-                    type: 'string',
-                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Insurance Percentage'
+        insurance_eligible: {
+            type: 'boolean',
+            title: 'Insurance Eligible',
+            default: false
         },
         id: {
             type: 'string',
@@ -9987,6 +10312,175 @@ export const ProductPublicSchema = {
     required: ['tenant_id', 'popup_id', 'name', 'slug', 'price', 'id'],
     title: 'ProductPublic',
     description: 'Product schema for API responses.'
+} as const;
+
+export const ProductPublicWithTierSchema = {
+    properties: {
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        slug: {
+            type: 'string',
+            title: 'Slug'
+        },
+        price: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Price'
+        },
+        compare_price: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Compare Price'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        image_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Image Url'
+        },
+        category: {
+            type: 'string',
+            title: 'Category',
+            default: 'ticket'
+        },
+        attendee_category: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TicketAttendeeCategory'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        duration_type: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TicketDuration'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        start_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Start Date'
+        },
+        end_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'End Date'
+        },
+        is_active: {
+            type: 'boolean',
+            title: 'Is Active',
+            default: true
+        },
+        exclusive: {
+            type: 'boolean',
+            title: 'Exclusive',
+            default: false
+        },
+        max_quantity: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Quantity'
+        },
+        insurance_eligible: {
+            type: 'boolean',
+            title: 'Insurance Eligible',
+            default: false
+        },
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        tier_group: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TierGroupPublic'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        phase: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TierPhasePublic'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    type: 'object',
+    required: ['tenant_id', 'popup_id', 'name', 'slug', 'price', 'id'],
+    title: 'ProductPublicWithTier',
+    description: `ProductPublic enriched with optional tier group and phase information.
+
+Additive delta over ProductPublic — both fields are null for products that
+are not assigned to any tier group (BC-2 / BC-3 backward-compat).`
 } as const;
 
 export const ProductUpdateSchema = {
@@ -10155,20 +10649,16 @@ export const ProductUpdateSchema = {
             ],
             title: 'Max Quantity'
         },
-        insurance_percentage: {
+        insurance_eligible: {
             anyOf: [
                 {
-                    type: 'number'
-                },
-                {
-                    type: 'string',
-                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                    type: 'boolean'
                 },
                 {
                     type: 'null'
                 }
             ],
-            title: 'Insurance Percentage'
+            title: 'Insurance Eligible'
         }
     },
     type: 'object',
@@ -10305,17 +10795,10 @@ export const ProductWithQuantitySchema = {
             ],
             title: 'Max Quantity'
         },
-        insurance_percentage: {
-            anyOf: [
-                {
-                    type: 'string',
-                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Insurance Percentage'
+        insurance_eligible: {
+            type: 'boolean',
+            title: 'Insurance Eligible',
+            default: false
         },
         id: {
             type: 'string',
@@ -11461,6 +11944,311 @@ export const TicketingStepUpdateSchema = {
     },
     type: 'object',
     title: 'TicketingStepUpdate'
+} as const;
+
+export const TierGroupCreateSchema = {
+    properties: {
+        name: {
+            type: 'string',
+            minLength: 1,
+            title: 'Name'
+        },
+        shared_stock_cap: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    minimum: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Shared Stock Cap'
+        },
+        popup_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Popup Id'
+        }
+    },
+    type: 'object',
+    required: ['name'],
+    title: 'TierGroupCreate',
+    description: 'Schema for creating a new ticket tier group.'
+} as const;
+
+export const TierGroupPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        shared_stock_cap: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Shared Stock Cap'
+        },
+        shared_stock_remaining: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Shared Stock Remaining'
+        },
+        phases: {
+            items: {
+                '$ref': '#/components/schemas/TierPhasePublic'
+            },
+            type: 'array',
+            title: 'Phases',
+            default: []
+        }
+    },
+    type: 'object',
+    required: ['id', 'tenant_id', 'name'],
+    title: 'TierGroupPublic',
+    description: 'Public read schema for a ticket tier group, with embedded phases.'
+} as const;
+
+export const TierGroupUpdateSchema = {
+    properties: {
+        name: {
+            anyOf: [
+                {
+                    type: 'string',
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Name'
+        },
+        shared_stock_cap: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    minimum: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Shared Stock Cap'
+        }
+    },
+    type: 'object',
+    title: 'TierGroupUpdate',
+    description: 'Schema for updating a ticket tier group (all fields optional).'
+} as const;
+
+export const TierPhaseCreateSchema = {
+    properties: {
+        group_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Group Id'
+        },
+        product_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Product Id'
+        },
+        label: {
+            type: 'string',
+            minLength: 1,
+            title: 'Label'
+        },
+        sale_starts_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sale Starts At'
+        },
+        sale_ends_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sale Ends At'
+        }
+    },
+    type: 'object',
+    required: ['product_id', 'label'],
+    title: 'TierPhaseCreate',
+    description: `Schema for creating a new ticket tier phase.
+
+group_id is optional here because the router endpoint at
+POST /ticket-tier-groups/{group_id}/phases injects it from the path param.
+
+\`order\` is not accepted on input: the backend derives it from
+\`sale_starts_at ASC\` (NULLS LAST) with a deterministic id tiebreak.`
+} as const;
+
+export const TierPhasePublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        group_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Group Id'
+        },
+        product_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Product Id'
+        },
+        order: {
+            type: 'integer',
+            title: 'Order'
+        },
+        label: {
+            type: 'string',
+            title: 'Label'
+        },
+        sale_starts_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sale Starts At'
+        },
+        sale_ends_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sale Ends At'
+        },
+        sales_state: {
+            '$ref': '#/components/schemas/PhaseState'
+        },
+        is_purchasable: {
+            type: 'boolean',
+            title: 'Is Purchasable'
+        },
+        remaining: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Remaining'
+        }
+    },
+    type: 'object',
+    required: ['id', 'group_id', 'product_id', 'order', 'label', 'sales_state', 'is_purchasable'],
+    title: 'TierPhasePublic',
+    description: 'Public read schema for a ticket tier phase, with derived progression fields.'
+} as const;
+
+export const TierPhaseUpdateSchema = {
+    properties: {
+        label: {
+            anyOf: [
+                {
+                    type: 'string',
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Label'
+        },
+        sale_starts_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sale Starts At'
+        },
+        sale_ends_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sale Ends At'
+        }
+    },
+    type: 'object',
+    title: 'TierPhaseUpdate',
+    description: `Schema for updating a ticket tier phase (all fields optional).
+
+\`order\` is derived automatically; updates that change \`sale_starts_at\`
+trigger a full re-order of the group.`
 } as const;
 
 export const TimelinePointSchema = {

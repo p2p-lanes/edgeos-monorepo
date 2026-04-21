@@ -4,11 +4,16 @@ import {
   useQueryClient,
   useSuspenseQuery,
 } from "@tanstack/react-query"
-import { createFileRoute, useNavigate } from "@tanstack/react-router"
-import { Check, Trash2 } from "lucide-react"
-import { Suspense, useEffect, useState } from "react"
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
+import { Check, Info, Trash2 } from "lucide-react"
+import { Suspense, useEffect, useRef, useState } from "react"
 
-import { ProductsService, TicketingStepsService } from "@/client"
+import {
+  type ApiError,
+  PopupsService,
+  ProductsService,
+  TicketingStepsService,
+} from "@/client"
 import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import {
@@ -16,6 +21,7 @@ import {
   TEMPLATE_DEFINITIONS,
 } from "@/components/ticketing-step-builder/constants"
 import { TEMPLATE_CONFIG_REGISTRY } from "@/components/ticketing-step-builder/template-configs"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -39,6 +45,10 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import useCustomToast from "@/hooks/useCustomToast"
+import {
+  UnsavedChangesDialog,
+  useDirtyBlocker,
+} from "@/hooks/useUnsavedChanges"
 import { cn } from "@/lib/utils"
 import { createErrorHandler } from "@/utils"
 
@@ -79,20 +89,7 @@ function StepConfigContent({ stepId }: { stepId: string }) {
   const navigate = useNavigate()
   const { showSuccessToast, showErrorToast } = useCustomToast()
   const { data: step } = useSuspenseQuery(getStepQueryOptions(stepId))
-
-  // Fetch insurance step for confirm step type
-  const { data: stepsData } = useQuery({
-    queryKey: ["ticketing-steps", step.popup_id],
-    queryFn: () =>
-      TicketingStepsService.listTicketingSteps({
-        popupId: step.popup_id,
-        limit: 100,
-      }),
-    enabled: step.step_type === "confirm",
-  })
-  const insuranceStep = stepsData?.results?.find(
-    (s) => s.step_type === "insurance_checkout",
-  )
+  const isSubmittingRef = useRef(false)
 
   // Form state
   const [title, setTitle] = useState(step.title)
@@ -110,8 +107,21 @@ function StepConfigContent({ stepId }: { stepId: string }) {
   const [showWatermark, setShowWatermark] = useState(
     step.show_watermark ?? true,
   )
-  const [insuranceEnabled, setInsuranceEnabled] = useState(
-    insuranceStep?.is_enabled ?? false,
+
+  const isDirty =
+    title !== step.title ||
+    description !== (step.description ?? "") ||
+    watermark !== (step.watermark ?? "") ||
+    productCategory !== (step.product_category ?? "") ||
+    template !== (step.template ?? "") ||
+    JSON.stringify(templateConfig) !==
+      JSON.stringify(step.template_config ?? null) ||
+    showTitle !== (step.show_title ?? true) ||
+    showWatermark !== (step.show_watermark ?? true)
+
+  const blocker = useDirtyBlocker(
+    isDirty,
+    () => isDirty && !isSubmittingRef.current,
   )
 
   // Sync on step change
@@ -135,9 +145,12 @@ function StepConfigContent({ stepId }: { stepId: string }) {
     step.show_watermark,
   ])
 
-  useEffect(() => {
-    setInsuranceEnabled(insuranceStep?.is_enabled ?? false)
-  }, [insuranceStep?.is_enabled])
+  // Popup data (needed for insurance_enabled gate on confirm step)
+  const { data: popup } = useQuery({
+    queryKey: ["popups", "detail", step.popup_id],
+    queryFn: () => PopupsService.getPopup({ popupId: step.popup_id }),
+    enabled: step.step_type === "confirm",
+  })
 
   // Product categories for select
   const { data: categorySuggestions } = useQuery({
@@ -173,31 +186,37 @@ function StepConfigContent({ stepId }: { stepId: string }) {
           show_watermark: showWatermark,
         },
       })
-      if (insuranceStep && insuranceEnabled !== insuranceStep.is_enabled) {
-        await TicketingStepsService.updateTicketingStep({
-          stepId: insuranceStep.id,
-          requestBody: { is_enabled: insuranceEnabled },
-        })
-      }
+    },
+    onMutate: () => {
+      isSubmittingRef.current = true
     },
     onSuccess: () => {
       showSuccessToast("Step updated")
       queryClient.invalidateQueries({ queryKey: ["ticketing-steps"] })
       navigate({ to: "/ticketing-steps" })
     },
-    onError: createErrorHandler(showErrorToast),
+    onError: (error: Error) => {
+      isSubmittingRef.current = false
+      createErrorHandler(showErrorToast)(error as ApiError)
+    },
   })
 
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: () =>
       TicketingStepsService.deleteTicketingStep({ stepId: step.id }),
+    onMutate: () => {
+      isSubmittingRef.current = true
+    },
     onSuccess: () => {
       showSuccessToast("Step deleted")
       queryClient.invalidateQueries({ queryKey: ["ticketing-steps"] })
       navigate({ to: "/ticketing-steps" })
     },
-    onError: createErrorHandler(showErrorToast),
+    onError: (error: Error) => {
+      isSubmittingRef.current = false
+      createErrorHandler(showErrorToast)(error as ApiError)
+    },
   })
 
   // Template config component
@@ -329,24 +348,152 @@ function StepConfigContent({ stepId }: { stepId: string }) {
               checkout.
             </p>
           </div>
-
-          {step.step_type === "confirm" && insuranceStep && (
-            <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
-              <div className="flex flex-col gap-0.5">
-                <Label>Enable Insurance</Label>
-                <p className="text-xs text-muted-foreground">
-                  Show the insurance card on the Review &amp; Confirm page
-                </p>
-              </div>
-              <Switch
-                checked={insuranceEnabled}
-                onCheckedChange={setInsuranceEnabled}
-                aria-label="Toggle insurance"
-              />
-            </div>
-          )}
         </CardContent>
       </Card>
+
+      {/* Insurance Card Content (only for confirm step) */}
+      {step.step_type === "confirm" &&
+        (popup?.insurance_enabled ? (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Insurance Card</CardTitle>
+              <CardDescription>
+                Text displayed inside the insurance toggle card in this step
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="insurance-card-title">Card Title</Label>
+                <Input
+                  id="insurance-card-title"
+                  value={
+                    ((templateConfig?.insurance as Record<string, unknown>)
+                      ?.card_title as string) ?? ""
+                  }
+                  onChange={(e) =>
+                    setTemplateConfig({
+                      ...templateConfig,
+                      insurance: {
+                        ...(templateConfig?.insurance as Record<
+                          string,
+                          unknown
+                        >),
+                        card_title: e.target.value || undefined,
+                      },
+                    })
+                  }
+                  placeholder="Insurance"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="insurance-card-subtitle">Card Subtitle</Label>
+                <Input
+                  id="insurance-card-subtitle"
+                  value={
+                    ((templateConfig?.insurance as Record<string, unknown>)
+                      ?.card_subtitle as string) ?? ""
+                  }
+                  onChange={(e) =>
+                    setTemplateConfig({
+                      ...templateConfig,
+                      insurance: {
+                        ...(templateConfig?.insurance as Record<
+                          string,
+                          unknown
+                        >),
+                        card_subtitle: e.target.value || undefined,
+                      },
+                    })
+                  }
+                  placeholder="Change of plans coverage"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="insurance-toggle-label">Toggle Label</Label>
+                <Input
+                  id="insurance-toggle-label"
+                  value={
+                    ((templateConfig?.insurance as Record<string, unknown>)
+                      ?.toggle_label as string) ?? ""
+                  }
+                  onChange={(e) =>
+                    setTemplateConfig({
+                      ...templateConfig,
+                      insurance: {
+                        ...(templateConfig?.insurance as Record<
+                          string,
+                          unknown
+                        >),
+                        toggle_label: e.target.value || undefined,
+                      },
+                    })
+                  }
+                  placeholder="Add insurance"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Accessible label for the insurance toggle button.
+                </p>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="insurance-benefits">
+                  Benefits (one per line)
+                </Label>
+                <Textarea
+                  id="insurance-benefits"
+                  value={
+                    Array.isArray(
+                      (templateConfig?.insurance as Record<string, unknown>)
+                        ?.benefits,
+                    )
+                      ? (
+                          (templateConfig?.insurance as Record<string, unknown>)
+                            ?.benefits as string[]
+                        ).join("\n")
+                      : ""
+                  }
+                  onChange={(e) =>
+                    setTemplateConfig({
+                      ...templateConfig,
+                      insurance: {
+                        ...(templateConfig?.insurance as Record<
+                          string,
+                          unknown
+                        >),
+                        benefits: e.target.value
+                          ? e.target.value
+                              .split("\n")
+                              .map((l) => l.trim())
+                              .filter(Boolean)
+                          : [],
+                      },
+                    })
+                  }
+                  placeholder={
+                    "Full refund up to 14 days before the event\n50% refund up to 7 days before\nFree date change at no extra cost"
+                  }
+                  rows={4}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Each line becomes a benefit bullet in the card.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertDescription>
+              Enable insurance in popup settings to configure the card content.{" "}
+              <Link
+                to="/popups/$id/edit"
+                params={{ id: step.popup_id }}
+                className="underline font-medium"
+              >
+                Go to Popup Settings
+              </Link>
+            </AlertDescription>
+          </Alert>
+        ))}
 
       {/* Template Selection & Configuration (hidden for confirm step) */}
       {step.step_type !== "confirm" && (
@@ -448,6 +595,8 @@ function StepConfigContent({ stepId }: { stepId: string }) {
           Save
         </LoadingButton>
       </div>
+
+      <UnsavedChangesDialog blocker={blocker} />
     </div>
   )
 }

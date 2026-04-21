@@ -20,7 +20,7 @@ import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import useCustomToast from "@/hooks/useCustomToast"
 import { createErrorHandler } from "@/utils"
-import { FIELD_TYPES, isSpecialField } from "./constants"
+import { canRemoveField, FIELD_TYPES, isSpecialField } from "./constants"
 
 interface FieldConfigPanelProps {
   field: FormFieldPublic
@@ -43,6 +43,8 @@ export function FieldConfigPanel({
     help_text: "",
     required: false,
     options: "",
+    min_date: "",
+    max_date: "",
   })
 
   useEffect(() => {
@@ -53,6 +55,8 @@ export function FieldConfigPanel({
       help_text: field.help_text ?? "",
       required: field.required ?? false,
       options: field.options?.join("\n") ?? "",
+      min_date: field.min_date ?? "",
+      max_date: field.max_date ?? "",
     })
   }, [field])
 
@@ -71,18 +75,10 @@ export function FieldConfigPanel({
     setLocalValues((prev) => ({ ...prev, [key]: value }))
   }
 
+  const isProtected = isSpecialField(field)
+  const isElemental = isProtected && !canRemoveField(field)
+
   const handleSave = () => {
-    if (isSpecialField(field)) {
-      updateMutation.mutate({
-        fieldId: field.id,
-        requestBody: {
-          label: localValues.label || undefined,
-          placeholder: localValues.placeholder || undefined,
-          help_text: localValues.help_text || undefined,
-        },
-      })
-      return
-    }
     const optionsArray = localValues.options
       .split("\n")
       .map((o) => o.trim())
@@ -90,14 +86,26 @@ export function FieldConfigPanel({
 
     const requestBody: FormFieldUpdate = {
       label: localValues.label || undefined,
-      field_type: localValues.field_type || undefined,
       help_text: localValues.help_text || undefined,
-      required: localValues.required,
       options: optionsArray.length > 0 ? optionsArray : undefined,
+      min_date: localValues.min_date || null,
+      max_date: localValues.max_date || null,
     }
+
+    // Elementals cannot change required; everyone else can.
+    if (!isElemental) {
+      requestBody.required = localValues.required
+    }
+
+    // Protected (base) fields have a fixed type defined by the catalog.
+    if (!isProtected) {
+      requestBody.field_type = localValues.field_type || undefined
+    }
+
     if (localValues.field_type !== "select_cards") {
       requestBody.placeholder = localValues.placeholder || undefined
     }
+
     updateMutation.mutate({ fieldId: field.id, requestBody })
   }
 
@@ -106,16 +114,22 @@ export function FieldConfigPanel({
     localValues.field_type === "select_cards" ||
     localValues.field_type === "multiselect"
 
-  const showPlaceholder = localValues.field_type !== "select_cards"
+  const showDateRange = localValues.field_type === "date"
 
-  const isProtected = isSpecialField(field)
+  const showPlaceholder = localValues.field_type !== "select_cards"
 
   return (
     <div className="space-y-5 px-4 pb-6">
-      {isProtected && (
+      {isElemental && (
         <p className="text-sm text-muted-foreground rounded-md bg-muted/30 px-3 py-2">
-          Protected field – label, placeholder, and help text can be edited.
-          Type and identity are fixed.
+          Elemental field — always required and always asked. Only label,
+          placeholder, and help text are editable.
+        </p>
+      )}
+      {isProtected && !isElemental && (
+        <p className="text-sm text-muted-foreground rounded-md bg-muted/30 px-3 py-2">
+          Predefined field — the type is fixed by the catalog. Everything else
+          is editable, and the field can be removed from this popup.
         </p>
       )}
       <div className="space-y-2">
@@ -179,9 +193,31 @@ export function FieldConfigPanel({
             onChange={(e) => handleChange("options", e.target.value)}
             placeholder={"Option 1\nOption 2\nOption 3"}
             rows={4}
-            disabled={isProtected}
           />
           <p className="text-xs text-muted-foreground">One option per line</p>
+        </div>
+      )}
+
+      {showDateRange && (
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="config-min-date">Minimum date</Label>
+            <Input
+              id="config-min-date"
+              type="date"
+              value={localValues.min_date}
+              onChange={(e) => handleChange("min_date", e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="config-max-date">Maximum date</Label>
+            <Input
+              id="config-max-date"
+              type="date"
+              value={localValues.max_date}
+              onChange={(e) => handleChange("max_date", e.target.value)}
+            />
+          </div>
         </div>
       )}
 
@@ -198,7 +234,7 @@ export function FieldConfigPanel({
           id="config-required"
           checked={localValues.required}
           onCheckedChange={(val) => handleChange("required", val)}
-          disabled={isProtected}
+          disabled={isElemental}
         />
       </div>
 

@@ -91,12 +91,12 @@ const HumanForm = ({
   }
 
   return (
-    <Card className="p-4 md:p-6 bg-white mb-8 flex flex-col md:flex-row md:flex-wrap md:items-center md:justify-between">
+    <Card className="p-4 md:p-6 bg-card mb-8 flex flex-col md:flex-row md:flex-wrap md:items-center md:justify-between">
       <div className="flex items-center gap-4 order-1 md:order-1 mb-6 md:mb-0">
         <div className="relative">
           <button
             type="button"
-            className="relative w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center cursor-pointer transition-all duration-200 hover:bg-blue-200 group"
+            className="relative w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center cursor-pointer transition-all duration-200 hover:bg-blue-200 group"
             onMouseEnter={() => setIsHovering(true)}
             onMouseLeave={() => setIsHovering(false)}
             onClick={handleAvatarClick}
@@ -109,15 +109,15 @@ const HumanForm = ({
                 className="rounded-full object-cover"
               />
             ) : (
-              <User className="w-8 h-8 text-blue-600" />
+              <User className="w-8 h-8 text-primary" />
             )}
 
             {(isHovering || isUploading) && (
-              <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center transition-all duration-200">
+              <div className="absolute inset-0 bg-foreground/50 rounded-full flex items-center justify-center transition-all duration-200">
                 {isUploading ? (
-                  <Loader2 className="w-6 h-6 text-white animate-spin" />
+                  <Loader2 className="w-6 h-6 text-background animate-spin" />
                 ) : (
-                  <Upload className="w-6 h-6 text-white" />
+                  <Upload className="w-6 h-6 text-background" />
                 )}
               </div>
             )}
@@ -132,10 +132,10 @@ const HumanForm = ({
           />
         </div>
         <div>
-          <h2 className="text-xl md:text-2xl font-bold text-gray-900">
+          <h2 className="text-xl md:text-2xl font-bold text-foreground">
             {userData?.first_name} {userData?.last_name}
           </h2>
-          <p className="text-sm md:text-base text-gray-600">
+          <p className="text-sm md:text-base text-muted-foreground">
             {userData?.email}
           </p>
         </div>
@@ -146,7 +146,7 @@ const HumanForm = ({
             variant="outline"
             size="sm"
             onClick={() => setIsEditing(true)}
-            className="w-full md:w-auto text-gray-700 border-gray-300 hover:bg-gray-50"
+            className="w-full md:w-auto text-foreground border-border hover:bg-muted bg-transparent"
           >
             <Edit2 className="w-4 h-4 mr-2" />
             {t("profile.edit_profile")}
@@ -157,7 +157,7 @@ const HumanForm = ({
               variant="outline"
               size="sm"
               onClick={handleCancel}
-              className="text-gray-700 border-gray-300 hover:bg-gray-50 bg-transparent"
+              className="text-foreground border-border hover:bg-muted bg-transparent"
             >
               <X className="w-4 h-4 mr-2" />
               {t("common.cancel")}
@@ -165,7 +165,7 @@ const HumanForm = ({
             <Button
               size="sm"
               onClick={handleSave}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground"
             >
               <Save className="w-4 h-4 mr-2" />
               {t("common.save")}
@@ -179,16 +179,18 @@ const HumanForm = ({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
             {userData?.email && (
               <div className="flex items-start md:items-center gap-3">
-                <Mail className="w-5 h-5 text-gray-400 mt-0.5 md:mt-0" />
+                <Mail className="w-5 h-5 text-muted-foreground mt-0.5 md:mt-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-gray-600">{t("common.email")}</p>
-                  <p className="text-gray-900 break-all">{userData?.email}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {t("common.email")}
+                  </p>
+                  <p className="text-foreground break-all">{userData?.email}</p>
                   {filteredLinkedEmails.length > 0 && (
                     <div className="mt-1">
                       <button
                         type="button"
                         onClick={() => setShowLinkedEmails(!showLinkedEmails)}
-                        className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition-colors"
+                        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
                       >
                         {showLinkedEmails ? (
                           <>
@@ -209,7 +211,7 @@ const HumanForm = ({
                           {filteredLinkedEmails.map((email) => (
                             <p
                               key={email}
-                              className="text-xs text-gray-500 break-all"
+                              className="text-xs text-muted-foreground break-all"
                             >
                               {email}
                             </p>
@@ -233,10 +235,12 @@ const HumanForm = ({
             {/* LEGACY: x_user removed from API – review for deletion */}
             {userData?.telegram && (
               <div className="flex items-center gap-3">
-                <RiTelegram2Line className="w-5 h-5 text-gray-400" />
+                <RiTelegram2Line className="w-5 h-5 text-muted-foreground" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm text-gray-600">{t("form.telegram")}</p>
-                  <p className="text-gray-900 break-words">
+                  <p className="text-sm text-muted-foreground">
+                    {t("form.telegram")}
+                  </p>
+                  <p className="text-foreground break-words">
                     {userData?.telegram}
                   </p>
                 </div>
@@ -249,7 +253,7 @@ const HumanForm = ({
               <div>
                 <Label
                   htmlFor="first_name"
-                  className="text-sm font-medium text-gray-700"
+                  className="text-sm font-medium text-foreground"
                 >
                   {t("form.first_name")}
                 </Label>
@@ -265,7 +269,7 @@ const HumanForm = ({
               <div>
                 <Label
                   htmlFor="last_name"
-                  className="text-sm font-medium text-gray-700"
+                  className="text-sm font-medium text-foreground"
                 >
                   {t("form.last_name")}
                 </Label>
@@ -284,7 +288,7 @@ const HumanForm = ({
               <div>
                 <Label
                   htmlFor="telegram"
-                  className="text-sm font-medium text-gray-700"
+                  className="text-sm font-medium text-foreground"
                 >
                   {t("form.telegram")}
                 </Label>

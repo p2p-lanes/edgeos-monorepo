@@ -57,8 +57,8 @@ function MerchQtyControl({
       className={cn(
         "h-8 px-3 rounded-lg text-xs font-semibold transition-all flex items-center gap-1",
         isAdded
-          ? "bg-blue-600 text-white hover:bg-blue-700"
-          : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50",
+          ? "bg-primary text-primary-foreground hover:bg-primary/90"
+          : "bg-card border border-border text-foreground hover:bg-muted",
       )}
     >
       {isAdded ? (
@@ -102,7 +102,7 @@ function MerchDefaultItem({
     <div
       className={cn(
         "p-4 transition-colors",
-        hasQuantity ? "bg-blue-50/50" : "",
+        hasQuantity ? "bg-primary/10" : "",
       )}
     >
       {/* Desktop layout */}
@@ -112,7 +112,7 @@ function MerchDefaultItem({
           quantity={quantity}
           onQuantityChange={onQuantityChange}
         />
-        <div className="relative w-14 h-14 shrink-0 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center">
+        <div className="relative w-14 h-14 shrink-0 rounded-xl overflow-hidden bg-muted flex items-center justify-center">
           {product.image_url ? (
             <Image
               src={product.image_url}
@@ -121,28 +121,30 @@ function MerchDefaultItem({
               className="object-cover"
             />
           ) : (
-            <ShoppingBag className="w-6 h-6 text-gray-300" />
+            <ShoppingBag className="w-6 h-6 text-muted-foreground" />
           )}
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="font-medium text-gray-900 text-sm">{product.name}</h3>
+          <h3 className="font-medium text-foreground text-sm">
+            {product.name}
+          </h3>
           {product.description && (
             <ExpandableDescription
               text={product.description}
               clamp={2}
-              className="text-xs text-gray-500 mt-0.5"
+              className="text-xs text-muted-foreground mt-0.5"
             />
           )}
         </div>
         <div className="text-right">
           {hasQuantity && quantity > 1 && (
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-muted-foreground">
               {quantity} × {formatCurrency(product.price)}
             </p>
           )}
           <div className="flex items-center gap-1.5 justify-end">
             {hasDiscount && product.compare_price != null && (
-              <span className="text-xs text-gray-400 line-through">
+              <span className="text-xs text-muted-foreground line-through">
                 {formatCurrency(
                   hasQuantity
                     ? product.compare_price * quantity
@@ -154,10 +156,10 @@ function MerchDefaultItem({
               className={cn(
                 "font-semibold",
                 hasQuantity
-                  ? "text-blue-600"
+                  ? "text-primary"
                   : hasDiscount
                     ? "text-green-600"
-                    : "text-gray-500",
+                    : "text-muted-foreground",
               )}
             >
               {formatCurrency(
@@ -176,7 +178,7 @@ function MerchDefaultItem({
       {/* Mobile layout */}
       <div className="md:hidden">
         <div className="flex gap-3 mb-3">
-          <div className="relative w-16 h-16 shrink-0 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center">
+          <div className="relative w-16 h-16 shrink-0 rounded-xl overflow-hidden bg-muted flex items-center justify-center">
             {product.image_url ? (
               <Image
                 src={product.image_url}
@@ -185,23 +187,23 @@ function MerchDefaultItem({
                 className="object-cover"
               />
             ) : (
-              <ShoppingBag className="w-7 h-7 text-gray-300" />
+              <ShoppingBag className="w-7 h-7 text-muted-foreground" />
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-gray-900 text-sm mb-0.5">
+            <h3 className="font-semibold text-foreground text-sm mb-0.5">
               {product.name}
             </h3>
             {product.description && (
               <ExpandableDescription
                 text={product.description}
                 clamp={2}
-                className="text-xs text-gray-500"
+                className="text-xs text-muted-foreground"
               />
             )}
             {hasDiscount && product.compare_price != null && (
               <div className="flex items-center gap-1.5 mt-1">
-                <span className="text-xs text-gray-400 line-through">
+                <span className="text-xs text-muted-foreground line-through">
                   {formatCurrency(product.compare_price)}
                 </span>
                 <span className="text-xs text-green-600 font-medium">
@@ -211,7 +213,7 @@ function MerchDefaultItem({
             )}
           </div>
         </div>
-        <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+        <div className="flex items-center justify-between pt-3 border-t border-border">
           <MerchQtyControl
             product={product}
             quantity={quantity}
@@ -219,14 +221,14 @@ function MerchDefaultItem({
           />
           <div className="text-right">
             {hasQuantity && quantity > 1 && (
-              <p className="text-xs text-gray-400 mb-0.5">
+              <p className="text-xs text-muted-foreground mb-0.5">
                 {quantity} × {formatCurrency(product.price)}
               </p>
             )}
             <span
               className={cn(
                 "text-base font-bold",
-                hasQuantity ? "text-blue-600" : "text-gray-500",
+                hasQuantity ? "text-primary" : "text-muted-foreground",
               )}
             >
               {formatCurrency(
@@ -248,7 +250,7 @@ function MerchDefault({
 }: CardListProps) {
   return (
     <div className="space-y-4">
-      <div className="bg-checkout-card-bg rounded-2xl shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-100">
+      <div className="bg-checkout-card-bg rounded-2xl shadow-sm border border-border overflow-hidden divide-y divide-border">
         {products.map((product) => (
           <MerchDefaultItem
             key={product.id}
@@ -285,10 +287,10 @@ function MerchGrid({
               key={product.id}
               className={cn(
                 "rounded-2xl border overflow-hidden bg-checkout-card-bg transition-all",
-                hasQty ? "border-blue-200" : "border-gray-200",
+                hasQty ? "border-primary/30" : "border-border",
               )}
             >
-              <div className="relative w-full aspect-square bg-gray-100 flex items-center justify-center">
+              <div className="relative w-full aspect-square bg-muted flex items-center justify-center">
                 {product.image_url ? (
                   <Image
                     src={product.image_url}
@@ -297,24 +299,24 @@ function MerchGrid({
                     className="object-cover"
                   />
                 ) : (
-                  <ShoppingBag className="w-10 h-10 text-gray-300" />
+                  <ShoppingBag className="w-10 h-10 text-muted-foreground" />
                 )}
               </div>
               <div className="p-3">
-                <p className="font-semibold text-gray-900 text-sm leading-tight">
+                <p className="font-semibold text-foreground text-sm leading-tight">
                   {product.name}
                 </p>
                 {product.description && (
                   <ExpandableDescription
                     text={product.description}
                     clamp={2}
-                    className="text-xs text-gray-500 mt-0.5"
+                    className="text-xs text-muted-foreground mt-0.5"
                   />
                 )}
                 <div className="flex items-center justify-between mt-2">
                   <div>
                     {hasDiscount && product.compare_price != null && (
-                      <p className="text-xs text-gray-400 line-through">
+                      <p className="text-xs text-muted-foreground line-through">
                         {formatCurrency(product.compare_price)}
                       </p>
                     )}
@@ -322,10 +324,10 @@ function MerchGrid({
                       className={cn(
                         "font-bold text-sm",
                         hasQty
-                          ? "text-blue-600"
+                          ? "text-primary"
                           : hasDiscount
                             ? "text-green-600"
-                            : "text-gray-900",
+                            : "text-foreground",
                       )}
                     >
                       {formatCurrency(
@@ -372,11 +374,11 @@ function MerchCompact({
             className={cn(
               "flex items-center gap-3 rounded-xl border px-3 py-3 transition-all",
               hasQty
-                ? "border-blue-200 bg-blue-50/50"
-                : "border-gray-200 hover:border-gray-300",
+                ? "border-primary/30 bg-primary/10"
+                : "border-border hover:border-muted-foreground/40",
             )}
           >
-            <div className="relative w-14 h-14 shrink-0 rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center">
+            <div className="relative w-14 h-14 shrink-0 rounded-lg overflow-hidden bg-muted flex items-center justify-center">
               {product.image_url ? (
                 <Image
                   src={product.image_url}
@@ -385,24 +387,24 @@ function MerchCompact({
                   className="object-cover"
                 />
               ) : (
-                <ShoppingBag className="w-5 h-5 text-gray-300" />
+                <ShoppingBag className="w-5 h-5 text-muted-foreground" />
               )}
             </div>
 
             <div className="flex-1 min-w-0">
-              <p className="font-medium text-sm text-gray-900 truncate">
+              <p className="font-medium text-sm text-foreground truncate">
                 {product.name}
               </p>
               <div>
                 {hasDiscount && product.compare_price != null && (
-                  <span className="text-xs text-gray-400 line-through mr-1">
+                  <span className="text-xs text-muted-foreground line-through mr-1">
                     {formatCurrency(product.compare_price)}
                   </span>
                 )}
                 <span
                   className={cn(
                     "text-xs font-medium",
-                    hasDiscount ? "text-green-600" : "text-gray-500",
+                    hasDiscount ? "text-green-600" : "text-muted-foreground",
                   )}
                 >
                   {formatCurrency(product.price)} each
@@ -421,7 +423,7 @@ function MerchCompact({
               <span
                 className={cn(
                   "font-bold text-sm w-16 text-right",
-                  hasQty ? "text-blue-600" : "text-gray-400",
+                  hasQty ? "text-primary" : "text-muted-foreground",
                 )}
               >
                 {formatCurrency(hasQty ? product.price * qty : product.price)}
@@ -462,11 +464,11 @@ export default function VariantMerchImage({
   if (products.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
-        <ShoppingBag className="w-12 h-12 text-gray-300 mb-4" />
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+        <ShoppingBag className="w-12 h-12 text-muted-foreground mb-4" />
+        <h3 className="text-lg font-semibold text-foreground mb-2">
           No Merchandise Available
         </h3>
-        <p className="text-gray-500 max-w-md mb-6">
+        <p className="text-muted-foreground max-w-md mb-6">
           Merchandise is not currently available for this event. You can
           continue to the next step.
         </p>

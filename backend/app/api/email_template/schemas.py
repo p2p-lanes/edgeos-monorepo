@@ -15,7 +15,9 @@ class EmailTemplateType(StrEnum):
     APPLICATION_REJECTED = "application_rejected"
     APPLICATION_ACCEPTED_WITH_DISCOUNT = "application_accepted_with_discount"
     APPLICATION_ACCEPTED_WITH_INCENTIVE = "application_accepted_with_incentive"
-    APPLICATION_ACCEPTED_SCHOLARSHIP_REJECTED = "application_accepted_scholarship_rejected"
+    APPLICATION_ACCEPTED_SCHOLARSHIP_REJECTED = (
+        "application_accepted_scholarship_rejected"
+    )
     PAYMENT_CONFIRMED = "payment_confirmed"
     ABANDONED_CART = "abandoned_cart"
     EDIT_PASSES_CONFIRMED = "edit_passes_confirmed"

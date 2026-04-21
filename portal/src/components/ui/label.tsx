@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils"
 import { RequiredFieldIndicator } from "./required-field-indicator"
 
 const labelVariants = cva(
-  "text-sm font-medium leading-none text-[#000000] peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
+  "text-sm font-medium leading-none text-heading peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
 )
 
 const Label = React.forwardRef<
@@ -31,7 +31,11 @@ const LabelMuted = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <LabelPrimitive.Root
     ref={ref}
-    className={cn(labelVariants(), "text-gray-700 font-normal", className)}
+    className={cn(
+      labelVariants(),
+      "text-heading-secondary font-normal",
+      className,
+    )}
     {...props}
   />
 ))

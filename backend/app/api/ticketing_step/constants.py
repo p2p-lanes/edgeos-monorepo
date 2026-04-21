@@ -13,7 +13,12 @@ DEFAULT_TICKETING_STEPS = [
             "sections": [
                 {"key": "full", "label": "Full Passes", "order": 0, "product_ids": []},
                 {"key": "month", "label": "Month Pass", "order": 1, "product_ids": []},
-                {"key": "week", "label": "Weekly Passes", "order": 2, "product_ids": []},
+                {
+                    "key": "week",
+                    "label": "Weekly Passes",
+                    "order": 2,
+                    "product_ids": [],
+                },
                 {"key": "day", "label": "Day Passes", "order": 3, "product_ids": []},
             ]
         },
@@ -61,21 +66,25 @@ DEFAULT_TICKETING_STEPS = [
         "product_category": "patreon",
     },
     {
-        "step_type": "insurance_checkout",
-        "title": "Insurance",
-        "description": "Optional: Protect your purchase",
-        "order": 4,
-        "is_enabled": False,
-        "protected": False,
-    },
-    {
         "step_type": "confirm",
         "title": "Review & Confirm",
         "description": "Review your order before payment",
         "watermark": "Confirm",
-        "order": 5,
+        "order": 4,
         "is_enabled": True,
         "protected": True,
+        "template_config": {
+            "insurance": {
+                "card_title": "Insurance",
+                "card_subtitle": "Change of plans coverage",
+                "toggle_label": "Add insurance",
+                "benefits": [
+                    "Full refund up to 14 days before the event",
+                    "50% refund up to 7 days before",
+                    "Free date change at no extra cost",
+                ],
+            }
+        },
     },
 ]
 

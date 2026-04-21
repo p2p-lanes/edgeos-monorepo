@@ -19,13 +19,18 @@ export interface FormFieldSchema {
   placeholder?: string
   help_text?: string
   target?: "human" | "application"
+  min_date?: string | null
+  max_date?: string | null
 }
+
+export type FormSectionKind = "standard" | "companions" | "scholarship"
 
 export interface FormSectionSchema {
   id: string
   label: string
   description: string | null
   order: number
+  kind: FormSectionKind
 }
 
 export interface ApplicationFormSchema {

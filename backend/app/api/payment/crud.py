@@ -1,6 +1,6 @@
 import uuid
 from decimal import ROUND_HALF_UP, Decimal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from fastapi import HTTPException, status
 from loguru import logger
@@ -34,6 +34,36 @@ from app.api.shared.crud import BaseCRUD
 
 # Decimal precision for money calculations
 MONEY_PRECISION = Decimal("0.01")
+
+
+def calculate_insurance_amount(
+    popup: "Any",
+    product_quantity_pairs: "list[tuple[Any, int]]",
+) -> Decimal:
+    """Pure function: compute insurance amount from popup settings + eligible products.
+
+    Args:
+        popup: Object with .insurance_enabled (bool) and .insurance_percentage (Decimal|None).
+        product_quantity_pairs: List of (product, quantity) where product has
+            .price (Decimal) and .insurance_eligible (bool).
+
+    Returns:
+        Total insurance amount rounded to 2 decimal places.
+        Returns Decimal("0") if insurance is disabled or percentage is None.
+    """
+    if not popup.insurance_enabled:
+        return Decimal("0")
+    if popup.insurance_percentage is None:
+        return Decimal("0")
+
+    eligible_subtotal = Decimal("0")
+    for product, quantity in product_quantity_pairs:
+        if product.insurance_eligible:
+            eligible_subtotal += product.price * quantity
+
+    return (eligible_subtotal * popup.insurance_percentage / 100).quantize(
+        MONEY_PRECISION, rounding=ROUND_HALF_UP
+    )
 
 
 def _require_application_id(application_id: uuid.UUID | None) -> uuid.UUID:
@@ -83,7 +113,10 @@ def _calculate_amounts(
     Returns: (standard_amount, supporter_amount, patreon_amount)
     """
     product_ids = list({rp.product_id for rp in requested_products})
-    statement = select(Products).where(Products.id.in_(product_ids))  # type: ignore[attr-defined]
+    statement = select(Products).where(
+        Products.id.in_(product_ids),  # type: ignore[attr-defined]
+        Products.deleted_at.is_(None),  # type: ignore[attr-defined]
+    )
     product_models = {p.id: p for p in session.exec(statement).all()}
 
     attendees: dict[uuid.UUID, dict[str, Decimal]] = {}
@@ -500,6 +533,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             Products.id.in_(product_ids),  # type: ignore[attr-defined]
             Products.popup_id == application.popup_id,
             Products.is_active == True,  # noqa: E712
+            Products.deleted_at.is_(None),  # type: ignore[attr-defined]
         )
         valid_products = list(session.exec(statement).all())
 
@@ -587,6 +621,62 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     f"Requested: {requested_qty}, Available: {available_qty}",
                 )
 
+    def _decrement_shared_tier_stocks(
+        self,
+        session: Session,
+        requested_products: list[PaymentProductRequest],
+    ) -> None:
+        """Atomically decrement shared_stock_remaining for any tier groups
+        that own the requested products.
+
+        Aggregates quantities per tier group, then issues one atomic UPDATE
+        per group via `tier_groups_crud.decrement_shared_stock`. If any group
+        has exhausted its shared cap, the method raises HTTP 409 and the
+        caller's transaction must roll back.
+
+        No-op for requests that touch no tier-managed products or only groups
+        without a shared cap.
+        """
+        from app.api.product.crud import tier_groups_crud
+        from app.api.product.models import TicketTierGroup, TicketTierPhase
+
+        product_ids = {p.product_id for p in requested_products}
+        if not product_ids:
+            return
+
+        phases_statement = select(TicketTierPhase).where(
+            TicketTierPhase.product_id.in_(product_ids)  # type: ignore[attr-defined]
+        )
+        phases = list(session.exec(phases_statement).all())
+        if not phases:
+            return
+
+        product_to_group: dict[uuid.UUID, uuid.UUID] = {
+            ph.product_id: ph.group_id for ph in phases
+        }
+
+        group_quantities: dict[uuid.UUID, int] = {}
+        for rp in requested_products:
+            group_id = product_to_group.get(rp.product_id)
+            if group_id is not None:
+                group_quantities[group_id] = (
+                    group_quantities.get(group_id, 0) + rp.quantity
+                )
+
+        if not group_quantities:
+            return
+
+        group_ids = list(group_quantities.keys())
+        groups_statement = select(TicketTierGroup).where(
+            TicketTierGroup.id.in_(group_ids),  # type: ignore[attr-defined]
+            TicketTierGroup.shared_stock_remaining.is_not(None),  # type: ignore[union-attr]
+        )
+        groups_with_cap = list(session.exec(groups_statement).all())
+
+        for group in groups_with_cap:
+            qty = group_quantities[group.id]
+            tier_groups_crud.decrement_shared_stock(session, group.id, qty)
+
     def _validate_attendees(
         self,
         session: Session,
@@ -636,22 +726,30 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         self,
         session: Session,
         requested_products: list[PaymentProductRequest],
+        popup: "Popups | None" = None,
     ) -> Decimal:
-        """Calculate insurance amount based on product insurance percentages."""
+        """Calculate insurance amount using popup.insurance_percentage and product.insurance_eligible.
+
+        Uses popup-level insurance settings (POPUP-6). Falls back to zero if popup is not provided
+        or popup insurance is disabled. The legacy per-product insurance_percentage field is no
+        longer read from this path.
+        """
+        if popup is None:
+            return Decimal("0")
+
         product_ids = list({rp.product_id for rp in requested_products})
-        statement = select(Products).where(Products.id.in_(product_ids))  # type: ignore[attr-defined]
+        statement = select(Products).where(
+            Products.id.in_(product_ids),  # type: ignore[attr-defined]
+            Products.deleted_at.is_(None),  # type: ignore[attr-defined]
+        )
         product_models = {p.id: p for p in session.exec(statement).all()}
 
-        total = Decimal("0")
-        for req_prod in requested_products:
-            product = product_models.get(req_prod.product_id)
-            if not product or not product.insurance_percentage:
-                continue
-            total += (
-                product.price * req_prod.quantity * product.insurance_percentage / 100
-            ).quantize(MONEY_PRECISION, rounding=ROUND_HALF_UP)
-
-        return total
+        product_quantity_pairs = [
+            (product_models[rp.product_id], rp.quantity)
+            for rp in requested_products
+            if rp.product_id in product_models
+        ]
+        return calculate_insurance_amount(popup, product_quantity_pairs)
 
     def _apply_discounts(
         self,
@@ -749,9 +847,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 response.group_id = None
                 response.scholarship_discount = True
 
-        # Calculate insurance if requested
+        # Calculate insurance if requested (application-flow only — POPUP-6)
         if obj.insurance:
-            insurance_amount = self._calculate_insurance(session, obj.products)
+            popup = application.popup if application else None
+            insurance_amount = self._calculate_insurance(session, obj.products, popup)
             response.insurance_amount = insurance_amount
             response.amount += insurance_amount
 
@@ -822,6 +921,12 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         """
         preview = self.preview_payment(session, obj)
 
+        # Reserve shared tier-group stock atomically before taking any
+        # irreversible action (creating payment rows, calling SimpleFI). If a
+        # linked group is sold out the 409 propagates and the transaction
+        # rolls back cleanly.
+        self._decrement_shared_tier_stocks(session, obj.products)
+
         # Use eager loading to avoid N+1 when accessing application relationships
         application = self._get_application_with_products(
             session,
@@ -859,7 +964,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
             # Get product details for snapshot
             product_ids = [p.product_id for p in obj.products]
-            prod_statement = select(Products).where(Products.id.in_(product_ids))  # type: ignore[attr-defined]
+            prod_statement = select(Products).where(
+                Products.id.in_(product_ids),  # type: ignore[attr-defined]
+                Products.deleted_at.is_(None),  # type: ignore[attr-defined]
+            )
             products_map = {p.id: p for p in session.exec(prod_statement).all()}
 
             # Create payment record for audit trail
@@ -931,7 +1039,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         # Get product details for snapshot and SimpleFI reference
         product_ids = [p.product_id for p in obj.products]
-        statement = select(Products).where(Products.id.in_(product_ids))  # type: ignore[attr-defined]
+        statement = select(Products).where(
+            Products.id.in_(product_ids),  # type: ignore[attr-defined]
+            Products.deleted_at.is_(None),  # type: ignore[attr-defined]
+        )
         products_map = {p.id: p for p in session.exec(statement).all()}
 
         # Create SimpleFI payment request
@@ -1077,6 +1188,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             Products.id.in_(product_ids),  # type: ignore[attr-defined]
             Products.popup_id == popup.id,
             Products.is_active == True,  # noqa: E712
+            Products.deleted_at.is_(None),  # type: ignore[attr-defined]
         )
         valid_products = list(session.exec(statement).all())
         if {p.id for p in valid_products} != set(product_ids):
@@ -1088,21 +1200,27 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         products_map = {p.id: p for p in valid_products}
 
         # 3. Validate availability (max_quantity vs sold+pending)
+        fabricated_requests = [
+            # reuse existing helpers which expect PaymentProductRequest —
+            # we fabricate one with a placeholder attendee_id since the
+            # helper only reads product_id and quantity.
+            PaymentProductRequest(
+                product_id=p.product_id,
+                attendee_id=uuid.uuid4(),
+                quantity=p.quantity,
+            )
+            for p in obj.products
+        ]
         self._validate_product_availability(
             session,
-            [
-                # reuse existing helper which expects PaymentProductRequest —
-                # we fabricate one with a placeholder attendee_id since the
-                # helper only reads product_id and quantity.
-                PaymentProductRequest(
-                    product_id=p.product_id,
-                    attendee_id=uuid.uuid4(),
-                    quantity=p.quantity,
-                )
-                for p in obj.products
-            ],
+            fabricated_requests,
             valid_products,
         )
+
+        # 3b. Reserve shared tier-group stock atomically before creating
+        # payment rows or calling SimpleFI. A 409 from a sold-out group
+        # rolls the whole transaction back.
+        self._decrement_shared_tier_stocks(session, fabricated_requests)
 
         # 4. Get or create the direct-sale attendee
         attendee = attendees_crud.find_direct_attendee(
@@ -1377,12 +1495,19 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         session: Session,
         payment: Payments,
     ) -> "Groups | None":
-        """Create an ambassador group when a payment is approved.
+        """Create an ambassador group when a payment with a patreon product is approved.
 
-        Returns the created group or None if the human already has an ambassador group
-        for this popup.
+        Returns the created group, or None if no patreon product was purchased or the
+        human already has an ambassador group for this popup.
         """
         from app.api.group.crud import groups_crud
+        from app.api.product.schemas import CATEGORY_PATREON
+
+        has_patreon_product = any(
+            ps.product_category == CATEGORY_PATREON for ps in payment.products_snapshot
+        )
+        if not has_patreon_product:
+            return None
 
         # Get application with popup
         application = session.get(Applications, payment.application_id)

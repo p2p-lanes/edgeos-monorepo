@@ -7,7 +7,9 @@ from app.api.ticketing_step.models import TicketingSteps
 from app.api.ticketing_step.schemas import TicketingStepCreate, TicketingStepUpdate
 
 
-class TicketingStepsCRUD(BaseCRUD[TicketingSteps, TicketingStepCreate, TicketingStepUpdate]):
+class TicketingStepsCRUD(
+    BaseCRUD[TicketingSteps, TicketingStepCreate, TicketingStepUpdate]
+):
     def __init__(self) -> None:
         super().__init__(TicketingSteps)
 

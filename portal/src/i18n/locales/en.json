@@ -103,6 +103,7 @@
   "application": {
     "unavailable": "Application Unavailable",
     "unavailable_description": "The application form for this event is not yet configured.",
+    "step_of": "Step {{current}} of {{total}}",
     "existing_found": "Existing Application Found",
     "existing_description": "We've found a previous application associated with your email.",
     "applicant": "Applicant:",
@@ -203,7 +204,17 @@
       "pay": "Pay",
       "claim_pass": "Claim Pass",
       "confirm_edit": "Confirm Edit",
-      "pay_and_confirm_edit": "Pay & Confirm Edit"
+      "pay_and_confirm_edit": "Pay & Confirm Edit",
+      "continue_to": "Continue to {{step}}",
+      "review": "Review"
+    },
+    "step_short": {
+      "passes": "Passes",
+      "tickets": "Passes",
+      "housing": "Housing",
+      "merch": "Merch",
+      "patron": "Patron",
+      "confirm": "Review & Confirm"
     }
   },
   "passes": {

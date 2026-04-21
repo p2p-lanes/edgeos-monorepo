@@ -101,23 +101,36 @@ export default function ConfirmStep() {
     Object.values(cart.dynamicItems).some((items) => items.length > 0) ||
     hasEditChanges
 
-  // Insurance available if any product has insurance potential and total is not zero
-  const isInsuranceEnabled = stepConfigs.some(
-    (s) => s.step_type === "insurance_checkout",
-  )
+  // Insurance available if popup has insurance enabled with a valid percentage
+  const isInsuranceEnabled =
+    popup?.insurance_enabled === true && popup?.insurance_percentage != null
   const hasInsurableProducts =
     isInsuranceEnabled &&
     cart.insurancePotentialPrice > 0 &&
     summary.grandTotal - summary.insuranceSubtotal > 0
 
+  // Extract template_config from the confirm step's nested 'insurance' sub-config
+  const confirmStep = stepConfigs.find((s) => s.step_type === "confirm")
+  const insuranceTemplateConfig =
+    confirmStep?.template_config &&
+    typeof confirmStep.template_config === "object" &&
+    "insurance" in (confirmStep.template_config as object)
+      ? ((confirmStep.template_config as Record<string, unknown>).insurance as {
+          card_title?: string
+          card_subtitle?: string
+          toggle_label?: string
+          benefits?: string[]
+        })
+      : null
+
   if (!hasCartItems) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
-        <ShoppingBag className="w-12 h-12 text-gray-300 mb-4" />
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+        <ShoppingBag className="w-12 h-12 text-muted-foreground mb-4" />
+        <h3 className="text-lg font-semibold text-foreground mb-2">
           {t("checkout.cart.empty_title")}
         </h3>
-        <p className="text-gray-500 max-w-md">
+        <p className="text-muted-foreground max-w-md">
           {t("checkout.cart.empty_description")}
         </p>
       </div>
@@ -127,11 +140,11 @@ export default function ConfirmStep() {
   return (
     <div className="space-y-4">
       {checkoutError && (
-        <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+        <div className="bg-destructive/10 border border-destructive rounded-2xl p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
           <div>
-            <h4 className="font-medium text-red-800">Error</h4>
-            <p className="text-sm text-red-600">{checkoutError}</p>
+            <h4 className="font-medium text-destructive">Error</h4>
+            <p className="text-sm text-destructive">{checkoutError}</p>
           </div>
         </div>
       )}
@@ -141,23 +154,27 @@ export default function ConfirmStep() {
           insurance={cart.insurance}
           price={cart.insurancePotentialPrice}
           onToggle={toggleInsurance}
+          title={insuranceTemplateConfig?.card_title}
+          subtitle={insuranceTemplateConfig?.card_subtitle}
+          toggleLabel={insuranceTemplateConfig?.toggle_label}
+          benefits={insuranceTemplateConfig?.benefits}
         />
       )}
 
-      <div className="bg-checkout-card-bg rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-checkout-card-bg rounded-2xl shadow-sm border border-border overflow-hidden">
         {/* Passes Section */}
         {cart.passes.length > 0 && (
           <div className="px-5 py-4">
             <div className="flex items-center gap-2 mb-3">
-              <Ticket className="w-4 h-4 text-gray-500" />
-              <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+              <Ticket className="w-4 h-4 text-muted-foreground" />
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Passes
               </span>
             </div>
             <div className="space-y-3">
               {Object.entries(passesByAttendee).map(([attendeeId, passes]) => (
                 <div key={attendeeId}>
-                  <p className="text-sm font-medium text-gray-700 mb-1">
+                  <p className="text-sm font-medium text-foreground mb-1">
                     {getAttendeeName(attendeeId)}
                   </p>
                   {passes.map((pass) => (
@@ -165,15 +182,15 @@ export default function ConfirmStep() {
                       key={pass.productId}
                       className="flex items-center justify-between text-sm py-0.5"
                     >
-                      <span className="text-gray-600">
+                      <span className="text-muted-foreground">
                         {pass.quantity > 1 && (
-                          <span className="text-gray-400">
+                          <span className="text-muted-foreground">
                             {pass.quantity} ×{" "}
                           </span>
                         )}
                         {pass.product.name}
                       </span>
-                      <span className="font-medium text-gray-900">
+                      <span className="font-medium text-foreground">
                         {formatCurrency(pass.originalPrice ?? pass.price)}
                       </span>
                     </div>
@@ -193,13 +210,11 @@ export default function ConfirmStep() {
             const isFirstSection = cart.passes.length === 0 && groupIdx === 0
             return (
               <div key={stepType}>
-                {!isFirstSection && (
-                  <div className="border-t border-gray-100" />
-                )}
+                {!isFirstSection && <div className="border-t border-border" />}
                 <div className="px-5 py-4">
                   <div className="flex items-center gap-2 mb-3">
-                    <Ticket className="w-4 h-4 text-gray-500" />
-                    <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                    <Ticket className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                       {label}
                     </span>
                   </div>
@@ -209,15 +224,15 @@ export default function ConfirmStep() {
                         key={item.productId}
                         className="flex items-center justify-between text-sm"
                       >
-                        <span className="text-gray-600">
+                        <span className="text-muted-foreground">
                           {item.quantity > 1 && (
-                            <span className="text-gray-400">
+                            <span className="text-muted-foreground">
                               {item.quantity} ×{" "}
                             </span>
                           )}
                           {item.product.name}
                         </span>
-                        <span className="font-medium text-gray-900">
+                        <span className="font-medium text-foreground">
                           {formatCurrency(item.price)}
                         </span>
                       </div>
@@ -232,35 +247,35 @@ export default function ConfirmStep() {
         {/* Housing Section */}
         {cart.housing && (
           <>
-            <div className="border-t border-gray-100" />
+            <div className="border-t border-border" />
             <div className="px-5 py-4">
               <div className="flex items-center gap-2 mb-3">
-                <Home className="w-4 h-4 text-gray-500" />
-                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                <Home className="w-4 h-4 text-muted-foreground" />
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   Housing
                 </span>
               </div>
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-700">
+                  <p className="text-sm font-medium text-foreground">
                     {cart.housing.quantity > 1 && (
-                      <span className="text-gray-400">
+                      <span className="text-muted-foreground">
                         {cart.housing.quantity} ×{" "}
                       </span>
                     )}
                     {cart.housing.product.name}
                   </p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-muted-foreground">
                     {cart.housing.pricePerDay !== false
                       ? `${cart.housing.nights} night${cart.housing.nights !== 1 ? "s" : ""}`
                       : "Full stay"}
                   </p>
-                  <p className="text-xs text-gray-400">
+                  <p className="text-xs text-muted-foreground">
                     {formatCheckoutDate(cart.housing.checkIn)} –{" "}
                     {formatCheckoutDate(cart.housing.checkOut)}
                   </p>
                 </div>
-                <span className="font-medium text-gray-900 text-sm">
+                <span className="font-medium text-foreground text-sm">
                   {formatCurrency(cart.housing.totalPrice)}
                 </span>
               </div>
@@ -271,11 +286,11 @@ export default function ConfirmStep() {
         {/* Merch Section */}
         {cart.merch.length > 0 && (
           <>
-            <div className="border-t border-gray-100" />
+            <div className="border-t border-border" />
             <div className="px-5 py-4">
               <div className="flex items-center gap-2 mb-3">
-                <ShoppingBag className="w-4 h-4 text-gray-500" />
-                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                <ShoppingBag className="w-4 h-4 text-muted-foreground" />
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   Merchandise
                 </span>
               </div>
@@ -285,15 +300,15 @@ export default function ConfirmStep() {
                     key={item.productId}
                     className="flex items-center justify-between text-sm"
                   >
-                    <span className="text-gray-600">
+                    <span className="text-muted-foreground">
                       {item.quantity > 1 && (
-                        <span className="text-gray-400">
+                        <span className="text-muted-foreground">
                           {item.quantity} ×{" "}
                         </span>
                       )}
                       {item.product.name}
                     </span>
-                    <span className="font-medium text-gray-900">
+                    <span className="font-medium text-foreground">
                       {formatCurrency(item.totalPrice)}
                     </span>
                   </div>
@@ -306,17 +321,19 @@ export default function ConfirmStep() {
         {/* Patron Section */}
         {cart.patron && (
           <>
-            <div className="border-t border-gray-100" />
+            <div className="border-t border-border" />
             <div className="px-5 py-4">
               <div className="flex items-center gap-2 mb-3">
-                <Heart className="w-4 h-4 text-gray-500" />
-                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                <Heart className="w-4 h-4 text-muted-foreground" />
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   Patron
                 </span>
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">Community contribution</span>
-                <span className="font-medium text-gray-900">
+                <span className="text-muted-foreground">
+                  Community contribution
+                </span>
+                <span className="font-medium text-foreground">
                   {formatCurrency(cart.patron.amount)}
                 </span>
               </div>
@@ -327,17 +344,19 @@ export default function ConfirmStep() {
         {/* Insurance in summary */}
         {cart.insurance && summary.insuranceSubtotal > 0 && (
           <>
-            <div className="border-t border-gray-100" />
+            <div className="border-t border-border" />
             <div className="px-5 py-4">
               <div className="flex items-center gap-2 mb-3">
-                <CloudRain className="w-4 h-4 text-gray-500" />
-                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                <CloudRain className="w-4 h-4 text-muted-foreground" />
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   Insurance
                 </span>
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">Change of plans coverage</span>
-                <span className="font-medium text-gray-900">
+                <span className="text-muted-foreground">
+                  Change of plans coverage
+                </span>
+                <span className="font-medium text-foreground">
                   {formatCurrency(summary.insuranceSubtotal)}
                 </span>
               </div>
@@ -346,7 +365,7 @@ export default function ConfirmStep() {
         )}
 
         {/* Promo Code Section */}
-        <div className="border-t border-gray-100" />
+        <div className="border-t border-border" />
         <div className="px-4 sm:px-5 py-4">
           <div className="flex items-center gap-2 sm:gap-3">
             <input
@@ -365,12 +384,12 @@ export default function ConfirmStep() {
               placeholder="Promo code"
               disabled={cart.promoCodeValid}
               className={cn(
-                "flex-1 px-3 py-2 border rounded-lg text-sm transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent",
+                "flex-1 px-3 py-2 border rounded-lg text-sm transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent",
                 promoError
-                  ? "border-red-300 bg-red-50"
+                  ? "border-destructive bg-destructive/10"
                   : cart.promoCodeValid
                     ? "border-green-300 bg-green-50"
-                    : "border-gray-200",
+                    : "border-border",
               )}
             />
             {cart.promoCodeValid ? (
@@ -378,7 +397,7 @@ export default function ConfirmStep() {
                 type="button"
                 onClick={handleClearPromo}
                 aria-label="Remove promo code"
-                className="px-3 py-2 rounded-lg text-sm font-medium bg-slate-100 text-gray-500 hover:bg-red-100 hover:text-red-600 transition-colors duration-200 shrink-0"
+                className="px-3 py-2 rounded-lg text-sm font-medium bg-slate-100 text-muted-foreground hover:bg-destructive/20 hover:text-destructive transition-colors duration-200 shrink-0"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -390,8 +409,8 @@ export default function ConfirmStep() {
                 className={cn(
                   "px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors shrink-0",
                   !promoInput.trim()
-                    ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                    : "bg-gray-900 text-white hover:bg-gray-800",
+                    ? "bg-muted text-muted-foreground cursor-not-allowed"
+                    : "bg-foreground text-background hover:bg-foreground/90",
                 )}
               >
                 {promoLoading || isLoading ? (
@@ -403,7 +422,7 @@ export default function ConfirmStep() {
             )}
           </div>
           {promoError && (
-            <div className="flex items-center gap-1.5 text-red-600 text-xs mt-2">
+            <div className="flex items-center gap-1.5 text-destructive text-xs mt-2">
               <AlertCircle className="w-3 h-3" />
               <span>{promoError}</span>
             </div>
@@ -416,7 +435,7 @@ export default function ConfirmStep() {
         {/* Terms and Conditions */}
         {popup?.terms_and_conditions_url && (
           <>
-            <div className="border-t border-gray-100" />
+            <div className="border-t border-border" />
             <div className="px-5 py-4">
               <label
                 htmlFor="terms-checkbox"
@@ -427,15 +446,15 @@ export default function ConfirmStep() {
                   type="checkbox"
                   checked={termsAccepted}
                   onChange={(e) => setTermsAccepted(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-2 focus:ring-gray-900 shrink-0"
+                  className="mt-0.5 h-4 w-4 rounded border-border text-foreground focus:ring-2 focus:ring-foreground shrink-0"
                 />
-                <span className="text-sm text-gray-600">
+                <span className="text-sm text-muted-foreground">
                   I agree to the{" "}
                   <a
                     href={popup.terms_and_conditions_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-blue-600 underline hover:text-blue-800"
+                    className="text-primary underline hover:text-primary/80"
                     onClick={(e) => e.stopPropagation()}
                   >
                     Terms and Conditions
@@ -449,14 +468,14 @@ export default function ConfirmStep() {
         {/* Subtotal */}
         <div
           className={cn(
-            "border-t border-gray-200 px-5 py-4",
+            "border-t border-border px-5 py-4",
             summary.grandTotal === 0
               ? "bg-gradient-to-r from-amber-50 to-orange-50"
-              : "bg-gray-50",
+              : "bg-muted",
           )}
         >
           {summary.discount > 0 && (
-            <div className="flex justify-between text-sm text-gray-500 mb-2">
+            <div className="flex justify-between text-sm text-muted-foreground mb-2">
               <span>Subtotal</span>
               <span>{formatCurrency(summary.subtotal)}</span>
             </div>
@@ -480,13 +499,13 @@ export default function ConfirmStep() {
             </div>
           )}
           {accountCredit > 0 && (
-            <div className="flex justify-between text-sm text-blue-600 mb-2">
+            <div className="flex justify-between text-sm text-primary mb-2">
               <span>Account Credit</span>
               <span>-{formatCurrency(accountCredit)}</span>
             </div>
           )}
           <div className="flex justify-between items-center">
-            <span className="font-semibold text-gray-900">
+            <span className="font-semibold text-foreground">
               {summary.discount > 0 || summary.credit > 0
                 ? "Total"
                 : "Subtotal"}
@@ -497,7 +516,7 @@ export default function ConfirmStep() {
                 <span className="text-2xl font-bold text-amber-600">$0</span>
               </div>
             ) : (
-              <span className="text-2xl font-bold text-gray-900">
+              <span className="text-2xl font-bold text-foreground">
                 {formatCurrency(summary.grandTotal)}
               </span>
             )}

@@ -103,6 +103,7 @@
   "application": {
     "unavailable": "Aplicación no disponible",
     "unavailable_description": "El formulario de aplicación para este evento aún no está configurado.",
+    "step_of": "Paso {{current}} de {{total}}",
     "existing_found": "Aplicación existente encontrada",
     "existing_description": "Encontramos una aplicación previa asociada a tu email.",
     "applicant": "Aplicante:",
@@ -203,7 +204,17 @@
       "pay": "Pagar",
       "claim_pass": "Reclamar pase",
       "confirm_edit": "Confirmar edición",
-      "pay_and_confirm_edit": "Pagar y confirmar edición"
+      "pay_and_confirm_edit": "Pagar y confirmar edición",
+      "continue_to": "Continuar a {{step}}",
+      "review": "Revisar"
+    },
+    "step_short": {
+      "passes": "Pases",
+      "tickets": "Pases",
+      "housing": "Alojamiento",
+      "merch": "Merch",
+      "patron": "Patrono",
+      "confirm": "Revisar y Confirmar"
     }
   },
   "passes": {

@@ -34,12 +34,12 @@ export default function MerchSection({ onSkip }: MerchSectionProps) {
   if (merchProducts.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
-        <ShoppingBag className="w-12 h-12 text-gray-300 mb-4" />
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+        <ShoppingBag className="w-12 h-12 text-muted-foreground mb-4" />
+        <h3 className="text-lg font-semibold text-foreground mb-2">
           No Merchandise Available
         </h3>
-        <p className="text-gray-500 max-w-md mb-6">
-          Merchandise is not currently available for this pop-up. You can
+        <p className="text-muted-foreground max-w-md mb-6">
+          Merchandise is not currently available for this event. You can
           continue to the next step.
         </p>
         <Button variant="outline" onClick={handleSkip}>
@@ -51,7 +51,7 @@ export default function MerchSection({ onSkip }: MerchSectionProps) {
 
   return (
     <div className="space-y-4">
-      <div className="bg-checkout-card-bg rounded-2xl shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-100">
+      <div className="bg-checkout-card-bg rounded-2xl shadow-sm border border-border overflow-hidden divide-y divide-border">
         {merchProducts.map((product) => (
           <MerchItem
             key={product.id}
@@ -80,7 +80,7 @@ function MerchItem({ product, quantity, onQuantityChange }: MerchItemProps) {
     <div
       className={cn(
         "p-4 transition-colors",
-        hasQuantity ? "bg-blue-50/50" : "",
+        hasQuantity ? "bg-primary/10" : "",
       )}
     >
       {/* Desktop layout */}
@@ -90,7 +90,7 @@ function MerchItem({ product, quantity, onQuantityChange }: MerchItemProps) {
           quantity={quantity}
           onQuantityChange={onQuantityChange}
         />
-        <div className="relative w-14 h-14 shrink-0 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center">
+        <div className="relative w-14 h-14 shrink-0 rounded-xl overflow-hidden bg-muted flex items-center justify-center">
           {product.image_url ? (
             <Image
               src={product.image_url}
@@ -99,16 +99,18 @@ function MerchItem({ product, quantity, onQuantityChange }: MerchItemProps) {
               className="object-cover"
             />
           ) : (
-            <ShoppingBag className="w-6 h-6 text-gray-300" />
+            <ShoppingBag className="w-6 h-6 text-muted-foreground" />
           )}
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="font-medium text-gray-900 text-sm">{product.name}</h3>
+          <h3 className="font-medium text-foreground text-sm">
+            {product.name}
+          </h3>
           {product.description && (
             <ExpandableDescription
               text={product.description}
               clamp={2}
-              className="text-xs text-gray-500 mt-0.5"
+              className="text-xs text-muted-foreground mt-0.5"
             />
           )}
         </div>
@@ -124,7 +126,7 @@ function MerchItem({ product, quantity, onQuantityChange }: MerchItemProps) {
       {/* Mobile layout */}
       <div className="md:hidden">
         <div className="flex gap-3 mb-3">
-          <div className="relative w-16 h-16 shrink-0 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center">
+          <div className="relative w-16 h-16 shrink-0 rounded-xl overflow-hidden bg-muted flex items-center justify-center">
             {product.image_url ? (
               <Image
                 src={product.image_url}
@@ -133,23 +135,23 @@ function MerchItem({ product, quantity, onQuantityChange }: MerchItemProps) {
                 className="object-cover"
               />
             ) : (
-              <ShoppingBag className="w-7 h-7 text-gray-300" />
+              <ShoppingBag className="w-7 h-7 text-muted-foreground" />
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-gray-900 text-sm mb-0.5">
+            <h3 className="font-semibold text-foreground text-sm mb-0.5">
               {product.name}
             </h3>
             {product.description && (
               <ExpandableDescription
                 text={product.description}
                 clamp={2}
-                className="text-xs text-gray-500"
+                className="text-xs text-muted-foreground"
               />
             )}
             {hasDiscount && product.compare_price != null && (
               <div className="flex items-center gap-1.5 mt-1">
-                <span className="text-xs text-gray-400 line-through">
+                <span className="text-xs text-muted-foreground line-through">
                   {formatCurrency(product.compare_price)}
                 </span>
                 <span className="text-xs text-green-600 font-medium">
@@ -159,7 +161,7 @@ function MerchItem({ product, quantity, onQuantityChange }: MerchItemProps) {
             )}
           </div>
         </div>
-        <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+        <div className="flex items-center justify-between pt-3 border-t border-border">
           <MerchQtyControl
             product={product}
             quantity={quantity}
@@ -167,14 +169,14 @@ function MerchItem({ product, quantity, onQuantityChange }: MerchItemProps) {
           />
           <div className="text-right">
             {hasQuantity && quantity > 1 && (
-              <p className="text-xs text-gray-400 mb-0.5">
+              <p className="text-xs text-muted-foreground mb-0.5">
                 {quantity} × {formatCurrency(product.price)}
               </p>
             )}
             <span
               className={cn(
                 "text-base font-bold",
-                hasQuantity ? "text-blue-600" : "text-gray-500",
+                hasQuantity ? "text-primary" : "text-muted-foreground",
               )}
             >
               {formatCurrency(
@@ -225,8 +227,8 @@ function MerchQtyControl({
       className={cn(
         "h-8 px-3 rounded-lg text-xs font-semibold transition-all flex items-center gap-1",
         isAdded
-          ? "bg-blue-600 text-white hover:bg-blue-700"
-          : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50",
+          ? "bg-primary text-primary-foreground hover:bg-primary/90"
+          : "bg-card border border-border text-foreground hover:bg-muted",
       )}
     >
       {isAdded ? (
@@ -260,13 +262,13 @@ function PriceDisplay({ price, comparePrice, quantity }: PriceDisplayProps) {
   return (
     <div className="text-right">
       {hasQuantity && quantity > 1 && (
-        <p className="text-xs text-gray-400">
+        <p className="text-xs text-muted-foreground">
           {quantity} × {formatCurrency(price)}
         </p>
       )}
       <div className="flex items-center gap-1.5 justify-end">
         {hasDiscount && displayOriginal != null && (
-          <span className="text-xs text-gray-400 line-through">
+          <span className="text-xs text-muted-foreground line-through">
             {formatCurrency(displayOriginal)}
           </span>
         )}
@@ -274,10 +276,10 @@ function PriceDisplay({ price, comparePrice, quantity }: PriceDisplayProps) {
           className={cn(
             "font-semibold",
             hasQuantity
-              ? "text-blue-600"
+              ? "text-primary"
               : hasDiscount
                 ? "text-green-600"
-                : "text-gray-500",
+                : "text-muted-foreground",
           )}
         >
           {formatCurrency(displayPrice)}

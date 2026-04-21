@@ -86,12 +86,14 @@ export default function ProfileContent() {
   if (!isLoading && !profile) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center h-full">
-        <Card className="p-6 bg-white gap-2">
-          <p className="text-gray-600 text-center">{t("portal.no_profile")}</p>
-          <p className="text-gray-600 text-center">
+        <Card className="p-6 bg-card gap-2">
+          <p className="text-muted-foreground text-center">
+            {t("portal.no_profile")}
+          </p>
+          <p className="text-muted-foreground text-center">
             {t("portal.no_profile_contact")}
           </p>
-          <p className="text-red-600 text-center">{error}</p>
+          <p className="text-destructive text-center">{error}</p>
         </Card>
       </div>
     )
@@ -111,7 +113,7 @@ export default function ProfileContent() {
       <HeaderProfile />
 
       {/* Profile Content */}
-      <div className="flex-1 p-6 bg-gray-50">
+      <div className="flex-1 p-6 bg-background">
         <div className="max-w-5xl mx-auto space-y-6">
           <HumanForm
             userData={userData}

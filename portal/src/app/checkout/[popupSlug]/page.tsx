@@ -5,7 +5,6 @@ import { useEffect } from "react"
 import { getBackgroundProps } from "@/lib/background-image"
 import { getPublicGroupPath } from "@/lib/group-route"
 import { useCityProvider } from "@/providers/cityProvider"
-import { useTenant } from "@/providers/tenantProvider"
 import { PopupCheckoutContent } from "../components/PopupCheckoutContent"
 
 const LoadingFallback = () => (
@@ -18,7 +17,6 @@ const PopupCheckoutPage = () => {
   const params = useParams<{ popupSlug: string }>()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { tenant } = useTenant()
   const { getPopups, popupsLoaded } = useCityProvider()
   const groupSlug = searchParams.get("group")
 
@@ -54,7 +52,7 @@ const PopupCheckoutPage = () => {
     )
   }
 
-  const background = getBackgroundProps(popupFromSlug, tenant)
+  const background = getBackgroundProps(popupFromSlug)
 
   return <PopupCheckoutContent popup={popupFromSlug} background={background} />
 }

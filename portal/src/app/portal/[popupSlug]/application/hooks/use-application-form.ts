@@ -1,9 +1,11 @@
 import { useCallback, useMemo, useReducer } from "react"
+import { useTranslation } from "react-i18next"
 import type { ApplicationPublic } from "@/client"
 import { buildFormZodSchema } from "@/lib/form-schema-builder"
 import type {
   ApplicationFormSchema,
   FormFieldSchema,
+  FormSectionKind,
 } from "@/types/form-schema"
 
 const HUMAN_FIELD_KEYS = new Set([
@@ -118,34 +120,17 @@ function getInitialValues(
   return values
 }
 
-/** Base field names that belong to a "Children" section (replaced by CompanionsSection UI). */
-function getFieldsReplacedByChildrenSection(
+/** Collect the base field names that live in any section of the given kind. */
+function getFieldsInSectionKind(
   schema: ApplicationFormSchema,
+  kind: FormSectionKind,
 ): Set<string> {
-  const childrenSectionIds = (schema.sections ?? [])
-    .filter((s) => s.label?.toLowerCase().includes("children"))
+  const sectionIds = (schema.sections ?? [])
+    .filter((s) => s.kind === kind)
     .map((s) => s.id)
   return new Set(
     Object.entries(schema.base_fields)
-      .filter(
-        ([, f]) => f.section_id && childrenSectionIds.includes(f.section_id),
-      )
-      .map(([name]) => name),
-  )
-}
-
-/** Base field names that belong to a "Scholarship" section (replaced by ScholarshipSection UI). */
-function getFieldsReplacedByScholarshipSection(
-  schema: ApplicationFormSchema,
-): Set<string> {
-  const scholarshipSectionIds = (schema.sections ?? [])
-    .filter((s) => s.label?.toLowerCase().includes("scholarship"))
-    .map((s) => s.id)
-  return new Set(
-    Object.entries(schema.base_fields)
-      .filter(
-        ([, f]) => f.section_id && scholarshipSectionIds.includes(f.section_id),
-      )
+      .filter(([, f]) => f.section_id && sectionIds.includes(f.section_id))
       .map(([name]) => name),
   )
 }
@@ -155,12 +140,22 @@ export function useApplicationForm(
   initialApplication?: ApplicationPublic | null,
   popupId?: string,
 ) {
-  const fieldsReplacedByChildrenSection = useMemo(
-    () => getFieldsReplacedByChildrenSection(schema),
+  const { t } = useTranslation()
+
+  // Base fields that render via custom UI sections (CompanionsSection,
+  // ScholarshipSection) — Zod skips them because those sections handle
+  // their own validation and data shape.
+  const fieldsReplacedByCustomSection = useMemo(
+    () =>
+      new Set([
+        ...getFieldsInSectionKind(schema, "companions"),
+        ...getFieldsInSectionKind(schema, "scholarship"),
+      ]),
     [schema],
   )
-  const fieldsReplacedByScholarshipSection = useMemo(
-    () => getFieldsReplacedByScholarshipSection(schema),
+
+  const hasScholarshipSection = useMemo(
+    () => (schema.sections ?? []).some((s) => s.kind === "scholarship"),
     [schema],
   )
 
@@ -174,15 +169,6 @@ export function useApplicationForm(
     dispatch({ type: "SET_FIELD", name, value })
   }, [])
 
-  const fieldsReplacedByCustomSection = useMemo(
-    () =>
-      new Set([
-        ...fieldsReplacedByChildrenSection,
-        ...fieldsReplacedByScholarshipSection,
-      ]),
-    [fieldsReplacedByChildrenSection, fieldsReplacedByScholarshipSection],
-  )
-
   const validate = useCallback(
     (
       isDraft: boolean,
@@ -194,23 +180,44 @@ export function useApplicationForm(
       )
       const result = zodSchema.safeParse(state.values)
 
-      if (result.success) {
-        dispatch({ type: "SET_ERRORS", errors: {} })
-        return { isValid: true, errors: {} }
-      }
-
       const errors: Record<string, string> = {}
-      for (const issue of result.error.issues) {
-        const path = issue.path.join(".")
-        if (!errors[path]) {
-          errors[path] = issue.message
+      if (!result.success) {
+        for (const issue of result.error.issues) {
+          const path = issue.path.join(".")
+          if (!errors[path]) {
+            errors[path] = issue.message
+          }
         }
       }
 
+      // Scholarship details are required when the applicant is requesting a
+      // scholarship. Enforced here (not in Zod) because the dependency is
+      // on another field's runtime value, and ScholarshipSection owns the
+      // scholarship_request/details/video_url subset of the schema.
+      if (
+        !isDraft &&
+        hasScholarshipSection &&
+        state.values.scholarship_request
+      ) {
+        const details = (state.values.scholarship_details as string) ?? ""
+        if (!details.trim()) {
+          errors.scholarship_details = t(
+            "application.scholarship.details_required_error",
+          )
+        }
+      }
+
+      const isValid = Object.keys(errors).length === 0
       dispatch({ type: "SET_ERRORS", errors })
-      return { isValid: false, errors }
+      return { isValid, errors }
     },
-    [schema, state.values, fieldsReplacedByCustomSection],
+    [
+      schema,
+      state.values,
+      fieldsReplacedByCustomSection,
+      hasScholarshipSection,
+      t,
+    ],
   )
 
   const progress = useMemo(() => {
@@ -250,5 +257,6 @@ export function useApplicationForm(
     setErrors: (errors: Record<string, string>) =>
       dispatch({ type: "SET_ERRORS", errors }),
     progress,
+    hasScholarshipSection,
   }
 }

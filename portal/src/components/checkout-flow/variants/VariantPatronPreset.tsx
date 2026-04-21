@@ -98,8 +98,10 @@ export default function VariantPatronPreset({
   if (!product) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
-        <Heart className="w-12 h-12 text-gray-300 mb-4" />
-        <p className="text-gray-500 mb-6">No contribution options available.</p>
+        <Heart className="w-12 h-12 text-muted-foreground mb-4" />
+        <p className="text-muted-foreground mb-6">
+          No contribution options available.
+        </p>
         <Button variant="outline" onClick={onSkip}>
           Continue
         </Button>
@@ -164,9 +166,11 @@ function PatronDefault({
 }: PatronLayoutProps) {
   return (
     <div className="space-y-4">
-      <div className="bg-checkout-card-bg rounded-2xl shadow-sm border border-gray-100 overflow-hidden p-5">
+      <div className="bg-checkout-card-bg rounded-2xl shadow-sm border border-border overflow-hidden p-5">
         {product.description && (
-          <p className="text-sm text-gray-600 mb-4">{product.description}</p>
+          <p className="text-sm text-muted-foreground mb-4">
+            {product.description}
+          </p>
         )}
 
         <div className="flex gap-2 mb-3">
@@ -180,8 +184,8 @@ function PatronDefault({
                 className={cn(
                   "flex-1 py-2.5 rounded-lg font-semibold text-sm transition-all",
                   selected
-                    ? "bg-gray-900 text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200",
+                    ? "bg-foreground text-background"
+                    : "bg-muted text-foreground hover:bg-muted/80",
                 )}
               >
                 {formatCurrency(amount)}
@@ -192,9 +196,9 @@ function PatronDefault({
 
         {allowCustom && (
           <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-500">Custom:</span>
+            <span className="text-sm text-muted-foreground">Custom:</span>
             <div className="relative flex-1">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
                 $
               </span>
               <input
@@ -210,11 +214,11 @@ function PatronDefault({
                     customValue &&
                     Number.parseInt(customValue, 10) >= minimum
                     ? "border-green-400 bg-green-50 focus:ring-green-400"
-                    : "border-gray-200 focus:ring-amber-400",
+                    : "border-border focus:ring-amber-400",
                 )}
               />
             </div>
-            <span className="text-xs text-gray-400">
+            <span className="text-xs text-muted-foreground">
               Min {formatCurrency(minimum)}
             </span>
           </div>
@@ -225,7 +229,7 @@ function PatronDefault({
             <button
               type="button"
               onClick={onRemove}
-              className="text-gray-400 hover:text-gray-600 text-xs transition-colors"
+              className="text-muted-foreground hover:text-foreground text-xs transition-colors"
             >
               Remove contribution
             </button>
@@ -251,9 +255,11 @@ function PatronCompact({
 }: PatronLayoutProps) {
   return (
     <div className="space-y-3">
-      <div className="bg-checkout-card-bg rounded-xl border border-gray-100 p-3">
+      <div className="bg-checkout-card-bg rounded-xl border border-border p-3">
         {product.description && (
-          <p className="text-xs text-gray-500 mb-3">{product.description}</p>
+          <p className="text-xs text-muted-foreground mb-3">
+            {product.description}
+          </p>
         )}
 
         <div className="flex gap-1.5 mb-2">
@@ -267,8 +273,8 @@ function PatronCompact({
                 className={cn(
                   "flex-1 py-1.5 rounded-md font-medium text-xs transition-all",
                   selected
-                    ? "bg-gray-900 text-white"
-                    : "bg-gray-50 text-gray-600 hover:bg-gray-100",
+                    ? "bg-foreground text-background"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80",
                 )}
               >
                 {formatCurrency(amount)}
@@ -280,7 +286,7 @@ function PatronCompact({
         {allowCustom && (
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
-              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
+              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">
                 $
               </span>
               <input
@@ -296,7 +302,7 @@ function PatronCompact({
                     customValue &&
                     Number.parseInt(customValue, 10) >= minimum
                     ? "border-green-400 bg-green-50 focus:ring-green-400"
-                    : "border-gray-200 focus:ring-amber-400",
+                    : "border-border focus:ring-amber-400",
                 )}
               />
             </div>
@@ -308,7 +314,7 @@ function PatronCompact({
             <button
               type="button"
               onClick={onRemove}
-              className="text-gray-400 hover:text-gray-600 text-[11px] transition-colors"
+              className="text-muted-foreground hover:text-foreground text-[11px] transition-colors"
             >
               Remove
             </button>
@@ -335,7 +341,7 @@ function PatronGrid({
   return (
     <div className="space-y-4">
       {product.description && (
-        <p className="text-sm text-gray-600">{product.description}</p>
+        <p className="text-sm text-muted-foreground">{product.description}</p>
       )}
 
       <div className="grid grid-cols-2 gap-3">
@@ -349,14 +355,14 @@ function PatronGrid({
               className={cn(
                 "flex flex-col items-center justify-center rounded-2xl border-2 p-5 transition-all",
                 selected
-                  ? "border-gray-900 bg-gray-900 text-white shadow-md"
-                  : "border-gray-200 bg-checkout-card-bg text-gray-700 hover:border-gray-400 hover:shadow-sm",
+                  ? "border-foreground bg-foreground text-background shadow-md"
+                  : "border-border bg-checkout-card-bg text-foreground hover:border-muted-foreground/60 hover:shadow-sm",
               )}
             >
               <Heart
                 className={cn(
                   "w-5 h-5 mb-2",
-                  selected ? "text-white" : "text-gray-300",
+                  selected ? "text-background" : "text-muted-foreground",
                 )}
               />
               <span className="text-lg font-bold">
@@ -374,12 +380,12 @@ function PatronGrid({
                 customValue &&
                 Number.parseInt(customValue, 10) >= minimum
                 ? "border-green-400 bg-green-50"
-                : "border-gray-200 bg-checkout-card-bg",
+                : "border-border bg-checkout-card-bg",
             )}
           >
-            <Heart className="w-5 h-5 mb-2 text-gray-300" />
+            <Heart className="w-5 h-5 mb-2 text-muted-foreground" />
             <div className="relative w-full max-w-[120px]">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
                 $
               </span>
               <input
@@ -389,10 +395,10 @@ function PatronGrid({
                 onChange={(e) => handleCustomChange(e.target.value)}
                 placeholder={minimum.toLocaleString()}
                 aria-label="Custom amount"
-                className="w-full pl-7 pr-2 py-1.5 border border-gray-200 rounded-lg text-center text-sm font-bold focus:outline-none focus:ring-1 focus:ring-amber-400 focus:border-transparent"
+                className="w-full pl-7 pr-2 py-1.5 border border-border rounded-lg text-center text-sm font-bold focus:outline-none focus:ring-1 focus:ring-amber-400 focus:border-transparent"
               />
             </div>
-            <span className="text-[10px] text-gray-400 mt-1">
+            <span className="text-[10px] text-muted-foreground mt-1">
               Min {formatCurrency(minimum)}
             </span>
           </div>
@@ -404,7 +410,7 @@ function PatronGrid({
           <button
             type="button"
             onClick={onRemove}
-            className="text-gray-400 hover:text-gray-600 text-xs transition-colors"
+            className="text-muted-foreground hover:text-foreground text-xs transition-colors"
           >
             Remove contribution
           </button>

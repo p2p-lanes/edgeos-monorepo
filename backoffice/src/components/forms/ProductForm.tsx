@@ -4,23 +4,25 @@ import { useNavigate } from "@tanstack/react-router"
 import {
   Calendar,
   Clock,
-  CloudRain,
   DollarSign,
   Hash,
+  Layers,
   Plus,
   Power,
   Shield,
+  ShieldCheck,
   Users,
 } from "lucide-react"
 import { useMemo, useState } from "react"
 import {
   PopupsService,
   type ProductCreate,
-  type ProductPublic,
+  type ProductPublicWithTier,
   ProductsService,
   type ProductUpdate,
   type TicketAttendeeCategory,
   type TicketDuration,
+  TicketTierGroupsService,
 } from "@/client"
 
 type ProductCategory = string
@@ -28,9 +30,11 @@ type ProductCategory = string
 import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
+import { TierGroupPicker } from "@/components/forms/TierGroupPicker"
 import { TranslationManager } from "@/components/translations/TranslationManager"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { DatePicker } from "@/components/ui/date-picker"
 import {
   Dialog,
@@ -46,6 +50,7 @@ import {
   InlineSection,
 } from "@/components/ui/inline-form"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { LoadingButton } from "@/components/ui/loading-button"
 import {
   Select,
@@ -67,7 +72,7 @@ import {
 import { createErrorHandler } from "@/utils"
 
 interface ProductFormProps {
-  defaultValues?: ProductPublic
+  defaultValues?: ProductPublicWithTier
   onSuccess: () => void
 }
 
@@ -125,7 +130,30 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
   const { data: popupData } = useQuery({
     queryKey: ["popups", popupId],
     queryFn: () => PopupsService.getPopup({ popupId: popupId! }),
-    enabled: isEdit && !!popupId,
+    enabled: !!popupId,
+  })
+
+  // Tier group state (local until Save)
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(
+    defaultValues?.phase?.group_id ?? null,
+  )
+  const [phaseLabel, setPhaseLabel] = useState(
+    defaultValues?.phase?.label ?? "",
+  )
+  const [phaseSaleStartsAt, setPhaseSaleStartsAt] = useState(
+    defaultValues?.phase?.sale_starts_at?.slice(0, 10) ?? "",
+  )
+  const [phaseSaleEndsAt, setPhaseSaleEndsAt] = useState(
+    defaultValues?.phase?.sale_ends_at?.slice(0, 10) ?? "",
+  )
+  const [tierOverlapError, setTierOverlapError] = useState<string | null>(null)
+
+  // Fetch selected group (for overlap validation)
+  const { data: selectedGroupData } = useQuery({
+    queryKey: ["tier-groups", selectedGroupId],
+    queryFn: () =>
+      TicketTierGroupsService.getTierGroup({ groupId: selectedGroupId! }),
+    enabled: !!selectedGroupId,
   })
 
   // Merge hardcoded defaults + API categories + locally added ones (deduplicated)
@@ -181,6 +209,67 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
     onError: createErrorHandler(showErrorToast),
   })
 
+  // ── Tier Phase helpers ─────────────────────────────────────────────────────
+
+  /**
+   * Check if the candidate window [starts, ends] overlaps with any existing
+   * phase in the selected group (excluding this product's own existing phase).
+   */
+  const checkOverlap = (starts: string, ends: string): boolean => {
+    const phases = selectedGroupData?.phases ?? []
+    const currentProductPhaseId = defaultValues?.phase?.id
+    const s = new Date(starts).getTime()
+    const e = ends ? new Date(ends).getTime() : Number.POSITIVE_INFINITY
+
+    for (const phase of phases) {
+      if (phase.id === currentProductPhaseId) continue
+      if (!phase.sale_starts_at && !phase.sale_ends_at) continue
+      const ps = phase.sale_starts_at
+        ? new Date(phase.sale_starts_at).getTime()
+        : Number.NEGATIVE_INFINITY
+      const pe = phase.sale_ends_at
+        ? new Date(phase.sale_ends_at).getTime()
+        : Number.POSITIVE_INFINITY
+      if (s < pe && e > ps) return true
+    }
+    return false
+  }
+
+  const tierPhaseMutation = useMutation({
+    mutationFn: ({
+      productId,
+      existingPhaseId,
+    }: {
+      productId: string
+      existingPhaseId?: string
+    }) => {
+      if (existingPhaseId) {
+        return TicketTierGroupsService.updateTierPhase({
+          groupId: selectedGroupId!,
+          phaseId: existingPhaseId,
+          requestBody: {
+            label: phaseLabel || null,
+            sale_starts_at: phaseSaleStartsAt || null,
+            sale_ends_at: phaseSaleEndsAt || null,
+          },
+        })
+      }
+      return TicketTierGroupsService.createTierPhase({
+        groupId: selectedGroupId!,
+        requestBody: {
+          product_id: productId,
+          label: phaseLabel,
+          sale_starts_at: phaseSaleStartsAt || null,
+          sale_ends_at: phaseSaleEndsAt || null,
+        },
+      })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tier-groups"] })
+    },
+    onError: createErrorHandler(showErrorToast),
+  })
+
   const form = useForm({
     defaultValues: {
       name: defaultValues?.name ?? "",
@@ -196,56 +285,90 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
       max_quantity: defaultValues?.max_quantity?.toString() ?? "",
       start_date: toDateInputValue(defaultValues?.start_date),
       end_date: toDateInputValue(defaultValues?.end_date),
-      insurance_percentage:
-        defaultValues?.insurance_percentage?.toString() ?? "",
+      insurance_eligible: defaultValues?.insurance_eligible ?? false,
     },
     onSubmit: ({ value }) => {
       if (readOnly) return
 
       const isTicket = value.category === "ticket"
+      const tierEnabled = !!popupData?.tier_progression_enabled && isTicket
+      const hasGroupSelected = tierEnabled && !!selectedGroupId
+
+      // BA-3: client-side overlap validation before calling the API
+      if (hasGroupSelected && phaseSaleStartsAt) {
+        const overlaps = checkOverlap(phaseSaleStartsAt, phaseSaleEndsAt)
+        if (overlaps) {
+          setTierOverlapError(
+            "The sale window overlaps with another phase in this group. Adjust the dates.",
+          )
+          return
+        }
+      }
+      setTierOverlapError(null)
 
       const maxQty = value.max_quantity
         ? Number.parseInt(value.max_quantity, 10)
         : null
 
       if (isEdit) {
-        updateMutation.mutate({
-          name: value.name,
-          price: value.price,
-          description: value.description || null,
-          image_url: value.image_url || null,
-          category: value.category,
-          attendee_category: isTicket ? value.attendee_category : null,
-          duration_type: isTicket ? value.duration_type : null,
-          start_date: isTicket && value.start_date ? value.start_date : null,
-          end_date: isTicket && value.end_date ? value.end_date : null,
-          is_active: value.is_active,
-          exclusive: value.exclusive,
-          max_quantity: maxQty,
-          insurance_percentage: value.insurance_percentage || null,
-        })
+        updateMutation.mutate(
+          {
+            name: value.name,
+            price: value.price,
+            description: value.description || null,
+            image_url: value.image_url || null,
+            category: value.category,
+            attendee_category: isTicket ? value.attendee_category : null,
+            duration_type: isTicket ? value.duration_type : null,
+            start_date: isTicket && value.start_date ? value.start_date : null,
+            end_date: isTicket && value.end_date ? value.end_date : null,
+            is_active: value.is_active,
+            exclusive: value.exclusive,
+            max_quantity: maxQty,
+            insurance_eligible: value.insurance_eligible,
+          },
+          {
+            onSuccess: () => {
+              if (hasGroupSelected) {
+                tierPhaseMutation.mutate({
+                  productId: defaultValues!.id,
+                  existingPhaseId: defaultValues?.phase?.id,
+                })
+              }
+            },
+          },
+        )
       } else {
         if (!selectedPopupId) {
           showErrorToast("Please select a popup first")
           return
         }
-        createMutation.mutate({
-          popup_id: selectedPopupId,
-          name: value.name,
-          price: value.price,
-          description: value.description || undefined,
-          image_url: value.image_url || undefined,
-          category: value.category,
-          attendee_category: isTicket ? value.attendee_category : undefined,
-          duration_type: isTicket ? value.duration_type : undefined,
-          start_date:
-            isTicket && value.start_date ? value.start_date : undefined,
-          end_date: isTicket && value.end_date ? value.end_date : undefined,
-          is_active: value.is_active,
-          exclusive: value.exclusive,
-          max_quantity: maxQty ?? undefined,
-          insurance_percentage: value.insurance_percentage || undefined,
-        })
+        createMutation.mutate(
+          {
+            popup_id: selectedPopupId,
+            name: value.name,
+            price: value.price,
+            description: value.description || undefined,
+            image_url: value.image_url || undefined,
+            category: value.category,
+            attendee_category: isTicket ? value.attendee_category : undefined,
+            duration_type: isTicket ? value.duration_type : undefined,
+            start_date:
+              isTicket && value.start_date ? value.start_date : undefined,
+            end_date: isTicket && value.end_date ? value.end_date : undefined,
+            is_active: value.is_active,
+            exclusive: value.exclusive,
+            max_quantity: maxQty ?? undefined,
+            insurance_eligible: value.insurance_eligible,
+          },
+          {
+            onSuccess: (created) => {
+              if (hasGroupSelected) {
+                tierPhaseMutation.mutate({ productId: created.id })
+              }
+            },
+          },
+        )
       }
     },
   })
@@ -455,23 +578,26 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
             )}
           </form.Field>
 
-          <form.Field name="insurance_percentage">
+          <form.Field name="insurance_eligible">
             {(field) => (
               <InlineRow
-                icon={<CloudRain className="h-4 w-4 text-muted-foreground" />}
-                label="Insurance %"
-                description="Leave empty to disable insurance for this product"
+                icon={<ShieldCheck className="h-4 w-4 text-muted-foreground" />}
+                label="Insurance Eligible"
+                description="Include this product in the insurance calculation when popup insurance is enabled"
               >
-                <Input
-                  placeholder="—"
-                  type="text"
-                  inputMode="decimal"
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  disabled={readOnly}
-                  className="max-w-24 text-sm"
-                />
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="insurance_eligible"
+                    checked={field.state.value}
+                    onCheckedChange={(checked) =>
+                      field.handleChange(checked === true)
+                    }
+                    disabled={readOnly}
+                  />
+                  <Label htmlFor="insurance_eligible" className="text-sm">
+                    Eligible
+                  </Label>
+                </div>
               </InlineRow>
             )}
           </form.Field>
@@ -617,6 +743,110 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
                       </InlineRow>
                     )}
                   </form.Field>
+                </InlineSection>
+              </>
+            )
+          }
+        </form.Subscribe>
+
+        {/* Tier Group Section — only for tickets when popup flag is on */}
+        <form.Subscribe selector={(state) => state.values.category}>
+          {(category) =>
+            popupData?.tier_progression_enabled &&
+            category === "ticket" && (
+              <>
+                <Separator />
+                <InlineSection title="Tier Group">
+                  <div className="space-y-3">
+                    <p className="px-1 text-xs text-muted-foreground">
+                      Assign this ticket to a tier group to enable early-bird /
+                      regular / late progression.
+                    </p>
+                    <TierGroupPicker
+                      popupId={popupId!}
+                      value={selectedGroupId}
+                      onChange={(id) => {
+                        setSelectedGroupId(id)
+                        setTierOverlapError(null)
+                      }}
+                      className="max-w-sm"
+                    />
+                  </div>
+
+                  {selectedGroupId && (
+                    <div className="space-y-3 pt-2">
+                      <p className="px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                        Phase Details
+                      </p>
+
+                      {/* Phase Label */}
+                      <InlineRow
+                        icon={
+                          <Layers className="h-4 w-4 text-muted-foreground" />
+                        }
+                        label="Phase label"
+                        description='E.g. "Early Bird", "Regular"'
+                      >
+                        <Input
+                          id="phase-label"
+                          aria-label="Phase label"
+                          placeholder="Early Bird"
+                          value={phaseLabel}
+                          onChange={(e) => setPhaseLabel(e.target.value)}
+                          disabled={readOnly}
+                          className="max-w-48 text-sm"
+                        />
+                      </InlineRow>
+
+                      {/* Sale Starts At */}
+                      <InlineRow
+                        icon={
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                        }
+                        label="Sale starts"
+                        description="When this phase opens for purchase"
+                      >
+                        <Input
+                          id="phase-sale-starts-at"
+                          aria-label="Sale starts"
+                          type="date"
+                          value={phaseSaleStartsAt}
+                          onChange={(e) => setPhaseSaleStartsAt(e.target.value)}
+                          disabled={readOnly}
+                          className="max-w-44 text-sm"
+                        />
+                      </InlineRow>
+
+                      {/* Sale Ends At */}
+                      <InlineRow
+                        icon={
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                        }
+                        label="Sale ends"
+                        description="When this phase closes"
+                      >
+                        <Input
+                          id="phase-sale-ends-at"
+                          aria-label="Sale ends"
+                          type="date"
+                          value={phaseSaleEndsAt}
+                          onChange={(e) => setPhaseSaleEndsAt(e.target.value)}
+                          disabled={readOnly}
+                          className="max-w-44 text-sm"
+                        />
+                      </InlineRow>
+
+                      {/* Overlap error */}
+                      {tierOverlapError && (
+                        <p
+                          role="alert"
+                          className="px-1 text-sm text-destructive"
+                        >
+                          {tierOverlapError}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </InlineSection>
               </>
             )

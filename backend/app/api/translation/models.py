@@ -41,11 +41,16 @@ class Translations(TranslationBase, table=True):
 
     __table_args__ = (
         UniqueConstraint(
-            "tenant_id", "entity_type", "entity_id", "language",
+            "tenant_id",
+            "entity_type",
+            "entity_id",
+            "language",
             name="uq_translation_entity_language",
         ),
         Index(
             "ix_translation_entity_lookup",
-            "entity_type", "entity_id", "language",
+            "entity_type",
+            "entity_id",
+            "language",
         ),
     )

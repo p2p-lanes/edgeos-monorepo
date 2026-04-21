@@ -34,7 +34,9 @@ function parseImages(
 
 function Caption({ text }: { text?: string }) {
   if (!text) return null
-  return <p className="text-sm text-gray-600 text-center mt-2">{text}</p>
+  return (
+    <p className="text-sm text-muted-foreground text-center mt-2">{text}</p>
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -56,7 +58,7 @@ function CarouselGallery({
 
   return (
     <div className="space-y-4">
-      <div className="relative overflow-hidden rounded-2xl bg-gray-100">
+      <div className="relative overflow-hidden rounded-2xl bg-muted">
         <div
           className="flex transition-transform duration-300 ease-out"
           style={{ transform: `translateX(-${current * 100}%)` }}
@@ -114,7 +116,7 @@ function CarouselGallery({
               onClick={() => setCurrent(i)}
               className={cn(
                 "w-2 h-2 rounded-full transition-colors",
-                i === current ? "bg-gray-800" : "bg-gray-300",
+                i === current ? "bg-foreground" : "bg-muted",
               )}
             />
           ))}
@@ -142,7 +144,7 @@ function MasonryGallery({
       <div className="columns-2 sm:columns-3 gap-3 space-y-3">
         {images.map((img) => (
           <div key={img.id} className="break-inside-avoid">
-            <div className="rounded-xl overflow-hidden shadow-sm border border-gray-100">
+            <div className="rounded-xl overflow-hidden shadow-sm border border-border">
               {/* biome-ignore lint: masonry items use native img for natural height */}
               <img
                 src={img.url}
@@ -152,7 +154,7 @@ function MasonryGallery({
               />
               {img.caption && (
                 <div className="px-3 py-2">
-                  <p className="text-xs text-gray-600">{img.caption}</p>
+                  <p className="text-xs text-muted-foreground">{img.caption}</p>
                 </div>
               )}
             </div>
@@ -211,7 +213,7 @@ function LightboxGallery({
             key={img.id}
             type="button"
             onClick={() => setSelected(i)}
-            className="relative aspect-square rounded-xl overflow-hidden bg-gray-100 group"
+            className="relative aspect-square rounded-xl overflow-hidden bg-muted group"
           >
             <Image
               src={img.url}
@@ -306,7 +308,7 @@ function SlideshowGallery({
 
   return (
     <div className="space-y-4">
-      <div className="relative rounded-2xl overflow-hidden bg-gray-100 aspect-[16/9]">
+      <div className="relative rounded-2xl overflow-hidden bg-muted aspect-[16/9]">
         {images.map((img, i) => (
           <div
             key={img.id}
@@ -351,7 +353,7 @@ function SlideshowGallery({
               }}
               className={cn(
                 "w-2 h-2 rounded-full transition-colors",
-                i === current ? "bg-gray-800" : "bg-gray-300",
+                i === current ? "bg-foreground" : "bg-muted",
               )}
             />
           ))}
@@ -377,8 +379,10 @@ export default function VariantImageGallery({
   if (images.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
-        <ImageIcon className="w-12 h-12 text-gray-300 mb-4" />
-        <p className="text-gray-500 mb-6">No images available for this step.</p>
+        <ImageIcon className="w-12 h-12 text-muted-foreground mb-4" />
+        <p className="text-muted-foreground mb-6">
+          No images available for this step.
+        </p>
         <Button variant="outline" onClick={onSkip}>
           Continue
         </Button>

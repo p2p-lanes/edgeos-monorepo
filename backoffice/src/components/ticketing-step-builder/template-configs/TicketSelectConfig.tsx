@@ -12,9 +12,13 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable"
 import { useQuery } from "@tanstack/react-query"
-import { Check, Plus } from "lucide-react"
+import { Check, Layers, Plus } from "lucide-react"
 
-import { ProductsService } from "@/client"
+import {
+  ProductsService,
+  type TierGroupPublic,
+  type TierPhasePublic,
+} from "@/client"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
@@ -26,6 +30,15 @@ import {
   toKey,
 } from "./SortableSectionCard"
 import type { TemplateConfigProps } from "./types"
+
+// Products from listProducts may carry tier enrichment when the popup flag is on.
+// We treat the response as potentially having these fields (additive, BC-2).
+interface EnrichedProduct {
+  id: string
+  name: string
+  tier_group?: TierGroupPublic | null
+  phase?: TierPhasePublic | null
+}
 
 const TICKET_SELECT_VARIANTS = [
   {
@@ -150,10 +163,50 @@ export function TicketSelectConfig({
     enabled: !!popupId,
   })
 
-  const products = (productsData?.results ?? []).map((p) => ({
+  // Cast to enriched shape — fields are optional and null for non-grouped products (BC-2)
+  const enrichedProducts = (productsData?.results ??
+    []) as unknown as EnrichedProduct[]
+
+  const products = enrichedProducts.map((p) => ({
     id: p.id,
-    name: p.name,
+    // Include phase label in display name when grouped
+    name: p.phase?.label ? `${p.phase.label} — ${p.name}` : p.name,
   }))
+
+  // Build tier group buckets for the visual panel
+  const hasAnyTierGroup = enrichedProducts.some((p) => !!p.tier_group)
+
+  type GroupBucket = {
+    group: TierGroupPublic
+    products: Array<EnrichedProduct & { phase: TierPhasePublic }>
+  }
+
+  const groupBuckets: GroupBucket[] = []
+  const ungroupedProducts: EnrichedProduct[] = []
+
+  if (hasAnyTierGroup) {
+    const groupMap = new Map<string, GroupBucket>()
+    for (const product of enrichedProducts) {
+      if (product.tier_group && product.phase) {
+        const g = product.tier_group
+        if (!groupMap.has(g.id)) {
+          groupMap.set(g.id, { group: g, products: [] })
+        }
+        groupMap
+          .get(g.id)!
+          .products.push(
+            product as EnrichedProduct & { phase: TierPhasePublic },
+          )
+      } else {
+        ungroupedProducts.push(product)
+      }
+    }
+    // Sort phases within each group by order asc
+    for (const bucket of groupMap.values()) {
+      bucket.products.sort((a, b) => a.phase.order - b.phase.order)
+      groupBuckets.push(bucket)
+    }
+  }
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -259,6 +312,78 @@ export function TicketSelectConfig({
       </div>
 
       <Separator />
+
+      {/* Tier Group Overview — shown when popup has tier progression enabled */}
+      {hasAnyTierGroup && (
+        <>
+          <div className="flex flex-col gap-3">
+            <div>
+              <Label className="text-sm font-medium">Tier Groups</Label>
+              <p className="text-xs text-muted-foreground">
+                Products organised by tier group. Phase order is ascending
+                within each group.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              {groupBuckets.map(({ group, products: phaseProducts }) => (
+                <div
+                  key={group.id}
+                  className="rounded-md border bg-muted/30 p-3 space-y-1.5"
+                >
+                  <div className="flex items-center gap-2">
+                    <Layers className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    <span className="text-sm font-medium">{group.name}</span>
+                    {group.shared_stock_cap != null && (
+                      <span className="ml-auto text-xs text-muted-foreground">
+                        {group.shared_stock_remaining ?? 0}/
+                        {group.shared_stock_cap} remaining
+                      </span>
+                    )}
+                  </div>
+                  <div className="ml-5.5 flex flex-col gap-0.5">
+                    {phaseProducts.map((p) => (
+                      <div
+                        key={p.id}
+                        className="text-xs text-muted-foreground flex items-center gap-1.5"
+                      >
+                        <span className="font-medium text-foreground">
+                          {p.phase.label}
+                        </span>
+                        <span>—</span>
+                        <span className="truncate">{p.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+
+              {ungroupedProducts.length > 0 && (
+                <div className="rounded-md border border-dashed p-3 space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <Layers className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    <span className="text-sm font-medium text-muted-foreground">
+                      Ungrouped
+                    </span>
+                  </div>
+                  <div className="ml-5.5 flex flex-col gap-0.5">
+                    {ungroupedProducts.map((p) => (
+                      <div
+                        key={p.id}
+                        className="text-xs text-muted-foreground truncate"
+                      >
+                        {p.name}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <Separator />
+        </>
+      )}
 
       {/* Sections */}
       <div className="flex items-center justify-between">

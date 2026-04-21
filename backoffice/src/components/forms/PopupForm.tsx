@@ -18,11 +18,13 @@ import {
   Mail,
   MapPin,
   Scale,
+  ShieldCheck,
   ShoppingCart,
   Ticket,
 } from "lucide-react"
 import {
   ApprovalStrategiesService,
+  type CheckoutMode,
   type PopupAdmin,
   type PopupCreate,
   PopupsService,
@@ -34,7 +36,6 @@ import { FieldError } from "@/components/Common/FieldError"
 import { FormErrorSummary } from "@/components/Common/FormErrorSummary"
 import { ApprovalStrategyForm } from "@/components/forms/ApprovalStrategyForm"
 import { ReviewersManager } from "@/components/forms/ReviewersManager"
-import { ThemeConfigForm } from "@/components/forms/ThemeConfigForm"
 import { TranslationManager } from "@/components/translations/TranslationManager"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -117,6 +118,10 @@ function getSaleTypeGuidance(saleType: SaleType) {
   }
 }
 
+function deriveCheckoutMode(saleType: SaleType): CheckoutMode {
+  return saleType === "direct" ? "simple_quantity" : "pass_system"
+}
+
 export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -180,6 +185,10 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
       location: defaultValues?.location ?? "",
       status: defaultValues?.status ?? "draft",
       sale_type: (defaultValues?.sale_type ?? "application") as SaleType,
+      checkout_mode: (defaultValues?.checkout_mode ??
+        deriveCheckoutMode(
+          defaultValues?.sale_type ?? "application",
+        )) as CheckoutMode,
       start_date: formatDateForInput(defaultValues?.start_date),
       end_date: formatDateForInput(defaultValues?.end_date),
       allows_spouse: defaultValues?.allows_spouse ?? false,
@@ -205,6 +214,11 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
       invoice_company_email: defaultValues?.invoice_company_email ?? "",
       default_language: defaultValues?.default_language ?? "en",
       supported_languages: defaultValues?.supported_languages ?? ["en"],
+      insurance_enabled: defaultValues?.insurance_enabled ?? false,
+      insurance_percentage:
+        defaultValues?.insurance_percentage?.toString() ?? "",
+      tier_progression_enabled:
+        defaultValues?.tier_progression_enabled ?? false,
     },
     onSubmit: ({ value }) => {
       if (readOnly) return
@@ -242,15 +256,17 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         invoice_company_email: value.invoice_company_email || null,
         default_language: value.default_language,
         supported_languages: value.supported_languages,
+        sale_type: value.sale_type,
+        insurance_enabled: value.insurance_enabled,
+        insurance_percentage: value.insurance_enabled
+          ? value.insurance_percentage || null
+          : null,
+        tier_progression_enabled: value.tier_progression_enabled,
       }
       if (isEdit) {
-        // sale_type is immutable — never sent on update (backend would 422)
         updateMutation.mutate(payload)
       } else {
-        createMutation.mutate({
-          ...payload,
-          sale_type: value.sale_type,
-        })
+        createMutation.mutate(payload)
       }
     },
   })
@@ -396,7 +412,8 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
             </h3>
             <p className="text-sm text-muted-foreground">
               Decide how people will access this event. This is the primary
-              identity of the popup and cannot be changed after creation.
+              identity of the popup. Checkout mode is always derived from this
+              choice by the backend.
             </p>
           </div>
 
@@ -414,7 +431,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                   label="Sale Type"
                   description={
                     isEdit
-                      ? "Sale type cannot be changed after creation"
+                      ? "Change sale type only if this popup has no approved payments yet"
                       : "Choose whether people apply first or buy tickets directly"
                   }
                 >
@@ -423,7 +440,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                     onValueChange={(value) =>
                       field.handleChange(value as SaleType)
                     }
-                    disabled={readOnly || isEdit}
+                    disabled={readOnly}
                   >
                     <SelectTrigger className="w-[220px] text-sm" size="sm">
                       <SelectValue />
@@ -435,35 +452,6 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                       <SelectItem value="direct">
                         {SALE_TYPE_COPY.direct.label}
                       </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </InlineRow>
-              )}
-            </form.Field>
-
-            <form.Field name="currency">
-              {(field) => (
-                <InlineRow
-                  icon={
-                    <DollarSign className="h-4 w-4 text-muted-foreground" />
-                  }
-                  label="Currency"
-                  description="Currency used for products, fees, invoices, and checkout totals"
-                >
-                  <Select
-                    value={field.state.value}
-                    onValueChange={(value) => field.handleChange(value)}
-                    disabled={readOnly}
-                  >
-                    <SelectTrigger className="w-[220px] text-sm" size="sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CURRENCIES.map((currency) => (
-                        <SelectItem key={currency.value} value={currency.value}>
-                          {currency.label}
-                        </SelectItem>
-                      ))}
                     </SelectContent>
                   </Select>
                 </InlineRow>
@@ -493,6 +481,37 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
               )
             }}
           </form.Subscribe>
+
+          <InlineSection>
+            <form.Field name="currency">
+              {(field) => (
+                <InlineRow
+                  icon={
+                    <DollarSign className="h-4 w-4 text-muted-foreground" />
+                  }
+                  label="Currency"
+                  description="Currency used for products, fees, invoices, and checkout totals"
+                >
+                  <Select
+                    value={field.state.value}
+                    onValueChange={(value) => field.handleChange(value)}
+                    disabled={readOnly}
+                  >
+                    <SelectTrigger className="w-[220px] text-sm" size="sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CURRENCIES.map((currency) => (
+                        <SelectItem key={currency.value} value={currency.value}>
+                          {currency.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </InlineRow>
+              )}
+            </form.Field>
+          </InlineSection>
         </div>
 
         <Separator />
@@ -821,53 +840,6 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
           </form.Field>
         </InlineSection>
 
-        {/* Portal Theme (edit only). The form is `mx-auto max-w-2xl` (672px),
-            but the theme section needs more horizontal room for the side-by-side
-            preview panel. Negative margins on lg+ widen this single section
-            without breaking the rest of the form's column. The parent route
-            container is `max-w-7xl` with `p-6 md:p-8`, so -mx-32 (128px) at lg
-            and -mx-48 (192px) at xl stay safely inside the page padding. */}
-        {isEdit && (
-          <>
-            <Separator />
-            <div className="lg:-mx-32 xl:-mx-48">
-              <form.Subscribe
-                selector={(state) => ({
-                  name: state.values.name,
-                  tagline: state.values.tagline,
-                  location: state.values.location,
-                  start_date: state.values.start_date,
-                  end_date: state.values.end_date,
-                  express_checkout_background:
-                    state.values.express_checkout_background,
-                })}
-              >
-                {(event) => (
-                  <ThemeConfigForm
-                    popupId={defaultValues!.id}
-                    themeConfig={
-                      defaultValues!.theme_config as Record<
-                        string,
-                        unknown
-                      > | null
-                    }
-                    readOnly={readOnly}
-                    previewEvent={{
-                      name: event.name,
-                      tagline: event.tagline || null,
-                      location: event.location || null,
-                      start_date: event.start_date || null,
-                      end_date: event.end_date || null,
-                      express_checkout_background:
-                        event.express_checkout_background || null,
-                    }}
-                  />
-                )}
-              </form.Subscribe>
-            </div>
-          </>
-        )}
-
         <Separator />
 
         {/* Links */}
@@ -1028,6 +1000,98 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                   onChange={(e) => field.handleChange(e.target.value)}
                   disabled={readOnly}
                   className="max-w-xs text-sm"
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+        </InlineSection>
+
+        <Separator />
+
+        {/* Insurance */}
+        <InlineSection title="Insurance">
+          <form.Field name="insurance_enabled">
+            {(field) => (
+              <InlineRow
+                icon={<ShieldCheck className="h-4 w-4 text-muted-foreground" />}
+                label="Enable Insurance"
+                description="Offer insurance for eligible products during checkout"
+              >
+                <Switch
+                  id="insurance_enabled"
+                  checked={field.state.value}
+                  onCheckedChange={(checked) => field.handleChange(checked)}
+                  disabled={readOnly}
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+
+          <form.Subscribe selector={(state) => state.values.insurance_enabled}>
+            {(insuranceEnabled) => (
+              <form.Field
+                name="insurance_percentage"
+                validators={{
+                  onBlur: ({ value }) => {
+                    if (readOnly || !insuranceEnabled) return undefined
+                    const num = Number.parseFloat(value)
+                    if (!value || Number.isNaN(num) || num <= 0) {
+                      return "Insurance percentage must be greater than 0 when insurance is enabled"
+                    }
+                    if (num > 100) {
+                      return "Insurance percentage cannot exceed 100"
+                    }
+                    return undefined
+                  },
+                }}
+              >
+                {(field) => (
+                  <div>
+                    <InlineRow
+                      icon={
+                        <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+                      }
+                      label="Insurance Rate (%)"
+                      description="Percentage of eligible product price applied as insurance fee"
+                    >
+                      <Input
+                        id="insurance_percentage"
+                        type="number"
+                        min="0.01"
+                        max="100"
+                        step="0.01"
+                        placeholder="e.g. 5.00"
+                        value={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                        disabled={readOnly || !insuranceEnabled}
+                        className="max-w-[120px] text-sm"
+                      />
+                    </InlineRow>
+                    <FieldError errors={field.state.meta.errors} />
+                  </div>
+                )}
+              </form.Field>
+            )}
+          </form.Subscribe>
+        </InlineSection>
+
+        <Separator />
+
+        {/* Ticket tier progression */}
+        <InlineSection title="Ticket tier progression">
+          <form.Field name="tier_progression_enabled">
+            {(field) => (
+              <InlineRow
+                icon={<Ticket className="h-4 w-4 text-muted-foreground" />}
+                label="Enable tier progression"
+                description="Group tickets into tiers (Early Bird → Regular → Late) so the portal shows the active phase and keeps sold-out phases visible."
+              >
+                <Switch
+                  id="tier_progression_enabled"
+                  checked={field.state.value}
+                  onCheckedChange={(checked) => field.handleChange(checked)}
+                  disabled={readOnly}
                 />
               </InlineRow>
             )}

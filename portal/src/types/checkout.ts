@@ -138,6 +138,14 @@ export interface CheckoutCartSummary {
 export const PATRON_PRESETS = [2500, 5000, 7500]
 export const PATRON_MINIMUM = 1000
 
+// --- Insurance Summary ---
+export interface CheckoutInsuranceSummary {
+  enabled: boolean
+  percentage: number | null
+  amount: number
+  eligibleProductIds: string[]
+}
+
 // --- Insurance ---
 export const INSURANCE_BENEFITS = [
   "Full refund up to 14 days before the pop-up",
