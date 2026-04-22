@@ -6,7 +6,14 @@ import {
 } from "@tanstack/react-query"
 import { createFileRoute, Link } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
-import { EllipsisVertical, ListTree, Pencil, Plus, Trash2 } from "lucide-react"
+import {
+  EllipsisVertical,
+  Eye,
+  ListTree,
+  Pencil,
+  Plus,
+  Trash2,
+} from "lucide-react"
 import { Suspense, useState } from "react"
 
 import { type TrackPublic, TracksService } from "@/client"
@@ -34,6 +41,7 @@ import {
 import { LoadingButton } from "@/components/ui/loading-button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
+import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
 import {
   useTableSearchParams,
@@ -54,6 +62,7 @@ function TrackActionsMenu({ track }: { track: TrackPublic }) {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
+  const { isAdmin } = useAuth()
 
   const deleteMutation = useMutation({
     mutationFn: () => TracksService.deleteTrack({ trackId: track.id }),
@@ -80,18 +89,29 @@ function TrackActionsMenu({ track }: { track: TrackPublic }) {
               to="/events/tracks/$trackId/edit"
               params={{ trackId: track.id }}
             >
-              <Pencil className="mr-2 h-4 w-4" />
-              Edit
+              {isAdmin ? (
+                <>
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Edit
+                </>
+              ) : (
+                <>
+                  <Eye className="mr-2 h-4 w-4" />
+                  View
+                </>
+              )}
             </Link>
           </DropdownMenuItem>
-          <DropdownMenuItem
-            variant="destructive"
-            onSelect={(e) => e.preventDefault()}
-            onClick={() => setDeleteOpen(true)}
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Delete
-          </DropdownMenuItem>
+          {isAdmin && (
+            <DropdownMenuItem
+              variant="destructive"
+              onSelect={(e) => e.preventDefault()}
+              onClick={() => setDeleteOpen(true)}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 

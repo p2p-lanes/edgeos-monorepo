@@ -12,6 +12,7 @@ import {
   CalendarRange,
   CheckCircle2,
   EllipsisVertical,
+  Eye,
   Pencil,
   Plus,
   Repeat,
@@ -45,6 +46,7 @@ import {
 import { LoadingButton } from "@/components/ui/loading-button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
+import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
 import {
   useTableSearchParams,
@@ -107,6 +109,7 @@ function EventActionsMenu({ event }: { event: EventPublic }) {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const { showSuccessToast, showErrorToast } = useCustomToast()
+  const { isAdmin } = useAuth()
 
   const occurrenceRef = parseOccurrenceId(event.occurrence_id)
   const isOccurrence = occurrenceRef !== null
@@ -213,7 +216,7 @@ function EventActionsMenu({ event }: { event: EventPublic }) {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          {isPendingApproval && (
+          {isAdmin && isPendingApproval && (
             <>
               <DropdownMenuItem
                 onSelect={(e) => e.preventDefault()}
@@ -222,7 +225,7 @@ function EventActionsMenu({ event }: { event: EventPublic }) {
                   setDecisionReason("")
                 }}
               >
-                <CheckCircle2 className="mr-2 h-4 w-4 text-green-600" />
+                <CheckCircle2 className="mr-2 h-4 w-4" />
                 Approve
               </DropdownMenuItem>
               <DropdownMenuItem
@@ -232,7 +235,7 @@ function EventActionsMenu({ event }: { event: EventPublic }) {
                   setDecisionReason("")
                 }}
               >
-                <XCircle className="mr-2 h-4 w-4 text-destructive" />
+                <XCircle className="mr-2 h-4 w-4" />
                 Reject
               </DropdownMenuItem>
             </>
@@ -243,17 +246,28 @@ function EventActionsMenu({ event }: { event: EventPublic }) {
               handleEdit()
             }}
           >
-            <Pencil className="mr-2 h-4 w-4" />
-            Edit
+            {isAdmin ? (
+              <>
+                <Pencil className="mr-2 h-4 w-4" />
+                Edit
+              </>
+            ) : (
+              <>
+                <Eye className="mr-2 h-4 w-4" />
+                View
+              </>
+            )}
           </DropdownMenuItem>
-          <DropdownMenuItem
-            variant="destructive"
-            onSelect={(e) => e.preventDefault()}
-            onClick={() => setDeleteOpen(true)}
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Delete
-          </DropdownMenuItem>
+          {isAdmin && (
+            <DropdownMenuItem
+              variant="destructive"
+              onSelect={(e) => e.preventDefault()}
+              onClick={() => setDeleteOpen(true)}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 
