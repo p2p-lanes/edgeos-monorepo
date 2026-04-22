@@ -9,6 +9,7 @@ from sqlalchemy import Boolean, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlmodel import Column, DateTime, Field, SQLModel
 
+from app.api.application_review.schemas import ReviewDecision
 from app.api.attendee.schemas import AttendeePublic, CompanionCreate
 from app.api.human.schemas import HumanPublic
 
@@ -154,6 +155,7 @@ class ApplicationPublic(BaseModel):
     brings_spouse: bool = False
     brings_kids: bool = False
     kid_count: int = 0
+    review_decision: ReviewDecision | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
