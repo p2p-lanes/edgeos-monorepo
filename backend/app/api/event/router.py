@@ -725,7 +725,6 @@ def _run_bulk_invite(
     """
     from sqlmodel import select
 
-    from app.api.event.models import EventInvitations
     from app.api.human.models import Humans
 
     cleaned = {e.strip().lower() for e in emails if e.strip()}
@@ -742,31 +741,14 @@ def _run_bulk_invite(
     found_by_email = {h.email.lower(): h for h in humans}
     not_found = sorted(e for e in cleaned if e not in found_by_email)
 
-    existing = list(
-        db.exec(
-            select(EventInvitations).where(EventInvitations.event_id == event.id)
-        ).all()
+    created, skipped_ids = crud.invitations_crud.create_bulk_for_humans(
+        db,
+        event=event,
+        humans=list(found_by_email.values()),
+        inviter_id=inviter_id,
     )
-    already_invited = {inv.human_id for inv in existing}
-
-    created: list[EventInvitations] = []
-    skipped_existing: list[str] = []
-    for email, human in found_by_email.items():
-        if human.id in already_invited:
-            skipped_existing.append(email)
-            continue
-        inv = EventInvitations(
-            tenant_id=event.tenant_id,
-            event_id=event.id,
-            human_id=human.id,
-            invited_by=inviter_id,
-        )
-        db.add(inv)
-        created.append(inv)
-
-    db.commit()
-    for inv in created:
-        db.refresh(inv)
+    id_to_email = {h.id: email for email, h in found_by_email.items()}
+    skipped_existing = sorted(id_to_email[hid] for hid in skipped_ids)
 
     by_id = {h.id: h for h in found_by_email.values()}
     invited_public = [
@@ -815,13 +797,10 @@ async def delete_invitation(
     db: TenantSession,
     _: CurrentWriter,
 ) -> None:
-    from app.api.event.models import EventInvitations
-
-    inv = db.get(EventInvitations, invitation_id)
+    inv = crud.invitations_crud.get(db, invitation_id)
     if not inv or inv.event_id != event_id:
         raise HTTPException(status_code=404, detail="Invitation not found")
-    db.delete(inv)
-    db.commit()
+    crud.invitations_crud.delete(db, inv)
 
 
 # ---------------------------------------------------------------------------
@@ -1038,14 +1017,11 @@ async def delete_portal_invitation(
     db: HumanTenantSession,
     current_human: CurrentHuman,
 ) -> None:
-    from app.api.event.models import EventInvitations
-
     _ensure_portal_event_owner(db, event_id, current_human)
-    inv = db.get(EventInvitations, invitation_id)
+    inv = crud.invitations_crud.get(db, invitation_id)
     if not inv or inv.event_id != event_id:
         raise HTTPException(status_code=404, detail="Invitation not found")
-    db.delete(inv)
-    db.commit()
+    crud.invitations_crud.delete(db, inv)
 
 
 # ---------------------------------------------------------------------------
@@ -1324,10 +1300,6 @@ async def hide_portal_event(
     instead. If it's a real exception override with a master, hide the
     master so all siblings disappear together.
     """
-    from sqlmodel import select
-
-    from app.api.event.models import EventHiddenByHuman
-
     event = crud.events_crud.get(db, event_id)
     if not event:
         raise HTTPException(
@@ -1335,23 +1307,12 @@ async def hide_portal_event(
         )
 
     target_id = event.recurrence_master_id or event.id
-
-    existing = db.exec(
-        select(EventHiddenByHuman)
-        .where(EventHiddenByHuman.human_id == current_human.id)
-        .where(EventHiddenByHuman.event_id == target_id)
-    ).first()
-    if existing:
-        return
-
-    db.add(
-        EventHiddenByHuman(
-            tenant_id=current_human.tenant_id,
-            human_id=current_human.id,
-            event_id=target_id,
-        )
+    crud.hidden_by_human_crud.hide(
+        db,
+        tenant_id=current_human.tenant_id,
+        human_id=current_human.id,
+        event_id=target_id,
     )
-    db.commit()
 
 
 @router.delete(
@@ -1363,21 +1324,15 @@ async def unhide_portal_event(
     current_human: CurrentHuman,
 ) -> None:
     """Undo a prior hide."""
-    from sqlmodel import delete
-
-    from app.api.event.models import EventHiddenByHuman
-
     event = crud.events_crud.get(db, event_id)
     target_id = (
         event.recurrence_master_id or event.id if event else event_id
     )
-
-    db.exec(
-        delete(EventHiddenByHuman)
-        .where(EventHiddenByHuman.human_id == current_human.id)
-        .where(EventHiddenByHuman.event_id == target_id)
+    crud.hidden_by_human_crud.unhide(
+        db,
+        human_id=current_human.id,
+        event_id=target_id,
     )
-    db.commit()
 
 
 @router.post("/portal/events", response_model=EventPublic, status_code=status.HTTP_201_CREATED)

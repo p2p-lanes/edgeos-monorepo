@@ -3,9 +3,9 @@ from collections.abc import Iterable
 from datetime import datetime, timedelta
 
 from sqlalchemy import asc
-from sqlmodel import Session, col, func, select
+from sqlmodel import Session, col, delete, func, select
 
-from app.api.event.models import Events
+from app.api.event.models import EventHiddenByHuman, EventInvitations, Events
 from app.api.event.recurrence import (
     DEFAULT_MAX_OCCURRENCES,
     expand,
@@ -13,6 +13,7 @@ from app.api.event.recurrence import (
     synthetic_occurrence_id,
 )
 from app.api.event.schemas import EventCreate, EventStatus, EventUpdate
+from app.api.human.models import Humans
 from app.api.shared.crud import BaseCRUD
 
 
@@ -314,3 +315,133 @@ def expanded_events_with_occurrence_id(events: Iterable[Events]) -> list[tuple[E
 
 
 events_crud = EventsCRUD()
+
+
+class EventInvitationsCRUD:
+    """CRUD operations for EventInvitations.
+
+    Not using BaseCRUD because invitations have no Create/Update schemas —
+    they're created via bulk operations keyed on (event, human) tuples and
+    deleted by id.
+    """
+
+    def get(
+        self, session: Session, invitation_id: uuid.UUID
+    ) -> EventInvitations | None:
+        return session.get(EventInvitations, invitation_id)
+
+    def delete(self, session: Session, invitation: EventInvitations) -> None:
+        session.delete(invitation)
+        session.commit()
+
+    def list_existing_human_ids(
+        self, session: Session, event_id: uuid.UUID
+    ) -> set[uuid.UUID]:
+        """Return the set of human_ids already invited to the event."""
+        rows = session.exec(
+            select(EventInvitations.human_id).where(
+                EventInvitations.event_id == event_id
+            )
+        ).all()
+        return set(rows)
+
+    def create_bulk_for_humans(
+        self,
+        session: Session,
+        *,
+        event: Events,
+        humans: list[Humans],
+        inviter_id: uuid.UUID,
+    ) -> tuple[list[EventInvitations], set[uuid.UUID]]:
+        """Create invitations for ``humans`` on ``event``, skipping dupes.
+
+        Returns ``(created, skipped_human_ids)`` — the caller can map
+        skipped ids back to emails if needed.
+        """
+        already_invited = self.list_existing_human_ids(session, event.id)
+        created: list[EventInvitations] = []
+        skipped_ids: set[uuid.UUID] = set()
+        for human in humans:
+            if human.id in already_invited:
+                skipped_ids.add(human.id)
+                continue
+            inv = EventInvitations(
+                tenant_id=event.tenant_id,
+                event_id=event.id,
+                human_id=human.id,
+                invited_by=inviter_id,
+            )
+            session.add(inv)
+            created.append(inv)
+        session.commit()
+        for inv in created:
+            session.refresh(inv)
+        return created, skipped_ids
+
+
+class EventHiddenByHumanCRUD:
+    """CRUD for EventHiddenByHuman markers.
+
+    Not using BaseCRUD — hides are idempotent and keyed by (human, event)
+    rather than by row id.
+    """
+
+    def get(
+        self,
+        session: Session,
+        *,
+        human_id: uuid.UUID,
+        event_id: uuid.UUID,
+    ) -> EventHiddenByHuman | None:
+        """Return the hide marker if one exists."""
+        return session.exec(
+            select(EventHiddenByHuman)
+            .where(EventHiddenByHuman.human_id == human_id)
+            .where(EventHiddenByHuman.event_id == event_id)
+        ).first()
+
+    def hide(
+        self,
+        session: Session,
+        *,
+        tenant_id: uuid.UUID,
+        human_id: uuid.UUID,
+        event_id: uuid.UUID,
+    ) -> EventHiddenByHuman:
+        """Idempotently hide an event.
+
+        Returns the existing marker when already hidden; otherwise creates a
+        new one and returns it.
+        """
+        existing = self.get(session, human_id=human_id, event_id=event_id)
+        if existing:
+            return existing
+
+        row = EventHiddenByHuman(
+            tenant_id=tenant_id,
+            human_id=human_id,
+            event_id=event_id,
+        )
+        session.add(row)
+        session.commit()
+        session.refresh(row)
+        return row
+
+    def unhide(
+        self,
+        session: Session,
+        *,
+        human_id: uuid.UUID,
+        event_id: uuid.UUID,
+    ) -> None:
+        """Delete any hide marker for (human, event). No-op if none exists."""
+        session.exec(
+            delete(EventHiddenByHuman)
+            .where(EventHiddenByHuman.human_id == human_id)
+            .where(EventHiddenByHuman.event_id == event_id)
+        )
+        session.commit()
+
+
+invitations_crud = EventInvitationsCRUD()
+hidden_by_human_crud = EventHiddenByHumanCRUD()
