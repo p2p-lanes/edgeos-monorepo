@@ -145,6 +145,7 @@ export type ApplicationPublic = {
     brings_spouse?: boolean;
     brings_kids?: boolean;
     kid_count?: number;
+    review_decision?: (ReviewDecision | null);
 };
 
 /**
@@ -2190,6 +2191,7 @@ export type ApplicationsListApplicationsData = {
      */
     limit?: number;
     popupId?: (string | null);
+    reviewedBy?: (string | null);
     search?: (string | null);
     /**
      * Number of items to skip

@@ -17,7 +17,7 @@ import {
   ThumbsDown,
   ThumbsUp,
 } from "lucide-react"
-import { Suspense, useState } from "react"
+import { Suspense, useCallback, useEffect, useState } from "react"
 
 import {
   type ApiError,
@@ -28,6 +28,9 @@ import {
   ApprovalStrategiesService,
   DashboardService,
   FormFieldsService,
+  type PopupReviewerPublic,
+  PopupReviewersService,
+  PopupsService,
   type ReviewDecision,
 } from "@/client"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
@@ -90,7 +93,6 @@ const APPLICATION_STATUS_OPTIONS: {
   { value: "in review", label: "In Review" },
   { value: "accepted", label: "Accepted" },
   { value: "rejected", label: "Rejected" },
-  { value: "withdrawn", label: "Withdrawn" },
 ]
 
 function getApplicationsQueryOptions(
@@ -99,6 +101,7 @@ function getApplicationsQueryOptions(
   pageSize: number,
   search?: string,
   statusFilter?: ApplicationStatus,
+  reviewedBy?: string,
 ) {
   return {
     queryFn: () =>
@@ -106,13 +109,14 @@ function getApplicationsQueryOptions(
         skip: page * pageSize,
         limit: pageSize,
         popupId: popupId || undefined,
+        reviewedBy: reviewedBy || undefined,
         search: search || undefined,
         statusFilter: statusFilter || undefined,
       }),
     queryKey: [
       "applications",
       popupId,
-      { page, pageSize, search, statusFilter },
+      { page, pageSize, search, statusFilter, reviewedBy },
     ],
   }
 }
@@ -141,33 +145,41 @@ function useStatusCounts(popupId: string | null) {
 
 function StatusDropdownFilter({
   popupId,
+  requiresApplicationFee,
   selected,
   onSelect,
 }: {
   popupId: string | null
+  requiresApplicationFee?: boolean
   selected: ApplicationStatus | undefined
   onSelect: (value: ApplicationStatus | undefined) => void
 }) {
   const { counts, total } = useStatusCounts(popupId)
+  const statusOptions =
+    requiresApplicationFee === false
+      ? APPLICATION_STATUS_OPTIONS.filter((opt) => opt.value !== "pending_fee")
+      : APPLICATION_STATUS_OPTIONS
+  const selectedOption = selected
+    ? statusOptions.find((option) => option.value === selected)
+    : undefined
 
   const options = [
     { value: "all" as const, label: "All", count: total },
-    ...APPLICATION_STATUS_OPTIONS.map((opt) => ({
+    ...statusOptions.map((opt) => ({
       value: opt.value,
       label: opt.label,
       count: counts[opt.value] ?? 0,
     })),
   ]
 
-  const currentLabel = selected
-    ? (APPLICATION_STATUS_OPTIONS.find((o) => o.value === selected)?.label ??
-      "All")
-    : "All"
-  const currentCount = selected ? (counts[selected] ?? 0) : total
+  const currentLabel = selectedOption?.label ?? "All"
+  const currentCount = selectedOption
+    ? (counts[selectedOption.value] ?? 0)
+    : total
 
   return (
     <Select
-      value={selected ?? "all"}
+      value={selectedOption?.value ?? "all"}
       onValueChange={(v) =>
         onSelect(v === "all" ? undefined : (v as ApplicationStatus))
       }
@@ -196,23 +208,72 @@ function StatusDropdownFilter({
   )
 }
 
+function ReviewerDropdownFilter({
+  reviewers,
+  selected,
+  onSelect,
+  disabled = false,
+}: {
+  reviewers: PopupReviewerPublic[]
+  selected: string | undefined
+  onSelect: (value: string | undefined) => void
+  disabled?: boolean
+}) {
+  const selectedReviewer = selected
+    ? reviewers.find((reviewer) => reviewer.user_id === selected)
+    : undefined
+
+  const currentLabel = disabled
+    ? "No reviewers"
+    : (selectedReviewer?.user_full_name ??
+      selectedReviewer?.user_email ??
+      "All reviewers")
+
+  return (
+    <Select
+      value={selected ?? "all"}
+      onValueChange={(value) => onSelect(value === "all" ? undefined : value)}
+      disabled={disabled}
+    >
+      <SelectTrigger className="h-9 w-[220px]">
+        <SelectValue>{currentLabel}</SelectValue>
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all">All reviewers</SelectItem>
+        {reviewers.map((reviewer) => (
+          <SelectItem key={reviewer.id} value={reviewer.user_id}>
+            {reviewer.user_full_name ??
+              reviewer.user_email ??
+              "Unknown reviewer"}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
+}
+
 const VALID_STATUSES: Set<string> = new Set([
   "draft",
   "pending_fee",
   "in review",
   "accepted",
   "rejected",
-  "withdrawn",
 ])
+
+type ApplicationsSearchParams = TableSearchParams & {
+  reviewerId?: string
+  status?: ApplicationStatus
+}
 
 export const Route = createFileRoute("/_layout/applications/")({
   component: Applications,
-  validateSearch: (
-    raw: Record<string, unknown>,
-  ): TableSearchParams & { status?: ApplicationStatus } => ({
+  validateSearch: (raw: Record<string, unknown>): ApplicationsSearchParams => ({
     ...validateTableSearch(raw),
     ...(typeof raw.status === "string" && VALID_STATUSES.has(raw.status)
       ? { status: raw.status as ApplicationStatus }
+      : {}),
+    ...(typeof raw.reviewerId === "string" && raw.reviewerId
+      ? { reviewerId: raw.reviewerId }
       : {}),
   }),
   head: () => ({
@@ -409,6 +470,7 @@ function ApplicationActionsMenu({
 
 const getColumns = (
   isWeightedVoting: boolean,
+  showReviewerDecision: boolean,
 ): ColumnDef<ApplicationPublic>[] => [
   {
     accessorKey: "human.first_name",
@@ -488,6 +550,21 @@ const getColumns = (
       </span>
     ),
   },
+  ...(showReviewerDecision
+    ? [
+        {
+          accessorKey: "review_decision",
+          header: "Vote",
+          meta: { label: "Vote", toggleable: true },
+          cell: ({ row }) =>
+            row.original.review_decision ? (
+              <StatusBadge status={row.original.review_decision} />
+            ) : (
+              <span className="text-muted-foreground">—</span>
+            ),
+        } satisfies ColumnDef<ApplicationPublic>,
+      ]
+    : []),
   {
     id: "actions",
     header: () => <span className="sr-only">Actions</span>,
@@ -515,18 +592,37 @@ function ApplicationsTableContent() {
     "/applications",
   )
   const statusFilter = searchParams.status
+  const reviewerId = searchParams.reviewerId
 
-  const setStatusFilter = (value: ApplicationStatus | undefined) => {
-    navigate({
-      to: "/applications",
-      search: (prev: Record<string, unknown>) => ({
-        ...prev,
-        status: value,
-        page: 0,
-      }),
-      replace: true,
-    })
-  }
+  const setStatusFilter = useCallback(
+    (value: ApplicationStatus | undefined) => {
+      navigate({
+        to: "/applications",
+        search: (prev: Record<string, unknown>) => ({
+          ...prev,
+          status: value,
+          page: 0,
+        }),
+        replace: true,
+      })
+    },
+    [navigate],
+  )
+
+  const setReviewerFilter = useCallback(
+    (value: string | undefined) => {
+      navigate({
+        to: "/applications",
+        search: (prev: Record<string, unknown>) => ({
+          ...prev,
+          reviewerId: value,
+          page: 0,
+        }),
+        replace: true,
+      })
+    },
+    [navigate],
+  )
 
   const { data: applications } = useQuery({
     ...getApplicationsQueryOptions(
@@ -535,8 +631,16 @@ function ApplicationsTableContent() {
       pagination.pageSize,
       search,
       statusFilter,
+      reviewerId,
     ),
     placeholderData: keepPreviousData,
+  })
+
+  const { data: popupReviewers } = useQuery({
+    queryKey: ["popup-reviewers", selectedPopupId],
+    queryFn: () =>
+      PopupReviewersService.listReviewers({ popupId: selectedPopupId! }),
+    enabled: !!selectedPopupId,
   })
 
   const { data: approvalStrategy } = useQuery({
@@ -548,6 +652,43 @@ function ApplicationsTableContent() {
     enabled: !!selectedPopupId,
     retry: false,
   })
+
+  const { data: popup } = useQuery({
+    queryKey: ["popups", selectedPopupId],
+    queryFn: () => PopupsService.getPopup({ popupId: selectedPopupId! }),
+    enabled: !!selectedPopupId,
+  })
+
+  useEffect(() => {
+    if (
+      popup?.requires_application_fee === false &&
+      statusFilter === "pending_fee"
+    ) {
+      setStatusFilter(undefined)
+    }
+  }, [popup?.requires_application_fee, setStatusFilter, statusFilter])
+
+  const reviewers = popupReviewers?.results ?? []
+
+  useEffect(() => {
+    if (!reviewerId) return
+    if (!selectedPopupId) {
+      setReviewerFilter(undefined)
+      return
+    }
+    if (
+      popupReviewers &&
+      !reviewers.some((reviewer) => reviewer.user_id === reviewerId)
+    ) {
+      setReviewerFilter(undefined)
+    }
+  }, [
+    popupReviewers,
+    reviewerId,
+    reviewers,
+    selectedPopupId,
+    setReviewerFilter,
+  ])
 
   const bulkReviewMutation = useMutation({
     mutationFn: async ({
@@ -618,7 +759,7 @@ function ApplicationsTableContent() {
   })
 
   const isWeightedVoting = approvalStrategy?.strategy_type === "weighted"
-  const columns = getColumns(isWeightedVoting)
+  const columns = getColumns(isWeightedVoting, !!reviewerId)
   const canBulkReview = isAdmin && !isWeightedVoting
 
   if (!applications) return <Skeleton className="h-64 w-full" />
@@ -636,10 +777,18 @@ function ApplicationsTableContent() {
         <div className="flex flex-wrap items-center gap-2">
           <StatusDropdownFilter
             popupId={selectedPopupId}
+            requiresApplicationFee={popup?.requires_application_fee}
             selected={statusFilter}
             onSelect={setStatusFilter}
           />
-          {/* Add more filter dropdowns here (e.g. organization, date range) */}
+          {selectedPopupId ? (
+            <ReviewerDropdownFilter
+              reviewers={reviewers}
+              selected={reviewerId}
+              onSelect={setReviewerFilter}
+              disabled={reviewers.length === 0}
+            />
+          ) : null}
         </div>
       }
       serverPagination={{

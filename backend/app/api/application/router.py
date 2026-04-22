@@ -23,6 +23,7 @@ from app.api.application.schemas import (
     ParticipationResponse,
     ScholarshipDecisionRequest,
 )
+from app.api.application_review.crud import application_reviews_crud
 from app.api.attendee.schemas import (
     AttendeeCreate,
     AttendeePublic,
@@ -45,7 +46,10 @@ from app.services.email_helpers import send_application_status_email
 router = APIRouter(prefix="/applications", tags=["applications"])
 
 
-def _build_application_public(application) -> ApplicationPublic:
+def _build_application_public(
+    application,
+    review_decision=None,
+) -> ApplicationPublic:
     """Build ApplicationPublic with attendees and products."""
     attendees = []
     for a in application.attendees:
@@ -64,6 +68,7 @@ def _build_application_public(application) -> ApplicationPublic:
     app_public = ApplicationPublic.model_validate(application)
     app_public.attendees = attendees
     app_public.red_flag = application.red_flag
+    app_public.review_decision = review_decision
     return app_public
 
 
@@ -73,6 +78,7 @@ async def list_applications(
     _: CurrentUser,
     popup_id: uuid.UUID | None = None,
     human_id: uuid.UUID | None = None,
+    reviewed_by: uuid.UUID | None = None,
     status_filter: ApplicationStatus | None = None,
     search: str | None = None,
     skip: PaginationSkip = 0,
@@ -87,6 +93,7 @@ async def list_applications(
             limit=limit,
             status_filter=status_filter,
             search=search,
+            reviewed_by=reviewed_by,
         )
     elif human_id:
         applications, total = crud.applications_crud.find_by_human(
@@ -95,7 +102,23 @@ async def list_applications(
     else:
         applications, total = crud.applications_crud.find(db, skip=skip, limit=limit)
 
-    results = [_build_application_public(a) for a in applications]
+    review_decisions = (
+        application_reviews_crud.get_decisions_by_reviewer_for_applications(
+            db,
+            reviewed_by,
+            [application.id for application in applications],
+        )
+        if reviewed_by
+        else {}
+    )
+
+    results = [
+        _build_application_public(
+            application,
+            review_decision=review_decisions.get(application.id),
+        )
+        for application in applications
+    ]
 
     return ListModel[ApplicationPublic](
         results=results,
