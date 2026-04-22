@@ -1,9 +1,28 @@
 import { useQuery } from "@tanstack/react-query"
 import { useParams, usePathname, useRouter } from "next/navigation"
 import { useEffect } from "react"
-import { PopupsService } from "@/client"
+import { type PopupPublic, PopupsService } from "@/client"
 import { useIsAuthenticated } from "@/hooks/useIsAuthenticated"
 import { queryKeys } from "@/lib/query-keys"
+
+const getPopupStartTime = (popup: PopupPublic) => {
+  if (!popup.start_date) return Number.POSITIVE_INFINITY
+
+  const startTime = new Date(popup.start_date).getTime()
+  return Number.isNaN(startTime) ? Number.POSITIVE_INFINITY : startTime
+}
+
+const sortPopupsByUpcomingDate = (popups: PopupPublic[]) => {
+  return [...popups].sort((a, b) => {
+    const dateDifference = getPopupStartTime(a) - getPopupStartTime(b)
+
+    if (dateDifference !== 0) {
+      return dateDifference
+    }
+
+    return a.name.localeCompare(b.name)
+  })
+}
 
 /** Authenticated query — uses HumanTenantSession (RLS-scoped) on the backend. */
 export function usePopupsQuery(enabled = true) {
@@ -12,7 +31,9 @@ export function usePopupsQuery(enabled = true) {
     queryKey: queryKeys.popups.portal(),
     queryFn: async () => {
       const result = await PopupsService.listPortalPopups()
-      return result.filter((p) => p.status === "active").reverse()
+      return sortPopupsByUpcomingDate(
+        result.filter((popup) => popup.status === "active"),
+      )
     },
     enabled: enabled && isAuthenticated,
   })
@@ -27,7 +48,7 @@ export function usePublicPopupsQuery(enabled = true) {
       const result = await PopupsService.listPublicPopups({
         xTenantId: tenantId,
       })
-      return result.reverse()
+      return sortPopupsByUpcomingDate(result)
     },
     enabled,
   })
