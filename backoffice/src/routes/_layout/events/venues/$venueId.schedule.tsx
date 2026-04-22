@@ -23,11 +23,10 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { VenueWeekCalendar } from "@/components/VenueWeekCalendar"
 
-export const Route = createFileRoute("/_layout/events/venues-schedule")({
+export const Route = createFileRoute(
+  "/_layout/events/venues/$venueId/schedule",
+)({
   component: VenueSchedulePage,
-  validateSearch: (search: Record<string, unknown>) => ({
-    venueId: search.venueId as string,
-  }),
   head: () => ({
     meta: [{ title: "Venue Schedule - EdgeOS" }],
   }),
@@ -231,7 +230,7 @@ function VenueScheduleContent({ venueId }: { venueId: string }) {
 }
 
 function VenueSchedulePage() {
-  const { venueId } = Route.useSearch()
+  const { venueId } = Route.useParams()
 
   return (
     <FormPageLayout

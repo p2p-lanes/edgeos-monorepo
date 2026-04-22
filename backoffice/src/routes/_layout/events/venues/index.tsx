@@ -10,6 +10,8 @@ import {
   CalendarRange,
   Check,
   CheckCircle2,
+  EllipsisVertical,
+  Eye,
   MapPin,
   Pencil,
   Plus,
@@ -21,6 +23,7 @@ import { type EventVenuePublic, EventVenuesService } from "@/client"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
+import { StatusBadge } from "@/components/Common/StatusBadge"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -33,9 +36,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { LoadingButton } from "@/components/ui/loading-button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
+import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
 import {
   useTableSearchParams,
@@ -43,7 +53,7 @@ import {
 } from "@/hooks/useTableSearchParams"
 import { createErrorHandler } from "@/utils"
 
-export const Route = createFileRoute("/_layout/events/venues")({
+export const Route = createFileRoute("/_layout/events/venues/")({
   component: VenuesPage,
   validateSearch: validateTableSearch,
   head: () => ({
@@ -64,22 +74,11 @@ const columns: ColumnDef<EventVenuePublic>[] = [
   {
     accessorKey: "status",
     header: "Status",
-    cell: ({ row }) =>
-      row.original.status === "pending" ? (
-        <Badge
-          variant="outline"
-          className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400"
-        >
-          Pending
-        </Badge>
-      ) : (
-        <Badge
-          variant="outline"
-          className="border-green-500/40 bg-green-500/10 text-green-700 dark:text-green-400"
-        >
-          Active
-        </Badge>
-      ),
+    cell: ({ row }) => (
+      <StatusBadge
+        status={row.original.status === "pending" ? "pending" : "active"}
+      />
+    ),
   },
   {
     accessorKey: "location",
@@ -111,16 +110,18 @@ const columns: ColumnDef<EventVenuePublic>[] = [
 ]
 
 function VenueRowActions({ venue }: { venue: EventVenuePublic }) {
-  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
+  const { isAdmin } = useAuth()
 
   const deleteMutation = useMutation({
     mutationFn: () => EventVenuesService.deleteVenue({ venueId: venue.id }),
     onSuccess: () => {
       showSuccessToast("Venue deleted successfully")
-      setDeleteOpen(false)
+      setDeleteDialogOpen(false)
     },
     onError: createErrorHandler(showErrorToast),
     onSettled: () =>
@@ -143,60 +144,74 @@ function VenueRowActions({ venue }: { venue: EventVenuePublic }) {
 
   return (
     <>
-      <div className="flex items-center justify-end gap-1">
-        {isPending && (
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={`Approve ${venue.title || "venue"}`}
-            title="Approve"
-            disabled={approveMutation.isPending}
-            onClick={() => approveMutation.mutate()}
-            className="text-muted-foreground hover:text-green-600"
-          >
-            <Check className="h-4 w-4" />
+      <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" aria-label="Venue actions">
+            <EllipsisVertical className="h-4 w-4" />
           </Button>
-        )}
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label={`Schedule ${venue.title || "venue"}`}
-          title="Schedule"
-          onClick={() =>
-            navigate({
-              to: "/events/venues-schedule",
-              search: { venueId: venue.id },
-            })
-          }
-          className="text-muted-foreground hover:text-primary"
-        >
-          <CalendarRange className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label={`Edit ${venue.title || "venue"}`}
-          onClick={() =>
-            navigate({
-              to: "/events/venues-edit",
-              search: { venueId: venue.id },
-            })
-          }
-        >
-          <Pencil className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label={`Delete ${venue.title || "venue"}`}
-          onClick={() => setDeleteOpen(true)}
-          className="text-muted-foreground hover:text-destructive"
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
-      </div>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem
+            onClick={() => {
+              setMenuOpen(false)
+              navigate({
+                to: "/events/venues/$venueId/edit",
+                params: { venueId: venue.id },
+              })
+            }}
+          >
+            {isAdmin ? (
+              <>
+                <Pencil className="mr-2 h-4 w-4" />
+                Edit
+              </>
+            ) : (
+              <>
+                <Eye className="mr-2 h-4 w-4" />
+                View
+              </>
+            )}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => {
+              setMenuOpen(false)
+              navigate({
+                to: "/events/venues/$venueId/schedule",
+                params: { venueId: venue.id },
+              })
+            }}
+          >
+            <CalendarRange className="mr-2 h-4 w-4" />
+            Schedule
+          </DropdownMenuItem>
+          {isAdmin && isPending && (
+            <DropdownMenuItem
+              onClick={() => {
+                setMenuOpen(false)
+                approveMutation.mutate()
+              }}
+              disabled={approveMutation.isPending}
+            >
+              <Check className="mr-2 h-4 w-4" />
+              Approve
+            </DropdownMenuItem>
+          )}
+          {isAdmin && (
+            <DropdownMenuItem
+              variant="destructive"
+              onClick={() => {
+                setMenuOpen(false)
+                setDeleteDialogOpen(true)
+              }}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete
+            </DropdownMenuItem>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
 
-      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Venue</DialogTitle>
@@ -208,7 +223,9 @@ function VenueRowActions({ venue }: { venue: EventVenuePublic }) {
           </DialogHeader>
           <DialogFooter>
             <DialogClose asChild>
-              <Button variant="outline">Cancel</Button>
+              <Button variant="outline" disabled={deleteMutation.isPending}>
+                Cancel
+              </Button>
             </DialogClose>
             <LoadingButton
               variant="destructive"
@@ -229,7 +246,7 @@ function VenuesTableContent() {
   const { selectedPopupId } = useWorkspace()
   const { search, pagination, setSearch, setPagination } = useTableSearchParams(
     searchParams,
-    "/events/venues",
+    "/events/venues/",
   )
   const [pendingOnly, setPendingOnly] = useState(false)
 
@@ -337,7 +354,7 @@ function VenuesPage() {
         </div>
         {selectedPopupId && (
           <Button asChild>
-            <Link to="/events/venues-new">
+            <Link to="/events/venues/new">
               <Plus className="mr-2 h-4 w-4" />
               Add Venue
             </Link>

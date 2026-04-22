@@ -8,11 +8,8 @@ import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { VenueForm } from "@/components/forms/VenueForm"
 import { Skeleton } from "@/components/ui/skeleton"
 
-export const Route = createFileRoute("/_layout/events/venues-edit")({
+export const Route = createFileRoute("/_layout/events/venues/$venueId/edit")({
   component: EditVenuePage,
-  validateSearch: (search: Record<string, unknown>) => ({
-    venueId: search.venueId as string,
-  }),
   head: () => ({
     meta: [{ title: "Edit Venue - EdgeOS" }],
   }),
@@ -34,7 +31,7 @@ function EditVenueContent({ venueId }: { venueId: string }) {
 }
 
 function EditVenuePage() {
-  const { venueId } = Route.useSearch()
+  const { venueId } = Route.useParams()
 
   return (
     <FormPageLayout

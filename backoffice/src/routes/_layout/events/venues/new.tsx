@@ -5,7 +5,7 @@ import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { VenueForm } from "@/components/forms/VenueForm"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 
-export const Route = createFileRoute("/_layout/events/venues-new")({
+export const Route = createFileRoute("/_layout/events/venues/new")({
   component: NewVenuePage,
   head: () => ({
     meta: [{ title: "New Venue - EdgeOS" }],
