@@ -39,6 +39,35 @@ from app.api.email_template.schemas import (
     EmailTemplateType,
     EmailTemplateUpdate,
 )
+
+# Events module
+from app.api.event.models import EventHiddenByHuman, EventInvitations, Events
+from app.api.event.schemas import EventCreate, EventPublic, EventUpdate
+from app.api.event_participant.models import EventParticipants
+from app.api.event_participant.schemas import (
+    EventParticipantCreate,
+    EventParticipantPublic,
+    EventParticipantUpdate,
+)
+from app.api.event_settings.models import EventSettings
+from app.api.event_settings.schemas import (
+    EventSettingsCreate,
+    EventSettingsPublic,
+    EventSettingsUpdate,
+)
+from app.api.event_venue.models import (
+    EventVenues,
+    VenueExceptions,
+    VenuePhotos,
+    VenueProperties,
+    VenuePropertyTypes,
+    VenueWeeklyHours,
+)
+from app.api.event_venue.schemas import (
+    EventVenueCreate,
+    EventVenuePublic,
+    EventVenueUpdate,
+)
 from app.api.form_field.models import FormFields
 from app.api.form_field.schemas import FormFieldCreate, FormFieldPublic, FormFieldUpdate
 
@@ -88,6 +117,8 @@ from app.api.ticketing_step.schemas import (
     TicketingStepPublic,
     TicketingStepUpdate,
 )
+from app.api.track.models import Tracks
+from app.api.track.schemas import TrackCreate, TrackPublic, TrackUpdate
 from app.api.translation.models import Translations
 from app.api.translation.schemas import TranslationCreate, TranslationPublic
 from app.api.user.models import Users
@@ -191,6 +222,34 @@ __all__ = [
     "ApplicationReviewCreate",
     "ApplicationReviewPublic",
     "ReviewDecision",
+    # Events module
+    "Events",
+    "EventHiddenByHuman",
+    "EventInvitations",
+    "EventCreate",
+    "EventPublic",
+    "EventUpdate",
+    "EventParticipants",
+    "EventParticipantCreate",
+    "EventParticipantPublic",
+    "EventParticipantUpdate",
+    "EventVenues",
+    "VenueExceptions",
+    "VenuePhotos",
+    "VenueProperties",
+    "VenuePropertyTypes",
+    "VenueWeeklyHours",
+    "EventVenueCreate",
+    "EventVenuePublic",
+    "EventVenueUpdate",
+    "EventSettings",
+    "EventSettingsCreate",
+    "EventSettingsPublic",
+    "EventSettingsUpdate",
+    "Tracks",
+    "TrackCreate",
+    "TrackPublic",
+    "TrackUpdate",
     # Translations
     "Translations",
     "TranslationCreate",

@@ -29,7 +29,7 @@ import { CREATE_ROUTES, formatShortcut, SHORTCUTS } from "@/lib/shortcuts"
 
 const pages = [
   { label: "Dashboard", to: "/", icon: Home },
-  { label: "Events", to: "/popups", icon: Calendar },
+  { label: "Pop-ups", to: "/popups", icon: Calendar },
   { label: "Products", to: "/products", icon: Package },
   { label: "Coupons", to: "/coupons", icon: Tag },
   { label: "Groups", to: "/groups", icon: UsersRound },

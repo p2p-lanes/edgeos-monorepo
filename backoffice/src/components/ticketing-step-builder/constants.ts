@@ -10,7 +10,7 @@ import {
   Shield,
   ShoppingBag,
   Ticket,
-  Youtube,
+  Video,
 } from "lucide-react"
 
 export interface StepTypeDefinition {
@@ -55,7 +55,7 @@ export const TEMPLATE_DEFINITIONS: TemplateDefinition[] = [
     key: "youtube-video",
     label: "YouTube Video",
     description: "Embedded YouTube video",
-    icon: Youtube,
+    icon: Video,
   },
   {
     key: "image-gallery",

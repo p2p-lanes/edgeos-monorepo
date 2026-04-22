@@ -8,7 +8,7 @@ import useAuth from "@/hooks/useAuth"
 export const Route = createFileRoute("/_layout/popups/new")({
   component: NewPopup,
   head: () => ({
-    meta: [{ title: "New Event - EdgeOS" }],
+    meta: [{ title: "New Pop-up - EdgeOS" }],
   }),
 })
 
@@ -29,8 +29,8 @@ function NewPopup() {
 
   return (
     <FormPageLayout
-      title="Create Event"
-      description="Add a new event to manage"
+      title="Create Pop-up"
+      description="Add a new pop-up to manage"
       backTo="/popups"
     >
       <PopupForm onSuccess={() => navigate({ to: "/popups" })} />

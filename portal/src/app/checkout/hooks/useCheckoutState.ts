@@ -135,7 +135,7 @@ const useCheckoutState = ({
         }
 
         setErrorMessage(
-          "You already have a pending application for this event. Please check your email or contact support.",
+          "You already have a pending application for this pop-up. Please check your email or contact support.",
         )
       } else {
         const msg =

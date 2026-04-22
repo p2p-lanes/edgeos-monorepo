@@ -180,6 +180,7 @@ export function ThemeConfigForm({
           </p>
 
           {/* Mode toggle */}
+          {/* biome-ignore lint/a11y/noStaticElementInteractions: hover-only preview highlight; no keyboard interaction required. */}
           <div
             className="flex items-center justify-between rounded-md border bg-background px-3 py-2.5"
             onMouseEnter={() => handleHover(["mode"])}

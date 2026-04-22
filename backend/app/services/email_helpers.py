@@ -1,7 +1,5 @@
 """Email dispatch helpers for application status transitions."""
 
-from typing import Union
-
 from sqlmodel import Session
 
 from app.api.email_template.schemas import EmailTemplateType
@@ -15,12 +13,12 @@ from app.services.email import (
     get_email_service,
 )
 
-_AcceptedContext = Union[
-    ApplicationAcceptedContext,
-    ApplicationAcceptedWithDiscountContext,
-    ApplicationAcceptedWithIncentiveContext,
-    ApplicationAcceptedScholarshipRejectedContext,
-]
+_AcceptedContext = (
+    ApplicationAcceptedContext
+    | ApplicationAcceptedWithDiscountContext
+    | ApplicationAcceptedWithIncentiveContext
+    | ApplicationAcceptedScholarshipRejectedContext
+)
 
 
 def _get_scholarship_email_variant(

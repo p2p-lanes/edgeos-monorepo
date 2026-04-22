@@ -133,7 +133,6 @@
   --checkout-button: #ffffff;
   --checkout-button-title: #1e2a4d;
   --checkout-bottom-bar-text: #ffffff;
-  /* Disabled variants derived via color-mix (no editables del form). */
   /* Disabled states ride the neutral muted palette so contrast holds in
      both light and dark without depending on whatever brand color the
      admin set for the active state. */
@@ -152,16 +151,17 @@
   --popover-foreground: oklch(0.205 0.015 285);
   --primary: oklch(0.279 0.041 260);
   --primary-foreground: oklch(0.975 0.005 285);
-  --secondary: oklch(0.965 0.005 285);
+  --secondary: oklch(0.96 0.005 285);
   --secondary-foreground: oklch(0.279 0.041 260);
-  --muted: oklch(0.965 0.005 285);
+  --muted: oklch(0.958 0.005 285);
   --muted-foreground: oklch(0.556 0.01 260);
-  --accent: oklch(0.965 0.005 285);
+  --accent: oklch(0.958 0.005 285);
   --accent-foreground: oklch(0.279 0.041 260);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.975 0.005 285);
-  --border: oklch(0.922 0.005 285);
-  --input: oklch(0.922 0.005 285);
+  /* Stronger border so card edges are clearly visible against the page. */
+  --border: oklch(0.86 0.01 260);
+  --input: oklch(0.88 0.008 260);
   --ring: oklch(0.205 0.015 285);
   --chart-1: oklch(0.646 0.222 41);
   --chart-2: oklch(0.6 0.118 185);
@@ -185,7 +185,8 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
+  /* Slightly deeper page background so cards (0.225) read as elevated. */
+  --background: oklch(0.135 0.005 260);
   --foreground: oklch(0.985 0 0);
   --heading: oklch(0.985 0 0);
   --heading-secondary: oklch(0.7 0.02 260);
@@ -217,19 +218,20 @@
   --checkout-nav-text: var(--checkout-badge-title);
   --card: oklch(0.205 0.015 285);
   --card-foreground: oklch(0.975 0.005 285);
-  --popover: oklch(0.205 0.015 285);
+  --popover: oklch(0.225 0.015 285);
   --popover-foreground: oklch(0.975 0.005 285);
   --primary: oklch(0.975 0.005 285);
   --primary-foreground: oklch(0.279 0.041 260);
-  --secondary: oklch(0.305 0.03 260);
+  --secondary: oklch(0.31 0.03 260);
   --secondary-foreground: oklch(0.975 0.005 285);
-  --muted: oklch(0.305 0.03 260);
+  --muted: oklch(0.28 0.025 260);
   --muted-foreground: oklch(0.7 0.02 260);
-  --accent: oklch(0.305 0.03 260);
+  --accent: oklch(0.31 0.03 260);
   --accent-foreground: oklch(0.975 0.005 285);
   --destructive: oklch(0.45 0.2 27);
   --destructive-foreground: oklch(0.975 0.005 285);
-  --border: oklch(0.305 0.03 260);
+  /* Border sits above the card surface so edges are visible against it. */
+  --border: oklch(0.33 0.025 260);
   --input: oklch(0.305 0.03 260);
   --ring: oklch(0.8 0.03 260);
   --chart-1: oklch(0.488 0.243 264);

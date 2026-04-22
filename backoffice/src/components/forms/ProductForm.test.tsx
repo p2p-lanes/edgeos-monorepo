@@ -234,7 +234,6 @@ describe("ProductForm — tier group integration", () => {
         Array.from(s.options).some((o) => o.value === "ticket"),
       )
       expect(categorySelect).toBeDefined()
-      // biome-ignore lint: test-only direct DOM manipulation
       categorySelect!.value = "housing"
       categorySelect!.dispatchEvent(new Event("change", { bubbles: true }))
 

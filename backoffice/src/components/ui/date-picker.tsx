@@ -12,10 +12,14 @@ import {
 } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 
+type DayMatcher = (date: Date) => boolean
+
 interface DatePickerProps {
   value: string
   onChange: (value: string) => void
   disabled?: boolean
+  /** Matcher for individual calendar days (greys them out and blocks selection). */
+  disabledDays?: DayMatcher
   placeholder?: string
   className?: string
   id?: string
@@ -30,6 +34,7 @@ export function DatePicker({
   value,
   onChange,
   disabled,
+  disabledDays,
   placeholder = "Pick a date",
   className,
   id,
@@ -79,6 +84,7 @@ export function DatePicker({
           selected={date}
           defaultMonth={date ?? defaultMonth}
           onSelect={(newDate) => onChange(formatDate(newDate))}
+          disabled={disabledDays}
           initialFocus
         />
       </PopoverContent>

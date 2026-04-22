@@ -9,6 +9,14 @@ from sqlalchemy import Boolean, Column, Numeric
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlmodel import Field, SQLModel, String
 
+from app.api.shared.enums import (
+    ApplicationLayout,
+    CheckoutMode,
+    SaleType,
+    derive_checkout_mode,
+)
+from app.utils.utils import slugify
+
 
 def validate_popup_insurance_config(enabled: bool, pct: "Decimal | None") -> None:
     """Validate insurance_percentage bounds when insurance is enabled.
@@ -26,14 +34,6 @@ def validate_popup_insurance_config(enabled: bool, pct: "Decimal | None") -> Non
             "insurance_percentage must be <= 100 (it represents a percentage)"
         )
 
-
-from app.api.shared.enums import (
-    ApplicationLayout,
-    CheckoutMode,
-    SaleType,
-    derive_checkout_mode,
-)
-from app.utils.utils import slugify
 
 ALLOWED_CURRENCIES = ("USD", "ARS", "EUR")
 

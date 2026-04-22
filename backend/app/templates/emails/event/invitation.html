@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}You're invited to {{ event_title }}{% endblock %}
+
+{% block content %}
+<h1>You're invited!</h1>
+
+<p>Hi {{ first_name or "there" }},</p>
+
+<p>
+    You have been invited to <strong>{{ event_title }}</strong>{% if popup_name %}
+    at <strong>{{ popup_name }}</strong>{% endif %}.
+</p>
+
+<div style="background-color: #f8f9fa; border-radius: 8px; padding: 20px; margin: 20px 0;">
+    <table style="width: 100%; border-collapse: collapse;">
+        {% if event_when %}
+        <tr>
+            <td style="padding: 8px 0; color: #666;">When</td>
+            <td style="padding: 8px 0; font-weight: 600;">{{ event_when }}</td>
+        </tr>
+        {% endif %}
+        {% if venue_title %}
+        <tr>
+            <td style="padding: 8px 0; color: #666;">Venue</td>
+            <td style="padding: 8px 0; font-weight: 600;">{{ venue_title }}</td>
+        </tr>
+        {% endif %}
+    </table>
+</div>
+
+{% if event_url %}
+<p class="text-center">
+    <a href="{{ event_url }}" class="button">View event &amp; RSVP</a>
+</p>
+{% endif %}
+
+<p>See you there!</p>
+{% endblock %}

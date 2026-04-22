@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from app.api.base_field_config.models import BaseFieldConfigs
     from app.api.coupon.models import Coupons
     from app.api.email_template.models import EmailTemplates
+    from app.api.event.models import Events
     from app.api.form_field.models import FormFields
     from app.api.form_section.models import FormSections
     from app.api.group.models import Groups
@@ -72,6 +73,9 @@ class Popups(PopupBase, table=True):
     base_field_configs: list["BaseFieldConfigs"] = Relationship(
         back_populates="popup", cascade_delete=True
     )
+
+    # Events
+    events: list["Events"] = Relationship(back_populates="popup", cascade_delete=True)
 
     # Ticketing step configuration
     ticketing_steps: list["TicketingSteps"] = Relationship(

@@ -153,8 +153,6 @@ function makeProduct(
   overrides: Partial<ProductsPass> & { id: string; name: string },
 ): ProductsPass {
   return {
-    id: overrides.id,
-    name: overrides.name,
     tenant_id: "tenant-1",
     popup_id: "popup-1",
     slug: overrides.id,

@@ -21,6 +21,9 @@ class EmailTemplateType(StrEnum):
     PAYMENT_CONFIRMED = "payment_confirmed"
     ABANDONED_CART = "abandoned_cart"
     EDIT_PASSES_CONFIRMED = "edit_passes_confirmed"
+    EVENT_INVITATION = "event_invitation"
+    EVENT_APPROVAL_APPROVED = "event_approval_approved"
+    EVENT_APPROVAL_REJECTED = "event_approval_rejected"
 
 
 class EmailTemplateBase(SQLModel):

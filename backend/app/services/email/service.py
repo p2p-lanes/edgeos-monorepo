@@ -29,6 +29,9 @@ from app.services.email.templates import (
     ApplicationRejectedContext,
     EditPassesConfirmedContext,
     EmailTemplates,
+    EventApprovalApprovedContext,
+    EventApprovalRejectedContext,
+    EventInvitationContext,
     LoginCodeHumanContext,
     LoginCodeUserContext,
     PaymentConfirmedContext,
@@ -248,6 +251,8 @@ class EmailService:
         from_address: str | None = None,
         from_name: str | None = None,
         attachments: list[EmailAttachment] | None = None,
+        ical_body: str | None = None,
+        ical_method: str = "REQUEST",
     ) -> bool:
         """
         Send an email via SMTP.
@@ -260,6 +265,10 @@ class EmailService:
             from_address: Override default from address (tenant-specific)
             from_name: Override default from name (tenant-specific)
             attachments: Optional list of file attachments
+            ical_body: Optional iTIP calendar body. When provided, embedded
+                as an inline ``text/calendar; method=...`` MIME part so Gmail
+                and other clients treat the email as a calendar invitation.
+            ical_method: iTIP method for the calendar part (REQUEST / CANCEL).
 
         Returns:
             True if email was sent successfully, False otherwise
@@ -275,11 +284,28 @@ class EmailService:
                 logger.error("No from address configured (neither tenant nor global)")
                 return False
 
-            # Build the text/html alternative part
+            # Build the text/html alternative part. When we have an iTIP body
+            # we also embed it as a peer alternative; Gmail/Apple Mail pick it
+            # up and render the invitation card inline.
             alt_part = MIMEMultipart("alternative")
             if text_content:
                 alt_part.attach(MIMEText(text_content, "plain"))
             alt_part.attach(MIMEText(html_content, "html"))
+            if ical_body:
+                method = ical_method.upper()
+                ical_part = MIMEText(ical_body, "calendar", "utf-8")
+                # MIMEText forces Content-Type = text/calendar; charset=utf-8.
+                # Replace it with the RFC 5546 flavour that iTIP requires so
+                # Gmail/Apple Mail parse the REQUEST vs. treating it as an
+                # .ics attachment.
+                del ical_part["Content-Type"]
+                ical_part.add_header(
+                    "Content-Type",
+                    "text/calendar",
+                    charset="utf-8",
+                    method=method,
+                )
+                alt_part.attach(ical_part)
 
             # If there are attachments, wrap in a mixed container
             if attachments:
@@ -343,28 +369,12 @@ class EmailService:
         from_address: str | None = None,
         from_name: str | None = None,
         attachments: list[EmailAttachment] | None = None,
+        ical_body: str | None = None,
+        ical_method: str = "REQUEST",
     ) -> bool:
-        """
-        Render and send a templated email.
-
-        Args:
-            to: Recipient email address(es)
-            subject: Email subject line
-            template_name: Name of the template file
-            context: Variables to pass to the template
-            text_content: Optional plain text version
-            from_address: Override default from address (tenant-specific)
-            from_name: Override default from name (tenant-specific)
-            attachments: Optional list of file attachments
-
-        Returns:
-            True if email was sent successfully, False otherwise
-        """
+        """Render and send a templated email. See ``send_email`` for args."""
         try:
-            # Render template
             html_content = self.render_template(template_name, context)
-
-            # Send email
             return await self.send_email(
                 to=to,
                 subject=subject,
@@ -373,6 +383,8 @@ class EmailService:
                 from_address=from_address,
                 from_name=from_name,
                 attachments=attachments,
+                ical_body=ical_body,
+                ical_method=ical_method,
             )
 
         except Exception as e:
@@ -624,6 +636,81 @@ class EmailService:
             db_session=db_session,
         )
 
+    async def send_event_invitation(
+        self,
+        to: str,
+        subject: str,
+        context: EventInvitationContext,
+        from_address: str | None = None,
+        from_name: str | None = None,
+        popup_id: uuid.UUID | None = None,
+        db_session: Session | None = None,
+        attachments: list[EmailAttachment] | None = None,
+        ical_body: str | None = None,
+        ical_method: str = "REQUEST",
+    ) -> bool:
+        """Send event invitation email with optional inline iTIP body."""
+        return await self._send_with_fallback(
+            to=to,
+            subject=subject,
+            template_type=EmailTemplateType.EVENT_INVITATION,
+            template_name=EmailTemplates.EVENT_INVITATION,
+            context=context.model_dump(exclude_none=True),
+            from_address=from_address,
+            from_name=from_name,
+            popup_id=popup_id,
+            db_session=db_session,
+            attachments=attachments,
+            ical_body=ical_body,
+            ical_method=ical_method,
+        )
+
+    async def send_event_approval_approved(
+        self,
+        to: str,
+        subject: str,
+        context: EventApprovalApprovedContext,
+        from_address: str | None = None,
+        from_name: str | None = None,
+        popup_id: uuid.UUID | None = None,
+        db_session: Session | None = None,
+    ) -> bool:
+        """Send event approved email to the event creator."""
+        return await self._send_with_fallback(
+            to=to,
+            subject=subject,
+            template_type=EmailTemplateType.EVENT_APPROVAL_APPROVED,
+            template_name=EmailTemplates.EVENT_APPROVAL_APPROVED,
+            context=context.model_dump(exclude_none=True),
+            from_address=from_address,
+            from_name=from_name,
+            popup_id=popup_id,
+            db_session=db_session,
+        )
+
+    async def send_event_approval_rejected(
+        self,
+        to: str,
+        subject: str,
+        context: EventApprovalRejectedContext,
+        from_address: str | None = None,
+        from_name: str | None = None,
+        popup_id: uuid.UUID | None = None,
+        db_session: Session | None = None,
+    ) -> bool:
+        """Send event rejected email to the event creator."""
+        return await self._send_with_fallback(
+            to=to,
+            subject=subject,
+            template_type=EmailTemplateType.EVENT_APPROVAL_REJECTED,
+            template_name=EmailTemplates.EVENT_APPROVAL_REJECTED,
+            context=context.model_dump(exclude_none=True),
+            from_address=from_address,
+            from_name=from_name,
+            popup_id=popup_id,
+            db_session=db_session,
+        )
+
     async def _send_with_fallback(
         self,
         to: str,
@@ -636,6 +723,8 @@ class EmailService:
         popup_id: uuid.UUID | None = None,
         db_session: Session | None = None,
         attachments: list[EmailAttachment] | None = None,
+        ical_body: str | None = None,
+        ical_method: str = "REQUEST",
     ) -> bool:
         """Send email using DB custom template if available, else file-based fallback."""
         try:
@@ -656,6 +745,8 @@ class EmailService:
                     from_address=from_address,
                     from_name=from_name,
                     attachments=attachments,
+                    ical_body=ical_body,
+                    ical_method=ical_method,
                 )
 
             return await self.send_template_email(
@@ -666,6 +757,8 @@ class EmailService:
                 from_address=from_address,
                 from_name=from_name,
                 attachments=attachments,
+                ical_body=ical_body,
+                ical_method=ical_method,
             )
         except Exception as e:
             logger.error(f"Error sending email with fallback to {to}: {e}")

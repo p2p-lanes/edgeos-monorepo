@@ -1,9 +1,16 @@
 import { Loader2 } from "lucide-react"
+import Link from "next/link"
 import { useTranslation } from "react-i18next"
-import { BreadcrumbItem, BreadcrumbLink } from "../ui/breadcrumb"
+import {
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbPage,
+} from "../ui/breadcrumb"
 
 interface BreadcrumbSegmentProps {
   path: string
+  href?: string
+  isCurrent?: boolean
   isLoading?: boolean
   groupMapping?: Record<string, string>
 }
@@ -19,11 +26,12 @@ const KNOWN_SEGMENTS: Record<string, string> = {
 
 const BreadcrumbSegment = ({
   path,
+  href,
+  isCurrent,
   isLoading,
   groupMapping,
 }: BreadcrumbSegmentProps) => {
   const { t } = useTranslation()
-  // Verificar si este path corresponde a un ID de grupo y tenemos un mapping para él
   const isGroupId = groupMapping && Object.keys(groupMapping).includes(path)
   const translationKey = KNOWN_SEGMENTS[path]
   const displayText = isGroupId
@@ -32,22 +40,37 @@ const BreadcrumbSegment = ({
       ? t(translationKey)
       : path
 
-  // Capitalizar primera letra
   const formattedText =
     typeof displayText === "string"
       ? displayText.charAt(0).toUpperCase() + displayText.slice(1)
       : displayText
 
-  return (
-    <BreadcrumbItem>
-      {isLoading && isGroupId ? (
+  // Groups still resolving: show a spinner, no link.
+  if (isLoading && isGroupId) {
+    return (
+      <BreadcrumbItem>
         <div className="flex items-center">
           <Loader2 className="h-3 w-3 mr-1 animate-spin" />
           <BreadcrumbLink>{t("common.loading")}</BreadcrumbLink>
         </div>
-      ) : (
-        <BreadcrumbLink>{formattedText}</BreadcrumbLink>
-      )}
+      </BreadcrumbItem>
+    )
+  }
+
+  // Last segment is the current page — non-clickable by convention.
+  if (isCurrent || !href) {
+    return (
+      <BreadcrumbItem>
+        <BreadcrumbPage>{formattedText}</BreadcrumbPage>
+      </BreadcrumbItem>
+    )
+  }
+
+  return (
+    <BreadcrumbItem>
+      <BreadcrumbLink asChild>
+        <Link href={href}>{formattedText}</Link>
+      </BreadcrumbLink>
     </BreadcrumbItem>
   )
 }

@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Your event "{{ event_title }}" was not approved{% endblock %}
+
+{% block content %}
+<h1>Your event request was not approved</h1>
+
+<p>Hi {{ first_name or "there" }},</p>
+
+<p>
+    Your request for <strong>{{ event_title }}</strong>{% if popup_name %}
+    at <strong>{{ popup_name }}</strong>{% endif %} was reviewed and could not
+    be approved at this time.
+</p>
+
+<div style="background-color: #fef5f5; border-left: 4px solid #dc3545; border-radius: 4px; padding: 16px; margin: 20px 0;">
+    <table style="width: 100%; border-collapse: collapse;">
+        {% if event_when %}
+        <tr>
+            <td style="padding: 6px 0; color: #666;">When</td>
+            <td style="padding: 6px 0; font-weight: 600;">{{ event_when }}</td>
+        </tr>
+        {% endif %}
+        {% if venue_title %}
+        <tr>
+            <td style="padding: 6px 0; color: #666;">Venue</td>
+            <td style="padding: 6px 0; font-weight: 600;">{{ venue_title }}</td>
+        </tr>
+        {% endif %}
+    </table>
+</div>
+
+{% if reason %}
+<p><strong>Reason:</strong> {{ reason }}</p>
+{% else %}
+<p>The admin didn't leave a specific reason. You can reach out to the organizer for more context.</p>
+{% endif %}
+{% endblock %}

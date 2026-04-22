@@ -18,7 +18,6 @@ from fastapi.testclient import TestClient
 
 from app.api.popup.schemas import validate_popup_insurance_config
 
-
 # ---------------------------------------------------------------------------
 # Unit tests: validate_popup_insurance_config (Phase 1)
 # ---------------------------------------------------------------------------

@@ -7,7 +7,6 @@ Verifies:
   4. Migration is idempotent
 """
 import json
-from pathlib import Path
 
 from sqlmodel import Session
 
@@ -52,8 +51,6 @@ def _setup_temp_tables(conn, suffix: str) -> None:
 
 def _run_migration_sql(conn, suffix: str) -> None:
     """Execute the migration SQL adapted for temp table names."""
-    ins_json = json.dumps(_INSURANCE_DEFAULTS)
-
     # Step 1: DELETE insurance_checkout rows
     conn.exec_driver_sql(
         f"DELETE FROM ticketingsteps_{suffix} WHERE step_type = 'insurance_checkout'"
