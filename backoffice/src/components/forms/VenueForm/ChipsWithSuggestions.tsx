@@ -6,6 +6,7 @@ interface ChipsWithSuggestionsProps {
   onChange: (next: string[]) => void
   suggestions: string[]
   placeholder?: string
+  disabled?: boolean
 }
 
 export function ChipsWithSuggestions({
@@ -13,6 +14,7 @@ export function ChipsWithSuggestions({
   onChange,
   suggestions,
   placeholder,
+  disabled,
 }: ChipsWithSuggestionsProps) {
   const [draft, setDraft] = useState("")
   const [open, setOpen] = useState(false)
@@ -27,6 +29,7 @@ export function ChipsWithSuggestions({
   }, [suggestions, value, normalized])
 
   const addTag = (raw: string) => {
+    if (disabled) return
     const tag = raw.trim().toLowerCase()
     if (!tag || value.includes(tag)) {
       setDraft("")
@@ -37,6 +40,7 @@ export function ChipsWithSuggestions({
   }
 
   const removeAt = (index: number) => {
+    if (disabled) return
     const next = value.slice()
     next.splice(index, 1)
     onChange(next)
@@ -54,8 +58,9 @@ export function ChipsWithSuggestions({
             <button
               type="button"
               aria-label={`Remove ${tag}`}
-              className="opacity-70 hover:opacity-100"
+              className="opacity-70 hover:opacity-100 disabled:opacity-40"
               onClick={() => removeAt(index)}
+              disabled={disabled}
             >
               <X className="h-3 w-3" />
             </button>
@@ -63,6 +68,7 @@ export function ChipsWithSuggestions({
         ))}
         <input
           value={draft}
+          disabled={disabled}
           onChange={(e) => {
             setDraft(e.target.value)
             setOpen(true)

@@ -45,13 +45,18 @@ export function buildInitialWeeklyHours(
 interface WeeklyHoursEditorProps {
   value: VenueWeeklyHourInput[]
   onChange: (hours: VenueWeeklyHourInput[]) => void
+  disabled?: boolean
 }
 
 function isOpenSlot(h: VenueWeeklyHourInput): boolean {
   return !h.is_closed && h.open_time != null && h.close_time != null
 }
 
-export function WeeklyHoursEditor({ value, onChange }: WeeklyHoursEditorProps) {
+export function WeeklyHoursEditor({
+  value,
+  onChange,
+  disabled,
+}: WeeklyHoursEditorProps) {
   const slotsByDay = new Map<number, VenueWeeklyHourInput[]>()
   for (const h of value) {
     const list = slotsByDay.get(h.day_of_week) ?? []
@@ -147,7 +152,10 @@ export function WeeklyHoursEditor({ value, onChange }: WeeklyHoursEditorProps) {
 
   return (
     <InlineSection title="Weekly hours">
-      <div className="space-y-2 py-3">
+      <fieldset
+        disabled={disabled}
+        className="space-y-2 py-3 disabled:opacity-70"
+      >
         {DAYS_OF_WEEK.map((day) => {
           const open = dayIsOpen(day.value)
           const slots = (slotsByDay.get(day.value) ?? []).filter(isOpenSlot)
@@ -221,7 +229,7 @@ export function WeeklyHoursEditor({ value, onChange }: WeeklyHoursEditorProps) {
             </div>
           )
         })}
-      </div>
+      </fieldset>
     </InlineSection>
   )
 }

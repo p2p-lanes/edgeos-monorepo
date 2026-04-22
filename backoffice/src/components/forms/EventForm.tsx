@@ -8,6 +8,7 @@ import {
 } from "@edgeos/shared-events"
 import { useForm, useStore } from "@tanstack/react-form"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useNavigate } from "@tanstack/react-router"
 import { Trash2 } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import {
@@ -15,9 +16,11 @@ import {
   type EventPublic,
   EventSettingsService,
   EventsService,
+  type EventUpdate,
   EventVenuesService,
   TracksService,
 } from "@/client"
+import { FieldError } from "@/components/Common/FieldError"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { DatePicker } from "@/components/ui/date-picker"
@@ -40,7 +43,12 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { VenueHoursSummary } from "@/components/VenueHoursSummary"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
+import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
+import {
+  UnsavedChangesDialog,
+  useUnsavedChanges,
+} from "@/hooks/useUnsavedChanges"
 import { createErrorHandler } from "@/utils"
 import {
   AvailabilityIndicator,
@@ -105,9 +113,12 @@ export function EventForm({
   initialStartIso,
   onSuccess,
 }: EventFormProps) {
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
   const { selectedPopupId } = useWorkspace()
+  const { isAdmin } = useAuth()
+  const readOnly = !isAdmin
   const isEdit = !!defaultValues
 
   const { data: venues } = useQuery({
@@ -135,8 +146,8 @@ export function EventForm({
   })
 
   const createMutation = useMutation({
-    mutationFn: (data: Record<string, unknown>) =>
-      EventsService.createEvent({ requestBody: data as EventCreate }),
+    mutationFn: (data: EventCreate) =>
+      EventsService.createEvent({ requestBody: data }),
     onSuccess: () => {
       showSuccessToast("Event created successfully")
       queryClient.invalidateQueries({ queryKey: ["events"] })
@@ -147,7 +158,7 @@ export function EventForm({
   })
 
   const updateMutation = useMutation({
-    mutationFn: async (data: Record<string, unknown>) => {
+    mutationFn: async (data: EventUpdate) => {
       const updated = await EventsService.updateEvent({
         eventId: defaultValues!.id,
         requestBody: data,
@@ -240,14 +251,7 @@ export function EventForm({
       tags: defaultValues?.tags ?? [],
     },
     onSubmit: ({ value }) => {
-      if (!value.title.trim()) {
-        showErrorToast("Title is required")
-        return
-      }
-      if (!value.start_time) {
-        showErrorToast("Start time is required")
-        return
-      }
+      if (readOnly) return
       if (!durationMinutes || durationMinutes <= 0) {
         showErrorToast("Duration must be greater than zero")
         return
@@ -265,33 +269,50 @@ export function EventForm({
       const startDate = localTzNaiveToUtc(value.start_time, value.timezone)
       const endDate = new Date(startDate.getTime() + durationMinutes * 60_000)
 
-      const payload: Record<string, unknown> = {
-        popup_id: selectedPopupId,
-        title: value.title,
-        content: value.content || null,
-        kind: value.kind || null,
-        start_time: startDate.toISOString(),
-        end_time: endDate.toISOString(),
-        timezone: value.timezone,
-        cover_url: value.cover_url || null,
-        meeting_url: value.meeting_url || null,
-        max_participant: value.max_participant
-          ? parseInt(value.max_participant, 10)
-          : null,
-        venue_id: value.venue_id || null,
-        track_id: value.track_id || null,
-        visibility: value.visibility,
-        require_approval: value.require_approval,
-        status: value.status,
-        tags,
-      }
-
       if (isEdit) {
+        const payload: EventUpdate = {
+          title: value.title,
+          content: value.content || null,
+          kind: value.kind || null,
+          start_time: startDate.toISOString(),
+          end_time: endDate.toISOString(),
+          timezone: value.timezone,
+          cover_url: value.cover_url || null,
+          meeting_url: value.meeting_url || null,
+          max_participant: value.max_participant
+            ? parseInt(value.max_participant, 10)
+            : null,
+          venue_id: value.venue_id || null,
+          track_id: value.track_id || null,
+          visibility: value.visibility,
+          require_approval: value.require_approval,
+          status: value.status,
+          tags,
+        }
         updateMutation.mutate(payload)
       } else {
-        const recurrence = buildRecurrence(repeat)
-        const createPayload = { ...payload, recurrence }
-        createMutation.mutate(createPayload)
+        const payload: EventCreate = {
+          popup_id: selectedPopupId,
+          title: value.title,
+          content: value.content || null,
+          kind: value.kind || null,
+          start_time: startDate.toISOString(),
+          end_time: endDate.toISOString(),
+          timezone: value.timezone,
+          cover_url: value.cover_url || null,
+          meeting_url: value.meeting_url || null,
+          max_participant: value.max_participant
+            ? parseInt(value.max_participant, 10)
+            : null,
+          venue_id: value.venue_id || null,
+          track_id: value.track_id || null,
+          visibility: value.visibility,
+          require_approval: value.require_approval,
+          status: value.status,
+          tags,
+          recurrence: buildRecurrence(repeat),
+        }
+        createMutation.mutate(payload)
       }
     },
   })
@@ -573,6 +594,7 @@ export function EventForm({
   })
 
   const handleBulkInvite = () => {
+    if (readOnly) return
     const emails = inviteEmails
       .split(/\r?\n/)
       .map((e) => e.trim())
@@ -587,18 +609,21 @@ export function EventForm({
   // --- Track options -------------------------------------------------------
   const trackOptions = useMemo(() => tracks?.results ?? [], [tracks])
 
+  const blocker = useUnsavedChanges(form)
+
   return (
     <form
       noValidate
       onSubmit={(e) => {
         e.preventDefault()
+        if (readOnly) return
         form.handleSubmit().catch((err: unknown) => {
           showErrorToast(
             err instanceof Error ? err.message : "Error submitting form",
           )
         })
       }}
-      className="max-w-2xl space-y-8"
+      className="mx-auto max-w-2xl space-y-8"
     >
       {/* ------------------------------------------------------------------
            VENUE FIRST – defines available times & defaults
@@ -615,6 +640,7 @@ export function EventForm({
                 onValueChange={(v) =>
                   field.handleChange(v === "__none__" ? "" : v)
                 }
+                disabled={readOnly}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="No venue" />
@@ -680,14 +706,60 @@ export function EventForm({
       {/* ------------------------------------------------------------------
            CORE EVENT DETAILS
          ------------------------------------------------------------------ */}
-      <form.Field name="title">
+      <form.Field
+        name="title"
+        validators={{
+          onBlur: ({ value }) =>
+            !readOnly && !value.trim() ? "Title is required" : undefined,
+        }}
+      >
         {(field) => (
-          <HeroInput
-            value={field.state.value}
-            onChange={(e) => field.handleChange(e.target.value)}
-            onBlur={field.handleBlur}
-            placeholder="Event Title"
-          />
+          <div>
+            <HeroInput
+              value={field.state.value}
+              onChange={(e) => field.handleChange(e.target.value)}
+              onBlur={field.handleBlur}
+              placeholder="Event Title"
+              disabled={readOnly}
+            />
+            <FieldError errors={field.state.meta.errors} />
+            <div className="mt-3">
+              <form.Field name="status">
+                {(statusField) => (
+                  <div className="flex items-center gap-2">
+                    <Select
+                      value={statusField.state.value}
+                      onValueChange={(v) =>
+                        statusField.handleChange(
+                          v as (typeof EVENT_STATUSES)[number]["value"],
+                        )
+                      }
+                      disabled={readOnly}
+                    >
+                      <SelectTrigger className="w-auto border-0 bg-transparent p-0 shadow-none focus:ring-0">
+                        <Badge
+                          variant={
+                            statusField.state.value === "published"
+                              ? "default"
+                              : "secondary"
+                          }
+                        >
+                          <SelectValue />
+                        </Badge>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {EVENT_STATUSES.map((s) => (
+                          <SelectItem key={s.value} value={s.value}>
+                            {s.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </form.Field>
+            </div>
+          </div>
         )}
       </form.Field>
 
@@ -699,6 +771,7 @@ export function EventForm({
                 value={field.state.value}
                 onChange={(e) => field.handleChange(e.target.value)}
                 placeholder="workshop, social, talk, panel..."
+                disabled={readOnly}
               />
             )}
           </form.Field>
@@ -707,7 +780,7 @@ export function EventForm({
         <InlineRow label="Date" description="Day the event takes place">
           <DatePicker
             value={dateStr}
-            disabled={isVenueUnbookable}
+            disabled={readOnly || isVenueUnbookable}
             disabledDays={isClosedOnDate}
             onChange={(newDate) => {
               if (!newDate) return
@@ -730,6 +803,7 @@ export function EventForm({
                 setDurationValue(Number.isNaN(n) ? 0 : n)
               }}
               className="w-24"
+              disabled={readOnly}
             />
             <Select
               value={durationUnit}
@@ -749,6 +823,7 @@ export function EventForm({
                   )
                 }
               }}
+              disabled={readOnly}
             >
               <SelectTrigger className="w-28">
                 <SelectValue />
@@ -776,7 +851,7 @@ export function EventForm({
                   form.setFieldValue("start_time", `${date}T${hhmm}`)
                 }}
                 options={startSlotOptions}
-                disabled={isVenueUnbookable}
+                disabled={readOnly || isVenueUnbookable}
                 fits={startFits}
                 placeholder={
                   startSlotOptions.length === 0 ? "No open hours" : "HH:mm"
@@ -794,6 +869,7 @@ export function EventForm({
                     value={field.state.value}
                     onChange={field.handleChange}
                     placeholder="Select start date"
+                    disabled={readOnly}
                   />
                   <AvailabilityIndicator availability={effectiveAvailability} />
                 </div>
@@ -807,9 +883,13 @@ export function EventForm({
           description="Make this event recur like Google Calendar."
         >
           <div className="flex flex-col items-end gap-1">
-            <RepeatPicker value={repeat} onChange={setRepeat} />
+            <RepeatPicker
+              value={repeat}
+              onChange={setRepeat}
+              disabled={readOnly}
+            />
             {recurrenceWarning && (
-              <p className="max-w-xs text-right text-xs text-yellow-600 dark:text-yellow-500">
+              <p className="max-w-xs text-right text-xs text-destructive">
                 {recurrenceWarning}
               </p>
             )}
@@ -828,6 +908,7 @@ export function EventForm({
                   onValueChange={(v) =>
                     field.handleChange(v as "public" | "private" | "unlisted")
                   }
+                  disabled={readOnly}
                 >
                   <SelectTrigger className="w-44">
                     <SelectValue />
@@ -860,6 +941,7 @@ export function EventForm({
                 onChange={(e) => field.handleChange(e.target.value)}
                 rows={4}
                 placeholder="Describe the event..."
+                disabled={readOnly}
               />
             )}
           </form.Field>
@@ -876,6 +958,7 @@ export function EventForm({
                 onValueChange={(v) =>
                   field.handleChange(v === "__none__" ? "" : v)
                 }
+                disabled={readOnly}
               >
                 <SelectTrigger className="w-56">
                   <SelectValue placeholder="(no track)" />
@@ -906,6 +989,7 @@ export function EventForm({
                 <ImageUpload
                   value={field.state.value || null}
                   onChange={(url) => field.handleChange(url ?? "")}
+                  disabled={readOnly}
                 />
                 {!field.state.value && (
                   <p className="text-xs text-muted-foreground">
@@ -924,6 +1008,7 @@ export function EventForm({
                 value={field.state.value}
                 onChange={(e) => field.handleChange(e.target.value)}
                 placeholder="https://meet.google.com/..."
+                disabled={readOnly}
               />
             )}
           </form.Field>
@@ -943,6 +1028,7 @@ export function EventForm({
               <ChipInput
                 value={field.state.value}
                 onChange={(next) => field.handleChange(next)}
+                disabled={readOnly}
               />
             )}
           </form.Field>
@@ -965,33 +1051,13 @@ export function EventForm({
                       : "Unlimited"
                   }
                   className="w-44"
+                  disabled={readOnly}
                 />
                 {exceedsCapacity && venueCapacity != null && (
-                  <p className="max-w-xs text-right text-xs text-yellow-600 dark:text-yellow-500">
+                  <p className="max-w-xs text-right text-xs text-destructive">
                     Exceeds venue capacity ({venueCapacity}).
                   </p>
                 )}
-              </div>
-            )}
-          </form.Field>
-        </InlineRow>
-
-        <InlineRow label="Status">
-          <form.Field name="status">
-            {(field) => (
-              <div className="flex gap-2">
-                {EVENT_STATUSES.map((s) => (
-                  <Badge
-                    key={s.value}
-                    variant={
-                      field.state.value === s.value ? "default" : "outline"
-                    }
-                    className="cursor-pointer"
-                    onClick={() => field.handleChange(s.value)}
-                  >
-                    {s.label}
-                  </Badge>
-                ))}
               </div>
             )}
           </form.Field>
@@ -1009,17 +1075,20 @@ export function EventForm({
               onChange={(e) => setInviteEmails(e.target.value)}
               rows={4}
               placeholder={"Paste emails, one per line"}
+              disabled={readOnly}
             />
-            <div className="flex justify-end">
-              <LoadingButton
-                type="button"
-                size="sm"
-                loading={bulkInviteMutation.isPending}
-                onClick={handleBulkInvite}
-              >
-                Invite
-              </LoadingButton>
-            </div>
+            {!readOnly && (
+              <div className="flex justify-end">
+                <LoadingButton
+                  type="button"
+                  size="sm"
+                  loading={bulkInviteMutation.isPending}
+                  onClick={handleBulkInvite}
+                >
+                  Invite
+                </LoadingButton>
+              </div>
+            )}
           </div>
 
           <div className="py-3">
@@ -1045,16 +1114,20 @@ export function EventForm({
                           </p>
                         )}
                       </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={`Remove invitation for ${inv.email}`}
-                        disabled={deleteInvitationMutation.isPending}
-                        onClick={() => deleteInvitationMutation.mutate(inv.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {!readOnly && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={`Remove invitation for ${inv.email}`}
+                          disabled={deleteInvitationMutation.isPending}
+                          onClick={() =>
+                            deleteInvitationMutation.mutate(inv.id)
+                          }
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </li>
                   )
                 })}
@@ -1068,11 +1141,21 @@ export function EventForm({
         </InlineSection>
       )}
 
-      <div className="flex justify-end gap-3">
-        <LoadingButton type="submit" loading={isPending}>
-          {isEdit ? "Save Changes" : "Create Event"}
-        </LoadingButton>
+      <div className="flex gap-4">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => navigate({ to: "/events" })}
+        >
+          {readOnly ? "Back" : "Cancel"}
+        </Button>
+        {!readOnly && (
+          <LoadingButton type="submit" loading={isPending}>
+            {isEdit ? "Save Changes" : "Create Event"}
+          </LoadingButton>
+        )}
       </div>
+      <UnsavedChangesDialog blocker={blocker} />
     </form>
   )
 }

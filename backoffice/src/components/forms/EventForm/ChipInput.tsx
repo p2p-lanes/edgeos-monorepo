@@ -6,12 +6,14 @@ import { cn } from "@/lib/utils"
 interface ChipInputProps {
   value: string[]
   onChange: (next: string[]) => void
+  disabled?: boolean
 }
 
-export function ChipInput({ value, onChange }: ChipInputProps) {
+export function ChipInput({ value, onChange, disabled }: ChipInputProps) {
   const [draft, setDraft] = useState("")
 
   const addTag = (raw: string) => {
+    if (disabled) return
     const tag = raw.trim().toLowerCase()
     if (!tag) return
     if (value.includes(tag)) {
@@ -23,6 +25,7 @@ export function ChipInput({ value, onChange }: ChipInputProps) {
   }
 
   const removeAt = (index: number) => {
+    if (disabled) return
     const next = value.slice()
     next.splice(index, 1)
     onChange(next)
@@ -44,8 +47,9 @@ export function ChipInput({ value, onChange }: ChipInputProps) {
           <button
             type="button"
             aria-label={`Remove ${tag}`}
-            className="opacity-70 hover:opacity-100"
+            className="opacity-70 hover:opacity-100 disabled:opacity-40"
             onClick={() => removeAt(index)}
+            disabled={disabled}
           >
             <X className="h-3 w-3" />
           </button>
@@ -54,6 +58,7 @@ export function ChipInput({ value, onChange }: ChipInputProps) {
       <input
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
+        disabled={disabled}
         onKeyDown={(e) => {
           if (e.key === "Enter") {
             e.preventDefault()

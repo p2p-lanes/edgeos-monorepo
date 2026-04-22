@@ -20,9 +20,14 @@ import { createErrorHandler } from "@/utils"
 interface PropertyPickerProps {
   value: string[]
   onChange: (ids: string[]) => void
+  disabled?: boolean
 }
 
-export function PropertyPicker({ value, onChange }: PropertyPickerProps) {
+export function PropertyPicker({
+  value,
+  onChange,
+  disabled,
+}: PropertyPickerProps) {
   const queryClient = useQueryClient()
   const { showErrorToast, showSuccessToast } = useCustomToast()
   const { selectedTenantId } = useWorkspace()
@@ -53,6 +58,7 @@ export function PropertyPicker({ value, onChange }: PropertyPickerProps) {
   })
 
   const toggle = (id: string) => {
+    if (disabled) return
     if (value.includes(id)) {
       onChange(value.filter((v) => v !== id))
     } else {
@@ -81,7 +87,8 @@ export function PropertyPicker({ value, onChange }: PropertyPickerProps) {
                   type="button"
                   onClick={() => toggle(pt.id)}
                   aria-pressed={selected}
-                  className={`flex h-24 w-24 flex-col items-center justify-center gap-1.5 rounded-lg border p-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                  disabled={disabled}
+                  className={`flex h-24 w-24 flex-col items-center justify-center gap-1.5 rounded-lg border p-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 disabled:cursor-not-allowed ${
                     selected
                       ? "bg-primary text-primary-foreground border-primary hover:bg-primary/90"
                       : "bg-card text-foreground hover:bg-muted/50"
@@ -141,15 +148,17 @@ export function PropertyPicker({ value, onChange }: PropertyPickerProps) {
             </div>
           </div>
         ) : (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setShowNew(true)}
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            New property type
-          </Button>
+          !disabled && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowNew(true)}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              New property type
+            </Button>
+          )
         )}
       </div>
     </InlineSection>

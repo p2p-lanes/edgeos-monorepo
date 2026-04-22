@@ -115,11 +115,14 @@ export function buildRecurrence(state: RepeatState): RecurrenceRule | null {
 interface RepeatPickerProps {
   value: RepeatState
   onChange: (next: RepeatState) => void
+  disabled?: boolean
 }
 
-export function RepeatPicker({ value, onChange }: RepeatPickerProps) {
-  const update = (patch: Partial<RepeatState>) =>
+export function RepeatPicker({ value, onChange, disabled }: RepeatPickerProps) {
+  const update = (patch: Partial<RepeatState>) => {
+    if (disabled) return
     onChange({ ...value, ...patch })
+  }
 
   const unitLabel =
     value.mode === "daily"
@@ -141,6 +144,7 @@ export function RepeatPicker({ value, onChange }: RepeatPickerProps) {
       <Select
         value={value.mode}
         onValueChange={(v) => update({ mode: v as RepeatMode })}
+        disabled={disabled}
       >
         <SelectTrigger className="w-56">
           <SelectValue />
@@ -166,6 +170,7 @@ export function RepeatPicker({ value, onChange }: RepeatPickerProps) {
                 update({ interval: parseInt(e.target.value, 10) || 1 })
               }
               className="w-16"
+              disabled={disabled}
             />
             <span className="text-xs text-muted-foreground">{unitLabel}</span>
           </div>
@@ -178,8 +183,9 @@ export function RepeatPicker({ value, onChange }: RepeatPickerProps) {
                   <button
                     key={code}
                     type="button"
+                    disabled={disabled}
                     className={cn(
-                      "inline-flex h-7 w-7 items-center justify-center rounded-full border text-xs",
+                      "inline-flex h-7 w-7 items-center justify-center rounded-full border text-xs disabled:opacity-50",
                       active
                         ? "border-primary bg-primary text-primary-foreground"
                         : "border-input bg-background text-muted-foreground",
@@ -204,6 +210,7 @@ export function RepeatPicker({ value, onChange }: RepeatPickerProps) {
               <input
                 type="radio"
                 name="repeat-end"
+                disabled={disabled}
                 checked={value.end === "never"}
                 onChange={() => update({ end: "never" })}
               />
@@ -213,6 +220,7 @@ export function RepeatPicker({ value, onChange }: RepeatPickerProps) {
               <input
                 type="radio"
                 name="repeat-end"
+                disabled={disabled}
                 checked={value.end === "count"}
                 onChange={() => update({ end: "count" })}
               />
@@ -229,6 +237,7 @@ export function RepeatPicker({ value, onChange }: RepeatPickerProps) {
                   })
                 }
                 className="h-7 w-20"
+                disabled={disabled}
               />{" "}
               occurrences
             </label>
@@ -236,6 +245,7 @@ export function RepeatPicker({ value, onChange }: RepeatPickerProps) {
               <input
                 type="radio"
                 name="repeat-end"
+                disabled={disabled}
                 checked={value.end === "until"}
                 onChange={() => update({ end: "until" })}
               />
@@ -245,6 +255,7 @@ export function RepeatPicker({ value, onChange }: RepeatPickerProps) {
                 onChange={(v) => update({ end: "until", until: v })}
                 className="h-7 w-40"
                 placeholder="Pick date"
+                disabled={disabled}
               />
             </label>
           </div>
