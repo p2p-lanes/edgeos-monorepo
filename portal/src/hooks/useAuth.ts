@@ -8,7 +8,6 @@ import {
   dispatchAuthChange,
   useIsAuthenticated,
 } from "@/hooks/useIsAuthenticated"
-import { saveAuthRedirect } from "@/lib/authRedirect"
 import { queryKeys } from "@/lib/query-keys"
 
 const useAuth = () => {
@@ -31,7 +30,6 @@ const useAuth = () => {
     dispatchAuthChange()
     queryClient.clear()
 
-    saveAuthRedirect(`${window.location.pathname}${window.location.search}`)
     router.push("/auth")
   }, [queryClient, router])
 

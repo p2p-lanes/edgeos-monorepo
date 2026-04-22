@@ -6,7 +6,6 @@ import { Suspense, useEffect } from "react"
 import Quote from "@/app/auth/Quote"
 import { Loader } from "@/components/ui/Loader"
 import { useIsAuthenticated } from "@/hooks/useIsAuthenticated"
-import { consumeAuthRedirect } from "@/lib/authRedirect"
 
 const AuthForm = dynamic(() => import("@/app/auth/AuthForm"), {
   ssr: false,
@@ -18,7 +17,7 @@ function AuthContent() {
 
   useEffect(() => {
     if (loggedIn) {
-      router.replace(consumeAuthRedirect("/portal"))
+      router.replace("/portal")
     }
   }, [loggedIn, router])
 
