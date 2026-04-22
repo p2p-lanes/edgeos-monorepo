@@ -104,7 +104,7 @@ function EventSettingsForm() {
   }
 
   return (
-    <div className="space-y-6 max-w-lg">
+    <div className="mx-auto space-y-6 max-w-lg">
       <div className="space-y-2">
         <div className="flex items-center justify-between rounded-lg border p-4">
           <div className="space-y-0.5">
