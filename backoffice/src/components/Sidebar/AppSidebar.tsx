@@ -166,16 +166,16 @@ export function AppSidebar() {
           <Main items={popupItems} />
         </SidebarGroup>
 
-        {/* Events section */}
-        <SidebarGroup>
-          <SidebarGroupLabel>Events</SidebarGroupLabel>
-          <Main items={eventItems} />
-        </SidebarGroup>
-
         {/* Registration section */}
         <SidebarGroup>
           <SidebarGroupLabel>Registrations</SidebarGroupLabel>
           <Main items={registrationItemsWithBadges} />
+        </SidebarGroup>
+
+        {/* Events section */}
+        <SidebarGroup>
+          <SidebarGroupLabel>Events</SidebarGroupLabel>
+          <Main items={eventItems} />
         </SidebarGroup>
 
         {/* Admin section (visible to admins+) */}

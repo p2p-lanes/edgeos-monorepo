@@ -70,6 +70,25 @@ class ApplicationReviewsCRUD(
 
         return results, total
 
+    def get_decisions_by_reviewer_for_applications(
+        self,
+        session: Session,
+        reviewer_id: uuid.UUID,
+        application_ids: list[uuid.UUID],
+    ) -> dict[uuid.UUID, ReviewDecision]:
+        """Get one review decision per application for a reviewer."""
+        if not application_ids:
+            return {}
+
+        statement = select(
+            ApplicationReviews.application_id, ApplicationReviews.decision
+        ).where(
+            ApplicationReviews.reviewer_id == reviewer_id,
+            ApplicationReviews.application_id.in_(application_ids),
+        )
+        results = session.exec(statement).all()
+        return dict(results)
+
     def create_review(
         self,
         session: Session,

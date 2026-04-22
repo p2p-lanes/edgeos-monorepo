@@ -743,6 +743,16 @@ export const ApplicationPublicSchema = {
             type: 'integer',
             title: 'Kid Count',
             default: 0
+        },
+        review_decision: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/ReviewDecision'
+                },
+                {
+                    type: 'null'
+                }
+            ]
         }
     },
     type: 'object',

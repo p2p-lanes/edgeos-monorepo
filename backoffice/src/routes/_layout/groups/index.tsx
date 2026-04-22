@@ -8,6 +8,7 @@ import { createFileRoute, Link } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
 import {
   EllipsisVertical,
+  ExternalLink,
   Eye,
   Pencil,
   Plus,
@@ -42,11 +43,13 @@ import { LoadingButton } from "@/components/ui/loading-button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
+import { useCurrentTenant } from "@/hooks/useCurrentTenant"
 import useCustomToast from "@/hooks/useCustomToast"
 import {
   useTableSearchParams,
   validateTableSearch,
 } from "@/hooks/useTableSearchParams"
+import { getGroupPortalUrl, getPortalBaseUrl } from "@/lib/portal-urls"
 import { createErrorHandler } from "@/utils"
 
 function getGroupsQueryOptions(
@@ -213,6 +216,8 @@ function DeleteGroup({
 function GroupActionsMenu({ group }: { group: GroupPublic }) {
   const [open, setOpen] = useState(false)
   const { isAdmin } = useAuth()
+  const { data: tenant } = useCurrentTenant()
+  const baseUrl = getPortalBaseUrl(tenant)
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
@@ -238,6 +243,18 @@ function GroupActionsMenu({ group }: { group: GroupPublic }) {
           </Link>
         </DropdownMenuItem>
         <ViewGroupMembers group={group} />
+        {baseUrl && group.slug && (
+          <DropdownMenuItem asChild>
+            <a
+              href={getGroupPortalUrl(baseUrl, group.slug)}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <ExternalLink className="mr-2 h-4 w-4" />
+              Open Portal
+            </a>
+          </DropdownMenuItem>
+        )}
         {isAdmin && (
           <DeleteGroup group={group} onSuccess={() => setOpen(false)} />
         )}

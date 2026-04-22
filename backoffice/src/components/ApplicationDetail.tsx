@@ -299,7 +299,6 @@ function ReviewSummary({
 }: {
   summary: {
     total_reviews: number
-    weighted_score?: number | null
     reviews: Array<{
       id: string
       reviewer_full_name?: string | null
@@ -324,17 +323,6 @@ function ReviewSummary({
           <StatusBadge status={review.decision} />
         </div>
       ))}
-      {summary.weighted_score !== null &&
-        summary.weighted_score !== undefined && (
-          <div className="flex items-center justify-between py-3">
-            <span className="text-sm text-muted-foreground">
-              Weighted Score
-            </span>
-            <span className="font-mono text-sm font-medium">
-              {summary.weighted_score}
-            </span>
-          </div>
-        )}
     </InlineSection>
   )
 }

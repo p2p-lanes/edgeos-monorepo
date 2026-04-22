@@ -15,6 +15,7 @@ from app.api.application.schemas import (
     ApplicationUpdate,
     ScholarshipDecisionRequest,
 )
+from app.api.application_review.models import ApplicationReviews
 from app.api.attendee.crud import attendees_crud, generate_check_in_code
 from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.human.models import Humans
@@ -85,6 +86,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         limit: int = 100,
         status_filter: ApplicationStatus | None = None,
         search: str | None = None,
+        reviewed_by: uuid.UUID | None = None,
     ) -> tuple[list[Applications], int]:
         """Find applications by popup_id with optional status filter and eager loading."""
         base_statement = select(Applications).where(Applications.popup_id == popup_id)
@@ -107,6 +109,14 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                     col(Humans.email).ilike(search_term),
                 )
             )
+
+        if reviewed_by:
+            has_review = (
+                exists()
+                .where(ApplicationReviews.application_id == Applications.id)
+                .where(ApplicationReviews.reviewer_id == reviewed_by)
+            )
+            base_statement = base_statement.where(has_review)
 
         count_statement = select(func.count()).select_from(base_statement.subquery())
         total = session.exec(count_statement).one()
