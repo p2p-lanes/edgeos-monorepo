@@ -17,7 +17,6 @@ HTTP-level integration tests (POPUP-6 Scenario 5):
 import uuid
 from decimal import Decimal
 
-import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
