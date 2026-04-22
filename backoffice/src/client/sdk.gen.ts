@@ -162,6 +162,7 @@ export class ApplicationsService {
      * @param data The data for the request.
      * @param data.popupId
      * @param data.humanId
+     * @param data.reviewedBy
      * @param data.statusFilter
      * @param data.search
      * @param data.skip Number of items to skip
@@ -180,6 +181,7 @@ export class ApplicationsService {
             query: {
                 popup_id: data.popupId,
                 human_id: data.humanId,
+                reviewed_by: data.reviewedBy,
                 status_filter: data.statusFilter,
                 search: data.search,
                 skip: data.skip,
