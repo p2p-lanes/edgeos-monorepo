@@ -275,9 +275,7 @@ export default function EventDetailPage() {
           <Badge
             variant="secondary"
             className={
-              event.status === "published"
-                ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                : ""
+              event.status === "published" ? "bg-primary/10 text-primary" : ""
             }
           >
             {event.status}

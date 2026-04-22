@@ -509,7 +509,7 @@ export default function NewPortalEventPage() {
                 </p>
               ) : null}
               {selectedDateIsClosed && (
-                <p className="text-yellow-600 dark:text-yellow-500">
+                <p className="text-destructive">
                   {t("events.form.venue_closed_warning")}
                 </p>
               )}
@@ -757,7 +757,7 @@ export default function NewPortalEventPage() {
             }
           />
           {exceedsCapacity && (
-            <p className="text-xs text-yellow-600">
+            <p className="text-xs text-destructive">
               {t("events.form.exceeds_capacity_warning", {
                 capacity: venueMaxCapacity ?? 0,
               })}

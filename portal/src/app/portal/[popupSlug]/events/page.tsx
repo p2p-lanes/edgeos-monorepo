@@ -47,10 +47,9 @@ function groupByDate(
 }
 
 const statusColors: Record<string, string> = {
-  published:
-    "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+  published: "bg-primary/10 text-primary",
   draft: "bg-muted text-muted-foreground",
-  cancelled: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+  cancelled: "bg-destructive/10 text-destructive",
 }
 
 export default function EventsPage() {
