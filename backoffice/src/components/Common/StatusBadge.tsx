@@ -19,7 +19,6 @@ const statusMap: Record<
   inactive: { variant: "secondary" },
   draft: { variant: "outline" },
   none: { variant: "outline", label: "None" },
-  withdrawn: { variant: "outline" },
   rejected: { variant: "destructive" },
   expired: { variant: "destructive" },
   cancelled: { variant: "destructive" },
@@ -40,6 +39,8 @@ interface StatusBadgeProps {
 
 export function StatusBadge({ status, className }: StatusBadgeProps) {
   const normalized = status.toLowerCase()
+  if (normalized === "withdrawn") return null
+
   const config = statusMap[normalized] ?? {
     variant: "outline" as StatusVariant,
   }
