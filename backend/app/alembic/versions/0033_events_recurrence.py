@@ -1,7 +1,7 @@
 """Events module phase 2a: recurrence (RRULE) support.
 
 Revision ID: 0033_events_recurrence
-Revises: 0032_gcal_sync
+Revises: 0031_events_phase1
 Create Date: 2026-04-14
 
 Adds to events:
@@ -18,7 +18,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = "0033_events_recurrence"
-down_revision = "0032_gcal_sync"
+down_revision = "0031_events_phase1"
 branch_labels = None
 depends_on = None
 
