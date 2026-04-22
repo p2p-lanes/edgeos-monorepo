@@ -10,7 +10,6 @@ import { z } from "zod/v4"
 import { ApiError, AuthService } from "@/client"
 import { ButtonAnimated } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { consumeAuthRedirect } from "@/lib/authRedirect"
 import { queryKeys } from "@/lib/query-keys"
 import { useTenant } from "@/providers/tenantProvider"
 
@@ -87,7 +86,7 @@ export default function AuthForm() {
         timerRef.current = null
       }
       queryClient.invalidateQueries({ queryKey: queryKeys.profile.current })
-      router.replace(consumeAuthRedirect("/portal"))
+      router.replace("/portal")
     },
     onError: (err) => {
       if (err instanceof ApiError) {
