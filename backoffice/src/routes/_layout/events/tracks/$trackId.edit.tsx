@@ -1,16 +1,16 @@
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query"
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
-import { format } from "date-fns"
 import { CalendarDays } from "lucide-react"
 import { Suspense } from "react"
 
-import { type EventPublic, TracksService } from "@/client"
+import { type EventPublic, EventSettingsService, TracksService } from "@/client"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { TrackForm } from "@/components/forms/TrackForm"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useWorkspace } from "@/contexts/WorkspaceContext"
 
 export const Route = createFileRoute("/_layout/events/tracks/$trackId/edit")({
   component: EditTrackPage,
@@ -19,10 +19,23 @@ export const Route = createFileRoute("/_layout/events/tracks/$trackId/edit")({
   }),
 })
 
-function formatDateTime(dateStr: string | null | undefined): string {
+function formatDateTime(
+  dateStr: string | null | undefined,
+  timezone?: string,
+): string {
   if (!dateStr) return "—"
   try {
-    return format(new Date(dateStr), "MMM d, yyyy HH:mm")
+    const d = new Date(dateStr)
+    if (Number.isNaN(d.getTime())) return "—"
+    return new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(d)
   } catch {
     return "—"
   }
@@ -35,10 +48,28 @@ const statusVariant: Record<string, "default" | "secondary" | "destructive"> = {
 }
 
 function TrackEventsList({ trackId }: { trackId: string }) {
+  const { selectedPopupId } = useWorkspace()
   const { data, isLoading, isError } = useQuery({
     queryKey: ["tracks", trackId, "events"],
     queryFn: () => TracksService.listTrackEvents({ trackId }),
   })
+
+  // Popup tz drives event time rendering so this matches the calendar views.
+  const { data: popupSettings } = useQuery({
+    queryKey: ["event-settings", selectedPopupId],
+    queryFn: async () => {
+      if (!selectedPopupId) return null
+      try {
+        return await EventSettingsService.getEventSettings({
+          popupId: selectedPopupId,
+        })
+      } catch {
+        return null
+      }
+    },
+    enabled: !!selectedPopupId,
+  })
+  const popupTz = popupSettings?.timezone ?? undefined
 
   if (isLoading) {
     return <Skeleton className="h-40 w-full" />
@@ -78,7 +109,7 @@ function TrackEventsList({ trackId }: { trackId: string }) {
               {event.title}
             </Link>
             <span className="text-xs text-muted-foreground">
-              {formatDateTime(event.start_time)}
+              {formatDateTime(event.start_time, popupTz)}
             </span>
           </div>
           <Badge variant={statusVariant[event.status as string] ?? "secondary"}>

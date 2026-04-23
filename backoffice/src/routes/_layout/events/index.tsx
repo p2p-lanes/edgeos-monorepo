@@ -6,12 +6,10 @@ import {
 } from "@tanstack/react-query"
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
-import { format } from "date-fns"
 import {
   CalendarDays,
   CalendarRange,
   CheckCircle2,
-  EllipsisVertical,
   Eye,
   Pencil,
   Plus,
@@ -21,7 +19,12 @@ import {
 } from "lucide-react"
 import { Suspense, useMemo, useState } from "react"
 
-import { type EventPublic, EventsService, EventVenuesService } from "@/client"
+import {
+  type EventPublic,
+  EventSettingsService,
+  EventsService,
+  EventVenuesService,
+} from "@/client"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
@@ -37,12 +40,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { LoadingButton } from "@/components/ui/loading-button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
@@ -62,10 +59,27 @@ export const Route = createFileRoute("/_layout/events/")({
   }),
 })
 
-function formatDateTime(dateStr: string | null | undefined): string {
+function formatDateTime(
+  dateStr: string | null | undefined,
+  timezone?: string,
+): string {
   if (!dateStr) return "—"
   try {
-    return format(new Date(dateStr), "MMM d, yyyy HH:mm")
+    const d = new Date(dateStr)
+    if (Number.isNaN(d.getTime())) return "—"
+    // All stored times are UTC. Render in the popup's configured timezone so
+    // the Events table matches the calendar views (day-by-venue, week) that
+    // already use popup tz. Falls back to browser tz if the popup hasn't
+    // configured one yet.
+    return new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(d)
   } catch {
     return "—"
   }
@@ -98,8 +112,13 @@ function parseOccurrenceId(
   return { masterId, start: iso }
 }
 
-function EventActionsMenu({ event }: { event: EventPublic }) {
-  const [open, setOpen] = useState(false)
+function EventActionsMenu({
+  event,
+  timezone,
+}: {
+  event: EventPublic
+  timezone?: string
+}) {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [editChoiceOpen, setEditChoiceOpen] = useState(false)
   const [decisionOpen, setDecisionOpen] = useState<null | "approve" | "reject">(
@@ -125,7 +144,6 @@ function EventActionsMenu({ event }: { event: EventPublic }) {
       showSuccessToast("Event approved")
       setDecisionOpen(null)
       setDecisionReason("")
-      setOpen(false)
     },
     onError: createErrorHandler(showErrorToast),
     onSettled: () => queryClient.invalidateQueries({ queryKey: ["events"] }),
@@ -141,7 +159,6 @@ function EventActionsMenu({ event }: { event: EventPublic }) {
       showSuccessToast("Event rejected")
       setDecisionOpen(null)
       setDecisionReason("")
-      setOpen(false)
     },
     onError: createErrorHandler(showErrorToast),
     onSettled: () => queryClient.invalidateQueries({ queryKey: ["events"] }),
@@ -158,7 +175,6 @@ function EventActionsMenu({ event }: { event: EventPublic }) {
     onSuccess: (child) => {
       showSuccessToast("Detached occurrence for editing")
       setEditChoiceOpen(false)
-      setOpen(false)
       queryClient.invalidateQueries({ queryKey: ["events"] })
       navigate({
         to: "/events/$eventId/edit",
@@ -179,7 +195,6 @@ function EventActionsMenu({ event }: { event: EventPublic }) {
     onSuccess: () => {
       showSuccessToast("Occurrence removed")
       setDeleteOpen(false)
-      setOpen(false)
     },
     onError: createErrorHandler(showErrorToast),
     onSettled: () => queryClient.invalidateQueries({ queryKey: ["events"] }),
@@ -190,7 +205,6 @@ function EventActionsMenu({ event }: { event: EventPublic }) {
     onSuccess: () => {
       showSuccessToast("Event deleted successfully")
       setDeleteOpen(false)
-      setOpen(false)
     },
     onError: createErrorHandler(showErrorToast),
     onSettled: () => queryClient.invalidateQueries({ queryKey: ["events"] }),
@@ -209,67 +223,61 @@ function EventActionsMenu({ event }: { event: EventPublic }) {
 
   return (
     <>
-      <DropdownMenu open={open} onOpenChange={setOpen}>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" aria-label="Event actions">
-            <EllipsisVertical className="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          {isAdmin && isPendingApproval && (
-            <>
-              <DropdownMenuItem
-                onSelect={(e) => e.preventDefault()}
-                onClick={() => {
-                  setDecisionOpen("approve")
-                  setDecisionReason("")
-                }}
-              >
-                <CheckCircle2 className="mr-2 h-4 w-4" />
-                Approve
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onSelect={(e) => e.preventDefault()}
-                onClick={() => {
-                  setDecisionOpen("reject")
-                  setDecisionReason("")
-                }}
-              >
-                <XCircle className="mr-2 h-4 w-4" />
-                Reject
-              </DropdownMenuItem>
-            </>
-          )}
-          <DropdownMenuItem
-            onSelect={(e) => {
-              e.preventDefault()
-              handleEdit()
-            }}
-          >
-            {isAdmin ? (
-              <>
-                <Pencil className="mr-2 h-4 w-4" />
-                Edit
-              </>
-            ) : (
-              <>
-                <Eye className="mr-2 h-4 w-4" />
-                View
-              </>
-            )}
-          </DropdownMenuItem>
-          {isAdmin && (
-            <DropdownMenuItem
-              variant="destructive"
-              onSelect={(e) => e.preventDefault()}
-              onClick={() => setDeleteOpen(true)}
+      <div className="flex items-center justify-end gap-0.5">
+        {isAdmin && isPendingApproval && (
+          <>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Approve event"
+              title="Approve"
+              onClick={() => {
+                setDecisionOpen("approve")
+                setDecisionReason("")
+              }}
             >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete
-            </DropdownMenuItem>
+              <CheckCircle2 className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Reject event"
+              title="Reject"
+              onClick={() => {
+                setDecisionOpen("reject")
+                setDecisionReason("")
+              }}
+            >
+              <XCircle className="h-4 w-4" />
+            </Button>
+          </>
+        )}
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={isAdmin ? "Edit event" : "View event"}
+          title={isAdmin ? "Edit" : "View"}
+          onClick={handleEdit}
+        >
+          {isAdmin ? (
+            <Pencil className="h-4 w-4" />
+          ) : (
+            <Eye className="h-4 w-4" />
           )}
-        </DropdownMenuContent>
-      </DropdownMenu>
+        </Button>
+        {isAdmin && (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Delete event"
+            title="Delete"
+            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+            onClick={() => setDeleteOpen(true)}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
 
       <Dialog
         open={!!decisionOpen}
@@ -338,7 +346,6 @@ function EventActionsMenu({ event }: { event: EventPublic }) {
               onClick={() => {
                 if (!occurrenceRef) return
                 setEditChoiceOpen(false)
-                setOpen(false)
                 navigate({
                   to: "/events/$eventId/edit",
                   params: { eventId: occurrenceRef.masterId },
@@ -365,7 +372,7 @@ function EventActionsMenu({ event }: { event: EventPublic }) {
             </DialogTitle>
             <DialogDescription>
               {isOccurrence
-                ? `Skip the "${event.title}" occurrence starting ${formatDateTime(event.start_time)}? Other occurrences in this series will remain.`
+                ? `Skip the "${event.title}" occurrence starting ${formatDateTime(event.start_time, timezone)}? Other occurrences in this series will remain.`
                 : `Are you sure you want to delete "${event.title}"? This action cannot be undone.`}
             </DialogDescription>
           </DialogHeader>
@@ -397,6 +404,7 @@ function EventActionsMenu({ event }: { event: EventPublic }) {
 
 function buildEventColumns(
   venueNameById: Map<string, string>,
+  timezone: string | undefined,
 ): ColumnDef<EventPublic>[] {
   return [
     {
@@ -447,7 +455,7 @@ function buildEventColumns(
       header: ({ column }) => <SortableHeader label="Start" column={column} />,
       cell: ({ row }) => (
         <span className="text-muted-foreground">
-          {formatDateTime(row.original.start_time)}
+          {formatDateTime(row.original.start_time, timezone)}
         </span>
       ),
     },
@@ -469,7 +477,7 @@ function buildEventColumns(
       header: () => <span className="sr-only">Actions</span>,
       cell: ({ row }) => (
         <div className="flex justify-end">
-          <EventActionsMenu event={row.original} />
+          <EventActionsMenu event={row.original} timezone={timezone} />
         </div>
       ),
     },
@@ -533,9 +541,28 @@ function EventsTableContent() {
     return map
   }, [venues])
 
+  // Popup timezone drives display of every start_time in the table so the
+  // "Events" list matches the calendar views. Falls back to browser tz if
+  // settings haven't loaded or aren't configured for this popup.
+  const { data: popupSettings } = useQuery({
+    queryKey: ["event-settings", selectedPopupId],
+    queryFn: async () => {
+      if (!selectedPopupId) return null
+      try {
+        return await EventSettingsService.getEventSettings({
+          popupId: selectedPopupId,
+        })
+      } catch {
+        return null
+      }
+    },
+    enabled: !!selectedPopupId,
+  })
+  const popupTz = popupSettings?.timezone ?? undefined
+
   const columns = useMemo(
-    () => buildEventColumns(venueNameById),
-    [venueNameById],
+    () => buildEventColumns(venueNameById, popupTz),
+    [venueNameById, popupTz],
   )
 
   if (!events) return <Skeleton className="h-64 w-full" />

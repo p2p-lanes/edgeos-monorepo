@@ -474,13 +474,29 @@ export function EventForm({
   // For new events, default the timezone field to the popup's configured tz
   // as soon as settings load — users shouldn't have to hunt for it, and the
   // UTC fallback creates silent round-trip drift against the calendars.
+  //
+  // The form is initialized BEFORE popupSettings resolves, so the naive
+  // datetime input was formatted with the "UTC" fallback. We also re-format
+  // it here: if we only updated `timezone`, the input would still hold the
+  // UTC wall-time but get re-interpreted as popup-tz on submit, silently
+  // shifting the event by the tz offset.
   useEffect(() => {
     if (isEdit || !popupSettings?.timezone) return
-    if (form.state.values.timezone && form.state.values.timezone !== "UTC") {
-      return
+    const tz = popupSettings.timezone
+    const sourceIso = initialStartIso
+    if (sourceIso) {
+      // Only re-format when the input still holds the value we set at
+      // mount (UTC fallback conversion). If the user already typed into
+      // the field we respect their input.
+      const mountFormatted = utcToLocalTzNaive(sourceIso, "UTC")
+      if (form.state.values.start_time === mountFormatted) {
+        form.setFieldValue("start_time", utcToLocalTzNaive(sourceIso, tz))
+      }
     }
-    form.setFieldValue("timezone", popupSettings.timezone)
-  }, [isEdit, popupSettings?.timezone, form])
+    if (!form.state.values.timezone || form.state.values.timezone === "UTC") {
+      form.setFieldValue("timezone", tz)
+    }
+  }, [isEdit, popupSettings?.timezone, initialStartIso, form])
 
   const dayBounds = useMemo(() => {
     if (!dateStr) return null

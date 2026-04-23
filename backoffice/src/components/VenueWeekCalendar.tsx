@@ -561,28 +561,39 @@ export function VenueWeekCalendar({
                         role={clickable ? "button" : undefined}
                         tabIndex={clickable ? 0 : undefined}
                         className={cn(
-                          "absolute left-1 right-1 rounded-md text-[11px] font-medium leading-tight overflow-hidden shadow-sm",
+                          "absolute left-1 right-1 rounded-md text-[11px] font-medium leading-tight overflow-hidden shadow-sm flex flex-col",
                           isClosedException
                             ? "bg-zinc-300 text-zinc-800 border border-zinc-500 border-dashed dark:bg-zinc-700 dark:text-zinc-100 dark:border-zinc-400"
                             : "bg-sky-600 text-white border border-sky-700 dark:bg-sky-500 dark:text-white dark:border-sky-400",
                           clickable && "cursor-pointer",
                         )}
                       >
-                        {/* Setup band (hatched lighter) at the top of the block. */}
+                        {/* Setup/teardown bands: solid darker background with
+                            a subtle hatch so they read as the SAME event but
+                            the reserved portion is clearly "locked" and the
+                            cut at event_start/event_end is unmistakable. */}
                         {setupH > 1 && (
                           <div
-                            style={{ height: setupH }}
+                            style={{
+                              height: setupH,
+                              backgroundImage:
+                                "repeating-linear-gradient(135deg, rgba(255,255,255,0.18) 0 4px, transparent 4px 8px)",
+                            }}
                             aria-hidden
-                            className="bg-sky-400/60 border-b border-sky-700/50 dark:bg-sky-400/40"
+                            className="bg-sky-900 border-b border-sky-950 dark:bg-sky-900 dark:border-sky-950"
                             title="Setup"
                           />
                         )}
                         <div className="px-1.5 py-1 truncate">{b.label}</div>
                         {teardownH > 1 && (
                           <div
-                            style={{ height: teardownH }}
+                            style={{
+                              height: teardownH,
+                              backgroundImage:
+                                "repeating-linear-gradient(135deg, rgba(255,255,255,0.18) 0 4px, transparent 4px 8px)",
+                            }}
                             aria-hidden
-                            className="bg-sky-400/60 border-t border-sky-700/50 dark:bg-sky-400/40 mt-auto"
+                            className="bg-sky-900 border-t border-sky-950 dark:bg-sky-900 dark:border-sky-950 mt-auto"
                             title="Teardown"
                           />
                         )}
@@ -600,6 +611,16 @@ export function VenueWeekCalendar({
         <div className="flex items-center gap-1.5">
           <span className="h-3 w-3 rounded-sm bg-sky-600 dark:bg-sky-500" />
           Event
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span
+            className="h-3 w-3 rounded-sm bg-sky-900"
+            style={{
+              backgroundImage:
+                "repeating-linear-gradient(135deg, rgba(255,255,255,0.18) 0 2px, transparent 2px 4px)",
+            }}
+          />
+          Setup / Teardown
         </div>
         <div className="flex items-center gap-1.5">
           <span className="h-3 w-3 rounded-sm bg-muted/60 border border-border dark:bg-muted/40" />
