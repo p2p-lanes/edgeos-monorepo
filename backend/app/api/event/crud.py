@@ -2,7 +2,7 @@ import uuid
 from collections.abc import Iterable
 from datetime import datetime, timedelta
 
-from sqlalchemy import asc
+from sqlalchemy import asc, or_
 from sqlmodel import Session, col, delete, func, select
 
 from app.api.event.models import EventHiddenByHuman, EventInvitations, Events
@@ -63,10 +63,24 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
             statement = statement.where(
                 Events.tags.cast(JSONB).op("?|")(list(tags))
             )
+        # Recurring masters (``rrule IS NOT NULL``) must bypass the start_time
+        # window filter: a series whose master row starts before the window
+        # can still have occurrences inside it. ``_expand_rows_in_window``
+        # narrows them down in memory after expansion.
         if start_after is not None:
-            statement = statement.where(Events.start_time >= start_after)
+            statement = statement.where(
+                or_(
+                    Events.rrule.is_not(None),  # type: ignore[union-attr]
+                    Events.start_time >= start_after,
+                )
+            )
         if start_before is not None:
-            statement = statement.where(Events.start_time <= start_before)
+            statement = statement.where(
+                or_(
+                    Events.rrule.is_not(None),  # type: ignore[union-attr]
+                    Events.start_time <= start_before,
+                )
+            )
         if search:
             statement = statement.where(col(Events.title).ilike(f"%{search}%"))
 
@@ -207,15 +221,23 @@ def _expand_rows_in_window(
             override_keys.add((child.recurrence_master_id, _strip_tz(child.start_time)))
 
     for ev in rows:
-        result.append(ev)
+        ev_in_window = _ts_in_window(ev.start_time, window_start, window_end)
         if not ev.rrule:
+            # Non-recurring rows (and detached override children) were already
+            # pre-filtered by SQL when a window was provided; keep them.
+            result.append(ev)
             continue
+        # Recurring master: only include the row itself if its own start
+        # falls in the window — otherwise we'd show a stale "first instance"
+        # marker for a series whose visible occurrences are all pseudo-rows.
+        if ev_in_window:
+            result.append(ev)
         try:
             rule = parse_rrule(ev.rrule)
         except ValueError:
-            # Skip expansion for unparseable rules — the master row is still
-            # returned so the caller sees something rather than silent data
-            # loss.
+            # Skip expansion for unparseable rules — if the master was in
+            # window it's already been appended above; otherwise we
+            # intentionally emit nothing rather than silently guessing.
             continue
         if rule is None:
             continue
@@ -307,6 +329,20 @@ def _strip_tz(dt: datetime) -> datetime:
     import datetime as _dt
 
     return dt.astimezone(_dt.UTC).replace(tzinfo=None)
+
+
+def _ts_in_window(
+    ts: datetime,
+    window_start: datetime | None,
+    window_end: datetime | None,
+) -> bool:
+    """Return True if ``ts`` lies within the (optional) window bounds."""
+    ts_n = _strip_tz(ts)
+    if window_start is not None and ts_n < _strip_tz(window_start):
+        return False
+    if window_end is not None and ts_n > _strip_tz(window_end):
+        return False
+    return True
 
 
 def expanded_events_with_occurrence_id(events: Iterable[Events]) -> list[tuple[Events, str | None]]:

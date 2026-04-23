@@ -491,6 +491,70 @@ class TestListExpansion:
         ]
         assert pseudos_at_override == []
 
+    def test_series_starting_before_window_still_expands_into_window(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        # Regression: the calendar view queries one month at a time. A
+        # recurring series whose master row starts *before* the queried
+        # window used to be filtered out at SQL level and never expanded,
+        # so the window rendered empty. It should now return pseudo-rows
+        # for every in-window occurrence, without the master row itself
+        # (which lives outside the window).
+        popup = _make_popup(db, tenant_a)
+        master_start = datetime(2026, 4, 1, 14, 0, tzinfo=UTC)  # before window
+        master = _make_event(
+            db,
+            tenant_a,
+            popup,
+            start=master_start,
+            rrule="FREQ=WEEKLY;INTERVAL=1;BYDAY=WE",
+        )
+
+        window_start = datetime(2026, 5, 1, 0, 0, tzinfo=UTC)
+        window_end = datetime(2026, 5, 31, 23, 59, tzinfo=UTC)
+        resp = client.get(
+            "/api/v1/events",
+            headers=_auth(admin_token_tenant_a),
+            params={
+                "popup_id": str(popup.id),
+                "start_after": window_start.isoformat(),
+                "start_before": window_end.isoformat(),
+            },
+        )
+
+        assert resp.status_code == 200, resp.text
+        results = resp.json()["results"]
+
+        # The master row starts in April, so it must NOT be listed as a real
+        # row in a May window.
+        real_master_rows = [
+            r
+            for r in results
+            if r["id"] == str(master.id) and r["occurrence_id"] is None
+        ]
+        assert real_master_rows == []
+
+        # All Wednesdays in May 2026 should be emitted as pseudos.
+        pseudos = [
+            r
+            for r in results
+            if r["id"] == str(master.id) and r["occurrence_id"] is not None
+        ]
+        pseudo_dates = sorted(
+            datetime.fromisoformat(p["start_time"]).strftime("%Y-%m-%d")
+            for p in pseudos
+        )
+        assert pseudo_dates == [
+            "2026-05-06",
+            "2026-05-13",
+            "2026-05-20",
+            "2026-05-27",
+        ]
+
     def test_exdates_suppress_pseudo_without_breaking_series(
         self,
         client: TestClient,

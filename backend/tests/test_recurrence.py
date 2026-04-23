@@ -132,6 +132,49 @@ def test_window_filter() -> None:
     assert [dt.day for dt in out] == [16, 17, 18]
 
 
+def test_window_past_dtstart_daily_unbounded() -> None:
+    # Regression: for an unbounded daily series whose dtstart precedes the
+    # window by more than ``DEFAULT_MAX_OCCURRENCES`` days, the expander used
+    # to return [] because pre-window candidates exhausted the safety cap.
+    rule = RecurrenceRule(freq="DAILY", interval=1)
+    dtstart = datetime(2026, 1, 1, 9, 0, 0)
+    window_start = datetime(2026, 5, 1, 0, 0, 0)  # +120 days
+    window_end = datetime(2026, 5, 31, 23, 59, 59)
+    out = expand(
+        dtstart=dtstart,
+        rule=rule,
+        window_start=window_start,
+        window_end=window_end,
+    )
+    # 31 May occurrences should all be emitted.
+    assert len(out) == 31
+    assert out[0].strftime("%Y-%m-%d") == "2026-05-01"
+    assert out[-1].strftime("%Y-%m-%d") == "2026-05-31"
+    assert all(dt.hour == 9 for dt in out)
+
+
+def test_window_past_dtstart_weekly_byday() -> None:
+    # Weekly MO/WE series starting 6 months before the window; the window
+    # should still see every MO/WE inside it.
+    rule = RecurrenceRule(freq="WEEKLY", interval=1, by_day=["MO", "WE"])
+    dtstart = datetime(2025, 11, 3, 10, 0, 0)  # Mon Nov 3 2025
+    window_start = datetime(2026, 5, 1, 0, 0, 0)
+    window_end = datetime(2026, 5, 15, 23, 59, 59)
+    out = expand(
+        dtstart=dtstart,
+        rule=rule,
+        window_start=window_start,
+        window_end=window_end,
+    )
+    dates = [dt.strftime("%Y-%m-%d") for dt in out]
+    assert dates == [
+        "2026-05-04",  # Mon
+        "2026-05-06",  # Wed
+        "2026-05-11",  # Mon
+        "2026-05-13",  # Wed
+    ]
+
+
 def test_occurrence_id_roundtrip() -> None:
     master_id = "11111111-1111-1111-1111-111111111111"
     dt = datetime(2026, 4, 14, 18, 30, 0)

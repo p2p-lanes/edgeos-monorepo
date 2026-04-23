@@ -233,12 +233,22 @@ def expand(
         target_weekdays = None
 
     results: list[datetime] = []
-    produced = 0
+    # ``produced_total`` counts every RFC-visible occurrence (including
+    # EXDATE-skipped and pre-window ones) so COUNT semantics stay correct.
+    # ``cap`` is a ceiling on the *emitted* list — checked via ``len(results)``
+    # — so a series whose dtstart precedes ``window_start`` still reaches the
+    # window instead of running out of cap on pre-window iterations.
+    produced_total = 0
     n = 0  # period counter
+    # Hard ceiling on period iterations, independent of ``cap``. Lets us walk
+    # from a far-past dtstart to the window without bailing early.
+    max_iters = HARD_MAX_OCCURRENCES * 10
 
     until_naive = _as_naive_utc(rule.until) if rule.until else None
 
-    while produced < cap:
+    while len(results) < cap:
+        if n > max_iters:
+            return results
         base = _increment(dtstart, rule, n)
 
         candidates: list[datetime] = []
@@ -253,39 +263,38 @@ def expand(
 
         for cand in candidates:
             cand_naive = _as_naive_utc(cand)
+            # Skip candidates that fall before dtstart (can happen for BYDAY
+            # in the first iteration when the first target weekday precedes
+            # dtstart's weekday — we computed (wd - base_weekday) % 7 which
+            # is >= 0, so this is only a safety guard). Not counted toward
+            # COUNT.
+            if _as_naive_utc(cand) < _as_naive_utc(dtstart):
+                continue
             # COUNT cap
-            if rule.count is not None and produced >= rule.count:
+            if rule.count is not None and produced_total >= rule.count:
                 return results
             # UNTIL cap
             if until_naive is not None and cand_naive > until_naive:
                 return results
-            # Skip candidates that fall before dtstart (can happen for BYDAY
-            # in the first iteration when the first target weekday precedes
-            # dtstart's weekday — we computed (wd - base_weekday) % 7 which
-            # is >= 0, so this is only a safety guard).
-            if _as_naive_utc(cand) < _as_naive_utc(dtstart):
-                continue
+
+            # This candidate counts toward COUNT (per RFC) even if we then
+            # skip it via EXDATE or the window filter.
+            produced_total += 1
+
             # EXDATE skip
             if cand_naive in exdate_set:
-                produced += 1  # still counts toward COUNT per RFC
                 continue
             # Window filter.
             if window_start is not None and cand_naive < _as_naive_utc(window_start):
-                produced += 1
                 continue
             if window_end is not None and cand_naive > _as_naive_utc(window_end):
                 return results
 
             results.append(cand)
-            produced += 1
-            if produced >= cap:
+            if len(results) >= cap:
                 return results
 
         n += 1
-        # Extra safety: if we haven't produced anything in a lot of iterations
-        # we are probably stuck (shouldn't happen with the supported subset).
-        if n > cap * 10:
-            return results
 
     return results
 
