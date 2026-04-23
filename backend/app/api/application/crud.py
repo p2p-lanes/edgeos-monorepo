@@ -20,7 +20,6 @@ from app.api.attendee.crud import attendees_crud, generate_check_in_code
 from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.human.models import Humans
 from app.api.human.schemas import HumanCreate, HumanUpdate
-from app.api.product.models import Products
 from app.api.shared.crud import BaseCRUD
 
 if TYPE_CHECKING:
@@ -178,14 +177,11 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         skip: int = 0,
         limit: int = 100,
         q: str | None = None,
-        brings_kids: bool | None = None,
-        participation: str | None = None,
     ) -> tuple[list[Applications], int]:
         """Find applications for the attendees directory.
 
         Returns accepted applications whose main attendee has at least one
-        product assigned. Supports text search, brings_kids filter, and
-        participation (week) filter.
+        product assigned. Supports text search across human fields.
         """
         base_statement = (
             select(Applications)
@@ -222,39 +218,6 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                     col(Humans.telegram).ilike(search_term),
                 )
             )
-
-        # Filter by brings_kids
-        if brings_kids is True:
-            has_kids = (
-                exists()
-                .where(Attendees.application_id == Applications.id)
-                .where(Attendees.category == "kid")
-            )
-            base_statement = base_statement.where(has_kids)
-        elif brings_kids is False:
-            has_kids = (
-                exists()
-                .where(Attendees.application_id == Applications.id)
-                .where(Attendees.category == "kid")
-            )
-            base_statement = base_statement.where(~has_kids)
-
-        # Filter by participation weeks
-        if participation:
-            week_numbers = [w.strip() for w in participation.split(",") if w.strip()]
-            week_conditions = []
-            for w in week_numbers:
-                week_conditions.append(col(Products.slug).ilike(f"week{w}%"))
-            if week_conditions:
-                participation_exists = (
-                    exists()
-                    .where(Attendees.application_id == Applications.id)
-                    .where(Attendees.category == "main")
-                    .where(AttendeeProducts.attendee_id == Attendees.id)
-                    .where(AttendeeProducts.product_id == Products.id)
-                    .where(or_(*week_conditions))
-                )
-                base_statement = base_statement.where(participation_exists)
 
         # Count
         count_statement = select(func.count()).select_from(base_statement.subquery())

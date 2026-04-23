@@ -10,7 +10,7 @@ const AttendeeCell = ({
   className?: string
 }) => {
   return (
-    <TableCell className={className}>
+    <TableCell className={`whitespace-nowrap min-w-[200px] ${className ?? ""}`}>
       <div className="flex items-center gap-1">
         <CellControl
           className="font-medium text-foreground"

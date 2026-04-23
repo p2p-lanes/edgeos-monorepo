@@ -410,8 +410,6 @@ export class ApplicationsService {
      * @param data.skip Number of items to skip
      * @param data.limit Maximum number of items to return
      * @param data.q
-     * @param data.bringsKids
-     * @param data.participation
      * @returns ListModel_AttendeesDirectoryEntry_ Successful Response
      * @throws ApiError
      */
@@ -425,9 +423,7 @@ export class ApplicationsService {
             query: {
                 skip: data.skip,
                 limit: data.limit,
-                q: data.q,
-                brings_kids: data.bringsKids,
-                participation: data.participation
+                q: data.q
             },
             errors: {
                 422: 'Validation Error'
@@ -443,8 +439,6 @@ export class ApplicationsService {
      * @param data The data for the request.
      * @param data.popupId
      * @param data.q
-     * @param data.bringsKids
-     * @param data.participation
      * @returns unknown Successful Response
      * @throws ApiError
      */
@@ -456,9 +450,7 @@ export class ApplicationsService {
                 popup_id: data.popupId
             },
             query: {
-                q: data.q,
-                brings_kids: data.bringsKids,
-                participation: data.participation
+                q: data.q
             },
             errors: {
                 422: 'Validation Error'

@@ -2771,12 +2771,10 @@ export type ApplicationsCreateMyApplicationData = {
 export type ApplicationsCreateMyApplicationResponse = (ApplicationPublic);
 
 export type ApplicationsListAttendeesDirectoryData = {
-    bringsKids?: (boolean | null);
     /**
      * Maximum number of items to return
      */
     limit?: number;
-    participation?: (string | null);
     popupId: string;
     q?: (string | null);
     /**
@@ -2788,8 +2786,6 @@ export type ApplicationsListAttendeesDirectoryData = {
 export type ApplicationsListAttendeesDirectoryResponse = (ListModel_AttendeesDirectoryEntry_);
 
 export type ApplicationsExportAttendeesDirectoryCsvData = {
-    bringsKids?: (boolean | null);
-    participation?: (string | null);
     popupId: string;
     q?: (string | null);
 };

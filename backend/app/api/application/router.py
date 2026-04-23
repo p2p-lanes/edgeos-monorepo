@@ -617,8 +617,6 @@ async def list_attendees_directory(
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
     q: str | None = None,
-    brings_kids: bool | None = None,
-    participation: str | None = None,
 ) -> ListModel[AttendeesDirectoryEntry]:
     """List attendees directory for a popup (Portal).
 
@@ -631,8 +629,6 @@ async def list_attendees_directory(
         skip=skip,
         limit=limit,
         q=q,
-        brings_kids=brings_kids,
-        participation=participation,
     )
 
     results = [_build_directory_entry(a) for a in applications]
@@ -649,8 +645,6 @@ async def export_attendees_directory_csv(
     db: HumanTenantSession,
     _: CurrentHuman,
     q: str | None = None,
-    brings_kids: bool | None = None,
-    participation: str | None = None,
 ) -> Response:
     """Export attendees directory as CSV (Portal).
 
@@ -662,8 +656,6 @@ async def export_attendees_directory_csv(
         skip=0,
         limit=10000,
         q=q,
-        brings_kids=brings_kids,
-        participation=participation,
     )
 
     entries = [_build_directory_entry(a) for a in applications]
