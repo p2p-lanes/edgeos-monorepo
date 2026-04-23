@@ -1,4 +1,4 @@
-const DATE_FORMATTER = new Intl.DateTimeFormat("es-AR", {
+const DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
   day: "numeric",
   month: "long",
   year: "numeric",
@@ -19,11 +19,11 @@ export function formatDateRange(
   if (s && e) return `${DATE_FORMATTER.format(s)} - ${DATE_FORMATTER.format(e)}`
   if (s) return DATE_FORMATTER.format(s)
   if (e) return DATE_FORMATTER.format(e)
-  return "Fechas por definir"
+  return "Dates TBD"
 }
 
 export function formatShortDate(iso: string | null): string {
   const d = parseDate(iso)
-  if (!d) return "Próximamente"
+  if (!d) return "Coming soon"
   return DATE_FORMATTER.format(d)
 }

@@ -81,16 +81,27 @@ function computeThemeVars(
 ): Record<string, string> {
   if (!colors) return {}
 
-  // If nothing is set (no mode, no primary), skip the theme entirely so the
-  // portal defaults from globals.css stay intact.
-  if (!colors.mode && !colors.primary_color) return {}
+  const hasTheme = Boolean(colors.mode || colors.primary_color)
+  const vars: Record<string, string> = {}
+
+  // Per-surface overrides (like checkout_navbar_bg) apply independently of
+  // mode/primary so the admin can tweak a single color without committing to
+  // the full design-token theme.
+  if (colors.checkout_navbar_bg) {
+    vars["--checkout-navbar-bg"] = colors.checkout_navbar_bg
+    vars["--checkout-nav-bg"] = colors.checkout_navbar_bg
+  }
+
+  // If no mode/primary is set, stop here — rest of the palette stays on the
+  // globals.css defaults.
+  if (!hasTheme) return vars
 
   const mode: ThemeMode = colors.mode === "dark" ? "dark" : "light"
   const palette = mode === "dark" ? DARK : LIGHT
   const primary = colors.primary_color
   const primaryFg = colors.primary_foreground_color || "oklch(1 0 0)"
 
-  const vars: Record<string, string> = {
+  Object.assign(vars, {
     // ─ Surface neutrals (always applied when a mode is chosen so the admin
     // can preview dark/light without committing to a primary).
     "--background": palette.background,
@@ -132,7 +143,7 @@ function computeThemeVars(
     "--checkout-card-bg": palette.card,
     "--checkout-bottom-bar-bg": palette.sidebar,
     "--checkout-bottom-bar-text": palette.foreground,
-  }
+  })
 
   // Brand-dependent tokens only fill in once the admin picked a primary —
   // otherwise we'd overwrite the nice shadcn default with nothing usable.

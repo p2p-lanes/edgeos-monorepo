@@ -107,7 +107,7 @@ export function PreviewEventCard() {
                 borderRadius: "var(--radius)",
               }}
             >
-              Ver pases
+              View passes
             </button>
           </div>
         </div>

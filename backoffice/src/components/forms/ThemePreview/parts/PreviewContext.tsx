@@ -33,9 +33,9 @@ export function usePreview() {
 // Resolves a PreviewEvent field to its display value, falling back to a mock
 // when the popup form hasn't been filled in yet.
 const DISPLAY_FALLBACKS = {
-  name: "Mi Evento",
-  tagline: "Una descripción breve del evento",
-  location: "Ubicación",
+  name: "My Event",
+  tagline: "A brief event description",
+  location: "Location",
 }
 
 export function useDisplayEvent() {

@@ -368,68 +368,104 @@ function MerchCompact({
         const hasDiscount =
           product.compare_price != null && product.compare_price > product.price
 
-        return (
-          <div
-            key={product.id}
-            className={cn(
-              "flex items-center gap-3 rounded-xl border px-3 py-3 transition-all",
-              hasQty
-                ? "border-primary/30 bg-primary/10"
-                : "border-border hover:border-muted-foreground/40",
+        const cardClassName = cn(
+          "group relative w-full flex items-center gap-3 rounded-2xl border bg-checkout-card-bg px-3 py-2.5 transition-all",
+          hasQty
+            ? "border-primary/30 shadow-sm"
+            : "border-border cursor-pointer hover:border-muted-foreground/40 hover:shadow-sm",
+        )
+
+        const cardBody = (
+          <>
+            {hasQty && (
+              <span
+                aria-hidden
+                className="pointer-events-none absolute inset-0 rounded-2xl bg-primary/5"
+              />
             )}
-          >
-            <div className="relative w-14 h-14 shrink-0 rounded-lg overflow-hidden bg-muted flex items-center justify-center">
-              {product.image_url ? (
-                <Image
-                  src={product.image_url}
-                  alt={product.name}
-                  fill
-                  className="object-cover"
-                />
-              ) : (
-                <ShoppingBag className="w-5 h-5 text-muted-foreground" />
+
+            <div className="relative shrink-0">
+              <div className="relative w-11 h-11 rounded-xl overflow-hidden bg-muted flex items-center justify-center">
+                {product.image_url ? (
+                  <Image
+                    src={product.image_url}
+                    alt={product.name}
+                    fill
+                    className="object-cover"
+                  />
+                ) : (
+                  <ShoppingBag className="w-4 h-4 text-muted-foreground" />
+                )}
+              </div>
+              {hasQty && qty > 1 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-bold shadow-sm tabular-nums">
+                  {qty}
+                </span>
               )}
             </div>
 
-            <div className="flex-1 min-w-0">
-              <p className="font-medium text-sm text-foreground truncate">
+            <div className="relative flex-1 min-w-0 text-left">
+              <p className="font-semibold text-sm text-pass-title truncate leading-tight">
                 {product.name}
               </p>
-              <div>
-                {hasDiscount && product.compare_price != null && (
-                  <span className="text-xs text-muted-foreground line-through mr-1">
+              <div className="mt-0.5 flex items-center gap-1.5">
+                {hasDiscount && product.compare_price != null && !hasQty && (
+                  <span className="text-[11px] text-pass-text line-through">
                     {formatCurrency(product.compare_price)}
                   </span>
                 )}
                 <span
                   className={cn(
                     "text-xs font-medium",
-                    hasDiscount ? "text-green-600" : "text-muted-foreground",
+                    hasQty
+                      ? "text-primary"
+                      : hasDiscount
+                        ? "text-green-600"
+                        : "text-pass-text",
                   )}
                 >
-                  {formatCurrency(product.price)} each
+                  {hasQty
+                    ? formatCurrency(product.price * qty)
+                    : `${formatCurrency(product.price)} each`}
                 </span>
               </div>
             </div>
 
-            <div className="flex items-center gap-3 shrink-0">
-              <MerchQtyControl
-                product={product}
-                quantity={qty}
-                onQuantityChange={(nextQty) =>
-                  onQuantityChange(product.id, nextQty)
-                }
-              />
-              <span
-                className={cn(
-                  "font-bold text-sm w-16 text-right",
-                  hasQty ? "text-primary" : "text-muted-foreground",
-                )}
-              >
-                {formatCurrency(hasQty ? product.price * qty : product.price)}
-              </span>
+            <div className="relative shrink-0">
+              {hasQty ? (
+                <MerchQtyControl
+                  product={product}
+                  quantity={qty}
+                  onQuantityChange={(nextQty) =>
+                    onQuantityChange(product.id, nextQty)
+                  }
+                />
+              ) : (
+                <span
+                  aria-hidden
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors group-hover:bg-primary/20"
+                >
+                  <Plus className="size-4" strokeWidth={2.5} />
+                </span>
+              )}
             </div>
+          </>
+        )
+
+        return hasQty ? (
+          <div key={product.id} className={cardClassName}>
+            {cardBody}
           </div>
+        ) : (
+          <button
+            key={product.id}
+            type="button"
+            onClick={() => onQuantityChange(product.id, 1)}
+            aria-label={`Add ${product.name} to cart`}
+            className={cn(cardClassName, "text-left")}
+          >
+            {cardBody}
+          </button>
         )
       })}
     </div>
