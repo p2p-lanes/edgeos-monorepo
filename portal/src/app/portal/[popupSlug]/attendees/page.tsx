@@ -1,7 +1,6 @@
 "use client"
 
 import { FileDown, Loader2 } from "lucide-react"
-import { useEffect } from "react"
 import { useTranslation } from "react-i18next"
 import Permissions from "@/components/Permissions"
 import { Button } from "@/components/ui/button"
@@ -28,26 +27,8 @@ const Page = () => {
     handlePageSizeChange,
     searchQuery,
     setSearchQuery,
-    applySearch,
   } = useGetData()
   const { isExporting, handleExportCsv } = useExportCsv()
-
-  const handleSearchKeyDown = (
-    event: React.KeyboardEvent<HTMLInputElement>,
-  ) => {
-    if (event.key === "Enter") {
-      applySearch()
-    }
-  }
-
-  // Debounce search query: auto-apply after 300ms of inactivity
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      applySearch()
-    }, 300)
-    return () => clearTimeout(timeoutId)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [applySearch])
 
   return (
     <TooltipProvider>
@@ -68,7 +49,6 @@ const Page = () => {
               placeholder={t("attendees.search_placeholder")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={handleSearchKeyDown}
               className="bg-card"
             />
 
