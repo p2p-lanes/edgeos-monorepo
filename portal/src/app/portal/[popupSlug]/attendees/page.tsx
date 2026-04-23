@@ -1,17 +1,10 @@
 "use client"
 
-import { FileDown, ListFilter, Loader2 } from "lucide-react"
-import { useEffect, useState } from "react"
+import { FileDown, Loader2 } from "lucide-react"
+import { useEffect } from "react"
 import { useTranslation } from "react-i18next"
 import Permissions from "@/components/Permissions"
 import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import {
   Tooltip,
@@ -19,7 +12,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { Switch } from "../../../../components/ui/switch"
 import AttendeesTable from "./components/AttendeesTable"
 import useExportCsv from "./hooks/useExportCsv"
 import useGetData from "./hooks/useGetData"
@@ -34,35 +26,28 @@ const Page = () => {
     pageSize,
     handlePageChange,
     handlePageSizeChange,
-    // filters
     searchQuery,
     setSearchQuery,
-    bringsKids,
-    setBringsKids,
-    selectedWeeks,
-    handleToggleWeek,
-    applyFilters,
-    clearFilters,
+    applySearch,
   } = useGetData()
-  const [filtersOpen, setFiltersOpen] = useState(false)
   const { isExporting, handleExportCsv } = useExportCsv()
 
   const handleSearchKeyDown = (
     event: React.KeyboardEvent<HTMLInputElement>,
   ) => {
     if (event.key === "Enter") {
-      applyFilters()
+      applySearch()
     }
   }
 
   // Debounce search query: auto-apply after 300ms of inactivity
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      applyFilters()
+      applySearch()
     }, 300)
     return () => clearTimeout(timeoutId)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [applyFilters])
+  }, [applySearch])
 
   return (
     <TooltipProvider>
@@ -86,103 +71,6 @@ const Page = () => {
               onKeyDown={handleSearchKeyDown}
               className="bg-card"
             />
-            {(searchQuery.trim() !== "" ||
-              bringsKids !== null ||
-              selectedWeeks.length > 0) && (
-              <Button
-                variant="ghost"
-                aria-label="Clear filters"
-                onClick={clearFilters}
-                className="bg-destructive text-primary-foreground hover:bg-destructive hover:shadow-md hover:text-primary-foreground"
-              >
-                {t("attendees.clear_filters")}
-              </Button>
-            )}
-            <Dialog open={filtersOpen} onOpenChange={setFiltersOpen}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <DialogTrigger asChild>
-                    <Button
-                      aria-label="Open filters"
-                      className="bg-card text-foreground hover:bg-card hover:shadow-md"
-                    >
-                      <ListFilter className="w-4 h-4" />
-                    </Button>
-                  </DialogTrigger>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{t("attendees.open_filters")}</p>
-                </TooltipContent>
-              </Tooltip>
-              <DialogContent className="bg-card">
-                <DialogHeader>
-                  <DialogTitle>{t("attendees.filters")}</DialogTitle>
-                </DialogHeader>
-                <div className="flex flex-col gap-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium">
-                        {t("attendees.brings_kids")}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {t("attendees.toggle_kids")}
-                      </span>
-                    </div>
-                    <Switch
-                      checked={bringsKids ?? false}
-                      onCheckedChange={(v: boolean) => setBringsKids(v)}
-                      aria-label="Toggle brings kids filter"
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-2">
-                    <span className="text-sm font-medium">
-                      {t("attendees.weeks_coming")}
-                    </span>
-                    <div className="flex flex-wrap gap-2">
-                      {[1, 2, 3, 4].map((week) => {
-                        const isActive = selectedWeeks.includes(week)
-                        return (
-                          <Button
-                            key={week}
-                            variant={isActive ? "default" : "outline"}
-                            className={
-                              isActive
-                                ? "bg-primary text-primary-foreground"
-                                : "bg-card text-foreground"
-                            }
-                            aria-pressed={isActive}
-                            onClick={() => handleToggleWeek(week)}
-                          >
-                            {t("attendees.week", { week })}
-                          </Button>
-                        )
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="flex justify-between gap-2">
-                    <Button
-                      variant="ghost"
-                      onClick={() => {
-                        clearFilters()
-                        setFiltersOpen(false)
-                      }}
-                    >
-                      {t("attendees.clear_filters")}
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        applyFilters()
-                        setFiltersOpen(false)
-                      }}
-                    >
-                      {t("attendees.apply_filters")}
-                    </Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
 
             <Tooltip>
               <TooltipTrigger asChild>
