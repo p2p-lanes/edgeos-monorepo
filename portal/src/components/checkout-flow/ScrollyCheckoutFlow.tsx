@@ -86,7 +86,6 @@ function ScrollyCheckoutFlowInner({
   const scrollToIndexRef = useRef<((index: number) => void) | null>(null)
 
   const footerDesign = "pill" as const
-  const navDesign = "pills" as const
   const watermarkStyle: WatermarkStyle = "bold"
 
   const allSections = useMemo(() => {
@@ -182,11 +181,32 @@ function ScrollyCheckoutFlowInner({
       el.style.scrollSnapStop = "always"
     }
 
+    // While a programmatic scroll is in flight we lock the active section to
+    // the destination so the IntersectionObserver doesn't flip through every
+    // intermediate section as they pass under the viewport.
+    let scrollTargetId: string | null = null
+    let scrollTargetTimeout: number | null = null
+    const releaseScrollTarget = () => {
+      scrollTargetId = null
+      if (scrollTargetTimeout !== null) {
+        window.clearTimeout(scrollTargetTimeout)
+        scrollTargetTimeout = null
+      }
+    }
+
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
           if (entry.isIntersecting && entry.intersectionRatio >= 0.3) {
-            setActiveSection(entry.target.id)
+            const id = entry.target.id
+            if (scrollTargetId !== null) {
+              if (id === scrollTargetId) {
+                releaseScrollTarget()
+                setActiveSection(id)
+              }
+              continue
+            }
+            setActiveSection(id)
           }
         }
       },
@@ -196,16 +216,24 @@ function ScrollyCheckoutFlowInner({
 
     scrollToIndexRef.current = (index: number) => {
       const clamped = Math.max(0, Math.min(index, sectionsSnapshot.length - 1))
-      const el = document.getElementById(sectionsSnapshot[clamped].id)
+      const targetId = sectionsSnapshot[clamped].id
+      const el = document.getElementById(targetId)
       if (!el) return
       const reduceMotion = window.matchMedia(
         "(prefers-reduced-motion: reduce)",
       ).matches
+      scrollTargetId = targetId
+      if (scrollTargetTimeout !== null) {
+        window.clearTimeout(scrollTargetTimeout)
+      }
+      // Safety net in case the target never reaches the threshold (e.g. user
+      // interrupts the scroll). 1500ms covers smooth scroll across many steps.
+      scrollTargetTimeout = window.setTimeout(releaseScrollTarget, 1500)
       mainEl.scrollTo({
         top: getScrollTop(el),
         behavior: reduceMotion ? "auto" : "smooth",
       })
-      setActiveSection(sectionsSnapshot[clamped].id)
+      setActiveSection(targetId)
     }
 
     return () => {
@@ -220,6 +248,7 @@ function ScrollyCheckoutFlowInner({
       observer.disconnect()
       ro.disconnect()
       navRo.disconnect()
+      releaseScrollTarget()
       scrollToIndexRef.current = null
     }
   }, [allSections])
@@ -274,7 +303,6 @@ function ScrollyCheckoutFlowInner({
           const idx = allSections.findIndex((s) => s.id === sectionId)
           if (idx >= 0) scrollToIndexRef.current?.(idx)
         }}
-        variant={navDesign}
         extraContent={navExtraContent}
       />
       {allSections.map((section) => {
