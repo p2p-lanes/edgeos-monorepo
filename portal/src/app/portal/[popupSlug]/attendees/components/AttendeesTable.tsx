@@ -1,12 +1,8 @@
 import { useTranslation } from "react-i18next"
 import Pagination from "@/components/common/Pagination"
-import ParticipationTickets from "@/components/common/ParticipationTickets"
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table"
-import { useProductsQuery } from "@/hooks/useProductsQuery"
-import { useCityProvider } from "@/providers/cityProvider"
 import type { AttendeeDirectory } from "@/types/Attendee"
 import AttendeeCell from "./Table/Cells/AttendeeCell"
-import CellControl from "./Table/Cells/CellControl"
 import CommonCell from "./Table/Cells/CommonCell"
 import Header from "./Table/Header"
 import "./Table/Cells/styles.css"
@@ -30,11 +26,6 @@ const AttendeesTable = ({
   onPageChange,
 }: AttendeesTableProps) => {
   const { t } = useTranslation()
-  const { getCity } = useCityProvider()
-  const city = getCity()
-  const { data: products = [] } = useProductsQuery(
-    city ? String(city.id) : null,
-  )
 
   if (attendees.length === 0 && !loading) {
     return (
@@ -53,7 +44,7 @@ const AttendeesTable = ({
         <TableBody>
           {loading ? (
             <TableRow>
-              <TableCell colSpan={6} className="h-[530px]">
+              <TableCell colSpan={5} className="h-[530px]">
                 <div className="flex justify-center items-center h-full">
                   <div className="w-6 h-6 border-2 border-gray-400 border-t-primary rounded-full animate-spin" />
                 </div>
@@ -68,23 +59,6 @@ const AttendeesTable = ({
                 <AttendeeCell attendee={attendee} />
                 <CommonCell value={attendee.email ?? ""} />
                 <CommonCell value={attendee.telegram ?? ""} />
-                <TableCell>
-                  <CellControl value={attendee.participation}>
-                    <ParticipationTickets
-                      participation={attendee.participation}
-                      passes={products}
-                    />
-                  </CellControl>
-                </TableCell>
-                <CommonCell
-                  value={
-                    attendee.brings_kids === "*"
-                      ? "*"
-                      : attendee.brings_kids
-                        ? t("common.yes")
-                        : t("common.no")
-                  }
-                />
                 <CommonCell
                   value={
                     attendee.role && attendee.role?.length > 60
