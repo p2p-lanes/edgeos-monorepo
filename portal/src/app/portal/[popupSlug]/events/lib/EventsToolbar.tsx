@@ -66,8 +66,8 @@ export function EventsToolbar({
 }: EventsToolbarProps) {
   const { t } = useTranslation()
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <div className="relative flex-1 min-w-[200px]">
+    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+      <div className="relative w-full sm:w-auto sm:flex-1 sm:min-w-[200px]">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           value={search}
@@ -82,9 +82,12 @@ export function EventsToolbar({
         size="sm"
         onClick={() => onRsvpedOnlyChange(!rsvpedOnly)}
         aria-pressed={rsvpedOnly}
+        aria-label={t("events.toolbar.my_rsvps")}
+        title={t("events.toolbar.my_rsvps")}
+        className="px-2 sm:px-3"
       >
-        <CheckCircle className="mr-2 h-4 w-4" />
-        {t("events.toolbar.my_rsvps")}
+        <CheckCircle className="h-4 w-4 sm:mr-2" />
+        <span className="hidden sm:inline">{t("events.toolbar.my_rsvps")}</span>
       </Button>
 
       <Button
@@ -92,9 +95,14 @@ export function EventsToolbar({
         size="sm"
         onClick={() => onMineOnlyChange(!mineOnly)}
         aria-pressed={mineOnly}
+        aria-label={t("events.toolbar.my_events")}
+        title={t("events.toolbar.my_events")}
+        className="px-2 sm:px-3"
       >
-        <Pencil className="mr-2 h-4 w-4" />
-        {t("events.toolbar.my_events")}
+        <Pencil className="h-4 w-4 sm:mr-2" />
+        <span className="hidden sm:inline">
+          {t("events.toolbar.my_events")}
+        </span>
       </Button>
 
       {onShowHiddenChange && (
@@ -103,21 +111,23 @@ export function EventsToolbar({
           size="sm"
           onClick={() => onShowHiddenChange(!showHidden)}
           aria-pressed={!!showHidden}
+          aria-label={t("events.toolbar.hidden")}
           title={
             showHidden
               ? t("events.toolbar.hidden_title_showing")
               : t("events.toolbar.hidden_title_hidden")
           }
           disabled={!showHidden && (hiddenCount ?? 0) === 0}
+          className="px-2 sm:px-3"
         >
           {showHidden ? (
-            <EyeOff className="mr-2 h-4 w-4" />
+            <EyeOff className="h-4 w-4 sm:mr-2" />
           ) : (
-            <Eye className="mr-2 h-4 w-4" />
+            <Eye className="h-4 w-4 sm:mr-2" />
           )}
-          {t("events.toolbar.hidden")}
+          <span className="hidden sm:inline">{t("events.toolbar.hidden")}</span>
           {typeof hiddenCount === "number" && hiddenCount > 0 && (
-            <span className="ml-1.5 text-xs opacity-80">({hiddenCount})</span>
+            <span className="ml-1 text-xs opacity-80">({hiddenCount})</span>
           )}
         </Button>
       )}
@@ -131,11 +141,15 @@ export function EventsToolbar({
               }
               size="sm"
               title={t("events.toolbar.filter_by_tags")}
+              aria-label={t("events.toolbar.tags_label")}
+              className="px-2 sm:px-3"
             >
-              <Filter className="mr-2 h-4 w-4" />
-              {t("events.toolbar.tags_label")}
+              <Filter className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">
+                {t("events.toolbar.tags_label")}
+              </span>
               {selectedTags && selectedTags.length > 0 && (
-                <span className="ml-1.5 text-xs opacity-80">
+                <span className="ml-1 text-xs opacity-80">
                   ({selectedTags.length})
                 </span>
               )}
@@ -189,7 +203,8 @@ export function EventsToolbar({
       )}
 
       {/* Segmented List / Calendar switcher — same page, only the body
-          swaps. Active option shows label + icon, inactive is icon-only. */}
+          swaps. Active option shows label + icon on sm+, icon-only on mobile
+          (the active background still marks the current view). */}
       <div className="inline-flex rounded-md border bg-card p-0.5">
         <Button
           type="button"
@@ -199,11 +214,16 @@ export function EventsToolbar({
           title={t("events.toolbar.list_view_label")}
           aria-pressed={view === "list"}
           onClick={() => onViewChange("list")}
-          className={cn("h-7 rounded-sm", view === "list" && "shadow-none")}
+          className={cn(
+            "h-7 rounded-sm px-2 sm:px-3",
+            view === "list" && "shadow-none",
+          )}
         >
-          <List className={cn("h-4 w-4", view === "list" && "mr-1.5")} />
+          <List className={cn("h-4 w-4", view === "list" && "sm:mr-1.5")} />
           {view === "list" && (
-            <span>{t("events.toolbar.list_view_short")}</span>
+            <span className="hidden sm:inline">
+              {t("events.toolbar.list_view_short")}
+            </span>
           )}
         </Button>
         <Button
@@ -214,22 +234,35 @@ export function EventsToolbar({
           title={t("events.toolbar.calendar_view_label")}
           aria-pressed={view === "calendar"}
           onClick={() => onViewChange("calendar")}
-          className={cn("h-7 rounded-sm", view === "calendar" && "shadow-none")}
+          className={cn(
+            "h-7 rounded-sm px-2 sm:px-3",
+            view === "calendar" && "shadow-none",
+          )}
         >
           <CalendarDays
-            className={cn("h-4 w-4", view === "calendar" && "mr-1.5")}
+            className={cn("h-4 w-4", view === "calendar" && "sm:mr-1.5")}
           />
           {view === "calendar" && (
-            <span>{t("events.toolbar.calendar_view_short")}</span>
+            <span className="hidden sm:inline">
+              {t("events.toolbar.calendar_view_short")}
+            </span>
           )}
         </Button>
       </div>
 
       {canCreate && (
-        <Button size="sm" asChild>
+        <Button
+          size="sm"
+          asChild
+          className="px-2 sm:px-3"
+          aria-label={t("events.toolbar.create_event")}
+          title={t("events.toolbar.create_event")}
+        >
           <Link href={`/portal/${slug}/events/new`}>
-            <Plus className="mr-2 h-4 w-4" />
-            {t("events.toolbar.create_event")}
+            <Plus className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">
+              {t("events.toolbar.create_event")}
+            </span>
           </Link>
         </Button>
       )}
