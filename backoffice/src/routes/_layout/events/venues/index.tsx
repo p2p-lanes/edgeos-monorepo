@@ -10,7 +10,6 @@ import {
   CalendarRange,
   Check,
   CheckCircle2,
-  EllipsisVertical,
   Eye,
   MapPin,
   Pencil,
@@ -36,12 +35,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { LoadingButton } from "@/components/ui/loading-button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
@@ -110,7 +103,6 @@ const columns: ColumnDef<EventVenuePublic>[] = [
 ]
 
 function VenueRowActions({ venue }: { venue: EventVenuePublic }) {
-  const [menuOpen, setMenuOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -141,75 +133,68 @@ function VenueRowActions({ venue }: { venue: EventVenuePublic }) {
   })
 
   const isPending = venue.status === "pending"
+  const editLabel = isAdmin ? "Edit venue" : "View venue"
 
   return (
     <>
-      <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" aria-label="Venue actions">
-            <EllipsisVertical className="h-4 w-4" />
+      <div className="flex items-center justify-end gap-0.5">
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Schedule venue"
+          title="Schedule"
+          onClick={() =>
+            navigate({
+              to: "/events/venues/$venueId/schedule",
+              params: { venueId: venue.id },
+            })
+          }
+        >
+          <CalendarRange className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={editLabel}
+          title={isAdmin ? "Edit" : "View"}
+          onClick={() =>
+            navigate({
+              to: "/events/venues/$venueId/edit",
+              params: { venueId: venue.id },
+            })
+          }
+        >
+          {isAdmin ? (
+            <Pencil className="h-4 w-4" />
+          ) : (
+            <Eye className="h-4 w-4" />
+          )}
+        </Button>
+        {isAdmin && isPending && (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Approve venue"
+            title="Approve"
+            disabled={approveMutation.isPending}
+            onClick={() => approveMutation.mutate()}
+          >
+            <Check className="h-4 w-4" />
           </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem
-            onClick={() => {
-              setMenuOpen(false)
-              navigate({
-                to: "/events/venues/$venueId/edit",
-                params: { venueId: venue.id },
-              })
-            }}
+        )}
+        {isAdmin && (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Delete venue"
+            title="Delete"
+            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+            onClick={() => setDeleteDialogOpen(true)}
           >
-            {isAdmin ? (
-              <>
-                <Pencil className="mr-2 h-4 w-4" />
-                Edit
-              </>
-            ) : (
-              <>
-                <Eye className="mr-2 h-4 w-4" />
-                View
-              </>
-            )}
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={() => {
-              setMenuOpen(false)
-              navigate({
-                to: "/events/venues/$venueId/schedule",
-                params: { venueId: venue.id },
-              })
-            }}
-          >
-            <CalendarRange className="mr-2 h-4 w-4" />
-            Schedule
-          </DropdownMenuItem>
-          {isAdmin && isPending && (
-            <DropdownMenuItem
-              onClick={() => {
-                setMenuOpen(false)
-                approveMutation.mutate()
-              }}
-              disabled={approveMutation.isPending}
-            >
-              <Check className="mr-2 h-4 w-4" />
-              Approve
-            </DropdownMenuItem>
-          )}
-          {isAdmin && (
-            <DropdownMenuItem
-              variant="destructive"
-              onClick={() => {
-                setMenuOpen(false)
-                setDeleteDialogOpen(true)
-              }}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete
-            </DropdownMenuItem>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
 
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent>
