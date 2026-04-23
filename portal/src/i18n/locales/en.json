@@ -191,7 +191,9 @@
       "patron_title": "Become a Patron",
       "patron_subtitle": "Optional: Support the community with a contribution",
       "confirm_title": "Review & Confirm",
-      "confirm_subtitle": "Review your order before payment"
+      "confirm_subtitle": "Review your order before payment",
+      "confirm_empty_title": "Nothing to review yet",
+      "confirm_empty_subtitle": "Head back and pick some passes — they'll show up here once they're in your cart."
     },
     "to_pay": "To Pay",
     "credit_label": "Credit: {{amount}}",

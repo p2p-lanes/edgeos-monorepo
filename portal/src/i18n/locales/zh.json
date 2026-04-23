@@ -191,7 +191,9 @@
       "patron_title": "成为赞助人",
       "patron_subtitle": "可选：通过贡献支持社区",
       "confirm_title": "审核并确认",
-      "confirm_subtitle": "付款前审核您的订单"
+      "confirm_subtitle": "付款前审核您的订单",
+      "confirm_empty_title": "暂无可审核的内容",
+      "confirm_empty_subtitle": "返回并选择一些通行证——加入购物车后会在此显示。"
     },
     "to_pay": "应付",
     "credit_label": "抵扣：{{amount}}",

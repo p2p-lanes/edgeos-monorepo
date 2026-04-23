@@ -274,6 +274,18 @@ export function ThemeConfigForm({
               isHighlighted={highlightedKeys.has("checkout_navbar_bg")}
               disabled={readOnly}
             />
+            <ColorField
+              colorKey="checkout_subtitle_color"
+              label="Checkout subtitle"
+              description="Optional color for checkout subtitles and section labels (e.g. step descriptions, category headings). Use this to boost contrast when the page background washes out the default muted gray."
+              value={colors.checkout_subtitle_color ?? ""}
+              defaultValue=""
+              onChange={(v) => handleColorChange("checkout_subtitle_color", v)}
+              onReset={() => handleResetColor("checkout_subtitle_color")}
+              onHover={handleHover}
+              isHighlighted={highlightedKeys.has("checkout_subtitle_color")}
+              disabled={readOnly}
+            />
           </div>
 
           {/* Typography */}

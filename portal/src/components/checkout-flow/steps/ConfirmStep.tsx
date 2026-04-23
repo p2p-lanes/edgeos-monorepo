@@ -124,15 +124,16 @@ export default function ConfirmStep() {
       : null
 
   if (!hasCartItems) {
+    // Header copy ("Nothing to review yet" / "Head back and pick some passes…")
+    // already tells the user what to do — keep the body to a quiet icon so the
+    // message isn't doubled up.
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
-        <ShoppingBag className="w-12 h-12 text-muted-foreground mb-4" />
-        <h3 className="text-lg font-semibold text-foreground mb-2">
-          {t("checkout.cart.empty_title")}
-        </h3>
-        <p className="text-muted-foreground max-w-md">
-          {t("checkout.cart.empty_description")}
-        </p>
+        <ShoppingBag
+          className="w-12 h-12 text-checkout-subtitle"
+          aria-hidden="true"
+        />
+        <span className="sr-only">{t("checkout.cart.empty_title")}</span>
       </div>
     )
   }
