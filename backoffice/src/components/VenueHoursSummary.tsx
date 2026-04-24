@@ -13,10 +13,13 @@ function formatTime(t: string | null | undefined): string {
 }
 
 export function VenueHoursSummary({ hours, className }: Props) {
+  // No weekly_hours rows is a "no schedule configured" state, which the
+  // backend treats as always-open. Say so explicitly so users don't read
+  // it as "closed".
   if (!hours || hours.length === 0) {
     return (
       <p className={className ?? "text-xs text-muted-foreground"}>
-        No weekly hours set for this venue.
+        Open anytime — no weekly schedule configured.
       </p>
     )
   }

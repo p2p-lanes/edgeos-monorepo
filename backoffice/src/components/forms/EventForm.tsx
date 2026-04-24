@@ -357,6 +357,11 @@ export function EventForm({
   // venue summary rendered below the selector.
   const venueWeeklyHours = selectedVenue?.weekly_hours ?? []
   const closedBackendDays = useMemo(() => {
+    // Venue with no weekly_hours rows is treated as always-open by the
+    // backend (see _compute_availability); mirror that here so every day
+    // isn't inferred as closed, which would otherwise disable every
+    // date in the picker.
+    if (venueWeeklyHours.length === 0) return new Set<number>()
     // Multi-slot aware: a weekday is "closed" when it has no row flagged
     // open with valid open/close times. A single ``is_closed=true`` row is
     // no longer authoritative because a day may contain both open and

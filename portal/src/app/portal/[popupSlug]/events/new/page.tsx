@@ -196,8 +196,13 @@ export default function NewPortalEventPage() {
   // True when the picked date falls on a weekday the venue is closed. HTML
   // date inputs don't support day-level disabling, so we surface a warning
   // and let the user correct it before submitting.
+  //
+  // A venue with *no* weekly_hours rows is treated as always-open by the
+  // backend (matches _compute_availability), so we skip this check when
+  // the schedule is unset.
   const selectedDateIsClosed = useMemo(() => {
     if (!selectedVenue?.weekly_hours || !dateStr) return false
+    if (selectedVenue.weekly_hours.length === 0) return false
     // dateStr is YYYY-MM-DD in display tz. Parse as local date.
     const [y, m, d] = dateStr.split("-").map(Number)
     if (!y || !m || !d) return false
