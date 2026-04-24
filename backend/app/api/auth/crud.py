@@ -100,11 +100,14 @@ async def login_user(
         subject=f"Your Login Code - {tenant_name}",
         context=LoginCodeUserContext(
             user_name=user.full_name,
+            tenant_name=tenant_name,
             auth_code=auth_code,
             expiration_minutes=CODE_EXPIRATION_MINUTES,
         ),
+        tenant_id=user.tenant_id,
         from_address=from_address,
         from_name=from_name,
+        db_session=session,
     )
 
     if not success:
@@ -234,11 +237,14 @@ async def login_human(
             subject=f"Your Login Code - {tenant.name if tenant else settings.PROJECT_NAME}",
             context=LoginCodeHumanContext(
                 first_name=display_name,
+                tenant_name=tenant.name if tenant else settings.PROJECT_NAME,
                 auth_code=auth_code,
                 expiration_minutes=CODE_EXPIRATION_MINUTES,
             ),
+            tenant_id=data.tenant_id,
             from_address=tenant.sender_email if tenant else settings.SENDER_EMAIL,
             from_name=tenant.sender_name if tenant else settings.SENDER_NAME,
+            db_session=session,
         )
 
         if not success:
@@ -303,11 +309,14 @@ async def login_human(
         subject=f"Your Verification Code - {tenant.name if tenant else settings.PROJECT_NAME}",
         context=LoginCodeHumanContext(
             first_name=data.email.split("@")[0],  # Use email prefix as fallback
+            tenant_name=tenant.name if tenant else settings.PROJECT_NAME,
             auth_code=auth_code,
             expiration_minutes=CODE_EXPIRATION_MINUTES,
         ),
+        tenant_id=data.tenant_id,
         from_address=tenant.sender_email if tenant else settings.SENDER_EMAIL,
         from_name=tenant.sender_name if tenant else settings.SENDER_NAME,
+        db_session=session,
     )
 
     if not success:

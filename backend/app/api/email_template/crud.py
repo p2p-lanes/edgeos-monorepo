@@ -22,6 +22,16 @@ class EmailTemplateCRUD(
         )
         return session.exec(statement).first()
 
+    def get_by_tenant_and_type(
+        self, session: Session, tenant_id: uuid.UUID, template_type: str
+    ) -> EmailTemplates | None:
+        statement = select(EmailTemplates).where(
+            EmailTemplates.tenant_id == tenant_id,
+            EmailTemplates.popup_id == None,  # noqa: E711
+            EmailTemplates.template_type == template_type,
+        )
+        return session.exec(statement).first()
+
     def find_by_popup(
         self,
         session: Session,
@@ -39,11 +49,42 @@ class EmailTemplateCRUD(
 
         return results, total
 
-    def get_active_template(
+    def find_by_tenant_scope(
+        self,
+        session: Session,
+        tenant_id: uuid.UUID,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> tuple[list[EmailTemplates], int]:
+        statement = select(EmailTemplates).where(
+            EmailTemplates.tenant_id == tenant_id,
+            EmailTemplates.popup_id == None,  # noqa: E711
+        )
+
+        count_statement = select(func.count()).select_from(statement.subquery())
+        total = session.exec(count_statement).one()
+
+        statement = statement.offset(skip).limit(limit)
+        results = list(session.exec(statement).all())
+
+        return results, total
+
+    def get_active_popup_template(
         self, session: Session, popup_id: uuid.UUID, template_type: str
     ) -> EmailTemplates | None:
         statement = select(EmailTemplates).where(
             EmailTemplates.popup_id == popup_id,
+            EmailTemplates.template_type == template_type,
+            EmailTemplates.is_active == True,  # noqa: E712
+        )
+        return session.exec(statement).first()
+
+    def get_active_tenant_template(
+        self, session: Session, tenant_id: uuid.UUID, template_type: str
+    ) -> EmailTemplates | None:
+        statement = select(EmailTemplates).where(
+            EmailTemplates.tenant_id == tenant_id,
+            EmailTemplates.popup_id == None,  # noqa: E711
             EmailTemplates.template_type == template_type,
             EmailTemplates.is_active == True,  # noqa: E712
         )

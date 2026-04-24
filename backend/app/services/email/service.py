@@ -33,6 +33,8 @@ from app.services.email.templates import (
     LoginCodeUserContext,
     PaymentConfirmedContext,
     SilentUndefined,
+    coerce_email_template_type,
+    get_template_scope,
     log_missing_template_variables,
 )
 
@@ -178,9 +180,10 @@ class EmailService:
 
     def render_with_fallback(
         self,
-        template_type: EmailTemplateType,
+        template_type: EmailTemplateType | str,
         context: Mapping[str, Any],
         popup_id: uuid.UUID | None = None,
+        tenant_id: uuid.UUID | None = None,
         db_session: Session | None = None,
     ) -> tuple[str, str | None]:
         """Render email using DB-stored custom template or file-based fallback.
@@ -188,11 +191,14 @@ class EmailService:
         Returns:
             Tuple of (rendered_html, custom_subject_or_none)
         """
-        if popup_id and db_session:
+        template_type_enum = coerce_email_template_type(template_type)
+        template_scope = get_template_scope(template_type_enum)
+
+        if db_session and template_scope == "tenant" and tenant_id:
             from app.api.email_template.crud import email_template_crud
 
-            custom = email_template_crud.get_active_template(
-                db_session, popup_id, template_type.value
+            custom = email_template_crud.get_active_tenant_template(
+                db_session, tenant_id, template_type_enum.value
             )
             if custom:
                 rendered_html = self.render_custom_template(
@@ -200,14 +206,30 @@ class EmailService:
                 )
                 rendered_subject = None
                 if custom.subject:
-                    env = SandboxedEnvironment()
+                    env = SandboxedEnvironment(undefined=SilentUndefined)
+                    rendered_subject = env.from_string(custom.subject).render(**context)
+                return rendered_html, rendered_subject
+
+        if db_session and template_scope == "popup" and popup_id:
+            from app.api.email_template.crud import email_template_crud
+
+            custom = email_template_crud.get_active_popup_template(
+                db_session, popup_id, template_type_enum.value
+            )
+            if custom:
+                rendered_html = self.render_custom_template(
+                    custom.html_content, context
+                )
+                rendered_subject = None
+                if custom.subject:
+                    env = SandboxedEnvironment(undefined=SilentUndefined)
                     rendered_subject = env.from_string(custom.subject).render(**context)
                 return rendered_html, rendered_subject
 
         # Fallback to file-based template
-        file_path = TEMPLATE_TYPE_TO_FILE.get(template_type)
+        file_path = TEMPLATE_TYPE_TO_FILE.get(template_type_enum)
         if not file_path:
-            raise ValueError(f"No file mapping for template type: {template_type}")
+            raise ValueError(f"No file mapping for template type: {template_type_enum}")
 
         rendered_html = self.render_template(file_path, context)
         return rendered_html, None
@@ -248,6 +270,8 @@ class EmailService:
         from_address: str | None = None,
         from_name: str | None = None,
         attachments: list[EmailAttachment] | None = None,
+        ical_body: str | None = None,
+        ical_method: str = "REQUEST",
     ) -> bool:
         """
         Send an email via SMTP.
@@ -260,6 +284,10 @@ class EmailService:
             from_address: Override default from address (tenant-specific)
             from_name: Override default from name (tenant-specific)
             attachments: Optional list of file attachments
+            ical_body: Optional iTIP calendar body. When provided, embedded
+                as an inline ``text/calendar; method=...`` MIME part so Gmail
+                and other clients treat the email as a calendar invitation.
+            ical_method: iTIP method for the calendar part (REQUEST / CANCEL).
 
         Returns:
             True if email was sent successfully, False otherwise
@@ -275,11 +303,28 @@ class EmailService:
                 logger.error("No from address configured (neither tenant nor global)")
                 return False
 
-            # Build the text/html alternative part
+            # Build the text/html alternative part. When we have an iTIP body
+            # we also embed it as a peer alternative; Gmail/Apple Mail pick it
+            # up and render the invitation card inline.
             alt_part = MIMEMultipart("alternative")
             if text_content:
                 alt_part.attach(MIMEText(text_content, "plain"))
             alt_part.attach(MIMEText(html_content, "html"))
+            if ical_body:
+                method = ical_method.upper()
+                ical_part = MIMEText(ical_body, "calendar", "utf-8")
+                # MIMEText forces Content-Type = text/calendar; charset=utf-8.
+                # Replace it with the RFC 5546 flavour that iTIP requires so
+                # Gmail/Apple Mail parse the REQUEST vs. treating it as an
+                # .ics attachment.
+                del ical_part["Content-Type"]
+                ical_part.add_header(
+                    "Content-Type",
+                    "text/calendar",
+                    charset="utf-8",
+                    method=method,
+                )
+                alt_part.attach(ical_part)
 
             # If there are attachments, wrap in a mixed container
             if attachments:
@@ -343,28 +388,12 @@ class EmailService:
         from_address: str | None = None,
         from_name: str | None = None,
         attachments: list[EmailAttachment] | None = None,
+        ical_body: str | None = None,
+        ical_method: str = "REQUEST",
     ) -> bool:
-        """
-        Render and send a templated email.
-
-        Args:
-            to: Recipient email address(es)
-            subject: Email subject line
-            template_name: Name of the template file
-            context: Variables to pass to the template
-            text_content: Optional plain text version
-            from_address: Override default from address (tenant-specific)
-            from_name: Override default from name (tenant-specific)
-            attachments: Optional list of file attachments
-
-        Returns:
-            True if email was sent successfully, False otherwise
-        """
+        """Render and send a templated email. See ``send_email`` for args."""
         try:
-            # Render template
             html_content = self.render_template(template_name, context)
-
-            # Send email
             return await self.send_email(
                 to=to,
                 subject=subject,
@@ -373,6 +402,8 @@ class EmailService:
                 from_address=from_address,
                 from_name=from_name,
                 attachments=attachments,
+                ical_body=ical_body,
+                ical_method=ical_method,
             )
 
         except Exception as e:
@@ -384,8 +415,10 @@ class EmailService:
         to: str,
         subject: str,
         context: LoginCodeUserContext,
+        tenant_id: uuid.UUID | None = None,
         from_address: str | None = None,
         from_name: str | None = None,
+        db_session: Session | None = None,
     ) -> bool:
         """Send login code email to backoffice user."""
         return await self.send_template_email(
@@ -402,17 +435,22 @@ class EmailService:
         to: str,
         subject: str,
         context: LoginCodeHumanContext,
+        tenant_id: uuid.UUID | None = None,
         from_address: str | None = None,
         from_name: str | None = None,
+        db_session: Session | None = None,
     ) -> bool:
         """Send login code email to portal user (human)."""
-        return await self.send_template_email(
+        return await self._send_with_fallback(
             to=to,
             subject=subject,
+            template_type=EmailTemplateType.LOGIN_CODE_HUMAN,
             template_name=EmailTemplates.LOGIN_CODE_HUMAN,
             context=context.model_dump(exclude_none=True),
+            tenant_id=tenant_id,
             from_address=from_address,
             from_name=from_name,
+            db_session=db_session,
         )
 
     async def send_application_received(
@@ -423,6 +461,7 @@ class EmailService:
         from_address: str | None = None,
         from_name: str | None = None,
         popup_id: uuid.UUID | None = None,
+        tenant_id: uuid.UUID | None = None,
         db_session: Session | None = None,
     ) -> bool:
         """Send application received confirmation email."""
@@ -634,39 +673,41 @@ class EmailService:
         from_address: str | None = None,
         from_name: str | None = None,
         popup_id: uuid.UUID | None = None,
+        tenant_id: uuid.UUID | None = None,
         db_session: Session | None = None,
         attachments: list[EmailAttachment] | None = None,
+        ical_body: str | None = None,
+        ical_method: str = "REQUEST",
     ) -> bool:
         """Send email using DB custom template if available, else file-based fallback."""
         try:
             enriched_context: Mapping[str, Any] = context
-            if popup_id and db_session:
+            template_scope = get_template_scope(template_type)
+
+            if template_scope == "popup" and popup_id and db_session:
                 enriched_context = _enrich_with_popup_data(
                     dict(context), popup_id, db_session
                 )
-                log_missing_template_variables(template_type, dict(enriched_context))
-                rendered_html, custom_subject = self.render_with_fallback(
-                    template_type, enriched_context, popup_id, db_session
-                )
-                final_subject = custom_subject or subject
-                return await self.send_email(
-                    to=to,
-                    subject=final_subject,
-                    html_content=rendered_html,
-                    from_address=from_address,
-                    from_name=from_name,
-                    attachments=attachments,
-                )
-
-            return await self.send_template_email(
+            log_missing_template_variables(template_type, dict(enriched_context))
+            rendered_html, custom_subject = self.render_with_fallback(
+                template_type,
+                enriched_context,
+                popup_id=popup_id,
+                tenant_id=tenant_id,
+                db_session=db_session,
+            )
+            final_subject = custom_subject or subject
+            return await self.send_email(
                 to=to,
-                subject=subject,
-                template_name=template_name,
-                context=enriched_context,
+                subject=final_subject,
+                html_content=rendered_html,
                 from_address=from_address,
                 from_name=from_name,
                 attachments=attachments,
+                ical_body=ical_body,
+                ical_method=ical_method,
             )
+
         except Exception as e:
             logger.error(f"Error sending email with fallback to {to}: {e}")
             return False
