@@ -27,7 +27,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 }
 
 export function TemplateList() {
-  const { selectedPopupId } = useWorkspace()
+  const { selectedPopupId, effectiveTenantId } = useWorkspace()
 
   const { data: types } = useQuery({
     queryKey: ["email-template-types"],
@@ -35,12 +35,12 @@ export function TemplateList() {
   })
 
   const { data: tenantTemplates } = useQuery({
-    queryKey: ["email-templates", "tenant"],
+    queryKey: ["email-templates", "tenant", effectiveTenantId],
     queryFn: () => EmailTemplatesService.listEmailTemplates(),
   })
 
   const { data: popupTemplates } = useQuery({
-    queryKey: ["email-templates", "popup", selectedPopupId],
+    queryKey: ["email-templates", "popup", effectiveTenantId, selectedPopupId],
     queryFn: () =>
       EmailTemplatesService.listEmailTemplates({ popupId: selectedPopupId! }),
     enabled: !!selectedPopupId,

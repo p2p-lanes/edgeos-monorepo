@@ -20,7 +20,7 @@ export const Route = createFileRoute("/_layout/email-templates/$type/edit")({
 })
 
 export function EditorContent({ templateType }: { templateType: string }) {
-  const { selectedPopupId } = useWorkspace()
+  const { selectedPopupId, effectiveTenantId } = useWorkspace()
   const navigate = useNavigate()
 
   const { data: types } = useQuery({
@@ -32,7 +32,9 @@ export function EditorContent({ templateType }: { templateType: string }) {
   const requiresPopup = typeInfo?.scope === "popup"
 
   const { data: customTemplates } = useQuery({
-    queryKey: ["email-templates", requiresPopup ? selectedPopupId : "tenant"],
+    queryKey: requiresPopup
+      ? ["email-templates", "popup", effectiveTenantId, selectedPopupId]
+      : ["email-templates", "tenant", effectiveTenantId],
     queryFn: () =>
       requiresPopup
         ? EmailTemplatesService.listEmailTemplates({
