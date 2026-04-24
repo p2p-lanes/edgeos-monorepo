@@ -56,8 +56,6 @@ class ApplicationAcceptedContext(BaseModel):
     first_name: str
     last_name: str
     popup_name: str
-    payment_deadline: str | None = None
-    discount_assigned: int | None = None
     portal_url: str | None = None
 
 
@@ -433,22 +431,6 @@ POPUP_TEMPLATE_METADATA: list[dict[str, Any]] = [
                 "description": "Applicant's last name",
                 "required": True,
                 "group": "Applicant",
-            },
-            {
-                "name": "payment_deadline",
-                "label": "Payment Deadline",
-                "type": "string",
-                "description": "Payment deadline date",
-                "required": False,
-                "group": "General",
-            },
-            {
-                "name": "discount_assigned",
-                "label": "Discount",
-                "type": "number",
-                "description": "Discount percentage if assigned",
-                "required": False,
-                "group": "General",
             },
             {
                 "name": "portal_url",

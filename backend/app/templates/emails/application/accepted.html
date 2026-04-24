@@ -16,9 +16,6 @@
     <h2 style="margin-top: 0; color: #155724;">Next Steps</h2>
     <p style="color: #155724; margin-bottom: 0;">
         Please proceed to purchase your passes to confirm your participation.
-        {% if payment_deadline %}
-        Complete your payment by <strong>{{ payment_deadline }}</strong> to secure your spot.
-        {% endif %}
     </p>
 </div>
 
@@ -41,12 +38,6 @@
                 </span>
             </td>
         </tr>
-        {% if discount_assigned %}
-        <tr>
-            <td style="padding: 8px 0; color: #666;">Discount</td>
-            <td style="padding: 8px 0; color: #28a745; font-weight: 600;">{{ discount_assigned }}% off standard passes</td>
-        </tr>
-        {% endif %}
     </table>
 </div>
 
