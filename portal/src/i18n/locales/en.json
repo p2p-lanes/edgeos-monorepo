@@ -551,7 +551,24 @@
         "venue_submitted_success": "Venue submitted — waiting for admin approval",
         "venue_created_success": "Venue created",
         "no_popup_error": "No popup",
-        "failed_to_create": "Failed to create venue"
+        "failed_to_create": "Failed to create venue",
+        "cover_image_label": "Cover image",
+        "upload_image_button": "Upload image",
+        "replace_button": "Replace",
+        "uploading_button": "Uploading…",
+        "image_uploaded_success": "Image uploaded",
+        "venue_cover_alt": "Venue cover"
+      },
+      "edit": {
+        "heading": "Edit venue",
+        "subheading": "Update details for this venue.",
+        "save_button": "Save changes",
+        "cancel_button": "Cancel",
+        "back_to_venue": "Back to venue",
+        "edit_not_allowed_heading": "You can't edit this venue",
+        "edit_not_allowed_message": "Only the human who created this venue can edit it from the portal.",
+        "venue_updated_success": "Venue updated",
+        "failed_to_update": "Failed to update venue"
       },
       "detail": {
         "all_venues_link": "All venues",
@@ -570,7 +587,8 @@
         "map_link": "Map",
         "booking_free": "Free to book",
         "booking_approval": "Approval required",
-        "booking_unbookable": "Not bookable"
+        "booking_unbookable": "Not bookable",
+        "edit_button": "Edit venue"
       }
     },
     "tracks": {

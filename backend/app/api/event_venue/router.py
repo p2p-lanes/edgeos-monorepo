@@ -469,13 +469,20 @@ def _resolve_popup_timezone(db, popup_id: uuid.UUID) -> str:
 
 
 def _compute_availability(
-    db, venue, start: datetime, end: datetime
+    db,
+    venue,
+    start: datetime,
+    end: datetime,
+    exclude_event_id: uuid.UUID | None = None,
 ) -> VenueAvailability:
     """Return open ranges (derived from weekly_hours + open exceptions) and
     busy slots (existing events with setup/teardown + closed exceptions).
 
     Times in weekly_hours are interpreted in the popup's configured TZ so
     that 'opens at 09:00' means 09:00 local in that TZ.
+
+    ``exclude_event_id`` drops one event from the busy list — used by edit
+    forms so the event being edited doesn't appear to overlap itself.
     """
     from app.api.event.models import Events
     from app.api.event.schemas import EventStatus
@@ -489,17 +496,18 @@ def _compute_availability(
     # --- Busy from events (+ setup/teardown) and closed exceptions --------
     # Cancelled and rejected events no longer hold their slot; treat them
     # as freed availability so calendars don't show ghost blocks.
-    events = list(
-        db.exec(
-            select(Events)
-            .where(Events.venue_id == venue.id)
-            .where(Events.status.notin_(
-                [EventStatus.CANCELLED, EventStatus.REJECTED]
-            ))
-            .where(Events.start_time < end)
-            .where(Events.end_time > start)
-        ).all()
+    events_query = (
+        select(Events)
+        .where(Events.venue_id == venue.id)
+        .where(Events.status.notin_(
+            [EventStatus.CANCELLED, EventStatus.REJECTED]
+        ))
+        .where(Events.start_time < end)
+        .where(Events.end_time > start)
     )
+    if exclude_event_id is not None:
+        events_query = events_query.where(Events.id != exclude_event_id)
+    events = list(db.exec(events_query).all())
 
     closed_exceptions = list(
         db.exec(
@@ -626,10 +634,11 @@ async def get_availability(
     _: CurrentUser,
     start: datetime = Query(...),
     end: datetime = Query(...),
+    exclude_event_id: uuid.UUID | None = Query(default=None),
 ) -> VenueAvailability:
     """Return open windows and busy slots for a venue in the given range."""
     venue = _get_venue_or_404(db, venue_id)
-    return _compute_availability(db, venue, start, end)
+    return _compute_availability(db, venue, start, end, exclude_event_id)
 
 
 # ---------------------------------------------------------------------------
@@ -647,12 +656,13 @@ async def get_portal_availability(
     _: CurrentHuman,
     start: datetime = Query(...),
     end: datetime = Query(...),
+    exclude_event_id: uuid.UUID | None = Query(default=None),
 ) -> VenueAvailability:
     """Portal-side availability query — same shape as the backoffice one,
     used by the event-creation form to show open/busy slots per day.
     """
     venue = _get_venue_or_404(db, venue_id)
-    return _compute_availability(db, venue, start, end)
+    return _compute_availability(db, venue, start, end, exclude_event_id)
 
 
 @router.get("/portal/venues", response_model=ListModel[EventVenuePublic])
@@ -673,6 +683,37 @@ async def list_portal_venues(
         results=[EventVenuePublic.model_validate(v) for v in venues],
         paging=Paging(offset=skip, limit=limit, total=len(venues)),
     )
+
+
+@router.patch("/portal/venues/{venue_id}", response_model=EventVenuePublic)
+async def update_portal_venue(
+    venue_id: uuid.UUID,
+    venue_in: EventVenueUpdate,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+) -> EventVenuePublic:
+    """Let a human edit a venue they created from the portal. Admin-only
+    fields (``status``) are ignored on this endpoint — re-approval lives in
+    the backoffice.
+    """
+    venue = _get_venue_or_404(db, venue_id)
+    if venue.owner_id != current_human.id:
+        raise HTTPException(
+            status_code=403,
+            detail="Only the venue's owner can edit it from the portal",
+        )
+
+    update_data = venue_in.model_dump(
+        exclude_unset=True, exclude={"property_type_ids", "status"}
+    )
+    for k, v in update_data.items():
+        setattr(venue, k, v)
+    venue.updated_at = datetime.utcnow()
+    if venue_in.property_type_ids is not None:
+        _set_property_types(db, venue, venue_in.property_type_ids)
+    db.commit()
+    db.refresh(venue)
+    return EventVenuePublic.model_validate(venue)
 
 
 @router.post(

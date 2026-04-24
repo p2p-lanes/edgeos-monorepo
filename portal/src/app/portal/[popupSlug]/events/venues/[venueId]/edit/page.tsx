@@ -1,24 +1,18 @@
 "use client"
 
-import { useMutation, useQuery } from "@tanstack/react-query"
-import {
-  ArrowLeft,
-  CircleAlert,
-  Hourglass,
-  Loader2,
-  MapPin,
-  Upload,
-  X,
-} from "lucide-react"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { ArrowLeft, CircleAlert, Loader2, Upload, X } from "lucide-react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { useRef, useState } from "react"
+import { useParams, useRouter } from "next/navigation"
+import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
 import {
   ApiError,
+  type EventVenuePublic,
   EventVenuesService,
+  HumansService,
   VenuePropertyTypesService,
 } from "@/client"
 import { CoverImageCropper } from "@/components/CoverImageCropper"
@@ -35,45 +29,47 @@ import {
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { useCityProvider } from "@/providers/cityProvider"
-import { useFileUpload } from "../../lib/useFileUpload"
-import { usePortalEventSettings } from "../../lib/useEventTimezone"
+import { useFileUpload } from "../../../lib/useFileUpload"
 
-/**
- * Portal venue creation form.
- *
- * Gating is driven by popup event settings:
- * - ``humans_can_create_venues = false`` → this page 403s (blocked UI).
- * - ``venues_require_approval = true`` → created venue lands in
- *   ``PENDING``; we redirect back to the list with a heads-up that an
- *   admin still has to approve it before it's visible.
- * - Otherwise the venue is ``ACTIVE`` and we jump straight to its detail.
- */
-export default function NewPortalVenuePage() {
+type BookingMode = "free" | "approval_required" | "unbookable"
+
+export default function EditPortalVenuePage() {
   const { t } = useTranslation()
   const router = useRouter()
+  const params = useParams<{ popupSlug: string; venueId: string }>()
+  const queryClient = useQueryClient()
   const { getCity } = useCityProvider()
   const city = getCity()
-  const popupId = city?.id
   const popupSlug = city?.slug
 
-  const { data: settings, isLoading: settingsLoading } =
-    usePortalEventSettings(popupId)
-  const canCreate = settings?.humans_can_create_venues === true
-  const requiresApproval = settings?.venues_require_approval === true
+  const { data: currentHuman } = useQuery({
+    queryKey: ["current-human"],
+    queryFn: () => HumansService.getCurrentHumanInfo(),
+    staleTime: 5 * 60 * 1000,
+  })
+
+  // Same pattern as the detail page: no single-venue portal endpoint, so we
+  // pull the list and pick the match.
+  const { data: venuesList, isLoading } = useQuery({
+    queryKey: ["portal-event-venues", city?.id],
+    queryFn: () =>
+      EventVenuesService.listPortalVenues({ popupId: city!.id, limit: 200 }),
+    enabled: !!city?.id,
+  })
+  const venue: EventVenuePublic | undefined = venuesList?.results.find(
+    (v) => v.id === params.venueId,
+  )
 
   const { data: propertyTypes } = useQuery({
     queryKey: ["portal-venue-property-types"],
     queryFn: () => VenuePropertyTypesService.listPropertyTypesPortal(),
-    enabled: canCreate,
     staleTime: 5 * 60 * 1000,
   })
 
   const [title, setTitle] = useState("")
   const [location, setLocation] = useState("")
   const [capacity, setCapacity] = useState("")
-  const [bookingMode, setBookingMode] = useState<
-    "free" | "approval_required" | "unbookable"
-  >("free")
+  const [bookingMode, setBookingMode] = useState<BookingMode>("free")
   const [propertyIds, setPropertyIds] = useState<Set<string>>(new Set())
   const [imageUrl, setImageUrl] = useState("")
   const fileRef = useRef<HTMLInputElement>(null)
@@ -82,6 +78,26 @@ export default function NewPortalVenuePage() {
     url: string
     name: string
   } | null>(null)
+
+  // Hydrate form state once the venue loads.
+  useEffect(() => {
+    if (!venue) return
+    setTitle(venue.title ?? "")
+    setLocation(venue.location ?? "")
+    setCapacity(venue.capacity != null ? String(venue.capacity) : "")
+    setBookingMode((venue.booking_mode as BookingMode) ?? "free")
+    setPropertyIds(new Set((venue.properties ?? []).map((p) => p.id)))
+    setImageUrl(venue.image_url ?? "")
+  }, [venue])
+
+  const toggleProperty = (id: string) => {
+    setPropertyIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   const onPickFile = (files: FileList | null) => {
     if (!files || files.length === 0) return
@@ -114,22 +130,12 @@ export default function NewPortalVenuePage() {
     setPendingCrop(null)
   }
 
-  const toggleProperty = (id: string) => {
-    setPropertyIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
-
-  const createMutation = useMutation({
-    mutationFn: async () => {
-      if (!popupId) throw new Error(t("events.venues.new.no_popup_error"))
+  const updateMutation = useMutation({
+    mutationFn: () => {
       const capacityNum = capacity.trim() ? Number(capacity) : null
-      return EventVenuesService.createPortalVenue({
+      return EventVenuesService.updatePortalVenue({
+        venueId: params.venueId,
         requestBody: {
-          popup_id: popupId,
           title: title.trim(),
           location: location.trim() || null,
           capacity:
@@ -142,17 +148,13 @@ export default function NewPortalVenuePage() {
         },
       })
     },
-    onSuccess: (venue) => {
-      if (venue.status === "pending") {
-        toast.success(t("events.venues.new.venue_submitted_success"))
-        router.push(`/portal/${popupSlug}/events/venues`)
-      } else {
-        toast.success(t("events.venues.new.venue_created_success"))
-        router.push(`/portal/${popupSlug}/events/venues/${venue.id}`)
-      }
+    onSuccess: () => {
+      toast.success(t("events.venues.edit.venue_updated_success"))
+      queryClient.invalidateQueries({ queryKey: ["portal-event-venues"] })
+      router.push(`/portal/${popupSlug}/events/venues/${params.venueId}`)
     },
     onError: (err) => {
-      const fallback = t("events.venues.new.failed_to_create")
+      const fallback = t("events.venues.edit.failed_to_update")
       const msg =
         err instanceof ApiError && typeof err.body === "object"
           ? ((err.body as { detail?: string }).detail ?? fallback)
@@ -161,8 +163,7 @@ export default function NewPortalVenuePage() {
     },
   })
 
-  // ---- render gates ----
-  if (settingsLoading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -170,17 +171,11 @@ export default function NewPortalVenuePage() {
     )
   }
 
-  if (!canCreate) {
+  if (!venue) {
     return (
       <div className="max-w-xl mx-auto p-6 text-center">
-        <CircleAlert className="mx-auto h-10 w-10 text-muted-foreground/50 mb-3" />
-        <h1 className="text-lg font-semibold">
-          {t("events.venues.new.venue_not_available")}
-        </h1>
-        <p className="text-sm text-muted-foreground mt-2">
-          {t("events.venues.new.venue_not_available_message", {
-            cityName: city?.name,
-          })}
+        <p className="text-sm text-muted-foreground">
+          {t("events.venues.detail.venue_not_found")}
         </p>
         <Link
           href={`/portal/${popupSlug}/events/venues`}
@@ -193,42 +188,54 @@ export default function NewPortalVenuePage() {
     )
   }
 
-  const canSubmit = title.trim().length > 0 && !createMutation.isPending
+  const isOwner =
+    currentHuman != null && venue.owner_id === currentHuman.id
+
+  if (!isOwner) {
+    return (
+      <div className="max-w-xl mx-auto p-6 text-center">
+        <CircleAlert className="mx-auto h-10 w-10 text-muted-foreground/50 mb-3" />
+        <h1 className="text-lg font-semibold">
+          {t("events.venues.edit.edit_not_allowed_heading")}
+        </h1>
+        <p className="text-sm text-muted-foreground mt-2">
+          {t("events.venues.edit.edit_not_allowed_message")}
+        </p>
+        <Link
+          href={`/portal/${popupSlug}/events/venues/${venue.id}`}
+          className="inline-flex items-center gap-1 text-sm text-primary mt-6"
+        >
+          <ArrowLeft className="h-4 w-4" />{" "}
+          {t("events.venues.edit.back_to_venue")}
+        </Link>
+      </div>
+    )
+  }
+
+  const canSubmit = title.trim().length > 0 && !updateMutation.isPending
 
   return (
     <div className="max-w-2xl mx-auto p-4 sm:p-6">
       <Link
-        href={`/portal/${popupSlug}/events/venues`}
+        href={`/portal/${popupSlug}/events/venues/${venue.id}`}
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-3"
       >
         <ArrowLeft className="h-4 w-4" />{" "}
-        {t("events.venues.new.back_to_venues")}
+        {t("events.venues.edit.back_to_venue")}
       </Link>
 
-      <div className="flex items-center gap-2 mb-1">
-        <MapPin className="h-5 w-5 text-primary" />
-        <h1 className="text-2xl font-bold tracking-tight">
-          {t("events.venues.new.heading")}
-        </h1>
-      </div>
+      <h1 className="text-2xl font-bold tracking-tight mb-1">
+        {t("events.venues.edit.heading")}
+      </h1>
       <p className="text-sm text-muted-foreground mb-6">
-        {t("events.venues.new.subheading", { cityName: city?.name })}
-        {requiresApproval && (
-          <>
-            {" "}
-            <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-400">
-              <Hourglass className="h-3 w-3" />{" "}
-              {t("events.venues.new.requires_approval_note")}
-            </span>
-          </>
-        )}
+        {t("events.venues.edit.subheading")}
       </p>
 
       <form
         className="space-y-4"
         onSubmit={(e) => {
           e.preventDefault()
-          if (canSubmit) createMutation.mutate()
+          if (canSubmit) updateMutation.mutate()
         }}
       >
         <div className="space-y-2">
@@ -340,7 +347,7 @@ export default function NewPortalVenuePage() {
             </Label>
             <Select
               value={bookingMode}
-              onValueChange={(v) => setBookingMode(v as typeof bookingMode)}
+              onValueChange={(v) => setBookingMode(v as BookingMode)}
             >
               <SelectTrigger id="booking_mode">
                 <SelectValue />
@@ -393,16 +400,16 @@ export default function NewPortalVenuePage() {
             disabled={!canSubmit}
             className="inline-flex items-center gap-2"
           >
-            {createMutation.isPending && (
+            {updateMutation.isPending && (
               <Loader2 className="h-4 w-4 animate-spin" />
             )}
-            {t("events.venues.new.create_button")}
+            {t("events.venues.edit.save_button")}
           </Button>
           <Link
-            href={`/portal/${popupSlug}/events/venues`}
+            href={`/portal/${popupSlug}/events/venues/${venue.id}`}
             className="text-sm text-muted-foreground hover:text-foreground"
           >
-            {t("events.venues.new.cancel_button")}
+            {t("events.venues.edit.cancel_button")}
           </Link>
         </div>
       </form>

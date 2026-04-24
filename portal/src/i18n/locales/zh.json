@@ -551,7 +551,24 @@
         "venue_submitted_success": "场地已提交 — 等待管理员审核",
         "venue_created_success": "场地已创建",
         "no_popup_error": "无 popup",
-        "failed_to_create": "创建场地失败"
+        "failed_to_create": "创建场地失败",
+        "cover_image_label": "封面图片",
+        "upload_image_button": "上传图片",
+        "replace_button": "替换",
+        "uploading_button": "上传中…",
+        "image_uploaded_success": "图片已上传",
+        "venue_cover_alt": "场地封面"
+      },
+      "edit": {
+        "heading": "编辑场地",
+        "subheading": "更新该场地的信息。",
+        "save_button": "保存更改",
+        "cancel_button": "取消",
+        "back_to_venue": "返回场地",
+        "edit_not_allowed_heading": "你无法编辑此场地",
+        "edit_not_allowed_message": "仅场地创建者可从 portal 编辑该场地。",
+        "venue_updated_success": "场地已更新",
+        "failed_to_update": "更新场地失败"
       },
       "detail": {
         "all_venues_link": "所有场地",
@@ -570,7 +587,8 @@
         "map_link": "地图",
         "booking_free": "可自由预订",
         "booking_approval": "需要审核",
-        "booking_unbookable": "不可预订"
+        "booking_unbookable": "不可预订",
+        "edit_button": "编辑场地"
       }
     },
     "tracks": {

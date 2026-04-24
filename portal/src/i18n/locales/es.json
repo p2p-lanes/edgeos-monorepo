@@ -551,7 +551,24 @@
         "venue_submitted_success": "Lugar enviado — esperando aprobación del admin",
         "venue_created_success": "Lugar creado",
         "no_popup_error": "Sin popup",
-        "failed_to_create": "No se pudo crear el lugar"
+        "failed_to_create": "No se pudo crear el lugar",
+        "cover_image_label": "Imagen de portada",
+        "upload_image_button": "Subir imagen",
+        "replace_button": "Reemplazar",
+        "uploading_button": "Subiendo…",
+        "image_uploaded_success": "Imagen subida",
+        "venue_cover_alt": "Portada del lugar"
+      },
+      "edit": {
+        "heading": "Editar lugar",
+        "subheading": "Actualizá los datos de este lugar.",
+        "save_button": "Guardar cambios",
+        "cancel_button": "Cancelar",
+        "back_to_venue": "Volver al lugar",
+        "edit_not_allowed_heading": "No podés editar este lugar",
+        "edit_not_allowed_message": "Solo quien creó este lugar desde el portal puede editarlo.",
+        "venue_updated_success": "Lugar actualizado",
+        "failed_to_update": "No se pudo actualizar el lugar"
       },
       "detail": {
         "all_venues_link": "Todos los lugares",
@@ -570,7 +587,8 @@
         "map_link": "Mapa",
         "booking_free": "Libre",
         "booking_approval": "Requiere aprobación",
-        "booking_unbookable": "No reservable"
+        "booking_unbookable": "No reservable",
+        "edit_button": "Editar lugar"
       }
     },
     "tracks": {

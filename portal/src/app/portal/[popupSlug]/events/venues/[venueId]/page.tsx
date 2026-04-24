@@ -1,12 +1,23 @@
 "use client"
 
 import { useQuery } from "@tanstack/react-query"
-import { ArrowLeft, ArrowUpRight, Clock, MapPin, Users } from "lucide-react"
+import {
+  ArrowLeft,
+  ArrowUpRight,
+  Clock,
+  MapPin,
+  Pencil,
+  Users,
+} from "lucide-react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { useTranslation } from "react-i18next"
 
-import { type EventVenuePublic, EventVenuesService } from "@/client"
+import {
+  type EventVenuePublic,
+  EventVenuesService,
+  HumansService,
+} from "@/client"
 import { LucideIcon } from "@/components/LucideIcon"
 import { VenueHoursSummary } from "@/components/VenueHoursSummary"
 import { useCityProvider } from "@/providers/cityProvider"
@@ -26,9 +37,19 @@ export default function PortalVenueDetailPage() {
     enabled: !!city?.id,
   })
 
+  const { data: currentHuman } = useQuery({
+    queryKey: ["current-human"],
+    queryFn: () => HumansService.getCurrentHumanInfo(),
+    staleTime: 5 * 60 * 1000,
+  })
+
   const venue: EventVenuePublic | undefined = data?.results.find(
     (v) => v.id === params.venueId,
   )
+  const isOwner =
+    venue != null &&
+    currentHuman != null &&
+    venue.owner_id === currentHuman.id
 
   if (isLoading) {
     return (
@@ -66,13 +87,24 @@ export default function PortalVenueDetailPage() {
 
   return (
     <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-6">
-      <Link
-        href={`/portal/${city?.slug}/events/venues`}
-        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="h-4 w-4" />{" "}
-        {t("events.venues.detail.all_venues_link")}
-      </Link>
+      <div className="flex items-center justify-between gap-2">
+        <Link
+          href={`/portal/${city?.slug}/events/venues`}
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" />{" "}
+          {t("events.venues.detail.all_venues_link")}
+        </Link>
+        {isOwner && (
+          <Link
+            href={`/portal/${city?.slug}/events/venues/${venue.id}/edit`}
+            className="inline-flex items-center gap-1 rounded-md border bg-card px-2.5 py-1 text-xs font-medium shadow-sm hover:bg-muted"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            {t("events.venues.detail.edit_button")}
+          </Link>
+        )}
+      </div>
 
       {/* Cover */}
       {venue.image_url && (

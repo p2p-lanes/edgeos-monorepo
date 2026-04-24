@@ -3572,6 +3572,7 @@ export type EventVenuesDeletePhotoResponse = (void);
 
 export type EventVenuesGetAvailabilityData = {
     end: string;
+    excludeEventId?: (string | null);
     start: string;
     venueId: string;
     xTenantId?: (string | null);
@@ -3581,6 +3582,7 @@ export type EventVenuesGetAvailabilityResponse = (VenueAvailability);
 
 export type EventVenuesGetPortalAvailabilityData = {
     end: string;
+    excludeEventId?: (string | null);
     start: string;
     venueId: string;
 };
@@ -3607,6 +3609,13 @@ export type EventVenuesCreatePortalVenueData = {
 };
 
 export type EventVenuesCreatePortalVenueResponse = (EventVenuePublic);
+
+export type EventVenuesUpdatePortalVenueData = {
+    requestBody: EventVenueUpdate;
+    venueId: string;
+};
+
+export type EventVenuesUpdatePortalVenueResponse = (EventVenuePublic);
 
 export type FormFieldsListFormFieldsData = {
     /**

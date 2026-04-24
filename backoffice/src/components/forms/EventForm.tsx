@@ -508,12 +508,17 @@ export function EventForm({
       "event-venue-availability",
       venueIdValue,
       dayBounds?.start.toISOString(),
+      defaultValues?.id ?? null,
     ],
     queryFn: () =>
       EventVenuesService.getAvailability({
         venueId: venueIdValue,
         start: dayBounds!.start.toISOString(),
         end: dayBounds!.end.toISOString(),
+        // In edit mode, drop the event being edited from the busy list so
+        // the local durationFits check doesn't flag it as overlapping
+        // itself. Mirrors the exclude_event_id we pass to /check-availability.
+        excludeEventId: defaultValues?.id ?? null,
       }),
     enabled: !!venueIdValue && !!dayBounds,
   })
