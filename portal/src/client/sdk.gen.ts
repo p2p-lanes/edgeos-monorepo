@@ -3808,6 +3808,7 @@ export class PaymentsService {
      * @param data.applicationId
      * @param data.externalId
      * @param data.paymentStatus
+     * @param data.search
      * @param data.skip Number of items to skip
      * @param data.limit Maximum number of items to return
      * @param data.xTenantId
@@ -3826,6 +3827,7 @@ export class PaymentsService {
                 application_id: data.applicationId,
                 external_id: data.externalId,
                 payment_status: data.paymentStatus,
+                search: data.search,
                 skip: data.skip,
                 limit: data.limit
             },

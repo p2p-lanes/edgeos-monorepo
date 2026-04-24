@@ -33,19 +33,27 @@ import {
 } from "@/hooks/useTableSearchParams"
 import { exportToCsv, fetchAllPages } from "@/lib/export"
 
+import {
+  buildPaymentsQueryConfig,
+  buildPaymentsTableState,
+} from "./payments.helpers"
+
 function getPaymentsQueryOptions(
   popupId: string | null,
   page: number,
   pageSize: number,
+  search: string,
 ) {
+  const queryConfig = buildPaymentsQueryConfig({
+    popupId,
+    page,
+    pageSize,
+    search,
+  })
+
   return {
-    queryFn: () =>
-      PaymentsService.listPayments({
-        skip: page * pageSize,
-        limit: pageSize,
-        popupId: popupId || undefined,
-      }),
-    queryKey: ["payments", popupId, { page, pageSize }],
+    queryFn: () => PaymentsService.listPayments(queryConfig.params),
+    queryKey: queryConfig.queryKey,
   }
 }
 
@@ -383,6 +391,7 @@ function PaymentsTableContent() {
       selectedPopupId,
       pagination.pageIndex,
       pagination.pageSize,
+      search,
     ),
     placeholderData: keepPreviousData,
   })
@@ -404,24 +413,13 @@ function PaymentsTableContent() {
 
   if (!payments) return <Skeleton className="h-64 w-full" />
 
-  const filtered = search
-    ? payments.results.filter((p) => {
-        const term = search.toLowerCase()
-        return (
-          p.id.toLowerCase().includes(term) ||
-          (p.status ?? "").toLowerCase().includes(term) ||
-          (p.source ?? "").toLowerCase().includes(term) ||
-          (p.coupon_code ?? "").toLowerCase().includes(term) ||
-          String(p.amount).includes(term)
-        )
-      })
-    : payments.results
+  const tableState = buildPaymentsTableState({ payments, pagination })
 
   return (
     <DataTable
       columns={columns}
-      data={filtered}
-      searchPlaceholder="Search by status, source, coupon, or amount..."
+      data={tableState.data}
+      searchPlaceholder="Search by external ID, attendee email, or attendee name..."
       hiddenOnMobile={[
         "source",
         "insurance_amount",
@@ -433,10 +431,7 @@ function PaymentsTableContent() {
       searchValue={search}
       onSearchChange={setSearch}
       serverPagination={{
-        total: search ? filtered.length : payments.paging.total,
-        pagination: search
-          ? { pageIndex: 0, pageSize: payments.paging.total }
-          : pagination,
+        ...tableState.serverPagination,
         onPaginationChange: setPagination,
       }}
       renderSubComponent={PaymentSubRow}
