@@ -11,23 +11,31 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import type { ApplicationFormSchema } from "@/types/form-schema"
 import { useApplicationData } from "../../hooks/useApplicationData"
 import { useEmailVerification } from "../../hooks/useEmailVerification"
 import { useUserForm } from "../../hooks/useUserForm"
-import type { FormDataProps } from "../../types"
+import type {
+  CheckoutApplicationValues,
+  DefaultCheckoutFormData,
+} from "../../types"
 import EmailVerification from "./EmailVerification"
 import PersonalInfoForm from "./PersonalInfoForm"
 
 interface UserInfoFormProps {
   popupId: string
   popupName: string
-  onSubmit: (data: FormDataProps) => Promise<void>
+  schema?: ApplicationFormSchema
+  onSubmit: (
+    data: DefaultCheckoutFormData | CheckoutApplicationValues,
+  ) => Promise<void>
   isSubmitting: boolean
 }
 
 const UserInfoForm = ({
   popupId,
   popupName,
+  schema,
   onSubmit,
   isSubmitting,
 }: UserInfoFormProps) => {
@@ -40,10 +48,12 @@ const UserInfoForm = ({
     refreshApplicationData,
   } = useApplicationData({
     groupPopupCityId: popupId,
+    schema,
   })
 
   const {
     formData,
+    emailVerified,
     errors,
     setErrors,
     handleInputChange,
@@ -52,9 +62,9 @@ const UserInfoForm = ({
     resetForm,
   } = useUserForm({
     applicationData,
+    schema,
   })
 
-  // Set autoFilled flag when applicationData has more than just email
   useEffect(() => {
     if (
       applicationData &&
@@ -79,9 +89,9 @@ const UserInfoForm = ({
     handleResendCode,
     handleChangeEmail,
   } = useEmailVerification({
-    email: formData.email,
+    email: String(formData.email ?? ""),
     onVerificationSuccess: (_token) => {
-      setEmailVerified(formData.email)
+      setEmailVerified(String(formData.email ?? ""))
       refreshApplicationData()
     },
   })
@@ -97,9 +107,9 @@ const UserInfoForm = ({
     e.preventDefault()
 
     if (
-      !formData.email_verified &&
+      !emailVerified &&
       formData.email &&
-      !/^\S+@\S+\.\S+$/.test(formData.email)
+      !/^\S+@\S+\.\S+$/.test(String(formData.email))
     ) {
       setErrors((prev) => ({
         ...prev,
@@ -108,7 +118,7 @@ const UserInfoForm = ({
       return
     }
 
-    if (!formData.email_verified) {
+    if (!emailVerified) {
       if (!showVerificationInput) {
         await handleSendVerificationCode()
       } else {
@@ -120,12 +130,26 @@ const UserInfoForm = ({
     if (validateForm()) {
       try {
         await onSubmit(formData)
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("Error submitting form:", error)
-        if (error.response?.data?.message) {
+        const errorMessage =
+          typeof error === "object" &&
+          error !== null &&
+          "response" in error &&
+          typeof error.response === "object" &&
+          error.response !== null &&
+          "data" in error.response &&
+          typeof error.response.data === "object" &&
+          error.response.data !== null &&
+          "message" in error.response.data &&
+          typeof error.response.data.message === "string"
+            ? error.response.data.message
+            : null
+
+        if (errorMessage) {
           setErrors((prev) => ({
             ...prev,
-            general: error.response.data.message,
+            general: errorMessage,
           }))
         } else {
           setErrors((prev) => ({
@@ -179,9 +203,9 @@ const UserInfoForm = ({
       </CardHeader>
       <form noValidate onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
-          {!formData.email_verified && (
+          {!emailVerified && (
             <EmailVerification
-              email={formData.email}
+              email={String(formData.email ?? "")}
               showVerificationInput={showVerificationInput}
               verificationCode={verificationCode}
               setVerificationCode={setVerificationCode}
@@ -196,12 +220,13 @@ const UserInfoForm = ({
             />
           )}
 
-          {formData.email_verified && (
+          {emailVerified && (
             <PersonalInfoForm
               formData={formData}
               handleInputChange={handleInputChange}
               handleChangeEmail={handleEmailChange}
               errors={errors}
+              schema={schema}
             />
           )}
         </CardContent>
@@ -214,14 +239,14 @@ const UserInfoForm = ({
               isSubmitting ||
               (showVerificationInput &&
                 verificationCode.length !== 6 &&
-                !formData.email_verified) ||
+                !emailVerified) ||
               isSendingCode ||
               isVerifyingCode
             }
           >
             {isSubmitting
               ? t("common.processing")
-              : formData.email_verified
+              : emailVerified
                 ? t("common.continue")
                 : showVerificationInput
                   ? t("checkout.verify_code")

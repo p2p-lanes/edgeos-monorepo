@@ -168,7 +168,7 @@ export default function CheckoutFlow({
     stepConfig?.description ?? getDefaultStepSubtitle(currentStep, t)
 
   const renderStepContent = () => {
-    // Passes/tickets: dynamic step or fall-back legacy section
+    // Passes/tickets: dynamic step or fall-back default section
     if (currentStep === "passes" || currentStep === "tickets") {
       const ticketStepConfig = stepConfigs.find(
         (s) =>
