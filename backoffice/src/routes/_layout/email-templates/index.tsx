@@ -26,7 +26,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   Payment: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
 }
 
-function TemplateList() {
+export function TemplateList() {
   const { selectedPopupId } = useWorkspace()
 
   const { data: types } = useQuery({
@@ -34,25 +34,34 @@ function TemplateList() {
     queryFn: () => EmailTemplatesService.listTemplateTypes(),
   })
 
-  const { data: customTemplates } = useQuery({
-    queryKey: ["email-templates", selectedPopupId],
+  const { data: tenantTemplates } = useQuery({
+    queryKey: ["email-templates", "tenant"],
+    queryFn: () => EmailTemplatesService.listEmailTemplates(),
+  })
+
+  const { data: popupTemplates } = useQuery({
+    queryKey: ["email-templates", "popup", selectedPopupId],
     queryFn: () =>
-      EmailTemplatesService.listEmailTemplates({
-        popupId: selectedPopupId!,
-      }),
+      EmailTemplatesService.listEmailTemplates({ popupId: selectedPopupId! }),
     enabled: !!selectedPopupId,
   })
 
   if (!types) return <Skeleton className="h-64 w-full" />
 
-  const customTypeSet = new Set(
-    customTemplates?.results?.map((t) => t.template_type) ?? [],
+  const tenantCustomTypeSet = new Set(
+    tenantTemplates?.results?.map((t) => t.template_type) ?? [],
+  )
+  const popupCustomTypeSet = new Set(
+    popupTemplates?.results?.map((t) => t.template_type) ?? [],
   )
 
   return (
     <div className="divide-y rounded-md border">
       {types.map((tmpl) => {
-        const hasCustom = customTypeSet.has(tmpl.type)
+        const requiresPopup = tmpl.scope === "popup"
+        const hasCustom = requiresPopup
+          ? popupCustomTypeSet.has(tmpl.type)
+          : tenantCustomTypeSet.has(tmpl.type)
         return (
           <div
             key={tmpl.type}
@@ -77,15 +86,22 @@ function TemplateList() {
               ) : (
                 <Badge variant="secondary">Default</Badge>
               )}
-              <Button variant="ghost" size="sm" asChild>
-                <Link
-                  to="/email-templates/$type/edit"
-                  params={{ type: tmpl.type }}
-                >
+              {requiresPopup && !selectedPopupId ? (
+                <Button variant="ghost" size="sm" disabled>
                   <Pencil className="mr-1.5 h-3.5 w-3.5" />
-                  Edit
-                </Link>
-              </Button>
+                  Select popup to edit
+                </Button>
+              ) : (
+                <Button variant="ghost" size="sm" asChild>
+                  <Link
+                    to="/email-templates/$type/edit"
+                    params={{ type: tmpl.type }}
+                  >
+                    <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                    Edit
+                  </Link>
+                </Button>
+              )}
             </div>
           </div>
         )
@@ -94,8 +110,8 @@ function TemplateList() {
   )
 }
 
-function EmailTemplatesPage() {
-  const { isContextReady } = useWorkspace()
+export function EmailTemplatesPage() {
+  const { needsTenantSelection, needsPopupSelection } = useWorkspace()
   const { isAdmin } = useAuth()
 
   if (!isAdmin) {
@@ -111,7 +127,10 @@ function EmailTemplatesPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      {!isContextReady && <WorkspaceAlert resource="email templates" />}
+      {needsTenantSelection && <WorkspaceAlert resource="email templates" />}
+      {needsPopupSelection && (
+        <WorkspaceAlert resource="popup-scoped email templates" />
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Email Templates</h1>
@@ -120,7 +139,7 @@ function EmailTemplatesPage() {
           </p>
         </div>
       </div>
-      {isContextReady && (
+      {!needsTenantSelection && (
         <QueryErrorBoundary>
           <Suspense fallback={<Skeleton className="h-64 w-full" />}>
             <TemplateList />

@@ -26,9 +26,16 @@ class EmailTemplateType(StrEnum):
     EVENT_APPROVAL_REJECTED = "event_approval_rejected"
 
 
+class TemplateScope(StrEnum):
+    TENANT = "tenant"
+    POPUP = "popup"
+
+
 class EmailTemplateBase(SQLModel):
     tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
-    popup_id: uuid.UUID = Field(foreign_key="popups.id", index=True)
+    popup_id: uuid.UUID | None = Field(
+        default=None, foreign_key="popups.id", index=True
+    )
     template_type: str = Field(index=True)
     subject: str | None = Field(default=None, nullable=True)
     html_content: str = Field(sa_type=Text())
@@ -38,8 +45,9 @@ class EmailTemplateBase(SQLModel):
 class EmailTemplatePublic(BaseModel):
     id: uuid.UUID
     tenant_id: uuid.UUID
-    popup_id: uuid.UUID
+    popup_id: uuid.UUID | None
     template_type: str
+    scope: TemplateScope
     subject: str | None = None
     html_content: str
     is_active: bool = True
@@ -50,7 +58,7 @@ class EmailTemplatePublic(BaseModel):
 
 
 class EmailTemplateCreate(BaseModel):
-    popup_id: uuid.UUID
+    popup_id: uuid.UUID | None = None
     template_type: str
     subject: str | None = None
     html_content: str
