@@ -458,6 +458,7 @@ export function VenueForm({ defaultValues, onSuccess }: VenueFormProps) {
                   value={field.state.value || null}
                   onChange={(url) => field.handleChange(url ?? "")}
                   disabled={readOnly}
+                  cropAspect={16 / 9}
                 />
               )}
             </form.Field>

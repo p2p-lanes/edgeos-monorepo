@@ -1016,6 +1016,7 @@ export function EventForm({
                   value={field.state.value || null}
                   onChange={(url) => field.handleChange(url ?? "")}
                   disabled={readOnly}
+                  cropAspect={16 / 9}
                 />
                 {!field.state.value && (
                   <p className="text-xs text-muted-foreground">
