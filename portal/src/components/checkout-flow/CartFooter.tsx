@@ -20,6 +20,7 @@ interface CartFooterProps {
   onBack?: () => void
   nextSectionLabel?: string
   onContinue?: () => void
+  isLastSection?: boolean
 }
 
 export default function CartFooter({
@@ -27,6 +28,7 @@ export default function CartFooter({
   onBack,
   nextSectionLabel,
   onContinue,
+  isLastSection = false,
 }: CartFooterProps) {
   const { t } = useTranslation()
   const {
@@ -48,7 +50,7 @@ export default function CartFooter({
 
   const [isExpanded, setIsExpanded] = useState(false)
 
-  const isConfirmStep = currentStep === "confirm"
+  const isConfirmStep = currentStep === "confirm" || isLastSection
   const isFirstStep = currentStep === "passes"
   const currentIndex = availableSteps.indexOf(currentStep)
   const nextStepId =
