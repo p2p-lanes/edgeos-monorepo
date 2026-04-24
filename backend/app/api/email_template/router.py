@@ -77,6 +77,43 @@ def _resolve_effective_tenant_id(current_user: CurrentUser, db: TenantSession) -
     return uuid.UUID(tenant_id)
 
 
+def _get_template_label(template_type: str) -> str | None:
+    from app.services.email.templates import TEMPLATE_TYPE_METADATA
+
+    metadata = next(
+        (
+            meta
+            for meta in TEMPLATE_TYPE_METADATA
+            if str(meta["type"]) == template_type
+        ),
+        None,
+    )
+    return metadata["label"] if metadata else None
+
+
+def _template_scope_required_message(template_type: str) -> str:
+    template_label = _get_template_label(template_type) or "email template"
+    return f"Select a popup before managing the {template_label} template"
+
+
+def _template_not_customizable_message(template_type: str) -> str:
+    template_label = _get_template_label(template_type)
+    if template_label:
+        return f"{template_label} can't be customized from backoffice"
+    return "This email template can't be customized from backoffice"
+
+
+def _duplicate_template_message(
+    template_type: str, template_scope: TemplateScope
+) -> str:
+    template_label = _get_template_label(template_type) or "email"
+    scope_label = "workspace" if template_scope == TemplateScope.TENANT else "popup"
+    return (
+        f"This {scope_label} already has a custom {template_label} template. "
+        "Open it from the list to edit it."
+    )
+
+
 @router.get("/types", response_model=list[TemplateTypeInfo])
 async def list_template_types(
     _: CurrentUser,
@@ -119,13 +156,13 @@ async def preview_template(
     if not is_customizable_template_type(body.template_type):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Template type is not customizable: {body.template_type}",
+            detail=_template_not_customizable_message(body.template_type),
         )
 
     if get_template_scope(body.template_type) == TemplateScope.POPUP and not body.popup_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="popup_id is required for popup-scoped templates",
+            detail=_template_scope_required_message(body.template_type),
         )
 
     # Start with enriched popup data as the base, then let preview_variables override
@@ -186,13 +223,13 @@ async def send_test_email(
     if not is_customizable_template_type(body.template_type):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Template type is not customizable: {body.template_type}",
+            detail=_template_not_customizable_message(body.template_type),
         )
 
     if get_template_scope(body.template_type) == TemplateScope.POPUP and not body.popup_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="popup_id is required for popup-scoped templates",
+            detail=_template_scope_required_message(body.template_type),
         )
 
     # Start with enriched popup data as the base, then let custom_variables override
@@ -307,7 +344,7 @@ async def create_email_template(
     if not is_customizable_template_type(template_in.template_type):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Template type is not customizable: {template_in.template_type}",
+            detail=_template_not_customizable_message(template_in.template_type),
         )
 
     template_scope = get_template_scope(template_in.template_type)
@@ -316,7 +353,7 @@ async def create_email_template(
         if not template_in.popup_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="popup_id is required for popup-scoped templates",
+                detail=_template_scope_required_message(template_in.template_type),
             )
 
         existing = crud.email_template_crud.get_by_popup_and_type(
@@ -325,7 +362,9 @@ async def create_email_template(
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="A template for this type already exists in this popup",
+                detail=_duplicate_template_message(
+                    template_in.template_type, TemplateScope.POPUP
+                ),
             )
 
         if current_user.role == UserRole.SUPERADMIN:
@@ -348,7 +387,9 @@ async def create_email_template(
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="A tenant-scoped template for this type already exists",
+                detail=_duplicate_template_message(
+                    template_in.template_type, TemplateScope.TENANT
+                ),
             )
 
     from app.api.email_template.models import EmailTemplates

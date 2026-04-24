@@ -49,10 +49,14 @@ vi.mock("@/components/EmailTemplateEditor", () => ({
   EmailTemplateEditor: ({
     popupId,
     templateType,
+    existingTemplate,
   }: {
     popupId?: string
     templateType: string
-  }) => <div>{`editor:${templateType}:${popupId ?? "tenant"}`}</div>,
+    existingTemplate?: { id?: string }
+  }) => (
+    <div>{`editor:${templateType}:${popupId ?? "tenant"}:${existingTemplate?.id ?? "new"}`}</div>
+  ),
 }))
 
 import { EmailTemplatesService } from "@/client"
@@ -69,13 +73,23 @@ const mockListEmailTemplates = vi.mocked(
 function renderWithQueryClient(ui: ReactNode) {
   const queryClient = new QueryClient({
     defaultOptions: {
-      queries: { retry: false },
+      queries: { retry: false, staleTime: Number.POSITIVE_INFINITY },
     },
   })
 
-  return render(
+  const renderResult = render(
     <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
   )
+
+  return {
+    ...renderResult,
+    rerender: (nextUi: ReactNode) =>
+      renderResult.rerender(
+        <QueryClientProvider client={queryClient}>
+          {nextUi}
+        </QueryClientProvider>,
+      ),
+  }
 }
 
 describe("email template routing behavior", () => {
@@ -148,7 +162,57 @@ describe("email template routing behavior", () => {
     renderWithQueryClient(<EditorContent templateType="login_code_human" />)
 
     expect(
-      await screen.findByText("editor:login_code_human:tenant"),
+      await screen.findByText("editor:login_code_human:tenant:template-1"),
     ).toBeInTheDocument()
+  })
+
+  it("refreshes tenant-scoped template state when tenant changes", async () => {
+    let tenantId = "tenant-1"
+
+    mockUseWorkspace.mockImplementation(() => ({
+      selectedPopupId: null,
+      selectedTenantId: tenantId,
+      effectiveTenantId: tenantId,
+      isContextReady: false,
+      needsTenantSelection: false,
+      needsPopupSelection: true,
+      setSelectedPopupId: vi.fn(),
+      setSelectedTenantId: vi.fn(),
+    }))
+
+    mockListEmailTemplates.mockImplementation(async ({ popupId } = {}) => ({
+      results: popupId
+        ? []
+        : tenantId === "tenant-2"
+          ? [
+              {
+                id: "template-2",
+                tenant_id: tenantId,
+                popup_id: null,
+                template_type: "login_code_human",
+                subject: "Tenant 2 subject",
+                html_content: "<html></html>",
+                is_active: true,
+              },
+            ]
+          : [],
+      paging: { offset: 0, limit: 100, total: tenantId === "tenant-2" ? 1 : 0 },
+    }))
+
+    const { rerender } = renderWithQueryClient(
+      <EditorContent templateType="login_code_human" />,
+    )
+
+    expect(
+      await screen.findByText("editor:login_code_human:tenant:new"),
+    ).toBeInTheDocument()
+
+    tenantId = "tenant-2"
+    rerender(<EditorContent templateType="login_code_human" />)
+
+    expect(
+      await screen.findByText("editor:login_code_human:tenant:template-2"),
+    ).toBeInTheDocument()
+    expect(mockListEmailTemplates).toHaveBeenCalledTimes(2)
   })
 })

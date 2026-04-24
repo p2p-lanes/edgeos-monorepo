@@ -1,5 +1,7 @@
 """Email dispatch helpers for application status transitions."""
 
+from datetime import UTC, datetime
+
 from sqlmodel import Session
 
 from app.api.email_template.schemas import EmailTemplateType
@@ -19,6 +21,29 @@ _AcceptedContext = (
     | ApplicationAcceptedWithIncentiveContext
     | ApplicationAcceptedScholarshipRejectedContext
 )
+
+
+def _resolve_application_human_details(
+    application, human
+) -> tuple[str, str, str]:
+    source_human = application.human or human
+
+    return (
+        getattr(source_human, "first_name", None) or "",
+        getattr(source_human, "last_name", None) or "",
+        getattr(source_human, "email", None) or "",
+    )
+
+
+def _format_email_datetime(value: datetime | None) -> str | None:
+    if value is None:
+        return None
+
+    if value.tzinfo is not None:
+        value = value.astimezone(UTC)
+        return value.strftime("%B %d, %Y %H:%M UTC")
+
+    return value.strftime("%B %d, %Y %H:%M")
 
 
 def _get_scholarship_email_variant(
@@ -129,19 +154,23 @@ async def send_application_status_email(
     if not popup or not human:
         return
 
+    first_name, last_name, email = _resolve_application_human_details(application, human)
+    submitted_at = _format_email_datetime(getattr(application, "submitted_at", None))
+
     email_service = get_email_service()
     from_address = popup.tenant.sender_email if popup.tenant else None
     from_name = popup.tenant.sender_name if popup.tenant else None
 
     if current_status == ApplicationStatus.IN_REVIEW.value:
         await email_service.send_application_received(
-            to=human.email,
+            to=email,
             subject=f"Application Received for {popup.name}",
             context=ApplicationReceivedContext(
-                first_name=human.first_name or "",
-                last_name=human.last_name or "",
-                email=human.email,
+                first_name=first_name,
+                last_name=last_name,
+                email=email,
                 popup_name=popup.name,
+                submitted_at=submitted_at,
             ),
             from_address=from_address,
             from_name=from_name,
@@ -153,7 +182,7 @@ async def send_application_status_email(
 
         if template_type == EmailTemplateType.APPLICATION_ACCEPTED:
             await email_service.send_application_accepted(
-                to=human.email,
+                to=email,
                 subject=f"Application Accepted for {popup.name}",
                 context=context,
                 from_address=from_address,
@@ -163,7 +192,7 @@ async def send_application_status_email(
             )
         elif template_type == EmailTemplateType.APPLICATION_ACCEPTED_WITH_DISCOUNT:
             await email_service.send_application_accepted_with_discount(
-                to=human.email,
+                to=email,
                 subject=f"Your scholarship & application — {popup.name}",
                 context=context,
                 from_address=from_address,
@@ -173,7 +202,7 @@ async def send_application_status_email(
             )
         elif template_type == EmailTemplateType.APPLICATION_ACCEPTED_WITH_INCENTIVE:
             await email_service.send_application_accepted_with_incentive(
-                to=human.email,
+                to=email,
                 subject=f"Your scholarship award — {popup.name}",
                 context=context,
                 from_address=from_address,
@@ -185,7 +214,7 @@ async def send_application_status_email(
             template_type == EmailTemplateType.APPLICATION_ACCEPTED_SCHOLARSHIP_REJECTED
         ):
             await email_service.send_application_accepted_scholarship_rejected(
-                to=human.email,
+                to=email,
                 subject=f"Your application to {popup.name} — accepted",
                 context=context,
                 from_address=from_address,
@@ -195,11 +224,11 @@ async def send_application_status_email(
             )
     elif current_status == ApplicationStatus.REJECTED.value:
         await email_service.send_application_rejected(
-            to=human.email,
+            to=email,
             subject=f"Application Update for {popup.name}",
             context=ApplicationRejectedContext(
-                first_name=human.first_name or "",
-                last_name=human.last_name or "",
+                first_name=first_name,
+                last_name=last_name,
                 popup_name=popup.name,
             ),
             from_address=from_address,

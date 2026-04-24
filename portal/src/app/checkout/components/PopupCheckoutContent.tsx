@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query"
 import { AnimatePresence, motion } from "framer-motion"
 import { UserRound } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { type CSSProperties, useEffect, useMemo, useRef } from "react"
+import { type CSSProperties, useEffect, useRef } from "react"
 import { resolvePopupCheckoutPolicy } from "@/checkout/popupCheckoutPolicy"
 import type { PopupPublic } from "@/client"
 import ScrollyCheckoutFlow from "@/components/checkout-flow/ScrollyCheckoutFlow"
@@ -16,6 +16,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
+import { useApplicationSchema } from "@/hooks/useApplicationSchema"
 import useAuth from "@/hooks/useAuth"
 import {
   dispatchAuthChange,
@@ -28,7 +29,10 @@ import { CheckoutProvider } from "@/providers/checkoutProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import PassesProvider from "@/providers/passesProvider"
 import useCheckoutState from "../hooks/useCheckoutState"
-import type { FormDataProps } from "../types"
+import type {
+  CheckoutApplicationValues,
+  DefaultCheckoutFormData,
+} from "../types"
 import CheckoutLoginGate from "./CheckoutLoginGate"
 import TransitionScreen from "./TransitionScreen"
 import UserInfoForm from "./UserInfoForm"
@@ -42,6 +46,14 @@ export const PopupCheckoutContent = ({
   background: { className: string; style?: CSSProperties }
   groupId?: string | null
 }) => {
+  const policy = resolvePopupCheckoutPolicy(popup)
+  const isAuthenticated = useIsAuthenticated()
+  const { data: applicationSchema, isLoading: isLoadingApplicationSchema } =
+    useApplicationSchema(
+      policy.saleType === "application" && isAuthenticated
+        ? popup.id
+        : undefined,
+    )
   const {
     checkoutState,
     isSubmitting,
@@ -52,16 +64,16 @@ export const PopupCheckoutContent = ({
     popupId: popup.id,
     saleType: resolvePopupCheckoutPolicy(popup).saleType,
     groupId,
+    schema: applicationSchema,
   })
   const queryClient = useQueryClient()
   const { user } = useAuth()
   const { getRelevantApplication } = useApplication()
   const { getCity, setCityPreselected } = useCityProvider()
   const router = useRouter()
-  const isAuthenticated = useIsAuthenticated()
   const hasSkippedForm = useRef(false)
-  const policy = useMemo(() => resolvePopupCheckoutPolicy(popup), [popup])
   const attendees = useResolvedAttendees()
+  const existingApplication = getRelevantApplication()
 
   useEffect(() => {
     setCityPreselected(popup.id)
@@ -85,12 +97,11 @@ export const PopupCheckoutContent = ({
   useEffect(() => {
     if (hasSkippedForm.current) return
     if (policy.saleType !== "application") return
-    const existingApp = getRelevantApplication()
-    if (!existingApp || checkoutState !== "form") return
+    if (!existingApplication || checkoutState !== "form") return
 
     hasSkippedForm.current = true
 
-    const hasPurchasedPasses = existingApp.attendees?.some(
+    const hasPurchasedPasses = existingApplication.attendees?.some(
       (a) => a.products && a.products.length > 0,
     )
     if (hasPurchasedPasses) {
@@ -102,14 +113,16 @@ export const PopupCheckoutContent = ({
     setCheckoutState("passes")
   }, [
     policy.saleType,
-    getRelevantApplication,
+    existingApplication,
     checkoutState,
     setCheckoutState,
     getCity,
     router,
   ])
 
-  const handleFormSubmit = async (formData: FormDataProps): Promise<void> => {
+  const handleFormSubmit = async (
+    formData: DefaultCheckoutFormData | CheckoutApplicationValues,
+  ): Promise<void> => {
     await handleSubmit(formData)
   }
 
@@ -134,9 +147,9 @@ export const PopupCheckoutContent = ({
             <button
               type="button"
               aria-label={`Signed in as ${user.email}`}
-              className="flex size-7 shrink-0 items-center justify-center rounded-full bg-checkout-badge-bg text-checkout-badge-title shadow-sm transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="flex size-9 shrink-0 items-center justify-center rounded-full bg-checkout-badge-bg text-checkout-badge-title shadow-sm transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
-              <UserRound className="size-3.5" />
+              <UserRound className="size-4" />
             </button>
           </PopoverTrigger>
           <PopoverContent align="end" className="w-auto max-w-[280px] p-3">
@@ -183,7 +196,16 @@ export const PopupCheckoutContent = ({
     return <Loader />
   }
 
-  // Passes state: full-page scrollable layout for ScrollyCheckoutFlow
+  if (
+    policy.saleType === "application" &&
+    isAuthenticated &&
+    checkoutState === "form" &&
+    !existingApplication &&
+    (isLoadingApplicationSchema || !applicationSchema)
+  ) {
+    return <Loader />
+  }
+
   if (checkoutState === "passes") {
     return (
       <SidebarProvider
@@ -214,7 +236,6 @@ export const PopupCheckoutContent = ({
     )
   }
 
-  // Form/processing states: centered card layout with background
   return (
     <div
       className={`min-h-screen w-full py-8 flex items-center justify-center ${background.className}`}
@@ -233,6 +254,7 @@ export const PopupCheckoutContent = ({
               <UserInfoForm
                 popupId={popup.id}
                 popupName={popup.name}
+                schema={applicationSchema}
                 onSubmit={handleFormSubmit}
                 isSubmitting={isSubmitting}
               />

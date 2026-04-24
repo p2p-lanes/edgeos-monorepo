@@ -3901,6 +3901,7 @@ export type PaymentsListPaymentsData = {
     limit?: number;
     paymentStatus?: (PaymentStatus | null);
     popupId?: (string | null);
+    search?: (string | null);
     /**
      * Number of items to skip
      */

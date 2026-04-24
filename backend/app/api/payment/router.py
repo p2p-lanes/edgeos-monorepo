@@ -33,8 +33,10 @@ from app.core.dependencies.users import (
 from app.core.redis import WebhookCache
 from app.services.email import (
     EmailAttachment,
+    PaymentAttendeeItem,
     PaymentConfirmedContext,
     PaymentProductItem,
+    compute_order_summary,
     get_email_service,
 )
 from app.services.email_helpers import send_application_status_email
@@ -86,6 +88,80 @@ def _extract_settlement_details(
     return settlement_currency, settlement_rate, source
 
 
+def _build_payment_email_products(payment: Payments) -> list[PaymentProductItem]:
+    return [
+        PaymentProductItem(
+            name=pp.product_name,
+            price=float(pp.product_price),
+            quantity=pp.quantity,
+        )
+        for pp in payment.products_snapshot
+    ]
+
+
+def _build_payment_email_attendees(
+    payment: Payments,
+) -> list[PaymentAttendeeItem] | None:
+    if not payment.products_snapshot:
+        return None
+
+    attendees_by_id: dict[uuid.UUID, PaymentAttendeeItem] = {}
+
+    for product_snapshot in payment.products_snapshot:
+        attendee = product_snapshot.attendee
+        attendee_id = product_snapshot.attendee_id
+
+        if attendee_id not in attendees_by_id:
+            attendees_by_id[attendee_id] = PaymentAttendeeItem(
+                name=(attendee.name if attendee else None)
+                or product_snapshot.attendee_name
+                or "Attendee",
+                category=(attendee.category if attendee else None) or "attendee",
+                products=[],
+            )
+
+        attendees_by_id[attendee_id].products = [
+            *(attendees_by_id[attendee_id].products or []),
+            PaymentProductItem(
+                name=product_snapshot.product_name,
+                price=float(product_snapshot.product_price),
+                quantity=product_snapshot.quantity,
+            ),
+        ]
+
+    return list(attendees_by_id.values())
+
+
+def _build_payment_confirmed_context(
+    payment: Payments,
+    popup_name: str,
+    first_name: str,
+    portal_url: str | None,
+) -> PaymentConfirmedContext:
+    products = _build_payment_email_products(payment)
+    attendees = _build_payment_email_attendees(payment)
+
+    original_amount = None
+    if payment.discount_value and payment.discount_value > 0:
+        original_amount = sum(
+            float(pp.product_price) * pp.quantity for pp in payment.products_snapshot
+        )
+
+    return PaymentConfirmedContext(
+        first_name=first_name,
+        popup_name=popup_name,
+        payment_id=str(payment.id),
+        amount=float(payment.amount),
+        currency=payment.currency,
+        products=products if products else None,
+        discount_value=int(payment.discount_value) if payment.discount_value else None,
+        original_amount=original_amount,
+        attendees=attendees,
+        order_summary=compute_order_summary(payment) if payment.products_snapshot else None,
+        portal_url=portal_url,
+    )
+
+
 async def _send_payment_confirmed_email(payment, db_session=None) -> None:
     """Send payment confirmation email.
 
@@ -130,25 +206,6 @@ async def _send_payment_confirmed_email(payment, db_session=None) -> None:
         )
         return
 
-    # Build products list from payment snapshot
-    products = [
-        PaymentProductItem(
-            name=pp.product_name,
-            price=float(pp.product_price),
-            quantity=pp.quantity,
-        )
-        for pp in payment_model.products_snapshot
-    ]
-
-    # Calculate original amount if discount was applied
-    original_amount = None
-    if payment_model.discount_value and payment_model.discount_value > 0:
-        # Sum of all products
-        original_amount = sum(
-            float(pp.product_price) * pp.quantity
-            for pp in payment_model.products_snapshot
-        )
-
     # Generate invoice PDF attachment if popup has invoice details configured
     attachments: list[EmailAttachment] | None = None
     popup_has_invoice = (
@@ -189,23 +246,17 @@ async def _send_payment_confirmed_email(payment, db_session=None) -> None:
     from app.api.tenant.utils import get_portal_url
 
     portal_url = get_portal_url(tenant)
+    context = _build_payment_confirmed_context(
+        payment_model,
+        popup_name=popup.name,
+        first_name=human.first_name or "",
+        portal_url=portal_url,
+    )
 
     await email_service.send_payment_confirmed(
         to=human.email,
         subject=f"Payment Confirmed for {popup.name}",
-        context=PaymentConfirmedContext(
-            first_name=human.first_name or "",
-            popup_name=popup.name,
-            payment_id=str(payment_model.id),
-            amount=float(payment_model.amount),
-            currency=payment_model.currency,
-            products=products if products else None,
-            discount_value=int(payment_model.discount_value)
-            if payment_model.discount_value
-            else None,
-            original_amount=original_amount,
-            portal_url=portal_url,
-        ),
+        context=context,
         from_address=tenant.sender_email,
         from_name=tenant.sender_name,
         popup_id=popup.id,
@@ -283,13 +334,19 @@ async def list_payments(
     application_id: uuid.UUID | None = None,
     external_id: str | None = None,
     payment_status: PaymentStatus | None = None,
+    search: str | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[PaymentPublic]:
     """List payments with optional filters (BO only)."""
     if popup_id:
         payments, total = payments_crud.find_by_popup(
-            db, popup_id=popup_id, skip=skip, limit=limit, status_filter=payment_status
+            db,
+            popup_id=popup_id,
+            skip=skip,
+            limit=limit,
+            status_filter=payment_status,
+            search=search,
         )
     else:
         filters = PaymentFilter(
