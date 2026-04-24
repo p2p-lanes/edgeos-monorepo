@@ -3,11 +3,11 @@
 import {
   CalendarDays,
   CheckCircle,
+  Crown,
   Eye,
   EyeOff,
   Filter,
   List,
-  Pencil,
   Plus,
   Search,
 } from "lucide-react"
@@ -99,7 +99,7 @@ export function EventsToolbar({
         title={t("events.toolbar.my_events")}
         className="px-2 sm:px-3"
       >
-        <Pencil className="h-4 w-4 sm:mr-2" />
+        <Crown className="h-4 w-4 sm:mr-2" />
         <span className="hidden sm:inline">
           {t("events.toolbar.my_events")}
         </span>
