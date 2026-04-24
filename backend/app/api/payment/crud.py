@@ -4,11 +4,12 @@ from typing import TYPE_CHECKING, Any
 
 from fastapi import HTTPException, status
 from loguru import logger
-from sqlalchemy import desc
+from sqlalchemy import desc, or_
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, func, select
 
 from app.api.application.models import Applications
+from app.api.human.models import Humans
 
 if TYPE_CHECKING:
     from app.api.group.models import Groups
@@ -446,6 +447,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         skip: int = 0,
         limit: int = 100,
         status_filter: PaymentStatus | None = None,
+        search: str | None = None,
     ) -> tuple[list[Payments], int]:
         """Find payments by popup_id via the denormalized popup_id column.
 
@@ -455,6 +457,30 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         statement = select(Payments).where(Payments.popup_id == popup_id)
         if status_filter:
             statement = statement.where(Payments.status == status_filter.value)
+
+        normalized_search = search.strip() if search else ""
+        if normalized_search:
+            pattern = f"%{normalized_search}%"
+            attendee_match = (
+                select(PaymentProducts.payment_id)
+                .join(Attendees, PaymentProducts.attendee_id == Attendees.id)
+                .outerjoin(Humans, Attendees.human_id == Humans.id)
+                .where(
+                    PaymentProducts.payment_id == Payments.id,
+                    or_(
+                        Attendees.name.ilike(pattern),
+                        Attendees.email.ilike(pattern),
+                        Humans.email.ilike(pattern),
+                    ),
+                )
+                .exists()
+            )
+            statement = statement.where(
+                or_(
+                    Payments.external_id.ilike(pattern),
+                    attendee_match,
+                )
+            )
 
         count_statement = select(func.count()).select_from(statement.subquery())
         total = session.exec(count_statement).one()
