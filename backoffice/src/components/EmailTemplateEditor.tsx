@@ -56,6 +56,12 @@ import {
   useDirtyBlocker,
 } from "@/hooks/useUnsavedChanges"
 import { createErrorHandler } from "@/utils"
+import {
+  buildEmailTemplateCreatePayload,
+  buildEmailTemplatePreviewPayload,
+  buildEmailTemplateSendTestPayload,
+  requirePopupForTemplateScope,
+} from "./email-template-scope"
 
 const HTML_SHELL_BEFORE_STYLE = `<!DOCTYPE html>
 <html lang="en">
@@ -114,7 +120,7 @@ function reconstructFullHtml(editableContent: string): string {
 
 interface EmailTemplateEditorProps {
   templateType: EmailTemplateType
-  popupId: string
+  popupId?: string
   existingTemplate?: EmailTemplatePublic
   typeInfo: TemplateTypeInfo
   onSave: () => void
@@ -151,6 +157,7 @@ export function EmailTemplateEditor({
   const [showPreview, setShowPreview] = useState(true)
 
   const isEdit = !!existingTemplate
+  const requiresPopup = requirePopupForTemplateScope(typeInfo.scope)
 
   const { data: defaultTemplate } = useQuery({
     queryKey: ["email-template-default", templateType],
@@ -162,7 +169,14 @@ export function EmailTemplateEditor({
 
   const { data: popupData } = useQuery({
     queryKey: ["popup", popupId],
-    queryFn: () => PopupsService.getPopup({ popupId }),
+    queryFn: () => {
+      if (!popupId) {
+        throw new Error("Popup id is required to load popup-scoped templates")
+      }
+
+      return PopupsService.getPopup({ popupId })
+    },
+    enabled: requiresPopup && !!popupId,
   })
 
   const initialHtmlRef = useRef(
@@ -214,12 +228,13 @@ export function EmailTemplateEditor({
         }
         try {
           const result = await EmailTemplatesService.previewTemplate({
-            requestBody: {
-              html_content: reconstructFullHtml(content),
-              template_type: templateType,
+            requestBody: buildEmailTemplatePreviewPayload({
+              scope: typeInfo.scope,
+              popupId,
+              templateType,
+              htmlContent: reconstructFullHtml(content),
               subject: subjectValue || undefined,
-              popup_id: popupId,
-            },
+            }),
           })
           setPreviewHtml(result.rendered_html)
         } catch {
@@ -227,7 +242,7 @@ export function EmailTemplateEditor({
         }
       }, 500)
     },
-    [templateType, popupId],
+    [templateType, popupId, typeInfo.scope],
   )
 
   useEffect(() => {
@@ -308,13 +323,14 @@ export function EmailTemplateEditor({
       is_active: boolean
     }) =>
       EmailTemplatesService.createEmailTemplate({
-        requestBody: {
-          popup_id: popupId,
-          template_type: templateType,
-          html_content: data.html_content,
+        requestBody: buildEmailTemplateCreatePayload({
+          scope: typeInfo.scope,
+          popupId,
+          templateType,
+          htmlContent: data.html_content,
           subject: data.subject,
-          is_active: data.is_active,
-        },
+          isActive: data.is_active,
+        }),
       }),
     onSuccess: () => {
       showSuccessToast("Template created")
@@ -362,13 +378,14 @@ export function EmailTemplateEditor({
   const sendTestMutation = useMutation({
     mutationFn: (email: string) =>
       EmailTemplatesService.sendTestEmail({
-        requestBody: {
-          html_content: reconstructFullHtml(htmlContent),
-          template_type: templateType,
+        requestBody: buildEmailTemplateSendTestPayload({
+          scope: typeInfo.scope,
+          popupId,
+          templateType,
+          htmlContent: reconstructFullHtml(htmlContent),
           subject: subject || undefined,
-          to_email: email,
-          popup_id: popupId,
-        },
+          toEmail: email,
+        }),
       }),
     onSuccess: () => {
       showSuccessToast("Test email sent!")
@@ -553,8 +570,8 @@ export function EmailTemplateEditor({
             <DialogTitle>Send Test Email</DialogTitle>
             <DialogDescription>
               Send a test email to verify layout and styling. Popup variables
-              will be filled with real data; other variables will show as
-              placeholders.
+              will be filled with real data when popup scope is required; other
+              variables will show as placeholders.
             </DialogDescription>
           </DialogHeader>
           <div>

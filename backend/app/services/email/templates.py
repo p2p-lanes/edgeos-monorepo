@@ -6,7 +6,7 @@ from jinja2 import Environment, FileSystemLoader, Undefined
 from loguru import logger
 from pydantic import BaseModel
 
-from app.api.email_template.schemas import EmailTemplateType
+from app.api.email_template.schemas import EmailTemplateType, TemplateScope
 
 
 class LoginCodeUserContext(BaseModel):
@@ -16,6 +16,7 @@ class LoginCodeUserContext(BaseModel):
     """
 
     user_name: str | None = None
+    tenant_name: str | None = None
     auth_code: str
     expiration_minutes: int = 15
 
@@ -27,6 +28,7 @@ class LoginCodeHumanContext(BaseModel):
     """
 
     first_name: str | None = None
+    tenant_name: str | None = None
     auth_code: str
     expiration_minutes: int = 15
 
@@ -287,7 +289,76 @@ _POPUP_EVENT_VARIABLES: list[dict[str, Any]] = [
     },
 ]
 
-TEMPLATE_TYPE_METADATA: list[dict[str, Any]] = [
+TENANT_SCOPED_TEMPLATE_TYPES = {
+    EmailTemplateType.LOGIN_CODE_HUMAN,
+}
+
+
+def coerce_email_template_type(
+    template_type: EmailTemplateType | str,
+) -> EmailTemplateType:
+    return (
+        template_type
+        if isinstance(template_type, EmailTemplateType)
+        else EmailTemplateType(template_type)
+    )
+
+
+def get_template_scope(template_type: EmailTemplateType | str) -> TemplateScope:
+    return (
+        TemplateScope.TENANT
+        if coerce_email_template_type(template_type) in TENANT_SCOPED_TEMPLATE_TYPES
+        else TemplateScope.POPUP
+    )
+
+
+AUTH_TEMPLATE_METADATA: list[dict[str, Any]] = [
+    {
+        "type": EmailTemplateType.LOGIN_CODE_HUMAN,
+        "label": "Portal Login Code",
+        "description": "Verification email sent to portal users during sign in.",
+        "category": "Auth",
+        "scope": TemplateScope.TENANT,
+        "default_subject": "Your Verification Code - {{ tenant_name or project_name }}",
+        "variables": [
+            {
+                "name": "first_name",
+                "label": "First Name",
+                "type": "string",
+                "description": "Portal user's first name",
+                "required": False,
+                "group": "Recipient",
+            },
+            {
+                "name": "tenant_name",
+                "label": "Tenant Name",
+                "type": "string",
+                "description": "Tenant or organization name",
+                "required": False,
+                "group": "General",
+            },
+            {
+                "name": "auth_code",
+                "label": "Authentication Code",
+                "type": "string",
+                "description": "One-time login code",
+                "required": True,
+                "group": "General",
+            },
+            {
+                "name": "expiration_minutes",
+                "label": "Expiration Minutes",
+                "type": "number",
+                "description": "How long the code remains valid",
+                "required": True,
+                "group": "General",
+            },
+        ],
+    },
+]
+
+
+POPUP_TEMPLATE_METADATA: list[dict[str, Any]] = [
     # NOTE: Login code templates (LOGIN_CODE_USER, LOGIN_CODE_HUMAN) are excluded
     # because they have no popup context during auth flow and always use file-based defaults.
     {
@@ -969,3 +1040,15 @@ def flatten_template(template_type: EmailTemplateType) -> str:
 
     template = env.get_template(file_path)
     return template.render()
+
+
+TEMPLATE_TYPE_METADATA: list[dict[str, Any]] = [
+    *AUTH_TEMPLATE_METADATA,
+    *[{**meta, "scope": TemplateScope.POPUP} for meta in POPUP_TEMPLATE_METADATA],
+]
+
+CUSTOMIZABLE_TEMPLATE_TYPES = {meta["type"] for meta in TEMPLATE_TYPE_METADATA}
+
+
+def is_customizable_template_type(template_type: EmailTemplateType | str) -> bool:
+    return coerce_email_template_type(template_type) in CUSTOMIZABLE_TEMPLATE_TYPES

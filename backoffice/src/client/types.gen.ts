@@ -693,7 +693,7 @@ export type DistributionItem = {
 };
 
 export type EmailTemplateCreate = {
-    popup_id: string;
+    popup_id?: (string | null);
     template_type: string;
     subject?: (string | null);
     html_content: string;
@@ -703,8 +703,9 @@ export type EmailTemplateCreate = {
 export type EmailTemplatePublic = {
     id: string;
     tenant_id: string;
-    popup_id: string;
+    popup_id: (string | null);
     template_type: string;
+    scope: TemplateScope;
     subject?: (string | null);
     html_content: string;
     is_active?: boolean;
@@ -1824,11 +1825,14 @@ export type SendTestRequest = {
     popup_id?: (string | null);
 };
 
+export type TemplateScope = 'tenant' | 'popup';
+
 export type TemplateTypeInfo = {
     type: string;
     label: string;
     description: string;
     category: string;
+    scope: TemplateScope;
     default_subject: string;
     variables: Array<TemplateVariable>;
 };
