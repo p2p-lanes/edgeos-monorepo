@@ -10,6 +10,7 @@ import {
   Filter,
   MapPin,
   Pencil,
+  Plus,
   Repeat,
   Tag,
 } from "lucide-react"
@@ -24,6 +25,7 @@ import {
   HumansService,
 } from "@/client"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { useCityProvider } from "@/providers/cityProvider"
 import { CalendarBody } from "./lib/CalendarBody"
 import { EventsToolbar } from "./lib/EventsToolbar"
@@ -193,9 +195,25 @@ export default function EventsPage() {
     // instead of letting the whole viewport scroll sideways.
     <div className="max-w-4xl mx-auto p-4 sm:p-6 overflow-x-hidden">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight">
-          {t("events.list.heading")}
-        </h1>
+        <div className="flex items-start justify-between gap-2">
+          <h1 className="text-2xl font-bold tracking-tight">
+            {t("events.list.heading")}
+          </h1>
+          {(eventSettings?.can_publish_event ?? "everyone") === "everyone" && (
+            <Button asChild size="sm" className="shrink-0 px-2 sm:px-3">
+              <Link
+                href={`/portal/${city?.slug}/events/new`}
+                aria-label={t("events.toolbar.create_event")}
+                title={t("events.toolbar.create_event")}
+              >
+                <Plus className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">
+                  {t("events.toolbar.create_event")}
+                </span>
+              </Link>
+            </Button>
+          )}
+        </div>
         <p className="text-sm text-muted-foreground mt-1">
           {timezone
             ? t("events.list.subheading_with_tz", {
@@ -208,7 +226,6 @@ export default function EventsPage() {
 
       <div className="mb-4">
         <EventsToolbar
-          slug={city?.slug}
           view={view}
           onViewChange={setView}
           search={search}
@@ -223,9 +240,6 @@ export default function EventsPage() {
           allowedTags={eventSettings?.allowed_tags ?? []}
           selectedTags={selectedTags}
           onSelectedTagsChange={setSelectedTags}
-          canCreate={
-            (eventSettings?.can_publish_event ?? "everyone") === "everyone"
-          }
         />
       </div>
 

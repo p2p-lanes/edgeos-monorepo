@@ -8,10 +8,8 @@ import {
   EyeOff,
   Filter,
   List,
-  Plus,
   Search,
 } from "lucide-react"
-import Link from "next/link"
 import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -23,7 +21,6 @@ import {
 import { cn } from "@/lib/utils"
 
 interface EventsToolbarProps {
-  slug: string | undefined
   view: "list" | "calendar"
   onViewChange: (view: "list" | "calendar") => void
   search: string
@@ -38,7 +35,6 @@ interface EventsToolbarProps {
   allowedTags?: string[]
   selectedTags?: string[]
   onSelectedTagsChange?: (tags: string[]) => void
-  canCreate: boolean
 }
 
 /**
@@ -47,7 +43,6 @@ interface EventsToolbarProps {
  * only the body below changes when you switch.
  */
 export function EventsToolbar({
-  slug,
   view,
   onViewChange,
   search,
@@ -62,7 +57,6 @@ export function EventsToolbar({
   allowedTags,
   selectedTags,
   onSelectedTagsChange,
-  canCreate,
 }: EventsToolbarProps) {
   const { t } = useTranslation()
   return (
@@ -249,23 +243,6 @@ export function EventsToolbar({
           )}
         </Button>
       </div>
-
-      {canCreate && (
-        <Button
-          size="sm"
-          asChild
-          className="px-2 sm:px-3"
-          aria-label={t("events.toolbar.create_event")}
-          title={t("events.toolbar.create_event")}
-        >
-          <Link href={`/portal/${slug}/events/new`}>
-            <Plus className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">
-              {t("events.toolbar.create_event")}
-            </span>
-          </Link>
-        </Button>
-      )}
     </div>
   )
 }
