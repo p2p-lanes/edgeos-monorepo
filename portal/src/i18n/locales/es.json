@@ -508,7 +508,7 @@
       "required_date": "Elegí una fecha",
       "required_start": "Elegí una hora de inicio",
       "creation_restricted_heading": "La creación de eventos está restringida",
-      "creation_restricted_message": "Solo los admins pueden publicar eventos para este pop-up.",
+      "creation_restricted_message": "Solo los admins pueden crear eventos para este pop-up.",
       "conflicts_with_another_event": "Se superpone con otro evento",
       "no_popup_error": "Sin popup",
       "no_venue_option": "Sin lugar",

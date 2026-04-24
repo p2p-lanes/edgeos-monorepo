@@ -1347,8 +1347,8 @@ async def create_portal_event(
     settings = event_settings_crud.get_by_popup_id(db, event_in.popup_id)
     if settings and not settings.event_enabled:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Event creation is disabled for this popup")
-    if settings and settings.can_publish_event == "admin_only" and event_in.status == EventStatus.PUBLISHED:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only admins can publish events")
+    if settings and settings.can_publish_event == "admin_only":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only admins can create events for this popup")
 
     rrule_str = format_rrule(event_in.recurrence) if event_in.recurrence else None
 

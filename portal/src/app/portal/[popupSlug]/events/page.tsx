@@ -223,7 +223,7 @@ export default function EventsPage() {
           allowedTags={eventSettings?.allowed_tags ?? []}
           selectedTags={selectedTags}
           onSelectedTagsChange={setSelectedTags}
-          canCreate={eventSettings?.can_publish_event === "everyone"}
+          canCreate={(eventSettings?.can_publish_event ?? "everyone") === "everyone"}
         />
       </div>
 

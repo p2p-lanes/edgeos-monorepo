@@ -14,8 +14,8 @@ Venue creation (portal → event-venues/portal/venues)
 
 Event creation / approval (events/portal/events + /approve + /reject)
 - ``event_enabled=False`` blocks portal creation.
-- ``can_publish_event=admin_only`` blocks portal creation with
-  ``status=published``.
+- ``can_publish_event=admin_only`` blocks all portal creation (draft or
+  published); only admins can create events via the backoffice.
 - A venue with ``booking_mode=approval_required`` forces
   ``status=PENDING_APPROVAL`` and ``visibility=UNLISTED`` regardless of
   the payload.
@@ -312,7 +312,7 @@ class TestEventCreationGate:
 
         assert resp.status_code == 403, resp.text
 
-    def test_admin_only_publish_blocks_portal_published_creation(
+    def test_admin_only_blocks_portal_published_creation(
         self,
         client: TestClient,
         db: Session,
@@ -332,13 +332,13 @@ class TestEventCreationGate:
 
         assert resp.status_code == 403, resp.text
 
-    def test_admin_only_publish_allows_portal_draft(
+    def test_admin_only_blocks_portal_draft_creation(
         self,
         client: TestClient,
         db: Session,
         tenant_a: Tenants,
     ) -> None:
-        """Restricting publish doesn't block DRAFT submissions."""
+        """admin_only locks the portal endpoint entirely — no drafts either."""
         popup = _make_popup(db, tenant_a)
         _set_event_settings(
             db, tenant_a, popup, can_publish_event=PublishPermission.ADMIN_ONLY
@@ -351,8 +351,7 @@ class TestEventCreationGate:
             json=_event_payload(popup, status=EventStatus.DRAFT),
         )
 
-        assert resp.status_code == 201, resp.text
-        assert resp.json()["status"] == EventStatus.DRAFT.value
+        assert resp.status_code == 403, resp.text
 
 
 class TestApprovalRequiredVenue:

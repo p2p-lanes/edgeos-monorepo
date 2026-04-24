@@ -126,12 +126,12 @@ function EventSettingsForm() {
         </div>
         <p className="text-sm text-muted-foreground">
           When off, the events section is hidden in the portal for humans and no
-          one can publish. Who can publish controls permission when on.
+          one can create events. Who can create controls permission when on.
         </p>
       </div>
 
       <div className="space-y-2">
-        <Label>Who Can Publish Events</Label>
+        <Label>Who Can Create Events</Label>
         <Select
           value={currentSettings.can_publish_event}
           onValueChange={(value) =>
@@ -151,8 +151,8 @@ function EventSettingsForm() {
           </SelectContent>
         </Select>
         <p className="text-sm text-muted-foreground">
-          Controls who can publish events. Drafts can always be created by
-          anyone.
+          Controls who sees the Create Event button in the portal. When set to
+          Admins Only, only admins can create events (via the backoffice).
         </p>
       </div>
 

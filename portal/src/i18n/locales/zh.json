@@ -508,7 +508,7 @@
       "required_date": "请选择日期",
       "required_start": "请选择开始时间",
       "creation_restricted_heading": "创建活动受限",
-      "creation_restricted_message": "仅管理员可为此 pop-up 发布活动。",
+      "creation_restricted_message": "仅管理员可为此 pop-up 创建活动。",
       "conflicts_with_another_event": "与其他活动冲突",
       "no_popup_error": "无 popup",
       "no_venue_option": "无场地",

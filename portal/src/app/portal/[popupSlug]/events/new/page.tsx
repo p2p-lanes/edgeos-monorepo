@@ -134,8 +134,8 @@ export default function NewPortalEventPage() {
   // ---- settings-driven gates ------------------------------------------
   const { data: settings, isLoading: settingsLoading } =
     usePortalEventSettings(popupId)
-  const eventsEnabled = settings?.event_enabled ?? false
-  const canPublish = settings?.can_publish_event === "everyone"
+  const eventsEnabled = settings?.event_enabled ?? true
+  const canCreate = (settings?.can_publish_event ?? "everyone") === "everyone"
 
   // ---- form state -----------------------------------------------------
   const displayTz = timezone || "UTC"
@@ -418,7 +418,7 @@ export default function NewPortalEventPage() {
       />
     )
   }
-  if (!canPublish) {
+  if (!canCreate) {
     return (
       <GatedMessage
         title={t("events.form.creation_restricted_heading")}
