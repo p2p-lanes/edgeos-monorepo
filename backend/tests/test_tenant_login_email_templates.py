@@ -128,7 +128,7 @@ def test_portal_login_templates_can_be_managed_without_popup_and_are_unique_per_
 
     assert duplicate_response.status_code == 400
     assert duplicate_response.json()["detail"] == (
-        "A tenant-scoped template for this type already exists"
+        "This workspace already has a custom Portal Login Code template. Open it from the list to edit it."
     )
 
 
@@ -143,7 +143,7 @@ def test_backoffice_login_template_is_not_customizable(client, admin_token_tenan
 
     assert response.status_code == 400
     assert response.json()["detail"] == (
-        "Template type is not customizable: login_code_user"
+        "This email template can't be customized from backoffice"
     )
 
 
@@ -159,7 +159,9 @@ def test_popup_templates_still_require_popup_context(client, admin_token_tenant_
     )
 
     assert response.status_code == 400
-    assert response.json()["detail"] == "popup_id is required for popup-scoped templates"
+    assert response.json()["detail"] == (
+        "Select a popup before managing the Application Received template"
+    )
 
 
 def test_popup_communications_ignore_tenant_auth_templates(
