@@ -186,8 +186,13 @@ export default function EventsPage() {
   }
 
   return (
-    <div className="flex flex-col h-full max-w-4xl mx-auto p-4 sm:p-6">
-      <div className="flex-none mb-6">
+    // Natural flow so the outer <main> from portal/layout drives scrolling:
+    // heading + toolbar scroll out of view with the list/calendar body
+    // instead of being sticky at the top. `overflow-x-hidden` is a safety
+    // net: any wide content inside the list/calendar body is clipped here
+    // instead of letting the whole viewport scroll sideways.
+    <div className="max-w-4xl mx-auto p-4 sm:p-6 overflow-x-hidden">
+      <div className="mb-6">
         <h1 className="text-2xl font-bold tracking-tight">
           {t("events.list.heading")}
         </h1>
@@ -201,7 +206,7 @@ export default function EventsPage() {
         </p>
       </div>
 
-      <div className="flex-none mb-4">
+      <div className="mb-4">
         <EventsToolbar
           slug={city?.slug}
           view={view}
@@ -222,7 +227,7 @@ export default function EventsPage() {
         />
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div>
         {view === "calendar" ? (
           <CalendarBody
             popupId={city?.id}

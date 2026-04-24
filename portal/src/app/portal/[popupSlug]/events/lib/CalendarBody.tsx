@@ -125,8 +125,12 @@ export function CalendarBody({
   const dayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
   return (
+    // `min-w-0` on each grid child prevents intrinsic content width from
+    // forcing the column wider than its track — otherwise a long event
+    // title/kind/venue string in the selected-day panel pushes the whole
+    // grid (including the calendar) past the viewport on mobile.
     <div className="grid lg:grid-cols-7 gap-5">
-      <div className="lg:col-span-3 rounded-xl border bg-card p-3">
+      <div className="min-w-0 lg:col-span-3 rounded-xl border bg-card p-3">
         <div className="flex items-center justify-between mb-2">
           <Button
             variant="ghost"
@@ -197,7 +201,7 @@ export function CalendarBody({
         </div>
       </div>
 
-      <div className="lg:col-span-4">
+      <div className="min-w-0 lg:col-span-4">
         {selectedDate ? (
           <>
             <div className="flex items-center justify-between mb-3">
@@ -228,7 +232,7 @@ export function CalendarBody({
                   return (
                     <div
                       key={event.id}
-                      className="relative rounded-xl border bg-card hover:shadow-md transition-shadow"
+                      className="relative rounded-xl border bg-card hover:shadow-md transition-shadow overflow-hidden"
                     >
                       <Link
                         href={`/portal/${slug}/events/${event.id}`}
@@ -250,7 +254,7 @@ export function CalendarBody({
                               {event.title}
                             </h4>
                             {event.kind && (
-                              <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-0.5">
+                              <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-0.5 truncate">
                                 {event.kind}
                               </p>
                             )}
