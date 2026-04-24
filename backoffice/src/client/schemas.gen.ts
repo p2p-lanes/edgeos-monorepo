@@ -3049,8 +3049,15 @@ export const DistributionItemSchema = {
 export const EmailTemplateCreateSchema = {
     properties: {
         popup_id: {
-            type: 'string',
-            format: 'uuid',
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
             title: 'Popup Id'
         },
         template_type: {
@@ -3079,7 +3086,7 @@ export const EmailTemplateCreateSchema = {
         }
     },
     type: 'object',
-    required: ['popup_id', 'template_type', 'html_content'],
+    required: ['template_type', 'html_content'],
     title: 'EmailTemplateCreate'
 } as const;
 
@@ -3096,13 +3103,23 @@ export const EmailTemplatePublicSchema = {
             title: 'Tenant Id'
         },
         popup_id: {
-            type: 'string',
-            format: 'uuid',
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
             title: 'Popup Id'
         },
         template_type: {
             type: 'string',
             title: 'Template Type'
+        },
+        scope: {
+            '$ref': '#/components/schemas/TemplateScope'
         },
         subject: {
             anyOf: [
@@ -3150,7 +3167,7 @@ export const EmailTemplatePublicSchema = {
         }
     },
     type: 'object',
-    required: ['id', 'tenant_id', 'popup_id', 'template_type', 'html_content'],
+    required: ['id', 'tenant_id', 'popup_id', 'template_type', 'scope', 'html_content'],
     title: 'EmailTemplatePublic'
 } as const;
 
@@ -9218,6 +9235,12 @@ export const SendTestRequestSchema = {
     title: 'SendTestRequest'
 } as const;
 
+export const TemplateScopeSchema = {
+    type: 'string',
+    enum: ['tenant', 'popup'],
+    title: 'TemplateScope'
+} as const;
+
 export const TemplateTypeInfoSchema = {
     properties: {
         type: {
@@ -9236,6 +9259,9 @@ export const TemplateTypeInfoSchema = {
             type: 'string',
             title: 'Category'
         },
+        scope: {
+            '$ref': '#/components/schemas/TemplateScope'
+        },
         default_subject: {
             type: 'string',
             title: 'Default Subject'
@@ -9249,7 +9275,7 @@ export const TemplateTypeInfoSchema = {
         }
     },
     type: 'object',
-    required: ['type', 'label', 'description', 'category', 'default_subject', 'variables'],
+    required: ['type', 'label', 'description', 'category', 'scope', 'default_subject', 'variables'],
     title: 'TemplateTypeInfo'
 } as const;
 
