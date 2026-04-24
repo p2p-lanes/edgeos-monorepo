@@ -85,6 +85,7 @@ export default function CheckoutFlow({
     merchProducts,
     patronProducts,
     submitPayment,
+    cart,
   } = useCheckout()
 
   const searchParams = useSearchParams()
@@ -163,9 +164,23 @@ export default function CheckoutFlow({
       (s.step_type === "tickets" && currentStep === "passes"),
   )
 
-  const stepTitle = stepConfig?.title ?? getDefaultStepTitle(currentStep, t)
-  const stepSubtitle =
-    stepConfig?.description ?? getDefaultStepSubtitle(currentStep, t)
+  // On the confirm step we swap in empty-state copy when there's nothing in
+  // the cart — "Review & Confirm / Review your order before payment" reads
+  // as a promise the UI can't keep when the body is just an empty bag icon.
+  const isConfirmEmpty =
+    currentStep === "confirm" &&
+    cart.passes.length === 0 &&
+    !cart.housing &&
+    cart.merch.length === 0 &&
+    !cart.patron &&
+    Object.values(cart.dynamicItems).every((items) => items.length === 0)
+
+  const stepTitle = isConfirmEmpty
+    ? t("checkout.steps.confirm_empty_title")
+    : (stepConfig?.title ?? getDefaultStepTitle(currentStep, t))
+  const stepSubtitle = isConfirmEmpty
+    ? t("checkout.steps.confirm_empty_subtitle")
+    : (stepConfig?.description ?? getDefaultStepSubtitle(currentStep, t))
 
   const renderStepContent = () => {
     // Passes/tickets: dynamic step or fall-back legacy section

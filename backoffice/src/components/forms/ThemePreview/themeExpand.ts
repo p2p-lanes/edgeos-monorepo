@@ -13,6 +13,7 @@ export interface ThemeColors {
   secondary_color?: string
   accent_color?: string
   checkout_navbar_bg?: string
+  checkout_subtitle_color?: string
 }
 
 // Editable keys shown in the backoffice form. Anything else in
@@ -25,6 +26,7 @@ export const NEW_THEME_KEYS = [
   "secondary_color",
   "accent_color",
   "checkout_navbar_bg",
+  "checkout_subtitle_color",
 ] as const
 
 export type NewThemeKey = (typeof NEW_THEME_KEYS)[number]
@@ -36,6 +38,7 @@ export const NEW_KEY_DEFAULTS: Record<NewThemeKey, string> = {
   secondary_color: "",
   accent_color: "",
   checkout_navbar_bg: "",
+  checkout_subtitle_color: "",
 }
 
 const LIGHT = {
@@ -73,7 +76,16 @@ export function computeThemeVars(
   colors: ThemeColors | undefined,
 ): Record<string, string> {
   if (!colors) return {}
-  if (!colors.mode && !colors.primary_color) return {}
+
+  const overrides: Record<string, string> = {}
+  // Per-surface overrides apply independently of mode/primary so the admin
+  // can tweak a single color without committing to the full design-token
+  // theme.
+  if (colors.checkout_subtitle_color) {
+    overrides["--checkout-subtitle"] = colors.checkout_subtitle_color
+  }
+
+  if (!colors.mode && !colors.primary_color) return overrides
 
   const mode: ThemeMode = colors.mode === "dark" ? "dark" : "light"
   const palette = mode === "dark" ? DARK : LIGHT
@@ -107,7 +119,8 @@ export function computeThemeVars(
     "--sidebar-border": palette.sidebarBorder,
 
     "--checkout-title": palette.foreground,
-    "--checkout-subtitle": palette.foregroundSecondary,
+    "--checkout-subtitle":
+      colors.checkout_subtitle_color || palette.foregroundSecondary,
     "--checkout-watermark": mix(palette.background, palette.foreground, 92),
     "--checkout-navbar-bg":
       colors.checkout_navbar_bg || mix(palette.background, "transparent", 85),
@@ -193,7 +206,8 @@ export const LEGACY_HIGHLIGHT_FROM_NEW: Record<string, string[]> = {
   sidebar_border: ["mode"],
   // Checkout
   checkout_title: ["mode"],
-  checkout_subtitle: ["mode"],
+  checkout_subtitle: ["checkout_subtitle_color", "mode"],
+  checkout_subtitle_color: ["checkout_subtitle_color", "mode"],
   checkout_watermark: ["mode"],
   checkout_navbar_bg: ["checkout_navbar_bg", "mode"],
   checkout_nav_bg: ["checkout_navbar_bg", "mode"],

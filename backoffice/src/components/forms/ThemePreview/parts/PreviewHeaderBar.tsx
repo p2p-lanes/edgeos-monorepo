@@ -34,14 +34,14 @@ export function PreviewHeaderBar() {
           className="h-3.5 w-3.5 shrink-0"
           style={{ color: "var(--nav-text-secondary)" }}
         />
-        <span style={{ color: "var(--nav-text-secondary)" }}>Aplicación</span>
+        <span style={{ color: "var(--nav-text-secondary)" }}>Application</span>
       </nav>
       <div className="ml-auto flex items-center gap-1 text-sm">
         <Globe
           className="h-3.5 w-3.5"
           style={{ color: "var(--nav-text-secondary)" }}
         />
-        <span style={{ color: "var(--nav-text)" }}>Español</span>
+        <span style={{ color: "var(--nav-text)" }}>English</span>
       </div>
     </header>
   )

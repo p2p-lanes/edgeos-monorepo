@@ -3,6 +3,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, EmailStr
+from sqlalchemy import text
 
 from app.api.email_template import crud
 from app.api.email_template.schemas import (
@@ -10,6 +11,7 @@ from app.api.email_template.schemas import (
     EmailTemplatePublic,
     EmailTemplateType,
     EmailTemplateUpdate,
+    TemplateScope,
 )
 from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
@@ -32,6 +34,7 @@ class TemplateTypeInfo(BaseModel):
     label: str
     description: str
     category: str
+    scope: TemplateScope
     default_subject: str
     variables: list[TemplateVariable]
 
@@ -56,6 +59,22 @@ class SendTestRequest(BaseModel):
     to_email: EmailStr
     custom_variables: dict[str, Any] | None = None
     popup_id: uuid.UUID | None = None
+
+
+def _resolve_effective_tenant_id(current_user: CurrentUser, db: TenantSession) -> uuid.UUID:
+    if current_user.tenant_id:
+        return current_user.tenant_id
+
+    tenant_id = db.connection().execute(
+        text("SELECT current_setting('app.tenant_id', true)")
+    ).scalar_one_or_none()
+    if not tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unable to resolve tenant context",
+        )
+
+    return uuid.UUID(tenant_id)
 
 
 @router.get("/types", response_model=list[TemplateTypeInfo])
@@ -84,12 +103,29 @@ async def preview_template(
     _: CurrentUser,
     db: TenantSession,
 ) -> PreviewResponse:
+    from app.services.email.templates import (
+        get_template_scope,
+        is_customizable_template_type,
+    )
+
     try:
         EmailTemplateType(body.template_type)
     except ValueError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid template type: {body.template_type}",
+        )
+
+    if not is_customizable_template_type(body.template_type):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Template type is not customizable: {body.template_type}",
+        )
+
+    if get_template_scope(body.template_type) == TemplateScope.POPUP and not body.popup_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="popup_id is required for popup-scoped templates",
         )
 
     # Start with enriched popup data as the base, then let preview_variables override
@@ -134,12 +170,29 @@ async def send_test_email(
     _: CurrentWriter,
     db: TenantSession,
 ) -> dict[str, str]:
+    from app.services.email.templates import (
+        get_template_scope,
+        is_customizable_template_type,
+    )
+
     try:
         EmailTemplateType(body.template_type)
     except ValueError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid template type: {body.template_type}",
+        )
+
+    if not is_customizable_template_type(body.template_type):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Template type is not customizable: {body.template_type}",
+        )
+
+    if get_template_scope(body.template_type) == TemplateScope.POPUP and not body.popup_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="popup_id is required for popup-scoped templates",
         )
 
     # Start with enriched popup data as the base, then let custom_variables override
@@ -191,7 +244,7 @@ async def send_test_email(
 @router.get("", response_model=ListModel[EmailTemplatePublic])
 async def list_email_templates(
     db: TenantSession,
-    _: CurrentUser,
+    current_user: CurrentUser,
     popup_id: uuid.UUID | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
@@ -201,7 +254,10 @@ async def list_email_templates(
             db, popup_id=popup_id, skip=skip, limit=limit
         )
     else:
-        templates, total = crud.email_template_crud.find(db, skip=skip, limit=limit)
+        tenant_id = _resolve_effective_tenant_id(current_user, db)
+        templates, total = crud.email_template_crud.find_by_tenant_scope(
+            db, tenant_id=tenant_id, skip=skip, limit=limit
+        )
 
     return ListModel[EmailTemplatePublic](
         results=[EmailTemplatePublic.model_validate(t) for t in templates],
@@ -234,6 +290,11 @@ async def create_email_template(
     db: TenantSession,
     current_user: CurrentWriter,
 ) -> EmailTemplatePublic:
+    from app.services.email.templates import (
+        get_template_scope,
+        is_customizable_template_type,
+    )
+
     # Validate template_type
     try:
         EmailTemplateType(template_in.template_type)
@@ -243,33 +304,59 @@ async def create_email_template(
             detail=f"Invalid template type: {template_in.template_type}",
         )
 
-    # Check uniqueness
-    existing = crud.email_template_crud.get_by_popup_and_type(
-        db, template_in.popup_id, template_in.template_type
-    )
-    if existing:
+    if not is_customizable_template_type(template_in.template_type):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="A template for this type already exists in this popup",
+            detail=f"Template type is not customizable: {template_in.template_type}",
         )
 
-    if current_user.role == UserRole.SUPERADMIN:
-        from app.api.popup.crud import popups_crud
+    template_scope = get_template_scope(template_in.template_type)
 
-        popup = popups_crud.get(db, template_in.popup_id)
-        if not popup:
+    if template_scope == TemplateScope.POPUP:
+        if not template_in.popup_id:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Popup not found",
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="popup_id is required for popup-scoped templates",
             )
-        tenant_id = popup.tenant_id
+
+        existing = crud.email_template_crud.get_by_popup_and_type(
+            db, template_in.popup_id, template_in.template_type
+        )
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="A template for this type already exists in this popup",
+            )
+
+        if current_user.role == UserRole.SUPERADMIN:
+            from app.api.popup.crud import popups_crud
+
+            popup = popups_crud.get(db, template_in.popup_id)
+            if not popup:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Popup not found",
+                )
+            tenant_id = popup.tenant_id
+        else:
+            tenant_id = current_user.tenant_id
     else:
-        tenant_id = current_user.tenant_id
+        tenant_id = _resolve_effective_tenant_id(current_user, db)
+        existing = crud.email_template_crud.get_by_tenant_and_type(
+            db, tenant_id, template_in.template_type
+        )
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="A tenant-scoped template for this type already exists",
+            )
 
     from app.api.email_template.models import EmailTemplates
 
     template_data = template_in.model_dump()
     template_data["tenant_id"] = tenant_id
+    if template_scope == TemplateScope.TENANT:
+        template_data["popup_id"] = None
     template = EmailTemplates(**template_data)
 
     db.add(template)

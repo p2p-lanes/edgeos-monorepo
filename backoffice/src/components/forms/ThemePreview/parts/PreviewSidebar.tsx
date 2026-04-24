@@ -70,7 +70,7 @@ export function PreviewSidebar() {
         </div>
       </div>
 
-      {/* Resources — "Tu Participación" */}
+      {/* Resources — "Your Participation" */}
       <div className="flex-1 overflow-hidden p-2">
         <div
           className="px-2 py-1.5 text-[10px] font-medium uppercase tracking-wider"
@@ -79,10 +79,10 @@ export function PreviewSidebar() {
               "color-mix(in oklab, var(--sidebar-foreground) 55%, transparent)",
           }}
         >
-          Tu Participación
+          Your Participation
         </div>
 
-        {/* Active item: Aplicación with "accepted" badge */}
+        {/* Active item: Application with "accepted" badge */}
         <div
           className={cn(
             "mb-0.5 flex items-center justify-between rounded-md px-2 py-1.5 text-sm",
@@ -96,15 +96,15 @@ export function PreviewSidebar() {
         >
           <div className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
-            <span>Aplicación</span>
+            <span>Application</span>
           </div>
           <span className="rounded-full bg-green-100 px-1.5 py-0.5 text-[9px] font-medium text-green-800">
             accepted
           </span>
         </div>
 
-        <SidebarItem icon={Ticket} label="Pases" />
-        <SidebarItem icon={Users} label="Directorio de Asistentes" />
+        <SidebarItem icon={Ticket} label="Passes" />
+        <SidebarItem icon={Users} label="Attendee Directory" />
       </div>
 
       {/* Footer: EdgeOS + profile */}
@@ -122,7 +122,7 @@ export function PreviewSidebar() {
             49
           </span>
         </div>
-        <SidebarItem icon={User} label="Mi Perfil" />
+        <SidebarItem icon={User} label="My Profile" />
       </div>
 
       {/* Focus ring sample (only visible when sidebar_ring hovered) */}
@@ -134,7 +134,7 @@ export function PreviewSidebar() {
             color: "var(--sidebar-foreground)",
           }}
         >
-          Item con foco
+          Focused item
         </div>
       )}
     </aside>

@@ -191,7 +191,9 @@
       "patron_title": "Convertite en Patrono",
       "patron_subtitle": "Opcional: Apoyá a la comunidad con una contribución",
       "confirm_title": "Revisar y Confirmar",
-      "confirm_subtitle": "Revisá tu orden antes de pagar"
+      "confirm_subtitle": "Revisá tu orden antes de pagar",
+      "confirm_empty_title": "Nada para revisar todavía",
+      "confirm_empty_subtitle": "Volvé atrás y seleccioná algunos pases — van a aparecer acá cuando los sumes al carrito."
     },
     "to_pay": "A pagar",
     "credit_label": "Crédito: {{amount}}",

@@ -86,7 +86,7 @@ export function CheckoutView() {
             )}
             style={{ color: "var(--checkout-subtitle)" }}
           >
-            Experiencias
+            Experiences
           </div>
 
           <div className="flex items-start justify-between gap-4 px-4 pb-4">
@@ -103,7 +103,7 @@ export function CheckoutView() {
                   )}
                   style={{ color: "var(--checkout-title)" }}
                 >
-                  Ticket 4 Días
+                  4-Day Ticket
                 </span>
               </div>
               <span
@@ -113,7 +113,7 @@ export function CheckoutView() {
                 )}
                 style={{ color: "var(--checkout-subtitle)" }}
               >
-                20 nov → 24 nov
+                Nov 20 → Nov 24
               </span>
               <span
                 className={cn(
@@ -122,9 +122,9 @@ export function CheckoutView() {
                 )}
                 style={{ color: "var(--checkout-subtitle)" }}
               >
-                La entrada te brinda acceso a todas las actividades, talleres y
-                shows durante los cuatro días del festival. Podés participar de
-                Amanita Festival: 20 al 24 de Noviembre,...
+                This ticket gives you access to all activities, workshops and
+                shows during the four days of the festival. Join Amanita
+                Festival: November 20–24,...
               </span>
               <span
                 className={cn(
@@ -133,7 +133,7 @@ export function CheckoutView() {
                 )}
                 style={{ color: "var(--checkout-badge-bg)" }}
               >
-                Ver más
+                See more
               </span>
             </div>
             <span

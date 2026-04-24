@@ -30,7 +30,7 @@ export function PreviewCheckoutBottomBar() {
         style={{ color: "var(--checkout-bottom-bar-text)" }}
       >
         <ArrowLeft className="size-3.5" />
-        Volver
+        Back
       </button>
       <div className="flex min-w-0 flex-1 flex-col">
         <span
@@ -65,7 +65,7 @@ export function PreviewCheckoutBottomBar() {
           borderRadius: "var(--radius)",
         }}
       >
-        Continuar
+        Continue
       </button>
     </div>
   )

@@ -36,6 +36,8 @@ from app.services.email.templates import (
     LoginCodeUserContext,
     PaymentConfirmedContext,
     SilentUndefined,
+    coerce_email_template_type,
+    get_template_scope,
     log_missing_template_variables,
 )
 
@@ -181,9 +183,10 @@ class EmailService:
 
     def render_with_fallback(
         self,
-        template_type: EmailTemplateType,
+        template_type: EmailTemplateType | str,
         context: Mapping[str, Any],
         popup_id: uuid.UUID | None = None,
+        tenant_id: uuid.UUID | None = None,
         db_session: Session | None = None,
     ) -> tuple[str, str | None]:
         """Render email using DB-stored custom template or file-based fallback.
@@ -191,11 +194,14 @@ class EmailService:
         Returns:
             Tuple of (rendered_html, custom_subject_or_none)
         """
-        if popup_id and db_session:
+        template_type_enum = coerce_email_template_type(template_type)
+        template_scope = get_template_scope(template_type_enum)
+
+        if db_session and template_scope == "tenant" and tenant_id:
             from app.api.email_template.crud import email_template_crud
 
-            custom = email_template_crud.get_active_template(
-                db_session, popup_id, template_type.value
+            custom = email_template_crud.get_active_tenant_template(
+                db_session, tenant_id, template_type_enum.value
             )
             if custom:
                 rendered_html = self.render_custom_template(
@@ -203,14 +209,30 @@ class EmailService:
                 )
                 rendered_subject = None
                 if custom.subject:
-                    env = SandboxedEnvironment()
+                    env = SandboxedEnvironment(undefined=SilentUndefined)
+                    rendered_subject = env.from_string(custom.subject).render(**context)
+                return rendered_html, rendered_subject
+
+        if db_session and template_scope == "popup" and popup_id:
+            from app.api.email_template.crud import email_template_crud
+
+            custom = email_template_crud.get_active_popup_template(
+                db_session, popup_id, template_type_enum.value
+            )
+            if custom:
+                rendered_html = self.render_custom_template(
+                    custom.html_content, context
+                )
+                rendered_subject = None
+                if custom.subject:
+                    env = SandboxedEnvironment(undefined=SilentUndefined)
                     rendered_subject = env.from_string(custom.subject).render(**context)
                 return rendered_html, rendered_subject
 
         # Fallback to file-based template
-        file_path = TEMPLATE_TYPE_TO_FILE.get(template_type)
+        file_path = TEMPLATE_TYPE_TO_FILE.get(template_type_enum)
         if not file_path:
-            raise ValueError(f"No file mapping for template type: {template_type}")
+            raise ValueError(f"No file mapping for template type: {template_type_enum}")
 
         rendered_html = self.render_template(file_path, context)
         return rendered_html, None
@@ -396,8 +418,10 @@ class EmailService:
         to: str,
         subject: str,
         context: LoginCodeUserContext,
+        tenant_id: uuid.UUID | None = None,
         from_address: str | None = None,
         from_name: str | None = None,
+        db_session: Session | None = None,
     ) -> bool:
         """Send login code email to backoffice user."""
         return await self.send_template_email(
@@ -414,17 +438,22 @@ class EmailService:
         to: str,
         subject: str,
         context: LoginCodeHumanContext,
+        tenant_id: uuid.UUID | None = None,
         from_address: str | None = None,
         from_name: str | None = None,
+        db_session: Session | None = None,
     ) -> bool:
         """Send login code email to portal user (human)."""
-        return await self.send_template_email(
+        return await self._send_with_fallback(
             to=to,
             subject=subject,
+            template_type=EmailTemplateType.LOGIN_CODE_HUMAN,
             template_name=EmailTemplates.LOGIN_CODE_HUMAN,
             context=context.model_dump(exclude_none=True),
+            tenant_id=tenant_id,
             from_address=from_address,
             from_name=from_name,
+            db_session=db_session,
         )
 
     async def send_application_received(
@@ -435,6 +464,7 @@ class EmailService:
         from_address: str | None = None,
         from_name: str | None = None,
         popup_id: uuid.UUID | None = None,
+        tenant_id: uuid.UUID | None = None,
         db_session: Session | None = None,
     ) -> bool:
         """Send application received confirmation email."""
@@ -721,6 +751,7 @@ class EmailService:
         from_address: str | None = None,
         from_name: str | None = None,
         popup_id: uuid.UUID | None = None,
+        tenant_id: uuid.UUID | None = None,
         db_session: Session | None = None,
         attachments: list[EmailAttachment] | None = None,
         ical_body: str | None = None,
@@ -729,37 +760,32 @@ class EmailService:
         """Send email using DB custom template if available, else file-based fallback."""
         try:
             enriched_context: Mapping[str, Any] = context
-            if popup_id and db_session:
+            template_scope = get_template_scope(template_type)
+
+            if template_scope == "popup" and popup_id and db_session:
                 enriched_context = _enrich_with_popup_data(
                     dict(context), popup_id, db_session
                 )
-                log_missing_template_variables(template_type, dict(enriched_context))
-                rendered_html, custom_subject = self.render_with_fallback(
-                    template_type, enriched_context, popup_id, db_session
-                )
-                final_subject = custom_subject or subject
-                return await self.send_email(
-                    to=to,
-                    subject=final_subject,
-                    html_content=rendered_html,
-                    from_address=from_address,
-                    from_name=from_name,
-                    attachments=attachments,
-                    ical_body=ical_body,
-                    ical_method=ical_method,
-                )
-
-            return await self.send_template_email(
+            log_missing_template_variables(template_type, dict(enriched_context))
+            rendered_html, custom_subject = self.render_with_fallback(
+                template_type,
+                enriched_context,
+                popup_id=popup_id,
+                tenant_id=tenant_id,
+                db_session=db_session,
+            )
+            final_subject = custom_subject or subject
+            return await self.send_email(
                 to=to,
-                subject=subject,
-                template_name=template_name,
-                context=enriched_context,
+                subject=final_subject,
+                html_content=rendered_html,
                 from_address=from_address,
                 from_name=from_name,
                 attachments=attachments,
                 ical_body=ical_body,
                 ical_method=ical_method,
             )
+
         except Exception as e:
             logger.error(f"Error sending email with fallback to {to}: {e}")
             return False

@@ -134,9 +134,9 @@ export const PopupCheckoutContent = ({
             <button
               type="button"
               aria-label={`Signed in as ${user.email}`}
-              className="flex size-9 shrink-0 items-center justify-center rounded-full bg-checkout-badge-bg text-checkout-badge-title shadow-sm transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="flex size-7 shrink-0 items-center justify-center rounded-full bg-checkout-badge-bg text-checkout-badge-title shadow-sm transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
-              <UserRound className="size-4" />
+              <UserRound className="size-3.5" />
             </button>
           </PopoverTrigger>
           <PopoverContent align="end" className="w-auto max-w-[280px] p-3">

@@ -18,11 +18,11 @@ interface Step {
 }
 
 const STEPS: Step[] = [
-  { id: "pases", label: "Pases", icon: Ticket, active: true },
-  { id: "alojamiento", label: "Alojamiento", icon: BedDouble },
-  { id: "experiencias", label: "Experiencias", icon: Sparkles },
-  { id: "galeria", label: "Galería", icon: ImageIcon },
-  { id: "continuar", label: "Continuar", icon: Check },
+  { id: "pases", label: "Passes", icon: Ticket, active: true },
+  { id: "alojamiento", label: "Housing", icon: BedDouble },
+  { id: "experiencias", label: "Experiences", icon: Sparkles },
+  { id: "galeria", label: "Gallery", icon: ImageIcon },
+  { id: "continuar", label: "Continue", icon: Check },
 ]
 
 // Replica del navbar sticky del checkout real: strip de pills con icono + label

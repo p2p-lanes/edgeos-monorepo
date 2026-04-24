@@ -3,9 +3,9 @@
 // finished state visually. Labels kept short to avoid overlap at preview scale.
 
 const STAGES: { key: string; label: string }[] = [
-  { key: "draft", label: "Borrador" },
-  { key: "in_review", label: "Enviada" },
-  { key: "accepted", label: "Aceptada" },
+  { key: "draft", label: "Draft" },
+  { key: "in_review", label: "Submitted" },
+  { key: "accepted", label: "Accepted" },
 ]
 
 export function PreviewProgressBar() {
