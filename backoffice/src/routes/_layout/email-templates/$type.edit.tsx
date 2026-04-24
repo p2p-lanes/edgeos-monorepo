@@ -19,7 +19,7 @@ export const Route = createFileRoute("/_layout/email-templates/$type/edit")({
   }),
 })
 
-function EditorContent({ templateType }: { templateType: string }) {
+export function EditorContent({ templateType }: { templateType: string }) {
   const { selectedPopupId } = useWorkspace()
   const navigate = useNavigate()
 
@@ -28,22 +28,30 @@ function EditorContent({ templateType }: { templateType: string }) {
     queryFn: () => EmailTemplatesService.listTemplateTypes(),
   })
 
+  const typeInfo = types?.find((t) => t.type === templateType)
+  const requiresPopup = typeInfo?.scope === "popup"
+
   const { data: customTemplates } = useQuery({
-    queryKey: ["email-templates", selectedPopupId],
+    queryKey: ["email-templates", requiresPopup ? selectedPopupId : "tenant"],
     queryFn: () =>
-      EmailTemplatesService.listEmailTemplates({
-        popupId: selectedPopupId!,
-      }),
-    enabled: !!selectedPopupId,
+      requiresPopup
+        ? EmailTemplatesService.listEmailTemplates({
+            popupId: selectedPopupId!,
+          })
+        : EmailTemplatesService.listEmailTemplates(),
+    enabled: !!typeInfo && (!requiresPopup || !!selectedPopupId),
   })
 
-  const typeInfo = types?.find((t) => t.type === templateType)
   const existingTemplate = customTemplates?.results?.find(
     (t) => t.template_type === templateType,
   )
 
-  if (!types || !customTemplates) return <Skeleton className="h-96 w-full" />
+  if (!types) return <Skeleton className="h-96 w-full" />
   if (!typeInfo) return <div>Unknown template type: {templateType}</div>
+  if (requiresPopup && !selectedPopupId) {
+    return <WorkspaceAlert resource="email templates" action="create" />
+  }
+  if (!customTemplates) return <Skeleton className="h-96 w-full" />
 
   return (
     <div className="flex flex-col gap-4">
@@ -63,7 +71,7 @@ function EditorContent({ templateType }: { templateType: string }) {
 
       <EmailTemplateEditor
         templateType={templateType as EmailTemplateType}
-        popupId={selectedPopupId!}
+        popupId={requiresPopup ? selectedPopupId! : undefined}
         existingTemplate={existingTemplate}
         typeInfo={typeInfo}
         onSave={() => navigate({ to: "/email-templates" })}
@@ -74,7 +82,7 @@ function EditorContent({ templateType }: { templateType: string }) {
 
 function EditEmailTemplate() {
   const { type } = Route.useParams()
-  const { isContextReady } = useWorkspace()
+  const { needsTenantSelection } = useWorkspace()
   const { isAdmin, isUserLoading } = useAuth()
   const navigate = useNavigate()
 
@@ -88,7 +96,7 @@ function EditEmailTemplate() {
     return null
   }
 
-  if (!isContextReady) {
+  if (needsTenantSelection) {
     return (
       <div className="flex flex-col gap-6">
         <WorkspaceAlert resource="email templates" action="create" />
