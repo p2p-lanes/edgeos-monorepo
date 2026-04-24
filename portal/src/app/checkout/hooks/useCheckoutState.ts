@@ -4,24 +4,84 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useState } from "react"
 import {
   ApiError,
+  type ApplicationCreate,
   type ApplicationPublic,
   ApplicationsService,
+  type ApplicationUpdate,
   HumansService,
 } from "@/client"
+import { splitForCreate, splitForUpdate } from "@/lib/form-data-splitter"
 import { queryKeys } from "@/lib/query-keys"
-import type { CheckoutState, FormDataProps } from "../types"
+import type { ApplicationFormSchema } from "@/types/form-schema"
+import {
+  type CheckoutApplicationValues,
+  type CheckoutState,
+  type DefaultCheckoutFormData,
+  filterCheckoutApplicationValues,
+  toDefaultCheckoutFormData,
+} from "../types"
 import useCookies from "./useCookies"
 
 interface UseCheckoutStateProps {
   popupId: string
   saleType: "application" | "direct"
   groupId?: string | null
+  schema?: ApplicationFormSchema
+}
+
+interface BuildCheckoutApplicationMutationPayloadArgs {
+  popupId: string
+  values: CheckoutApplicationValues
+  schema: ApplicationFormSchema
+  existingApplication: ApplicationPublic | null
+}
+
+type CheckoutApplicationMutationPayload =
+  | { kind: "create"; payload: ApplicationCreate }
+  | { kind: "update"; payload: ApplicationUpdate }
+
+function getApiErrorDetail(error: ApiError): string | null {
+  if (typeof error.body !== "object" || error.body === null) return null
+  const detail = (error.body as Record<string, unknown>).detail
+  return typeof detail === "string" ? detail : null
+}
+
+export function buildCheckoutApplicationMutationPayload({
+  popupId,
+  values,
+  schema,
+  existingApplication,
+}: BuildCheckoutApplicationMutationPayloadArgs): CheckoutApplicationMutationPayload {
+  const checkoutValues = filterCheckoutApplicationValues(schema, values)
+
+  if (existingApplication) {
+    return {
+      kind: "update",
+      payload: splitForUpdate({
+        values: checkoutValues,
+        status: "in review",
+        schema,
+      }),
+    }
+  }
+
+  return {
+    kind: "create",
+    payload: splitForCreate({
+      values: checkoutValues,
+      popupId,
+      companions: [],
+      status: "in review",
+      schema,
+    }),
+  }
 }
 
 const useCheckoutState = ({
   popupId,
   saleType,
   groupId,
+  schema,
 }: UseCheckoutStateProps) => {
   const queryClient = useQueryClient()
   const [checkoutState, setCheckoutState] = useState<CheckoutState>("form")
@@ -29,7 +89,11 @@ const useCheckoutState = ({
   const { setCookie } = useCookies()
 
   const submitMutation = useMutation({
-    mutationFn: async ({ formData }: { formData: FormDataProps }) => {
+    mutationFn: async ({
+      formData,
+    }: {
+      formData: DefaultCheckoutFormData | CheckoutApplicationValues
+    }) => {
       if (!popupId) throw new Error("No popup selected")
 
       setCookie(
@@ -41,44 +105,49 @@ const useCheckoutState = ({
       )
 
       if (saleType === "direct") {
+        const directFormData: DefaultCheckoutFormData =
+          toDefaultCheckoutFormData(formData)
         await HumansService.updateCurrentHuman({
           requestBody: {
-            first_name: formData.first_name,
-            last_name: formData.last_name,
-            telegram: formData.telegram,
-            gender: formData.gender || undefined,
+            first_name: directFormData.first_name,
+            last_name: directFormData.last_name,
+            telegram: directFormData.telegram,
+            gender: directFormData.gender || undefined,
           },
         })
 
         return { matchingApp: null }
       }
 
-      // Check if an application already exists (e.g. user navigated back)
+      if (!schema) {
+        throw new Error("Application checkout schema is required")
+      }
+
       const existingApps = queryClient.getQueryData<ApplicationPublic[]>(
         queryKeys.applications.mine(),
       )
       const existingApp = existingApps?.find((app) => app.popup_id === popupId)
 
+      const mutationPayload = buildCheckoutApplicationMutationPayload({
+        popupId,
+        values: filterCheckoutApplicationValues(
+          schema,
+          formData as CheckoutApplicationValues,
+        ),
+        schema,
+        existingApplication: existingApp ?? null,
+      })
+
       let application: ApplicationPublic
-      if (existingApp) {
+      if (mutationPayload.kind === "update") {
         application = await ApplicationsService.updateMyApplication({
           popupId,
-          requestBody: {
-            first_name: formData.first_name,
-            last_name: formData.last_name,
-            telegram: formData.telegram,
-            gender: formData.gender || undefined,
-          },
+          requestBody: mutationPayload.payload,
         })
       } else {
         application = await ApplicationsService.createMyApplication({
           requestBody: {
-            popup_id: popupId,
-            first_name: formData.first_name,
-            last_name: formData.last_name,
-            email: formData.email,
-            telegram: formData.telegram,
-            gender: formData.gender || undefined,
+            ...mutationPayload.payload,
             group_id: groupId ?? undefined,
           },
         })
@@ -105,13 +174,15 @@ const useCheckoutState = ({
       setCheckoutState("passes")
       setErrorMessage(null)
     },
-    onError: async (error: any) => {
+    onError: async (error: unknown) => {
+      const detail = error instanceof ApiError ? getApiErrorDetail(error) : null
+
       if (
         saleType === "application" &&
         error instanceof ApiError &&
         (error.status === 400 ||
           error.status === 409 ||
-          (error.body as any)?.detail?.includes("already have an application"))
+          detail?.includes("already have an application"))
       ) {
         try {
           const token = window?.localStorage?.getItem("token")
@@ -139,10 +210,10 @@ const useCheckoutState = ({
         )
       } else {
         const msg =
-          error instanceof ApiError
-            ? ((error.body as any)?.detail ??
-              "Something went wrong. Please try again.")
-            : "Something went wrong. Please try again."
+          detail ??
+          (error instanceof ApiError
+            ? "Something went wrong. Please try again."
+            : "Something went wrong. Please try again.")
         setErrorMessage(msg)
       }
 
@@ -150,7 +221,9 @@ const useCheckoutState = ({
     },
   })
 
-  const handleSubmit = async (formData: FormDataProps): Promise<void> => {
+  const handleSubmit = async (
+    formData: DefaultCheckoutFormData | CheckoutApplicationValues,
+  ): Promise<void> => {
     await submitMutation.mutateAsync({ formData })
   }
 
