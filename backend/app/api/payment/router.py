@@ -334,13 +334,19 @@ async def list_payments(
     application_id: uuid.UUID | None = None,
     external_id: str | None = None,
     payment_status: PaymentStatus | None = None,
+    search: str | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[PaymentPublic]:
     """List payments with optional filters (BO only)."""
     if popup_id:
         payments, total = payments_crud.find_by_popup(
-            db, popup_id=popup_id, skip=skip, limit=limit, status_filter=payment_status
+            db,
+            popup_id=popup_id,
+            skip=skip,
+            limit=limit,
+            status_filter=payment_status,
+            search=search,
         )
     else:
         filters = PaymentFilter(
