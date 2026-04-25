@@ -145,8 +145,25 @@ class SimpleFIClient:
             },
         }
 
-        logger.info("Creating SimpleFI payment for amount: {}", amount)
+        logger.info(
+            "SimpleFI create payment request: amount={} currency={} popup_slug={} tenant_slug={} memo={} reference_keys={} success_url={} cancel_url={}",
+            amount,
+            currency,
+            popup_slug,
+            tenant_slug,
+            memo,
+            sorted(body["reference"].keys()),
+            success_url,
+            cancel_url,
+        )
         data = self._make_request("POST", "/payment_requests", json=body)
+
+        logger.info(
+            "SimpleFI create payment parsed response: external_id={} status={} checkout_url={}",
+            data.get("id"),
+            data.get("status"),
+            data.get("checkout_v2_url"),
+        )
 
         return SimpleFIPaymentResponse(
             id=data["id"],
