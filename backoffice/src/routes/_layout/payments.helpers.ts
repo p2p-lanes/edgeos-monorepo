@@ -1,9 +1,11 @@
+import type { PaymentStatus } from "@/client"
+
 interface PaymentsQueryInput {
   popupId: string | null
   page: number
   pageSize: number
   search: string
-  statusFilter?: string
+  statusFilter?: PaymentStatus
   sortBy?: string
   sortOrder?: "asc" | "desc"
 }
