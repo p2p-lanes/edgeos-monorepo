@@ -403,6 +403,16 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         }
 
         try:
+            logger.info(
+                "Creating SimpleFI application fee payment: application_id={} popup_id={} tenant_id={} amount={} currency={} success_path={} cancel_path={}",
+                application.id,
+                popup.id,
+                application.tenant_id,
+                fee_amount,
+                popup.currency,
+                success_path,
+                cancel_path,
+            )
             simplefi_response = simplefi_client.create_payment(
                 amount=fee_amount,
                 popup_slug=popup.slug,
@@ -413,6 +423,13 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 portal_base_override=portal_base,
                 success_path=success_path,
                 cancel_path=cancel_path,
+            )
+            logger.info(
+                "SimpleFI application fee payment created: application_id={} external_id={} provider_status={} checkout_url={}",
+                application.id,
+                simplefi_response.id,
+                simplefi_response.status,
+                simplefi_response.checkout_url,
             )
         except Exception as e:
             logger.error(f"Failed to create SimpleFI fee payment: {e}")
@@ -437,6 +454,15 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         session.add(payment)
         session.commit()
         session.refresh(payment)
+
+        logger.info(
+            "Application fee payment persisted: payment_id={} application_id={} external_id={} status={} amount={}",
+            payment.id,
+            payment.application_id,
+            payment.external_id,
+            payment.status,
+            payment.amount,
+        )
 
         return payment
 
@@ -1096,6 +1122,18 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         try:
             from app.api.tenant.utils import get_portal_url
 
+            logger.info(
+                "Creating SimpleFI pass payment: application_id={} popup_id={} tenant_id={} amount={} currency={} product_count={} coupon_code={} edit_passes={} insurance={}",
+                application.id,
+                application.popup_id,
+                application.tenant_id,
+                preview.amount,
+                preview.currency,
+                len(obj.products),
+                obj.coupon_code,
+                obj.edit_passes,
+                obj.insurance,
+            )
             simplefi_response = simplefi_client.create_payment(
                 amount=preview.amount,
                 popup_slug=application.popup.slug,
@@ -1104,6 +1142,13 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 reference=reference,
                 memo=application.popup.tenant.name,
                 portal_base_override=get_portal_url(application.popup.tenant),
+            )
+            logger.info(
+                "SimpleFI pass payment created: application_id={} external_id={} provider_status={} checkout_url={}",
+                application.id,
+                simplefi_response.id,
+                simplefi_response.status,
+                simplefi_response.checkout_url,
             )
         except Exception as e:
             logger.error(f"Failed to create SimpleFI payment: {e}")
@@ -1158,6 +1203,16 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         session.commit()
         session.refresh(payment)
+
+        logger.info(
+            "Pass payment persisted: payment_id={} application_id={} external_id={} status={} amount={} product_count={}",
+            payment.id,
+            payment.application_id,
+            payment.external_id,
+            payment.status,
+            payment.amount,
+            len(obj.products),
+        )
 
         # Update preview with SimpleFI response data
         preview.status = simplefi_response.status
@@ -1346,6 +1401,15 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         portal_base = get_portal_url(tenant)
 
         try:
+            logger.info(
+                "Creating SimpleFI direct payment: human_id={} popup_id={} tenant_id={} amount={} currency={} product_count={}",
+                human.id,
+                popup.id,
+                tenant.id,
+                amount,
+                popup.currency,
+                len(obj.products),
+            )
             simplefi_response = simplefi_client.create_payment(
                 amount=amount,
                 popup_slug=popup.slug,
@@ -1354,6 +1418,14 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 reference=reference,
                 memo=f"{popup.name} — direct purchase",
                 portal_base_override=portal_base,
+            )
+            logger.info(
+                "SimpleFI direct payment created: human_id={} popup_id={} external_id={} provider_status={} checkout_url={}",
+                human.id,
+                popup.id,
+                simplefi_response.id,
+                simplefi_response.status,
+                simplefi_response.checkout_url,
             )
         except Exception as e:
             logger.error(f"Failed to create SimpleFI direct payment: {e}")
@@ -1394,6 +1466,16 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         session.commit()
         session.refresh(payment)
+        logger.info(
+            "Direct payment persisted: payment_id={} human_id={} popup_id={} external_id={} status={} amount={} product_count={}",
+            payment.id,
+            human.id,
+            payment.popup_id,
+            payment.external_id,
+            payment.status,
+            payment.amount,
+            len(obj.products),
+        )
         return payment
 
     def approve_payment(

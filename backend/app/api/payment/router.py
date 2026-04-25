@@ -755,7 +755,12 @@ async def simplefi_webhook(
 
     raw_body = await request.json()
     event_type = raw_body.get("event_type")
-    logger.info("SimpleFI webhook received, event_type: {}", event_type)
+    logger.info(
+        "SimpleFI webhook received: event_type={} entity_type={} entity_id={}",
+        event_type,
+        raw_body.get("entity_type"),
+        raw_body.get("entity_id"),
+    )
 
     if event_type == "installment_plan_completed":
         return await _handle_installment_plan_completed(raw_body, db, webhook_cache)
@@ -765,6 +770,10 @@ async def simplefi_webhook(
 
     if event_type == "installment_plan_cancelled":
         return await _handle_installment_plan_cancelled(raw_body, db, webhook_cache)
+
+    if event_type == "payment_request_expired":
+        payload = SimpleFIWebhookPayload(**raw_body)
+        return await _handle_payment_request_expired(payload, db, webhook_cache)
 
     if event_type not in ("new_payment", "new_card_payment"):
         logger.info("Unhandled event type: {}. Ignoring.", event_type)
@@ -800,9 +809,10 @@ async def _handle_regular_payment(
         return {"message": "Webhook already processed"}
 
     logger.info(
-        "Regular payment - payment_request_id: %s, event_type: %s",
+        "SimpleFI regular payment webhook processing: payment_request_id=%s event_type=%s provider_status=%s",
         payment_request_id,
         event_type,
+        payload.data.payment_request.status,
     )
 
     payment = payments_crud.get_by_external_id(db, payment_request_id)
@@ -814,6 +824,15 @@ async def _handle_regular_payment(
         )
 
     payment_request_status = payload.data.payment_request.status
+
+    logger.info(
+        "SimpleFI payment matched local payment: payment_id={} external_id={} current_status={} provider_status={} payment_type={}",
+        payment.id,
+        payment.external_id,
+        payment.status,
+        payment_request_status,
+        payment.payment_type,
+    )
 
     if payment.status == payment_request_status:
         logger.info(
@@ -853,6 +872,58 @@ async def _handle_regular_payment(
         )
 
     return {"message": "Payment status updated successfully"}
+
+
+async def _handle_payment_request_expired(
+    payload: SimpleFIWebhookPayload,
+    db: Session,
+    webhook_cache: WebhookCache,
+) -> dict:
+    """Handle SimpleFI payment request expiration webhooks."""
+    from loguru import logger
+
+    payment_request_id = payload.data.payment_request.id
+    fingerprint = f"simplefi:{payment_request_id}:{payload.event_type}"
+    if not webhook_cache.add(fingerprint):
+        logger.info(
+            "Webhook already processed (fingerprint: %s). Skipping...", fingerprint
+        )
+        return {"message": "Webhook already processed"}
+
+    payment = payments_crud.get_by_external_id(db, payment_request_id)
+    if not payment:
+        logger.warning("Payment not found for expired external_id: {}", payment_request_id)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Payment not found",
+        )
+
+    if payment.status == PaymentStatus.APPROVED.value:
+        logger.warning(
+            "Ignoring expiration webhook for already-approved payment {}",
+            payment.id,
+        )
+        return {"message": "Payment already approved"}
+
+    if payment.status == PaymentStatus.EXPIRED.value:
+        logger.info("Payment {} already expired. Skipping...", payment.id)
+        return {"message": "Payment status unchanged"}
+
+    logger.info(
+        "SimpleFI expiration webhook matched local payment: payment_id={} external_id={} current_status={} provider_status={}",
+        payment.id,
+        payment.external_id,
+        payment.status,
+        payload.data.payment_request.status,
+    )
+
+    payments_crud.update(db, payment, PaymentUpdate(status=PaymentStatus.EXPIRED))
+    logger.info(
+        "Payment {} marked as expired via SimpleFI webhook (external_id: {})",
+        payment.id,
+        payment_request_id,
+    )
+    return {"message": "Payment marked as expired"}
 
 
 async def _handle_fee_payment_approved(
