@@ -2910,6 +2910,8 @@ export type PaymentsListPaymentsData = {
      * Number of items to skip
      */
     skip?: number;
+    sortBy?: (string | null);
+    sortOrder?: 'asc' | 'desc';
     xTenantId?: (string | null);
 };
 

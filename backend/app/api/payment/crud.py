@@ -188,6 +188,8 @@ def _calculate_price(
 class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
     """CRUD operations for Payments."""
 
+    SORT_FIELDS = {"amount", "status", "created_at"}
+
     def __init__(self) -> None:
         super().__init__(Payments)
 
@@ -474,6 +476,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         limit: int = 100,
         status_filter: PaymentStatus | None = None,
         search: str | None = None,
+        sort_by: str | None = None,
+        sort_order: str = "desc",
     ) -> tuple[list[Payments], int]:
         """Find payments by popup_id via the denormalized popup_id column.
 
@@ -511,7 +515,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         count_statement = select(func.count()).select_from(statement.subquery())
         total = session.exec(count_statement).one()
 
-        statement = statement.order_by(desc(Payments.created_at))  # type: ignore[arg-type]
+        validated_sort = sort_by if sort_by in self.SORT_FIELDS else "created_at"
+        statement = self._apply_sorting(statement, validated_sort, sort_order)
         statement = statement.offset(skip).limit(limit)
         statement = statement.options(
             selectinload(Payments.products_snapshot).selectinload(  # ty: ignore[invalid-argument-type]
@@ -528,6 +533,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         filters: PaymentFilter,
         skip: int = 0,
         limit: int = 100,
+        sort_by: str | None = None,
+        sort_order: str = "desc",
     ) -> tuple[list[Payments], int]:
         """Find payments with filters."""
         statement = select(Payments)
@@ -544,7 +551,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         count_statement = select(func.count()).select_from(statement.subquery())
         total = session.exec(count_statement).one()
 
-        statement = statement.order_by(desc(Payments.created_at))  # type: ignore[arg-type]
+        validated_sort = sort_by if sort_by in self.SORT_FIELDS else "created_at"
+        statement = self._apply_sorting(statement, validated_sort, sort_order)
         statement = statement.offset(skip).limit(limit)
         statement = statement.options(
             selectinload(Payments.products_snapshot).selectinload(  # ty: ignore[invalid-argument-type]

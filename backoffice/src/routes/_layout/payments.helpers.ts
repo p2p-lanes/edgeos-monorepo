@@ -3,6 +3,9 @@ interface PaymentsQueryInput {
   page: number
   pageSize: number
   search: string
+  statusFilter?: string
+  sortBy?: string
+  sortOrder?: "asc" | "desc"
 }
 
 interface PaymentsPaging {
@@ -29,6 +32,9 @@ export function buildPaymentsQueryConfig({
   page,
   pageSize,
   search,
+  statusFilter,
+  sortBy,
+  sortOrder,
 }: PaymentsQueryInput) {
   const normalizedSearch = search.trim()
 
@@ -38,11 +44,21 @@ export function buildPaymentsQueryConfig({
       limit: pageSize,
       popupId: popupId || undefined,
       search: normalizedSearch || undefined,
+      paymentStatus: statusFilter || undefined,
+      sortBy: sortBy || undefined,
+      sortOrder: sortBy ? (sortOrder ?? "desc") : undefined,
     },
     queryKey: [
       "payments",
       popupId,
-      { page, pageSize, search: normalizedSearch },
+      {
+        page,
+        pageSize,
+        search: normalizedSearch,
+        statusFilter,
+        sortBy,
+        sortOrder,
+      },
     ],
   }
 }

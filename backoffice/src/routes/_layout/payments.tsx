@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
-import { createFileRoute } from "@tanstack/react-router"
+import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import type { ColumnDef, Row } from "@tanstack/react-table"
 import {
   ChevronDown,
@@ -13,8 +13,10 @@ import { Fragment, Suspense, useCallback, useState } from "react"
 import { toast } from "sonner"
 
 import {
+  DashboardService,
   OpenAPI,
   type PaymentPublic,
+  type PaymentStatus,
   PaymentsService,
   PopupsService,
 } from "@/client"
@@ -25,9 +27,17 @@ import { StatusBadge } from "@/components/Common/StatusBadge"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import {
+  type TableSearchParams,
   useTableSearchParams,
   validateTableSearch,
 } from "@/hooks/useTableSearchParams"
@@ -43,12 +53,18 @@ function getPaymentsQueryOptions(
   page: number,
   pageSize: number,
   search: string,
+  statusFilter?: PaymentStatus,
+  sortBy?: string,
+  sortOrder?: "asc" | "desc",
 ) {
   const queryConfig = buildPaymentsQueryConfig({
     popupId,
     page,
     pageSize,
     search,
+    statusFilter,
+    sortBy,
+    sortOrder,
   })
 
   return {
@@ -57,9 +73,113 @@ function getPaymentsQueryOptions(
   }
 }
 
+const PAYMENT_STATUS_OPTIONS: { value: PaymentStatus; label: string }[] = [
+  { value: "pending", label: "Pending" },
+  { value: "approved", label: "Approved" },
+  { value: "rejected", label: "Rejected" },
+  { value: "expired", label: "Expired" },
+  { value: "cancelled", label: "Cancelled" },
+]
+
+function usePaymentStatusCounts(popupId: string | null) {
+  const { data: stats } = useQuery({
+    queryKey: ["dashboard", "stats", popupId],
+    queryFn: () => DashboardService.getDashboardStats({ popupId: popupId! }),
+    enabled: !!popupId,
+  })
+
+  const counts: Partial<Record<PaymentStatus, number>> = {}
+  if (stats?.payments) {
+    const payments = stats.payments
+    counts.pending = payments.pending ?? 0
+    counts.approved = payments.approved ?? 0
+    counts.rejected = payments.rejected ?? 0
+    counts.expired = payments.expired ?? 0
+    counts.cancelled = payments.cancelled ?? 0
+  }
+
+  return { counts, total: stats?.payments?.total ?? 0 }
+}
+
+function StatusDropdownFilter({
+  popupId,
+  selected,
+  onSelect,
+}: {
+  popupId: string | null
+  selected: PaymentStatus | undefined
+  onSelect: (value: PaymentStatus | undefined) => void
+}) {
+  const { counts, total } = usePaymentStatusCounts(popupId)
+  const selectedOption = selected
+    ? PAYMENT_STATUS_OPTIONS.find((option) => option.value === selected)
+    : undefined
+
+  const options = [
+    { value: "all" as const, label: "All", count: total },
+    ...PAYMENT_STATUS_OPTIONS.map((option) => ({
+      value: option.value,
+      label: option.label,
+      count: counts[option.value] ?? 0,
+    })),
+  ]
+
+  const currentLabel = selectedOption?.label ?? "All"
+  const currentCount = selectedOption
+    ? (counts[selectedOption.value] ?? 0)
+    : total
+
+  return (
+    <Select
+      value={selectedOption?.value ?? "all"}
+      onValueChange={(value) =>
+        onSelect(value === "all" ? undefined : (value as PaymentStatus))
+      }
+    >
+      <SelectTrigger className="h-9 w-[180px]">
+        <SelectValue>
+          {currentLabel} ({currentCount})
+        </SelectValue>
+      </SelectTrigger>
+      <SelectContent>
+        {options.map((option) => (
+          <SelectItem
+            key={option.value === "all" ? "all" : option.value}
+            value={option.value === "all" ? "all" : option.value}
+          >
+            <span className="flex w-full items-center justify-between gap-4">
+              <span>{option.label}</span>
+              <span className="text-muted-foreground tabular-nums">
+                {option.count}
+              </span>
+            </span>
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
+}
+
+const VALID_PAYMENT_STATUSES: Set<string> = new Set([
+  "pending",
+  "approved",
+  "rejected",
+  "expired",
+  "cancelled",
+])
+
+type PaymentsSearchParams = TableSearchParams & {
+  status?: PaymentStatus
+}
+
 export const Route = createFileRoute("/_layout/payments")({
   component: Payments,
-  validateSearch: validateTableSearch,
+  validateSearch: (raw: Record<string, unknown>): PaymentsSearchParams => ({
+    ...validateTableSearch(raw),
+    ...(typeof raw.status === "string" && VALID_PAYMENT_STATUSES.has(raw.status)
+      ? { status: raw.status as PaymentStatus }
+      : {}),
+  }),
   head: () => ({
     meta: [{ title: "Payments - EdgeOS" }],
   }),
@@ -380,11 +500,11 @@ function PaymentSubRow({ row }: { row: Row<PaymentPublic> }) {
 
 function PaymentsTableContent() {
   const { selectedPopupId } = useWorkspace()
+  const navigate = useNavigate()
   const searchParams = Route.useSearch()
-  const { search, pagination, setSearch, setPagination } = useTableSearchParams(
-    searchParams,
-    "/payments",
-  )
+  const { search, pagination, sorting, setSearch, setPagination, setSorting } =
+    useTableSearchParams(searchParams, "/payments")
+  const statusFilter = searchParams.status
 
   const { data: payments } = useQuery({
     ...getPaymentsQueryOptions(
@@ -392,6 +512,9 @@ function PaymentsTableContent() {
       pagination.pageIndex,
       pagination.pageSize,
       search,
+      statusFilter,
+      sorting[0]?.id,
+      sorting[0]?.desc ? "desc" : "asc",
     ),
     placeholderData: keepPreviousData,
   })
@@ -430,10 +553,27 @@ function PaymentsTableContent() {
       ]}
       searchValue={search}
       onSearchChange={setSearch}
+      serverSorting={{
+        sorting,
+        onSortingChange: setSorting,
+      }}
       serverPagination={{
         ...tableState.serverPagination,
         onPaginationChange: setPagination,
       }}
+      filterBar={
+        <StatusDropdownFilter
+          popupId={selectedPopupId}
+          selected={statusFilter}
+          onSelect={(value) => {
+            navigate({
+              to: "/payments",
+              search: (prev) => ({ ...prev, status: value, page: 0 }),
+              replace: true,
+            })
+          }}
+        />
+      }
       renderSubComponent={PaymentSubRow}
       emptyState={
         !search ? (
