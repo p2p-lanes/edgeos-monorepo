@@ -12,6 +12,9 @@ describe("payments.helpers", () => {
       page: 2,
       pageSize: 25,
       search: "Lucia",
+      statusFilter: "expired",
+      sortBy: "amount",
+      sortOrder: "asc",
     })
 
     expect(config.params).toEqual({
@@ -19,11 +22,21 @@ describe("payments.helpers", () => {
       limit: 25,
       popupId: "popup-123",
       search: "Lucia",
+      paymentStatus: "expired",
+      sortBy: "amount",
+      sortOrder: "asc",
     })
     expect(config.queryKey).toEqual([
       "payments",
       "popup-123",
-      { page: 2, pageSize: 25, search: "Lucia" },
+      {
+        page: 2,
+        pageSize: 25,
+        search: "Lucia",
+        statusFilter: "expired",
+        sortBy: "amount",
+        sortOrder: "asc",
+      },
     ])
   })
 

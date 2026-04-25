@@ -2326,6 +2326,8 @@ export class PaymentsService {
      * @param data.externalId
      * @param data.paymentStatus
      * @param data.search
+     * @param data.sortBy
+     * @param data.sortOrder
      * @param data.skip Number of items to skip
      * @param data.limit Maximum number of items to return
      * @param data.xTenantId
@@ -2345,6 +2347,8 @@ export class PaymentsService {
                 external_id: data.externalId,
                 payment_status: data.paymentStatus,
                 search: data.search,
+                sort_by: data.sortBy,
+                sort_order: data.sortOrder,
                 skip: data.skip,
                 limit: data.limit
             },

@@ -1,6 +1,6 @@
 import uuid
 from decimal import Decimal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from fastapi import APIRouter, HTTPException, Request, Response, status
 from sqlmodel import Session
@@ -335,6 +335,8 @@ async def list_payments(
     external_id: str | None = None,
     payment_status: PaymentStatus | None = None,
     search: str | None = None,
+    sort_by: str | None = None,
+    sort_order: Literal["asc", "desc"] = "desc",
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[PaymentPublic]:
@@ -347,6 +349,8 @@ async def list_payments(
             limit=limit,
             status_filter=payment_status,
             search=search,
+            sort_by=sort_by,
+            sort_order=sort_order,
         )
     else:
         filters = PaymentFilter(
@@ -355,7 +359,12 @@ async def list_payments(
             status=payment_status,
         )
         payments, total = payments_crud.find_by_filter(
-            db, filters=filters, skip=skip, limit=limit
+            db,
+            filters=filters,
+            skip=skip,
+            limit=limit,
+            sort_by=sort_by,
+            sort_order=sort_order,
         )
 
     return ListModel[PaymentPublic](
