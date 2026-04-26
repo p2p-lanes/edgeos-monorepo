@@ -46,7 +46,10 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
   )
 
   const mainTickets = products.filter(
-    (p) => p.category === TICKET_CATEGORY && p.attendee_category === "main",
+    (p) =>
+      p.category === TICKET_CATEGORY &&
+      p.attendee_category === "main" &&
+      p.is_active !== false,
   )
   const minPrice =
     mainTickets.length > 0 ? Math.min(...mainTickets.map((p) => p.price)) : null
