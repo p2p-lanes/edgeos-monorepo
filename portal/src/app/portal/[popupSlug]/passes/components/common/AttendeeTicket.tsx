@@ -49,6 +49,7 @@ const AttendeeTicket = ({
     .filter(
       (product) =>
         product.category !== "patreon" &&
+        (toggleProduct ? product.is_active !== false : true) &&
         (isDayCheckout ? product.duration_type === "day" : true),
     )
     .sort(sortProductsByPriority)
