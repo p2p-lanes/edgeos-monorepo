@@ -3605,6 +3605,18 @@ export const EventParticipantCreateSchema = {
                 }
             ],
             title: 'Message'
+        },
+        occurrence_start: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Occurrence Start'
         }
     },
     type: 'object',
@@ -3637,6 +3649,18 @@ export const EventParticipantPublicSchema = {
         role: {
             '$ref': '#/components/schemas/ParticipantRole',
             default: 'attendee'
+        },
+        occurrence_start: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Occurrence Start'
         },
         check_time: {
             anyOf: [
@@ -4045,6 +4069,14 @@ export const EventSettingsCreateSchema = {
             title: 'Allowed Tags',
             default: []
         },
+        allowed_kinds: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Allowed Kinds',
+            default: []
+        },
         approval_notification_email: {
             anyOf: [
                 {
@@ -4106,6 +4138,13 @@ export const EventSettingsPublicSchema = {
             },
             type: 'array',
             title: 'Allowed Tags'
+        },
+        allowed_kinds: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Allowed Kinds'
         },
         approval_notification_email: {
             anyOf: [
@@ -4209,6 +4248,20 @@ export const EventSettingsUpdateSchema = {
                 }
             ],
             title: 'Allowed Tags'
+        },
+        allowed_kinds: {
+            anyOf: [
+                {
+                    items: {
+                        type: 'string'
+                    },
+                    type: 'array'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Allowed Kinds'
         },
         approval_notification_email: {
             anyOf: [
@@ -4512,14 +4565,6 @@ export const EventVenueCreateSchema = {
             ],
             title: 'End Date'
         },
-        amenities: {
-            items: {
-                type: 'string'
-            },
-            type: 'array',
-            title: 'Amenities',
-            default: []
-        },
         tags: {
             items: {
                 type: 'string'
@@ -4680,13 +4725,6 @@ export const EventVenuePublicSchema = {
                 }
             ],
             title: 'End Date'
-        },
-        amenities: {
-            items: {
-                type: 'string'
-            },
-            type: 'array',
-            title: 'Amenities'
         },
         tags: {
             items: {
@@ -4882,20 +4920,6 @@ export const EventVenueUpdateSchema = {
                 }
             ],
             title: 'End Date'
-        },
-        amenities: {
-            anyOf: [
-                {
-                    items: {
-                        type: 'string'
-                    },
-                    type: 'array'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Amenities'
         },
         tags: {
             anyOf: [
@@ -10950,6 +10974,18 @@ export const RegisterRequestSchema = {
                 }
             ],
             title: 'Message'
+        },
+        occurrence_start: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Occurrence Start'
         }
     },
     type: 'object',

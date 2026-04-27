@@ -806,6 +806,7 @@ export type EventParticipantCreate = {
     profile_id: string;
     role?: ParticipantRole;
     message?: (string | null);
+    occurrence_start?: (string | null);
 };
 
 /**
@@ -817,6 +818,7 @@ export type EventParticipantPublic = {
     profile_id: string;
     status?: ParticipantStatus;
     role?: ParticipantRole;
+    occurrence_start?: (string | null);
     check_time?: (string | null);
     message?: (string | null);
     registered_at?: string;
@@ -884,6 +886,7 @@ export type EventSettingsCreate = {
     venues_require_approval?: boolean;
     timezone?: string;
     allowed_tags?: Array<(string)>;
+    allowed_kinds?: Array<(string)>;
     approval_notification_email?: (string | null);
 };
 
@@ -899,6 +902,7 @@ export type EventSettingsPublic = {
     venues_require_approval?: boolean;
     timezone?: string;
     allowed_tags?: Array<(string)>;
+    allowed_kinds?: Array<(string)>;
     approval_notification_email?: (string | null);
     created_at?: string;
     updated_at?: string;
@@ -915,6 +919,7 @@ export type EventSettingsUpdate = {
     venues_require_approval?: (boolean | null);
     timezone?: (string | null);
     allowed_tags?: (Array<(string)> | null);
+    allowed_kinds?: (Array<(string)> | null);
     approval_notification_email?: (string | null);
 };
 
@@ -955,7 +960,6 @@ export type EventVenueCreate = {
     capacity?: (number | null);
     start_date?: (string | null);
     end_date?: (string | null);
-    amenities?: Array<(string)>;
     tags?: Array<(string)>;
     image_url?: (string | null);
     booking_mode?: VenueBookingMode;
@@ -980,7 +984,6 @@ export type EventVenuePublic = {
     capacity?: (number | null);
     start_date?: (string | null);
     end_date?: (string | null);
-    amenities?: Array<(string)>;
     tags?: Array<(string)>;
     image_url?: (string | null);
     booking_mode?: VenueBookingMode;
@@ -1009,7 +1012,6 @@ export type EventVenueUpdate = {
     capacity?: (number | null);
     start_date?: (string | null);
     end_date?: (string | null);
-    amenities?: (Array<(string)> | null);
     tags?: (Array<(string)> | null);
     image_url?: (string | null);
     booking_mode?: (VenueBookingMode | null);
@@ -2105,6 +2107,7 @@ export type RecurrenceUpdate = {
 export type RegisterRequest = {
     role?: ParticipantRole;
     message?: (string | null);
+    occurrence_start?: (string | null);
 };
 
 /**
@@ -3171,6 +3174,7 @@ export type EventParticipantsListPortalParticipantsData = {
      * Maximum number of items to return
      */
     limit?: number;
+    occurrenceStart?: (string | null);
     /**
      * Number of items to skip
      */
@@ -3188,12 +3192,14 @@ export type EventParticipantsRegisterForEventResponse = (EventParticipantPublic)
 
 export type EventParticipantsCancelRegistrationData = {
     eventId: string;
+    requestBody?: (RegisterRequest | null);
 };
 
 export type EventParticipantsCancelRegistrationResponse = (EventParticipantPublic);
 
 export type EventParticipantsCheckInData = {
     eventId: string;
+    requestBody?: (RegisterRequest | null);
 };
 
 export type EventParticipantsCheckInResponse = (EventParticipantPublic);
@@ -3393,6 +3399,7 @@ export type EventsPortalHiddenEventsCountResponse = ({
 
 export type EventsGetPortalEventData = {
     eventId: string;
+    occurrenceStart?: (string | null);
 };
 
 export type EventsGetPortalEventResponse = (EventPublic);

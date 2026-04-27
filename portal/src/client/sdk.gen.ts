@@ -1598,10 +1598,15 @@ export class EventParticipantsService {
     /**
      * List Portal Participants
      * List participants for an event (portal).
+     *
+     * When ``occurrence_start`` is provided, scope the result to that single
+     * occurrence; otherwise return every participant row of the event (used
+     * by the admin/owner participants section that wants the full picture).
      * @param data The data for the request.
      * @param data.eventId
      * @param data.skip Number of items to skip
      * @param data.limit Maximum number of items to return
+     * @param data.occurrenceStart
      * @returns ListModel_EventParticipantPublic_ Successful Response
      * @throws ApiError
      */
@@ -1612,7 +1617,8 @@ export class EventParticipantsService {
             query: {
                 event_id: data.eventId,
                 skip: data.skip,
-                limit: data.limit
+                limit: data.limit,
+                occurrence_start: data.occurrenceStart
             },
             errors: {
                 422: 'Validation Error'
@@ -1647,8 +1653,12 @@ export class EventParticipantsService {
     /**
      * Cancel Registration
      * Cancel current human's registration (portal).
+     *
+     * Body is reused from RegisterRequest for the optional ``occurrence_start``
+     * field; ``role``/``message`` are ignored on cancel.
      * @param data The data for the request.
      * @param data.eventId
+     * @param data.requestBody
      * @returns EventParticipantPublic Successful Response
      * @throws ApiError
      */
@@ -1659,6 +1669,8 @@ export class EventParticipantsService {
             path: {
                 event_id: data.eventId
             },
+            body: data.requestBody,
+            mediaType: 'application/json',
             errors: {
                 422: 'Validation Error'
             }
@@ -1670,6 +1682,7 @@ export class EventParticipantsService {
      * Check in current human for an event (portal).
      * @param data The data for the request.
      * @param data.eventId
+     * @param data.requestBody
      * @returns EventParticipantPublic Successful Response
      * @throws ApiError
      */
@@ -1680,6 +1693,8 @@ export class EventParticipantsService {
             path: {
                 event_id: data.eventId
             },
+            body: data.requestBody,
+            mediaType: 'application/json',
             errors: {
                 422: 'Validation Error'
             }
@@ -2283,8 +2298,14 @@ export class EventsService {
     
     /**
      * Get Portal Event
+     * Fetch a single event for the portal.
+     *
+     * ``occurrence_start`` scopes the user's RSVP lookup to a specific
+     * instance of a recurring event so the detail page reflects the
+     * occurrence's status (not the series' first instance).
      * @param data The data for the request.
      * @param data.eventId
+     * @param data.occurrenceStart
      * @returns EventPublic Successful Response
      * @throws ApiError
      */
@@ -2294,6 +2315,9 @@ export class EventsService {
             url: '/api/v1/events/portal/events/{event_id}',
             path: {
                 event_id: data.eventId
+            },
+            query: {
+                occurrence_start: data.occurrenceStart
             },
             errors: {
                 422: 'Validation Error'

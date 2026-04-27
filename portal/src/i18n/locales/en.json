@@ -393,8 +393,10 @@
       "clear_filters": "Clear",
       "list_view_label": "List view",
       "calendar_view_label": "Calendar view",
+      "day_view_label": "Day view",
       "list_view_short": "List",
       "calendar_view_short": "Calendar",
+      "day_view_short": "Day",
       "create_event": "Create event"
     },
     "calendar": {
@@ -403,6 +405,17 @@
       "no_events_on_day": "No events on this day",
       "select_a_day": "Select a day to see events",
       "max_participants": "Max {{count}}"
+    },
+    "day": {
+      "prev_day": "Previous day",
+      "next_day": "Next day",
+      "today": "Today",
+      "empty_state": "No events on this day",
+      "event_count_one": "{{count}} event",
+      "event_count_other": "{{count}} events",
+      "no_venues": "No venues configured for this pop-up yet.",
+      "no_venue_column": "No venue",
+      "untitled_venue": "Untitled venue"
     },
     "add_to_calendar": {
       "title": "Add to calendar",
@@ -467,6 +480,7 @@
       "uploading_button": "Uploading…",
       "replace_button": "Replace",
       "cover_fallback_note": "Leave empty to fall back to the venue's main photo.",
+      "popup_window_hint": "Events for this pop-up must fall within {{window}}.",
       "date_label": "Date",
       "start_time_label": "Start time",
       "start_label": "Start",

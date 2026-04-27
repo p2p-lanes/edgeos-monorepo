@@ -27,6 +27,11 @@ class EventParticipantBase(SQLModel):
     profile_id: uuid.UUID = Field(index=True)
     status: ParticipantStatus = Field(default=ParticipantStatus.REGISTERED)
     role: ParticipantRole = Field(default=ParticipantRole.ATTENDEE)
+    # Set when the registration targets a single occurrence of a recurring
+    # event. NULL for one-off events (the row applies to the event itself).
+    occurrence_start: datetime | None = Field(
+        default=None, sa_type=DateTime(timezone=True)
+    )
     check_time: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))
     message: str | None = Field(default=None, sa_type=Text())
     registered_at: datetime = Field(
@@ -63,6 +68,7 @@ class EventParticipantCreate(BaseModel):
     profile_id: uuid.UUID
     role: ParticipantRole = ParticipantRole.ATTENDEE
     message: str | None = None
+    occurrence_start: datetime | None = None
 
 
 class EventParticipantUpdate(BaseModel):
@@ -78,3 +84,5 @@ class RegisterRequest(BaseModel):
 
     role: ParticipantRole = ParticipantRole.ATTENDEE
     message: str | None = None
+    # Set when registering for a single occurrence of a recurring event.
+    occurrence_start: datetime | None = None
