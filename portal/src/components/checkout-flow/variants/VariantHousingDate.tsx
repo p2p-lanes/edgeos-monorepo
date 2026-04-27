@@ -286,9 +286,11 @@ function CompactCard({
       </div>
 
       <div className="flex-1 min-w-0">
-        <p className="font-medium text-sm text-pass-title truncate">
-          {product.name}
-        </p>
+        <ExpandableDescription
+          text={product.name}
+          clamp={2}
+          className="font-medium text-sm text-pass-title leading-tight"
+        />
         {pricePerDay && (
           <p className="text-xs text-pass-text">
             {formatCurrency(product.price)}/night
@@ -567,9 +569,11 @@ function DefaultSectionCard({
                   </div>
                 )}
                 <div className="min-w-0">
-                  <p className="font-medium text-pass-title text-sm truncate">
-                    {product.name}
-                  </p>
+                  <ExpandableDescription
+                    text={product.name}
+                    clamp={2}
+                    className="font-medium text-pass-title text-sm leading-tight"
+                  />
                   {pricePerDay && (
                     <p className="text-xs text-pass-text">
                       {formatCurrency(product.price)}/night
@@ -749,9 +753,11 @@ function ShowcaseSectionCard({
                 )}
 
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm text-pass-title truncate">
-                    {product.name}
-                  </p>
+                  <ExpandableDescription
+                    text={product.name}
+                    clamp={2}
+                    className="font-semibold text-sm text-pass-title leading-tight"
+                  />
                   {product.description && (
                     <ExpandableDescription
                       text={product.description}

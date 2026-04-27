@@ -1,7 +1,8 @@
 import { ChevronRight } from "lucide-react"
 import { usePathname, useRouter } from "next/navigation"
-import { Fragment } from "react"
+import { Fragment, useEffect, useState } from "react"
 import { LanguageSwitcher } from "@/components/common/LanguageSwitcher"
+import { cn } from "@/lib/utils"
 import { useCityProvider } from "@/providers/cityProvider"
 import {
   Breadcrumb,
@@ -15,12 +16,54 @@ import CartBadge from "./CartBadge"
 import useGroupMapping from "./hooks/useGroupMapping"
 import { SidebarTrigger } from "./SidebarComponents"
 
+const SHOW_THRESHOLD = 64
+const DELTA = 4
+
+function useHideOnScroll() {
+  const [hidden, setHidden] = useState(false)
+
+  useEffect(() => {
+    const lastScrollMap = new WeakMap<EventTarget, number>()
+
+    const onScroll = (event: Event) => {
+      const target = event.target
+      if (!target) return
+      const el =
+        target instanceof Document
+          ? (document.scrollingElement ?? document.documentElement)
+          : (target as HTMLElement)
+      const currentY = el.scrollTop
+      const lastY = lastScrollMap.get(target) ?? 0
+      const diff = currentY - lastY
+      lastScrollMap.set(target, currentY)
+
+      if (currentY <= SHOW_THRESHOLD) {
+        setHidden(false)
+        return
+      }
+      if (diff > DELTA) setHidden(true)
+      else if (diff < -DELTA) setHidden(false)
+    }
+
+    window.addEventListener("scroll", onScroll, {
+      capture: true,
+      passive: true,
+    })
+    return () => {
+      window.removeEventListener("scroll", onScroll, { capture: true })
+    }
+  }, [])
+
+  return hidden
+}
+
 const HeaderBar = () => {
   const { getCity } = useCityProvider()
   const pathname = usePathname()
   const city = getCity()
   const router = useRouter()
   const { groupMapping, isLoading } = useGroupMapping()
+  const hidden = useHideOnScroll()
 
   const handleClickCity = () => {
     router.push(`/portal/${city?.slug}`)
@@ -39,7 +82,12 @@ const HeaderBar = () => {
   const base = city?.slug ? `/portal/${city.slug}` : null
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-4 border-b bg-sidebar px-6 text-nav-text">
+    <header
+      className={cn(
+        "flex h-14 shrink-0 items-center gap-4 border-b bg-sidebar px-6 text-nav-text transition-[height,transform] duration-300 ease-out",
+        hidden && "h-0 -translate-y-full overflow-hidden border-b-0",
+      )}
+    >
       <SidebarTrigger />
       <Breadcrumb>
         <BreadcrumbList>

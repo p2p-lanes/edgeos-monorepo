@@ -47,9 +47,7 @@ export default function PortalVenueDetailPage() {
     (v) => v.id === params.venueId,
   )
   const isOwner =
-    venue != null &&
-    currentHuman != null &&
-    venue.owner_id === currentHuman.id
+    venue != null && currentHuman != null && venue.owner_id === currentHuman.id
 
   if (isLoading) {
     return (

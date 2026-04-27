@@ -35,8 +35,8 @@ import {
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { useCityProvider } from "@/providers/cityProvider"
-import { useFileUpload } from "../../lib/useFileUpload"
 import { usePortalEventSettings } from "../../lib/useEventTimezone"
+import { useFileUpload } from "../../lib/useFileUpload"
 
 /**
  * Portal venue creation form.
