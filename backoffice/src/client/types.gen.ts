@@ -884,6 +884,7 @@ export type EventSettingsCreate = {
     venues_require_approval?: boolean;
     timezone?: string;
     allowed_tags?: Array<(string)>;
+    allowed_kinds?: Array<(string)>;
     approval_notification_email?: (string | null);
 };
 
@@ -899,6 +900,7 @@ export type EventSettingsPublic = {
     venues_require_approval?: boolean;
     timezone?: string;
     allowed_tags?: Array<(string)>;
+    allowed_kinds?: Array<(string)>;
     approval_notification_email?: (string | null);
     created_at?: string;
     updated_at?: string;
@@ -915,6 +917,7 @@ export type EventSettingsUpdate = {
     venues_require_approval?: (boolean | null);
     timezone?: (string | null);
     allowed_tags?: (Array<(string)> | null);
+    allowed_kinds?: (Array<(string)> | null);
     approval_notification_email?: (string | null);
 };
 
@@ -955,7 +958,6 @@ export type EventVenueCreate = {
     capacity?: (number | null);
     start_date?: (string | null);
     end_date?: (string | null);
-    amenities?: Array<(string)>;
     tags?: Array<(string)>;
     image_url?: (string | null);
     booking_mode?: VenueBookingMode;
@@ -980,7 +982,6 @@ export type EventVenuePublic = {
     capacity?: (number | null);
     start_date?: (string | null);
     end_date?: (string | null);
-    amenities?: Array<(string)>;
     tags?: Array<(string)>;
     image_url?: (string | null);
     booking_mode?: VenueBookingMode;
@@ -1009,7 +1010,6 @@ export type EventVenueUpdate = {
     capacity?: (number | null);
     start_date?: (string | null);
     end_date?: (string | null);
-    amenities?: (Array<(string)> | null);
     tags?: (Array<(string)> | null);
     image_url?: (string | null);
     booking_mode?: (VenueBookingMode | null);

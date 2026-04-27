@@ -47,9 +47,7 @@ export default function PortalVenueDetailPage() {
     (v) => v.id === params.venueId,
   )
   const isOwner =
-    venue != null &&
-    currentHuman != null &&
-    venue.owner_id === currentHuman.id
+    venue != null && currentHuman != null && venue.owner_id === currentHuman.id
 
   if (isLoading) {
     return (
@@ -231,9 +229,7 @@ export default function PortalVenueDetailPage() {
         </section>
       )}
 
-      {/* Tags + amenities */}
-      {((venue.tags?.length ?? 0) > 0 ||
-        (venue.amenities?.length ?? 0) > 0) && (
+      {(venue.tags?.length ?? 0) > 0 && (
         <section className="space-y-2">
           <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground">
             {t("events.venues.detail.details_heading")}
@@ -245,14 +241,6 @@ export default function PortalVenueDetailPage() {
                 className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs"
               >
                 {t}
-              </span>
-            ))}
-            {venue.amenities?.map((a) => (
-              <span
-                key={`amen-${a}`}
-                className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs"
-              >
-                {a}
               </span>
             ))}
           </div>

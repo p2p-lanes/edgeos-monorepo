@@ -38,7 +38,7 @@ export const Route = createFileRoute("/_layout/events/properties")({
 function VenuePropertiesPage() {
   const queryClient = useQueryClient()
   const { showErrorToast, showSuccessToast } = useCustomToast()
-  const { selectedTenantId } = useWorkspace()
+  const { effectiveTenantId } = useWorkspace()
 
   const [showNew, setShowNew] = useState(false)
   const [newName, setNewName] = useState("")
@@ -61,7 +61,7 @@ function VenuePropertiesPage() {
   const createMutation = useMutation({
     mutationFn: () =>
       VenuePropertyTypesService.createPropertyType({
-        xTenantId: selectedTenantId ?? "",
+        xTenantId: effectiveTenantId ?? "",
         requestBody: { name: newName.trim(), icon: newIcon.trim() || null },
       }),
     onSuccess: () => {
@@ -79,7 +79,7 @@ function VenuePropertiesPage() {
       if (!editing) throw new Error("nothing to update")
       return VenuePropertyTypesService.updatePropertyType({
         propertyTypeId: editing.id,
-        xTenantId: selectedTenantId ?? null,
+        xTenantId: effectiveTenantId ?? null,
         requestBody: {
           name: editName.trim() || null,
           icon: editIcon.trim() || null,

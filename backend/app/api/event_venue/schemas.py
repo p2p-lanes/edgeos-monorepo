@@ -34,7 +34,6 @@ class EventVenueBase(SQLModel):
     capacity: int | None = Field(default=None)
     start_date: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))
     end_date: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))
-    amenities: list[str] = Field(default_factory=list, sa_column=Column(JSONB, nullable=False, server_default="[]"))
     tags: list[str] = Field(default_factory=list, sa_column=Column(JSONB, nullable=False, server_default="[]"))
     image_url: str | None = Field(default=None, sa_type=Text())
     booking_mode: VenueBookingMode = Field(default=VenueBookingMode.FREE, max_length=30)
@@ -126,7 +125,6 @@ class EventVenueCreate(BaseModel):
     capacity: int | None = None
     start_date: datetime | None = None
     end_date: datetime | None = None
-    amenities: list[str] = []
     tags: list[str] = []
     image_url: str | None = None
     booking_mode: VenueBookingMode = VenueBookingMode.FREE
@@ -149,7 +147,6 @@ class EventVenueUpdate(BaseModel):
     capacity: int | None = None
     start_date: datetime | None = None
     end_date: datetime | None = None
-    amenities: list[str] | None = None
     tags: list[str] | None = None
     image_url: str | None = None
     booking_mode: VenueBookingMode | None = None
