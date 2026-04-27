@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
+from app.core.config import settings as app_settings
 from app.services.email import get_email_service
 
 if TYPE_CHECKING:
@@ -57,6 +58,9 @@ async def notify_event_pending_approval(
         return
     popup_name = popup.name if popup else "event"
     subject = f"[{popup_name}] Event pending approval: {event.title}"
+    review_url = (
+        f"{app_settings.BACKOFFICE_URL.rstrip('/')}/events/{event.id}/edit"
+    )
     html = (
         f"<p>A new event has been submitted and is pending approval.</p>"
         f"<ul>"
@@ -66,7 +70,7 @@ async def notify_event_pending_approval(
         f"<li><b>Reason:</b> {reason}</li>"
         f"<li><b>Event ID:</b> {event.id}</li>"
         f"</ul>"
-        f"<p>Open the backoffice to review.</p>"
+        f'<p><a href="{review_url}">Review in backoffice →</a></p>'
     )
     try:
         await get_email_service().send_email(
@@ -101,6 +105,10 @@ async def notify_venue_pending_approval(
         return
     popup_name = popup.name if popup else "venue"
     subject = f"[{popup_name}] Venue pending approval: {venue.title}"
+    review_url = (
+        f"{app_settings.BACKOFFICE_URL.rstrip('/')}"
+        f"/events/venues/{venue.id}/edit"
+    )
     html = (
         f"<p>A new venue has been submitted and is pending approval.</p>"
         f"<ul>"
@@ -108,7 +116,7 @@ async def notify_venue_pending_approval(
         f"<li><b>Location:</b> {venue.location or ''}</li>"
         f"<li><b>Venue ID:</b> {venue.id}</li>"
         f"</ul>"
-        f"<p>Open the backoffice to review.</p>"
+        f'<p><a href="{review_url}">Review in backoffice →</a></p>'
     )
     try:
         await get_email_service().send_email(

@@ -128,6 +128,39 @@ export default function NewPortalEventPage() {
   const city = getCity()
   const popupId = city?.id
   const { timezone } = useEventTimezone(popupId)
+
+  // Popup booking window. start_date/end_date come from the popup record
+  // (stored in UTC) and the portal restricts event creation to dates
+  // inside that range. We compare on the wall-clock date string (first 10
+  // chars of the ISO) to avoid surprising tz-boundary off-by-ones at the
+  // UI level — the backend re-checks the full timestamp on submit.
+  const popupStartKey = city?.start_date ? city.start_date.slice(0, 10) : null
+  const popupEndKey = city?.end_date ? city.end_date.slice(0, 10) : null
+  const isDateOutsidePopupWindow = useMemo(() => {
+    if (!popupStartKey && !popupEndKey) return () => false
+    return (d: Date) => {
+      const y = d.getFullYear()
+      const m = String(d.getMonth() + 1).padStart(2, "0")
+      const day = String(d.getDate()).padStart(2, "0")
+      const key = `${y}-${m}-${day}`
+      if (popupStartKey && key < popupStartKey) return true
+      if (popupEndKey && key > popupEndKey) return true
+      return false
+    }
+  }, [popupStartKey, popupEndKey])
+  const popupWindowLabel = useMemo(() => {
+    if (!popupStartKey && !popupEndKey) return null
+    const fmt = (key: string) =>
+      new Intl.DateTimeFormat(undefined, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      }).format(new Date(`${key}T00:00:00`))
+    if (popupStartKey && popupEndKey)
+      return `${fmt(popupStartKey)} – ${fmt(popupEndKey)}`
+    if (popupStartKey) return `from ${fmt(popupStartKey)}`
+    return `until ${fmt(popupEndKey!)}`
+  }, [popupStartKey, popupEndKey])
   const { uploadFile, isUploading } = useFileUpload()
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -615,7 +648,15 @@ export default function NewPortalEventPage() {
               }
             }}
             disabled={selectedVenue?.booking_mode === "unbookable"}
+            disabledDays={isDateOutsidePopupWindow}
           />
+          {popupWindowLabel && (
+            <p className="text-xs text-muted-foreground">
+              {t("events.form.popup_window_hint", {
+                window: popupWindowLabel,
+              })}
+            </p>
+          )}
         </div>
 
         {/* Times + duration */}
@@ -668,6 +709,8 @@ export default function NewPortalEventPage() {
                 type="datetime-local"
                 value={startIso ? toLocalInput(new Date(startIso)) : ""}
                 onChange={(e) => setStartIso(localInputToIso(e.target.value))}
+                min={popupStartKey ? `${popupStartKey}T00:00` : undefined}
+                max={popupEndKey ? `${popupEndKey}T23:59` : undefined}
                 required
               />
             </div>
