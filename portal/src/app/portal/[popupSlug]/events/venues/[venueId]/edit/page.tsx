@@ -188,8 +188,7 @@ export default function EditPortalVenuePage() {
     )
   }
 
-  const isOwner =
-    currentHuman != null && venue.owner_id === currentHuman.id
+  const isOwner = currentHuman != null && venue.owner_id === currentHuman.id
 
   if (!isOwner) {
     return (
