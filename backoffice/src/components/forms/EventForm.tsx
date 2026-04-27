@@ -8,7 +8,7 @@ import {
 } from "@edgeos/shared-events"
 import { useForm, useStore } from "@tanstack/react-form"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { useNavigate } from "@tanstack/react-router"
+import { Link, useNavigate } from "@tanstack/react-router"
 import { Trash2 } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import {
@@ -792,14 +792,59 @@ export function EventForm({
       <InlineSection title="Event Details">
         <InlineRow label="Type" description="Category of the event">
           <form.Field name="kind">
-            {(field) => (
-              <Input
-                value={field.state.value}
-                onChange={(e) => field.handleChange(e.target.value)}
-                placeholder="workshop, social, talk, panel..."
-                disabled={readOnly}
-              />
-            )}
+            {(field) => {
+              const allowed = popupSettings?.allowed_kinds ?? []
+              const noneConfigured = allowed.length === 0
+              const current = field.state.value || ""
+              // If the saved kind is no longer in allowed_kinds (admin
+              // removed it later), still surface it in the dropdown so we
+              // don't silently lose data — it'll appear as a stray option.
+              const options =
+                current && !allowed.includes(current)
+                  ? [current, ...allowed]
+                  : allowed
+              return (
+                <div className="flex w-full flex-col gap-1">
+                  <Select
+                    value={current}
+                    disabled={readOnly || noneConfigured}
+                    onValueChange={(v) =>
+                      field.handleChange(v === "__none__" ? "" : v)
+                    }
+                  >
+                    <SelectTrigger className="w-[220px]">
+                      <SelectValue
+                        placeholder={
+                          noneConfigured
+                            ? "Configure types in Settings"
+                            : "Pick a type"
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">— None —</SelectItem>
+                      {options.map((k) => (
+                        <SelectItem key={k} value={k}>
+                          {k}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {noneConfigured && (
+                    <p className="text-xs text-muted-foreground">
+                      No types configured.{" "}
+                      <Link
+                        to="/events/settings"
+                        className="underline underline-offset-2 hover:text-foreground"
+                      >
+                        Configure types in Event Settings
+                      </Link>
+                      .
+                    </p>
+                  )}
+                </div>
+              )
+            }}
           </form.Field>
         </InlineRow>
 

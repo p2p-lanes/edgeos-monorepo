@@ -155,6 +155,29 @@ async def delete_participant(
 # ---------------------------------------------------------------------------
 
 
+def _resolve_occurrence_start(
+    event, occurrence_start: datetime | None
+) -> datetime | None:
+    """Validate the (event, occurrence_start) pair for portal RSVP endpoints.
+
+    Recurring events require ``occurrence_start`` so each registration
+    targets a single instance. One-off events ignore it (and reject it,
+    to avoid fragmented data).
+    """
+    is_recurring = bool(event.rrule)
+    if is_recurring and occurrence_start is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="occurrence_start is required for recurring events",
+        )
+    if not is_recurring and occurrence_start is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="occurrence_start is not allowed for non-recurring events",
+        )
+    return occurrence_start
+
+
 @router.get("/portal/participants", response_model=ListModel[EventParticipantPublic])
 async def list_portal_participants(
     db: HumanTenantSession,
@@ -162,10 +185,21 @@ async def list_portal_participants(
     event_id: uuid.UUID,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
+    occurrence_start: datetime | None = None,
 ) -> ListModel[EventParticipantPublic]:
-    """List participants for an event (portal)."""
+    """List participants for an event (portal).
+
+    When ``occurrence_start`` is provided, scope the result to that single
+    occurrence; otherwise return every participant row of the event (used
+    by the admin/owner participants section that wants the full picture).
+    """
     participants, total = crud.event_participants_crud.find_by_event(
-        db, event_id=event_id, skip=skip, limit=limit,
+        db,
+        event_id=event_id,
+        skip=skip,
+        limit=limit,
+        occurrence_start=occurrence_start,
+        scope_to_occurrence=occurrence_start is not None,
     )
     return ListModel[EventParticipantPublic](
         results=_participants_with_names(db, participants),
@@ -191,12 +225,20 @@ async def register_for_event(
     if event.status != EventStatus.PUBLISHED:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Event is not published")
 
-    existing = crud.event_participants_crud.get_by_event_and_profile(db, event_id, current_human.id)
+    occ_start = _resolve_occurrence_start(
+        event, body.occurrence_start if body else None
+    )
+
+    existing = crud.event_participants_crud.get_by_event_and_profile(
+        db, event_id, current_human.id, occurrence_start=occ_start
+    )
     if existing and existing.status != ParticipantStatus.CANCELLED:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Already registered")
 
     if event.max_participant:
-        active_count = crud.event_participants_crud.count_active_for_event(db, event_id)
+        active_count = crud.event_participants_crud.count_active_for_event(
+            db, event_id, occurrence_start=occ_start
+        )
         if active_count >= event.max_participant:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Event is full")
 
@@ -208,7 +250,9 @@ async def register_for_event(
         db.add(existing)
         db.commit()
         db.refresh(existing)
-        await _notify_rsvp(db, event, current_human, method="REQUEST")
+        await _notify_rsvp(
+            db, event, current_human, method="REQUEST", occurrence_start=occ_start
+        )
         return EventParticipantPublic.model_validate(existing)
 
     req = body or RegisterRequest()
@@ -218,16 +262,30 @@ async def register_for_event(
         profile_id=current_human.id,
         role=req.role,
         message=req.message,
+        occurrence_start=occ_start,
     )
     db.add(participant)
     db.commit()
     db.refresh(participant)
-    await _notify_rsvp(db, event, current_human, method="REQUEST")
+    await _notify_rsvp(
+        db, event, current_human, method="REQUEST", occurrence_start=occ_start
+    )
     return EventParticipantPublic.model_validate(participant)
 
 
-async def _notify_rsvp(db, event, human, *, method: str) -> None:
+async def _notify_rsvp(
+    db,
+    event,
+    human,
+    *,
+    method: str,
+    occurrence_start: datetime | None = None,
+) -> None:
     """Send a single iTIP message to the human who just RSVPed/cancelled.
+
+    For recurring events, ``occurrence_start`` shifts the calendar entry to
+    the specific instance the user RSVPed to, so the message imports as a
+    one-off appointment on that day instead of as the whole series.
 
     Uses the current event ``ical_sequence`` so the recipient's calendar
     client correlates this email with any existing entry from a prior
@@ -246,6 +304,7 @@ async def _notify_rsvp(db, event, human, *, method: str) -> None:
             first_name=human.first_name or "",
             human_id=human.id,
             method=method,
+            occurrence_start=occurrence_start,
         )
     except Exception as exc:  # pragma: no cover - defensive
         logger.warning(
@@ -258,11 +317,25 @@ async def cancel_registration(
     event_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    body: RegisterRequest | None = None,
 ) -> EventParticipantPublic:
-    """Cancel current human's registration (portal)."""
+    """Cancel current human's registration (portal).
+
+    Body is reused from RegisterRequest for the optional ``occurrence_start``
+    field; ``role``/``message`` are ignored on cancel.
+    """
     from app.api.event.crud import events_crud
 
-    existing = crud.event_participants_crud.get_by_event_and_profile(db, event_id, current_human.id)
+    event = events_crud.get(db, event_id)
+    if not event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+    occ_start = _resolve_occurrence_start(
+        event, body.occurrence_start if body else None
+    )
+
+    existing = crud.event_participants_crud.get_by_event_and_profile(
+        db, event_id, current_human.id, occurrence_start=occ_start
+    )
     if not existing or existing.status == ParticipantStatus.CANCELLED:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No active registration found")
 
@@ -271,9 +344,9 @@ async def cancel_registration(
     db.commit()
     db.refresh(existing)
 
-    event = events_crud.get(db, event_id)
-    if event is not None:
-        await _notify_rsvp(db, event, current_human, method="CANCEL")
+    await _notify_rsvp(
+        db, event, current_human, method="CANCEL", occurrence_start=occ_start
+    )
 
     return EventParticipantPublic.model_validate(existing)
 
@@ -283,9 +356,21 @@ async def check_in(
     event_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    body: RegisterRequest | None = None,
 ) -> EventParticipantPublic:
     """Check in current human for an event (portal)."""
-    existing = crud.event_participants_crud.get_by_event_and_profile(db, event_id, current_human.id)
+    from app.api.event.crud import events_crud
+
+    event = events_crud.get(db, event_id)
+    if not event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+    occ_start = _resolve_occurrence_start(
+        event, body.occurrence_start if body else None
+    )
+
+    existing = crud.event_participants_crud.get_by_event_and_profile(
+        db, event_id, current_human.id, occurrence_start=occ_start
+    )
     if not existing or existing.status == ParticipantStatus.CANCELLED:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No active registration found")
     if existing.status == ParticipantStatus.CHECKED_IN:

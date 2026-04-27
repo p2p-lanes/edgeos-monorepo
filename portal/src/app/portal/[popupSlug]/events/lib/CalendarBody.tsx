@@ -88,16 +88,26 @@ export function CalendarBody({
     enabled: !!popupId,
   })
 
+  // For recurring instances we must include occurrence_start; one-off events
+  // must not. Use occurrence_id (set only on virtual occurrences) to decide.
+  const rsvpBodyFor = (e: EventPublic) =>
+    e.occurrence_id ? { occurrence_start: e.start_time } : undefined
   const rsvpMutation = useMutation({
-    mutationFn: (eventId: string) =>
-      EventParticipantsService.registerForEvent({ eventId }),
+    mutationFn: (e: EventPublic) =>
+      EventParticipantsService.registerForEvent({
+        eventId: e.id,
+        requestBody: rsvpBodyFor(e),
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["portal-events-calendar"] })
     },
   })
   const cancelRsvpMutation = useMutation({
-    mutationFn: (eventId: string) =>
-      EventParticipantsService.cancelRegistration({ eventId }),
+    mutationFn: (e: EventPublic) =>
+      EventParticipantsService.cancelRegistration({
+        eventId: e.id,
+        requestBody: rsvpBodyFor(e),
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["portal-events-calendar"] })
     },
@@ -235,7 +245,11 @@ export function CalendarBody({
                       className="relative rounded-xl border bg-card hover:shadow-md transition-shadow overflow-hidden"
                     >
                       <Link
-                        href={`/portal/${slug}/events/${event.id}`}
+                        href={
+                          event.occurrence_id
+                            ? `/portal/${slug}/events/${event.id}?occ=${encodeURIComponent(event.start_time)}`
+                            : `/portal/${slug}/events/${event.id}`
+                        }
                         className="block p-3"
                       >
                         <div className="flex items-start gap-3">
@@ -315,7 +329,7 @@ export function CalendarBody({
                             <button
                               type="button"
                               onClick={() =>
-                                cancelRsvpMutation.mutate(event.id)
+                                cancelRsvpMutation.mutate(event)
                               }
                               className="inline-flex items-center gap-1 rounded-md border border-primary/30 bg-primary/10 px-2 py-1 text-xs font-medium text-primary hover:bg-primary/20"
                             >
@@ -325,7 +339,7 @@ export function CalendarBody({
                           ) : (
                             <button
                               type="button"
-                              onClick={() => rsvpMutation.mutate(event.id)}
+                              onClick={() => rsvpMutation.mutate(event)}
                               className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs font-medium hover:bg-muted"
                             >
                               {t("events.rsvp.rsvp")}

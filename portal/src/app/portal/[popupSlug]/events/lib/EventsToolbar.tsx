@@ -1,6 +1,7 @@
 "use client"
 
 import {
+  CalendarClock,
   CalendarDays,
   CheckCircle,
   Crown,
@@ -20,9 +21,11 @@ import {
 } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 
+export type EventsView = "list" | "calendar" | "day"
+
 interface EventsToolbarProps {
-  view: "list" | "calendar"
-  onViewChange: (view: "list" | "calendar") => void
+  view: EventsView
+  onViewChange: (view: EventsView) => void
   search: string
   onSearchChange: (value: string) => void
   rsvpedOnly: boolean
@@ -239,6 +242,28 @@ export function EventsToolbar({
           {view === "calendar" && (
             <span className="hidden sm:inline">
               {t("events.toolbar.calendar_view_short")}
+            </span>
+          )}
+        </Button>
+        <Button
+          type="button"
+          variant={view === "day" ? "default" : "ghost"}
+          size="sm"
+          aria-label={t("events.toolbar.day_view_label")}
+          title={t("events.toolbar.day_view_label")}
+          aria-pressed={view === "day"}
+          onClick={() => onViewChange("day")}
+          className={cn(
+            "h-7 rounded-sm px-2 sm:px-3",
+            view === "day" && "shadow-none",
+          )}
+        >
+          <CalendarClock
+            className={cn("h-4 w-4", view === "day" && "sm:mr-1.5")}
+          />
+          {view === "day" && (
+            <span className="hidden sm:inline">
+              {t("events.toolbar.day_view_short")}
             </span>
           )}
         </Button>

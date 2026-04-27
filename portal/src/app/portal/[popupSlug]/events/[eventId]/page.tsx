@@ -17,7 +17,7 @@ import {
   Video,
 } from "lucide-react"
 import Link from "next/link"
-import { useParams } from "next/navigation"
+import { useParams, useSearchParams } from "next/navigation"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
@@ -44,6 +44,18 @@ export default function EventDetailPage() {
   const { getCity } = useCityProvider()
   const city = getCity()
   const params = useParams<{ eventId: string }>()
+  const searchParams = useSearchParams()
+  // Originating events-page URL search (e.g. "view=day&date=2026-05-15"),
+  // set by Day-view links so "Back to events" can return to the same spot.
+  const fromSearch = searchParams.get("from") ?? ""
+  const backHref = fromSearch
+    ? `/portal/${city?.slug}/events?${fromSearch}`
+    : `/portal/${city?.slug}/events`
+  // For an expanded recurring instance, the calendar passes the occurrence's
+  // ISO start time via ?occ=. We render that in place of the master's
+  // start_time (and shift end_time by the same offset) so the user sees the
+  // specific instance they clicked, not the series' first occurrence.
+  const occParam = searchParams.get("occ")
   const queryClient = useQueryClient()
   const { timezone, formatTime, formatDateFull } = useEventTimezone(city?.id)
 
@@ -52,8 +64,12 @@ export default function EventDetailPage() {
     isLoading,
     error: eventError,
   } = useQuery({
-    queryKey: ["portal-event", params.eventId],
-    queryFn: () => EventsService.getPortalEvent({ eventId: params.eventId }),
+    queryKey: ["portal-event", params.eventId, occParam],
+    queryFn: () =>
+      EventsService.getPortalEvent({
+        eventId: params.eventId,
+        occurrenceStart: occParam ?? undefined,
+      }),
     enabled: !!params.eventId,
     retry: (failureCount, err) => {
       if (
@@ -67,10 +83,11 @@ export default function EventDetailPage() {
   })
 
   const { data: participantsData } = useQuery({
-    queryKey: ["portal-event-participants", params.eventId],
+    queryKey: ["portal-event-participants", params.eventId, occParam],
     queryFn: () =>
       EventParticipantsService.listPortalParticipants({
         eventId: params.eventId,
+        occurrenceStart: occParam ?? undefined,
       }),
     enabled: !!params.eventId && !!event,
   })
@@ -95,38 +112,45 @@ export default function EventDetailPage() {
   const myParticipationActive =
     myParticipation && myParticipation.status !== "cancelled"
 
+  // Recurring events require occurrence_start so the RSVP targets a single
+  // instance; one-off events must not send it (the backend rejects mixing
+  // the two semantics).
+  const rsvpBody = occParam ? { occurrence_start: occParam } : undefined
+  const invalidateRsvpQueries = () => {
+    queryClient.invalidateQueries({
+      queryKey: ["portal-event-participants", params.eventId],
+    })
+    queryClient.invalidateQueries({ queryKey: ["portal-event"] })
+    queryClient.invalidateQueries({ queryKey: ["portal-events"] })
+    queryClient.invalidateQueries({ queryKey: ["portal-events-day"] })
+    queryClient.invalidateQueries({ queryKey: ["portal-events-calendar"] })
+  }
+
   const registerMutation = useMutation({
     mutationFn: () =>
       EventParticipantsService.registerForEvent({
         eventId: params.eventId,
+        requestBody: rsvpBody,
       }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["portal-event-participants", params.eventId],
-      })
-    },
+    onSuccess: invalidateRsvpQueries,
   })
 
   const cancelMutation = useMutation({
     mutationFn: () =>
       EventParticipantsService.cancelRegistration({
         eventId: params.eventId,
+        requestBody: rsvpBody,
       }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["portal-event-participants", params.eventId],
-      })
-    },
+    onSuccess: invalidateRsvpQueries,
   })
 
   const checkInMutation = useMutation({
     mutationFn: () =>
-      EventParticipantsService.checkIn({ eventId: params.eventId }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["portal-event-participants", params.eventId],
-      })
-    },
+      EventParticipantsService.checkIn({
+        eventId: params.eventId,
+        requestBody: rsvpBody,
+      }),
+    onSuccess: invalidateRsvpQueries,
   })
 
   const { data: invitations = [] } = useQuery<EventInvitationPublic[]>({
@@ -214,7 +238,7 @@ export default function EventDetailPage() {
           {t("events.detail.event_not_found_message")}
         </p>
         <Link
-          href={`/portal/${city?.slug}/events`}
+          href={backHref}
           className="inline-flex items-center gap-1 text-sm text-primary mt-4"
         >
           <ArrowLeft className="h-4 w-4" /> {t("events.common.back_to_events")}
@@ -237,7 +261,18 @@ export default function EventDetailPage() {
     registerMutation.isPending ||
     cancelMutation.isPending ||
     checkInMutation.isPending
-  const eventStarted = new Date(event.start_time) <= new Date()
+
+  // Effective start/end: if `?occ=<iso>` is present, this is a recurring
+  // occurrence — shift end_time by (master end - master start) to preserve
+  // duration. Otherwise show the row's own times.
+  const effectiveStartTime = occParam ?? event.start_time
+  const effectiveEndTime = (() => {
+    if (!occParam) return event.end_time
+    const masterDuration =
+      new Date(event.end_time).getTime() - new Date(event.start_time).getTime()
+    return new Date(new Date(occParam).getTime() + masterDuration).toISOString()
+  })()
+  const eventStarted = new Date(effectiveStartTime) <= new Date()
 
   const coverUrl = event.cover_url || event.venue_image_url || null
   const coverCredit =
@@ -246,7 +281,7 @@ export default function EventDetailPage() {
   return (
     <div className="max-w-2xl mx-auto p-4 sm:p-6 space-y-4">
       <Link
-        href={`/portal/${city?.slug}/events`}
+        href={backHref}
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="h-4 w-4" /> {t("events.common.back_to_events")}
@@ -298,10 +333,10 @@ export default function EventDetailPage() {
           </div>
           <div>
             <p className="text-sm font-medium">
-              {formatDateFull(event.start_time)}
+              {formatDateFull(effectiveStartTime)}
             </p>
             <p className="text-xs text-muted-foreground">
-              {formatTime(event.start_time)} – {formatTime(event.end_time)}
+              {formatTime(effectiveStartTime)} – {formatTime(effectiveEndTime)}
             </p>
             {timezone && (
               <p className="text-[11px] text-muted-foreground/80 mt-0.5">
@@ -371,8 +406,8 @@ export default function EventDetailPage() {
         eventId={event.id}
         event={{
           title: event.title,
-          startIso: event.start_time,
-          endIso: event.end_time,
+          startIso: effectiveStartTime,
+          endIso: effectiveEndTime,
           description: event.content,
           location:
             [event.venue_title, event.venue_location]

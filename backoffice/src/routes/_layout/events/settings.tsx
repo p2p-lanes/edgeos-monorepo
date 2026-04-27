@@ -100,6 +100,7 @@ function EventSettingsForm() {
     humans_can_create_venues: false,
     venues_require_approval: true,
     allowed_tags: [] as string[],
+    allowed_kinds: [] as string[],
     approval_notification_email: null as string | null,
   }
 
@@ -198,7 +199,27 @@ function EventSettingsForm() {
         />
         <p className="text-sm text-muted-foreground">
           Humans in the portal can only tag their events with values from this
-          list. Empty = no tagging allowed.
+          list. Empty = no tagging allowed. Tip: paste <code>a, b, c</code> and
+          press Enter to add many at once.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Allowed event types</Label>
+        <ChipInput
+          value={currentSettings.allowed_kinds ?? []}
+          placeholder="Add type (or paste workshop, talk, social)"
+          onChange={(next) =>
+            upsertMutation.mutate({
+              ...currentSettings,
+              popup_id: selectedPopupId!,
+              allowed_kinds: next,
+            })
+          }
+        />
+        <p className="text-sm text-muted-foreground">
+          Curated set of event "types" (workshop, talk, social…) shown as a
+          dropdown when creating an event. Empty = type field is disabled.
         </p>
       </div>
 

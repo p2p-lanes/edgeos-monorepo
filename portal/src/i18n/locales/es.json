@@ -393,8 +393,10 @@
       "clear_filters": "Limpiar",
       "list_view_label": "Vista de lista",
       "calendar_view_label": "Vista de calendario",
+      "day_view_label": "Vista de día",
       "list_view_short": "Lista",
       "calendar_view_short": "Calendario",
+      "day_view_short": "Día",
       "create_event": "Crear evento"
     },
     "calendar": {
@@ -403,6 +405,17 @@
       "no_events_on_day": "No hay eventos este día",
       "select_a_day": "Seleccioná un día para ver eventos",
       "max_participants": "Máx. {{count}}"
+    },
+    "day": {
+      "prev_day": "Día anterior",
+      "next_day": "Día siguiente",
+      "today": "Hoy",
+      "empty_state": "No hay eventos este día",
+      "event_count_one": "{{count}} evento",
+      "event_count_other": "{{count}} eventos",
+      "no_venues": "Este pop-up todavía no tiene venues configurados.",
+      "no_venue_column": "Sin venue",
+      "untitled_venue": "Venue sin título"
     },
     "add_to_calendar": {
       "title": "Agregar al calendario",
@@ -467,6 +480,7 @@
       "uploading_button": "Subiendo…",
       "replace_button": "Reemplazar",
       "cover_fallback_note": "Dejá vacío para usar la foto principal del lugar.",
+      "popup_window_hint": "Los eventos de este pop-up deben estar dentro de {{window}}.",
       "date_label": "Fecha",
       "start_time_label": "Hora de inicio",
       "start_label": "Inicio",

@@ -15,7 +15,8 @@ import {
   Tag,
 } from "lucide-react"
 import Link from "next/link"
-import { useState } from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { useCallback, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 
 import {
@@ -28,7 +29,8 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useCityProvider } from "@/providers/cityProvider"
 import { CalendarBody } from "./lib/CalendarBody"
-import { EventsToolbar } from "./lib/EventsToolbar"
+import { DayBody } from "./lib/DayBody"
+import { EventsToolbar, type EventsView } from "./lib/EventsToolbar"
 import { summarizeRrule } from "./lib/summarizeRrule"
 import {
   useEventTimezone,
@@ -63,8 +65,44 @@ export default function EventsPage() {
   const [mineOnly, setMineOnly] = useState(false)
   const [showHidden, setShowHidden] = useState(false)
   const [selectedTags, setSelectedTags] = useState<string[]>([])
-  const [view, setView] = useState<"list" | "calendar">("list")
   const queryClient = useQueryClient()
+
+  // Persist view + day-view date in URL search params so "back to events"
+  // from an event detail page can return to the same calendar spot.
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const view: EventsView =
+    (searchParams.get("view") as EventsView | null) ?? "day"
+  const dateParam = searchParams.get("date")
+  const selectedDate = useMemo(() => {
+    if (!dateParam) return null
+    const m = dateParam.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    if (!m) return null
+    const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 0, 0, 0, 0)
+    return Number.isNaN(d.getTime()) ? null : d
+  }, [dateParam])
+  const setView = useCallback(
+    (next: EventsView) => {
+      const params = new URLSearchParams(searchParams.toString())
+      if (next === "day") params.delete("view")
+      else params.set("view", next)
+      const qs = params.toString()
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+    },
+    [router, pathname, searchParams],
+  )
+  const setSelectedDate = useCallback(
+    (next: Date) => {
+      const params = new URLSearchParams(searchParams.toString())
+      const y = next.getFullYear()
+      const m = String(next.getMonth() + 1).padStart(2, "0")
+      const d = String(next.getDate()).padStart(2, "0")
+      params.set("date", `${y}-${m}-${d}`)
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+    },
+    [router, pathname, searchParams],
+  )
 
   const { data: currentHuman } = useQuery({
     queryKey: ["current-human"],
@@ -128,16 +166,26 @@ export default function EventsPage() {
     staleTime: 30 * 1000,
   })
 
+  // For recurring instances we must include occurrence_start; one-off events
+  // must not. Use occurrence_id (set only on virtual occurrences) to decide.
+  const rsvpBodyFor = (e: EventPublic) =>
+    e.occurrence_id ? { occurrence_start: e.start_time } : undefined
   const rsvpMutation = useMutation({
-    mutationFn: (eventId: string) =>
-      EventParticipantsService.registerForEvent({ eventId }),
+    mutationFn: (e: EventPublic) =>
+      EventParticipantsService.registerForEvent({
+        eventId: e.id,
+        requestBody: rsvpBodyFor(e),
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["portal-events"] })
     },
   })
   const cancelRsvpMutation = useMutation({
-    mutationFn: (eventId: string) =>
-      EventParticipantsService.cancelRegistration({ eventId }),
+    mutationFn: (e: EventPublic) =>
+      EventParticipantsService.cancelRegistration({
+        eventId: e.id,
+        requestBody: rsvpBodyFor(e),
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["portal-events"] })
     },
@@ -252,6 +300,16 @@ export default function EventsPage() {
             rsvpedOnly={rsvpedOnly}
             tags={selectedTags}
           />
+        ) : view === "day" ? (
+          <DayBody
+            popupId={city?.id}
+            slug={city?.slug}
+            search={search}
+            rsvpedOnly={rsvpedOnly}
+            tags={selectedTags}
+            selectedDate={selectedDate}
+            onSelectedDateChange={setSelectedDate}
+          />
         ) : isLoading ? (
           <div className="flex items-center justify-center py-20">
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
@@ -289,7 +347,11 @@ export default function EventsPage() {
                         }
                       >
                         <Link
-                          href={`/portal/${city?.slug}/events/${event.id}`}
+                          href={
+                            event.occurrence_id
+                              ? `/portal/${city?.slug}/events/${event.id}?occ=${encodeURIComponent(event.start_time)}`
+                              : `/portal/${city?.slug}/events/${event.id}`
+                          }
                           className="block p-3 sm:p-4 pb-11"
                         >
                           <div className="flex items-start justify-between gap-2 mb-1 pr-8">
@@ -355,7 +417,7 @@ export default function EventsPage() {
                                 onClick={(e) => {
                                   e.preventDefault()
                                   e.stopPropagation()
-                                  cancelRsvpMutation.mutate(event.id)
+                                  cancelRsvpMutation.mutate(event)
                                 }}
                                 className="inline-flex h-7 items-center gap-1 rounded-md border border-primary/30 bg-primary/10 px-2 text-xs font-medium text-primary hover:bg-primary/20"
                               >
@@ -368,7 +430,7 @@ export default function EventsPage() {
                                 onClick={(e) => {
                                   e.preventDefault()
                                   e.stopPropagation()
-                                  rsvpMutation.mutate(event.id)
+                                  rsvpMutation.mutate(event)
                                 }}
                                 className="inline-flex h-7 items-center gap-1 rounded-md border bg-background px-2 text-xs font-medium shadow-sm hover:bg-muted"
                               >

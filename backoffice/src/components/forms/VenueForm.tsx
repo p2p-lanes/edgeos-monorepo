@@ -210,13 +210,6 @@ export function VenueForm({ defaultValues, onSuccess }: VenueFormProps) {
       ).sort(),
     [popupVenues],
   )
-  const existingAmenities = useMemo(
-    () =>
-      Array.from(
-        new Set((popupVenues?.results ?? []).flatMap((v) => v.amenities ?? [])),
-      ).sort(),
-    [popupVenues],
-  )
 
   const form = useForm({
     defaultValues: {
@@ -236,7 +229,6 @@ export function VenueForm({ defaultValues, onSuccess }: VenueFormProps) {
       ).toString(),
       property_type_ids: initialPropertyIds,
       tags: (defaultValues?.tags ?? []) as string[],
-      amenities: (defaultValues?.amenities ?? []) as string[],
       weekly_hours: buildInitialWeeklyHours(defaultValues?.weekly_hours),
     },
     onSubmit: ({ value }) => {
@@ -248,9 +240,6 @@ export function VenueForm({ defaultValues, onSuccess }: VenueFormProps) {
       const coords = parseGoogleMapsUrl(value.google_maps_link)
 
       const tags = value.tags.map((t) => t.trim().toLowerCase()).filter(Boolean)
-      const amenities = value.amenities
-        .map((t) => t.trim().toLowerCase())
-        .filter(Boolean)
 
       if (isEdit) {
         const payload: EventVenueUpdate = {
@@ -271,7 +260,6 @@ export function VenueForm({ defaultValues, onSuccess }: VenueFormProps) {
             : 0,
           property_type_ids: value.property_type_ids,
           tags,
-          amenities,
         }
         updateMutation.mutate({ data: payload, hours: value.weekly_hours })
       } else {
@@ -295,7 +283,6 @@ export function VenueForm({ defaultValues, onSuccess }: VenueFormProps) {
             : 0,
           property_type_ids: value.property_type_ids,
           tags,
-          amenities,
         }
         createMutation.mutate({ data: payload, hours: value.weekly_hours })
       }
@@ -577,23 +564,6 @@ export function VenueForm({ defaultValues, onSuccess }: VenueFormProps) {
                   onChange={field.handleChange}
                   suggestions={existingTags}
                   placeholder="outdoor, rooftop, lounge"
-                  disabled={readOnly}
-                />
-              )}
-            </form.Field>
-          </InlineRow>
-
-          <InlineRow
-            label="Amenities"
-            description="Type to search or add new. Enter to confirm."
-          >
-            <form.Field name="amenities">
-              {(field) => (
-                <ChipsWithSuggestions
-                  value={field.state.value}
-                  onChange={field.handleChange}
-                  suggestions={existingAmenities}
-                  placeholder="wifi, projector, whiteboard"
                   disabled={readOnly}
                 />
               )}

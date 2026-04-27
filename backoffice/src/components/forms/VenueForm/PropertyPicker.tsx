@@ -30,7 +30,7 @@ export function PropertyPicker({
 }: PropertyPickerProps) {
   const queryClient = useQueryClient()
   const { showErrorToast, showSuccessToast } = useCustomToast()
-  const { selectedTenantId } = useWorkspace()
+  const { effectiveTenantId } = useWorkspace()
   const [showNew, setShowNew] = useState(false)
   const [newName, setNewName] = useState("")
   const [newIcon, setNewIcon] = useState("")
@@ -43,7 +43,7 @@ export function PropertyPicker({
   const createMutation = useMutation({
     mutationFn: () =>
       VenuePropertyTypesService.createPropertyType({
-        xTenantId: selectedTenantId ?? "",
+        xTenantId: effectiveTenantId ?? "",
         requestBody: { name: newName.trim(), icon: newIcon.trim() || null },
       }),
     onSuccess: (created) => {

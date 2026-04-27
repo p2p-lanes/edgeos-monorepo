@@ -160,6 +160,48 @@ def _venue_map_for_events(
     return {v.id: (v.title, v.location, v.image_url) for v in rows}
 
 
+def _check_event_within_popup_window(
+    popup,
+    *,
+    start_time: datetime,
+    end_time: datetime,
+) -> None:
+    """Reject events that fall outside the popup's [start_date, end_date].
+
+    Both popup bounds are optional — only enforced when set. Comparisons
+    are timezone-aware: bounds without tzinfo are treated as UTC. Used by
+    portal-facing endpoints; backoffice/admin paths are not restricted.
+    """
+    if popup is None:
+        return
+    start_bound = getattr(popup, "start_date", None)
+    end_bound = getattr(popup, "end_date", None)
+
+    def _aware(dt: datetime) -> datetime:
+        if dt.tzinfo is None:
+            from datetime import timezone
+
+            return dt.replace(tzinfo=timezone.utc)
+        return dt
+
+    if start_bound is not None and _aware(start_time) < _aware(start_bound):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Event must start on or after the popup's start date "
+                f"({start_bound.isoformat()})."
+            ),
+        )
+    if end_bound is not None and _aware(end_time) > _aware(end_bound):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Event must end on or before the popup's end date "
+                f"({end_bound.isoformat()})."
+            ),
+        )
+
+
 def _check_recurrence_conflicts(
     db,
     *,
@@ -1130,24 +1172,48 @@ async def list_portal_events(
 
     visible = _portal_visibility_filter(db, events, current_human.id)
 
+    def _rsvp_lookup_key(e) -> tuple[uuid.UUID, datetime | None] | None:
+        """Build the ``(event_id, occurrence_start)`` key used to find this
+        user's RSVP row. Returns ``None`` for series-master rows surfaced
+        directly (RSVPs are per-occurrence, not series-wide).
+        """
+        is_expanded = e.__dict__.get("_occurrence_id") is not None
+        if is_expanded:
+            return (e.id, e.start_time)
+        if getattr(e, "recurrence_master_id", None):
+            return (e.recurrence_master_id, e.start_time)
+        if getattr(e, "rrule", None):
+            return None
+        return (e.id, None)
+
     if rsvped_only:
         from sqlmodel import select
 
         from app.api.event_participant.models import EventParticipants
         from app.api.event_participant.schemas import ParticipantStatus
 
-        event_ids = [e.id for e in visible]
-        if event_ids:
-            active = list(
-                db.exec(
-                    select(EventParticipants.event_id)
-                    .where(EventParticipants.profile_id == current_human.id)
-                    .where(EventParticipants.event_id.in_(event_ids))
-                    .where(EventParticipants.status != ParticipantStatus.CANCELLED)
-                ).all()
-            )
-            active_set = set(active)
-            visible = [e for e in visible if e.id in active_set]
+        keys: list[tuple[uuid.UUID, datetime | None]] = []
+        for e in visible:
+            k = _rsvp_lookup_key(e)
+            if k is not None:
+                keys.append(k)
+        if keys:
+            event_ids = list({k[0] for k in keys})
+            rows = db.exec(
+                select(
+                    EventParticipants.event_id,
+                    EventParticipants.occurrence_start,
+                )
+                .where(EventParticipants.profile_id == current_human.id)
+                .where(EventParticipants.event_id.in_(event_ids))
+                .where(EventParticipants.status != ParticipantStatus.CANCELLED)
+            ).all()
+            active_set = {(row[0], row[1]) for row in rows}
+            visible = [
+                e
+                for e in visible
+                if (k := _rsvp_lookup_key(e)) is not None and k in active_set
+            ]
         else:
             visible = []
 
@@ -1179,15 +1245,21 @@ async def list_portal_events(
     # inline button without an extra batch call from the client.
     from app.api.event_participant.models import EventParticipants
 
-    rsvp_status_map: dict[uuid.UUID, str] = {}
+    rsvp_status_map: dict[tuple[uuid.UUID, datetime | None], str] = {}
     if visible:
-        event_ids = [e.id for e in visible]
-        rows = db.exec(
-            select(EventParticipants.event_id, EventParticipants.status)
-            .where(EventParticipants.profile_id == current_human.id)
-            .where(EventParticipants.event_id.in_(event_ids))
-        ).all()
-        rsvp_status_map = {row[0]: row[1] for row in rows}
+        keys = [_rsvp_lookup_key(e) for e in visible]
+        event_ids = list({k[0] for k in keys if k is not None})
+        if event_ids:
+            rows = db.exec(
+                select(
+                    EventParticipants.event_id,
+                    EventParticipants.occurrence_start,
+                    EventParticipants.status,
+                )
+                .where(EventParticipants.profile_id == current_human.id)
+                .where(EventParticipants.event_id.in_(event_ids))
+            ).all()
+            rsvp_status_map = {(row[0], row[1]): row[2] for row in rows}
 
     def _publicize(e) -> EventPublic:
         pub = _to_public(e, venue_map)
@@ -1197,10 +1269,11 @@ async def list_portal_events(
             or (e.recurrence_master_id and e.recurrence_master_id in hidden_ids)
         ):
             updates["hidden"] = True
-        # Occurrences share the master's participants row, so fall back to
-        # the master id when looking up status.
-        rsvp_key = e.recurrence_master_id or e.id
-        if rsvp_key in rsvp_status_map:
+        # RSVP rows are scoped to a specific occurrence for recurring events
+        # so the user can be "Going" to one instance without flipping the
+        # state of every sibling instance.
+        rsvp_key = _rsvp_lookup_key(e)
+        if rsvp_key is not None and rsvp_key in rsvp_status_map:
             updates["my_rsvp_status"] = rsvp_status_map[rsvp_key]
         if updates:
             pub = pub.model_copy(update=updates)
@@ -1251,7 +1324,14 @@ async def get_portal_event(
     event_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    occurrence_start: datetime | None = None,
 ) -> EventPublic:
+    """Fetch a single event for the portal.
+
+    ``occurrence_start`` scopes the user's RSVP lookup to a specific
+    instance of a recurring event so the detail page reflects the
+    occurrence's status (not the series' first instance).
+    """
     from sqlmodel import select
 
     from app.api.event.models import EventInvitations
@@ -1272,12 +1352,21 @@ async def get_portal_event(
 
     from app.api.event_participant.models import EventParticipants
 
-    rsvp_key = event.recurrence_master_id or event.id
-    rsvp = db.exec(
+    rsvp_event_id = event.recurrence_master_id or event.id
+    rsvp_q = (
         select(EventParticipants.status)
         .where(EventParticipants.profile_id == current_human.id)
-        .where(EventParticipants.event_id == rsvp_key)
-    ).first()
+        .where(EventParticipants.event_id == rsvp_event_id)
+    )
+    if occurrence_start is None:
+        rsvp_q = rsvp_q.where(
+            EventParticipants.occurrence_start.is_(None)  # type: ignore[union-attr]
+        )
+    else:
+        rsvp_q = rsvp_q.where(
+            EventParticipants.occurrence_start == occurrence_start
+        )
+    rsvp = db.exec(rsvp_q).first()
 
     pub = _to_public(event)
     if rsvp:
@@ -1349,6 +1438,13 @@ async def create_portal_event(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Event creation is disabled for this popup")
     if settings and settings.can_publish_event == "admin_only":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only admins can create events for this popup")
+
+    from app.api.popup.crud import popups_crud
+
+    popup = popups_crud.get(db, event_in.popup_id)
+    _check_event_within_popup_window(
+        popup, start_time=event_in.start_time, end_time=event_in.end_time
+    )
 
     rrule_str = format_rrule(event_in.recurrence) if event_in.recurrence else None
 
@@ -1436,6 +1532,13 @@ async def update_portal_event(
         or event_in.start_time is not None
         or event_in.end_time is not None
     )
+    if event_in.start_time is not None or event_in.end_time is not None:
+        from app.api.popup.crud import popups_crud
+
+        popup = popups_crud.get(db, event.popup_id)
+        _check_event_within_popup_window(
+            popup, start_time=new_start, end_time=new_end
+        )
     if new_venue_id is not None and timing_or_venue_changed:
         _check_recurrence_conflicts(
             db,

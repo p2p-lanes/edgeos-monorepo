@@ -74,6 +74,7 @@ def build_event_ics(
     event_url: str | None = None,
     method: Method = "REQUEST",
     sequence: int | None = None,
+    occurrence_start: datetime | None = None,
 ) -> str:
     """Build an iTIP .ics body for a single event + recipient.
 
@@ -86,6 +87,11 @@ def build_event_ics(
     - ``REQUEST``: initial invite or update. Recipient's calendar creates
       or replaces the entry keyed on UID.
     - ``CANCEL``: event was cancelled. Calendar removes the entry.
+
+    ``occurrence_start`` shifts the calendar entry to a specific instance
+    of a recurring event: DTSTART/DTEND are recomputed using the master's
+    duration, and the UID is suffixed with the occurrence timestamp so
+    each instance is a distinct entry in the recipient's calendar.
     """
     title = _escape(getattr(event, "title", "") or "Event")
 
@@ -105,10 +111,22 @@ def build_event_ics(
             location_bits.append(venue.location)
     location = _escape(" — ".join(location_bits)) if location_bits else ""
 
-    uid = f"{event.id}@edgeos"
+    if occurrence_start is not None:
+        master_duration = event.end_time - event.start_time
+        effective_start = occurrence_start
+        effective_end = occurrence_start + master_duration
+        # Distinct UID per instance so the recipient's calendar imports
+        # each occurrence as its own appointment instead of overwriting
+        # the previous one.
+        uid_suffix = f"_{occurrence_start.strftime('%Y%m%dT%H%M%SZ')}"
+    else:
+        effective_start = event.start_time
+        effective_end = event.end_time
+        uid_suffix = ""
+    uid = f"{event.id}{uid_suffix}@edgeos"
     now = _fmt_utc(datetime.now(UTC))
-    dtstart = _fmt_utc(event.start_time)
-    dtend = _fmt_utc(event.end_time)
+    dtstart = _fmt_utc(effective_start)
+    dtend = _fmt_utc(effective_end)
     last_modified = (
         _fmt_utc(event.updated_at) if getattr(event, "updated_at", None) else now
     )

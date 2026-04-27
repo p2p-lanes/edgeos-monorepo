@@ -29,6 +29,13 @@ class EventSettingsBase(SQLModel):
         default_factory=list,
         sa_column=Column(JSONB, nullable=False, server_default="[]"),
     )
+    # Event "kind" / type values an admin has whitelisted. Backoffice and
+    # portal EventForms render these as a single-select dropdown; free-text
+    # entry is disabled. Mirror of allowed_tags.
+    allowed_kinds: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSONB, nullable=False, server_default="[]"),
+    )
     # Email that receives notifications when an event or venue is submitted
     # and requires approval. Falls back to the popup owner if unset.
     approval_notification_email: str | None = Field(
@@ -56,6 +63,7 @@ class EventSettingsCreate(BaseModel):
     venues_require_approval: bool = True
     timezone: str = "UTC"
     allowed_tags: list[str] = []
+    allowed_kinds: list[str] = []
     approval_notification_email: str | None = None
 
 
@@ -68,4 +76,5 @@ class EventSettingsUpdate(BaseModel):
     venues_require_approval: bool | None = None
     timezone: str | None = None
     allowed_tags: list[str] | None = None
+    allowed_kinds: list[str] | None = None
     approval_notification_email: str | None = None

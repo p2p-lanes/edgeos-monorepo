@@ -6,6 +6,7 @@ exception so a broken SMTP never blocks the underlying mutation.
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from typing import Any
 
 from loguru import logger
@@ -70,6 +71,7 @@ async def send_event_itip(
     recipients: list[dict[str, Any]],
     *,
     method: str = "REQUEST",
+    occurrence_start: datetime | None = None,
 ) -> None:
     """Send an iTIP REQUEST or CANCEL email to each recipient.
 
@@ -78,6 +80,11 @@ async def send_event_itip(
     correlate incoming updates with the original invitation. SEQUENCE is
     read from ``event.ical_sequence``; caller is responsible for bumping
     it before dispatching an update/cancel.
+
+    When ``occurrence_start`` is provided, the calendar entry is shifted
+    to that single instance (and its UID disambiguated) so recurring-event
+    RSVP emails create a one-off calendar appointment on that day instead
+    of a series.
     """
     if not recipients:
         return
@@ -100,9 +107,8 @@ async def send_event_itip(
             f"{event.id}"
         )
 
-    when = (
-        event.start_time.strftime("%b %d, %Y at %H:%M") if event.start_time else ""
-    )
+    when_dt = occurrence_start or event.start_time
+    when = when_dt.strftime("%b %d, %Y at %H:%M") if when_dt else ""
 
     service = get_email_service()
     from_address = popup.tenant.sender_email if popup and popup.tenant else None
@@ -135,6 +141,7 @@ async def send_event_itip(
                 event_url=event_url or None,
                 method=method,
                 sequence=int(getattr(event, "ical_sequence", 0)),
+                occurrence_start=occurrence_start,
             )
         except Exception as exc:  # pragma: no cover - defensive
             logger.warning(
@@ -204,16 +211,21 @@ async def send_itip_to_single_recipient(
     first_name: str,
     human_id: uuid.UUID,
     method: str = "REQUEST",
+    occurrence_start: datetime | None = None,
 ) -> None:
     """Convenience wrapper: send a single iTIP email (e.g. RSVP confirmation).
 
     Does NOT bump SEQUENCE — RSVPing or cancelling your own participation
     doesn't change the event itself, we're just (re-)delivering the
     current invitation to one person.
+
+    ``occurrence_start`` shifts the calendar entry to a specific occurrence
+    of a recurring event (used by the portal RSVP flow).
     """
     await send_event_itip(
         db,
         event,
         [{"email": email, "first_name": first_name, "human_id": human_id}],
         method=method,
+        occurrence_start=occurrence_start,
     )

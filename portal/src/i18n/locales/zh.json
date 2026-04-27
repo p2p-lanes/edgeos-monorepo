@@ -393,8 +393,10 @@
       "clear_filters": "清除",
       "list_view_label": "列表视图",
       "calendar_view_label": "日历视图",
+      "day_view_label": "日视图",
       "list_view_short": "列表",
       "calendar_view_short": "日历",
+      "day_view_short": "日",
       "create_event": "创建活动"
     },
     "calendar": {
@@ -403,6 +405,17 @@
       "no_events_on_day": "当天无活动",
       "select_a_day": "选择日期查看活动",
       "max_participants": "上限 {{count}}"
+    },
+    "day": {
+      "prev_day": "前一天",
+      "next_day": "后一天",
+      "today": "今天",
+      "empty_state": "当天无活动",
+      "event_count_one": "{{count}} 个活动",
+      "event_count_other": "{{count}} 个活动",
+      "no_venues": "此 pop-up 暂未配置场地。",
+      "no_venue_column": "无场地",
+      "untitled_venue": "未命名场地"
     },
     "add_to_calendar": {
       "title": "添加到日历",
@@ -467,6 +480,7 @@
       "uploading_button": "上传中…",
       "replace_button": "替换",
       "cover_fallback_note": "留空则使用场地的主图作为封面。",
+      "popup_window_hint": "本 pop-up 的活动必须在 {{window}} 之间。",
       "date_label": "日期",
       "start_time_label": "开始时间",
       "start_label": "开始",
