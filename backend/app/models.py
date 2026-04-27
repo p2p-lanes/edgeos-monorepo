@@ -1,5 +1,8 @@
 from sqlmodel import SQLModel
 
+from app.api.api_key.models import ApiKeys
+from app.api.api_key.schemas import ApiKeyCreate, ApiKeyCreated, ApiKeyPublic
+
 # Application & Attendee models
 from app.api.application.models import Applications, ApplicationSnapshots
 from app.api.application.schemas import (
@@ -126,6 +129,11 @@ from app.api.user.schemas import UserCreate, UserPublic, UserUpdate
 
 __all__ = [
     "SQLModel",
+    # API keys
+    "ApiKeys",
+    "ApiKeyCreate",
+    "ApiKeyCreated",
+    "ApiKeyPublic",
     # Auth
     "PendingHumans",
     # Core models

@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.api import (
+    api_key,
     application,
     application_review,
     approval_strategy,
@@ -38,6 +39,7 @@ api_router.include_router(user.router)
 api_router.include_router(auth.router)
 api_router.include_router(tenant.router)
 api_router.include_router(human.router)
+api_router.include_router(api_key.router)
 api_router.include_router(popup.router)
 
 # Popup-related resources

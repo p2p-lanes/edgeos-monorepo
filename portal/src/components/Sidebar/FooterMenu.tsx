@@ -1,4 +1,4 @@
-import { Github, Star, User } from "lucide-react"
+import { BookOpen, Github, Key, Star, User } from "lucide-react"
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
@@ -59,8 +59,31 @@ const FooterMenu = () => {
         <SidebarMenuItem>
           <SidebarMenuButton asChild>
             <Link
+              href="/portal/api-keys"
+              className="mt-4 text-nav-text-secondary"
+            >
+              <Key className="size-4" />
+              <span className="text-sm font-medium">
+                {t("sidebar.api_keys", { defaultValue: "API Keys" })}
+              </span>
+            </Link>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+        <SidebarMenuItem>
+          <SidebarMenuButton asChild>
+            <Link href="/docs" className="text-nav-text-secondary">
+              <BookOpen className="size-4" />
+              <span className="text-sm font-medium">
+                {t("sidebar.api_docs", { defaultValue: "API Docs" })}
+              </span>
+            </Link>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+        <SidebarMenuItem>
+          <SidebarMenuButton asChild>
+            <Link
               href="/portal/profile"
-              className="mb-4 mt-4 text-nav-text-secondary"
+              className="mb-4 text-nav-text-secondary"
             >
               <User className="size-4" />
               <span className="text-sm font-medium">
