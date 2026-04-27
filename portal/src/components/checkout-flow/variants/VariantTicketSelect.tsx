@@ -410,6 +410,7 @@ function PassRow({
   const tierState = resolveTierPhaseState(product)
   const effectiveDisabled = disabled || tierState.blocked
   const isClickable = !effectiveDisabled && (!purchased || isEditing)
+  const [summaryOpen, setSummaryOpen] = useState(false)
   // Multi-unit stepper mode — editing of purchased multi-unit passes is out
   // of scope (plan decision), so we only show the stepper for non-purchased rows.
   const showStepper =
@@ -525,7 +526,9 @@ function PassRow({
     onClick()
   }
 
-  return (
+  const ticketIconSize = "w-4 h-4"
+
+  const mainButton = (
     <button
       type="button"
       onClick={isClickable ? handleRowClick : undefined}
@@ -570,10 +573,12 @@ function PassRow({
         )}
         <div className="flex-1 min-w-0 text-left">
           <div className="flex items-center gap-2">
-            <Ticket className="w-4 h-4 text-muted-foreground" />
-            <span className="font-medium text-foreground">{product.name}</span>
+            <Ticket className={cn(ticketIconSize, "text-muted-foreground")} />
+            <span className="font-medium text-foreground truncate">
+              {product.name}
+            </span>
             {tierState.badge && (
-              <span className="text-[10px] uppercase tracking-wide text-muted-foreground border border-border rounded px-1 py-0.5">
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground border border-border rounded px-1 py-0.5 shrink-0">
                 {tierState.badge}
               </span>
             )}
@@ -587,13 +592,6 @@ function PassRow({
               {" – "}
               {formatDate(product.end_date, { day: "numeric", month: "short" })}
             </p>
-          )}
-          {product.description && (
-            <ExpandableDescription
-              text={product.description}
-              clamp={2}
-              className="text-xs text-muted-foreground mt-1"
-            />
           )}
         </div>
       </div>
@@ -614,6 +612,45 @@ function PassRow({
       </div>
     </button>
   )
+
+  const hasDescription = !!product.description
+
+  if (hasDescription) {
+    return (
+      <div>
+        {mainButton}
+        <div className="px-5 pb-3 -mt-1">
+          {summaryOpen ? (
+            <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-line">
+              {product.description}{" "}
+              <button
+                type="button"
+                onClick={() => setSummaryOpen(false)}
+                className="font-medium text-primary hover:underline"
+              >
+                Ver menos
+              </button>
+            </p>
+          ) : (
+            <div className="flex items-baseline gap-1.5">
+              <p className="text-xs text-muted-foreground truncate flex-1 min-w-0">
+                {product.description}
+              </p>
+              <button
+                type="button"
+                onClick={() => setSummaryOpen(true)}
+                className="text-xs font-medium text-primary hover:underline shrink-0"
+              >
+                Ver más
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  return mainButton
 }
 
 // ---------------------------------------------------------------------------
