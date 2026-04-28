@@ -234,8 +234,8 @@ function CompactCard({
     <button
       type="button"
       onClick={() => {
-        if (supportsQty) {
-          if (quantity === 0) onIncrement()
+        if (supportsQty && quantity === 0) {
+          onIncrement()
         } else {
           onSelect()
         }
@@ -312,7 +312,6 @@ function CompactCard({
         >
           {formatCurrency(totalPrice)}
         </p>
-        <p className="text-xs text-pass-text">total</p>
       </div>
     </button>
   )
@@ -352,8 +351,8 @@ function GridCard({
     <button
       type="button"
       onClick={() => {
-        if (supportsQty) {
-          if (quantity === 0) onIncrement()
+        if (supportsQty && quantity === 0) {
+          onIncrement()
         } else {
           onSelect()
         }
@@ -530,8 +529,8 @@ function DefaultSectionCard({
               key={product.id}
               type="button"
               onClick={() => {
-                if (supportsQty) {
-                  if (quantity === 0) onIncrement(product.id)
+                if (supportsQty && quantity === 0) {
+                  onIncrement(product.id)
                 } else {
                   onProductSelect(product.id)
                 }
@@ -595,7 +594,6 @@ function DefaultSectionCard({
                 >
                   {formatCurrency(totalPrice)}
                 </p>
-                <p className="text-xs text-pass-text">total</p>
               </div>
             </button>
           )
@@ -728,8 +726,8 @@ function ShowcaseSectionCard({
                 key={product.id}
                 type="button"
                 onClick={() => {
-                  if (supportsQty) {
-                    if (quantity === 0) onIncrement(product.id)
+                  if (supportsQty && quantity === 0) {
+                    onIncrement(product.id)
                   } else {
                     onProductSelect(product.id)
                   }
@@ -786,7 +784,6 @@ function ShowcaseSectionCard({
                   >
                     {formatCurrency(totalPrice)}
                   </p>
-                  <p className="text-xs text-pass-text">total</p>
                 </div>
 
                 {supportsQty ? (

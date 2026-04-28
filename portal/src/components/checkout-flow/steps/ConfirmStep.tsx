@@ -141,7 +141,7 @@ export default function ConfirmStep() {
   return (
     <div className="space-y-4">
       {checkoutError && (
-        <div className="bg-destructive/10 border border-destructive rounded-2xl p-4 flex items-start gap-3">
+        <div className="bg-white border border-destructive rounded-2xl p-4 flex items-start gap-3">
           <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
           <div>
             <h4 className="font-medium text-destructive">Error</h4>

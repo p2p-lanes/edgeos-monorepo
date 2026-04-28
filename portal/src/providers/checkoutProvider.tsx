@@ -61,6 +61,7 @@ interface CheckoutContextValue {
   allProducts: ProductsPass[]
   attendees: AttendeePassState[]
   isLoading: boolean
+  isInitialLoading: boolean
   isSubmitting: boolean
   error: string | null
   goToStep: (step: CheckoutStep) => void
@@ -120,7 +121,7 @@ export function CheckoutProvider({
   const { discountApplied, setDiscount, resetDiscount } = useDiscount()
   const { getRelevantApplication } = useApplication()
   const { getCity } = useCityProvider()
-  const { products } = useGetPassesData()
+  const { products, loading: isLoadingProducts } = useGetPassesData()
   const isAuthenticated = useIsAuthenticated()
   const application = getRelevantApplication()
   const appCredit = application?.credit
@@ -133,7 +134,7 @@ export function CheckoutProvider({
   const paymentCompleteRef = useRef(false)
 
   // Ticketing step configuration from API
-  const { data: stepsData } = useQuery({
+  const { data: stepsData, isLoading: isLoadingSteps } = useQuery({
     queryKey: ["ticketing-steps-portal", cityId],
     queryFn: () =>
       TicketingStepsService.listPortalTicketingSteps({
@@ -142,6 +143,13 @@ export function CheckoutProvider({
     enabled: !!cityId && isAuthenticated,
   })
   const configuredSteps = stepsData?.results ?? []
+
+  // True while step configs or products are still loading on first render.
+  // Why: when both queries are pending, availableSteps falls back to
+  // ["passes", "confirm"] with default labels and the cart total reads $0,
+  // producing a brief flash of a "broken" checkout before real data arrives.
+  const isInitialLoading =
+    !!cityId && isAuthenticated && (isLoadingSteps || isLoadingProducts)
 
   // Product categories
   const { passProducts, housingProducts, merchProducts, patronProducts } =
@@ -624,6 +632,7 @@ export function CheckoutProvider({
     allProducts: products,
     attendees: attendeePasses,
     isLoading,
+    isInitialLoading,
     isSubmitting,
     error,
     goToStep,

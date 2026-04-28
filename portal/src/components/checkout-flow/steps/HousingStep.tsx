@@ -302,9 +302,6 @@ function PropertyCard({
             >
               {formatCurrency(totalPrice)}
             </p>
-            <p className="text-xs text-pass-text">
-              {quantity > 1 ? `${quantity} × total` : "total"}
-            </p>
           </div>
         </button>
         {showStepper && onQuantityChange && (

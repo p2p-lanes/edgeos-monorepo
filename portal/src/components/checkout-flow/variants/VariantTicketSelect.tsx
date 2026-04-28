@@ -470,7 +470,7 @@ function PassRow({
             <div className="flex items-center gap-2">
               <Ticket
                 className={cn(
-                  "w-4 h-4",
+                  "w-4 h-4 shrink-0",
                   isEditedForCredit
                     ? "text-orange-400"
                     : "text-muted-foreground",
@@ -526,20 +526,18 @@ function PassRow({
     onClick()
   }
 
-  const ticketIconSize = "w-4 h-4"
-
   const mainButton = (
     <button
       type="button"
       onClick={isClickable ? handleRowClick : undefined}
       disabled={!isClickable}
       className={cn(
-        "w-full px-5 py-3 flex items-center justify-between gap-4 transition-all",
+        "w-full px-5 py-3 flex items-center justify-between gap-4 transition-all border-l-[4px]",
         effectiveDisabled
-          ? "opacity-40 cursor-not-allowed bg-muted"
+          ? "opacity-40 cursor-not-allowed bg-muted border-l-transparent"
           : rowIsActive
-            ? "bg-primary/10"
-            : "hover:bg-muted",
+            ? "bg-gradient-to-r from-primary/25 via-primary/[0.08] to-transparent border-l-primary"
+            : "hover:bg-muted border-l-transparent",
       )}
     >
       <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -572,13 +570,12 @@ function PassRow({
           </div>
         )}
         <div className="flex-1 min-w-0 text-left">
-          <div className="flex items-center gap-2">
-            <Ticket className={cn(ticketIconSize, "text-muted-foreground")} />
-            <span className="font-medium text-foreground truncate">
+          <div className="flex items-start gap-2">
+            <span className="font-medium text-foreground break-words">
               {product.name}
             </span>
             {tierState.badge && (
-              <span className="text-[10px] uppercase tracking-wide text-muted-foreground border border-border rounded px-1 py-0.5 shrink-0">
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground border border-border rounded px-1 py-0.5 shrink-0 mt-0.5">
                 {tierState.badge}
               </span>
             )}
@@ -619,16 +616,17 @@ function PassRow({
     return (
       <div>
         {mainButton}
-        <div className="px-5 pb-3 -mt-1">
+        <div className="px-5 pb-3 pt-2">
           {summaryOpen ? (
             <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-line">
               {product.description}{" "}
               <button
                 type="button"
                 onClick={() => setSummaryOpen(false)}
-                className="font-medium text-primary hover:underline"
+                className="inline-flex items-center gap-0.5 font-medium text-primary underline underline-offset-2 hover:opacity-80 align-baseline"
               >
                 Ver menos
+                <ChevronDown className="w-3 h-3 rotate-180" />
               </button>
             </p>
           ) : (
@@ -639,9 +637,10 @@ function PassRow({
               <button
                 type="button"
                 onClick={() => setSummaryOpen(true)}
-                className="text-xs font-medium text-primary hover:underline shrink-0"
+                className="inline-flex items-center gap-0.5 text-xs font-medium text-primary underline underline-offset-2 hover:opacity-80 shrink-0"
               >
                 Ver más
+                <ChevronDown className="w-3 h-3" />
               </button>
             </div>
           )}
@@ -739,8 +738,12 @@ function DayPassRow({
   return (
     <div
       className={cn(
-        "px-5 py-3 flex items-center justify-between gap-4",
-        effectiveDisabled ? "opacity-40" : hasQuantity ? "bg-primary/10" : "",
+        "px-5 py-3 flex items-center justify-between gap-4 border-l-[4px]",
+        effectiveDisabled
+          ? "opacity-40 border-l-transparent"
+          : hasQuantity
+            ? "bg-gradient-to-r from-primary/25 via-primary/[0.08] to-transparent border-l-primary"
+            : "border-l-transparent",
       )}
     >
       <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -756,11 +759,12 @@ function DayPassRow({
           className="shrink-0"
         />
         <div className="flex-1 min-w-0 text-left">
-          <div className="flex items-center gap-2">
-            <Ticket className="w-4 h-4 text-muted-foreground" />
-            <span className="font-medium text-foreground">{product.name}</span>
+          <div className="flex items-start gap-2">
+            <span className="font-medium text-foreground break-words">
+              {product.name}
+            </span>
             {tierState.badge && (
-              <span className="text-[10px] uppercase tracking-wide text-muted-foreground border border-border rounded px-1 py-0.5">
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground border border-border rounded px-1 py-0.5 shrink-0 mt-0.5">
                 {tierState.badge}
               </span>
             )}
