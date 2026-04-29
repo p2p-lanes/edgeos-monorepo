@@ -13,12 +13,21 @@ import {
 import { useEmailVerification } from "../hooks/useEmailVerification"
 import EmailVerification from "./UserInfoForm/EmailVerification"
 
-export default function CheckoutLoginGate() {
+interface CheckoutLoginGateProps {
+  popupId: string
+  otpEnabled: boolean
+}
+
+export default function CheckoutLoginGate({
+  popupId,
+  otpEnabled,
+}: CheckoutLoginGateProps) {
   const { t } = useTranslation()
   const [email, setEmail] = useState("")
   const [emailError, setEmailError] = useState<string | undefined>(undefined)
 
   const {
+    otpEnabled: isOtpEnabled,
     showVerificationInput,
     verificationCode,
     setVerificationCode,
@@ -30,6 +39,8 @@ export default function CheckoutLoginGate() {
     handleResendCode,
     handleChangeEmail,
   } = useEmailVerification({
+    popupId,
+    otpEnabled,
     email,
     onVerificationSuccess: () => {},
   })
@@ -44,16 +55,8 @@ export default function CheckoutLoginGate() {
       return
     }
 
-    if (!/^\S+@\S+\.\S+$/.test(email)) {
-      setEmailError(t("auth.invalid_email"))
-      return
-    }
-
     setEmailError(undefined)
-
-    if (!showVerificationInput) {
-      await handleSendVerificationCode()
-    }
+    await handleSendVerificationCode()
   }
 
   const handleEmailChange = (value: string) => {
@@ -73,12 +76,13 @@ export default function CheckoutLoginGate() {
           {t("checkout.express_title")}
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          Sign in to continue to the application form.
+          {t("checkout.express_subtitle")}
         </p>
       </CardHeader>
       <form noValidate onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
           <EmailVerification
+            otpEnabled={isOtpEnabled}
             email={email}
             showVerificationInput={showVerificationInput}
             verificationCode={verificationCode}
@@ -100,7 +104,11 @@ export default function CheckoutLoginGate() {
             className="w-full"
             disabled={isBusy || showVerificationInput}
           >
-            {isBusy ? t("common.processing") : t("checkout.send_code")}
+            {isBusy
+              ? t("common.processing")
+              : isOtpEnabled
+                ? t("checkout.send_code")
+                : t("common.continue")}
           </Button>
         </CardFooter>
       </form>

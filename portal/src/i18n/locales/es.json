@@ -67,7 +67,8 @@
     "invalid_code": "Código de verificación inválido. Por favor, intentá de nuevo.",
     "code_expired": "El código expiró. Por favor, solicitá uno nuevo.",
     "failed_to_verify": "Error al verificar el código. Por favor, intentá de nuevo.",
-    "network_error": "Error de red. Por favor, verificá tu conexión."
+    "network_error": "Error de red. Por favor, verificá tu conexión.",
+    "otp_required_for_existing_account": "Ya existe una cuenta con este email. Te enviamos un código de 6 dígitos para verificar."
   },
   "form": {
     "first_name": "Nombre",
@@ -181,6 +182,10 @@
     "resend_hint": "¿No recibiste el código? Revisá tu carpeta de spam o hacé clic en \"Reenviar código\" después de que expire el temporizador.",
     "success_title": "¡Tickets comprados!",
     "success_description": "Gracias por tu compra. Tus tickets ya están listos para usar.",
+    "success_email_hint": "Te enviamos los detalles por mail.",
+    "success_portal_login_hint": "Para ver tus tickets en el portal, ingresá con el código de verificación que te enviamos por mail.",
+    "go_to_portal_signin": "Ingresá para ver tus tickets",
+    "express_subtitle": "Ingresá para continuar con la compra.",
     "steps": {
       "passes_title": "Seleccioná tus Pases",
       "passes_subtitle": "Elegí pases para vos y tu familia",
