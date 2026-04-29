@@ -5,6 +5,7 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, Query, Response, status
 from loguru import logger
 from pydantic import BaseModel
+from sqlmodel import Session
 
 from app.api.event import crud
 from app.api.event.recurrence import (
@@ -72,6 +73,100 @@ async def _send_event_invitation_emails(
 # ---------------------------------------------------------------------------
 
 
+def _check_venue_open_hours(
+    db,
+    venue,
+    start_time: datetime,
+    end_time: datetime,
+) -> None:
+    """Raise 400 if [start_time, end_time] falls outside the venue's open
+    hours for the relevant day in the popup's timezone.
+
+    Mirrors ``_compute_availability``'s "no weekly_hours = always open"
+    convention so venues without a configured schedule keep working as
+    they did before. When weekly_hours exists but doesn't cover the
+    requested window (closed day, partial overlap, before opening, after
+    closing), the request is rejected — the frontend's local check is the
+    primary gate, this is the safety net for direct API callers / stale
+    clients.
+    """
+    from datetime import timedelta
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+    from sqlmodel import select
+
+    from app.api.event_venue.models import VenueExceptions, VenueWeeklyHours
+    from app.api.event_venue.router import _resolve_popup_timezone
+
+    weekly_rows = list(
+        db.exec(
+            select(VenueWeeklyHours).where(VenueWeeklyHours.venue_id == venue.id)
+        ).all()
+    )
+    open_exceptions = list(
+        db.exec(
+            select(VenueExceptions)
+            .where(VenueExceptions.venue_id == venue.id)
+            .where(VenueExceptions.is_closed == False)  # noqa: E712
+            .where(VenueExceptions.start_datetime < end_time)
+            .where(VenueExceptions.end_datetime > start_time)
+        ).all()
+    )
+    if not weekly_rows and not open_exceptions:
+        return  # no schedule configured = always open (matches availability)
+
+    tz_name = _resolve_popup_timezone(db, venue.popup_id)
+    try:
+        tz = ZoneInfo(tz_name)
+    except ZoneInfoNotFoundError:
+        tz = ZoneInfo("UTC")
+
+    def _aware(dt: datetime) -> datetime:
+        if dt.tzinfo is None:
+            from datetime import timezone
+
+            return dt.replace(tzinfo=timezone.utc)
+        return dt
+
+    s = _aware(start_time)
+    e = _aware(end_time)
+
+    # Build candidate open ranges spanning the request window. Mirrors the
+    # weekly-hours expansion in ``_compute_availability`` but only for the
+    # 1–2 days the request crosses (events virtually never span more).
+    candidate_ranges: list[tuple[datetime, datetime]] = []
+    s_local = s.astimezone(tz)
+    e_local = e.astimezone(tz)
+    day_cursor = s_local.date()
+    last_day = e_local.date()
+    while day_cursor <= last_day + timedelta(days=1):
+        dow = day_cursor.weekday()
+        for row in weekly_rows:
+            if (
+                row.day_of_week != dow
+                or row.is_closed
+                or row.open_time is None
+                or row.close_time is None
+            ):
+                continue
+            open_local = datetime.combine(day_cursor, row.open_time, tzinfo=tz)
+            close_local = datetime.combine(day_cursor, row.close_time, tzinfo=tz)
+            if close_local <= open_local:
+                close_local = close_local + timedelta(days=1)
+            candidate_ranges.append((open_local, close_local))
+        day_cursor = day_cursor + timedelta(days=1)
+    for exc in open_exceptions:
+        candidate_ranges.append((_aware(exc.start_datetime), _aware(exc.end_datetime)))
+
+    if any(r_s <= s and e <= r_e for r_s, r_e in candidate_ranges):
+        return
+
+    raise HTTPException(
+        status_code=400,
+        detail="Selected time falls outside the venue's open hours.",
+    )
+
+
 def _check_venue_availability(
     db,
     venue_id: uuid.UUID,
@@ -79,7 +174,8 @@ def _check_venue_availability(
     end_time: datetime,
     exclude_event_id: uuid.UUID | None = None,
 ) -> None:
-    """Raise 409 if the window collides with an existing booking."""
+    """Raise 400/409 if the window is outside open hours or collides with
+    an existing booking."""
     from app.api.event_venue.models import EventVenues
     from app.api.event_venue.schemas import VenueBookingMode
 
@@ -88,6 +184,8 @@ def _check_venue_availability(
         raise HTTPException(status_code=404, detail="Venue not found")
     if venue.booking_mode == VenueBookingMode.UNBOOKABLE.value:
         raise HTTPException(status_code=409, detail="Venue is not bookable")
+
+    _check_venue_open_hours(db, venue, start_time, end_time)
 
     window_start, window_end = crud.compute_booking_window(
         start_time,
@@ -679,13 +777,11 @@ async def delete_occurrence(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/check-availability", response_model=EventAvailabilityResult)
-async def check_availability(
+def _run_availability_check(
+    db: Session,
     payload: EventAvailabilityCheck,
-    db: TenantSession,
-    _: CurrentUser,
 ) -> EventAvailabilityResult:
-    """Check whether a venue is free for a candidate time window."""
+    """Shared implementation for the user- and portal-facing availability checks."""
     from app.api.event_venue.models import EventVenues
     from app.api.event_venue.schemas import VenueBookingMode
 
@@ -717,6 +813,30 @@ async def check_availability(
         conflicts=[c.id for c in conflicts],
         reason=None if not conflicts else "Conflicts with existing events",
     )
+
+
+@router.post("/check-availability", response_model=EventAvailabilityResult)
+async def check_availability(
+    payload: EventAvailabilityCheck,
+    db: TenantSession,
+    _: CurrentUser,
+) -> EventAvailabilityResult:
+    """Check whether a venue is free for a candidate time window."""
+    return _run_availability_check(db, payload)
+
+
+@router.post(
+    "/portal/events/check-availability",
+    response_model=EventAvailabilityResult,
+    tags=["events"],
+)
+async def check_availability_portal(
+    payload: EventAvailabilityCheck,
+    db: HumanTenantSession,
+    _: CurrentHuman,
+) -> EventAvailabilityResult:
+    """Portal-facing variant of /check-availability authenticated as a human."""
+    return _run_availability_check(db, payload)
 
 
 # ---------------------------------------------------------------------------
@@ -1465,10 +1585,14 @@ async def create_portal_event(
     event_data["owner_id"] = current_human.id
 
     # Reasons the event might need approval:
-    #  1. Venue is bookable only with admin approval (booking_mode).
-    #  2. User requested ``max_participant`` larger than the venue capacity.
+    #  1. Popup-level setting requires admin approval for human-created events.
+    #  2. Venue is bookable only with admin approval (booking_mode).
+    #  3. User requested ``max_participant`` larger than the venue capacity.
     requires_approval = False
     approval_reason = ""
+    if settings and settings.events_require_approval:
+        requires_approval = True
+        approval_reason = "Event submissions require admin approval."
     venue = None
     if event_in.venue_id is not None:
         from app.api.event_venue import crud as venue_crud

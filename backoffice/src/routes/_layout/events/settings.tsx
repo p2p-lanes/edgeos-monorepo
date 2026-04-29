@@ -99,6 +99,7 @@ function EventSettingsForm() {
     timezone: "UTC",
     humans_can_create_venues: false,
     venues_require_approval: true,
+    events_require_approval: true,
     allowed_tags: [] as string[],
     allowed_kinds: [] as string[],
     approval_notification_email: null as string | null,
@@ -155,6 +156,30 @@ function EventSettingsForm() {
           Controls who sees the Create Event button in the portal. When set to
           Admins Only, only admins can create events (via the backoffice).
         </p>
+
+        {currentSettings.can_publish_event === "everyone" && (
+          <div className="flex items-center justify-between rounded-lg border p-4">
+            <div className="space-y-0.5">
+              <Label className="text-base">
+                Human-created events require approval
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                When enabled, events submitted by humans stay in pending
+                approval until an admin reviews them.
+              </p>
+            </div>
+            <Switch
+              checked={currentSettings.events_require_approval ?? true}
+              onCheckedChange={(checked) =>
+                upsertMutation.mutate({
+                  ...currentSettings,
+                  popup_id: selectedPopupId!,
+                  events_require_approval: checked,
+                })
+              }
+            />
+          </div>
+        )}
       </div>
 
       <div className="space-y-2">

@@ -22,6 +22,10 @@ class EventSettingsBase(SQLModel):
     event_enabled: bool = Field(default=True)
     humans_can_create_venues: bool = Field(default=False)
     venues_require_approval: bool = Field(default=True)
+    # When ``can_publish_event`` is EVERYONE, this flag controls whether
+    # human-created events stay in PENDING_APPROVAL until an admin approves
+    # them. Ignored when ``can_publish_event`` is ADMIN_ONLY.
+    events_require_approval: bool = Field(default=True)
     timezone: str = Field(default="UTC", max_length=64)
     # Tags an admin has whitelisted. Portal EventForm offers these as
     # selectable chips; free-text tag entry is disabled.
@@ -61,6 +65,7 @@ class EventSettingsCreate(BaseModel):
     event_enabled: bool = True
     humans_can_create_venues: bool = False
     venues_require_approval: bool = True
+    events_require_approval: bool = True
     timezone: str = "UTC"
     allowed_tags: list[str] = []
     allowed_kinds: list[str] = []
@@ -74,6 +79,7 @@ class EventSettingsUpdate(BaseModel):
     event_enabled: bool | None = None
     humans_can_create_venues: bool | None = None
     venues_require_approval: bool | None = None
+    events_require_approval: bool | None = None
     timezone: str | None = None
     allowed_tags: list[str] | None = None
     allowed_kinds: list[str] | None = None

@@ -20,6 +20,42 @@ export type AITranslateRequest = {
 };
 
 /**
+ * Request body for creating a new API key.
+ */
+export type ApiKeyCreate = {
+    name: string;
+    expires_at?: (string | null);
+};
+
+/**
+ * Response returned only at creation. ``key`` is the raw token; it is
+ * shown to the user exactly once and never persisted in plaintext.
+ */
+export type ApiKeyCreated = {
+    id: string;
+    name: string;
+    prefix: string;
+    created_at: string;
+    last_used_at?: (string | null);
+    expires_at?: (string | null);
+    revoked_at?: (string | null);
+    key: string;
+};
+
+/**
+ * Safe representation of an API key — never includes the raw secret.
+ */
+export type ApiKeyPublic = {
+    id: string;
+    name: string;
+    prefix: string;
+    created_at: string;
+    last_used_at?: (string | null);
+    expires_at?: (string | null);
+    revoked_at?: (string | null);
+};
+
+/**
  * Response when human is the main applicant.
  */
 export type ApplicantParticipation = {
@@ -807,6 +843,7 @@ export type EventParticipantCreate = {
     profile_id: string;
     role?: ParticipantRole;
     message?: (string | null);
+    occurrence_start?: (string | null);
 };
 
 /**
@@ -818,6 +855,7 @@ export type EventParticipantPublic = {
     profile_id: string;
     status?: ParticipantStatus;
     role?: ParticipantRole;
+    occurrence_start?: (string | null);
     check_time?: (string | null);
     message?: (string | null);
     registered_at?: string;
@@ -884,6 +922,7 @@ export type EventSettingsCreate = {
     event_enabled?: boolean;
     humans_can_create_venues?: boolean;
     venues_require_approval?: boolean;
+    events_require_approval?: boolean;
     timezone?: string;
     allowed_tags?: Array<(string)>;
     allowed_kinds?: Array<(string)>;
@@ -900,6 +939,7 @@ export type EventSettingsPublic = {
     event_enabled?: boolean;
     humans_can_create_venues?: boolean;
     venues_require_approval?: boolean;
+    events_require_approval?: boolean;
     timezone?: string;
     allowed_tags?: Array<(string)>;
     allowed_kinds?: Array<(string)>;
@@ -917,6 +957,7 @@ export type EventSettingsUpdate = {
     event_enabled?: (boolean | null);
     humans_can_create_venues?: (boolean | null);
     venues_require_approval?: (boolean | null);
+    events_require_approval?: (boolean | null);
     timezone?: (string | null);
     allowed_tags?: (Array<(string)> | null);
     allowed_kinds?: (Array<(string)> | null);
@@ -2108,6 +2149,7 @@ export type RecurrenceUpdate = {
 export type RegisterRequest = {
     role?: ParticipantRole;
     message?: (string | null);
+    occurrence_start?: (string | null);
 };
 
 /**
@@ -2638,6 +2680,20 @@ export type VenueWeeklyHourRef = {
 export type VenueWeeklyHoursUpdate = {
     hours: Array<VenueWeeklyHourInput>;
 };
+
+export type ApiKeysListApiKeysResponse = (Array<ApiKeyPublic>);
+
+export type ApiKeysCreateApiKeyData = {
+    requestBody: ApiKeyCreate;
+};
+
+export type ApiKeysCreateApiKeyResponse = (ApiKeyCreated);
+
+export type ApiKeysRevokeApiKeyData = {
+    keyId: string;
+};
+
+export type ApiKeysRevokeApiKeyResponse = (void);
 
 export type ApplicationReviewsListReviewsData = {
     applicationId: string;
@@ -3174,6 +3230,7 @@ export type EventParticipantsListPortalParticipantsData = {
      * Maximum number of items to return
      */
     limit?: number;
+    occurrenceStart?: (string | null);
     /**
      * Number of items to skip
      */
@@ -3191,12 +3248,14 @@ export type EventParticipantsRegisterForEventResponse = (EventParticipantPublic)
 
 export type EventParticipantsCancelRegistrationData = {
     eventId: string;
+    requestBody?: (RegisterRequest | null);
 };
 
 export type EventParticipantsCancelRegistrationResponse = (EventParticipantPublic);
 
 export type EventParticipantsCheckInData = {
     eventId: string;
+    requestBody?: (RegisterRequest | null);
 };
 
 export type EventParticipantsCheckInResponse = (EventParticipantPublic);
@@ -3289,6 +3348,12 @@ export type EventsCheckAvailabilityData = {
 };
 
 export type EventsCheckAvailabilityResponse = (EventAvailabilityResult);
+
+export type EventsCheckAvailabilityPortalData = {
+    requestBody: EventAvailabilityCheck;
+};
+
+export type EventsCheckAvailabilityPortalResponse = (EventAvailabilityResult);
 
 export type EventsListInvitationsData = {
     eventId: string;
@@ -3396,6 +3461,7 @@ export type EventsPortalHiddenEventsCountResponse = ({
 
 export type EventsGetPortalEventData = {
     eventId: string;
+    occurrenceStart?: (string | null);
 };
 
 export type EventsGetPortalEventResponse = (EventPublic);

@@ -20,6 +20,42 @@ export type AITranslateRequest = {
 };
 
 /**
+ * Request body for creating a new API key.
+ */
+export type ApiKeyCreate = {
+    name: string;
+    expires_at?: (string | null);
+};
+
+/**
+ * Response returned only at creation. ``key`` is the raw token; it is
+ * shown to the user exactly once and never persisted in plaintext.
+ */
+export type ApiKeyCreated = {
+    id: string;
+    name: string;
+    prefix: string;
+    created_at: string;
+    last_used_at?: (string | null);
+    expires_at?: (string | null);
+    revoked_at?: (string | null);
+    key: string;
+};
+
+/**
+ * Safe representation of an API key — never includes the raw secret.
+ */
+export type ApiKeyPublic = {
+    id: string;
+    name: string;
+    prefix: string;
+    created_at: string;
+    last_used_at?: (string | null);
+    expires_at?: (string | null);
+    revoked_at?: (string | null);
+};
+
+/**
  * Response when human is the main applicant.
  */
 export type ApplicantParticipation = {
@@ -886,6 +922,7 @@ export type EventSettingsCreate = {
     event_enabled?: boolean;
     humans_can_create_venues?: boolean;
     venues_require_approval?: boolean;
+    events_require_approval?: boolean;
     timezone?: string;
     allowed_tags?: Array<(string)>;
     allowed_kinds?: Array<(string)>;
@@ -902,6 +939,7 @@ export type EventSettingsPublic = {
     event_enabled?: boolean;
     humans_can_create_venues?: boolean;
     venues_require_approval?: boolean;
+    events_require_approval?: boolean;
     timezone?: string;
     allowed_tags?: Array<(string)>;
     allowed_kinds?: Array<(string)>;
@@ -919,6 +957,7 @@ export type EventSettingsUpdate = {
     event_enabled?: (boolean | null);
     humans_can_create_venues?: (boolean | null);
     venues_require_approval?: (boolean | null);
+    events_require_approval?: (boolean | null);
     timezone?: (string | null);
     allowed_tags?: (Array<(string)> | null);
     allowed_kinds?: (Array<(string)> | null);
@@ -2642,6 +2681,20 @@ export type VenueWeeklyHoursUpdate = {
     hours: Array<VenueWeeklyHourInput>;
 };
 
+export type ApiKeysListApiKeysResponse = (Array<ApiKeyPublic>);
+
+export type ApiKeysCreateApiKeyData = {
+    requestBody: ApiKeyCreate;
+};
+
+export type ApiKeysCreateApiKeyResponse = (ApiKeyCreated);
+
+export type ApiKeysRevokeApiKeyData = {
+    keyId: string;
+};
+
+export type ApiKeysRevokeApiKeyResponse = (void);
+
 export type ApplicationReviewsListReviewsData = {
     applicationId: string;
     /**
@@ -3295,6 +3348,12 @@ export type EventsCheckAvailabilityData = {
 };
 
 export type EventsCheckAvailabilityResponse = (EventAvailabilityResult);
+
+export type EventsCheckAvailabilityPortalData = {
+    requestBody: EventAvailabilityCheck;
+};
+
+export type EventsCheckAvailabilityPortalResponse = (EventAvailabilityResult);
 
 export type EventsListInvitationsData = {
     eventId: string;

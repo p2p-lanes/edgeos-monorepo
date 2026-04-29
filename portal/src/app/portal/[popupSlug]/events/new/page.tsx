@@ -9,8 +9,6 @@ import {
 import { useMutation, useQuery } from "@tanstack/react-query"
 import {
   ArrowLeft,
-  CheckCircle,
-  CircleAlert,
   Image as ImageIcon,
   Loader2,
   Plus,
@@ -35,11 +33,6 @@ import { Button } from "@/components/ui/button"
 import { DatePicker } from "@/components/ui/date-picker"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
 import {
   Select,
   SelectContent,
@@ -67,17 +60,6 @@ function todayInTz(tz: string): string {
   }).formatToParts(new Date())
   const get = (t: string) => parts.find((p) => p.type === t)?.value ?? ""
   return `${get("year")}-${get("month")}-${get("day")}`
-}
-
-/** "YYYY-MM-DDTHH:mm" local form expected by <input type="datetime-local">. */
-function toLocalInput(date: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0")
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
-}
-
-function localInputToIso(local: string): string {
-  if (!local) return ""
-  return new Date(local).toISOString()
 }
 
 /**
@@ -185,12 +167,8 @@ export default function NewPortalEventPage() {
   const [venueId, setVenueId] = useState<string>("")
   // Date picked by the user, "YYYY-MM-DD" in the popup's configured TZ.
   const [dateStr, setDateStr] = useState(() => todayInTz(displayTz))
-  // Start time as an absolute UTC ISO string. When the user has a venue
-  // selected we derive this from the picked date + typed/suggested HH:mm;
-  // without a venue we fall back to a <datetime-local> input.
-  const [startIso, setStartIso] = useState<string>(defaultStart.toISOString())
-  // Typed "HH:mm" (in displayTz) for the venue-backed time picker. Kept in
-  // sync with startIso but also allows custom values typed by the user.
+  // "HH:mm" in displayTz. The single source of truth for the start time —
+  // startIso is derived below from dateStr + timeStr.
   const [timeStr, setTimeStr] = useState<string>(() => {
     const parts = new Intl.DateTimeFormat("en-GB", {
       timeZone: displayTz,
@@ -201,14 +179,19 @@ export default function NewPortalEventPage() {
     const get = (t: string) => parts.find((p) => p.type === t)?.value ?? ""
     return `${get("hour")}:${get("minute")}`
   })
+  const startIso = useMemo(() => {
+    if (!dateStr || !timeStr) return ""
+    const ms = combineDateTimeInTz(dateStr, timeStr, displayTz)
+    return Number.isNaN(ms) ? "" : new Date(ms).toISOString()
+  }, [dateStr, timeStr, displayTz])
   const [durationValue, setDurationValue] = useState<number>(60)
   const [durationUnit, setDurationUnit] = useState<DurationUnit>("minutes")
 
   // City loads asynchronously, so the popup window isn't known on first
   // render. When it arrives and today falls outside [start_date, end_date],
-  // snap the date picker default (and the no-venue datetime-local default)
-  // to the popup's start_date so the calendar opens on a valid month.
-  // One-shot — once the user picks a date themselves we leave it alone.
+  // snap the date picker default to the popup's start_date so the calendar
+  // opens on a valid month. One-shot — once the user picks a date themselves
+  // we leave it alone.
   const didSnapDefaultsRef = useRef(false)
   useEffect(() => {
     if (didSnapDefaultsRef.current) return
@@ -222,8 +205,6 @@ export default function NewPortalEventPage() {
     const targetDate = popupStartKey ?? popupEndKey
     if (!targetDate) return
     setDateStr(targetDate)
-    const ms = combineDateTimeInTz(targetDate, "10:00", displayTz)
-    if (!Number.isNaN(ms)) setStartIso(new Date(ms).toISOString())
   }, [popupStartKey, popupEndKey, displayTz])
 
   const durationMinutes = Math.max(
@@ -300,14 +281,7 @@ export default function NewPortalEventPage() {
         const yy = cursor.getFullYear()
         const mm = String(cursor.getMonth() + 1).padStart(2, "0")
         const dd = String(cursor.getDate()).padStart(2, "0")
-        const next = `${yy}-${mm}-${dd}`
-        setDateStr(next)
-        if (timeStr) {
-          const ms = combineDateTimeInTz(next, timeStr, displayTz)
-          setStartIso(Number.isNaN(ms) ? "" : new Date(ms).toISOString())
-        } else {
-          setStartIso("")
-        }
+        setDateStr(`${yy}-${mm}-${dd}`)
         return
       }
       cursor.setDate(cursor.getDate() + 1)
@@ -319,7 +293,6 @@ export default function NewPortalEventPage() {
     dateStr,
     displayTz,
     popupStartKey,
-    timeStr,
   ])
 
   const { data: tracksData } = useQuery({
@@ -361,6 +334,19 @@ export default function NewPortalEventPage() {
     )
   }, [availabilityData, dayBounds])
 
+  // Same as freeIntervals but with busy-slot subtraction skipped — used to
+  // distinguish "time falls outside the venue's open hours" from "venue is
+  // open at this time but another event already occupies the slot".
+  const openOnlyIntervals = useMemo(() => {
+    if (!availabilityData || !dayBounds) return []
+    return freeIntervalsForDay(
+      availabilityData.open_ranges,
+      [],
+      dayBounds.start,
+      dayBounds.end,
+    )
+  }, [availabilityData, dayBounds])
+
   const startOptions = useMemo(
     () =>
       availableStartOptionsForDuration(
@@ -372,6 +358,22 @@ export default function NewPortalEventPage() {
     [freeIntervals, durationMinutes, displayTz],
   )
 
+  // When the user selects a venue, snap timeStr to the first available
+  // slot once availability data has loaded. We snap once per venueId so
+  // subsequent typing isn't overwritten — out-of-range times surface as
+  // a validation error and block submit instead.
+  const lastVenueSnapRef = useRef("")
+  useEffect(() => {
+    if (!venueId) {
+      lastVenueSnapRef.current = ""
+      return
+    }
+    if (lastVenueSnapRef.current === venueId) return
+    if (startOptions.length === 0) return
+    lastVenueSnapRef.current = venueId
+    setTimeStr(startOptions[0].label)
+  }, [venueId, startOptions])
+
   // End ISO derived from startIso + duration.
   const endIso = useMemo(() => {
     if (!startIso) return ""
@@ -380,52 +382,45 @@ export default function NewPortalEventPage() {
     return new Date(start + durationMinutes * 60_000).toISOString()
   }, [startIso, durationMinutes])
 
-  // Does the typed start + duration fit in a free interval?
-  const startFits = useMemo(() => {
+  // Does the typed start + duration fit inside the venue's open hours
+  // (ignoring busy slots from other events)? Drives the inline "outside
+  // open hours" error on the start-time input.
+  const withinOpenHours = useMemo(() => {
     if (!venueId) return true
     if (!startIso) return true
-    if (freeIntervals.length === 0) return true
+    if (openOnlyIntervals.length === 0) return true
     const ms = Date.parse(startIso)
     if (Number.isNaN(ms)) return true
-    return durationFits(freeIntervals, ms, durationMinutes)
-  }, [venueId, startIso, freeIntervals, durationMinutes])
+    return durationFits(openOnlyIntervals, ms, durationMinutes)
+  }, [venueId, startIso, openOnlyIntervals, durationMinutes])
 
-  // ---- final availability check (used even when there's no venue) ----
+  // ---- final availability check (only renders the conflict signal now) --
   const [availability, setAvailability] = useState<
-    | { state: "idle" | "checking" }
-    | { state: "ok" }
-    | { state: "conflict"; reason: string | null }
-  >({ state: "idle" })
+    "idle" | "checking" | "ok" | "conflict"
+  >("idle")
 
   useEffect(() => {
     if (!venueId || !startIso || !endIso) {
-      setAvailability({ state: "idle" })
+      setAvailability("idle")
       return
     }
     const handle = setTimeout(async () => {
-      setAvailability({ state: "checking" })
+      setAvailability("checking")
       try {
-        const res = await EventsService.checkAvailability({
+        const res = await EventsService.checkAvailabilityPortal({
           requestBody: {
             venue_id: venueId,
             start_time: startIso,
             end_time: endIso,
           },
         })
-        if (res.available) {
-          setAvailability({ state: "ok" })
-        } else {
-          setAvailability({
-            state: "conflict",
-            reason: res.reason ?? t("events.form.conflicts_with_another_event"),
-          })
-        }
+        setAvailability(res.available ? "ok" : "conflict")
       } catch {
-        setAvailability({ state: "idle" })
+        setAvailability("idle")
       }
     }, 500)
     return () => clearTimeout(handle)
-  }, [venueId, startIso, endIso, t])
+  }, [venueId, startIso, endIso])
 
   // ---- mutation -------------------------------------------------------
   const createMutation = useMutation({
@@ -541,7 +536,13 @@ export default function NewPortalEventPage() {
   }
 
   const canSubmit =
-    !!title.trim() && !!startIso && !!endIso && !createMutation.isPending
+    !!title.trim() &&
+    !!startIso &&
+    !!endIso &&
+    (!venueId || withinOpenHours) &&
+    availability !== "conflict" &&
+    availability !== "checking" &&
+    !createMutation.isPending
 
   return (
     <div className="flex flex-col max-w-2xl mx-auto p-4 sm:p-6 space-y-5">
@@ -713,15 +714,7 @@ export default function NewPortalEventPage() {
           <DatePicker
             id="date"
             value={dateStr}
-            onChange={(newDate) => {
-              setDateStr(newDate)
-              if (venueId && timeStr) {
-                const ms = combineDateTimeInTz(newDate, timeStr, displayTz)
-                setStartIso(Number.isNaN(ms) ? "" : new Date(ms).toISOString())
-              } else {
-                setStartIso("")
-              }
-            }}
+            onChange={setDateStr}
             disabled={selectedVenue?.booking_mode === "unbookable"}
             disabledDays={isDateOutsidePopupWindow}
             closedDays={
@@ -739,93 +732,61 @@ export default function NewPortalEventPage() {
           )}
         </div>
 
-        {/* Times + duration */}
-        {venueId ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-2">
+        {/* Time + duration. Date lives in its own field above; this input
+            is always HH:mm only (whether a venue is selected or not). */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
               <Label htmlFor="start">{t("events.form.start_time_label")}</Label>
-              <StartTimeCombobox
-                id="start"
-                value={timeStr}
-                onChange={(hhmm) => {
-                  setTimeStr(hhmm)
-                  if (!hhmm) {
-                    setStartIso("")
-                    return
-                  }
-                  const ms = combineDateTimeInTz(dateStr, hhmm, displayTz)
-                  setStartIso(
-                    Number.isNaN(ms) ? "" : new Date(ms).toISOString(),
-                  )
-                }}
-                options={startOptions}
-                disabled={selectedVenue?.booking_mode === "unbookable"}
-                fits={startFits}
-                placeholder={
-                  startOptions.length === 0
-                    ? t("events.common.no_open_hours")
-                    : "HH:mm"
-                }
-              />
+              {availability === "checking" && (
+                <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+              )}
             </div>
-            <div className="space-y-2">
-              <Label>{t("events.form.duration_label")}</Label>
-              <DurationPicker
-                value={durationValue}
-                unit={durationUnit}
-                onChange={(next) => {
-                  setDurationValue(next.value)
-                  setDurationUnit(next.unit)
-                }}
-              />
-            </div>
+            <Input
+              id="start"
+              type="time"
+              value={timeStr}
+              disabled={selectedVenue?.booking_mode === "unbookable"}
+              onChange={(e) => setTimeStr(e.target.value.slice(0, 5))}
+              className={cn(
+                "w-full",
+                venueId &&
+                  timeStr &&
+                  (!withinOpenHours || availability === "conflict")
+                  ? "border-destructive focus-visible:ring-destructive/40"
+                  : "",
+              )}
+              required
+            />
+            {venueId && timeStr && !withinOpenHours && (
+              <p className="text-xs text-destructive">
+                {t("events.form.start_time_outside_venue_hours")}
+              </p>
+            )}
+            {venueId &&
+              timeStr &&
+              withinOpenHours &&
+              availability === "conflict" && (
+                <p className="text-xs text-destructive">
+                  There is already an event at this time.
+                </p>
+              )}
           </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label htmlFor="start">{t("events.form.start_label")}</Label>
-              <Input
-                id="start"
-                type="datetime-local"
-                value={startIso ? toLocalInput(new Date(startIso)) : ""}
-                onChange={(e) => setStartIso(localInputToIso(e.target.value))}
-                min={popupStartKey ? `${popupStartKey}T00:00` : undefined}
-                max={popupEndKey ? `${popupEndKey}T23:59` : undefined}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>{t("events.form.duration_label")}</Label>
-              <DurationPicker
-                value={durationValue}
-                unit={durationUnit}
-                onChange={(next) => {
-                  setDurationValue(next.value)
-                  setDurationUnit(next.unit)
-                }}
-              />
-            </div>
+          <div className="space-y-2">
+            <Label>{t("events.form.duration_label")}</Label>
+            <DurationPicker
+              value={durationValue}
+              unit={durationUnit}
+              onChange={(next) => {
+                setDurationValue(next.value)
+                setDurationUnit(next.unit)
+              }}
+            />
           </div>
-        )}
+        </div>
         {venueId && startOptions.length === 0 && availabilityData && (
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-destructive">
             {t("events.form.no_venue_open_hours")}
-          </p>
-        )}
-        {availability.state === "checking" && (
-          <p className="text-xs text-muted-foreground">
-            {t("events.form.checking_availability")}
-          </p>
-        )}
-        {availability.state === "ok" && (
-          <p className="text-xs text-green-600 inline-flex items-center gap-1">
-            <CheckCircle className="h-3.5 w-3.5" />{" "}
-            {t("events.form.slot_available")}
-          </p>
-        )}
-        {availability.state === "conflict" && (
-          <p className="text-xs text-destructive inline-flex items-center gap-1">
-            <CircleAlert className="h-3.5 w-3.5" /> {availability.reason}
           </p>
         )}
 
@@ -1002,94 +963,6 @@ function GatedMessage({ title, message }: { title: string; message: string }) {
       <ImageIcon className="h-10 w-10 text-muted-foreground/50 mb-3" />
       <h1 className="text-xl font-semibold">{title}</h1>
       <p className="text-sm text-muted-foreground mt-2">{message}</p>
-    </div>
-  )
-}
-
-interface StartTimeComboboxProps {
-  id?: string
-  value: string // "HH:mm"
-  onChange: (hhmm: string) => void
-  options: { label: string; isoUtc: string }[]
-  disabled?: boolean
-  fits: boolean
-  placeholder?: string
-}
-
-function StartTimeCombobox({
-  id,
-  value,
-  onChange,
-  options,
-  disabled,
-  fits,
-  placeholder,
-}: StartTimeComboboxProps) {
-  const { t } = useTranslation()
-  const [open, setOpen] = useState(false)
-  return (
-    <div className="w-full">
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Input
-            id={id}
-            type="time"
-            value={value}
-            placeholder={placeholder}
-            disabled={disabled}
-            onFocus={() => {
-              if (options.length > 0) setOpen(true)
-            }}
-            onChange={(e) => {
-              const raw = e.target.value
-              onChange(raw ? raw.slice(0, 5) : "")
-            }}
-            className={cn(
-              "w-full",
-              !fits && value
-                ? "border-destructive focus-visible:ring-destructive/40"
-                : "",
-            )}
-          />
-        </PopoverTrigger>
-        {options.length > 0 && (
-          <PopoverContent
-            align="start"
-            className="w-[220px] p-1"
-            onOpenAutoFocus={(e) => e.preventDefault()}
-          >
-            <p className="px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-              {t("events.form.suggested_slots")}
-            </p>
-            <ul className="max-h-60 overflow-y-auto">
-              {options.map((o) => (
-                <li key={o.isoUtc}>
-                  <button
-                    type="button"
-                    className={cn(
-                      "flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground",
-                      value === o.label
-                        ? "bg-accent text-accent-foreground"
-                        : "",
-                    )}
-                    onClick={() => {
-                      onChange(o.label)
-                      setOpen(false)
-                    }}
-                  >
-                    <span>{o.label}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </PopoverContent>
-        )}
-      </Popover>
-      {!fits && value && (
-        <p className="mt-1 text-xs text-destructive">
-          {t("events.form.not_available_overlaps")}
-        </p>
-      )}
     </div>
   )
 }

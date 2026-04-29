@@ -76,6 +76,164 @@ export const AbandonedCartPublicSchema = {
     description: 'Abandoned cart with enriched info for backoffice.'
 } as const;
 
+export const ApiKeyCreateSchema = {
+    properties: {
+        name: {
+            type: 'string',
+            maxLength: 100,
+            minLength: 1,
+            title: 'Name'
+        },
+        expires_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Expires At'
+        }
+    },
+    type: 'object',
+    required: ['name'],
+    title: 'ApiKeyCreate',
+    description: 'Request body for creating a new API key.'
+} as const;
+
+export const ApiKeyCreatedSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        prefix: {
+            type: 'string',
+            title: 'Prefix'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        last_used_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Used At'
+        },
+        expires_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Expires At'
+        },
+        revoked_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Revoked At'
+        },
+        key: {
+            type: 'string',
+            title: 'Key'
+        }
+    },
+    type: 'object',
+    required: ['id', 'name', 'prefix', 'created_at', 'key'],
+    title: 'ApiKeyCreated',
+    description: `Response returned only at creation. \`\`key\`\` is the raw token; it is
+shown to the user exactly once and never persisted in plaintext.`
+} as const;
+
+export const ApiKeyPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        prefix: {
+            type: 'string',
+            title: 'Prefix'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        last_used_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Used At'
+        },
+        expires_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Expires At'
+        },
+        revoked_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Revoked At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'name', 'prefix', 'created_at'],
+    title: 'ApiKeyPublic',
+    description: 'Safe representation of an API key — never includes the raw secret.'
+} as const;
+
 export const ApplicantParticipationSchema = {
     properties: {
         type: {
@@ -3461,6 +3619,11 @@ export const EventCreateSchema = {
             '$ref': '#/components/schemas/EventStatus',
             default: 'draft'
         },
+        highlighted: {
+            type: 'boolean',
+            title: 'Highlighted',
+            default: false
+        },
         recurrence: {
             anyOf: [
                 {
@@ -3912,6 +4075,11 @@ export const EventPublicSchema = {
             '$ref': '#/components/schemas/EventStatus',
             default: 'draft'
         },
+        highlighted: {
+            type: 'boolean',
+            title: 'Highlighted',
+            default: false
+        },
         rrule: {
             anyOf: [
                 {
@@ -4056,6 +4224,11 @@ export const EventSettingsCreateSchema = {
             title: 'Venues Require Approval',
             default: true
         },
+        events_require_approval: {
+            type: 'boolean',
+            title: 'Events Require Approval',
+            default: true
+        },
         timezone: {
             type: 'string',
             title: 'Timezone',
@@ -4124,6 +4297,11 @@ export const EventSettingsPublicSchema = {
         venues_require_approval: {
             type: 'boolean',
             title: 'Venues Require Approval',
+            default: true
+        },
+        events_require_approval: {
+            type: 'boolean',
+            title: 'Events Require Approval',
             default: true
         },
         timezone: {
@@ -4223,6 +4401,17 @@ export const EventSettingsUpdateSchema = {
                 }
             ],
             title: 'Venues Require Approval'
+        },
+        events_require_approval: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Events Require Approval'
         },
         timezone: {
             anyOf: [
@@ -4457,6 +4646,17 @@ export const EventUpdateSchema = {
                     type: 'null'
                 }
             ]
+        },
+        highlighted: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Highlighted'
         }
     },
     type: 'object',

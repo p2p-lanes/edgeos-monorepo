@@ -553,19 +553,82 @@ export function EventForm({
     [freeIntervals, durationMinutes, popupTz],
   )
 
-  // Does the typed start + duration fit in a free window?
-  const startFits = useMemo(() => {
-    if (!startUtc) return true
-    if (freeIntervals.length === 0) return true // no venue / no day data yet
-    return durationFits(freeIntervals, startUtc.getTime(), durationMinutes)
-  }, [freeIntervals, startUtc, durationMinutes])
+  // Does the typed start + duration fit a free window? Returns the reason
+  // it does NOT fit (so the indicator and submit gate share a single source
+  // of truth and a precise message), or null when the slot is fine /
+  // there's no venue / availability is still loading.
+  const fitnessIssue = useMemo<string | null>(() => {
+    if (!venueIdValue) return null
+    if (!startUtc) return null
+    // No availability data yet — let the server check decide. Once
+    // dayAvailability resolves, an empty open_ranges *truly* means the
+    // venue is closed and we should block.
+    if (!dayAvailability) return null
+    if ((dayAvailability.open_ranges ?? []).length === 0) {
+      return "Venue is closed on this day"
+    }
+    const startMs = startUtc.getTime()
+    if (durationFits(freeIntervals, startMs, durationMinutes)) return null
+    // Distinguish "outside open hours" from "inside hours but conflicts
+    // with another event". Both block submit; the message differs so the
+    // user knows whether to change the time or pick a different venue.
+    const endMs = startMs + durationMinutes * 60_000
+    const insideOpen = (dayAvailability.open_ranges ?? []).some((r) => {
+      const rs = Date.parse(r.start)
+      const re = Date.parse(r.end)
+      return startMs >= rs && endMs <= re
+    })
+    return insideOpen
+      ? "Overlaps another event at this venue"
+      : "Outside venue open hours"
+  }, [venueIdValue, startUtc, dayAvailability, freeIntervals, durationMinutes])
 
-  // Combined availability: if the slot doesn't fit locally, report unavailable
-  // so we don't show a stale "Slot available" message from the server check.
+  const startFits = fitnessIssue === null
+
+  // Combined availability: when the slot doesn't fit locally, surface the
+  // precise reason — we'd otherwise show a stale "Slot available" from the
+  // server check, which only validates conflicts (not open hours).
   const effectiveAvailability: AvailabilityState =
-    startTimeValue && !startFits
-      ? { status: "unavailable", reason: "Not available — overlaps busy" }
+    startTimeValue && fitnessIssue
+      ? { status: "unavailable", reason: fitnessIssue }
       : availability
+
+  // When picking a venue (create mode), snap start_time into one of the
+  // venue's open slots. Without this, the form keeps whatever default time
+  // it had before the venue was chosen — often outside the venue's hours,
+  // which then either gets rejected by the backend or, worse, slips through
+  // when no weekly_hours are configured. Two-step: seed a date first so the
+  // availability query can fire, then snap to the first available slot.
+  const venueAutoInitRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (isEdit) return
+    if (!venueIdValue) {
+      venueAutoInitRef.current = null
+      return
+    }
+    if (!dateStr) {
+      const today = new Date().toISOString().slice(0, 10)
+      form.setFieldValue("start_time", `${today}T09:00`)
+      return
+    }
+    if (venueAutoInitRef.current === venueIdValue) return
+    if (startSlotOptions.length === 0) return
+    venueAutoInitRef.current = venueIdValue
+    if (!startTimeValue || !startFits) {
+      form.setFieldValue(
+        "start_time",
+        `${dateStr}T${startSlotOptions[0].label}`,
+      )
+    }
+  }, [
+    isEdit,
+    venueIdValue,
+    dateStr,
+    startSlotOptions,
+    startFits,
+    startTimeValue,
+    form,
+  ])
 
   // --- Max participant warning -------------------------------------------
   const venueCapacity = selectedVenue?.capacity ?? null
@@ -647,6 +710,13 @@ export function EventForm({
       onSubmit={(e) => {
         e.preventDefault()
         if (readOnly) return
+        if (effectiveAvailability.status === "unavailable") {
+          showErrorToast(
+            effectiveAvailability.reason ||
+              "Selected time is not available at this venue.",
+          )
+          return
+        }
         form.handleSubmit().catch((err: unknown) => {
           showErrorToast(
             err instanceof Error ? err.message : "Error submitting form",
@@ -1241,9 +1311,20 @@ export function EventForm({
           {readOnly ? "Back" : "Cancel"}
         </Button>
         {!readOnly && (
-          <LoadingButton type="submit" loading={isPending}>
-            {isEdit ? "Save Changes" : "Create Event"}
-          </LoadingButton>
+          <div className="flex flex-col items-start gap-1">
+            <LoadingButton
+              type="submit"
+              loading={isPending}
+              disabled={effectiveAvailability.status === "unavailable"}
+            >
+              {isEdit ? "Save Changes" : "Create Event"}
+            </LoadingButton>
+            {effectiveAvailability.status === "unavailable" && (
+              <p className="text-xs text-destructive">
+                Pick a time the venue is open and free before submitting.
+              </p>
+            )}
+          </div>
         )}
       </div>
       <UnsavedChangesDialog blocker={blocker} />
