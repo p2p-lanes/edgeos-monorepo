@@ -2,11 +2,11 @@
 
 import { describe, expect, it } from "vitest"
 import { CHECKOUT_MODE } from "@/checkout/popupCheckoutPolicy"
+import type { ProductWithQuantity } from "@/client"
 import {
   buildBaseAttendeePasses,
   buildPurchasesMap,
 } from "@/providers/passesProvider"
-import type { ProductWithQuantity } from "@/client"
 import type { AttendeePassState } from "@/types/Attendee"
 import type { ProductsPass } from "@/types/Products"
 
