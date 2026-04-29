@@ -3,6 +3,7 @@ from loguru import logger
 
 from app.api.auth.crud import (
     authenticate_human,
+    authenticate_human_for_checkout,
     authenticate_user,
     login_human,
     login_user,
@@ -10,6 +11,7 @@ from app.api.auth.crud import (
 from app.api.auth.schemas import (
     AuthCodeSentResponse,
     HumanAuth,
+    HumanCheckoutAuth,
     HumanVerify,
     UserAuth,
     UserVerify,
@@ -98,5 +100,32 @@ async def human_authenticate(
 
     access_token = create_access_token(subject=human.id, token_type="human")
     logger.info(f"Human authenticated: {human.email}")
+
+    return Token(access_token=access_token)
+
+
+@router.post("/human/checkout-authenticate", response_model=Token)
+async def human_checkout_authenticate(
+    request: HumanCheckoutAuth,
+    session: SessionDep,
+) -> Token:
+    """Authenticate a human for popup checkout when OTP is disabled.
+
+    Issues a narrowly scoped ``human_checkout`` token bound to ``popup_id``.
+    The token only opens the checkout allowlist — the rest of the portal
+    still requires a full OTP-validated ``human`` token.
+    """
+    human = authenticate_human_for_checkout(
+        session=session,
+        popup_id=request.popup_id,
+        email=request.normalized_email,
+    )
+
+    access_token = create_access_token(
+        subject=human.id,
+        token_type="human_checkout",
+        popup_id=request.popup_id,
+    )
+    logger.info(f"Human checkout-authenticated without OTP: {human.email}")
 
     return Token(access_token=access_token)

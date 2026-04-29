@@ -4680,6 +4680,25 @@ export const HumanAuthSchema = {
     description: 'Request to initiate human authentication.'
 } as const;
 
+export const HumanCheckoutAuthSchema = {
+    properties: {
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        email: {
+            type: 'string',
+            minLength: 1,
+            title: 'Email'
+        }
+    },
+    type: 'object',
+    required: ['popup_id', 'email'],
+    title: 'HumanCheckoutAuth',
+    description: 'Request to authenticate directly for a popup checkout when OTP is disabled.'
+} as const;
+
 export const HumanCreateSchema = {
     properties: {
         email: {
@@ -6528,6 +6547,11 @@ export const PopupAdminSchema = {
             '$ref': '#/components/schemas/ApplicationLayout',
             default: 'single_page'
         },
+        checkout_otp_enabled: {
+            type: 'boolean',
+            title: 'Checkout Otp Enabled',
+            default: true
+        },
         tier_progression_enabled: {
             type: 'boolean',
             title: 'Tier Progression Enabled',
@@ -6889,6 +6913,11 @@ export const PopupCreateSchema = {
             '$ref': '#/components/schemas/ApplicationLayout',
             default: 'single_page'
         },
+        checkout_otp_enabled: {
+            type: 'boolean',
+            title: 'Checkout Otp Enabled',
+            default: true
+        },
         tier_progression_enabled: {
             type: 'boolean',
             title: 'Tier Progression Enabled',
@@ -7169,6 +7198,11 @@ export const PopupPublicSchema = {
         application_layout: {
             '$ref': '#/components/schemas/ApplicationLayout',
             default: 'single_page'
+        },
+        checkout_otp_enabled: {
+            type: 'boolean',
+            title: 'Checkout Otp Enabled',
+            default: true
         },
         tier_progression_enabled: {
             type: 'boolean',
@@ -7699,6 +7733,17 @@ export const PopupUpdateSchema = {
                     type: 'null'
                 }
             ]
+        },
+        checkout_otp_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Checkout Otp Enabled'
         },
         tier_progression_enabled: {
             anyOf: [
