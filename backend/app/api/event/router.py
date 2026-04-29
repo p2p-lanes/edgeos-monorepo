@@ -123,9 +123,9 @@ def _check_venue_open_hours(
 
     def _aware(dt: datetime) -> datetime:
         if dt.tzinfo is None:
-            from datetime import timezone
+            from datetime import UTC
 
-            return dt.replace(tzinfo=timezone.utc)
+            return dt.replace(tzinfo=UTC)
         return dt
 
     s = _aware(start_time)
@@ -277,9 +277,9 @@ def _check_event_within_popup_window(
 
     def _aware(dt: datetime) -> datetime:
         if dt.tzinfo is None:
-            from datetime import timezone
+            from datetime import UTC
 
-            return dt.replace(tzinfo=timezone.utc)
+            return dt.replace(tzinfo=UTC)
         return dt
 
     if start_bound is not None and _aware(start_time) < _aware(start_bound):

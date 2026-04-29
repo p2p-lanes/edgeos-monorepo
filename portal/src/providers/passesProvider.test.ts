@@ -6,6 +6,7 @@ import {
   buildBaseAttendeePasses,
   buildPurchasesMap,
 } from "@/providers/passesProvider"
+import type { ProductWithQuantity } from "@/client"
 import type { AttendeePassState } from "@/types/Attendee"
 import type { ProductsPass } from "@/types/Products"
 
@@ -27,6 +28,22 @@ function createProduct(overrides: Partial<ProductsPass>): ProductsPass {
   } as ProductsPass
 }
 
+function createPurchasedProduct(
+  overrides: Partial<ProductWithQuantity>,
+): ProductWithQuantity {
+  return {
+    tenant_id: overrides.tenant_id ?? "tenant-1",
+    popup_id: overrides.popup_id ?? "popup-1",
+    name: overrides.name ?? "Product",
+    slug: overrides.slug ?? "product",
+    price: overrides.price ?? "100",
+    is_active: overrides.is_active ?? true,
+    id: overrides.id ?? "product-1",
+    quantity: overrides.quantity ?? 1,
+    ...overrides,
+  }
+}
+
 describe("buildBaseAttendeePasses", () => {
   it("keeps purchased inactive products in the attendee passes state", () => {
     const attendees = [
@@ -41,7 +58,7 @@ describe("buildBaseAttendeePasses", () => {
         attendee_name: "Main Attendee",
         attendee_category: "main",
         products: [
-          createProduct({
+          createPurchasedProduct({
             id: "inactive-ticket",
             name: "Inactive Ticket",
             is_active: false,
