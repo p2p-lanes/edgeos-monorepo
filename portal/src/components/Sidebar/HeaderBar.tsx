@@ -18,6 +18,7 @@ import { SidebarTrigger } from "./SidebarComponents"
 
 const SHOW_THRESHOLD = 64
 const DELTA = 4
+const HEADER_HEIGHT = 56 // matches h-14
 
 function useHideOnScroll() {
   const [hidden, setHidden] = useState(false)
@@ -41,8 +42,15 @@ function useHideOnScroll() {
         setHidden(false)
         return
       }
-      if (diff > DELTA) setHidden(true)
-      else if (diff < -DELTA) setHidden(false)
+      if (diff > DELTA) {
+        // Only hide when there is at least one header's worth of room left
+        // below. Hiding collapses the header to h-0, which grows the scroll
+        // container; if scrollTop would no longer fit, the browser clamps it
+        // down and emits a scroll-up event, re-showing the header and looping
+        // every frame on short pages.
+        const roomBelow = el.scrollHeight - el.clientHeight - currentY
+        if (roomBelow >= HEADER_HEIGHT) setHidden(true)
+      } else if (diff < -DELTA) setHidden(false)
     }
 
     window.addEventListener("scroll", onScroll, {

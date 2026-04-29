@@ -12,11 +12,12 @@ import {
   Pencil,
   Plus,
   Repeat,
+  Star,
   Tag,
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 
 import {
@@ -67,21 +68,18 @@ export default function EventsPage() {
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const queryClient = useQueryClient()
 
-  // Persist view + day-view date in URL search params so "back to events"
-  // from an event detail page can return to the same calendar spot.
+  // The view tab is persisted in the URL so a refresh keeps the user on
+  // their current tab. The day-view date, on the other hand, is owned
+  // locally — we only seed it from `?date=` once on mount (so the
+  // back-from-event-detail link still lands on the right day) and then
+  // strip the param. That way a plain refresh always falls back to the
+  // popup's first booking day, while session navigation (today/first-day/
+  // prev/next) still works in-page.
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const view: EventsView =
     (searchParams.get("view") as EventsView | null) ?? "day"
-  const dateParam = searchParams.get("date")
-  const selectedDate = useMemo(() => {
-    if (!dateParam) return null
-    const m = dateParam.match(/^(\d{4})-(\d{2})-(\d{2})$/)
-    if (!m) return null
-    const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 0, 0, 0, 0)
-    return Number.isNaN(d.getTime()) ? null : d
-  }, [dateParam])
   const setView = useCallback(
     (next: EventsView) => {
       const params = new URLSearchParams(searchParams.toString())
@@ -92,17 +90,29 @@ export default function EventsPage() {
     },
     [router, pathname, searchParams],
   )
-  const setSelectedDate = useCallback(
-    (next: Date) => {
-      const params = new URLSearchParams(searchParams.toString())
-      const y = next.getFullYear()
-      const m = String(next.getMonth() + 1).padStart(2, "0")
-      const d = String(next.getDate()).padStart(2, "0")
-      params.set("date", `${y}-${m}-${d}`)
-      router.replace(`${pathname}?${params.toString()}`, { scroll: false })
-    },
-    [router, pathname, searchParams],
-  )
+
+  const [selectedDate, setSelectedDate] = useState<Date | null>(() => {
+    if (typeof window === "undefined") return null
+    const dateParam = new URLSearchParams(window.location.search).get("date")
+    if (!dateParam) return null
+    const m = dateParam.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    if (!m) return null
+    const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 0, 0, 0, 0)
+    return Number.isNaN(d.getTime()) ? null : d
+  })
+  // One-shot URL cleanup: drop `?date=` after seeding local state so a
+  // refresh no longer carries it. Runs once per mount; back-from-detail
+  // re-mounts the page so its `?date=` is honored on the new mount.
+  const didCleanDateUrlRef = useRef(false)
+  useEffect(() => {
+    if (didCleanDateUrlRef.current) return
+    didCleanDateUrlRef.current = true
+    const params = new URLSearchParams(searchParams.toString())
+    if (!params.has("date")) return
+    params.delete("date")
+    const qs = params.toString()
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+  }, [router, pathname, searchParams])
 
   const { data: currentHuman } = useQuery({
     queryKey: ["current-human"],
@@ -115,28 +125,67 @@ export default function EventsPage() {
   const { data: eventSettings } = usePortalEventSettings(city?.id)
   const eventsEnabled = eventSettings?.event_enabled ?? true
 
+  // Default landing date for the day/calendar views: the popup's first
+  // booking day, parsed as a local Date. Falls back to "today" until the
+  // popup data has loaded.
+  const popupStartDate = useMemo(() => {
+    if (!city?.start_date) return null
+    const m = city.start_date.slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    if (!m) return null
+    return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 0, 0, 0, 0)
+  }, [city?.start_date])
+
   // Expansion window for recurring events. Passing start_after triggers the
   // backend to expand RRULEs into concrete occurrences; without it, recurring
   // events render only at their master's start (hiding the other instances
   // from the list while the calendar still showed them).
-  const listWindow = useState(() => {
+  //
+  // Anchored to the popup's booking window so the list view starts on the
+  // popup's first day rather than "today" — if the popup hasn't started or
+  // has already ended, the list still shows its events instead of being
+  // empty. Falls back to a 180-day window from today before the popup
+  // record loads.
+  const listWindow = useMemo(() => {
+    if (city?.start_date && city?.end_date) {
+      return {
+        startAfter: new Date(city.start_date).toISOString(),
+        startBefore: new Date(city.end_date).toISOString(),
+      }
+    }
     const start = new Date()
     start.setUTCHours(0, 0, 0, 0)
     const end = new Date(start)
     end.setUTCDate(end.getUTCDate() + 180)
     return {
-      startAfter: start.toISOString(),
-      startBefore: end.toISOString(),
+      startAfter: (city?.start_date
+        ? new Date(city.start_date)
+        : start
+      ).toISOString(),
+      startBefore: (city?.end_date
+        ? new Date(city.end_date)
+        : end
+      ).toISOString(),
     }
-  })[0]
+  }, [city?.start_date, city?.end_date])
 
-  const { data, isLoading } = useQuery({
+  // The list is built from up to three independent "channels" — picking
+  // events with OR semantics across the active filters so that toggling
+  // "My events" + "My RSVPs" together shows the *union* (everything I
+  // own + everything I'm going to) rather than the intersection.
+  // - all:    no filter on → published events for everyone
+  // - mine:   "My events" on → events I own (any status, filtered locally
+  //           since the API has no owner filter)
+  // - rsvped: "My RSVPs" on → published events I'm registered for
+  const useAllChannel = !mineOnly && !rsvpedOnly
+  const useMineChannel = mineOnly
+  const useRsvpedChannel = rsvpedOnly
+
+  const allQuery = useQuery({
     queryKey: [
       "portal-events",
+      "all",
       city?.id,
       search,
-      rsvpedOnly,
-      mineOnly,
       showHidden,
       selectedTags,
       listWindow.startAfter,
@@ -146,18 +195,72 @@ export default function EventsPage() {
       EventsService.listPortalEvents({
         popupId: city!.id,
         search: search || undefined,
-        // When showing "My events" we want drafts / pending / rejected too;
-        // otherwise restrict to what's publicly visible.
-        eventStatus: mineOnly ? undefined : "published",
-        rsvpedOnly: rsvpedOnly || undefined,
+        eventStatus: "published",
         includeHidden: showHidden || undefined,
         tags: selectedTags.length ? selectedTags : undefined,
         startAfter: listWindow.startAfter,
         startBefore: listWindow.startBefore,
         limit: 200,
       }),
-    enabled: !!city?.id && eventsEnabled && view === "list",
+    enabled: !!city?.id && eventsEnabled && view === "list" && useAllChannel,
   })
+
+  const mineQuery = useQuery({
+    queryKey: [
+      "portal-events",
+      "mine",
+      city?.id,
+      search,
+      showHidden,
+      selectedTags,
+      listWindow.startAfter,
+      listWindow.startBefore,
+    ],
+    queryFn: () =>
+      EventsService.listPortalEvents({
+        popupId: city!.id,
+        search: search || undefined,
+        // No status filter: include my drafts / pending / rejected.
+        eventStatus: undefined,
+        includeHidden: showHidden || undefined,
+        tags: selectedTags.length ? selectedTags : undefined,
+        startAfter: listWindow.startAfter,
+        startBefore: listWindow.startBefore,
+        limit: 200,
+      }),
+    enabled: !!city?.id && eventsEnabled && view === "list" && useMineChannel,
+  })
+
+  const rsvpedQuery = useQuery({
+    queryKey: [
+      "portal-events",
+      "rsvped",
+      city?.id,
+      search,
+      showHidden,
+      selectedTags,
+      listWindow.startAfter,
+      listWindow.startBefore,
+    ],
+    queryFn: () =>
+      EventsService.listPortalEvents({
+        popupId: city!.id,
+        search: search || undefined,
+        eventStatus: "published",
+        rsvpedOnly: true,
+        includeHidden: showHidden || undefined,
+        tags: selectedTags.length ? selectedTags : undefined,
+        startAfter: listWindow.startAfter,
+        startBefore: listWindow.startBefore,
+        limit: 200,
+      }),
+    enabled: !!city?.id && eventsEnabled && view === "list" && useRsvpedChannel,
+  })
+
+  const isLoading =
+    (useAllChannel && allQuery.isLoading) ||
+    (useMineChannel && mineQuery.isLoading) ||
+    (useRsvpedChannel && rsvpedQuery.isLoading)
 
   const { data: hiddenCountData } = useQuery({
     queryKey: ["portal-events-hidden-count", city?.id],
@@ -211,10 +314,35 @@ export default function EventsPage() {
     },
   })
 
-  const rawEvents = data?.results ?? []
-  const events = mineOnly
-    ? rawEvents.filter((e) => currentHuman && e.owner_id === currentHuman.id)
-    : rawEvents
+  const events = useMemo(() => {
+    if (useAllChannel) return allQuery.data?.results ?? []
+
+    // Union the active channels by (event id + occurrence start) so a
+    // recurring instance and its master don't collapse into one row.
+    const byKey = new Map<string, EventPublic>()
+    if (useMineChannel) {
+      const mine = (mineQuery.data?.results ?? []).filter(
+        (e) => currentHuman != null && e.owner_id === currentHuman.id,
+      )
+      for (const e of mine) byKey.set(`${e.id}:${e.start_time}`, e)
+    }
+    if (useRsvpedChannel) {
+      for (const e of rsvpedQuery.data?.results ?? []) {
+        byKey.set(`${e.id}:${e.start_time}`, e)
+      }
+    }
+    return Array.from(byKey.values()).sort((a, b) =>
+      a.start_time.localeCompare(b.start_time),
+    )
+  }, [
+    useAllChannel,
+    useMineChannel,
+    useRsvpedChannel,
+    allQuery.data,
+    mineQuery.data,
+    rsvpedQuery.data,
+    currentHuman,
+  ])
   const grouped = groupByDate(events, formatDayKey)
 
   if (!eventsEnabled) {
@@ -299,6 +427,7 @@ export default function EventsPage() {
             search={search}
             rsvpedOnly={rsvpedOnly}
             tags={selectedTags}
+            defaultDate={popupStartDate}
           />
         ) : view === "day" ? (
           <DayBody
@@ -309,6 +438,7 @@ export default function EventsPage() {
             tags={selectedTags}
             selectedDate={selectedDate}
             onSelectedDateChange={setSelectedDate}
+            defaultDate={popupStartDate}
           />
         ) : isLoading ? (
           <div className="flex items-center justify-center py-20">
@@ -337,15 +467,14 @@ export default function EventsPage() {
                     const isOwner =
                       currentHuman != null && event.owner_id === currentHuman.id
                     const isHidden = event.hidden === true
+                    const isHighlighted = event.highlighted === true
+                    const cardClass = isHidden
+                      ? "relative rounded-xl border bg-card opacity-60 hover:opacity-100 transition-opacity"
+                      : isHighlighted
+                        ? "relative rounded-xl border-2 border-amber-400 bg-amber-50 dark:bg-amber-950/30 hover:shadow-md transition-shadow"
+                        : "relative rounded-xl border bg-card hover:shadow-md transition-shadow"
                     return (
-                      <div
-                        key={event.id}
-                        className={
-                          isHidden
-                            ? "relative rounded-xl border bg-card opacity-60 hover:opacity-100 transition-opacity"
-                            : "relative rounded-xl border bg-card hover:shadow-md transition-shadow"
-                        }
-                      >
+                      <div key={event.id} className={cardClass}>
                         <Link
                           href={
                             event.occurrence_id
@@ -355,8 +484,16 @@ export default function EventsPage() {
                           className="block p-3 sm:p-4 pb-11"
                         >
                           <div className="flex items-start justify-between gap-2 mb-1 pr-8">
-                            <h3 className="font-medium text-sm sm:text-base">
-                              {event.title}
+                            <h3 className="font-medium text-sm sm:text-base flex items-center gap-1.5">
+                              {isHighlighted && (
+                                <Star
+                                  className="h-3.5 w-3.5 shrink-0 fill-amber-400 text-amber-500"
+                                  aria-label={t(
+                                    "events.list.highlighted_title",
+                                  )}
+                                />
+                              )}
+                              <span>{event.title}</span>
                             </h3>
                             <Badge
                               variant="secondary"

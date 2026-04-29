@@ -40,6 +40,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { VenueHoursSummary } from "@/components/VenueHoursSummary"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
@@ -247,6 +248,7 @@ export function EventForm({
       // The field stays in the schema with a hardcoded ``false`` default so
       // existing records keep round-tripping unchanged.
       require_approval: false,
+      highlighted: defaultValues?.highlighted ?? false,
       status: defaultValues?.status ?? "draft",
       tags: defaultValues?.tags ?? [],
     },
@@ -286,6 +288,7 @@ export function EventForm({
           track_id: value.track_id || null,
           visibility: value.visibility,
           require_approval: value.require_approval,
+          highlighted: value.highlighted,
           status: value.status,
           tags,
         }
@@ -308,6 +311,7 @@ export function EventForm({
           track_id: value.track_id || null,
           visibility: value.visibility,
           require_approval: value.require_approval,
+          highlighted: value.highlighted,
           status: value.status,
           tags,
           recurrence: buildRecurrence(repeat),
@@ -1000,6 +1004,21 @@ export function EventForm({
                   }
                 </p>
               </div>
+            )}
+          </form.Field>
+        </InlineRow>
+
+        <InlineRow
+          label="Highlight"
+          description="Mark as a special event — shown with an accent in the portal"
+        >
+          <form.Field name="highlighted">
+            {(field) => (
+              <Switch
+                checked={field.state.value}
+                onCheckedChange={(v) => field.handleChange(v)}
+                disabled={readOnly}
+              />
             )}
           </form.Field>
         </InlineRow>

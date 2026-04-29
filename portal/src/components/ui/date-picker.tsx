@@ -21,6 +21,13 @@ interface DatePickerProps {
   disabled?: boolean
   /** Matcher for individual days — greys them out and blocks selection. */
   disabledDays?: DayMatcher
+  /**
+   * Days that are blocked because of an external schedule (e.g. the
+   * selected venue is closed). Same effect as `disabledDays` (unselectable)
+   * but rendered with a distinct color so the user can tell apart "outside
+   * the booking window" from "venue is closed that day".
+   */
+  closedDays?: DayMatcher
   placeholder?: string
   className?: string
   id?: string
@@ -40,6 +47,7 @@ export function DatePicker({
   onChange,
   disabled,
   disabledDays,
+  closedDays,
   placeholder = "Pick a date",
   className,
   id,
@@ -63,6 +71,16 @@ export function DatePicker({
   }
 
   const date = parseDate(value)
+
+  // Closed days are also unselectable, so fold them into the disabled
+  // matcher. We additionally tag them with a custom "closed" modifier so
+  // they get a distinct color (see modifiersClassNames below) — that way
+  // "outside booking window" and "venue closed" are visually different
+  // even though both block selection.
+  const disabledMatcher: DayMatcher | undefined =
+    disabledDays && closedDays
+      ? (d) => disabledDays(d) || closedDays(d)
+      : (disabledDays ?? closedDays)
 
   return (
     <Popover>
@@ -89,7 +107,20 @@ export function DatePicker({
           selected={date}
           defaultMonth={date ?? defaultMonth}
           onSelect={(newDate) => onChange(formatDate(newDate))}
-          disabled={disabledDays}
+          disabled={disabledMatcher}
+          modifiers={closedDays ? { closed: closedDays } : undefined}
+          modifiersClassNames={
+            closedDays
+              ? {
+                  // `!` prefix forces these to win over the built-in
+                  // `disabled` modifier classes (text-muted-foreground /
+                  // opacity-50) regardless of CSS source order — the
+                  // Calendar concatenates classes without tailwind-merge.
+                  closed:
+                    "!text-destructive/80 !opacity-100 line-through hover:bg-transparent",
+                }
+              : undefined
+          }
           autoFocus
         />
       </PopoverContent>

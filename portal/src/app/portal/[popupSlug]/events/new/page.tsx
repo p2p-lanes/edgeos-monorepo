@@ -203,6 +203,29 @@ export default function NewPortalEventPage() {
   })
   const [durationValue, setDurationValue] = useState<number>(60)
   const [durationUnit, setDurationUnit] = useState<DurationUnit>("minutes")
+
+  // City loads asynchronously, so the popup window isn't known on first
+  // render. When it arrives and today falls outside [start_date, end_date],
+  // snap the date picker default (and the no-venue datetime-local default)
+  // to the popup's start_date so the calendar opens on a valid month.
+  // One-shot — once the user picks a date themselves we leave it alone.
+  const didSnapDefaultsRef = useRef(false)
+  useEffect(() => {
+    if (didSnapDefaultsRef.current) return
+    if (!popupStartKey && !popupEndKey) return
+    didSnapDefaultsRef.current = true
+    const todayKey = todayInTz(displayTz)
+    const todayInWindow =
+      (!popupStartKey || todayKey >= popupStartKey) &&
+      (!popupEndKey || todayKey <= popupEndKey)
+    if (todayInWindow) return
+    const targetDate = popupStartKey ?? popupEndKey
+    if (!targetDate) return
+    setDateStr(targetDate)
+    const ms = combineDateTimeInTz(targetDate, "10:00", displayTz)
+    if (!Number.isNaN(ms)) setStartIso(new Date(ms).toISOString())
+  }, [popupStartKey, popupEndKey, displayTz])
+
   const durationMinutes = Math.max(
     1,
     Math.round(durationUnit === "hours" ? durationValue * 60 : durationValue),
@@ -226,26 +249,78 @@ export default function NewPortalEventPage() {
     (v) => v.id === venueId,
   )
 
-  // True when the picked date falls on a weekday the venue is closed. HTML
-  // date inputs don't support day-level disabling, so we surface a warning
-  // and let the user correct it before submitting.
-  //
-  // A venue with *no* weekly_hours rows is treated as always-open by the
-  // backend (matches _compute_availability), so we skip this check when
-  // the schedule is unset.
+  // Day-level matcher used by both the warning text and the date picker:
+  // returns true when the venue is closed on the given date. Mirrors the
+  // backend's `_compute_availability` rule that a venue with *no*
+  // weekly_hours rows is always-open.
+  const isVenueClosedOnDay = useMemo(() => {
+    const hours = selectedVenue?.weekly_hours
+    if (!hours || hours.length === 0) return undefined
+    const closedByBackendDay = new Map<number, boolean>()
+    for (const h of hours) {
+      closedByBackendDay.set(h.day_of_week, h.is_closed)
+    }
+    return (date: Date) => {
+      const backendDay = (date.getDay() + 6) % 7 // JS 0=Sun..6=Sat → BE 0=Mon..6=Sun
+      const isClosed = closedByBackendDay.get(backendDay)
+      return isClosed === undefined || isClosed === true
+    }
+  }, [selectedVenue])
+
   const selectedDateIsClosed = useMemo(() => {
-    if (!selectedVenue?.weekly_hours || !dateStr) return false
-    if (selectedVenue.weekly_hours.length === 0) return false
-    // dateStr is YYYY-MM-DD in display tz. Parse as local date.
+    if (!isVenueClosedOnDay || !dateStr) return false
     const [y, m, d] = dateStr.split("-").map(Number)
     if (!y || !m || !d) return false
-    const jsDay = new Date(y, m - 1, d).getDay() // 0=Sun..6=Sat
-    const backendDay = (jsDay + 6) % 7 // 0=Mon..6=Sun
-    const entry = selectedVenue.weekly_hours.find(
-      (h) => h.day_of_week === backendDay,
-    )
-    return !entry || entry.is_closed
-  }, [selectedVenue, dateStr])
+    return isVenueClosedOnDay(new Date(y, m - 1, d))
+  }, [isVenueClosedOnDay, dateStr])
+
+  // When the venue changes (or one is picked for the first time), if the
+  // currently selected date is closed at the new venue, jump forward to
+  // the first open day inside the popup window. Driven off venueId via a
+  // ref so other deps (matcher refs, dateStr) don't re-trigger the snap.
+  const prevVenueIdRef = useRef(venueId)
+  useEffect(() => {
+    if (prevVenueIdRef.current === venueId) return
+    prevVenueIdRef.current = venueId
+    if (!isVenueClosedOnDay || !dateStr) return
+    const [y, m, d] = dateStr.split("-").map(Number)
+    if (!y || !m || !d) return
+    if (!isVenueClosedOnDay(new Date(y, m - 1, d))) return // current day still works
+    // Walk forward from max(today, popupStart) until we find an open day,
+    // bailing out once we leave the popup window.
+    const todayKey = todayInTz(displayTz)
+    const startKey =
+      popupStartKey && popupStartKey > todayKey ? popupStartKey : todayKey
+    const [sy, sm, sd] = startKey.split("-").map(Number)
+    if (!sy || !sm || !sd) return
+    const cursor = new Date(sy, sm - 1, sd)
+    for (let i = 0; i < 400; i++) {
+      if (isDateOutsidePopupWindow(cursor)) return
+      if (!isVenueClosedOnDay(cursor)) {
+        const yy = cursor.getFullYear()
+        const mm = String(cursor.getMonth() + 1).padStart(2, "0")
+        const dd = String(cursor.getDate()).padStart(2, "0")
+        const next = `${yy}-${mm}-${dd}`
+        setDateStr(next)
+        if (timeStr) {
+          const ms = combineDateTimeInTz(next, timeStr, displayTz)
+          setStartIso(Number.isNaN(ms) ? "" : new Date(ms).toISOString())
+        } else {
+          setStartIso("")
+        }
+        return
+      }
+      cursor.setDate(cursor.getDate() + 1)
+    }
+  }, [
+    venueId,
+    isVenueClosedOnDay,
+    isDateOutsidePopupWindow,
+    dateStr,
+    displayTz,
+    popupStartKey,
+    timeStr,
+  ])
 
   const { data: tracksData } = useQuery({
     queryKey: ["portal-tracks", popupId],
@@ -649,6 +724,11 @@ export default function NewPortalEventPage() {
             }}
             disabled={selectedVenue?.booking_mode === "unbookable"}
             disabledDays={isDateOutsidePopupWindow}
+            closedDays={
+              isVenueClosedOnDay
+                ? (d) => !isDateOutsidePopupWindow(d) && isVenueClosedOnDay(d)
+                : undefined
+            }
           />
           {popupWindowLabel && (
             <p className="text-xs text-muted-foreground">

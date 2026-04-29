@@ -21,11 +21,12 @@ import {
   Clock,
   MapPin,
   Repeat,
+  Star,
   Tag,
   Users,
 } from "lucide-react"
 import Link from "next/link"
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 
 import {
@@ -44,6 +45,8 @@ interface CalendarBodyProps {
   search: string
   rsvpedOnly: boolean
   tags?: string[]
+  /** Initial month + selected day. Defaults to today before the popup loads. */
+  defaultDate?: Date | null
 }
 
 /**
@@ -57,11 +60,27 @@ export function CalendarBody({
   search,
   rsvpedOnly,
   tags,
+  defaultDate,
 }: CalendarBodyProps) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
-  const [currentMonth, setCurrentMonth] = useState(new Date())
-  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date())
+  const [currentMonth, setCurrentMonth] = useState(
+    () => defaultDate ?? new Date(),
+  )
+  const [selectedDate, setSelectedDate] = useState<Date | null>(
+    () => defaultDate ?? new Date(),
+  )
+
+  // The popup record loads asynchronously, so `defaultDate` may arrive
+  // after mount. One-shot snap: when it first becomes known, jump the
+  // calendar there. After the user navigates we leave their state alone.
+  const didSnapToDefaultRef = useRef(defaultDate != null)
+  useEffect(() => {
+    if (didSnapToDefaultRef.current || !defaultDate) return
+    didSnapToDefaultRef.current = true
+    setCurrentMonth(defaultDate)
+    setSelectedDate(defaultDate)
+  }, [defaultDate])
   const { formatTime, formatDayKey, formatGridDayKey } =
     useEventTimezone(popupId)
 
@@ -239,10 +258,15 @@ export function CalendarBody({
                     (event.recurrence_master_id
                       ? t("events.list.part_of_recurring_series")
                       : null)
+                  const isHighlighted = event.highlighted === true
                   return (
                     <div
                       key={event.id}
-                      className="relative rounded-xl border bg-card hover:shadow-md transition-shadow overflow-hidden"
+                      className={cn(
+                        "relative rounded-xl border bg-card hover:shadow-md transition-shadow overflow-hidden",
+                        isHighlighted &&
+                          "border-2 border-amber-400 bg-amber-50 dark:bg-amber-950/30",
+                      )}
                     >
                       <Link
                         href={
@@ -264,8 +288,16 @@ export function CalendarBody({
                             </div>
                           )}
                           <div className="min-w-0 flex-1">
-                            <h4 className="text-sm font-medium truncate">
-                              {event.title}
+                            <h4 className="text-sm font-medium truncate flex items-center gap-1.5">
+                              {isHighlighted && (
+                                <Star
+                                  className="h-3.5 w-3.5 shrink-0 fill-amber-400 text-amber-500"
+                                  aria-label={t(
+                                    "events.list.highlighted_title",
+                                  )}
+                                />
+                              )}
+                              <span className="truncate">{event.title}</span>
                             </h4>
                             {event.kind && (
                               <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-0.5 truncate">
@@ -328,9 +360,7 @@ export function CalendarBody({
                           event.my_rsvp_status !== "cancelled" ? (
                             <button
                               type="button"
-                              onClick={() =>
-                                cancelRsvpMutation.mutate(event)
-                              }
+                              onClick={() => cancelRsvpMutation.mutate(event)}
                               className="inline-flex items-center gap-1 rounded-md border border-primary/30 bg-primary/10 px-2 py-1 text-xs font-medium text-primary hover:bg-primary/20"
                             >
                               <CheckCircle className="h-3 w-3" />

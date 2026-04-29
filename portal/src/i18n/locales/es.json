@@ -408,7 +408,9 @@
       "unhide_event_aria": "Mostrar {{title}}",
       "edit_event_aria": "Editar {{title}}",
       "hide_title": "Ocultar de mi lista",
-      "unhide_title": "Mostrar"
+      "unhide_title": "Mostrar",
+      "highlighted_badge": "Destacado",
+      "highlighted_title": "Evento destacado"
     },
     "toolbar": {
       "search_placeholder": "Buscar eventos...",
@@ -440,6 +442,7 @@
       "prev_day": "Día anterior",
       "next_day": "Día siguiente",
       "today": "Hoy",
+      "first_day": "Primer día",
       "empty_state": "No hay eventos este día",
       "event_count_one": "{{count}} evento",
       "event_count_other": "{{count}} eventos",

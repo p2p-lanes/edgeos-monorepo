@@ -9,6 +9,7 @@ import {
   ChevronRight,
   Clock,
   Repeat,
+  Star,
   Tag,
 } from "lucide-react"
 import Link from "next/link"
@@ -34,6 +35,8 @@ interface DayBodyProps {
   tags?: string[]
   selectedDate: Date | null
   onSelectedDateChange: (date: Date) => void
+  /** Fallback when no `?date=` URL param is present. Defaults to today. */
+  defaultDate?: Date | null
 }
 
 const HOUR_PX = 56
@@ -78,14 +81,16 @@ export function DayBody({
   tags,
   selectedDate: selectedDateProp,
   onSelectedDateChange,
+  defaultDate,
 }: DayBodyProps) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
-  // Fall back to today when the parent hasn't set a date yet (no `?date=`
-  // in the URL on first visit).
+  // Fall back to the popup's first booking day (or today, before the
+  // popup record loads) when the parent hasn't set a date yet — no
+  // `?date=` in the URL on first visit.
   const selectedDate = useMemo(
-    () => selectedDateProp ?? startOfDay(new Date()),
-    [selectedDateProp],
+    () => selectedDateProp ?? defaultDate ?? startOfDay(new Date()),
+    [selectedDateProp, defaultDate],
   )
   const setSelectedDate = (next: Date | ((prev: Date) => Date)) => {
     const resolved = typeof next === "function" ? next(selectedDate) : next
@@ -298,11 +303,6 @@ export function DayBody({
 
   const goPrev = () => setSelectedDate((d) => subDays(d, 1))
   const goNext = () => setSelectedDate((d) => addDays(d, 1))
-  const goToday = () => setSelectedDate(startOfDay(new Date()))
-
-  const isToday =
-    formatDayKey(selectedDate.toISOString()) ===
-    formatDayKey(new Date().toISOString())
 
   const hours = Array.from({ length: 24 }, (_, i) => i)
   const venueCount = columns.length
@@ -330,15 +330,6 @@ export function DayBody({
             title={t("events.day.next_day")}
           >
             <ChevronRight className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 ml-1"
-            onClick={goToday}
-            disabled={isToday}
-          >
-            {t("events.day.today")}
           </Button>
         </div>
         <div className="flex flex-col items-end min-w-0">
@@ -442,11 +433,17 @@ export function DayBody({
                         const isRsvpd =
                           !!event.my_rsvp_status &&
                           event.my_rsvp_status !== "cancelled"
+                        const isHighlighted = event.highlighted === true
                         return (
                           <Link
                             key={event.id}
                             href={eventHref(event)}
-                            className="absolute rounded-md border border-primary/30 bg-primary/10 hover:bg-primary/20 transition-colors p-1.5 overflow-hidden text-xs"
+                            className={cn(
+                              "absolute rounded-md border transition-colors p-1.5 overflow-hidden text-xs",
+                              isHighlighted
+                                ? "border-amber-400 bg-amber-100 hover:bg-amber-200 dark:bg-amber-900/40 dark:hover:bg-amber-900/60"
+                                : "border-primary/30 bg-primary/10 hover:bg-primary/20",
+                            )}
                             style={{
                               top: `${top}px`,
                               height: `${height}px`,
@@ -456,11 +453,25 @@ export function DayBody({
                           >
                             <div
                               className={cn(
-                                "font-medium leading-tight",
+                                "font-medium leading-tight flex items-center gap-1",
                                 isShort ? "truncate" : "line-clamp-2",
                               )}
                             >
-                              {event.title}
+                              {isHighlighted && (
+                                <Star
+                                  className="h-3 w-3 shrink-0 fill-amber-400 text-amber-500"
+                                  aria-label={t(
+                                    "events.list.highlighted_title",
+                                  )}
+                                />
+                              )}
+                              <span
+                                className={cn(
+                                  isShort ? "truncate" : "line-clamp-2",
+                                )}
+                              >
+                                {event.title}
+                              </span>
                             </div>
                             <div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-0.5">
                               <Clock className="h-2.5 w-2.5" />
@@ -621,11 +632,17 @@ export function DayBody({
                         const isRsvpd =
                           !!event.my_rsvp_status &&
                           event.my_rsvp_status !== "cancelled"
+                        const isHighlighted = event.highlighted === true
                         return (
                           <Link
                             key={event.id}
                             href={eventHref(event)}
-                            className="absolute rounded-md border border-primary/30 bg-primary/10 hover:bg-primary/20 transition-colors px-1.5 py-1 overflow-hidden"
+                            className={cn(
+                              "absolute rounded-md border transition-colors px-1.5 py-1 overflow-hidden",
+                              isHighlighted
+                                ? "border-amber-400 bg-amber-100 hover:bg-amber-200 dark:bg-amber-900/40 dark:hover:bg-amber-900/60"
+                                : "border-primary/30 bg-primary/10 hover:bg-primary/20",
+                            )}
                             style={{
                               left: `${left + 1}px`,
                               width: `${width}px`,
@@ -633,8 +650,14 @@ export function DayBody({
                               height: `${height}px`,
                             }}
                           >
-                            <div className="font-medium text-[11px] leading-tight truncate">
-                              {event.title}
+                            <div className="font-medium text-[11px] leading-tight truncate flex items-center gap-1">
+                              {isHighlighted && (
+                                <Star
+                                  className="h-2.5 w-2.5 shrink-0 fill-amber-400 text-amber-500"
+                                  aria-hidden="true"
+                                />
+                              )}
+                              <span className="truncate">{event.title}</span>
                             </div>
                             <div className="flex items-center gap-1 text-[9px] text-muted-foreground mt-0.5">
                               <Clock className="h-2 w-2" />

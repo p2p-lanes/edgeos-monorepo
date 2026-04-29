@@ -58,10 +58,13 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
             statement = statement.where(Events.track_id == track_id)
         if tags:
             # Postgres JSONB ?| operator: any of the provided tags present.
-            from sqlalchemy.dialects.postgresql import JSONB
+            # The right operand must be text[] — wrapping with array() makes
+            # it render as ARRAY['a','b'] instead of being bound as JSONB
+            # (which would fail with "operator does not exist: jsonb ?| jsonb").
+            from sqlalchemy.dialects.postgresql import array
 
             statement = statement.where(
-                Events.tags.cast(JSONB).op("?|")(list(tags))
+                Events.tags.op("?|")(array(list(tags)))
             )
         # Recurring masters (``rrule IS NOT NULL``) must bypass the start_time
         # window filter: a series whose master row starts before the window

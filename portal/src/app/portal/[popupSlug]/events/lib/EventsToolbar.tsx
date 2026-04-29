@@ -199,9 +199,9 @@ export function EventsToolbar({
         </Popover>
       )}
 
-      {/* Segmented List / Calendar switcher — same page, only the body
-          swaps. Active option shows label + icon on sm+, icon-only on mobile
-          (the active background still marks the current view). */}
+      {/* Segmented List / Calendar / Day switcher — icon-only. The active
+          background marks the current view; titles/aria-labels carry the
+          name for screen readers and tooltips. */}
       <div className="inline-flex rounded-md border bg-card p-0.5">
         <Button
           type="button"
@@ -212,16 +212,11 @@ export function EventsToolbar({
           aria-pressed={view === "list"}
           onClick={() => onViewChange("list")}
           className={cn(
-            "h-7 rounded-sm px-2 sm:px-3",
+            "h-7 w-7 rounded-sm p-0",
             view === "list" && "shadow-none",
           )}
         >
-          <List className={cn("h-4 w-4", view === "list" && "sm:mr-1.5")} />
-          {view === "list" && (
-            <span className="hidden sm:inline">
-              {t("events.toolbar.list_view_short")}
-            </span>
-          )}
+          <List className="h-4 w-4" />
         </Button>
         <Button
           type="button"
@@ -232,18 +227,11 @@ export function EventsToolbar({
           aria-pressed={view === "calendar"}
           onClick={() => onViewChange("calendar")}
           className={cn(
-            "h-7 rounded-sm px-2 sm:px-3",
+            "h-7 w-7 rounded-sm p-0",
             view === "calendar" && "shadow-none",
           )}
         >
-          <CalendarDays
-            className={cn("h-4 w-4", view === "calendar" && "sm:mr-1.5")}
-          />
-          {view === "calendar" && (
-            <span className="hidden sm:inline">
-              {t("events.toolbar.calendar_view_short")}
-            </span>
-          )}
+          <CalendarDays className="h-4 w-4" />
         </Button>
         <Button
           type="button"
@@ -254,18 +242,11 @@ export function EventsToolbar({
           aria-pressed={view === "day"}
           onClick={() => onViewChange("day")}
           className={cn(
-            "h-7 rounded-sm px-2 sm:px-3",
+            "h-7 w-7 rounded-sm p-0",
             view === "day" && "shadow-none",
           )}
         >
-          <CalendarClock
-            className={cn("h-4 w-4", view === "day" && "sm:mr-1.5")}
-          />
-          {view === "day" && (
-            <span className="hidden sm:inline">
-              {t("events.toolbar.day_view_short")}
-            </span>
-          )}
+          <CalendarClock className="h-4 w-4" />
         </Button>
       </div>
     </div>

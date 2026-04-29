@@ -86,6 +86,11 @@ class EventBase(SQLModel):
     require_approval: bool = Field(default=False)
     kind: str | None = Field(default=None, max_length=100)
     status: EventStatus = Field(default=EventStatus.DRAFT)
+    # When true, portal clients render the event with a "special" treatment
+    # (badge, accent border) so it stands out in the list/day/calendar views.
+    highlighted: bool = Field(
+        default=False, sa_column_kwargs={"server_default": "false"}
+    )
     # --- Recurrence ------------------------------------------------------
     # Canonical RRULE string (RFC-5545 subset). NULL for one-off events.
     rrule: str | None = Field(default=None, sa_type=Text())
@@ -158,6 +163,7 @@ class EventCreate(BaseModel):
     require_approval: bool = False
     kind: str | None = None
     status: EventStatus = EventStatus.DRAFT
+    highlighted: bool = False
     recurrence: RecurrenceRule | None = None
 
     model_config = ConfigDict(str_strip_whitespace=True)
@@ -181,6 +187,7 @@ class EventUpdate(BaseModel):
     require_approval: bool | None = None
     kind: str | None = None
     status: EventStatus | None = None
+    highlighted: bool | None = None
 
 
 class RecurrenceUpdate(BaseModel):

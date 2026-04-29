@@ -408,7 +408,9 @@
       "unhide_event_aria": "取消隐藏 {{title}}",
       "edit_event_aria": "编辑 {{title}}",
       "hide_title": "从我的列表隐藏",
-      "unhide_title": "取消隐藏"
+      "unhide_title": "取消隐藏",
+      "highlighted_badge": "精选",
+      "highlighted_title": "精选活动"
     },
     "toolbar": {
       "search_placeholder": "搜索活动...",
@@ -440,6 +442,7 @@
       "prev_day": "前一天",
       "next_day": "后一天",
       "today": "今天",
+      "first_day": "首日",
       "empty_state": "当天无活动",
       "event_count_one": "{{count}} 个活动",
       "event_count_other": "{{count}} 个活动",

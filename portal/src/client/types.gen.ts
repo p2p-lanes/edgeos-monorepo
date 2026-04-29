@@ -772,6 +772,7 @@ export type EventCreate = {
     require_approval?: boolean;
     kind?: (string | null);
     status?: EventStatus;
+    highlighted?: boolean;
     recurrence?: (RecurrenceRule | null);
 };
 
@@ -860,6 +861,7 @@ export type EventPublic = {
     require_approval?: boolean;
     kind?: (string | null);
     status?: EventStatus;
+    highlighted?: boolean;
     rrule?: (string | null);
     recurrence_master_id?: (string | null);
     recurrence_exdates?: Array<(string)>;
@@ -944,6 +946,7 @@ export type EventUpdate = {
     require_approval?: (boolean | null);
     kind?: (string | null);
     status?: (EventStatus | null);
+    highlighted?: (boolean | null);
 };
 
 /**
