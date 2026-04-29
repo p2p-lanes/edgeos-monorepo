@@ -25,6 +25,7 @@ import PersonalInfoForm from "./PersonalInfoForm"
 interface UserInfoFormProps {
   popupId: string
   popupName: string
+  otpEnabled: boolean
   schema?: ApplicationFormSchema
   onSubmit: (
     data: DefaultCheckoutFormData | CheckoutApplicationValues,
@@ -35,6 +36,7 @@ interface UserInfoFormProps {
 const UserInfoForm = ({
   popupId,
   popupName,
+  otpEnabled,
   schema,
   onSubmit,
   isSubmitting,
@@ -77,6 +79,7 @@ const UserInfoForm = ({
   }, [applicationData])
 
   const {
+    otpEnabled: isOtpEnabled,
     showVerificationInput,
     verificationCode,
     setVerificationCode,
@@ -89,6 +92,8 @@ const UserInfoForm = ({
     handleResendCode,
     handleChangeEmail,
   } = useEmailVerification({
+    popupId,
+    otpEnabled,
     email: String(formData.email ?? ""),
     onVerificationSuccess: (_token) => {
       setEmailVerified(String(formData.email ?? ""))
@@ -119,7 +124,7 @@ const UserInfoForm = ({
     }
 
     if (!emailVerified) {
-      if (!showVerificationInput) {
+      if (!showVerificationInput || !isOtpEnabled) {
         await handleSendVerificationCode()
       } else {
         await handleVerifyCode()
@@ -205,6 +210,7 @@ const UserInfoForm = ({
         <CardContent className="space-y-4">
           {!emailVerified && (
             <EmailVerification
+              otpEnabled={isOtpEnabled}
               email={String(formData.email ?? "")}
               showVerificationInput={showVerificationInput}
               verificationCode={verificationCode}
@@ -237,7 +243,8 @@ const UserInfoForm = ({
             className="w-full"
             disabled={
               isSubmitting ||
-              (showVerificationInput &&
+              (isOtpEnabled &&
+                showVerificationInput &&
                 verificationCode.length !== 6 &&
                 !emailVerified) ||
               isSendingCode ||
@@ -248,9 +255,11 @@ const UserInfoForm = ({
               ? t("common.processing")
               : emailVerified
                 ? t("common.continue")
-                : showVerificationInput
+                : isOtpEnabled && showVerificationInput
                   ? t("checkout.verify_code")
-                  : t("checkout.send_code")}
+                  : isOtpEnabled
+                    ? t("checkout.send_code")
+                    : t("common.continue")}
           </Button>
         </CardFooter>
       </form>

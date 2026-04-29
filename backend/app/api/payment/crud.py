@@ -188,6 +188,8 @@ def _calculate_price(
 class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
     """CRUD operations for Payments."""
 
+    SORT_FIELDS = {"amount", "status", "created_at"}
+
     def __init__(self) -> None:
         super().__init__(Payments)
 
@@ -403,6 +405,16 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         }
 
         try:
+            logger.info(
+                "Creating SimpleFI application fee payment: application_id={} popup_id={} tenant_id={} amount={} currency={} success_path={} cancel_path={}",
+                application.id,
+                popup.id,
+                application.tenant_id,
+                fee_amount,
+                popup.currency,
+                success_path,
+                cancel_path,
+            )
             simplefi_response = simplefi_client.create_payment(
                 amount=fee_amount,
                 popup_slug=popup.slug,
@@ -413,6 +425,13 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 portal_base_override=portal_base,
                 success_path=success_path,
                 cancel_path=cancel_path,
+            )
+            logger.info(
+                "SimpleFI application fee payment created: application_id={} external_id={} provider_status={} checkout_url={}",
+                application.id,
+                simplefi_response.id,
+                simplefi_response.status,
+                simplefi_response.checkout_url,
             )
         except Exception as e:
             logger.error(f"Failed to create SimpleFI fee payment: {e}")
@@ -438,6 +457,15 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         session.commit()
         session.refresh(payment)
 
+        logger.info(
+            "Application fee payment persisted: payment_id={} application_id={} external_id={} status={} amount={}",
+            payment.id,
+            payment.application_id,
+            payment.external_id,
+            payment.status,
+            payment.amount,
+        )
+
         return payment
 
     def find_by_popup(
@@ -448,6 +476,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         limit: int = 100,
         status_filter: PaymentStatus | None = None,
         search: str | None = None,
+        sort_by: str | None = None,
+        sort_order: str = "desc",
     ) -> tuple[list[Payments], int]:
         """Find payments by popup_id via the denormalized popup_id column.
 
@@ -485,7 +515,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         count_statement = select(func.count()).select_from(statement.subquery())
         total = session.exec(count_statement).one()
 
-        statement = statement.order_by(desc(Payments.created_at))  # type: ignore[arg-type]
+        validated_sort = sort_by if sort_by in self.SORT_FIELDS else "created_at"
+        statement = self._apply_sorting(statement, validated_sort, sort_order)
         statement = statement.offset(skip).limit(limit)
         statement = statement.options(
             selectinload(Payments.products_snapshot).selectinload(  # ty: ignore[invalid-argument-type]
@@ -502,6 +533,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         filters: PaymentFilter,
         skip: int = 0,
         limit: int = 100,
+        sort_by: str | None = None,
+        sort_order: str = "desc",
     ) -> tuple[list[Payments], int]:
         """Find payments with filters."""
         statement = select(Payments)
@@ -518,7 +551,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         count_statement = select(func.count()).select_from(statement.subquery())
         total = session.exec(count_statement).one()
 
-        statement = statement.order_by(desc(Payments.created_at))  # type: ignore[arg-type]
+        validated_sort = sort_by if sort_by in self.SORT_FIELDS else "created_at"
+        statement = self._apply_sorting(statement, validated_sort, sort_order)
         statement = statement.offset(skip).limit(limit)
         statement = statement.options(
             selectinload(Payments.products_snapshot).selectinload(  # ty: ignore[invalid-argument-type]
@@ -1096,6 +1130,18 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         try:
             from app.api.tenant.utils import get_portal_url
 
+            logger.info(
+                "Creating SimpleFI pass payment: application_id={} popup_id={} tenant_id={} amount={} currency={} product_count={} coupon_code={} edit_passes={} insurance={}",
+                application.id,
+                application.popup_id,
+                application.tenant_id,
+                preview.amount,
+                preview.currency,
+                len(obj.products),
+                obj.coupon_code,
+                obj.edit_passes,
+                obj.insurance,
+            )
             simplefi_response = simplefi_client.create_payment(
                 amount=preview.amount,
                 popup_slug=application.popup.slug,
@@ -1104,6 +1150,13 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 reference=reference,
                 memo=application.popup.tenant.name,
                 portal_base_override=get_portal_url(application.popup.tenant),
+            )
+            logger.info(
+                "SimpleFI pass payment created: application_id={} external_id={} provider_status={} checkout_url={}",
+                application.id,
+                simplefi_response.id,
+                simplefi_response.status,
+                simplefi_response.checkout_url,
             )
         except Exception as e:
             logger.error(f"Failed to create SimpleFI payment: {e}")
@@ -1158,6 +1211,16 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         session.commit()
         session.refresh(payment)
+
+        logger.info(
+            "Pass payment persisted: payment_id={} application_id={} external_id={} status={} amount={} product_count={}",
+            payment.id,
+            payment.application_id,
+            payment.external_id,
+            payment.status,
+            payment.amount,
+            len(obj.products),
+        )
 
         # Update preview with SimpleFI response data
         preview.status = simplefi_response.status
@@ -1346,6 +1409,15 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         portal_base = get_portal_url(tenant)
 
         try:
+            logger.info(
+                "Creating SimpleFI direct payment: human_id={} popup_id={} tenant_id={} amount={} currency={} product_count={}",
+                human.id,
+                popup.id,
+                tenant.id,
+                amount,
+                popup.currency,
+                len(obj.products),
+            )
             simplefi_response = simplefi_client.create_payment(
                 amount=amount,
                 popup_slug=popup.slug,
@@ -1354,6 +1426,14 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 reference=reference,
                 memo=f"{popup.name} — direct purchase",
                 portal_base_override=portal_base,
+            )
+            logger.info(
+                "SimpleFI direct payment created: human_id={} popup_id={} external_id={} provider_status={} checkout_url={}",
+                human.id,
+                popup.id,
+                simplefi_response.id,
+                simplefi_response.status,
+                simplefi_response.checkout_url,
             )
         except Exception as e:
             logger.error(f"Failed to create SimpleFI direct payment: {e}")
@@ -1394,6 +1474,16 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         session.commit()
         session.refresh(payment)
+        logger.info(
+            "Direct payment persisted: payment_id={} human_id={} popup_id={} external_id={} status={} amount={} product_count={}",
+            payment.id,
+            human.id,
+            payment.popup_id,
+            payment.external_id,
+            payment.status,
+            payment.amount,
+            len(obj.products),
+        )
         return payment
 
     def approve_payment(

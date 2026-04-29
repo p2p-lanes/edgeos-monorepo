@@ -56,6 +56,19 @@ def resolve_checkout_mode(
     return derived_checkout_mode
 
 
+def resolve_checkout_otp_enabled(
+    sale_type: SaleType, checkout_otp_enabled: bool | None
+) -> bool:
+    if sale_type != SaleType.direct:
+        if checkout_otp_enabled is False:
+            raise ValueError(
+                "checkout_otp_enabled can only be disabled for direct sale_type"
+            )
+        return True
+
+    return True if checkout_otp_enabled is None else checkout_otp_enabled
+
+
 class PopupStatus(StrEnum):
     draft = "draft"
     active = "active"
@@ -132,6 +145,10 @@ class PopupBase(SQLModel):
         default=ApplicationLayout.single_page,
         sa_column=Column(String, nullable=False, server_default="single_page"),
     )
+    checkout_otp_enabled: bool = Field(
+        default=True,
+        sa_column=Column(Boolean, nullable=False, server_default="true"),
+    )
     tier_progression_enabled: bool = Field(
         default=False,
         sa_column=Column(Boolean, nullable=False, server_default="false"),
@@ -179,6 +196,7 @@ class PopupCreate(SQLModel):
     insurance_enabled: bool = False
     insurance_percentage: Decimal | None = None
     application_layout: ApplicationLayout = ApplicationLayout.single_page
+    checkout_otp_enabled: bool = True
     tier_progression_enabled: bool = False
 
     @field_validator("currency")
@@ -190,6 +208,9 @@ class PopupCreate(SQLModel):
     def generate_slug(self) -> Self:
         self.slug = slugify(self.name)
         self.checkout_mode = resolve_checkout_mode(self.sale_type, self.checkout_mode)
+        self.checkout_otp_enabled = resolve_checkout_otp_enabled(
+            self.sale_type, self.checkout_otp_enabled
+        )
         if self.requires_application_fee and (
             not self.application_fee_amount or self.application_fee_amount <= 0
         ):
@@ -237,6 +258,7 @@ class PopupUpdate(SQLModel):
     insurance_enabled: bool | None = None
     insurance_percentage: Decimal | None = None
     application_layout: ApplicationLayout | None = None
+    checkout_otp_enabled: bool | None = None
     tier_progression_enabled: bool | None = None
 
     @field_validator("currency")
@@ -254,6 +276,9 @@ class PopupUpdate(SQLModel):
         else:
             self.checkout_mode = resolve_checkout_mode(
                 self.sale_type, self.checkout_mode
+            )
+            self.checkout_otp_enabled = resolve_checkout_otp_enabled(
+                self.sale_type, self.checkout_otp_enabled
             )
         if self.requires_application_fee is True and (
             not self.application_fee_amount or self.application_fee_amount <= 0
@@ -301,6 +326,7 @@ class PopupPublic(SQLModel):
     insurance_enabled: bool = False
     insurance_percentage: Decimal | None = None
     application_layout: ApplicationLayout = ApplicationLayout.single_page
+    checkout_otp_enabled: bool = True
     tier_progression_enabled: bool = False
 
 

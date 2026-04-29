@@ -25,6 +25,7 @@ class TokenPayload(BaseModel):
     sub: str
     exp: datetime
     token_type: str | None = None
+    popup_id: str | None = None
     # True when this payload was synthesised from an API key rather than a
     # JWT. Sensitive endpoints (e.g. API key management) reject these so a
     # leaked key cannot mint further keys.
@@ -35,6 +36,7 @@ def create_access_token(
     subject: str | uuid.UUID,
     token_type: str | None = None,
     expires_delta: timedelta | None = None,
+    popup_id: str | uuid.UUID | None = None,
 ) -> str:
     if expires_delta:
         expire = datetime.now(UTC) + expires_delta
@@ -49,6 +51,8 @@ def create_access_token(
     }
     if token_type:
         to_encode["token_type"] = token_type
+    if popup_id:
+        to_encode["popup_id"] = str(popup_id)
 
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=ALGORITHM)
 
@@ -60,6 +64,7 @@ def decode_access_token(token: str) -> TokenPayload:
             sub=payload["sub"],
             exp=payload["exp"],
             token_type=payload.get("token_type"),
+            popup_id=payload.get("popup_id"),
         )
     except jwt.ExpiredSignatureError:
         raise HTTPException(

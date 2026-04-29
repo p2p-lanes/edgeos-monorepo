@@ -217,6 +217,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
       insurance_enabled: defaultValues?.insurance_enabled ?? false,
       insurance_percentage:
         defaultValues?.insurance_percentage?.toString() ?? "",
+      checkout_otp_enabled: defaultValues?.checkout_otp_enabled ?? true,
       tier_progression_enabled:
         defaultValues?.tier_progression_enabled ?? false,
     },
@@ -261,6 +262,8 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         insurance_percentage: value.insurance_enabled
           ? value.insurance_percentage || null
           : null,
+        checkout_otp_enabled:
+          value.sale_type === "direct" ? value.checkout_otp_enabled : true,
         tier_progression_enabled: value.tier_progression_enabled,
       }
       if (isEdit) {
@@ -437,9 +440,13 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                 >
                   <Select
                     value={field.state.value}
-                    onValueChange={(value) =>
-                      field.handleChange(value as SaleType)
-                    }
+                    onValueChange={(value) => {
+                      const nextSaleType = value as SaleType
+                      field.handleChange(nextSaleType)
+                      if (nextSaleType !== "direct") {
+                        form.setFieldValue("checkout_otp_enabled", true)
+                      }
+                    }}
                     disabled={readOnly}
                   >
                     <SelectTrigger className="w-[220px] text-sm" size="sm">
@@ -730,37 +737,63 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
 
           <form.Subscribe
             selector={(state) => ({
+              saleType: state.values.sale_type,
               requiresFee: state.values.requires_application_fee,
               currency: state.values.currency,
             })}
           >
-            {({ requiresFee, currency }) =>
-              requiresFee ? (
-                <form.Field name="application_fee_amount">
-                  {(field) => (
-                    <InlineRow
-                      icon={
-                        <DollarSign className="h-4 w-4 text-muted-foreground" />
-                      }
-                      label={`Fee Amount (${currency})`}
-                      description={`Amount in ${currency} that applicants must pay`}
-                    >
-                      <Input
-                        id="application_fee_amount"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        placeholder="0.00"
-                        value={field.state.value}
-                        onChange={(e) => field.handleChange(e.target.value)}
-                        disabled={readOnly}
-                        className="max-w-[120px] text-sm"
-                      />
-                    </InlineRow>
-                  )}
-                </form.Field>
-              ) : null
-            }
+            {({ saleType, requiresFee, currency }) => (
+              <>
+                {requiresFee ? (
+                  <form.Field name="application_fee_amount">
+                    {(field) => (
+                      <InlineRow
+                        icon={
+                          <DollarSign className="h-4 w-4 text-muted-foreground" />
+                        }
+                        label={`Fee Amount (${currency})`}
+                        description={`Amount in ${currency} that applicants must pay`}
+                      >
+                        <Input
+                          id="application_fee_amount"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          placeholder="0.00"
+                          value={field.state.value}
+                          onChange={(e) => field.handleChange(e.target.value)}
+                          disabled={readOnly}
+                          className="max-w-[120px] text-sm"
+                        />
+                      </InlineRow>
+                    )}
+                  </form.Field>
+                ) : null}
+
+                {saleType === "direct" ? (
+                  <form.Field name="checkout_otp_enabled">
+                    {(field) => (
+                      <InlineRow
+                        icon={
+                          <Lock className="h-4 w-4 text-muted-foreground" />
+                        }
+                        label="Require checkout OTP"
+                        description="Send a verification code before portal checkout can continue. Disable this to allow email-only checkout access for direct-sale popups."
+                      >
+                        <Switch
+                          id="checkout_otp_enabled"
+                          checked={!!field.state.value}
+                          onCheckedChange={(checked) =>
+                            field.handleChange(checked)
+                          }
+                          disabled={readOnly}
+                        />
+                      </InlineRow>
+                    )}
+                  </form.Field>
+                ) : null}
+              </>
+            )}
           </form.Subscribe>
         </InlineSection>
 
