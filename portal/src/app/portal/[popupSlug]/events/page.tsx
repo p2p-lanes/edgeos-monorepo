@@ -8,6 +8,7 @@ import {
   Eye,
   EyeOff,
   Filter,
+  Layers,
   MapPin,
   Pencil,
   Plus,
@@ -25,6 +26,7 @@ import {
   type EventPublic,
   EventsService,
   HumansService,
+  TracksService,
 } from "@/client"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -66,6 +68,7 @@ export default function EventsPage() {
   const [mineOnly, setMineOnly] = useState(false)
   const [showHidden, setShowHidden] = useState(false)
   const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const [selectedTrackIds, setSelectedTrackIds] = useState<string[]>([])
   const queryClient = useQueryClient()
 
   // The view tab is persisted in the URL so a refresh keeps the user on
@@ -124,6 +127,15 @@ export default function EventsPage() {
 
   const { data: eventSettings } = usePortalEventSettings(city?.id)
   const eventsEnabled = eventSettings?.event_enabled ?? true
+
+  const { data: tracksData } = useQuery({
+    queryKey: ["portal-tracks", city?.id],
+    queryFn: () =>
+      TracksService.listPortalTracks({ popupId: city!.id, limit: 200 }),
+    enabled: !!city?.id,
+    staleTime: 5 * 60 * 1000,
+  })
+  const allowedTracks = tracksData?.results ?? []
 
   // Default landing date for the day/calendar views: the popup's first
   // booking day, parsed as a local Date. Falls back to "today" until the
@@ -188,6 +200,7 @@ export default function EventsPage() {
       search,
       showHidden,
       selectedTags,
+      selectedTrackIds,
       listWindow.startAfter,
       listWindow.startBefore,
     ],
@@ -198,6 +211,7 @@ export default function EventsPage() {
         eventStatus: "published",
         includeHidden: showHidden || undefined,
         tags: selectedTags.length ? selectedTags : undefined,
+        trackIds: selectedTrackIds.length ? selectedTrackIds : undefined,
         startAfter: listWindow.startAfter,
         startBefore: listWindow.startBefore,
         limit: 200,
@@ -213,6 +227,7 @@ export default function EventsPage() {
       search,
       showHidden,
       selectedTags,
+      selectedTrackIds,
       listWindow.startAfter,
       listWindow.startBefore,
     ],
@@ -224,6 +239,7 @@ export default function EventsPage() {
         eventStatus: undefined,
         includeHidden: showHidden || undefined,
         tags: selectedTags.length ? selectedTags : undefined,
+        trackIds: selectedTrackIds.length ? selectedTrackIds : undefined,
         startAfter: listWindow.startAfter,
         startBefore: listWindow.startBefore,
         limit: 200,
@@ -239,6 +255,7 @@ export default function EventsPage() {
       search,
       showHidden,
       selectedTags,
+      selectedTrackIds,
       listWindow.startAfter,
       listWindow.startBefore,
     ],
@@ -250,6 +267,7 @@ export default function EventsPage() {
         rsvpedOnly: true,
         includeHidden: showHidden || undefined,
         tags: selectedTags.length ? selectedTags : undefined,
+        trackIds: selectedTrackIds.length ? selectedTrackIds : undefined,
         startAfter: listWindow.startAfter,
         startBefore: listWindow.startBefore,
         limit: 200,
@@ -416,6 +434,9 @@ export default function EventsPage() {
           allowedTags={eventSettings?.allowed_tags ?? []}
           selectedTags={selectedTags}
           onSelectedTagsChange={setSelectedTags}
+          allowedTracks={allowedTracks}
+          selectedTrackIds={selectedTrackIds}
+          onSelectedTrackIdsChange={setSelectedTrackIds}
         />
       </div>
 
@@ -427,6 +448,7 @@ export default function EventsPage() {
             search={search}
             rsvpedOnly={rsvpedOnly}
             tags={selectedTags}
+            trackIds={selectedTrackIds}
             defaultDate={popupStartDate}
           />
         ) : view === "day" ? (
@@ -436,6 +458,7 @@ export default function EventsPage() {
             search={search}
             rsvpedOnly={rsvpedOnly}
             tags={selectedTags}
+            trackIds={selectedTrackIds}
             selectedDate={selectedDate}
             onSelectedDateChange={setSelectedDate}
             defaultDate={popupStartDate}
@@ -528,6 +551,14 @@ export default function EventsPage() {
                               <span className="truncate">
                                 {summarizeRrule(event.rrule) ??
                                   t("events.list.part_of_recurring_series")}
+                              </span>
+                            </div>
+                          )}
+                          {event.track_title && (
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                              <Layers className="h-3 w-3" />
+                              <span className="truncate">
+                                {event.track_title}
                               </span>
                             </div>
                           )}

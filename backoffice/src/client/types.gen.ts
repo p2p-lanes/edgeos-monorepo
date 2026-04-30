@@ -909,6 +909,7 @@ export type EventPublic = {
     venue_title?: (string | null);
     venue_location?: (string | null);
     venue_image_url?: (string | null);
+    track_title?: (string | null);
     hidden?: boolean;
     my_rsvp_status?: (string | null);
 };
@@ -3275,7 +3276,7 @@ export type EventsListEventsData = {
     skip?: number;
     startAfter?: (string | null);
     startBefore?: (string | null);
-    trackId?: (string | null);
+    trackIds?: (Array<(string)> | null);
     venueId?: (string | null);
     xTenantId?: (string | null);
 };
@@ -3439,7 +3440,7 @@ export type EventsListPortalEventsData = {
     startAfter?: (string | null);
     startBefore?: (string | null);
     tags?: (Array<(string)> | null);
-    trackId?: (string | null);
+    trackIds?: (Array<(string)> | null);
     venueId?: (string | null);
 };
 

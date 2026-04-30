@@ -8,6 +8,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  Layers,
   Repeat,
   Star,
   Tag,
@@ -33,6 +34,7 @@ interface DayBodyProps {
   search: string
   rsvpedOnly: boolean
   tags?: string[]
+  trackIds?: string[]
   selectedDate: Date | null
   onSelectedDateChange: (date: Date) => void
   /** Fallback when no `?date=` URL param is present. Defaults to today. */
@@ -79,6 +81,7 @@ export function DayBody({
   search,
   rsvpedOnly,
   tags,
+  trackIds,
   selectedDate: selectedDateProp,
   onSelectedDateChange,
   defaultDate,
@@ -132,7 +135,15 @@ export function DayBody({
   })
 
   const { data: eventsData, isLoading } = useQuery({
-    queryKey: ["portal-events-day", popupId, dayKey, rsvpedOnly, search, tags],
+    queryKey: [
+      "portal-events-day",
+      popupId,
+      dayKey,
+      rsvpedOnly,
+      search,
+      tags,
+      trackIds,
+    ],
     queryFn: () =>
       EventsService.listPortalEvents({
         popupId: popupId!,
@@ -142,6 +153,7 @@ export function DayBody({
         rsvpedOnly: rsvpedOnly || undefined,
         search: search || undefined,
         tags: tags?.length ? tags : undefined,
+        trackIds: trackIds?.length ? trackIds : undefined,
         limit: 500,
       }),
     enabled: !!popupId,
@@ -485,6 +497,14 @@ export function DayBody({
                                 <Repeat className="h-2.5 w-2.5" />
                                 <span className="truncate">
                                   {recurrenceLabel}
+                                </span>
+                              </div>
+                            )}
+                            {!isShort && event.track_title && (
+                              <div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-0.5">
+                                <Layers className="h-2.5 w-2.5" />
+                                <span className="truncate">
+                                  {event.track_title}
                                 </span>
                               </div>
                             )}

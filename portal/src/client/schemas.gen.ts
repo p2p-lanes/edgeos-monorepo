@@ -4175,6 +4175,17 @@ export const EventPublicSchema = {
             ],
             title: 'Venue Image Url'
         },
+        track_title: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Track Title'
+        },
         hidden: {
             type: 'boolean',
             title: 'Hidden',

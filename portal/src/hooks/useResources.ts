@@ -1,11 +1,4 @@
-import {
-  CalendarDays,
-  FileText,
-  Layers,
-  MapPin,
-  Ticket,
-  Users,
-} from "lucide-react"
+import { CalendarDays, FileText, MapPin, Ticket, Users } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import useAuth from "@/hooks/useAuth"
 import { useApplication } from "@/providers/applicationProvider"
@@ -108,12 +101,6 @@ const useResources = () => {
           icon: MapPin,
           status: canSeeAttendees ? "active" : "hidden",
           path: `/portal/${city?.slug}/events/venues`,
-        },
-        {
-          name: t("sidebar.tracks"),
-          icon: Layers,
-          status: canSeeAttendees ? "active" : "hidden",
-          path: `/portal/${city?.slug}/events/tracks`,
         },
       ],
     },

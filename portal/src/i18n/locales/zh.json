@@ -337,9 +337,8 @@
     "companion": "同伴",
     "status": "状态",
     "groups": "团体",
-    "events": "活动",
+    "events": "活动日历",
     "venues": "场地",
-    "tracks": "Tracks",
     "api_keys": "API 密钥",
     "api_docs": "API 文档"
   },
@@ -422,6 +421,9 @@
       "filter_by_tags": "按标签筛选",
       "tags_label": "标签",
       "filter_by_tag_label": "按标签筛选",
+      "filter_by_tracks": "按赛道筛选",
+      "tracks_label": "赛道",
+      "filter_by_track_label": "按赛道筛选",
       "clear_filters": "清除",
       "list_view_label": "列表视图",
       "calendar_view_label": "日历视图",
@@ -490,7 +492,8 @@
       "bulk_invite_error": "邀请失败",
       "remove_invitation_error": "移除失败",
       "enter_at_least_one_email": "请至少输入一个邮箱",
-      "remove_invitation_aria": "移除 {{email}} 的邀请"
+      "remove_invitation_aria": "移除 {{email}} 的邀请",
+      "edit_event_button": "编辑活动"
     },
     "form": {
       "create_heading": "创建活动",
@@ -505,6 +508,9 @@
       "venue_approval_required": "此场地的新活动需要管理员审核。",
       "venue_setup_teardown": "开始前锁定 {{setupTime}} 分钟,结束后锁定 {{teardownTime}} 分钟用于布置/撤场。",
       "venue_closed_warning": "所选日期为场地不营业的日期。",
+      "view_pictures_button": "查看图片",
+      "venue_pictures_heading": "{{venue}} — 图片",
+      "no_venue_pictures": "此场地尚未上传图片。",
       "title_label": "标题",
       "title_placeholder": "活动名称",
       "cover_image_label": "封面图(可选)",
@@ -632,20 +638,6 @@
         "booking_approval": "需要审核",
         "booking_unbookable": "不可预订",
         "edit_button": "编辑场地"
-      }
-    },
-    "tracks": {
-      "list": {
-        "heading": "Tracks",
-        "subheading": "{{cityName}} 按主题分组的活动集合。",
-        "empty_state": "暂无 track"
-      },
-      "detail": {
-        "heading": "活动",
-        "no_events": "此 track 尚无活动。",
-        "track_not_found": "未找到 track",
-        "back_to_tracks": "返回 tracks",
-        "times_in_timezone": "时区：{{timezone}}"
       }
     }
   }

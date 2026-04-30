@@ -13,7 +13,7 @@ import {
 } from "../ui/breadcrumb"
 import BreadcrumbSegment from "./BreadcrumbSegment"
 import CartBadge from "./CartBadge"
-import useGroupMapping from "./hooks/useGroupMapping"
+import useBreadcrumbNameMapping from "./hooks/useBreadcrumbNameMapping"
 import { SidebarTrigger } from "./SidebarComponents"
 
 const SHOW_THRESHOLD = 64
@@ -70,7 +70,6 @@ const HeaderBar = () => {
   const pathname = usePathname()
   const city = getCity()
   const router = useRouter()
-  const { groupMapping, isLoading } = useGroupMapping()
   const hidden = useHideOnScroll()
 
   const handleClickCity = () => {
@@ -82,6 +81,8 @@ const HeaderBar = () => {
     city?.sale_type === "direct" ? ["checkout"] : ["application"]
   const pathsToDisplay =
     pathSegments.length > 0 ? pathSegments : fallbackSegments
+
+  const { nameMapping, isLoading } = useBreadcrumbNameMapping(pathSegments)
 
   // Build cumulative href per segment so each breadcrumb links back to its
   // own level. Anchored at `/portal/{slug}` when a slug is present;
@@ -123,7 +124,7 @@ const HeaderBar = () => {
                   href={href}
                   isCurrent={isCurrent}
                   isLoading={isLoading}
-                  groupMapping={groupMapping}
+                  nameMapping={nameMapping}
                 />
               </Fragment>
             )

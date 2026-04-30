@@ -12,7 +12,7 @@ interface BreadcrumbSegmentProps {
   href?: string
   isCurrent?: boolean
   isLoading?: boolean
-  groupMapping?: Record<string, string>
+  nameMapping?: Record<string, string>
 }
 
 const KNOWN_SEGMENTS: Record<string, string> = {
@@ -29,13 +29,13 @@ const BreadcrumbSegment = ({
   href,
   isCurrent,
   isLoading,
-  groupMapping,
+  nameMapping,
 }: BreadcrumbSegmentProps) => {
   const { t } = useTranslation()
-  const isGroupId = groupMapping && Object.keys(groupMapping).includes(path)
+  const isMappedId = nameMapping && Object.keys(nameMapping).includes(path)
   const translationKey = KNOWN_SEGMENTS[path]
-  const displayText = isGroupId
-    ? groupMapping[path]
+  const displayText = isMappedId
+    ? nameMapping[path]
     : translationKey
       ? t(translationKey)
       : path
@@ -45,8 +45,8 @@ const BreadcrumbSegment = ({
       ? displayText.charAt(0).toUpperCase() + displayText.slice(1)
       : displayText
 
-  // Groups still resolving: show a spinner, no link.
-  if (isLoading && isGroupId) {
+  // Mapping still resolving: show a spinner, no link.
+  if (isLoading && isMappedId) {
     return (
       <BreadcrumbItem>
         <div className="flex items-center">

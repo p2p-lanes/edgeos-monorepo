@@ -132,6 +132,9 @@ class EventPublic(EventBase):
     venue_title: str | None = None
     venue_location: str | None = None
     venue_image_url: str | None = None
+    # Denormalized track name so portal clients can render the track label
+    # without a follow-up call. None when the event has no track.
+    track_title: str | None = None
     # True when the current human has hidden this event (per-user marker).
     # Only populated by portal endpoints and only ever True inside responses
     # to ``?include_hidden=true`` — otherwise hidden events are filtered out.

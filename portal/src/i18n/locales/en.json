@@ -337,9 +337,8 @@
     "companion": "Companion",
     "status": "Status",
     "groups": "Groups",
-    "events": "Events",
+    "events": "Event Calendar",
     "venues": "Venues",
-    "tracks": "Tracks",
     "api_keys": "API Keys",
     "api_docs": "API Docs"
   },
@@ -422,6 +421,9 @@
       "filter_by_tags": "Filter by tags",
       "tags_label": "Tags",
       "filter_by_tag_label": "Filter by tag",
+      "filter_by_tracks": "Filter by tracks",
+      "tracks_label": "Tracks",
+      "filter_by_track_label": "Filter by track",
       "clear_filters": "Clear",
       "list_view_label": "List view",
       "calendar_view_label": "Calendar view",
@@ -490,7 +492,8 @@
       "bulk_invite_error": "Failed to invite",
       "remove_invitation_error": "Failed to remove",
       "enter_at_least_one_email": "Enter at least one email",
-      "remove_invitation_aria": "Remove invitation for {{email}}"
+      "remove_invitation_aria": "Remove invitation for {{email}}",
+      "edit_event_button": "Edit event"
     },
     "form": {
       "create_heading": "Create event",
@@ -505,6 +508,9 @@
       "venue_approval_required": "This venue requires admin approval for new events.",
       "venue_setup_teardown": "Venue is blocked{{setupTime}}min before & after each scheduled session for setup/teardown",
       "venue_closed_warning": "The selected date falls on a day the venue is closed.",
+      "view_pictures_button": "View pictures",
+      "venue_pictures_heading": "{{venue}} — pictures",
+      "no_venue_pictures": "This venue has no pictures yet.",
       "title_label": "Title",
       "title_placeholder": "Event name",
       "cover_image_label": "Cover image (optional)",
@@ -632,20 +638,6 @@
         "booking_approval": "Approval required",
         "booking_unbookable": "Not bookable",
         "edit_button": "Edit venue"
-      }
-    },
-    "tracks": {
-      "list": {
-        "heading": "Tracks",
-        "subheading": "Themed collections of events at {{cityName}}.",
-        "empty_state": "No tracks yet"
-      },
-      "detail": {
-        "heading": "Events",
-        "no_events": "No events in this track yet.",
-        "track_not_found": "Track not found",
-        "back_to_tracks": "Back to tracks",
-        "times_in_timezone": "Times in {{timezone}}"
       }
     }
   }

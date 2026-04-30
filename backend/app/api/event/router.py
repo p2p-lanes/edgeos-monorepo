@@ -214,14 +214,15 @@ VenueInfo = tuple[str | None, str | None, str | None]  # (title, location, image
 def _to_public(
     event,
     venue_map: dict[uuid.UUID, VenueInfo] | None = None,
+    track_map: dict[uuid.UUID, str] | None = None,
 ) -> EventPublic:
     """Convert an Events row (or expanded pseudo-row) to EventPublic.
 
     Propagates the synthetic ``occurrence_id`` set by
     :func:`app.api.event.crud._clone_as_occurrence`.
 
-    ``venue_map`` lets callers pre-fetch venues in a single query and avoid
-    N+1 when serializing a list.
+    ``venue_map``/``track_map`` let callers pre-fetch venues/tracks in a
+    single query and avoid N+1 when serializing a list.
     """
     data = EventPublic.model_validate(event)
     occ = event.__dict__.get("_occurrence_id") if hasattr(event, "__dict__") else None
@@ -238,6 +239,11 @@ def _to_public(
             updates["venue_title"] = event.venue.title
             updates["venue_location"] = event.venue.location
             updates["venue_image_url"] = event.venue.image_url
+    if event.track_id:
+        if track_map is not None and event.track_id in track_map:
+            updates["track_title"] = track_map[event.track_id]
+        elif track_map is None and getattr(event, "track", None) is not None:
+            updates["track_title"] = event.track.name
     if updates:
         data = data.model_copy(update=updates)
     return data
@@ -256,6 +262,19 @@ def _venue_map_for_events(
         return {}
     rows = db.exec(select(EventVenues).where(EventVenues.id.in_(venue_ids))).all()
     return {v.id: (v.title, v.location, v.image_url) for v in rows}
+
+
+def _track_map_for_events(db, events: list) -> dict[uuid.UUID, str]:
+    """Fetch track names for all track_ids referenced."""
+    from sqlmodel import select
+
+    from app.api.track.models import Tracks
+
+    track_ids = {e.track_id for e in events if e.track_id}
+    if not track_ids:
+        return {}
+    rows = db.exec(select(Tracks).where(Tracks.id.in_(track_ids))).all()
+    return {t.id: t.name for t in rows}
 
 
 def _check_event_within_popup_window(
@@ -418,7 +437,7 @@ async def list_events(
     event_status: EventStatus | None = None,
     kind: str | None = None,
     venue_id: uuid.UUID | None = None,
-    track_id: uuid.UUID | None = None,
+    track_ids: list[uuid.UUID] | None = Query(default=None),
     start_after: datetime | None = None,
     start_before: datetime | None = None,
     search: str | None = None,
@@ -435,7 +454,7 @@ async def list_events(
             event_status=event_status,
             kind=kind,
             venue_id=venue_id,
-            track_id=track_id,
+            track_ids=track_ids,
             start_after=start_after,
             start_before=start_before,
             search=search,
@@ -450,8 +469,9 @@ async def list_events(
         )
 
     venue_map = _venue_map_for_events(db, events)
+    track_map = _track_map_for_events(db, events)
     return ListModel[EventPublic](
-        results=[_to_public(e, venue_map) for e in events],
+        results=[_to_public(e, venue_map, track_map) for e in events],
         paging=Paging(offset=skip, limit=limit, total=total),
     )
 
@@ -1260,7 +1280,7 @@ async def list_portal_events(
     event_status: EventStatus | None = None,
     kind: str | None = None,
     venue_id: uuid.UUID | None = None,
-    track_id: uuid.UUID | None = None,
+    track_ids: list[uuid.UUID] | None = Query(default=None),
     tags: list[str] | None = Query(default=None),
     start_after: datetime | None = None,
     start_before: datetime | None = None,
@@ -1279,7 +1299,7 @@ async def list_portal_events(
             event_status=event_status,
             kind=kind,
             venue_id=venue_id,
-            track_id=track_id,
+            track_ids=track_ids,
             tags=tags,
             start_after=start_after,
             start_before=start_before,
@@ -1360,6 +1380,7 @@ async def list_portal_events(
         ]
 
     venue_map = _venue_map_for_events(db, visible)
+    track_map = _track_map_for_events(db, visible)
 
     # RSVP status of current human per event, so cards can render the right
     # inline button without an extra batch call from the client.
@@ -1382,7 +1403,7 @@ async def list_portal_events(
             rsvp_status_map = {(row[0], row[1]): row[2] for row in rows}
 
     def _publicize(e) -> EventPublic:
-        pub = _to_public(e, venue_map)
+        pub = _to_public(e, venue_map, track_map)
         updates: dict = {}
         if hidden_ids and (
             e.id in hidden_ids

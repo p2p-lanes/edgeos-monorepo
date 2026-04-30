@@ -337,9 +337,8 @@
     "companion": "Acompañante",
     "status": "Estado",
     "groups": "Grupos",
-    "events": "Eventos",
+    "events": "Calendario de Eventos",
     "venues": "Lugares",
-    "tracks": "Tracks",
     "api_keys": "API Keys",
     "api_docs": "API Docs"
   },
@@ -422,6 +421,9 @@
       "filter_by_tags": "Filtrar por etiquetas",
       "tags_label": "Etiquetas",
       "filter_by_tag_label": "Filtrar por etiqueta",
+      "filter_by_tracks": "Filtrar por tracks",
+      "tracks_label": "Tracks",
+      "filter_by_track_label": "Filtrar por track",
       "clear_filters": "Limpiar",
       "list_view_label": "Vista de lista",
       "calendar_view_label": "Vista de calendario",
@@ -490,7 +492,8 @@
       "bulk_invite_error": "Falló la invitación",
       "remove_invitation_error": "No se pudo quitar",
       "enter_at_least_one_email": "Ingresá al menos un email",
-      "remove_invitation_aria": "Quitar invitación para {{email}}"
+      "remove_invitation_aria": "Quitar invitación para {{email}}",
+      "edit_event_button": "Editar evento"
     },
     "form": {
       "create_heading": "Crear evento",
@@ -505,6 +508,9 @@
       "venue_approval_required": "Este lugar requiere aprobación del admin para eventos nuevos.",
       "venue_setup_teardown": "Bloqueado {{setupTime}}m antes de inicio y {{teardownTime}}m después del fin para setup/teardown.",
       "venue_closed_warning": "La fecha elegida cae en un día que el lugar está cerrado.",
+      "view_pictures_button": "Ver fotos",
+      "venue_pictures_heading": "{{venue}} — fotos",
+      "no_venue_pictures": "Este lugar todavía no tiene fotos.",
       "title_label": "Título",
       "title_placeholder": "Nombre del evento",
       "cover_image_label": "Imagen de portada (opcional)",
@@ -632,20 +638,6 @@
         "booking_approval": "Requiere aprobación",
         "booking_unbookable": "No reservable",
         "edit_button": "Editar lugar"
-      }
-    },
-    "tracks": {
-      "list": {
-        "heading": "Tracks",
-        "subheading": "Colecciones temáticas de eventos en {{cityName}}.",
-        "empty_state": "Aún no hay tracks"
-      },
-      "detail": {
-        "heading": "Eventos",
-        "no_events": "Todavía no hay eventos en este track.",
-        "track_not_found": "Track no encontrado",
-        "back_to_tracks": "Volver a tracks",
-        "times_in_timezone": "Horarios en {{timezone}}"
       }
     }
   }

@@ -34,7 +34,7 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
         start_after: datetime | None = None,
         start_before: datetime | None = None,
         venue_id: uuid.UUID | None = None,
-        track_id: uuid.UUID | None = None,
+        track_ids: list[uuid.UUID] | None = None,
         tags: list[str] | None = None,
         search: str | None = None,
         expand_occurrences: bool | None = None,
@@ -54,8 +54,8 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
             statement = statement.where(Events.kind == kind)
         if venue_id is not None:
             statement = statement.where(Events.venue_id == venue_id)
-        if track_id is not None:
-            statement = statement.where(Events.track_id == track_id)
+        if track_ids:
+            statement = statement.where(col(Events.track_id).in_(track_ids))
         if tags:
             # Postgres JSONB ?| operator: any of the provided tags present.
             # The right operand must be text[] — wrapping with array() makes

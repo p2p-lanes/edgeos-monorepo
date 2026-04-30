@@ -1764,7 +1764,7 @@ export class EventsService {
      * @param data.eventStatus
      * @param data.kind
      * @param data.venueId
-     * @param data.trackId
+     * @param data.trackIds
      * @param data.startAfter
      * @param data.startBefore
      * @param data.search
@@ -1786,7 +1786,7 @@ export class EventsService {
                 event_status: data.eventStatus,
                 kind: data.kind,
                 venue_id: data.venueId,
-                track_id: data.trackId,
+                track_ids: data.trackIds,
                 start_after: data.startAfter,
                 start_before: data.startBefore,
                 search: data.search,
@@ -2289,7 +2289,7 @@ export class EventsService {
      * @param data.eventStatus
      * @param data.kind
      * @param data.venueId
-     * @param data.trackId
+     * @param data.trackIds
      * @param data.tags
      * @param data.startAfter
      * @param data.startBefore
@@ -2310,7 +2310,7 @@ export class EventsService {
                 event_status: data.eventStatus,
                 kind: data.kind,
                 venue_id: data.venueId,
-                track_id: data.trackId,
+                track_ids: data.trackIds,
                 tags: data.tags,
                 start_after: data.startAfter,
                 start_before: data.startBefore,

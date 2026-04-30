@@ -19,6 +19,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  Layers,
   MapPin,
   Repeat,
   Star,
@@ -45,6 +46,7 @@ interface CalendarBodyProps {
   search: string
   rsvpedOnly: boolean
   tags?: string[]
+  trackIds?: string[]
   /** Initial month + selected day. Defaults to today before the popup loads. */
   defaultDate?: Date | null
 }
@@ -60,6 +62,7 @@ export function CalendarBody({
   search,
   rsvpedOnly,
   tags,
+  trackIds,
   defaultDate,
 }: CalendarBodyProps) {
   const { t } = useTranslation()
@@ -92,6 +95,7 @@ export function CalendarBody({
       rsvpedOnly,
       search,
       tags,
+      trackIds,
     ],
     queryFn: () =>
       EventsService.listPortalEvents({
@@ -102,6 +106,7 @@ export function CalendarBody({
         rsvpedOnly: rsvpedOnly || undefined,
         search: search || undefined,
         tags: tags?.length ? tags : undefined,
+        trackIds: trackIds?.length ? trackIds : undefined,
         limit: 200,
       }),
     enabled: !!popupId,
@@ -335,6 +340,14 @@ export function CalendarBody({
                                   {t("events.calendar.max_participants", {
                                     count: event.max_participant,
                                   })}
+                                </span>
+                              </div>
+                            )}
+                            {event.track_title && (
+                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                                <Layers className="h-3 w-3" />
+                                <span className="truncate">
+                                  {event.track_title}
                                 </span>
                               </div>
                             )}

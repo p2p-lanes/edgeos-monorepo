@@ -132,7 +132,7 @@ async def list_track_events(
     events, total = events_crud.find_by_popup(
         db,
         popup_id=track.popup_id,
-        track_id=track_id,
+        track_ids=[track_id],
         skip=skip,
         limit=limit,
     )
@@ -198,7 +198,7 @@ async def list_portal_track_events(
     events, total = events_crud.find_by_popup(
         db,
         popup_id=track.popup_id,
-        track_id=track_id,
+        track_ids=[track_id],
         event_status=EventStatus.PUBLISHED,
         skip=skip,
         limit=limit,
