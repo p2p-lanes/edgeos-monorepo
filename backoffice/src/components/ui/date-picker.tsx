@@ -20,6 +20,13 @@ interface DatePickerProps {
   disabled?: boolean
   /** Matcher for individual calendar days (greys them out and blocks selection). */
   disabledDays?: DayMatcher
+  /**
+   * Days unselectable because of an external schedule (e.g. the selected
+   * venue is closed). Same effect as `disabledDays` but rendered with a
+   * distinct destructive color so the user can tell apart "outside the
+   * booking window" from "venue closed that day".
+   */
+  closedDays?: DayMatcher
   placeholder?: string
   className?: string
   id?: string
@@ -35,6 +42,7 @@ export function DatePicker({
   onChange,
   disabled,
   disabledDays,
+  closedDays,
   placeholder = "Pick a date",
   className,
   id,
@@ -60,6 +68,16 @@ export function DatePicker({
 
   const date = parseDate(value)
 
+  // Closed days are also unselectable — fold them into the disabled matcher
+  // and additionally tag them with a "closed" modifier so they get a
+  // destructive color (see modifiersClassNames). That visually separates
+  // "outside booking window" from "venue closed that day" while still
+  // blocking selection in both cases.
+  const disabledMatcher: DayMatcher | undefined =
+    disabledDays && closedDays
+      ? (d) => disabledDays(d) || closedDays(d)
+      : (disabledDays ?? closedDays)
+
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -84,7 +102,16 @@ export function DatePicker({
           selected={date}
           defaultMonth={date ?? defaultMonth}
           onSelect={(newDate) => onChange(formatDate(newDate))}
-          disabled={disabledDays}
+          disabled={disabledMatcher}
+          modifiers={closedDays ? { closed: closedDays } : undefined}
+          modifiersClassNames={
+            closedDays
+              ? {
+                  closed:
+                    "!text-destructive/80 !opacity-100 line-through hover:bg-transparent",
+                }
+              : undefined
+          }
           initialFocus
         />
       </PopoverContent>

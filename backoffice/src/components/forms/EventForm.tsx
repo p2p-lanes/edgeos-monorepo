@@ -18,13 +18,13 @@ import {
   EventsService,
   type EventUpdate,
   EventVenuesService,
+  PopupsService,
   TracksService,
 } from "@/client"
 import { FieldError } from "@/components/Common/FieldError"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { DatePicker } from "@/components/ui/date-picker"
-import { DateTimePicker } from "@/components/ui/datetime-picker"
 import { ImageUpload } from "@/components/ui/image-upload"
 import {
   HeroInput,
@@ -42,7 +42,6 @@ import {
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
-import { VenueHoursSummary } from "@/components/VenueHoursSummary"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
@@ -63,6 +62,7 @@ import {
   type RepeatState,
 } from "./EventForm/RepeatPicker"
 import { StartTimeCombobox } from "./EventForm/StartTimeCombobox"
+import { VenueDetailsDialog } from "./EventForm/VenueDetailsDialog"
 
 interface EventFormProps {
   defaultValues?: EventPublic
@@ -219,6 +219,7 @@ export function EventForm({
     useState<DurationUnit>(initialDurationUnit)
   const [durationValue, setDurationValue] =
     useState<number>(initialDurationValue)
+  const [venueDialogOpen, setVenueDialogOpen] = useState(false)
   const durationMinutes = Math.max(
     1,
     Math.round(durationUnit === "hours" ? durationValue * 60 : durationValue),
@@ -271,6 +272,9 @@ export function EventForm({
       const startDate = localTzNaiveToUtc(value.start_time, value.timezone)
       const endDate = new Date(startDate.getTime() + durationMinutes * 60_000)
 
+      // meeting_url only applies when there's no physical venue.
+      const meetingUrl = value.venue_id ? null : value.meeting_url || null
+
       if (isEdit) {
         const payload: EventUpdate = {
           title: value.title,
@@ -280,7 +284,7 @@ export function EventForm({
           end_time: endDate.toISOString(),
           timezone: value.timezone,
           cover_url: value.cover_url || null,
-          meeting_url: value.meeting_url || null,
+          meeting_url: meetingUrl,
           max_participant: value.max_participant
             ? parseInt(value.max_participant, 10)
             : null,
@@ -303,7 +307,7 @@ export function EventForm({
           end_time: endDate.toISOString(),
           timezone: value.timezone,
           cover_url: value.cover_url || null,
-          meeting_url: value.meeting_url || null,
+          meeting_url: meetingUrl,
           max_participant: value.max_participant
             ? parseInt(value.max_participant, 10)
             : null,
@@ -480,6 +484,62 @@ export function EventForm({
   })
   const popupTz = popupSettings?.timezone ?? "UTC"
 
+  // Popup window (start_date / end_date) used to constrain the date picker
+  // to the active popup's calendar — mirrors the portal event create flow.
+  const { data: popup } = useQuery({
+    queryKey: ["popup", selectedPopupId],
+    queryFn: () => PopupsService.getPopup({ popupId: selectedPopupId! }),
+    enabled: !!selectedPopupId,
+  })
+
+  const isDateOutsidePopupWindow = useMemo(() => {
+    const startKey = popup?.start_date ? popup.start_date.slice(0, 10) : null
+    const endKey = popup?.end_date ? popup.end_date.slice(0, 10) : null
+    if (!startKey && !endKey) return undefined
+    return (d: Date) => {
+      const y = d.getFullYear()
+      const m = String(d.getMonth() + 1).padStart(2, "0")
+      const day = String(d.getDate()).padStart(2, "0")
+      const key = `${y}-${m}-${day}`
+      if (startKey && key < startKey) return true
+      if (endKey && key > endKey) return true
+      return false
+    }
+  }, [popup?.start_date, popup?.end_date])
+
+  // First day within the popup window where the venue is open. Used to
+  // default the date picker when a user picks a venue with no date set
+  // yet — and to recover when the previously selected date becomes a
+  // closed day after switching venues.
+  const firstOpenDayKey = useMemo(() => {
+    const popupStartKey = popup?.start_date
+      ? popup.start_date.slice(0, 10)
+      : null
+    const popupEndKey = popup?.end_date ? popup.end_date.slice(0, 10) : null
+    const fmt = (d: Date) => {
+      const y = d.getFullYear()
+      const m = String(d.getMonth() + 1).padStart(2, "0")
+      const day = String(d.getDate()).padStart(2, "0")
+      return `${y}-${m}-${day}`
+    }
+    const today = new Date()
+    today.setHours(12, 0, 0, 0)
+    const todayKey = fmt(today)
+    const startKey =
+      popupStartKey && popupStartKey > todayKey ? popupStartKey : todayKey
+    const [sy, sm, sd] = startKey.split("-").map(Number)
+    const cursor = new Date(sy, sm - 1, sd, 12, 0, 0)
+    // Scan up to ~13 months forward — covers any reasonable popup window
+    // while keeping a hard upper bound on the loop.
+    for (let i = 0; i < 400; i++) {
+      const key = fmt(cursor)
+      if (popupEndKey && key > popupEndKey) return null
+      if (!isClosedOnDate || !isClosedOnDate(cursor)) return key
+      cursor.setDate(cursor.getDate() + 1)
+    }
+    return null
+  }, [popup?.start_date, popup?.end_date, isClosedOnDate])
+
   // For new events, default the timezone field to the popup's configured tz
   // as soon as settings load — users shouldn't have to hunt for it, and the
   // UTC fallback creates silent round-trip drift against the calendars.
@@ -602,15 +662,45 @@ export function EventForm({
   const venueAutoInitRef = useRef<string | null>(null)
   useEffect(() => {
     if (isEdit) return
+
+    // When no venue is selected, just ensure the date sits inside the
+    // popup window — every day outside it is disabled in the picker, so
+    // an empty/out-of-window default would force the user to navigate
+    // there manually.
     if (!venueIdValue) {
       venueAutoInitRef.current = null
+      const dateInvalid = (() => {
+        if (!dateStr) return true
+        const [y, m, d] = dateStr.split("-").map(Number)
+        if (!y || !m || !d) return true
+        const date = new Date(y, m - 1, d, 12, 0, 0)
+        return isDateOutsidePopupWindow?.(date) ?? false
+      })()
+      if (dateInvalid && firstOpenDayKey) {
+        form.setFieldValue("start_time", `${firstOpenDayKey}T09:00`)
+      }
       return
     }
-    if (!dateStr) {
-      const today = new Date().toISOString().slice(0, 10)
-      form.setFieldValue("start_time", `${today}T09:00`)
+
+    // If the current date is unset, closed for this venue, or outside the
+    // popup window, snap to the first day the venue is open. Covers both
+    // "no date yet" and "switched venues — old date is now closed".
+    const currentDateInvalid = (() => {
+      if (!dateStr) return true
+      const [y, m, d] = dateStr.split("-").map(Number)
+      if (!y || !m || !d) return true
+      const date = new Date(y, m - 1, d, 12, 0, 0)
+      if (isDateOutsidePopupWindow?.(date)) return true
+      if (isClosedOnDate?.(date)) return true
+      return false
+    })()
+
+    if (currentDateInvalid) {
+      const target = firstOpenDayKey ?? new Date().toISOString().slice(0, 10)
+      form.setFieldValue("start_time", `${target}T09:00`)
       return
     }
+
     if (venueAutoInitRef.current === venueIdValue) return
     if (startSlotOptions.length === 0) return
     venueAutoInitRef.current = venueIdValue
@@ -628,6 +718,9 @@ export function EventForm({
     startFits,
     startTimeValue,
     form,
+    firstOpenDayKey,
+    isClosedOnDate,
+    isDateOutsidePopupWindow,
   ])
 
   // --- Max participant warning -------------------------------------------
@@ -726,85 +819,7 @@ export function EventForm({
       className="mx-auto max-w-2xl space-y-8"
     >
       {/* ------------------------------------------------------------------
-           VENUE FIRST – defines available times & defaults
-         ------------------------------------------------------------------ */}
-      <InlineSection title="Venue">
-        <InlineRow
-          label="Venue"
-          description="Pick the venue first. It defines available times and capacity."
-        >
-          <form.Field name="venue_id">
-            {(field) => (
-              <Select
-                value={field.state.value || "__none__"}
-                onValueChange={(v) =>
-                  field.handleChange(v === "__none__" ? "" : v)
-                }
-                disabled={readOnly}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="No venue" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">No venue</SelectItem>
-                  {venues?.results.map((v) => (
-                    <SelectItem key={v.id} value={v.id}>
-                      {v.title || "Untitled venue"}
-                      {v.capacity ? ` (cap. ${v.capacity})` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </form.Field>
-        </InlineRow>
-
-        {selectedVenue && (
-          <div className="space-y-2 px-1 py-3 text-xs text-muted-foreground">
-            <div className="flex flex-wrap gap-x-4 gap-y-1">
-              {selectedVenue.capacity != null && (
-                <span>
-                  <strong className="text-foreground">Capacity:</strong>{" "}
-                  {selectedVenue.capacity}
-                </span>
-              )}
-              {selectedVenue.booking_mode && (
-                <span>
-                  <strong className="text-foreground">Booking:</strong>{" "}
-                  {selectedVenue.booking_mode}
-                </span>
-              )}
-              {selectedVenue.setup_time_minutes != null && (
-                <span>
-                  <strong className="text-foreground">Setup:</strong>{" "}
-                  {selectedVenue.setup_time_minutes} min
-                </span>
-              )}
-              {selectedVenue.teardown_time_minutes != null && (
-                <span>
-                  <strong className="text-foreground">Teardown:</strong>{" "}
-                  {selectedVenue.teardown_time_minutes} min
-                </span>
-              )}
-            </div>
-            <VenueHoursSummary hours={venueWeeklyHours} />
-            {selectedVenue.description && (
-              <p className="whitespace-pre-wrap">
-                <strong className="text-foreground">About this venue:</strong>{" "}
-                {selectedVenue.description}
-              </p>
-            )}
-            {isVenueUnbookable && (
-              <p className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-destructive">
-                This venue is marked as unbookable. Date selection is disabled.
-              </p>
-            )}
-          </div>
-        )}
-      </InlineSection>
-
-      {/* ------------------------------------------------------------------
-           CORE EVENT DETAILS
+           TITLE + STATUS
          ------------------------------------------------------------------ */}
       <form.Field
         name="title"
@@ -862,6 +877,90 @@ export function EventForm({
           </div>
         )}
       </form.Field>
+
+      {/* ------------------------------------------------------------------
+           VENUE — defines available times & capacity
+         ------------------------------------------------------------------ */}
+      <InlineSection title="Venue">
+        <InlineRow
+          label="Venue"
+          description="Where the event takes place. Defines available times and capacity."
+        >
+          <form.Field name="venue_id">
+            {(field) => (
+              <Select
+                value={field.state.value || "__none__"}
+                onValueChange={(v) =>
+                  field.handleChange(v === "__none__" ? "" : v)
+                }
+                disabled={readOnly}
+              >
+                <SelectTrigger className="w-[240px]">
+                  <SelectValue placeholder="No venue" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">No venue</SelectItem>
+                  {venues?.results.map((v) => (
+                    <SelectItem key={v.id} value={v.id}>
+                      {v.title || "Untitled venue"}
+                      {v.capacity ? ` (cap. ${v.capacity})` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </form.Field>
+        </InlineRow>
+
+        {selectedVenue && (
+          <InlineRow
+            label="Venue details"
+            description="Capacity, booking mode and weekly hours"
+          >
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setVenueDialogOpen(true)}
+            >
+              View details
+            </Button>
+          </InlineRow>
+        )}
+
+        {selectedVenue && isVenueUnbookable && (
+          <div className="px-1 py-3">
+            <p className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">
+              This venue is marked as unbookable. Date selection is disabled.
+            </p>
+          </div>
+        )}
+
+        {!venueIdValue && (
+          <InlineRow
+            label="Meeting URL"
+            description="Virtual meeting link for this event"
+          >
+            <form.Field name="meeting_url">
+              {(field) => (
+                <Input
+                  value={field.state.value}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  placeholder="https://meet.google.com/..."
+                  disabled={readOnly}
+                  className="w-[280px]"
+                />
+              )}
+            </form.Field>
+          </InlineRow>
+        )}
+      </InlineSection>
+
+      <VenueDetailsDialog
+        venue={selectedVenue ?? null}
+        open={venueDialogOpen}
+        onOpenChange={setVenueDialogOpen}
+      />
 
       <InlineSection title="Event Details">
         <InlineRow label="Type" description="Category of the event">
@@ -926,7 +1025,14 @@ export function EventForm({
           <DatePicker
             value={dateStr}
             disabled={readOnly || isVenueUnbookable}
-            disabledDays={isClosedOnDate}
+            disabledDays={isDateOutsidePopupWindow}
+            closedDays={
+              isClosedOnDate
+                ? (d) =>
+                    !(isDateOutsidePopupWindow?.(d) ?? false) &&
+                    isClosedOnDate(d)
+                : undefined
+            }
             onChange={(newDate) => {
               if (!newDate) return
               const currentStartTime = startTimeValue?.slice(11, 16) || "09:00"
@@ -981,47 +1087,29 @@ export function EventForm({
           </div>
         </InlineRow>
 
-        {venueIdValue ? (
-          <InlineRow label="Start time" description="Pick or type a time">
-            <div className="flex flex-col items-end gap-1 w-[240px]">
-              <StartTimeCombobox
-                dateStr={dateStr}
-                value={startTimeValue ? startTimeValue.slice(11, 16) : ""}
-                onChange={(hhmm) => {
-                  if (!hhmm) {
-                    form.setFieldValue("start_time", "")
-                    return
-                  }
-                  const date = dateStr || new Date().toISOString().slice(0, 10)
-                  form.setFieldValue("start_time", `${date}T${hhmm}`)
-                }}
-                options={startSlotOptions}
-                disabled={readOnly || isVenueUnbookable}
-                fits={startFits}
-                placeholder={
-                  startSlotOptions.length === 0 ? "No open hours" : "HH:mm"
+        <InlineRow label="Start time" description="Pick or type a time">
+          <div className="flex flex-col items-end gap-1 w-[240px]">
+            <StartTimeCombobox
+              value={startTimeValue ? startTimeValue.slice(11, 16) : ""}
+              onChange={(hhmm) => {
+                if (!hhmm) {
+                  form.setFieldValue("start_time", "")
+                  return
                 }
-              />
-              <AvailabilityIndicator availability={effectiveAvailability} />
-            </div>
-          </InlineRow>
-        ) : (
-          <InlineRow label="Start" description="When the event begins">
-            <form.Field name="start_time">
-              {(field) => (
-                <div className="flex flex-col items-end gap-1">
-                  <DateTimePicker
-                    value={field.state.value}
-                    onChange={field.handleChange}
-                    placeholder="Select start date"
-                    disabled={readOnly}
-                  />
-                  <AvailabilityIndicator availability={effectiveAvailability} />
-                </div>
-              )}
-            </form.Field>
-          </InlineRow>
-        )}
+                const date = dateStr || new Date().toISOString().slice(0, 10)
+                form.setFieldValue("start_time", `${date}T${hhmm}`)
+              }}
+              disabled={readOnly || isVenueUnbookable}
+              fits={venueIdValue ? startFits : true}
+              placeholder={
+                venueIdValue && startSlotOptions.length === 0
+                  ? "No open hours"
+                  : "HH:mm"
+              }
+            />
+            <AvailabilityIndicator availability={effectiveAvailability} />
+          </div>
+        </InlineRow>
 
         <InlineRow
           label="Repeats"
@@ -1099,9 +1187,9 @@ export function EventForm({
               <Textarea
                 value={field.state.value}
                 onChange={(e) => field.handleChange(e.target.value)}
-                rows={4}
                 placeholder="Describe the event..."
                 disabled={readOnly}
+                className="w-[380px] min-h-20"
               />
             )}
           </form.Field>
@@ -1161,19 +1249,6 @@ export function EventForm({
             )}
           </form.Field>
         </div>
-
-        <InlineRow label="Meeting Link" description="Virtual meeting URL">
-          <form.Field name="meeting_url">
-            {(field) => (
-              <Input
-                value={field.state.value}
-                onChange={(e) => field.handleChange(e.target.value)}
-                placeholder="https://meet.google.com/..."
-                disabled={readOnly}
-              />
-            )}
-          </form.Field>
-        </InlineRow>
       </InlineSection>
 
       {/* ------------------------------------------------------------------

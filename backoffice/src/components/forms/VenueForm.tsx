@@ -364,8 +364,8 @@ export function VenueForm({ defaultValues, onSuccess }: VenueFormProps) {
                   onChange={(e) => field.handleChange(e.target.value)}
                   onBlur={field.handleBlur}
                   placeholder="Accessibility notes, quirks, vibe, capacity details…"
-                  rows={3}
                   disabled={readOnly}
+                  className="w-[380px] min-h-20"
                 />
               )}
             </form.Field>
