@@ -1,7 +1,6 @@
 import uuid
-from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, HTTPException, status
 
 from app.api.coupon import crud
 from app.api.coupon.schemas import (
@@ -13,14 +12,12 @@ from app.api.coupon.schemas import (
 from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
-    CurrentHumanForCheckout,
+    CurrentHuman,
     CurrentUser,
     CurrentWriter,
     SessionDep,
     TenantSession,
-    enforce_checkout_popup_match,
 )
-from app.core.security import TokenPayload, get_token_payload
 
 router = APIRouter(prefix="/coupons", tags=["coupons"])
 
@@ -78,8 +75,7 @@ async def get_coupon(
 async def validate_coupon(
     coupon_in: CouponValidate,
     db: SessionDep,
-    _: CurrentHumanForCheckout,
-    token_payload: Annotated[TokenPayload, Depends(get_token_payload)],
+    _: CurrentHuman,
 ) -> CouponPublic:
     """
     Validate a coupon code (Portal - Human only).
@@ -87,7 +83,6 @@ async def validate_coupon(
     This endpoint is used by the ticketing portal to check if a coupon is valid
     before applying it to a payment.
     """
-    enforce_checkout_popup_match(token_payload, coupon_in.popup_id)
     coupon = crud.coupons_crud.validate_coupon(db, coupon_in.code, coupon_in.popup_id)
     return CouponPublic.model_validate(coupon)
 

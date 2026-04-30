@@ -61,17 +61,13 @@ class SendTestRequest(BaseModel):
     popup_id: uuid.UUID | None = None
 
 
-def _resolve_effective_tenant_id(
-    current_user: CurrentUser, db: TenantSession
-) -> uuid.UUID:
+def _resolve_effective_tenant_id(current_user: CurrentUser, db: TenantSession) -> uuid.UUID:
     if current_user.tenant_id:
         return current_user.tenant_id
 
-    tenant_id = (
-        db.connection()
-        .execute(text("SELECT current_setting('app.tenant_id', true)"))
-        .scalar_one_or_none()
-    )
+    tenant_id = db.connection().execute(
+        text("SELECT current_setting('app.tenant_id', true)")
+    ).scalar_one_or_none()
     if not tenant_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -85,7 +81,11 @@ def _get_template_label(template_type: str) -> str | None:
     from app.services.email.templates import TEMPLATE_TYPE_METADATA
 
     metadata = next(
-        (meta for meta in TEMPLATE_TYPE_METADATA if str(meta["type"]) == template_type),
+        (
+            meta
+            for meta in TEMPLATE_TYPE_METADATA
+            if str(meta["type"]) == template_type
+        ),
         None,
     )
     return metadata["label"] if metadata else None
@@ -159,10 +159,7 @@ async def preview_template(
             detail=_template_not_customizable_message(body.template_type),
         )
 
-    if (
-        get_template_scope(body.template_type) == TemplateScope.POPUP
-        and not body.popup_id
-    ):
+    if get_template_scope(body.template_type) == TemplateScope.POPUP and not body.popup_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=_template_scope_required_message(body.template_type),
@@ -229,10 +226,7 @@ async def send_test_email(
             detail=_template_not_customizable_message(body.template_type),
         )
 
-    if (
-        get_template_scope(body.template_type) == TemplateScope.POPUP
-        and not body.popup_id
-    ):
+    if get_template_scope(body.template_type) == TemplateScope.POPUP and not body.popup_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=_template_scope_required_message(body.template_type),

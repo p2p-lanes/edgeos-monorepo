@@ -181,10 +181,7 @@ export const PopupCheckoutContent = ({
           style={background.style}
         >
           <div className="container mx-auto">
-            <CheckoutLoginGate
-              popupId={popup.id}
-              otpEnabled={policy.checkoutOtpEnabled}
-            />
+            <CheckoutLoginGate />
           </div>
         </div>
       )
@@ -257,7 +254,6 @@ export const PopupCheckoutContent = ({
               <UserInfoForm
                 popupId={popup.id}
                 popupName={popup.name}
-                otpEnabled={policy.checkoutOtpEnabled}
                 schema={applicationSchema}
                 onSubmit={handleFormSubmit}
                 isSubmitting={isSubmitting}

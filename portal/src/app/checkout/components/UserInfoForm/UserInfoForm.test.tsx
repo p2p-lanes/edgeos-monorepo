@@ -106,7 +106,6 @@ describe("UserInfoForm application checkout", () => {
       refreshApplicationData: vi.fn(),
     })
     mockUseEmailVerification.mockReturnValue({
-      otpEnabled: true,
       showVerificationInput: false,
       verificationCode: "",
       setVerificationCode: vi.fn(),
@@ -128,7 +127,6 @@ describe("UserInfoForm application checkout", () => {
       <UserInfoForm
         popupId="popup-1"
         popupName="Popup"
-        otpEnabled={true}
         schema={schema}
         onSubmit={onSubmit}
         isSubmitting={false}
@@ -188,7 +186,6 @@ describe("UserInfoForm application checkout", () => {
       <UserInfoForm
         popupId="popup-1"
         popupName="Popup"
-        otpEnabled={true}
         schema={schemaWithoutTelegram}
         onSubmit={onSubmit}
         isSubmitting={false}

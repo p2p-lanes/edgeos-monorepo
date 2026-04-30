@@ -5,7 +5,6 @@ import { LabelRequired } from "@/components/ui/label"
 import { OtpInput } from "@/components/ui/otp-input"
 
 interface EmailVerificationProps {
-  otpEnabled: boolean
   email: string
   showVerificationInput: boolean
   verificationCode: string
@@ -21,7 +20,6 @@ interface EmailVerificationProps {
 }
 
 const EmailVerification = ({
-  otpEnabled,
   email,
   showVerificationInput,
   verificationCode,
@@ -36,9 +34,6 @@ const EmailVerification = ({
   emailError,
 }: EmailVerificationProps) => {
   const { t } = useTranslation()
-  const inputError =
-    emailError ??
-    (!showVerificationInput ? verificationError || undefined : undefined)
 
   return (
     <div className="space-y-4">
@@ -52,7 +47,7 @@ const EmailVerification = ({
             type="email"
             value={email}
             onChange={(e) => handleEmailChange(e.target.value)}
-            error={inputError}
+            error={emailError}
             required
             placeholder={t("form.email_placeholder")}
             disabled={showVerificationInput}
@@ -60,7 +55,7 @@ const EmailVerification = ({
           />
         </div>
 
-        {otpEnabled && showVerificationInput && (
+        {showVerificationInput && (
           <Button
             type="button"
             variant="link"
@@ -73,7 +68,7 @@ const EmailVerification = ({
         )}
       </div>
 
-      {otpEnabled && showVerificationInput && (
+      {showVerificationInput && (
         <div className="space-y-2">
           <div className="flex flex-col items-center space-y-3">
             <p className="text-sm text-center">

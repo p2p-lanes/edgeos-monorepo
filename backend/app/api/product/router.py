@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Header, HTTPException, status
 from loguru import logger
 from sqlalchemy.exc import IntegrityError
 
@@ -30,17 +30,15 @@ from app.api.translation.service import (
     get_translations_bulk,
 )
 from app.core.dependencies.users import (
-    CheckoutHumanTenantSession,
     CurrentAdmin,
-    CurrentHumanForCheckout,
+    CurrentHuman,
     CurrentSuperadmin,
     CurrentUser,
     CurrentWriter,
+    HumanTenantSession,
     SessionDep,
     TenantSession,
-    enforce_checkout_popup_match,
 )
-from app.core.security import TokenPayload, get_token_payload
 from app.utils.utils import slugify
 
 router = APIRouter(prefix="/products", tags=["products"])
@@ -705,26 +703,19 @@ async def delete_product(
             detail="Product not found",
         )
 
-    has_history = (
-        db.exec(
-            select(func.count())
-            .select_from(AttendeeProducts)
-            .where(AttendeeProducts.product_id == product.id)
-        ).one()
-        > 0
-        or db.exec(
-            select(func.count())
-            .select_from(PaymentProducts)
-            .where(PaymentProducts.product_id == product.id)
-        ).one()
-        > 0
-        or db.exec(
-            select(func.count())
-            .select_from(TicketTierPhase)
-            .where(TicketTierPhase.product_id == product.id)
-        ).one()
-        > 0
-    )
+    has_history = db.exec(
+        select(func.count())
+        .select_from(AttendeeProducts)
+        .where(AttendeeProducts.product_id == product.id)
+    ).one() > 0 or db.exec(
+        select(func.count())
+        .select_from(PaymentProducts)
+        .where(PaymentProducts.product_id == product.id)
+    ).one() > 0 or db.exec(
+        select(func.count())
+        .select_from(TicketTierPhase)
+        .where(TicketTierPhase.product_id == product.id)
+    ).one() > 0
 
     if has_history:
         crud.products_crud.soft_delete(db, product)
@@ -735,9 +726,8 @@ async def delete_product(
 
 @router.get("/portal/products", response_model=ListModel[ProductPublicWithTier])
 async def list_portal_products(
-    db: CheckoutHumanTenantSession,
-    _: CurrentHumanForCheckout,
-    token_payload: Annotated[TokenPayload, Depends(get_token_payload)],
+    db: HumanTenantSession,
+    _: CurrentHuman,
     popup_id: uuid.UUID | None = None,
     is_active: bool | None = None,
     category: str | None = None,
@@ -750,15 +740,6 @@ async def list_portal_products(
     Response carries enriched tier_group/phase fields for products whose popup
     has tier_progression_enabled=True; null otherwise (BC-2 additive).
     """
-    if popup_id:
-        enforce_checkout_popup_match(token_payload, popup_id)
-    elif token_payload.token_type == "human_checkout":
-        # The lighter checkout token must always be scoped to a popup.
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="popup_id is required for checkout sessions",
-        )
-
     if popup_id:
         products, total = crud.products_crud.find_by_popup(
             db,

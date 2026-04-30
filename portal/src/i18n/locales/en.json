@@ -67,8 +67,7 @@
     "invalid_code": "Invalid verification code. Please try again.",
     "code_expired": "Code expired. Please request a new one.",
     "failed_to_verify": "Failed to verify code. Please try again.",
-    "network_error": "Network error. Please check your connection.",
-    "otp_required_for_existing_account": "An account already exists for this email. We sent you a 6-digit verification code."
+    "network_error": "Network error. Please check your connection."
   },
   "form": {
     "first_name": "First Name",
@@ -182,10 +181,6 @@
     "resend_hint": "Didn't receive the code? Check your spam folder or click \"Resend Code\" after the timer expires.",
     "success_title": "Tickets Purchased!",
     "success_description": "Thank you for your purchase. Your tickets are now ready for use.",
-    "success_email_hint": "We sent a confirmation with the details to your email.",
-    "success_portal_login_hint": "To view your tickets in the portal, sign in with the verification code we email you.",
-    "go_to_portal_signin": "Sign in to view your tickets",
-    "express_subtitle": "Sign in to continue to checkout.",
     "steps": {
       "passes_title": "Select Your Passes",
       "passes_subtitle": "Choose passes for yourself and family members",

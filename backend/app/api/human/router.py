@@ -13,10 +13,10 @@ from app.api.human.schemas import (
 from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
-    CheckoutHumanTenantSession,
-    CurrentHumanForCheckout,
+    CurrentHuman,
     CurrentUser,
     CurrentWriter,
+    HumanTenantSession,
     TenantSession,
 )
 from app.services.email_helpers import send_application_status_email
@@ -115,7 +115,7 @@ async def create_human(
 
 @router.get("/me", response_model=HumanPublic)
 async def get_current_human_info(
-    current_user: CurrentHumanForCheckout,
+    current_user: CurrentHuman,
 ) -> HumanPublic:
     return HumanPublic.model_validate(current_user)
 
@@ -123,8 +123,8 @@ async def get_current_human_info(
 @router.patch("/me", response_model=HumanPublic)
 async def update_current_human(
     human_in: HumanProfileUpdate,
-    current_human: CurrentHumanForCheckout,
-    db: CheckoutHumanTenantSession,
+    current_human: CurrentHuman,
+    db: HumanTenantSession,
 ) -> HumanPublic:
     """Update the current authenticated human's profile."""
     human = crud.get(db, current_human.id)

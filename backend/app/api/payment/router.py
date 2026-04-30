@@ -1,8 +1,8 @@
 import uuid
 from decimal import Decimal
-from typing import TYPE_CHECKING, Annotated, Literal
+from typing import TYPE_CHECKING, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, HTTPException, Request, Response, status
 from sqlmodel import Session
 
 from app.api.payment.crud import payments_crud
@@ -23,18 +23,14 @@ from app.api.payment.schemas import (
 )
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
-    CheckoutHumanTenantSession,
     CurrentHuman,
-    CurrentHumanForCheckout,
     CurrentUser,
     CurrentWriter,
     HumanTenantSession,
     SessionDep,
     TenantSession,
-    enforce_checkout_popup_match,
 )
 from app.core.redis import WebhookCache
-from app.core.security import TokenPayload, get_token_payload
 from app.services.email import (
     EmailAttachment,
     PaymentAttendeeItem,
@@ -47,7 +43,6 @@ from app.services.email_helpers import send_application_status_email
 
 if TYPE_CHECKING:
     from app.api.human.models import Humans
-    from app.api.human.schemas import HumanPublic
     from app.api.popup.models import Popups
 
 router = APIRouter(prefix="/payments", tags=["payments"])
@@ -162,9 +157,7 @@ def _build_payment_confirmed_context(
         discount_value=int(payment.discount_value) if payment.discount_value else None,
         original_amount=original_amount,
         attendees=attendees,
-        order_summary=compute_order_summary(payment)
-        if payment.products_snapshot
-        else None,
+        order_summary=compute_order_summary(payment) if payment.products_snapshot else None,
         portal_url=portal_url,
     )
 
@@ -276,9 +269,9 @@ async def _send_payment_confirmed_email(payment, db_session=None) -> None:
 
 
 def _get_portal_owned_payment_or_404(
-    db: Session,
+    db: HumanTenantSession,
     payment_id: uuid.UUID,
-    current_human: "HumanPublic",
+    current_human: CurrentHuman,
 ) -> Payments:
     payment = payments_crud.get_portal_owned_payment(db, payment_id, current_human.id)
     if payment is None:
@@ -290,9 +283,9 @@ def _get_portal_owned_payment_or_404(
 
 
 def _get_portal_payment_context_or_404(
-    db: Session,
+    db: HumanTenantSession,
     payment_id: uuid.UUID,
-    current_human: "HumanPublic",
+    current_human: CurrentHuman,
 ) -> tuple[Payments, "Popups", "Humans | None"]:
     payment = _get_portal_owned_payment_or_404(db, payment_id, current_human)
 
@@ -557,17 +550,11 @@ async def get_my_latest_payment(
 @router.get("/my/{payment_id}/status", response_model=PaymentStatusCheck)
 async def get_my_payment_status(
     payment_id: uuid.UUID,
-    db: CheckoutHumanTenantSession,
-    current_human: CurrentHumanForCheckout,
-    token_payload: Annotated[TokenPayload, Depends(get_token_payload)],
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
 ) -> PaymentStatusCheck:
-    """Get the current status for an owned payment (Portal).
-
-    Reachable from the checkout allowlist: the polling step after creating
-    a direct payment needs to keep working with the lighter checkout token.
-    """
+    """Get the current status for an owned payment (Portal)."""
     payment = _get_portal_owned_payment_or_404(db, payment_id, current_human)
-    enforce_checkout_popup_match(token_payload, payment.popup_id)
 
     return PaymentStatusCheck(
         id=payment.id,
@@ -727,9 +714,8 @@ async def create_my_payment(
 )
 async def create_direct_payment(
     purchase_in: DirectPurchaseCreate,
-    db: CheckoutHumanTenantSession,
-    current_human: CurrentHumanForCheckout,
-    token_payload: Annotated[TokenPayload, Depends(get_token_payload)],
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
 ) -> PaymentPublic:
     """Create a direct-sale payment for the current human (Portal).
 
@@ -739,8 +725,6 @@ async def create_direct_payment(
     """
     from app.api.human.crud import humans_crud
     from app.api.tenant.crud import tenants_crud
-
-    enforce_checkout_popup_match(token_payload, purchase_in.popup_id)
 
     # Load human + tenant (the request session is already tenant-scoped, but
     # we need the Tenants ORM instance for the SimpleFI call)
@@ -917,9 +901,7 @@ async def _handle_payment_request_expired(
 
     payment = payments_crud.get_by_external_id(db, payment_request_id)
     if not payment:
-        logger.warning(
-            "Payment not found for expired external_id: {}", payment_request_id
-        )
+        logger.warning("Payment not found for expired external_id: {}", payment_request_id)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Payment not found",

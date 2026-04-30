@@ -34,13 +34,12 @@ export type PopupSaleType = (typeof SALE_TYPE)[keyof typeof SALE_TYPE]
 
 export type PopupCheckoutPolicySource = Pick<
   PopupPublic,
-  "sale_type" | "checkout_mode" | "checkout_otp_enabled"
+  "sale_type" | "checkout_mode"
 >
 
 export interface PopupCheckoutPolicy {
   saleType: PopupSaleType
   checkoutMode: CheckoutMode
-  checkoutOtpEnabled: boolean
   isPassSystem: boolean
   isSimpleQuantity: boolean
 }
@@ -71,13 +70,9 @@ export function resolvePopupCheckoutPolicy(
       ? popup.checkout_mode
       : (deriveCheckoutModeFromSaleType(saleType) ?? DEFAULT_CHECKOUT_MODE)
 
-  const checkoutOtpEnabled =
-    saleType === SALE_TYPE.DIRECT ? popup?.checkout_otp_enabled !== false : true
-
   return {
     saleType,
     checkoutMode,
-    checkoutOtpEnabled,
     isPassSystem: checkoutMode === CHECKOUT_MODE.PASS_SYSTEM,
     isSimpleQuantity: checkoutMode === CHECKOUT_MODE.SIMPLE_QUANTITY,
   }

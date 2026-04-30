@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Header, HTTPException, status
 
 from app.api.approval_strategy.crud import approval_strategies_crud
 from app.api.approval_strategy.schemas import (
@@ -22,7 +22,6 @@ from app.api.popup.schemas import (
     PopupPublic,
     PopupStatus,
     PopupUpdate,
-    resolve_checkout_otp_enabled,
 )
 from app.api.shared.enums import SaleType, UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
@@ -35,17 +34,13 @@ from app.api.translation.service import (
     get_translations_for_entity,
 )
 from app.core.dependencies.users import (
-    CheckoutHumanTenantSession,
     CurrentHuman,
-    CurrentHumanForCheckout,
     CurrentUser,
     CurrentWriter,
     HumanTenantSession,
     SessionDep,
     TenantSession,
-    enforce_checkout_popup_match,
 )
-from app.core.security import TokenPayload, get_token_payload
 
 router = APIRouter(prefix="/popups", tags=["popups"])
 
@@ -234,14 +229,6 @@ async def update_popup(
                 detail="A popup with this slug already exists",
             )
 
-    effective_sale_type = popup_in.sale_type or SaleType(popup.sale_type)
-    popup_in.checkout_otp_enabled = resolve_checkout_otp_enabled(
-        effective_sale_type,
-        popup_in.checkout_otp_enabled
-        if popup_in.checkout_otp_enabled is not None
-        else popup.checkout_otp_enabled,
-    )
-
     sale_type_change_requested = (
         popup_in.sale_type is not None and popup_in.sale_type != popup.sale_type
     )
@@ -376,12 +363,11 @@ async def list_portal_popups(
 @router.get("/portal/{slug}", response_model=PopupPublic)
 async def get_portal_popup(
     slug: str,
-    db: CheckoutHumanTenantSession,
-    _: CurrentHumanForCheckout,
-    token_payload: Annotated[TokenPayload, Depends(get_token_payload)],
+    db: HumanTenantSession,
+    _: CurrentHuman,
     accept_language: Annotated[str | None, Header(alias="Accept-Language")] = None,
 ) -> PopupPublic:
-    """Get a popup by slug (Portal). Reachable from the checkout allowlist."""
+    """Get a popup by slug (Portal)."""
     popup = crud.get_by_slug(db, slug)
 
     if not popup or popup.status != PopupStatus.active:
@@ -389,8 +375,6 @@ async def get_portal_popup(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Event not found",
         )
-
-    enforce_checkout_popup_match(token_payload, popup.id)
 
     if not accept_language or accept_language == "en":
         return PopupPublic.model_validate(popup)

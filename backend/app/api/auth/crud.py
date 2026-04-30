@@ -12,7 +12,6 @@ from app.api.auth.utils import (
     is_code_valid,
 )
 from app.api.human.models import Humans
-from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
 from app.core.config import settings
@@ -329,99 +328,6 @@ async def login_human(
 
     logger.info(f"Auth code sent to pending human: {data.email}")
     return data.email, CODE_EXPIRATION_MINUTES
-
-
-class CheckoutOtpRequired(HTTPException):
-    """Raised when the no-OTP checkout shortcut is not allowed for an email.
-
-    The portal frontend uses the dedicated ``otp_required`` error code to
-    fall back to the regular OTP login flow without bothering the buyer.
-    """
-
-    def __init__(self, message: str) -> None:
-        super().__init__(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={"code": "otp_required", "message": message},
-        )
-
-
-def authenticate_human_for_checkout(
-    session: Session,
-    popup_id: uuid.UUID,
-    email: str,
-) -> Humans:
-    """Authenticate a human for checkout without OTP when popup allows it.
-
-    The shortcut is only available for emails that do NOT yet have a Human
-    in the popup's tenant. Once an account exists, OTP becomes mandatory so
-    that nobody can take over an existing identity by knowing only the email.
-    """
-    from app.api.shared.enums import SaleType
-
-    normalized_email = email.lower().strip()
-    if not normalized_email:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email is required",
-        )
-
-    popup = session.get(Popups, popup_id)
-    if not popup:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Popup not found",
-        )
-
-    if popup.sale_type != SaleType.direct.value or popup.checkout_otp_enabled:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="OTP is required for this popup checkout",
-        )
-
-    check_rate_limit(f"checkout:{popup_id}:{normalized_email}")
-
-    human_statement = select(Humans).where(
-        Humans.email == normalized_email,
-        Humans.tenant_id == popup.tenant_id,
-    )
-    existing_human = session.exec(human_statement).first()
-    if existing_human:
-        logger.info(
-            "Checkout without OTP rejected (existing human): {}",
-            normalized_email,
-        )
-        raise CheckoutOtpRequired(
-            "An account already exists for this email. Please verify with the code we just sent."
-        )
-
-    human = Humans(
-        tenant_id=popup.tenant_id,
-        email=normalized_email,
-    )
-    session.add(human)
-    session.commit()
-    session.refresh(human)
-
-    from app.api.attendee.crud import attendees_crud
-
-    linked_count = attendees_crud.link_attendees_to_human(
-        session,
-        human_id=human.id,
-        email=human.email,
-        tenant_id=human.tenant_id,
-    )
-    if linked_count > 0:
-        logger.info(
-            "Linked {} attendee(s) during checkout auth without OTP: {}",
-            linked_count,
-            normalized_email,
-        )
-
-    logger.info(
-        "Checkout authentication without OTP created new human: {}",
-        normalized_email,
-    )
-    return human
 
 
 async def authenticate_human(

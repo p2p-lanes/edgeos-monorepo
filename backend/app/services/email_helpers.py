@@ -23,7 +23,9 @@ _AcceptedContext = (
 )
 
 
-def _resolve_application_human_details(application, human) -> tuple[str, str, str]:
+def _resolve_application_human_details(
+    application, human
+) -> tuple[str, str, str]:
     source_human = application.human or human
 
     return (
@@ -152,9 +154,7 @@ async def send_application_status_email(
     if not popup or not human:
         return
 
-    first_name, last_name, email = _resolve_application_human_details(
-        application, human
-    )
+    first_name, last_name, email = _resolve_application_human_details(application, human)
     submitted_at = _format_email_datetime(getattr(application, "submitted_at", None))
 
     email_service = get_email_service()

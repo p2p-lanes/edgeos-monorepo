@@ -981,14 +981,6 @@ export type HumanAuth = {
 };
 
 /**
- * Request to authenticate directly for a popup checkout when OTP is disabled.
- */
-export type HumanCheckoutAuth = {
-    popup_id: string;
-    email: string;
-};
-
-/**
  * Human schema for creation.
  */
 export type HumanCreate = {
@@ -1369,7 +1361,6 @@ export type PopupAdmin = {
     insurance_enabled?: boolean;
     insurance_percentage?: (string | null);
     application_layout?: ApplicationLayout;
-    checkout_otp_enabled?: boolean;
     tier_progression_enabled?: boolean;
     id: string;
 };
@@ -1412,7 +1403,6 @@ export type PopupCreate = {
     insurance_enabled?: boolean;
     insurance_percentage?: (number | string | null);
     application_layout?: ApplicationLayout;
-    checkout_otp_enabled?: boolean;
     tier_progression_enabled?: boolean;
 };
 
@@ -1453,7 +1443,6 @@ export type PopupPublic = {
     insurance_enabled?: boolean;
     insurance_percentage?: (string | null);
     application_layout?: ApplicationLayout;
-    checkout_otp_enabled?: boolean;
     tier_progression_enabled?: boolean;
 };
 
@@ -1528,7 +1517,6 @@ export type PopupUpdate = {
     insurance_enabled?: (boolean | null);
     insurance_percentage?: (number | string | null);
     application_layout?: (ApplicationLayout | null);
-    checkout_otp_enabled?: (boolean | null);
     tier_progression_enabled?: (boolean | null);
 };
 
@@ -2438,12 +2426,6 @@ export type AuthHumanAuthenticateData = {
 };
 
 export type AuthHumanAuthenticateResponse = (Token);
-
-export type AuthHumanCheckoutAuthenticateData = {
-    requestBody: HumanCheckoutAuth;
-};
-
-export type AuthHumanCheckoutAuthenticateResponse = (Token);
 
 export type BaseFieldConfigsListBaseFieldConfigsData = {
     /**

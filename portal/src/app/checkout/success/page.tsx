@@ -6,8 +6,6 @@ import { useRouter } from "next/navigation"
 import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
 import { useApplicationsQuery } from "@/hooks/useGetApplications"
-import { useStoredTokenInfo } from "@/hooks/useIsAuthenticated"
-import { clearStoredToken, isCheckoutOnlyToken } from "@/lib/auth-token"
 import { getBackgroundProps } from "@/lib/background-image"
 import { useCityProvider } from "@/providers/cityProvider"
 
@@ -15,12 +13,7 @@ const SuccessPage = () => {
   const { t } = useTranslation()
   const router = useRouter()
   const { getCity } = useCityProvider()
-  const tokenInfo = useStoredTokenInfo()
-  const isCheckoutOnly = isCheckoutOnlyToken(tokenInfo)
-  // The lighter checkout token is not authorized for /portal/* — skip the
-  // applications fetch entirely so the page does not throw 403 in the
-  // background while the user is celebrating their purchase.
-  useApplicationsQuery({ enabled: !isCheckoutOnly })
+  useApplicationsQuery()
 
   const popup = getCity()
   const background = getBackgroundProps(popup)
@@ -32,11 +25,6 @@ const SuccessPage = () => {
   }
 
   const handleGoToPortal = () => {
-    if (isCheckoutOnly) {
-      // Forget the checkout-scoped token so the portal lands on the OTP
-      // login gate instead of fetching with an insufficient token.
-      clearStoredToken()
-    }
     router.push("/portal")
   }
 
@@ -62,16 +50,6 @@ const SuccessPage = () => {
             <p className="mt-2 text-gray-600">
               {t("checkout.success_description")}
             </p>
-            {isCheckoutOnly ? (
-              <>
-                <p className="mt-3 text-sm text-gray-500">
-                  {t("checkout.success_email_hint")}
-                </p>
-                <p className="mt-2 text-sm text-gray-500">
-                  {t("checkout.success_portal_login_hint")}
-                </p>
-              </>
-            ) : null}
           </div>
 
           {/* <div className="bg-gray-50 rounded-lg p-5 mb-6">
@@ -110,9 +88,7 @@ const SuccessPage = () => {
               className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white"
             >
               <Home className="h-4 w-4" />
-              {isCheckoutOnly
-                ? t("checkout.go_to_portal_signin")
-                : t("checkout.go_to_portal")}
+              {t("checkout.go_to_portal")}
             </Button>
           </div>
 
