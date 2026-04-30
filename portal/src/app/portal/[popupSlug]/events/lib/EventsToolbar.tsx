@@ -8,10 +8,12 @@ import {
   Eye,
   EyeOff,
   Filter,
+  Layers,
   List,
   Search,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
+import type { TrackPublic } from "@/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -38,6 +40,9 @@ interface EventsToolbarProps {
   allowedTags?: string[]
   selectedTags?: string[]
   onSelectedTagsChange?: (tags: string[]) => void
+  allowedTracks?: TrackPublic[]
+  selectedTrackIds?: string[]
+  onSelectedTrackIdsChange?: (ids: string[]) => void
 }
 
 /**
@@ -60,6 +65,9 @@ export function EventsToolbar({
   allowedTags,
   selectedTags,
   onSelectedTagsChange,
+  allowedTracks,
+  selectedTrackIds,
+  onSelectedTrackIdsChange,
 }: EventsToolbarProps) {
   const { t } = useTranslation()
   return (
@@ -77,7 +85,11 @@ export function EventsToolbar({
       <Button
         variant={rsvpedOnly ? "default" : "outline"}
         size="sm"
-        onClick={() => onRsvpedOnlyChange(!rsvpedOnly)}
+        onClick={() => {
+          const next = !rsvpedOnly
+          onRsvpedOnlyChange(next)
+          if (next && mineOnly) onMineOnlyChange(false)
+        }}
         aria-pressed={rsvpedOnly}
         aria-label={t("events.toolbar.my_rsvps")}
         title={t("events.toolbar.my_rsvps")}
@@ -90,7 +102,11 @@ export function EventsToolbar({
       <Button
         variant={mineOnly ? "default" : "outline"}
         size="sm"
-        onClick={() => onMineOnlyChange(!mineOnly)}
+        onClick={() => {
+          const next = !mineOnly
+          onMineOnlyChange(next)
+          if (next && rsvpedOnly) onRsvpedOnlyChange(false)
+        }}
         aria-pressed={mineOnly}
         aria-label={t("events.toolbar.my_events")}
         title={t("events.toolbar.my_events")}
@@ -167,7 +183,7 @@ export function EventsToolbar({
                 </button>
               )}
             </div>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-2">
               {allowedTags.map((t) => {
                 const active = !!selectedTags?.includes(t)
                 return (
@@ -184,10 +200,10 @@ export function EventsToolbar({
                     }}
                     aria-pressed={active}
                     className={cn(
-                      "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium leading-none transition-colors",
+                      "inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium leading-none shadow-sm transition-colors",
                       active
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-input bg-background text-muted-foreground hover:bg-muted hover:text-foreground",
+                        ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
+                        : "border-input bg-background text-foreground hover:bg-muted",
                     )}
                   >
                     {t}
@@ -198,6 +214,80 @@ export function EventsToolbar({
           </PopoverContent>
         </Popover>
       )}
+
+      {allowedTracks &&
+        allowedTracks.length > 0 &&
+        onSelectedTrackIdsChange && (
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant={
+                  selectedTrackIds && selectedTrackIds.length > 0
+                    ? "default"
+                    : "outline"
+                }
+                size="sm"
+                title={t("events.toolbar.filter_by_tracks")}
+                aria-label={t("events.toolbar.tracks_label")}
+                className="px-2 sm:px-3"
+              >
+                <Layers className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">
+                  {t("events.toolbar.tracks_label")}
+                </span>
+                {selectedTrackIds && selectedTrackIds.length > 0 && (
+                  <span className="ml-1 text-xs opacity-80">
+                    ({selectedTrackIds.length})
+                  </span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-72 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {t("events.toolbar.filter_by_track_label")}
+                </span>
+                {selectedTrackIds && selectedTrackIds.length > 0 && (
+                  <button
+                    type="button"
+                    className="text-[11px] text-muted-foreground hover:text-foreground"
+                    onClick={() => onSelectedTrackIdsChange([])}
+                  >
+                    {t("events.toolbar.clear_filters")}
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {allowedTracks.map((track) => {
+                  const active = !!selectedTrackIds?.includes(track.id)
+                  return (
+                    <button
+                      key={track.id}
+                      type="button"
+                      onClick={() => {
+                        const current = selectedTrackIds ?? []
+                        onSelectedTrackIdsChange(
+                          active
+                            ? current.filter((x) => x !== track.id)
+                            : [...current, track.id],
+                        )
+                      }}
+                      aria-pressed={active}
+                      className={cn(
+                        "inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium leading-none shadow-sm transition-colors",
+                        active
+                          ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
+                          : "border-input bg-background text-foreground hover:bg-muted",
+                      )}
+                    >
+                      {track.name}
+                    </button>
+                  )
+                })}
+              </div>
+            </PopoverContent>
+          </Popover>
+        )}
 
       {/* Segmented List / Calendar / Day switcher — icon-only. The active
           background marks the current view; titles/aria-labels carry the

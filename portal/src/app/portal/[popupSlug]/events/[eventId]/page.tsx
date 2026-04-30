@@ -6,8 +6,10 @@ import {
   CalendarPlus,
   CheckCircle,
   Clock,
+  Layers,
   Mail,
   MapPin,
+  Pencil,
   Repeat,
   Send,
   Tag,
@@ -34,6 +36,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+import { cn } from "@/lib/utils"
 import { useCityProvider } from "@/providers/cityProvider"
 import { AddToCalendarModal } from "../lib/AddToCalendarModal"
 import { summarizeRrule } from "../lib/summarizeRrule"
@@ -280,12 +283,25 @@ export default function EventDetailPage() {
 
   return (
     <div className="max-w-2xl mx-auto p-4 sm:p-6 space-y-4">
-      <Link
-        href={backHref}
-        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="h-4 w-4" /> {t("events.common.back_to_events")}
-      </Link>
+      <div className="flex items-center justify-between gap-2">
+        <Link
+          href={backHref}
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" /> {t("events.common.back_to_events")}
+        </Link>
+        {isOwner && (
+          <Button asChild variant="outline" size="sm" className="shrink-0">
+            <Link
+              href={`/portal/${city?.slug}/events/${event.id}/edit`}
+              aria-label={t("events.detail.edit_event_button")}
+            >
+              <Pencil className="mr-2 h-3.5 w-3.5" />
+              {t("events.detail.edit_event_button")}
+            </Link>
+          </Button>
+        )}
+      </div>
 
       {coverUrl && (
         <div>
@@ -309,15 +325,26 @@ export default function EventDetailPage() {
         <div className="flex items-center gap-2 mb-1 flex-wrap">
           <Badge
             variant="secondary"
-            className={
-              event.status === "published" ? "bg-primary/10 text-primary" : ""
-            }
+            className={cn(
+              "px-3 py-1 text-xs shadow-sm",
+              event.status === "published" && "bg-primary/10 text-primary",
+            )}
           >
             {event.status}
           </Badge>
-          {event.kind && <Badge variant="outline">{event.kind}</Badge>}
+          {event.kind && (
+            <Badge
+              variant="outline"
+              className="px-3 py-1 text-xs shadow-sm bg-card"
+            >
+              {event.kind}
+            </Badge>
+          )}
           {event.visibility && event.visibility !== "public" && (
-            <Badge variant="outline" className="capitalize">
+            <Badge
+              variant="outline"
+              className="px-3 py-1 text-xs shadow-sm bg-card capitalize"
+            >
               {event.visibility}
             </Badge>
           )}
@@ -326,8 +353,17 @@ export default function EventDetailPage() {
       </div>
 
       {/* Details card */}
-      <div className="rounded-xl border bg-card p-4 space-y-3">
-        <div className="flex items-center gap-2.5">
+      <div className="relative rounded-xl border bg-card p-4 space-y-3">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setAddToCalOpen(true)}
+          className="absolute top-3 right-3"
+        >
+          <CalendarPlus className="mr-2 h-4 w-4" />
+          {t("events.detail.add_to_calendar_button")}
+        </Button>
+        <div className="flex items-center gap-2.5 pr-36">
           <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
             <Clock className="h-4 w-4 text-primary" />
           </div>
@@ -387,17 +423,6 @@ export default function EventDetailPage() {
             </a>
           </div>
         )}
-
-        <div className="pt-1">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setAddToCalOpen(true)}
-          >
-            <CalendarPlus className="mr-2 h-4 w-4" />
-            {t("events.detail.add_to_calendar_button")}
-          </Button>
-        </div>
       </div>
 
       <AddToCalendarModal
@@ -427,14 +452,20 @@ export default function EventDetailPage() {
         </div>
       )}
 
-      {event.tags && event.tags.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {event.tags.map((tag: string) => (
+      {(event.track_title || (event.tags && event.tags.length > 0)) && (
+        <div className="flex flex-wrap gap-2">
+          {event.track_title && (
+            <span className="inline-flex items-center gap-1.5 text-xs font-medium border border-primary/40 bg-primary/10 text-primary px-3 py-1.5 rounded-full shadow-sm transition-colors hover:bg-primary/20">
+              <Layers className="h-3.5 w-3.5" />
+              {event.track_title}
+            </span>
+          )}
+          {event.tags?.map((tag: string) => (
             <span
               key={tag}
-              className="inline-flex items-center gap-1 text-xs border bg-card px-2 py-1 rounded-lg"
+              className="inline-flex items-center gap-1.5 text-xs font-medium border bg-card px-3 py-1.5 rounded-full shadow-sm transition-colors hover:bg-muted"
             >
-              <Tag className="h-3 w-3" />
+              <Tag className="h-3.5 w-3.5" />
               {tag}
             </span>
           ))}
