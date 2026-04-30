@@ -25,6 +25,7 @@ from app.api import (
     upload,
     user,
 )
+from app.api.application.router import portal_router
 
 api_router = APIRouter()
 
@@ -54,6 +55,7 @@ api_router.include_router(application_review.router)
 
 # Application flow resources
 api_router.include_router(application.router)
+api_router.include_router(portal_router)
 api_router.include_router(attendee.router)
 api_router.include_router(payment.router)
 api_router.include_router(cart.router)

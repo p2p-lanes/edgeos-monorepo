@@ -1,8 +1,8 @@
 import uuid
 from decimal import Decimal
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Annotated, Literal
 
-from fastapi import APIRouter, HTTPException, Request, Response, status
+from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 from sqlmodel import Session
 
 from app.api.payment.crud import payments_crud
@@ -157,7 +157,9 @@ def _build_payment_confirmed_context(
         discount_value=int(payment.discount_value) if payment.discount_value else None,
         original_amount=original_amount,
         attendees=attendees,
-        order_summary=compute_order_summary(payment) if payment.products_snapshot else None,
+        order_summary=compute_order_summary(payment)
+        if payment.products_snapshot
+        else None,
         portal_url=portal_url,
     )
 
@@ -515,6 +517,34 @@ async def create_my_application_fee(
     popup = application.popup
     payment = payments_crud.create_fee_payment(db, application, popup)
     return PaymentPublic.model_validate(payment)
+
+
+@router.get("/my/popup/{popup_id}", response_model=ListModel[PaymentPublic])
+async def list_my_payments_by_popup(
+    popup_id: uuid.UUID,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+    skip: Annotated[int, Query(ge=0, description="Number of payments to skip")] = 0,
+    limit: Annotated[
+        int, Query(ge=1, le=100, description="Max payments to return (max 100)")
+    ] = 50,
+) -> ListModel[PaymentPublic]:
+    """List all payments owned by the current Human for a specific popup (Portal).
+
+    Ownership is resolved via dual-path predicate:
+    - Application leg: payment.application.human_id == current_human.id
+    - Direct-sale leg: payment_products.attendee.human_id == current_human.id
+
+    Requires OTP-authenticated Human token. Empty result is valid (not 404).
+    """
+    payments, total = payments_crud.find_by_human_popup(
+        db, human_id=current_human.id, popup_id=popup_id, skip=skip, limit=limit
+    )
+    results = [PaymentPublic.model_validate(p) for p in payments]
+    return ListModel[PaymentPublic](
+        results=results,
+        paging=Paging(offset=skip, limit=limit, total=total),
+    )
 
 
 @router.get("/my/latest", response_model=PaymentStatusCheck)
@@ -901,7 +931,9 @@ async def _handle_payment_request_expired(
 
     payment = payments_crud.get_by_external_id(db, payment_request_id)
     if not payment:
-        logger.warning("Payment not found for expired external_id: {}", payment_request_id)
+        logger.warning(
+            "Payment not found for expired external_id: {}", payment_request_id
+        )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Payment not found",

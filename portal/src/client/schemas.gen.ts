@@ -1447,6 +1447,29 @@ export const AttendeeInfoSchema = {
     description: 'Minimal attendee information for participation responses.'
 } as const;
 
+export const AttendeeProductPublicSchema = {
+    properties: {
+        attendee_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Attendee Id'
+        },
+        product_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Product Id'
+        },
+        quantity: {
+            type: 'integer',
+            title: 'Quantity'
+        }
+    },
+    type: 'object',
+    required: ['attendee_id', 'product_id', 'quantity'],
+    title: 'AttendeeProductPublic',
+    description: 'Schema for attendee product with quantity.'
+} as const;
+
 export const AttendeePublicSchema = {
     properties: {
         tenant_id: {
@@ -1667,6 +1690,143 @@ export const AttendeeUpdateSchema = {
     type: 'object',
     title: 'AttendeeUpdate',
     description: 'Attendee schema for updates.'
+} as const;
+
+export const AttendeeWithOriginPublicSchema = {
+    properties: {
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        application_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Application Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        human_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Human Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        category: {
+            type: 'string',
+            title: 'Category'
+        },
+        email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Email'
+        },
+        gender: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Gender'
+        },
+        check_in_code: {
+            type: 'string',
+            title: 'Check In Code'
+        },
+        poap_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Poap Url'
+        },
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        created_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created At'
+        },
+        updated_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Updated At'
+        },
+        products: {
+            items: {
+                '$ref': '#/components/schemas/AttendeeProductPublic'
+            },
+            type: 'array',
+            title: 'Products',
+            default: []
+        },
+        origin: {
+            type: 'string',
+            title: 'Origin',
+            default: ''
+        }
+    },
+    type: 'object',
+    required: ['tenant_id', 'popup_id', 'name', 'category', 'check_in_code', 'id'],
+    title: 'AttendeeWithOriginPublic',
+    description: `Attendee response with an origin discriminator field.
+
+Used by GET /attendees/my/popup/{popup_id} and related human-scoped
+endpoints. Extends AttendeePublic with:
+- products: list of AttendeeProductPublic items (overwrites the base Any list)
+- origin: "application" when application_id IS NOT NULL, "direct_sale" otherwise
+
+The origin is set by the router after fetching from the CRUD layer.`
 } as const;
 
 export const AttendeeWithTicketsSchema = {
@@ -5217,6 +5377,24 @@ export const ListModel_AttendeePublic_Schema = {
     title: 'ListModel[AttendeePublic]'
 } as const;
 
+export const ListModel_AttendeeWithOriginPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/AttendeeWithOriginPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[AttendeeWithOriginPublic]'
+} as const;
+
 export const ListModel_AttendeesDirectoryEntry_Schema = {
     properties: {
         results: {
@@ -6217,6 +6395,61 @@ export const PhaseStateSchema = {
     description: `Derived sales state for a ticket tier phase.
 
 Computed server-side by the progression service at read time; never persisted.`
+} as const;
+
+export const PopupAccessResponseSchema = {
+    properties: {
+        allowed: {
+            type: 'boolean',
+            title: 'Allowed'
+        },
+        source: {
+            anyOf: [
+                {
+                    type: 'string',
+                    enum: ['application', 'attendee', 'payment', 'companion']
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Source'
+        },
+        application_status: {
+            anyOf: [
+                {
+                    type: 'string',
+                    enum: ['accepted', 'submitted', 'in review', 'rejected']
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Application Status'
+        },
+        reason: {
+            anyOf: [
+                {
+                    type: 'string',
+                    enum: ['no_access', 'application_pending', 'application_rejected']
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Reason'
+        }
+    },
+    type: 'object',
+    required: ['allowed'],
+    title: 'PopupAccessResponse',
+    description: `Response schema for GET /portal/popup/{popup_id}/access.
+
+Encodes the result of the 7-step access ladder for the authenticated Human.
+allowed=True means the Human can view the passes page.
+source indicates which ladder step granted access (None when denied).
+application_status carries the Application status string when one exists.
+reason explains the denial when allowed=False.`
 } as const;
 
 export const PopupAdminSchema = {

@@ -1,8 +1,6 @@
-import { useQuery } from "@tanstack/react-query"
 import type { PaymentProductResponse, PaymentPublic } from "@/client"
-import { PaymentsService } from "@/client"
-import { queryKeys } from "@/lib/query-keys"
-import { useApplication } from "@/providers/applicationProvider"
+import useHumanPaymentsQuery from "@/hooks/useHumanPaymentsQuery"
+import { useCityProvider } from "@/providers/cityProvider"
 import type { PaymentsProps } from "@/types/passes"
 
 function mapPayment(p: PaymentPublic): PaymentsProps {
@@ -33,20 +31,23 @@ function mapPayment(p: PaymentPublic): PaymentsProps {
   }
 }
 
+/**
+ * Fetches all payments for the current Human in the current popup.
+ *
+ * Uses `GET /payments/my/popup/{popup_id}` which combines both
+ * application-linked and direct-sale payments via the dual-path predicate.
+ * The query is keyed by `queryKeys.payments.byPopup(popupId)`.
+ *
+ * The query is disabled when the city context is not available.
+ */
 const useGetPaymentsData = () => {
-  const { getRelevantApplication } = useApplication()
-  const application = getRelevantApplication()
+  const { getCity } = useCityProvider()
+  const city = getCity()
+  const popupId = city ? String(city.id) : null
 
-  const { data: payments = [] } = useQuery({
-    queryKey: queryKeys.payments.byApp(String(application?.id ?? "")),
-    queryFn: async () => {
-      const result = await PaymentsService.listMyPayments({
-        applicationId: String(application!.id),
-      })
-      return result.results.map(mapPayment)
-    },
-    enabled: !!application?.id,
-  })
+  const { data: rawPayments = [] } = useHumanPaymentsQuery(popupId)
+
+  const payments = rawPayments.map(mapPayment)
 
   return { payments }
 }

@@ -198,6 +198,72 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         statement = select(Payments).where(Payments.external_id == external_id)
         return session.exec(statement).first()
 
+    def find_by_human_popup(
+        self,
+        session: Session,
+        human_id: uuid.UUID,
+        popup_id: uuid.UUID,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> tuple[list[Payments], int]:
+        """Find all payments owned by (human_id, popup_id) via dual-path predicate.
+
+        Ownership is resolved through two legs:
+        1. Application leg: payment.application.human_id == human_id
+           AND payment.popup_id == popup_id (via popup_id denorm column).
+        2. Direct-sale leg: payment has no application, but has a PaymentProducts
+           row pointing to an Attendee with human_id == human_id AND popup_id == popup_id.
+
+        A UNION of payment IDs from both legs avoids duplicates. Ordered by
+        created_at DESC. Returns (rows, total_count) for paginated response.
+        """
+        from app.api.attendee.models import Attendees
+
+        # Application leg: payment has an application owned by this human for this popup
+        app_leg = (
+            select(Payments.id)
+            .join(Applications, Payments.application_id == Applications.id)  # type: ignore[arg-type]
+            .where(
+                Applications.human_id == human_id,
+                Applications.popup_id == popup_id,
+            )
+        )
+
+        # Direct-sale leg: payment has a product snapshot linked to an attendee
+        # with human_id == human_id and popup_id == popup_id (no application)
+        direct_leg = (
+            select(Payments.id)
+            .join(PaymentProducts, PaymentProducts.payment_id == Payments.id)  # type: ignore[arg-type]
+            .join(Attendees, PaymentProducts.attendee_id == Attendees.id)  # type: ignore[arg-type]
+            .where(
+                Attendees.human_id == human_id,
+                Attendees.popup_id == popup_id,
+                Attendees.application_id.is_(None),  # type: ignore[union-attr]
+            )
+        )
+
+        union_ids = app_leg.union(direct_leg).subquery()
+
+        count_statement = select(func.count()).where(
+            Payments.id.in_(select(union_ids.c.id))  # type: ignore[arg-type]
+        )
+        total = session.exec(count_statement).one()
+
+        statement = (
+            select(Payments)
+            .where(Payments.id.in_(select(union_ids.c.id)))  # type: ignore[arg-type]
+            .order_by(desc(Payments.created_at))  # type: ignore[arg-type]
+            .options(
+                selectinload(Payments.products_snapshot).selectinload(  # ty: ignore[invalid-argument-type]
+                    PaymentProducts.attendee  # ty: ignore[invalid-argument-type]
+                ),
+            )
+            .offset(skip)
+            .limit(limit)
+        )
+        results = list(session.exec(statement).all())
+        return results, total
+
     def find_by_application(
         self,
         session: Session,

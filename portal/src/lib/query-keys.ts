@@ -11,6 +11,7 @@ export const queryKeys = {
   attendees: {
     directory: (popupId: string) =>
       ["attendees", "directory", popupId] as const,
+    byHumanPopup: (popupId: string) => ["attendees", "human", popupId] as const,
   },
   purchases: {
     byPopup: (popupId: string) => ["purchases", popupId] as const,
@@ -24,6 +25,10 @@ export const queryKeys = {
   payments: {
     all: ["payments"] as const,
     byApp: (applicationId: string) => ["payments", applicationId] as const,
+    byPopup: (popupId: string) => ["payments", "popup", popupId] as const,
+  },
+  humanPopupAccess: {
+    byPopup: (popupId: string) => ["human-popup-access", popupId] as const,
   },
   groups: {
     mine: () => ["groups", "mine"] as const,

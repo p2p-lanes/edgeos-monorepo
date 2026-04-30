@@ -13,6 +13,7 @@ from app.api.application.schemas import (
     ApplicationCreate,
     ApplicationStatus,
     ApplicationUpdate,
+    PopupAccessResponse,
     ScholarshipDecisionRequest,
 )
 from app.api.application_review.models import ApplicationReviews
@@ -979,6 +980,145 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
 
         session.delete(db_obj)
         session.commit()
+
+    def resolve_popup_access(
+        self,
+        session: Session,
+        human_id: uuid.UUID,
+        popup_id: uuid.UUID,
+    ) -> PopupAccessResponse:
+        """Run the 7-step access ladder for (human_id, popup_id).
+
+        Resolution order (first match wins):
+        1. Accepted Application → allowed=True, source="application"
+        2. Submitted or in-review Application → denied, reason="application_pending"
+        3. Rejected Application → denied, reason="application_rejected"
+        4. Direct Attendee row for (human_id, popup_id) → allowed, source="attendee"
+        5. Payment owned by human for popup → allowed, source="payment"
+        6. Companion participation (find_companion_for_popup) → allowed, source="companion"
+        7. Fallback → denied, reason="no_access"
+
+        Uses lightweight scalar/exists probes so no full row is loaded unnecessarily.
+        Short-circuits at the first match — application checks run before attendee
+        and payment checks to respect the application flow semantics.
+        """
+        from app.api.attendee.crud import attendees_crud
+        from app.api.attendee.models import Attendees
+        from app.api.payment.models import PaymentProducts, Payments
+
+        # ---- Steps 1-3: Application check ----
+        application = self.get_by_human_popup(session, human_id, popup_id)
+
+        if application is not None:
+            app_status = application.status
+
+            if app_status == ApplicationStatus.ACCEPTED.value:
+                return PopupAccessResponse(
+                    allowed=True,
+                    source="application",
+                    application_status="accepted",
+                )
+
+            if app_status in (ApplicationStatus.IN_REVIEW.value, "submitted"):
+                return PopupAccessResponse(
+                    allowed=False,
+                    application_status="in review"
+                    if app_status == ApplicationStatus.IN_REVIEW.value
+                    else "submitted",
+                    reason="application_pending",
+                )
+
+            if app_status == ApplicationStatus.REJECTED.value:
+                return PopupAccessResponse(
+                    allowed=False,
+                    application_status="rejected",
+                    reason="application_rejected",
+                )
+
+        # ---- Step 4: Direct Attendee check ----
+        # Check for attendees OWNED by this human (application owner or direct-sale).
+        # This uses the same dual-path predicate as find_by_human_popup so that
+        # companion attendees (whose APPLICATION.human_id != human_id) are excluded
+        # here and fall through to Step 6.
+        from sqlalchemy import exists as sa_exists
+
+        union_ids = attendees_crud._human_popup_attendee_ids(
+            session, human_id, popup_id
+        )
+        attendee_exists_stmt = select(
+            sa_exists().where(
+                Attendees.id.in_(select(union_ids.c.id))  # type: ignore[arg-type]
+            )
+        )
+        has_attendee = session.exec(attendee_exists_stmt).one()
+
+        if has_attendee:
+            return PopupAccessResponse(
+                allowed=True,
+                source="attendee",
+            )
+
+        # ---- Step 5: Payment check ----
+        # Application-leg: payment linked to an application owned by this human for this popup
+        app_payment_exists = select(
+            sa_exists()
+            .where(Payments.popup_id == popup_id)
+            .where(
+                Payments.application_id.in_(  # type: ignore[union-attr]
+                    select(Applications.id).where(
+                        Applications.human_id == human_id,
+                        Applications.popup_id == popup_id,
+                    )
+                )
+            )
+        )
+        has_app_payment = session.exec(app_payment_exists).one()
+
+        if has_app_payment:
+            return PopupAccessResponse(
+                allowed=True,
+                source="payment",
+            )
+
+        # Direct-sale leg: payment via product snapshot → attendee with human_id
+        direct_payment_exists = select(
+            sa_exists()
+            .where(Payments.popup_id == popup_id)
+            .where(Payments.application_id.is_(None))  # type: ignore[union-attr]
+            .where(
+                Payments.id.in_(  # type: ignore[union-attr]
+                    select(PaymentProducts.payment_id)
+                    .join(Attendees, PaymentProducts.attendee_id == Attendees.id)
+                    .where(
+                        Attendees.human_id == human_id,
+                        Attendees.popup_id == popup_id,
+                        Attendees.application_id.is_(None),  # type: ignore[union-attr]
+                    )
+                )
+            )
+        )
+        has_direct_payment = session.exec(direct_payment_exists).one()
+
+        if has_direct_payment:
+            return PopupAccessResponse(
+                allowed=True,
+                source="payment",
+            )
+
+        # ---- Step 6: Companion check ----
+        companion = attendees_crud.find_companion_for_popup(session, human_id, popup_id)
+
+        if companion is not None:
+            return PopupAccessResponse(
+                allowed=True,
+                source="companion",
+            )
+
+        # ---- Step 7: No match ----
+        return PopupAccessResponse(
+            allowed=False,
+            reason="no_access",
+        )
 
 
 applications_crud = ApplicationsCRUD()

@@ -306,6 +306,15 @@ export type AttendeeInfo = {
 };
 
 /**
+ * Schema for attendee product with quantity.
+ */
+export type AttendeeProductPublic = {
+    attendee_id: string;
+    product_id: string;
+    quantity: number;
+};
+
+/**
  * Attendee schema for API responses.
  */
 export type AttendeePublic = {
@@ -374,6 +383,34 @@ export type AttendeeUpdate = {
     name?: (string | null);
     email?: (string | null);
     gender?: (string | null);
+};
+
+/**
+ * Attendee response with an origin discriminator field.
+ *
+ * Used by GET /attendees/my/popup/{popup_id} and related human-scoped
+ * endpoints. Extends AttendeePublic with:
+ * - products: list of AttendeeProductPublic items (overwrites the base Any list)
+ * - origin: "application" when application_id IS NOT NULL, "direct_sale" otherwise
+ *
+ * The origin is set by the router after fetching from the CRUD layer.
+ */
+export type AttendeeWithOriginPublic = {
+    tenant_id: string;
+    application_id?: (string | null);
+    popup_id: string;
+    human_id?: (string | null);
+    name: string;
+    category: string;
+    email?: (string | null);
+    gender?: (string | null);
+    check_in_code: string;
+    poap_url?: (string | null);
+    id: string;
+    created_at?: (string | null);
+    updated_at?: (string | null);
+    products?: Array<AttendeeProductPublic>;
+    origin?: string;
 };
 
 /**
@@ -1090,6 +1127,11 @@ export type ListModel_AttendeesDirectoryEntry_ = {
     paging: Paging;
 };
 
+export type ListModel_AttendeeWithOriginPublic_ = {
+    results: Array<AttendeeWithOriginPublic>;
+    paging: Paging;
+};
+
 export type ListModel_CouponPublic_ = {
     results: Array<CouponPublic>;
     paging: Paging;
@@ -1319,6 +1361,22 @@ export type PaymentUpdate = {
  * Computed server-side by the progression service at read time; never persisted.
  */
 export type PhaseState = 'upcoming' | 'available' | 'sold_out' | 'expired';
+
+/**
+ * Response schema for GET /portal/popup/{popup_id}/access.
+ *
+ * Encodes the result of the 7-step access ladder for the authenticated Human.
+ * allowed=True means the Human can view the passes page.
+ * source indicates which ladder step granted access (None when denied).
+ * application_status carries the Application status string when one exists.
+ * reason explains the denial when allowed=False.
+ */
+export type PopupAccessResponse = {
+    allowed: boolean;
+    source?: ('application' | 'attendee' | 'payment' | 'companion' | null);
+    application_status?: ('accepted' | 'submitted' | 'in review' | 'rejected' | null);
+    reason?: ('no_access' | 'application_pending' | 'application_rejected' | null);
+};
 
 /**
  * Admin popup schema — all fields including sensitive ones.
@@ -2349,6 +2407,44 @@ export type ApprovalStrategiesDeleteApprovalStrategyData = {
 
 export type ApprovalStrategiesDeleteApprovalStrategyResponse = (void);
 
+export type AttendeesListMyAttendeesByPopupData = {
+    /**
+     * Max attendees to return
+     */
+    limit?: number;
+    popupId: string;
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+};
+
+export type AttendeesListMyAttendeesByPopupResponse = (ListModel_AttendeeWithOriginPublic_);
+
+export type AttendeesCreateMyAttendeeForPopupData = {
+    popupId: string;
+    requestBody: AttendeeCreate;
+};
+
+export type AttendeesCreateMyAttendeeForPopupResponse = (AttendeeWithOriginPublic);
+
+export type AttendeesUpdateMyAttendeeForPopupData = {
+    attendeeId: string;
+    popupId: string;
+    requestBody: AttendeeUpdate;
+};
+
+export type AttendeesUpdateMyAttendeeForPopupResponse = (AttendeeWithOriginPublic);
+
+export type AttendeesDeleteMyAttendeeForPopupData = {
+    attendeeId: string;
+    popupId: string;
+};
+
+export type AttendeesDeleteMyAttendeeForPopupResponse = ({
+    [key: string]: unknown;
+});
+
 export type AttendeesListAttendeesData = {
     applicationId?: (string | null);
     email?: (string | null);
@@ -2945,6 +3041,20 @@ export type PaymentsCreateMyApplicationFeeData = {
 
 export type PaymentsCreateMyApplicationFeeResponse = (PaymentPublic);
 
+export type PaymentsListMyPaymentsByPopupData = {
+    /**
+     * Max payments to return (max 100)
+     */
+    limit?: number;
+    popupId: string;
+    /**
+     * Number of payments to skip
+     */
+    skip?: number;
+};
+
+export type PaymentsListMyPaymentsByPopupResponse = (ListModel_PaymentPublic_);
+
 export type PaymentsGetMyLatestPaymentData = {
     applicationId: string;
 };
@@ -3101,6 +3211,12 @@ export type PopupsGetPortalPopupData = {
 };
 
 export type PopupsGetPortalPopupResponse = (PopupPublic);
+
+export type PortalGetPopupAccessData = {
+    popupId: string;
+};
+
+export type PortalGetPopupAccessResponse = (PopupAccessResponse);
 
 export type ProductsListProductCategoriesData = {
     popupId: string;

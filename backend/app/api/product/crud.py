@@ -318,14 +318,12 @@ class TierPhasesCRUD(BaseCRUD[TicketTierPhase, TierPhaseCreate, TierPhaseUpdate]
         )
         session.flush()
 
-    def _next_placeholder_order(
-        self, session: Session, group_id: uuid.UUID
-    ) -> int:
+    def _next_placeholder_order(self, session: Session, group_id: uuid.UUID) -> int:
         """Return MAX(order)+1 for a group, used as a temporary value during
         insert. `_rebalance_order` overwrites it right after."""
         row = session.exec(  # type: ignore[call-overload]
             text(
-                "SELECT COALESCE(MAX(\"order\"), 0) + 1 AS next_order "
+                'SELECT COALESCE(MAX("order"), 0) + 1 AS next_order '
                 "FROM ticket_tier_phase WHERE group_id = :group_id"
             ).bindparams(group_id=group_id)
         ).first()
