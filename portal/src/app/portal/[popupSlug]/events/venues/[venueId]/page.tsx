@@ -19,7 +19,8 @@ import {
   HumansService,
 } from "@/client"
 import { LucideIcon } from "@/components/LucideIcon"
-import { VenueHoursSummary } from "@/components/VenueHoursSummary"
+import { VenueHoursPreview } from "@/components/VenueHoursPreview"
+import { Pill } from "@/components/ui/pill"
 import { useCityProvider } from "@/providers/cityProvider"
 
 export default function PortalVenueDetailPage() {
@@ -188,13 +189,13 @@ export default function PortalVenueDetailPage() {
           </h2>
           <div className="flex flex-wrap gap-2">
             {venue.properties.map((p) => (
-              <div
+              <Pill
                 key={p.id}
-                className="inline-flex items-center gap-2 rounded-md border bg-card px-3 py-1.5 text-sm"
+                variant="chip"
+                icon={<LucideIcon name={p.icon} className="h-4 w-4" />}
               >
-                <LucideIcon name={p.icon} className="h-4 w-4" />
-                <span>{p.name}</span>
-              </div>
+                {p.name}
+              </Pill>
             ))}
           </div>
         </section>
@@ -205,7 +206,7 @@ export default function PortalVenueDetailPage() {
         <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground">
           {t("events.venues.detail.open_hours_heading")}
         </h2>
-        <VenueHoursSummary hours={venue.weekly_hours} />
+        <VenueHoursPreview hours={venue.weekly_hours} />
       </section>
 
       {/* Gallery */}
@@ -234,14 +235,9 @@ export default function PortalVenueDetailPage() {
           <h2 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground">
             {t("events.venues.detail.details_heading")}
           </h2>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-2">
             {venue.tags?.map((t) => (
-              <span
-                key={`tag-${t}`}
-                className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs"
-              >
-                {t}
-              </span>
+              <Pill key={`tag-${t}`}>{t}</Pill>
             ))}
           </div>
         </section>

@@ -32,7 +32,10 @@ const detectIds = (pathSegments: string[]): DetectedIds => {
   return { ...empty, eventId: second }
 }
 
-const useBreadcrumbNameMapping = (pathSegments: string[]) => {
+const useBreadcrumbNameMapping = (
+  pathSegments: string[],
+  popupId: string | undefined,
+) => {
   const { groupMapping, isLoading: groupsLoading } = useGroupMapping()
   const { eventId, venueId } = useMemo(
     () => detectIds(pathSegments),
@@ -48,11 +51,17 @@ const useBreadcrumbNameMapping = (pathSegments: string[]) => {
         enabled: !!eventId,
         staleTime: 5 * 60 * 1000,
       },
+      // No single-venue portal endpoint exists, so we share the same key
+      // and request shape as the venue list/detail page to hit the cache
+      // when the user navigates from there.
       {
-        queryKey: ["breadcrumb-venue-name", venueId],
+        queryKey: ["portal-event-venues", popupId],
         queryFn: () =>
-          EventVenuesService.getVenue({ venueId: venueId as string }),
-        enabled: !!venueId,
+          EventVenuesService.listPortalVenues({
+            popupId: popupId as string,
+            limit: 200,
+          }),
+        enabled: !!venueId && !!popupId,
         staleTime: 5 * 60 * 1000,
       },
     ],
@@ -68,8 +77,11 @@ const useBreadcrumbNameMapping = (pathSegments: string[]) => {
       else if (eventQuery.isLoading) result[eventId] = ""
     }
     if (venueId) {
-      if (venueQuery.data) result[venueId] = venueQuery.data.title
-      else if (venueQuery.isLoading) result[venueId] = ""
+      if (venueQuery.data) {
+        const match = venueQuery.data.results.find((v) => v.id === venueId)
+        if (match) result[venueId] = match.title
+        else result[venueId] = ""
+      } else if (venueQuery.isLoading) result[venueId] = ""
     }
     return result
   }, [

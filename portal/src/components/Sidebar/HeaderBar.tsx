@@ -82,7 +82,10 @@ const HeaderBar = () => {
   const pathsToDisplay =
     pathSegments.length > 0 ? pathSegments : fallbackSegments
 
-  const { nameMapping, isLoading } = useBreadcrumbNameMapping(pathSegments)
+  const { nameMapping, isLoading } = useBreadcrumbNameMapping(
+    pathSegments,
+    city?.id,
+  )
 
   // Build cumulative href per segment so each breadcrumb links back to its
   // own level. Anchored at `/portal/{slug}` when a slug is present;

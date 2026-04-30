@@ -35,6 +35,7 @@ import {
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Pill } from "@/components/ui/pill"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import { useCityProvider } from "@/providers/cityProvider"
@@ -326,8 +327,10 @@ export default function EventDetailPage() {
           <Badge
             variant="secondary"
             className={cn(
-              "px-3 py-1 text-xs shadow-sm",
-              event.status === "published" && "bg-primary/10 text-primary",
+              "px-3 py-1 text-xs shadow-sm capitalize cursor-default",
+              event.status === "published"
+                ? "bg-primary/10 text-primary hover:bg-primary/10"
+                : "hover:bg-secondary",
             )}
           >
             {event.status}
@@ -335,7 +338,7 @@ export default function EventDetailPage() {
           {event.kind && (
             <Badge
               variant="outline"
-              className="px-3 py-1 text-xs shadow-sm bg-card"
+              className="px-3 py-1 text-xs shadow-sm bg-card capitalize cursor-default"
             >
               {event.kind}
             </Badge>
@@ -343,7 +346,7 @@ export default function EventDetailPage() {
           {event.visibility && event.visibility !== "public" && (
             <Badge
               variant="outline"
-              className="px-3 py-1 text-xs shadow-sm bg-card capitalize"
+              className="px-3 py-1 text-xs shadow-sm bg-card capitalize cursor-default"
             >
               {event.visibility}
             </Badge>
@@ -455,19 +458,14 @@ export default function EventDetailPage() {
       {(event.track_title || (event.tags && event.tags.length > 0)) && (
         <div className="flex flex-wrap gap-2">
           {event.track_title && (
-            <span className="inline-flex items-center gap-1.5 text-xs font-medium border border-primary/40 bg-primary/10 text-primary px-3 py-1.5 rounded-full shadow-sm transition-colors hover:bg-primary/20">
-              <Layers className="h-3.5 w-3.5" />
+            <Pill tone="primary" icon={<Layers className="h-3.5 w-3.5" />}>
               {event.track_title}
-            </span>
+            </Pill>
           )}
           {event.tags?.map((tag: string) => (
-            <span
-              key={tag}
-              className="inline-flex items-center gap-1.5 text-xs font-medium border bg-card px-3 py-1.5 rounded-full shadow-sm transition-colors hover:bg-muted"
-            >
-              <Tag className="h-3.5 w-3.5" />
+            <Pill key={tag} icon={<Tag className="h-3.5 w-3.5" />}>
               {tag}
-            </span>
+            </Pill>
           ))}
         </div>
       )}
