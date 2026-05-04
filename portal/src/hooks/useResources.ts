@@ -1,6 +1,5 @@
 import { BookOpen, CalendarDays, FileText, Key, MapPin, Ticket, Users } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { usePortalEventSettings } from "@/app/portal/[popupSlug]/events/lib/useEventTimezone"
 import useAuth from "@/hooks/useAuth"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
@@ -13,8 +12,10 @@ const useResources = () => {
   const { user } = useAuth()
   const application = getRelevantApplication()
   const city = getCity()
-  const { data: eventSettings } = usePortalEventSettings(city?.id)
-  const eventsEnabled = eventSettings?.event_enabled ?? true
+  // Popup-level feature flag: hides the entire events module when off.
+  // Whether humans can *create* events is a separate setting handled
+  // inside the events page itself (event_settings.event_enabled).
+  const eventsEnabled = city?.events_enabled ?? true
 
   const isCompanion = participation?.type === "companion"
   const canSeeAttendees = application?.status === "accepted"
@@ -42,7 +43,7 @@ const useResources = () => {
                 name: t("sidebar.api_docs", { defaultValue: "API Docs" }),
                 icon: BookOpen,
                 status: "active",
-                path: "/docs",
+                path: "/portal/docs",
               },
             ]
           : undefined,
@@ -132,7 +133,7 @@ const useResources = () => {
           name: t("sidebar.api_docs", { defaultValue: "API Docs" }),
           icon: BookOpen,
           status: canSeeAttendees && eventsEnabled ? "active" : "hidden",
-          path: "/docs",
+          path: "/portal/docs",
         },
       ],
     },

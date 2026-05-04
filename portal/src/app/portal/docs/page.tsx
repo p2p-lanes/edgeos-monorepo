@@ -1,4 +1,3 @@
-import { ChevronLeft } from "lucide-react"
 import type { Metadata } from "next"
 import Link from "next/link"
 
@@ -100,16 +99,9 @@ function Section({
 
 export default function ApiDocsPage() {
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-10 space-y-10">
+    <div className="flex-1 p-6 bg-background">
+      <div className="max-w-4xl mx-auto space-y-10">
         <header className="space-y-3">
-          <Link
-            href="/"
-            className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
-          >
-            <ChevronLeft className="size-4 mr-1" />
-            Home
-          </Link>
           <h1 className="text-3xl font-semibold">Events API</h1>
           <p className="text-muted-foreground">
             REST API for reading and writing community events. Designed to be

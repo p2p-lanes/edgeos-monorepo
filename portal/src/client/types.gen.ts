@@ -1886,6 +1886,7 @@ export type PopupAdmin = {
     insurance_percentage?: (string | null);
     application_layout?: ApplicationLayout;
     tier_progression_enabled?: boolean;
+    events_enabled?: boolean;
     id: string;
 };
 
@@ -1928,6 +1929,7 @@ export type PopupCreate = {
     insurance_percentage?: (number | string | null);
     application_layout?: ApplicationLayout;
     tier_progression_enabled?: boolean;
+    events_enabled?: boolean;
 };
 
 /**
@@ -1968,6 +1970,7 @@ export type PopupPublic = {
     insurance_percentage?: (string | null);
     application_layout?: ApplicationLayout;
     tier_progression_enabled?: boolean;
+    events_enabled?: boolean;
 };
 
 /**
@@ -2042,6 +2045,7 @@ export type PopupUpdate = {
     insurance_percentage?: (number | string | null);
     application_layout?: (ApplicationLayout | null);
     tier_progression_enabled?: (boolean | null);
+    events_enabled?: (boolean | null);
 };
 
 /**
