@@ -1,6 +1,6 @@
 import uuid
 from collections.abc import Iterable
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
 from loguru import logger
@@ -123,9 +123,7 @@ def _check_venue_open_hours(
 
     def _aware(dt: datetime) -> datetime:
         if dt.tzinfo is None:
-            from datetime import timezone
-
-            return dt.replace(tzinfo=timezone.utc)
+            return dt.replace(tzinfo=UTC)
         return dt
 
     s = _aware(start_time)
@@ -249,9 +247,7 @@ def _to_public(
     return data
 
 
-def _venue_map_for_events(
-    db, events: list
-) -> dict[uuid.UUID, VenueInfo]:
+def _venue_map_for_events(db, events: list) -> dict[uuid.UUID, VenueInfo]:
     """Fetch ``(title, location, image_url)`` for all venue_ids referenced."""
     from sqlmodel import select
 
@@ -296,9 +292,7 @@ def _check_event_within_popup_window(
 
     def _aware(dt: datetime) -> datetime:
         if dt.tzinfo is None:
-            from datetime import timezone
-
-            return dt.replace(tzinfo=timezone.utc)
+            return dt.replace(tzinfo=UTC)
         return dt
 
     if start_bound is not None and _aware(start_time) < _aware(start_bound):
@@ -417,7 +411,9 @@ def _render_ics(event) -> str:
     return "\r\n".join(lines) + "\r\n"
 
 
-def _invitation_visible_to_human(event, human_id: uuid.UUID, invitation_human_ids: Iterable[uuid.UUID]) -> bool:
+def _invitation_visible_to_human(
+    event, human_id: uuid.UUID, invitation_human_ids: Iterable[uuid.UUID]
+) -> bool:
     """A private event is only visible to owner + explicitly invited humans."""
     if event.owner_id == human_id:
         return True
@@ -484,7 +480,9 @@ async def get_event(
 ) -> EventPublic:
     event = crud.events_crud.get(db, event_id)
     if not event:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
+        )
     return _to_public(event)
 
 
@@ -500,7 +498,9 @@ async def create_event(
 
     popup = popups_crud.get(db, event_in.popup_id)
     if not popup:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Popup not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Popup not found"
+        )
 
     rrule_str = format_rrule(event_in.recurrence) if event_in.recurrence else None
 
@@ -514,7 +514,11 @@ async def create_event(
             exdates=None,
         )
 
-    tenant_id = popup.tenant_id if current_user.role == UserRole.SUPERADMIN else current_user.tenant_id
+    tenant_id = (
+        popup.tenant_id
+        if current_user.role == UserRole.SUPERADMIN
+        else current_user.tenant_id
+    )
 
     event_data = event_in.model_dump()
     event_data.pop("recurrence", None)
@@ -578,9 +582,13 @@ async def update_event(
 ) -> EventPublic:
     event = crud.events_crud.get(db, event_id)
     if not event:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
+        )
 
-    new_venue_id = event_in.venue_id if event_in.venue_id is not None else event.venue_id
+    new_venue_id = (
+        event_in.venue_id if event_in.venue_id is not None else event.venue_id
+    )
     new_start = event_in.start_time or event.start_time
     new_end = event_in.end_time or event.end_time
     timing_or_venue_changed = (
@@ -621,9 +629,13 @@ async def cancel_event(
 ) -> EventPublic:
     event = crud.events_crud.get(db, event_id)
     if not event:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
+        )
     if event.status == EventStatus.CANCELLED:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Event is already cancelled")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Event is already cancelled"
+        )
 
     cancel_update = EventUpdate(status=EventStatus.CANCELLED)
     updated = crud.events_crud.update(db, event, cancel_update)
@@ -639,7 +651,9 @@ async def delete_event(
 ) -> None:
     event = crud.events_crud.get(db, event_id)
     if not event:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
+        )
     # Send CANCEL to every attendee *before* we drop the row so they get a
     # clean tombstone in their calendar.
     try:
@@ -669,7 +683,9 @@ async def set_recurrence(
     """
     event = crud.events_crud.get(db, event_id)
     if not event:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
+        )
     if event.recurrence_master_id is not None:
         raise HTTPException(
             status_code=400,
@@ -972,7 +988,9 @@ async def bulk_invite(
     return result
 
 
-@router.delete("/{event_id}/invitations/{invitation_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{event_id}/invitations/{invitation_id}", status_code=status.HTTP_204_NO_CONTENT
+)
 async def delete_invitation(
     event_id: uuid.UUID,
     invitation_id: uuid.UUID,
@@ -990,9 +1008,7 @@ async def delete_invitation(
 # ---------------------------------------------------------------------------
 
 
-def _ensure_portal_event_owner(
-    db, event_id: uuid.UUID, current_human
-):
+def _ensure_portal_event_owner(db, event_id: uuid.UUID, current_human):
     event = crud.events_crud.get(db, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
@@ -1073,8 +1089,7 @@ async def _send_event_approval_email(
     event_url = ""
     if popup_slug:
         event_url = (
-            f"{settings.PORTAL_URL.rstrip('/')}/portal/{popup_slug}/events/"
-            f"{event.id}"
+            f"{settings.PORTAL_URL.rstrip('/')}/portal/{popup_slug}/events/{event.id}"
         )
 
     when = event.start_time.strftime("%b %d, %Y at %H:%M") if event.start_time else ""
@@ -1120,9 +1135,7 @@ async def _send_event_approval_email(
                 db_session=db,
             )
     except Exception as exc:  # pragma: no cover - defensive
-        logger.warning(
-            "Failed to send event approval email for {}: {}", event.id, exc
-        )
+        logger.warning("Failed to send event approval email for {}: {}", event.id, exc)
 
 
 @router.post("/{event_id}/approve", response_model=EventPublic)
@@ -1246,7 +1259,9 @@ def _portal_visibility_filter(db, events: list, human_id: uuid.UUID) -> list:
 
     from app.api.event.models import EventInvitations
 
-    private_event_ids = [e.id for e in events if e.visibility == EventVisibility.PRIVATE]
+    private_event_ids = [
+        e.id for e in events if e.visibility == EventVisibility.PRIVATE
+    ]
     invited_map: dict[uuid.UUID, set[uuid.UUID]] = {}
     if private_event_ids:
         invs = list(
@@ -1307,7 +1322,11 @@ async def list_portal_events(
         )
     else:
         events, total = crud.events_crud.find(
-            db, skip=skip, limit=limit, search=search, search_fields=["title"],
+            db,
+            skip=skip,
+            limit=limit,
+            search=search,
+            search_fields=["title"],
         )
 
     visible = _portal_visibility_filter(db, events, current_human.id)
@@ -1479,7 +1498,9 @@ async def get_portal_event(
 
     event = crud.events_crud.get(db, event_id)
     if not event:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
+        )
 
     if event.visibility == EventVisibility.PRIVATE:
         invited = db.exec(
@@ -1488,7 +1509,9 @@ async def get_portal_event(
             .where(EventInvitations.human_id == current_human.id)
         ).first()
         if not invited and event.owner_id != current_human.id:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
+            )
     # Public + unlisted are accessible via direct ID.
 
     from app.api.event_participant.models import EventParticipants
@@ -1504,9 +1527,7 @@ async def get_portal_event(
             EventParticipants.occurrence_start.is_(None)  # type: ignore[union-attr]
         )
     else:
-        rsvp_q = rsvp_q.where(
-            EventParticipants.occurrence_start == occurrence_start
-        )
+        rsvp_q = rsvp_q.where(EventParticipants.occurrence_start == occurrence_start)
     rsvp = db.exec(rsvp_q).first()
 
     pub = _to_public(event)
@@ -1515,9 +1536,7 @@ async def get_portal_event(
     return pub
 
 
-@router.post(
-    "/portal/events/{event_id}/hide", status_code=status.HTTP_204_NO_CONTENT
-)
+@router.post("/portal/events/{event_id}/hide", status_code=status.HTTP_204_NO_CONTENT)
 async def hide_portal_event(
     event_id: uuid.UUID,
     db: HumanTenantSession,
@@ -1545,9 +1564,7 @@ async def hide_portal_event(
     )
 
 
-@router.delete(
-    "/portal/events/{event_id}/hide", status_code=status.HTTP_204_NO_CONTENT
-)
+@router.delete("/portal/events/{event_id}/hide", status_code=status.HTTP_204_NO_CONTENT)
 async def unhide_portal_event(
     event_id: uuid.UUID,
     db: HumanTenantSession,
@@ -1555,9 +1572,7 @@ async def unhide_portal_event(
 ) -> None:
     """Undo a prior hide."""
     event = crud.events_crud.get(db, event_id)
-    target_id = (
-        event.recurrence_master_id or event.id if event else event_id
-    )
+    target_id = event.recurrence_master_id or event.id if event else event_id
     crud.hidden_by_human_crud.unhide(
         db,
         human_id=current_human.id,
@@ -1565,7 +1580,9 @@ async def unhide_portal_event(
     )
 
 
-@router.post("/portal/events", response_model=EventPublic, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/portal/events", response_model=EventPublic, status_code=status.HTTP_201_CREATED
+)
 async def create_portal_event(
     event_in: EventCreate,
     db: HumanTenantSession,
@@ -1576,9 +1593,15 @@ async def create_portal_event(
 
     settings = event_settings_crud.get_by_popup_id(db, event_in.popup_id)
     if settings and not settings.event_enabled:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Event creation is disabled for this popup")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Event creation is disabled for this popup",
+        )
     if settings and settings.can_publish_event == "admin_only":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only admins can create events for this popup")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admins can create events for this popup",
+        )
 
     from app.api.popup.crud import popups_crud
 
@@ -1665,11 +1688,18 @@ async def update_portal_event(
 ) -> EventPublic:
     event = crud.events_crud.get(db, event_id)
     if not event:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
+        )
     if event.owner_id != current_human.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the event owner can edit")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the event owner can edit",
+        )
 
-    new_venue_id = event_in.venue_id if event_in.venue_id is not None else event.venue_id
+    new_venue_id = (
+        event_in.venue_id if event_in.venue_id is not None else event.venue_id
+    )
     new_start = event_in.start_time or event.start_time
     new_end = event_in.end_time or event.end_time
     timing_or_venue_changed = (
@@ -1681,9 +1711,7 @@ async def update_portal_event(
         from app.api.popup.crud import popups_crud
 
         popup = popups_crud.get(db, event.popup_id)
-        _check_event_within_popup_window(
-            popup, start_time=new_start, end_time=new_end
-        )
+        _check_event_within_popup_window(popup, start_time=new_start, end_time=new_end)
     if new_venue_id is not None and timing_or_venue_changed:
         _check_recurrence_conflicts(
             db,
@@ -1717,7 +1745,10 @@ async def export_portal_event_ics(
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
     # Re-use the same visibility gate as the detail endpoint.
-    if event.visibility == EventVisibility.PRIVATE and event.owner_id != current_human.id:
+    if (
+        event.visibility == EventVisibility.PRIVATE
+        and event.owner_id != current_human.id
+    ):
         from sqlmodel import select
 
         from app.api.event.models import EventInvitations

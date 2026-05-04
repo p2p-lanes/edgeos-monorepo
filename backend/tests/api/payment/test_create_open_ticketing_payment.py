@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
+from fastapi import HTTPException
 from sqlmodel import Session, select
 
 from app.api.attendee.models import AttendeeProducts, Attendees
@@ -63,7 +64,9 @@ def _make_product(
     return product
 
 
-def _make_section(db: Session, popup: Popups, *, label: str, order: int = 0) -> FormSections:
+def _make_section(
+    db: Session, popup: Popups, *, label: str, order: int = 0
+) -> FormSections:
     section = FormSections(
         id=uuid.uuid4(),
         tenant_id=popup.tenant_id,
@@ -104,7 +107,14 @@ def _make_field(
     return field
 
 
-def _purchase_create(*, email: str, first_name: str, last_name: str, products: list[tuple[Products, int]], form_data: dict[str, object]) -> OpenTicketingPurchaseCreate:
+def _purchase_create(
+    *,
+    email: str,
+    first_name: str,
+    last_name: str,
+    products: list[tuple[Products, int]],
+    form_data: dict[str, object],
+) -> OpenTicketingPurchaseCreate:
     return OpenTicketingPurchaseCreate(
         products=[
             ProductLine(product_id=product.id, quantity=quantity)
@@ -126,7 +136,9 @@ def test_create_open_ticketing_payment_creates_main_and_companions(
     popup = _make_popup(db, tenant_a, slug_prefix="main-comp")
     product = _make_product(db, popup, name="GA", price="120.00")
     section = _make_section(db, popup, label="Buyer Info")
-    first_name_field = _make_field(db, popup, section, name="first_name", label="Nombre", required=True)
+    first_name_field = _make_field(
+        db, popup, section, name="first_name", label="Nombre", required=True
+    )
     dietary_field = _make_field(
         db,
         popup,
@@ -183,13 +195,17 @@ def test_create_open_ticketing_payment_creates_main_and_companions(
     assert all(attendee.human_id == attendees[0].human_id for attendee in attendees)
 
     attendee_products = list(
-        db.exec(select(AttendeeProducts).where(AttendeeProducts.product_id == product.id)).all()
+        db.exec(
+            select(AttendeeProducts).where(AttendeeProducts.product_id == product.id)
+        ).all()
     )
     assert len(attendee_products) == 3
     assert all(link.quantity == 1 for link in attendee_products)
 
     payment_products = list(
-        db.exec(select(PaymentProducts).where(PaymentProducts.payment_id == payment.id)).all()
+        db.exec(
+            select(PaymentProducts).where(PaymentProducts.payment_id == payment.id)
+        ).all()
     )
     assert len(payment_products) == 3
     assert all(link.quantity == 1 for link in payment_products)
@@ -217,7 +233,9 @@ def test_create_open_ticketing_payment_respects_explicit_attendee_categories(
         attendee_category=TicketAttendeeCategory.SPOUSE,
     )
     section = _make_section(db, popup, label="Buyer Info")
-    name_field = _make_field(db, popup, section, name="first_name", label="Nombre", required=True)
+    name_field = _make_field(
+        db, popup, section, name="first_name", label="Nombre", required=True
+    )
     db.commit()
 
     obj = _purchase_create(
@@ -254,9 +272,13 @@ def test_create_open_ticketing_payment_respects_explicit_attendee_categories(
     assert attendees[1].category == "spouse"
 
     payment_products = list(
-        db.exec(select(PaymentProducts).where(PaymentProducts.payment_id == payment.id)).all()
+        db.exec(
+            select(PaymentProducts).where(PaymentProducts.payment_id == payment.id)
+        ).all()
     )
-    spouse_link = next(pp for pp in payment_products if pp.product_id == spouse_product.id)
+    spouse_link = next(
+        pp for pp in payment_products if pp.product_id == spouse_product.id
+    )
     assert spouse_link.attendee_id == attendees[1].id
 
 
@@ -267,7 +289,9 @@ def test_create_open_ticketing_payment_does_not_overwrite_existing_human(
     popup = _make_popup(db, tenant_a, slug_prefix="existing-human")
     product = _make_product(db, popup, name="GA", price="50.00")
     section = _make_section(db, popup, label="Buyer Info")
-    name_field = _make_field(db, popup, section, name="first_name", label="Nombre", required=True)
+    name_field = _make_field(
+        db, popup, section, name="first_name", label="Nombre", required=True
+    )
 
     existing = Humans(
         id=uuid.uuid4(),
@@ -294,7 +318,9 @@ def test_create_open_ticketing_payment_does_not_overwrite_existing_human(
             checkout_url="https://simplefi.test/checkout/3",
         )
 
-        payments_crud.create_open_ticketing_payment(db, obj=obj, popup=popup, tenant=tenant_a)
+        payments_crud.create_open_ticketing_payment(
+            db, obj=obj, popup=popup, tenant=tenant_a
+        )
 
     db.expire(existing)
     db.refresh(existing)
@@ -314,7 +340,9 @@ def test_create_open_ticketing_payment_rolls_back_payment_artifacts_on_provider_
     popup = _make_popup(db, tenant_a, slug_prefix="rollback")
     product = _make_product(db, popup, name="GA", price="99.00")
     section = _make_section(db, popup, label="Buyer Info")
-    name_field = _make_field(db, popup, section, name="first_name", label="Nombre", required=True)
+    name_field = _make_field(
+        db, popup, section, name="first_name", label="Nombre", required=True
+    )
     db.commit()
 
     obj = _purchase_create(
@@ -328,7 +356,7 @@ def test_create_open_ticketing_payment_rolls_back_payment_artifacts_on_provider_
     with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
         mock_get_client.return_value.create_payment.side_effect = RuntimeError("boom")
 
-        with pytest.raises(Exception):
+        with pytest.raises(HTTPException):
             payments_crud.create_open_ticketing_payment(
                 db,
                 obj=obj,
@@ -336,8 +364,12 @@ def test_create_open_ticketing_payment_rolls_back_payment_artifacts_on_provider_
                 tenant=tenant_a,
             )
 
-    payments = list(db.exec(select(Payments).where(Payments.popup_id == popup.id)).all())
-    attendees = list(db.exec(select(Attendees).where(Attendees.popup_id == popup.id)).all())
+    payments = list(
+        db.exec(select(Payments).where(Payments.popup_id == popup.id)).all()
+    )
+    attendees = list(
+        db.exec(select(Attendees).where(Attendees.popup_id == popup.id)).all()
+    )
     payment_products = list(
         db.exec(
             select(PaymentProducts)

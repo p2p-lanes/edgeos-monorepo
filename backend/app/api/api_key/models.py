@@ -15,9 +15,7 @@ class ApiKeys(SQLModel, table=True):
     """
 
     __tablename__ = "api_keys"
-    __table_args__ = (
-        Index("ix_api_keys_human_revoked", "human_id", "revoked_at"),
-    )
+    __table_args__ = (Index("ix_api_keys_human_revoked", "human_id", "revoked_at"),)
 
     id: uuid.UUID = Field(
         default_factory=uuid.uuid4,
@@ -28,15 +26,9 @@ class ApiKeys(SQLModel, table=True):
     name: str = Field(max_length=100)
     key_hash: str = Field(max_length=64, unique=True)
     prefix: str = Field(max_length=20)
-    last_used_at: datetime | None = Field(
-        default=None, sa_type=DateTime(timezone=True)
-    )
-    revoked_at: datetime | None = Field(
-        default=None, sa_type=DateTime(timezone=True)
-    )
-    expires_at: datetime | None = Field(
-        default=None, sa_type=DateTime(timezone=True)
-    )
+    last_used_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))
+    revoked_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))
+    expires_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))
     created_at: datetime = Field(
         default_factory=datetime.utcnow, sa_type=DateTime(timezone=True)
     )

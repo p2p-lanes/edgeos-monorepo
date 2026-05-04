@@ -51,7 +51,9 @@ utils_router = APIRouter(prefix="/utils", tags=["utils"])
 
 
 @utils_router.get("/resolve-url")
-async def resolve_url(url: str = Query(..., description="Short URL to resolve")) -> dict:
+async def resolve_url(
+    url: str = Query(..., description="Short URL to resolve"),
+) -> dict:
     """Follow redirects on a short URL and return the final resolved URL."""
     if not url.startswith("http"):
         raise HTTPException(status_code=400, detail="Invalid URL")
@@ -64,7 +66,9 @@ async def resolve_url(url: str = Query(..., description="Short URL to resolve"))
 
 
 router = APIRouter(prefix="/event-venues", tags=["event-venues"])
-property_types_router = APIRouter(prefix="/venue-property-types", tags=["venue-property-types"])
+property_types_router = APIRouter(
+    prefix="/venue-property-types", tags=["venue-property-types"]
+)
 
 
 # ---------------------------------------------------------------------------
@@ -104,9 +108,7 @@ def _set_property_types(
     existing_ids = {link.property_type_id: link for link in existing}
 
     # Remove links that shouldn't stay.
-    to_delete = [
-        link for pt_id, link in existing_ids.items() if pt_id not in seen
-    ]
+    to_delete = [link for pt_id, link in existing_ids.items() if pt_id not in seen]
     for link in to_delete:
         db.delete(link)
     if to_delete:
@@ -128,7 +130,9 @@ def _set_property_types(
 def _get_venue_or_404(db, venue_id: uuid.UUID) -> EventVenues:
     venue = db.get(EventVenues, venue_id)
     if not venue:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Venue not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Venue not found"
+        )
     return venue
 
 
@@ -149,11 +153,19 @@ async def list_venues(
     """List venues (backoffice)."""
     if popup_id:
         venues, total = crud.event_venues_crud.find_by_popup(
-            db, popup_id=popup_id, skip=skip, limit=limit, search=search,
+            db,
+            popup_id=popup_id,
+            skip=skip,
+            limit=limit,
+            search=search,
         )
     else:
         venues, total = crud.event_venues_crud.find(
-            db, skip=skip, limit=limit, search=search, search_fields=["title", "location"],
+            db,
+            skip=skip,
+            limit=limit,
+            search=search,
+            search_fields=["title", "location"],
         )
     return ListModel[EventVenuePublic](
         results=[EventVenuePublic.model_validate(v) for v in venues],
@@ -182,9 +194,15 @@ async def create_venue(
 
     popup = popups_crud.get(db, venue_in.popup_id)
     if not popup:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Popup not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Popup not found"
+        )
 
-    tenant_id = popup.tenant_id if current_user.role == UserRole.SUPERADMIN else current_user.tenant_id
+    tenant_id = (
+        popup.tenant_id
+        if current_user.role == UserRole.SUPERADMIN
+        else current_user.tenant_id
+    )
     venue_data = venue_in.model_dump(exclude={"property_type_ids"})
     venue_data["tenant_id"] = tenant_id
     venue_data["owner_id"] = current_user.id
@@ -309,7 +327,9 @@ async def create_exception(
 ) -> VenueExceptionPublic:
     venue = _get_venue_or_404(db, venue_id)
     if payload.start_datetime >= payload.end_datetime:
-        raise HTTPException(status_code=400, detail="start_datetime must be before end_datetime")
+        raise HTTPException(
+            status_code=400, detail="start_datetime must be before end_datetime"
+        )
     exc = VenueExceptions(
         tenant_id=venue.tenant_id,
         venue_id=venue.id,
@@ -499,9 +519,7 @@ def _compute_availability(
     events_query = (
         select(Events)
         .where(Events.venue_id == venue.id)
-        .where(Events.status.notin_(
-            [EventStatus.CANCELLED, EventStatus.REJECTED]
-        ))
+        .where(Events.status.notin_([EventStatus.CANCELLED, EventStatus.REJECTED]))
         .where(Events.start_time < end)
         .where(Events.end_time > start)
     )
@@ -586,12 +604,8 @@ def _compute_availability(
                     or hours.close_time is None
                 ):
                     continue
-                open_local = datetime.combine(
-                    day_cursor, hours.open_time, tzinfo=tz
-                )
-                close_local = datetime.combine(
-                    day_cursor, hours.close_time, tzinfo=tz
-                )
+                open_local = datetime.combine(day_cursor, hours.open_time, tzinfo=tz)
+                close_local = datetime.combine(day_cursor, hours.close_time, tzinfo=tz)
                 # Handle overnight (close < open).
                 if close_local <= open_local:
                     close_local = close_local + timedelta(days=1)
@@ -675,7 +689,11 @@ async def list_portal_venues(
     limit: PaginationLimit = 100,
 ) -> ListModel[EventVenuePublic]:
     venues, total = crud.event_venues_crud.find_by_popup(
-        db, popup_id=popup_id, skip=skip, limit=limit, search=search,
+        db,
+        popup_id=popup_id,
+        skip=skip,
+        limit=limit,
+        search=search,
     )
     # Hide pending venues from portal listings.
     venues = [v for v in venues if v.status == VenueStatus.ACTIVE]
@@ -740,9 +758,7 @@ async def create_portal_venue(
     venue_data["tenant_id"] = current_human.tenant_id
     venue_data["owner_id"] = current_human.id
     pending = settings.venues_require_approval
-    venue_data["status"] = (
-        VenueStatus.PENDING if pending else VenueStatus.ACTIVE
-    )
+    venue_data["status"] = VenueStatus.PENDING if pending else VenueStatus.ACTIVE
     venue = EventVenues(**venue_data)
     db.add(venue)
     db.flush()
@@ -804,7 +820,9 @@ async def create_property_type(
     return VenuePropertyTypePublic.model_validate(pt)
 
 
-@property_types_router.patch("/{property_type_id}", response_model=VenuePropertyTypePublic)
+@property_types_router.patch(
+    "/{property_type_id}", response_model=VenuePropertyTypePublic
+)
 async def update_property_type(
     property_type_id: uuid.UUID,
     payload: VenuePropertyTypeUpdate,

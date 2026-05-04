@@ -75,7 +75,7 @@ def parse_rrule(s: str | None) -> RecurrenceRule | None:
         return None
     raw = s.strip()
     if raw.upper().startswith("RRULE:"):
-        raw = raw[len("RRULE:"):]
+        raw = raw[len("RRULE:") :]
 
     kv: dict[str, str] = {}
     for part in raw.split(";"):

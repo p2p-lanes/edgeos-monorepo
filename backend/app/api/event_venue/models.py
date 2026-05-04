@@ -115,7 +115,9 @@ class VenueWeeklyHours(SQLModel, table=True):
     venue_id: uuid.UUID = Field(foreign_key="event_venues.id", index=True)
     day_of_week: int = Field(ge=0, le=6)
     open_time: time | None = Field(default=None, sa_column=Column(Time(timezone=False)))
-    close_time: time | None = Field(default=None, sa_column=Column(Time(timezone=False)))
+    close_time: time | None = Field(
+        default=None, sa_column=Column(Time(timezone=False))
+    )
     is_closed: bool = Field(default=False)
 
     venue: "EventVenues" = Relationship(back_populates="weekly_hours")

@@ -27,7 +27,9 @@ async def get_event_settings(
     """Get event settings for a popup (backoffice)."""
     settings = crud.event_settings_crud.get_by_popup_id(db, popup_id)
     if not settings:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event settings not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Event settings not found"
+        )
     return EventSettingsPublic.model_validate(settings)
 
 
@@ -45,7 +47,9 @@ async def upsert_event_settings(
 
     popup = popups_crud.get(db, popup_id)
     if not popup:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Popup not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Popup not found"
+        )
 
     existing = crud.event_settings_crud.get_by_popup_id(db, popup_id)
     if existing:
@@ -59,7 +63,11 @@ async def upsert_event_settings(
         updated = crud.event_settings_crud.update(db, existing, update)
         return EventSettingsPublic.model_validate(updated)
 
-    tenant_id = popup.tenant_id if current_user.role == UserRole.SUPERADMIN else current_user.tenant_id
+    tenant_id = (
+        popup.tenant_id
+        if current_user.role == UserRole.SUPERADMIN
+        else current_user.tenant_id
+    )
     settings_data = settings_in.model_dump()
     settings_data["tenant_id"] = tenant_id
     settings_data["popup_id"] = popup_id
@@ -80,7 +88,9 @@ async def update_event_settings(
     """Partial update of event settings (backoffice)."""
     existing = crud.event_settings_crud.get_by_popup_id(db, popup_id)
     if not existing:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event settings not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Event settings not found"
+        )
     updated = crud.event_settings_crud.update(db, existing, settings_in)
     return EventSettingsPublic.model_validate(updated)
 

@@ -80,9 +80,7 @@ class EventBase(SQLModel):
     track_id: uuid.UUID | None = Field(
         default=None, foreign_key="tracks.id", index=True
     )
-    visibility: EventVisibility = Field(
-        default=EventVisibility.PUBLIC, max_length=20
-    )
+    visibility: EventVisibility = Field(default=EventVisibility.PUBLIC, max_length=20)
     require_approval: bool = Field(default=False)
     kind: str | None = Field(default=None, max_length=100)
     status: EventStatus = Field(default=EventStatus.DRAFT)

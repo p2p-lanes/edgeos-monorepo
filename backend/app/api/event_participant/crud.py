@@ -12,7 +12,9 @@ from app.api.event_participant.schemas import (
 from app.api.shared.crud import BaseCRUD
 
 
-class EventParticipantsCRUD(BaseCRUD[EventParticipants, EventParticipantCreate, EventParticipantUpdate]):
+class EventParticipantsCRUD(
+    BaseCRUD[EventParticipants, EventParticipantCreate, EventParticipantUpdate]
+):
     """CRUD operations for EventParticipants."""
 
     def __init__(self) -> None:

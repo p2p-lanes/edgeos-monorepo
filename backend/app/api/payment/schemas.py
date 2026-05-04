@@ -173,6 +173,7 @@ class PaymentCreate(BaseModel):
             raise ValueError("Either application_id or popup_id is required")
         return self
 
+
 class PaymentPreview(BaseModel):
     """Schema for payment preview (before creating)."""
 

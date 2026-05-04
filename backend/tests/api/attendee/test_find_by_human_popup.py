@@ -15,7 +15,6 @@ Scenarios covered:
 
 import uuid
 
-import pytest
 from sqlmodel import Session
 
 from app.api.attendee.crud import attendees_crud
@@ -23,7 +22,6 @@ from app.api.attendee.models import Attendees
 from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -136,7 +134,9 @@ class TestFindByHumanPopup:
     def test_empty_when_no_attendees(self, db: Session, tenant_a: Tenants) -> None:
         """Human with no attendees in the popup returns empty list, total=0."""
         popup = _make_popup(db, tenant_a, suffix="empty")
-        human = _make_human(db, tenant_a, email=f"empty-{uuid.uuid4().hex[:8]}@test.com")
+        human = _make_human(
+            db, tenant_a, email=f"empty-{uuid.uuid4().hex[:8]}@test.com"
+        )
         db.commit()
 
         results, total = attendees_crud.find_by_human_popup(db, human.id, popup.id)
@@ -181,7 +181,9 @@ class TestFindByHumanPopup:
     ) -> None:
         """Both application-linked AND direct-sale attendees returned, no duplicates."""
         popup = _make_popup(db, tenant_a, suffix="mixed")
-        human = _make_human(db, tenant_a, email=f"mixed-{uuid.uuid4().hex[:8]}@test.com")
+        human = _make_human(
+            db, tenant_a, email=f"mixed-{uuid.uuid4().hex[:8]}@test.com"
+        )
         app_attendee = _make_app_attendee(db, tenant_a, popup, human, name="App One")
         direct_attendee = _make_direct_attendee(
             db, tenant_a, popup, human, name="Direct One"
@@ -198,7 +200,9 @@ class TestFindByHumanPopup:
     def test_pagination_skip_limit(self, db: Session, tenant_a: Tenants) -> None:
         """Pagination: skip=1, limit=1 returns the right slice and total=3."""
         popup = _make_popup(db, tenant_a, suffix="paged")
-        human = _make_human(db, tenant_a, email=f"paged-{uuid.uuid4().hex[:8]}@test.com")
+        human = _make_human(
+            db, tenant_a, email=f"paged-{uuid.uuid4().hex[:8]}@test.com"
+        )
         _make_app_attendee(db, tenant_a, popup, human, name="Paged One")
         _make_direct_attendee(db, tenant_a, popup, human, name="Paged Two")
         _make_direct_attendee(db, tenant_a, popup, human, name="Paged Three")

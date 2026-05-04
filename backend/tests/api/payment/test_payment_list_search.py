@@ -67,7 +67,9 @@ def _create_attendee(
     return attendee
 
 
-def _create_product(db: Session, tenant: Tenants, popup: Popups, *, suffix: str) -> Products:
+def _create_product(
+    db: Session, tenant: Tenants, popup: Popups, *, suffix: str
+) -> Products:
     product = Products(
         tenant_id=tenant.id,
         popup_id=popup.id,

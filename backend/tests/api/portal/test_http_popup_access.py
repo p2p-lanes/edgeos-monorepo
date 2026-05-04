@@ -34,7 +34,6 @@ from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -213,7 +212,9 @@ class TestGetPopupAccessHttp:
         """Ladder step 1: accepted application → 200, allowed=True, source=application."""
         popup = _make_popup(db, tenant_a, suffix="http-acc")
         human = _make_human(db, tenant_a, suffix="http-acc")
-        _make_application(db, tenant_a, popup, human, status=ApplicationStatus.ACCEPTED.value)
+        _make_application(
+            db, tenant_a, popup, human, status=ApplicationStatus.ACCEPTED.value
+        )
 
         response = client.get(_access_url(popup.id), headers=_auth(human))
 
@@ -253,7 +254,9 @@ class TestGetPopupAccessHttp:
         """Ladder step 2b: in-review application → 200, denied, reason=application_pending."""
         popup = _make_popup(db, tenant_a, suffix="http-rev")
         human = _make_human(db, tenant_a, suffix="http-rev")
-        _make_application(db, tenant_a, popup, human, status=ApplicationStatus.IN_REVIEW.value)
+        _make_application(
+            db, tenant_a, popup, human, status=ApplicationStatus.IN_REVIEW.value
+        )
 
         response = client.get(_access_url(popup.id), headers=_auth(human))
 
@@ -272,7 +275,9 @@ class TestGetPopupAccessHttp:
         """Ladder step 3: rejected application → 200, denied, reason=application_rejected."""
         popup = _make_popup(db, tenant_a, suffix="http-rej")
         human = _make_human(db, tenant_a, suffix="http-rej")
-        _make_application(db, tenant_a, popup, human, status=ApplicationStatus.REJECTED.value)
+        _make_application(
+            db, tenant_a, popup, human, status=ApplicationStatus.REJECTED.value
+        )
 
         response = client.get(_access_url(popup.id), headers=_auth(human))
 

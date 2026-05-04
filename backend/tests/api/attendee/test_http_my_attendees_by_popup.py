@@ -51,7 +51,6 @@ from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.core.security import create_access_token
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -78,7 +77,11 @@ def _make_human(db: Session, tenant: Tenants, *, suffix: str) -> Humans:
 
 
 def _make_popup(
-    db: Session, tenant: Tenants, *, suffix: str, sale_type: str = SaleType.application.value
+    db: Session,
+    tenant: Tenants,
+    *,
+    suffix: str,
+    sale_type: str = SaleType.application.value,
 ) -> Popups:
     popup = Popups(
         id=uuid.uuid4(),
@@ -300,7 +303,9 @@ class TestListMyAttendeesByPopupHttp:
         human = _make_human(db, tenant_a, suffix="b-paged")
         app = _make_application(db, tenant_a, popup, human)
         _make_app_attendee(db, tenant_a, popup, human, app, name="A1", category="main")
-        _make_app_attendee(db, tenant_a, popup, human, app, name="A2", category="spouse")
+        _make_app_attendee(
+            db, tenant_a, popup, human, app, name="A2", category="spouse"
+        )
         _make_app_attendee(db, tenant_a, popup, human, app, name="A3", category="child")
 
         response = client.get(
@@ -378,7 +383,9 @@ class TestCreateMyAttendeeForPopupHttp:
         """Application popup + accepted application → 200, attendee created, origin=application."""
         popup = _make_popup(db, tenant_a, suffix="c-post-ok", sale_type="application")
         human = _make_human(db, tenant_a, suffix="c-post-ok")
-        _make_application(db, tenant_a, popup, human, status=ApplicationStatus.ACCEPTED.value)
+        _make_application(
+            db, tenant_a, popup, human, status=ApplicationStatus.ACCEPTED.value
+        )
 
         response = client.post(
             f"/api/v1/attendees/my/popup/{popup.id}",
@@ -415,7 +422,9 @@ class TestCreateMyAttendeeForPopupHttp:
         self, client: TestClient, db: Session, tenant_a: Tenants
     ) -> None:
         """Application popup but human has no application → 422, code=application_required."""
-        popup = _make_popup(db, tenant_a, suffix="c-post-noapp", sale_type="application")
+        popup = _make_popup(
+            db, tenant_a, suffix="c-post-noapp", sale_type="application"
+        )
         human = _make_human(db, tenant_a, suffix="c-post-noapp")
 
         response = client.post(
@@ -455,7 +464,9 @@ class TestUpdateMyAttendeeForPopupHttp:
         popup = _make_popup(db, tenant_a, suffix="c-patch-owner")
         owner = _make_human(db, tenant_a, suffix="c-patch-owner")
         companion = _make_human(db, tenant_a, suffix="c-patch-comp")
-        app = _make_application(db, tenant_a, popup, owner, status=ApplicationStatus.ACCEPTED.value)
+        app = _make_application(
+            db, tenant_a, popup, owner, status=ApplicationStatus.ACCEPTED.value
+        )
 
         # Create companion attendee: application belongs to owner, but attendee.human_id is companion
         attendee = Attendees(
@@ -490,7 +501,9 @@ class TestUpdateMyAttendeeForPopupHttp:
         popup = _make_popup(db, tenant_a, suffix="c-patch-self")
         owner = _make_human(db, tenant_a, suffix="c-patch-self-owner")
         companion = _make_human(db, tenant_a, suffix="c-patch-self-comp")
-        app = _make_application(db, tenant_a, popup, owner, status=ApplicationStatus.ACCEPTED.value)
+        app = _make_application(
+            db, tenant_a, popup, owner, status=ApplicationStatus.ACCEPTED.value
+        )
 
         attendee = Attendees(
             id=uuid.uuid4(),
@@ -620,7 +633,9 @@ class TestDeleteMyAttendeeForPopupHttp:
         popup = _make_popup(db, tenant_a, suffix="c-del-prod")
         human = _make_human(db, tenant_a, suffix="c-del-prod")
         app = _make_application(db, tenant_a, popup, human)
-        attendee = _make_app_attendee(db, tenant_a, popup, human, app, name="Has Products")
+        attendee = _make_app_attendee(
+            db, tenant_a, popup, human, app, name="Has Products"
+        )
         _add_product_to_attendee(db, attendee, tenant_a, popup)
 
         response = client.delete(

@@ -16,7 +16,6 @@ Scenarios covered:
 
 import uuid
 
-import pytest
 from sqlmodel import Session
 
 from app.api.attendee.crud import attendees_crud
@@ -24,7 +23,6 @@ from app.api.attendee.models import Attendees
 from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -136,7 +134,9 @@ class TestFindPurchasesByHumanPopup:
         """Regression: application-linked leg must still work after the fix."""
         tenant = _make_tenant(db, suffix="app-leg")
         popup = _make_popup(db, tenant, suffix="app-leg")
-        human = _make_human(db, tenant, email=f"app-leg-{uuid.uuid4().hex[:8]}@test.com")
+        human = _make_human(
+            db, tenant, email=f"app-leg-{uuid.uuid4().hex[:8]}@test.com"
+        )
 
         app_attendee = _make_app_attendee(db, tenant, popup, human)
 
@@ -188,16 +188,24 @@ class TestFindPurchasesByHumanPopup:
         )
 
         app_attendee = _make_app_attendee(db, tenant, popup, human, name="App Side")
-        direct_attendee = _make_direct_attendee(db, tenant, popup, human, name="Direct Side")
+        direct_attendee = _make_direct_attendee(
+            db, tenant, popup, human, name="Direct Side"
+        )
 
         results = attendees_crud.find_purchases_by_human_popup(
             db, human_id=human.id, popup_id=popup.id
         )
 
         ids = {a.id for a in results}
-        assert app_attendee.id in ids, "Application-linked attendee missing from combined result"
-        assert direct_attendee.id in ids, "Direct-sale attendee missing from combined result"
-        assert len(ids) == len(results), "Duplicate rows detected — UNION must deduplicate"
+        assert app_attendee.id in ids, (
+            "Application-linked attendee missing from combined result"
+        )
+        assert direct_attendee.id in ids, (
+            "Direct-sale attendee missing from combined result"
+        )
+        assert len(ids) == len(results), (
+            "Duplicate rows detected — UNION must deduplicate"
+        )
         db.rollback()
 
     def test_returns_empty_for_human_with_no_attendees(self, db: Session) -> None:

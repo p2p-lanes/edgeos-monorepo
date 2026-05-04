@@ -14,7 +14,6 @@ Scenarios:
 import uuid
 from unittest.mock import patch
 
-import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
@@ -25,7 +24,6 @@ from app.api.product.models import Products
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.api.ticketing_step.models import TicketingSteps
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -76,7 +74,9 @@ def _make_product(
     return product
 
 
-def _make_form_section(db: Session, popup: Popups, *, order: int = 0, label: str = "Buyer Info") -> FormSections:
+def _make_form_section(
+    db: Session, popup: Popups, *, order: int = 0, label: str = "Buyer Info"
+) -> FormSections:
     section = FormSections(
         id=uuid.uuid4(),
         tenant_id=popup.tenant_id,
@@ -142,7 +142,9 @@ def _make_ticketing_step(
 # ---------------------------------------------------------------------------
 
 
-def test_runtime_valid_direct_popup(client: TestClient, db: Session, tenant_a: Tenants) -> None:
+def test_runtime_valid_direct_popup(
+    client: TestClient, db: Session, tenant_a: Tenants
+) -> None:
     """Valid active direct popup returns 200 with correct shape."""
     popup = _make_direct_popup(db, tenant_a)
     _make_product(db, popup, name="GA Ticket")
@@ -175,11 +177,17 @@ def test_runtime_valid_direct_popup(client: TestClient, db: Session, tenant_a: T
     assert body["ticketing_steps"][0]["title"] == "Choose Tickets"
 
 
-def test_runtime_only_enabled_ticketing_steps(client: TestClient, db: Session, tenant_a: Tenants) -> None:
+def test_runtime_only_enabled_ticketing_steps(
+    client: TestClient, db: Session, tenant_a: Tenants
+) -> None:
     """Only enabled ticketing steps are included in the public bootstrap."""
     popup = _make_direct_popup(db, tenant_a)
-    _make_ticketing_step(db, popup, step_type="tickets", title="Visible Step", is_enabled=True)
-    _make_ticketing_step(db, popup, step_type="merch", title="Hidden Step", is_enabled=False, order=1)
+    _make_ticketing_step(
+        db, popup, step_type="tickets", title="Visible Step", is_enabled=True
+    )
+    _make_ticketing_step(
+        db, popup, step_type="merch", title="Hidden Step", is_enabled=False, order=1
+    )
     db.commit()
 
     response = client.get(f"/api/v1/checkout/{popup.slug}/runtime")
@@ -195,7 +203,9 @@ def test_runtime_unknown_slug_returns_404(client: TestClient) -> None:
     assert response.status_code == 404, response.text
 
 
-def test_runtime_application_popup_returns_403(client: TestClient, db: Session, tenant_a: Tenants) -> None:
+def test_runtime_application_popup_returns_403(
+    client: TestClient, db: Session, tenant_a: Tenants
+) -> None:
     """Application popup returns 403 (only direct-sale popups served)."""
     slug = f"app-boot-{uuid.uuid4().hex[:8]}"
     popup = Popups(
@@ -213,7 +223,9 @@ def test_runtime_application_popup_returns_403(client: TestClient, db: Session, 
     assert response.status_code == 403, response.text
 
 
-def test_runtime_inactive_direct_popup_returns_403(client: TestClient, db: Session, tenant_a: Tenants) -> None:
+def test_runtime_inactive_direct_popup_returns_403(
+    client: TestClient, db: Session, tenant_a: Tenants
+) -> None:
     """Inactive direct popup returns 403."""
     popup = _make_direct_popup(db, tenant_a, status="draft")
     db.commit()
@@ -222,7 +234,9 @@ def test_runtime_inactive_direct_popup_returns_403(client: TestClient, db: Sessi
     assert response.status_code == 403, response.text
 
 
-def test_runtime_only_active_products(client: TestClient, db: Session, tenant_a: Tenants) -> None:
+def test_runtime_only_active_products(
+    client: TestClient, db: Session, tenant_a: Tenants
+) -> None:
     """Only active products are included in the response."""
     popup = _make_direct_popup(db, tenant_a)
     _make_product(db, popup, name="Active GA", is_active=True)
@@ -238,7 +252,9 @@ def test_runtime_only_active_products(client: TestClient, db: Session, tenant_a:
     assert "Inactive VIP" not in product_names
 
 
-def test_runtime_rate_limit_triggers_429(client: TestClient, db: Session, tenant_a: Tenants) -> None:
+def test_runtime_rate_limit_triggers_429(
+    client: TestClient, db: Session, tenant_a: Tenants
+) -> None:
     """121st request from same IP returns 429 (mocked Redis at limit)."""
     popup = _make_direct_popup(db, tenant_a)
     db.commit()

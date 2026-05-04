@@ -1,5 +1,6 @@
 import uuid
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from fastapi import HTTPException, status
 from sqlmodel import Session, col, select
@@ -7,6 +8,9 @@ from sqlmodel import Session, col, select
 from app.api.coupon.models import Coupons
 from app.api.coupon.schemas import CouponCreate, CouponUpdate
 from app.api.shared.crud import BaseCRUD
+
+if TYPE_CHECKING:
+    from app.api.coupon.schemas import CouponValidatePublicResponse
 
 # Uniform error message for all invalid/expired/unknown coupon states on the
 # public endpoint — NEVER differentiate between states (prevents enumeration).
@@ -37,9 +41,7 @@ class CouponsCRUD(BaseCRUD[Coupons, CouponCreate, CouponUpdate]):
         from app.api.popup.models import Popups
         from app.api.shared.enums import SaleType
 
-        popup = session.exec(
-            select(Popups).where(Popups.slug == popup_slug)
-        ).first()
+        popup = session.exec(select(Popups).where(Popups.slug == popup_slug)).first()
 
         if popup is None:
             # Unknown popup — return uniform coupon error (don't reveal popup existence)

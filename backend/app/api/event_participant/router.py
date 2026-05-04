@@ -24,9 +24,7 @@ from app.core.dependencies.users import (
 router = APIRouter(prefix="/event-participants", tags=["event-participants"])
 
 
-def _participants_with_names(
-    db, participants: list
-) -> list[EventParticipantPublic]:
+def _participants_with_names(db, participants: list) -> list[EventParticipantPublic]:
     """Serialize participants, joining Humans to fill in first/last names.
 
     Runs a single ``profile_id IN (...)`` query so the list endpoints remain
@@ -67,10 +65,15 @@ async def list_participants(
     """List participants with optional event filter (backoffice)."""
     if event_id:
         participants, total = crud.event_participants_crud.find_by_event(
-            db, event_id=event_id, skip=skip, limit=limit,
+            db,
+            event_id=event_id,
+            skip=skip,
+            limit=limit,
         )
     else:
-        participants, total = crud.event_participants_crud.find(db, skip=skip, limit=limit)
+        participants, total = crud.event_participants_crud.find(
+            db, skip=skip, limit=limit
+        )
 
     return ListModel[EventParticipantPublic](
         results=_participants_with_names(db, participants),
@@ -78,7 +81,9 @@ async def list_participants(
     )
 
 
-@router.post("", response_model=EventParticipantPublic, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "", response_model=EventParticipantPublic, status_code=status.HTTP_201_CREATED
+)
 async def admin_add_participant(
     participant_in: EventParticipantCreate,
     db: TenantSession,
@@ -91,13 +96,17 @@ async def admin_add_participant(
 
     event = events_crud.get(db, participant_in.event_id)
     if not event:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
+        )
 
     existing = crud.event_participants_crud.get_by_event_and_profile(
         db, participant_in.event_id, participant_in.profile_id
     )
     if existing and existing.status != ParticipantStatus.CANCELLED:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Already registered")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Already registered"
+        )
     if existing:
         existing.status = ParticipantStatus.REGISTERED
         existing.role = participant_in.role
@@ -107,7 +116,11 @@ async def admin_add_participant(
         db.refresh(existing)
         return EventParticipantPublic.model_validate(existing)
 
-    tenant_id = event.tenant_id if current_user.role == UserRole.SUPERADMIN else current_user.tenant_id
+    tenant_id = (
+        event.tenant_id
+        if current_user.role == UserRole.SUPERADMIN
+        else current_user.tenant_id
+    )
     p_data = participant_in.model_dump()
     p_data["tenant_id"] = tenant_id
     participant = EventParticipants(**p_data)
@@ -128,7 +141,9 @@ async def update_participant(
 
     participant = crud.event_participants_crud.get(db, participant_id)
     if not participant:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Participant not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Participant not found"
+        )
 
     updated = crud.event_participants_crud.update(db, participant, participant_in)
 
@@ -145,7 +160,9 @@ async def delete_participant(
 
     participant = crud.event_participants_crud.get(db, participant_id)
     if not participant:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Participant not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Participant not found"
+        )
 
     crud.event_participants_crud.delete(db, participant)
 
@@ -221,9 +238,13 @@ async def register_for_event(
 
     event = events_crud.get(db, event_id)
     if not event:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
+        )
     if event.status != EventStatus.PUBLISHED:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Event is not published")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Event is not published"
+        )
 
     occ_start = _resolve_occurrence_start(
         event, body.occurrence_start if body else None
@@ -233,14 +254,18 @@ async def register_for_event(
         db, event_id, current_human.id, occurrence_start=occ_start
     )
     if existing and existing.status != ParticipantStatus.CANCELLED:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Already registered")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Already registered"
+        )
 
     if event.max_participant:
         active_count = crud.event_participants_crud.count_active_for_event(
             db, event_id, occurrence_start=occ_start
         )
         if active_count >= event.max_participant:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Event is full")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="Event is full"
+            )
 
     if existing:
         existing.status = ParticipantStatus.REGISTERED
@@ -307,12 +332,12 @@ async def _notify_rsvp(
             occurrence_start=occurrence_start,
         )
     except Exception as exc:  # pragma: no cover - defensive
-        logger.warning(
-            "iTIP {} delivery to {} failed: {}", method, human.email, exc
-        )
+        logger.warning("iTIP {} delivery to {} failed: {}", method, human.email, exc)
 
 
-@router.post("/portal/cancel-registration/{event_id}", response_model=EventParticipantPublic)
+@router.post(
+    "/portal/cancel-registration/{event_id}", response_model=EventParticipantPublic
+)
 async def cancel_registration(
     event_id: uuid.UUID,
     db: HumanTenantSession,
@@ -328,7 +353,9 @@ async def cancel_registration(
 
     event = events_crud.get(db, event_id)
     if not event:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
+        )
     occ_start = _resolve_occurrence_start(
         event, body.occurrence_start if body else None
     )
@@ -337,7 +364,9 @@ async def cancel_registration(
         db, event_id, current_human.id, occurrence_start=occ_start
     )
     if not existing or existing.status == ParticipantStatus.CANCELLED:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No active registration found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="No active registration found"
+        )
 
     existing.status = ParticipantStatus.CANCELLED
     db.add(existing)
@@ -363,7 +392,9 @@ async def check_in(
 
     event = events_crud.get(db, event_id)
     if not event:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
+        )
     occ_start = _resolve_occurrence_start(
         event, body.occurrence_start if body else None
     )
@@ -372,9 +403,13 @@ async def check_in(
         db, event_id, current_human.id, occurrence_start=occ_start
     )
     if not existing or existing.status == ParticipantStatus.CANCELLED:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No active registration found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="No active registration found"
+        )
     if existing.status == ParticipantStatus.CHECKED_IN:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Already checked in")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Already checked in"
+        )
 
     existing.status = ParticipantStatus.CHECKED_IN
     existing.check_time = datetime.now(UTC)

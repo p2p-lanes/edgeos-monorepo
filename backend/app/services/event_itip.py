@@ -3,6 +3,7 @@
 Every entry point is best-effort: we log on failure and swallow the
 exception so a broken SMTP never blocks the underlying mutation.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -90,9 +91,7 @@ async def send_event_itip(
         return
 
     if not settings.emails_enabled:
-        logger.info(
-            "Email disabled; skipping iTIP {} for event {}", method, event.id
-        )
+        logger.info("Email disabled; skipping iTIP {} for event {}", method, event.id)
         return
 
     popup = getattr(event, "popup", None)
@@ -103,8 +102,7 @@ async def send_event_itip(
     event_url = ""
     if popup_slug:
         event_url = (
-            f"{settings.PORTAL_URL.rstrip('/')}/portal/{popup_slug}/events/"
-            f"{event.id}"
+            f"{settings.PORTAL_URL.rstrip('/')}/portal/{popup_slug}/events/{event.id}"
         )
 
     when_dt = occurrence_start or event.start_time
@@ -116,7 +114,7 @@ async def send_event_itip(
     organizer_name = from_name or popup_name or None
 
     if method == "CANCEL":
-        subject = f'Event cancelled: {event.title or "an event"}'
+        subject = f"Event cancelled: {event.title or 'an event'}"
     else:
         subject = f"You're invited to {event.title or 'an event'}"
         if popup_name:
@@ -165,9 +163,7 @@ async def send_event_itip(
                 ical_method=method,
             )
         except Exception as exc:  # pragma: no cover - defensive
-            logger.warning(
-                "Failed to send iTIP {} to {}: {}", method, r["email"], exc
-            )
+            logger.warning("Failed to send iTIP {} to {}: {}", method, r["email"], exc)
 
 
 async def bump_and_dispatch_update(db, event) -> None:

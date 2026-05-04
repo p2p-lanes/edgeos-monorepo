@@ -65,7 +65,9 @@ def test_payment_request_expired_webhook_marks_pending_payment_expired(
         def update(self, _db, db_obj, obj_in):
             update_data = obj_in.model_dump(exclude_unset=True)
             for field, value in update_data.items():
-                setattr(db_obj, field, value.value if hasattr(value, "value") else value)
+                setattr(
+                    db_obj, field, value.value if hasattr(value, "value") else value
+                )
             return db_obj
 
     monkeypatch.setattr(payment_router_module, "payments_crud", FakePaymentsCRUD())

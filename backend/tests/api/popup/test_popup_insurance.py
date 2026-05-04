@@ -10,6 +10,7 @@ Phase 3 — Integration:
   - idempotent call → no error
   - no step row → no error
 """
+
 import uuid
 from decimal import Decimal
 
@@ -174,5 +175,3 @@ class TestPopupInsuranceApi:
         )
         assert update_resp.status_code == 200
         assert update_resp.json()["insurance_enabled"] is False
-
-

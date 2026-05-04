@@ -6,6 +6,7 @@ Verifies:
   3. Existing customizations in confirm template_config are not overwritten
   4. Migration is idempotent
 """
+
 import json
 
 from sqlmodel import Session
@@ -72,7 +73,10 @@ def _run_migration_sql(conn, suffix: str) -> None:
         END
         WHERE step_type = 'confirm'
         """,
-        (json.dumps({"insurance": _INSURANCE_DEFAULTS}), json.dumps({"insurance": _INSURANCE_DEFAULTS})),
+        (
+            json.dumps({"insurance": _INSURANCE_DEFAULTS}),
+            json.dumps({"insurance": _INSURANCE_DEFAULTS}),
+        ),
     )
 
 
@@ -119,7 +123,9 @@ class TestConfirmInsuranceMigration:
         conn.exec_driver_sql(f"DROP TABLE ticketingsteps_{suffix}")
         conn.exec_driver_sql(f"DROP TABLE popups_{suffix}")
 
-    def test_confirm_step_null_template_config_gets_insurance_defaults(self, db: Session) -> None:
+    def test_confirm_step_null_template_config_gets_insurance_defaults(
+        self, db: Session
+    ) -> None:
         """Batch4: confirm step with NULL template_config gets insurance defaults."""
         conn = db.connection()
         suffix = "b4_null"
@@ -158,7 +164,9 @@ class TestConfirmInsuranceMigration:
         conn.exec_driver_sql(f"DROP TABLE ticketingsteps_{suffix}")
         conn.exec_driver_sql(f"DROP TABLE popups_{suffix}")
 
-    def test_confirm_step_existing_template_config_gets_insurance_key_appended(self, db: Session) -> None:
+    def test_confirm_step_existing_template_config_gets_insurance_key_appended(
+        self, db: Session
+    ) -> None:
         """Batch4: confirm step with existing template_config (no 'insurance' key) gets it appended."""
         conn = db.connection()
         suffix = "b4_app"
@@ -193,7 +201,9 @@ class TestConfirmInsuranceMigration:
         conn.exec_driver_sql(f"DROP TABLE ticketingsteps_{suffix}")
         conn.exec_driver_sql(f"DROP TABLE popups_{suffix}")
 
-    def test_confirm_step_existing_insurance_key_not_overwritten(self, db: Session) -> None:
+    def test_confirm_step_existing_insurance_key_not_overwritten(
+        self, db: Session
+    ) -> None:
         """Batch4: confirm step with existing template_config.insurance is NOT overwritten."""
         conn = db.connection()
         suffix = "b4_keep"
@@ -204,7 +214,10 @@ class TestConfirmInsuranceMigration:
         ).fetchone()[0]
         tenant_id = conn.exec_driver_sql("SELECT gen_random_uuid()").fetchone()[0]
 
-        custom_insurance = {"card_title": "Custom Title", "benefits": ["Custom benefit"]}
+        custom_insurance = {
+            "card_title": "Custom Title",
+            "benefits": ["Custom benefit"],
+        }
         existing_config = json.dumps({"insurance": custom_insurance})
         conn.exec_driver_sql(
             f"""
@@ -221,13 +234,19 @@ class TestConfirmInsuranceMigration:
             (popup_id,),
         ).fetchone()
         tc = row[0]
-        assert tc["insurance"]["card_title"] == "Custom Title", "custom insurance config must not be overwritten"
-        assert tc["insurance"]["benefits"] == ["Custom benefit"], "custom benefits must not be overwritten"
+        assert tc["insurance"]["card_title"] == "Custom Title", (
+            "custom insurance config must not be overwritten"
+        )
+        assert tc["insurance"]["benefits"] == ["Custom benefit"], (
+            "custom benefits must not be overwritten"
+        )
 
         conn.exec_driver_sql(f"DROP TABLE ticketingsteps_{suffix}")
         conn.exec_driver_sql(f"DROP TABLE popups_{suffix}")
 
-    def test_confirm_step_json_null_template_config_gets_defaults(self, db: Session) -> None:
+    def test_confirm_step_json_null_template_config_gets_defaults(
+        self, db: Session
+    ) -> None:
         """Batch4 regression: confirm step with JSON null (not SQL NULL) template_config
         must still get the defaults, not produce `[null, {obj}]` via `||` wrapping."""
         conn = db.connection()

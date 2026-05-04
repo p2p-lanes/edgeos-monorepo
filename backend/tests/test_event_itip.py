@@ -550,13 +550,18 @@ class TestPatchBumpsSequenceAndDispatches:
             resp = client.patch(
                 f"/api/v1/events/{event.id}",
                 headers=_auth(admin_token_tenant_a),
-                json={"start_time": (event.start_time + timedelta(hours=2)).isoformat()},
+                json={
+                    "start_time": (event.start_time + timedelta(hours=2)).isoformat()
+                },
             )
 
         assert resp.status_code == 200, resp.text
         assert send_mock.await_count == 1
         recipients = send_mock.await_args.args[2]
-        assert {r["email"] for r in recipients} == {"invited@test.com", "rsvped@test.com"}
+        assert {r["email"] for r in recipients} == {
+            "invited@test.com",
+            "rsvped@test.com",
+        }
 
 
 class TestCancelAndDeleteDispatchCancel:

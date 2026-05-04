@@ -592,6 +592,4 @@ class TestListExpansion:
         # Master itself is still listed.
         assert any(r["id"] == str(master.id) for r in results)
         # None of the pseudos sit on the excluded date.
-        assert all(
-            datetime.fromisoformat(p["start_time"]) != skipped for p in pseudos
-        )
+        assert all(datetime.fromisoformat(p["start_time"]) != skipped for p in pseudos)

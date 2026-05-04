@@ -14,7 +14,6 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
-import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
@@ -23,13 +22,14 @@ from app.api.popup.models import Popups
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 
-def _make_direct_popup(db: Session, tenant: Tenants, *, slug_suffix: str = "") -> Popups:
+def _make_direct_popup(
+    db: Session, tenant: Tenants, *, slug_suffix: str = ""
+) -> Popups:
     slug = f"val-pub-direct-{uuid.uuid4().hex[:6]}{slug_suffix}"
     popup = Popups(
         id=uuid.uuid4(),
@@ -90,10 +90,12 @@ def _make_coupon(
 # ---------------------------------------------------------------------------
 
 
-def test_validate_public_valid_coupon(client: TestClient, db: Session, tenant_a: Tenants) -> None:
+def test_validate_public_valid_coupon(
+    client: TestClient, db: Session, tenant_a: Tenants
+) -> None:
     """Valid coupon returns 200 with correct shape."""
     popup = _make_direct_popup(db, tenant_a)
-    coupon = _make_coupon(db, popup, code="FEST10")
+    _make_coupon(db, popup, code="FEST10")
     db.commit()
 
     response = client.post(
@@ -109,7 +111,9 @@ def test_validate_public_valid_coupon(client: TestClient, db: Session, tenant_a:
     assert body["valid"] is True
 
 
-def test_validate_public_unknown_code_returns_400(client: TestClient, db: Session, tenant_a: Tenants) -> None:
+def test_validate_public_unknown_code_returns_400(
+    client: TestClient, db: Session, tenant_a: Tenants
+) -> None:
     """Unknown coupon code returns 400 with uniform message."""
     popup = _make_direct_popup(db, tenant_a)
     db.commit()
@@ -123,7 +127,9 @@ def test_validate_public_unknown_code_returns_400(client: TestClient, db: Sessio
     assert response.json()["detail"] == "Invalid or expired coupon"
 
 
-def test_validate_public_expired_coupon_same_shape(client: TestClient, db: Session, tenant_a: Tenants) -> None:
+def test_validate_public_expired_coupon_same_shape(
+    client: TestClient, db: Session, tenant_a: Tenants
+) -> None:
     """Expired coupon returns 400 with IDENTICAL shape to unknown-coupon response."""
     popup = _make_direct_popup(db, tenant_a)
     past = datetime.now(UTC) - timedelta(days=1)
@@ -140,7 +146,9 @@ def test_validate_public_expired_coupon_same_shape(client: TestClient, db: Sessi
     assert body["detail"] == "Invalid or expired coupon"
 
 
-def test_validate_public_application_popup_returns_403(client: TestClient, db: Session, tenant_a: Tenants) -> None:
+def test_validate_public_application_popup_returns_403(
+    client: TestClient, db: Session, tenant_a: Tenants
+) -> None:
     """Application popup returns 403."""
     popup = _make_app_popup(db, tenant_a)
     db.commit()
@@ -153,7 +161,9 @@ def test_validate_public_application_popup_returns_403(client: TestClient, db: S
     assert response.status_code == 403, response.text
 
 
-def test_validate_public_rate_limit_triggers_429(client: TestClient, db: Session, tenant_a: Tenants) -> None:
+def test_validate_public_rate_limit_triggers_429(
+    client: TestClient, db: Session, tenant_a: Tenants
+) -> None:
     """31st request from same IP returns 429 with Retry-After (mocked Redis)."""
     popup = _make_direct_popup(db, tenant_a)
     _make_coupon(db, popup, code="VALID1")

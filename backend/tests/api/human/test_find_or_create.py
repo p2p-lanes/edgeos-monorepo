@@ -13,13 +13,11 @@ Scenarios:
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-import pytest
 from sqlmodel import Session, select
 
 from app.api.human.crud import humans_crud
 from app.api.human.models import Humans
 from app.api.tenant.models import Tenants
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -142,14 +140,18 @@ def test_find_or_create_concurrent_calls_converge(
         results = [f.result() for f in as_completed(futures)]
 
     # All 5 must return the same id
-    assert len(set(results)) == 1, f"Expected 1 unique id, got {len(set(results))}: {results}"
+    assert len(set(results)) == 1, (
+        f"Expected 1 unique id, got {len(set(results))}: {results}"
+    )
 
     # DB must have exactly 1 row for this email+tenant
     engine = create_engine(test_connection_url)
     with Session(engine) as sess:
-        rows = list(sess.exec(
-            select(Humans).where(
-                Humans.email == email, Humans.tenant_id == tenant_id
-            )
-        ).all())
+        rows = list(
+            sess.exec(
+                select(Humans).where(
+                    Humans.email == email, Humans.tenant_id == tenant_id
+                )
+            ).all()
+        )
     assert len(rows) == 1

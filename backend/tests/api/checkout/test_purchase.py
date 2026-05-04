@@ -40,7 +40,9 @@ def _make_popup(
     return popup
 
 
-def _make_product(db: Session, popup: Popups, *, name: str = "GA", price: str = "100.00") -> Products:
+def _make_product(
+    db: Session, popup: Popups, *, name: str = "GA", price: str = "100.00"
+) -> Products:
     product = Products(
         id=uuid.uuid4(),
         tenant_id=popup.tenant_id,
@@ -56,7 +58,9 @@ def _make_product(db: Session, popup: Popups, *, name: str = "GA", price: str = 
     return product
 
 
-def _make_section(db: Session, popup: Popups, *, label: str = "Buyer Info") -> FormSections:
+def _make_section(
+    db: Session, popup: Popups, *, label: str = "Buyer Info"
+) -> FormSections:
     section = FormSections(
         id=uuid.uuid4(),
         tenant_id=popup.tenant_id,
@@ -70,7 +74,9 @@ def _make_section(db: Session, popup: Popups, *, label: str = "Buyer Info") -> F
     return section
 
 
-def _make_field(db: Session, popup: Popups, section: FormSections, *, required: bool = True) -> FormFields:
+def _make_field(
+    db: Session, popup: Popups, section: FormSections, *, required: bool = True
+) -> FormFields:
     field = FormFields(
         id=uuid.uuid4(),
         tenant_id=popup.tenant_id,
@@ -127,7 +133,9 @@ def test_purchase_happy_path_creates_payment_and_attendees(
 
     payment = db.exec(select(Payments).where(Payments.popup_id == popup.id)).first()
     assert payment is not None
-    attendees = list(db.exec(select(Attendees).where(Attendees.popup_id == popup.id)).all())
+    attendees = list(
+        db.exec(select(Attendees).where(Attendees.popup_id == popup.id)).all()
+    )
     assert len(attendees) == 2
 
 
@@ -152,7 +160,9 @@ def test_purchase_application_popup_returns_403(
     db: Session,
     tenant_a: Tenants,
 ) -> None:
-    popup = _make_popup(db, tenant_a, sale_type=SaleType.application.value, slug_prefix="app")
+    popup = _make_popup(
+        db, tenant_a, sale_type=SaleType.application.value, slug_prefix="app"
+    )
     product = _make_product(db, popup)
     db.commit()
 

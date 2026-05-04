@@ -17,7 +17,6 @@ from fastapi.testclient import TestClient
 
 from app.core.rate_limit import RateLimit, RateLimitExceeded
 
-
 # ---------------------------------------------------------------------------
 # Test app fixture
 # ---------------------------------------------------------------------------
@@ -35,7 +34,12 @@ def _make_app(limit: int, window: int, prefix: str) -> FastAPI:
             headers={"Retry-After": str(exc.retry_after)},
         )
 
-    @app.get("/test", dependencies=[Depends(RateLimit(limit=limit, window_sec=window, key_prefix=prefix))])
+    @app.get(
+        "/test",
+        dependencies=[
+            Depends(RateLimit(limit=limit, window_sec=window, key_prefix=prefix))
+        ],
+    )
     def endpoint() -> dict:
         return {"ok": True}
 
@@ -56,17 +60,17 @@ def test_requests_within_limit_pass() -> None:
     mock_redis = MagicMock()
     counter = {"val": 0}
 
-    def mock_get(key: str):
+    def mock_get(_key: str):
         return str(counter["val"]) if counter["val"] > 0 else None
 
-    def mock_incr(key: str):
+    def mock_incr(_key: str):
         counter["val"] += 1
         return counter["val"]
 
-    def mock_setex(key: str, window: int, val: int):
+    def mock_setex(_key: str, _window: int, val: int):
         counter["val"] = val
 
-    def mock_ttl(key: str):
+    def mock_ttl(_key: str):
         return 55
 
     mock_redis.get = mock_get
@@ -148,10 +152,10 @@ def test_different_ips_have_independent_counters() -> None:
         ip_counters[key] = str(current + 1)
         return current + 1
 
-    def mock_setex(key: str, window: int, val: int) -> None:
+    def mock_setex(key: str, _window: int, val: int) -> None:
         ip_counters[key] = str(val)
 
-    def mock_ttl(key: str) -> int:
+    def mock_ttl(_key: str) -> int:
         return 50
 
     mock_redis = MagicMock()

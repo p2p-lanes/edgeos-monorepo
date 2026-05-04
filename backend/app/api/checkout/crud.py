@@ -10,7 +10,6 @@ from app.api.checkout.schemas import (
     CheckoutRuntimeProduct,
     CheckoutRuntimeResponse,
 )
-from app.api.form_field.models import FormFields
 from app.api.form_field.crud import form_fields_crud
 from app.api.form_section.models import FormSections
 from app.api.popup.models import Popups
@@ -29,9 +28,7 @@ def get_open_ticketing_popup(session: Session, slug: str) -> Popups:
         404 — popup not found by slug
         403 — popup is not sale_type=direct OR is not active
     """
-    popup = session.exec(
-        select(Popups).where(Popups.slug == slug)
-    ).first()
+    popup = session.exec(select(Popups).where(Popups.slug == slug)).first()
 
     if popup is None:
         raise HTTPException(

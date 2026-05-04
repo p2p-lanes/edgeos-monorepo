@@ -435,6 +435,7 @@ class TestScholarshipEndpoint:
             db.delete(existing)
             db.commit()
         from app.api.approval_strategy.models import ApprovalStrategies as AS
+
         strategy = AS(
             popup_id=popup.id,
             tenant_id=tenant_a.id,
@@ -536,7 +537,6 @@ class TestPaymentBestOfThree:
         """
         from decimal import Decimal
 
-
         # Validate that the scholarship discount block exists in _apply_discounts:
         # scholarship_status=APPROVED and discount_percentage > 0 should set scholarship_discount=True
         # We verify this by reading the code path through a MagicMock application
@@ -614,7 +614,9 @@ class TestEmailVariantSelection:
         mock_app.scholarship_request = scholarship_request
         mock_app.scholarship_status = scholarship_status
         mock_app.discount_percentage = (
-            Decimal(str(discount_percentage)) if discount_percentage is not None else None
+            Decimal(str(discount_percentage))
+            if discount_percentage is not None
+            else None
         )
         mock_app.incentive_amount = (
             Decimal(str(incentive_amount)) if incentive_amount is not None else None
@@ -628,9 +630,7 @@ class TestEmailVariantSelection:
 
         return mock_app
 
-    def _make_mock_popup(
-        self, *, allows_incentive: bool = False
-    ) -> MagicMock:
+    def _make_mock_popup(self, *, allows_incentive: bool = False) -> MagicMock:
         mock_popup = MagicMock()
         mock_popup.name = "Test Popup"
         mock_popup.allows_incentive = allows_incentive
@@ -702,7 +702,9 @@ class TestEmailVariantSelection:
 
         template_type, context = _get_scholarship_email_variant(app, popup)
 
-        assert template_type == EmailTemplateType.APPLICATION_ACCEPTED_SCHOLARSHIP_REJECTED
+        assert (
+            template_type == EmailTemplateType.APPLICATION_ACCEPTED_SCHOLARSHIP_REJECTED
+        )
 
     def test_8_12e_incentive_zero_falls_back_to_discount_variant(self) -> None:
         """scholarship APPROVED, incentive_amount=0 → discount variant (not incentive)."""

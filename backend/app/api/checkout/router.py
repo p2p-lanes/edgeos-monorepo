@@ -25,7 +25,9 @@ router = APIRouter(prefix="/checkout", tags=["checkout"])
     "/{slug}/runtime",
     response_model=CheckoutRuntimeResponse,
     dependencies=[
-        Depends(RateLimit(limit=120, window_sec=60, key_prefix="rl:checkout-bootstrap")),
+        Depends(
+            RateLimit(limit=120, window_sec=60, key_prefix="rl:checkout-bootstrap")
+        ),
     ],
 )
 async def get_runtime(

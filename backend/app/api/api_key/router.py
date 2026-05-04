@@ -11,7 +11,9 @@ from app.core.security import TokenPayload, get_token_payload
 router = APIRouter(prefix="/api-keys", tags=["api-keys"])
 
 
-def _require_jwt(token_payload: Annotated[TokenPayload, Depends(get_token_payload)]) -> None:
+def _require_jwt(
+    token_payload: Annotated[TokenPayload, Depends(get_token_payload)],
+) -> None:
     """Reject calls authenticated via API key — only JWT sessions can manage keys.
 
     Rationale: if an API key could mint more API keys, a single leaked

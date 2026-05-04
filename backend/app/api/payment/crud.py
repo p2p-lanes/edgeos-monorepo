@@ -19,8 +19,8 @@ if TYPE_CHECKING:
     from app.api.popup.models import Popups
     from app.api.tenant.models import Tenants
 from app.api.application.schemas import ApplicationStatus, ScholarshipStatus
-from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.attendee.crud import generate_check_in_code
+from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.coupon.crud import coupons_crud
 from app.api.form_section.models import FormSections
 from app.api.human.crud import humans_crud
@@ -215,7 +215,11 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             if section.kind == "standard" and field.required
         }
 
-        missing = [field_id for field_id in required_field_ids if form_data.get(field_id) in (None, "", [])]
+        missing = [
+            field_id
+            for field_id in required_field_ids
+            if form_data.get(field_id) in (None, "", [])
+        ]
         if missing:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -228,7 +232,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             for field in section.form_fields
             if section.kind == "standard"
         }
-        invalid_ids = [field_id for field_id in form_data if field_id not in popup_field_ids]
+        invalid_ids = [
+            field_id for field_id in form_data if field_id not in popup_field_ids
+        ]
         if invalid_ids:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -249,7 +255,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         )
 
         for section in ordered_sections:
-            ordered_fields = sorted(section.form_fields, key=lambda field: field.position)
+            ordered_fields = sorted(
+                section.form_fields, key=lambda field: field.position
+            )
             fields_snapshot = []
             for field in ordered_fields:
                 fields_snapshot.append(
@@ -342,11 +350,15 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             )
             for line in obj.products
         ]
-        self._validate_product_availability(session, fabricated_requests, valid_products)
+        self._validate_product_availability(
+            session, fabricated_requests, valid_products
+        )
         self._decrement_shared_tier_stocks(session, fabricated_requests)
 
         buyer_snapshot = self._build_buyer_snapshot(popup, obj.buyer.form_data)
-        buyer_name = f"{obj.buyer.first_name} {obj.buyer.last_name}".strip() or obj.buyer.email
+        buyer_name = (
+            f"{obj.buyer.first_name} {obj.buyer.last_name}".strip() or obj.buyer.email
+        )
         amount = Decimal("0")
 
         payment = Payments(
@@ -375,7 +387,11 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     attendee_category = (
                         "main"
                         if first_slot
-                        else (product.attendee_category.value if product.attendee_category else "main")
+                        else (
+                            product.attendee_category.value
+                            if product.attendee_category
+                            else "main"
+                        )
                     )
 
                     attendee = Attendees(
@@ -386,7 +402,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                         name=attendee_name,
                         category=attendee_category,
                         email=attendee_email,
-                        check_in_code=generate_check_in_code((popup.slug or "")[:3].upper()),
+                        check_in_code=generate_check_in_code(
+                            (popup.slug or "")[:3].upper()
+                        ),
                     )
                     session.add(attendee)
                     session.flush()
@@ -428,7 +446,9 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
             portal_base = get_portal_url(tenant)
             simplefi_client = get_simplefi_client(popup.simplefi_api_key)
-            success_url = f"{portal_base}/checkout/{popup.slug}/thank-you?payment_id={payment.id}"
+            success_url = (
+                f"{portal_base}/checkout/{popup.slug}/thank-you?payment_id={payment.id}"
+            )
             cancel_url = f"{portal_base}/checkout/{popup.slug}?cancelled=1"
             reference = {
                 "email": buyer.email,

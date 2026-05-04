@@ -964,7 +964,7 @@ POPUP_TEMPLATE_METADATA: list[dict[str, Any]] = [
         "label": "Event Approved",
         "description": "Sent to the event creator when an admin approves their request.",
         "category": "Event",
-        "default_subject": "Your event \"{{ event_title }}\" was approved",
+        "default_subject": 'Your event "{{ event_title }}" was approved',
         "variables": [
             {
                 "name": "first_name",
@@ -1022,7 +1022,7 @@ POPUP_TEMPLATE_METADATA: list[dict[str, Any]] = [
         "label": "Event Rejected",
         "description": "Sent to the event creator when an admin rejects their request.",
         "category": "Event",
-        "default_subject": "Your event \"{{ event_title }}\" was not approved",
+        "default_subject": 'Your event "{{ event_title }}" was not approved',
         "variables": [
             {
                 "name": "first_name",
