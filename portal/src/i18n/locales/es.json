@@ -71,6 +71,7 @@
     "network_error": "Error de red. Por favor, verificá tu conexión."
   },
   "form": {
+    "email": "Email",
     "first_name": "Nombre",
     "first_name_placeholder": "Ingresá tu nombre",
     "first_name_required": "El nombre es obligatorio",
@@ -164,6 +165,8 @@
   "checkout": {
     "title": "Checkout",
     "express_title": "Checkout Express",
+    "buyer_step_title": "Tu información",
+    "buyer_step_description": "Completá tus datos antes del pago.",
     "loading_info": "Cargando tu información",
     "processing": "Procesando tu registro",
     "processing_subtitle": "Esto puede tardar unos momentos",

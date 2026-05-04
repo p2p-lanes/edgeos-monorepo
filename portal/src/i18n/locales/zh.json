@@ -71,6 +71,7 @@
     "network_error": "网络错误，请检查您的连接。"
   },
   "form": {
+    "email": "电子邮件",
     "first_name": "名",
     "first_name_placeholder": "输入您的名字",
     "first_name_required": "请输入名字",
@@ -164,6 +165,8 @@
   "checkout": {
     "title": "结账",
     "express_title": "快速结账",
+    "buyer_step_title": "您的信息",
+    "buyer_step_description": "请在付款前填写您的信息。",
     "loading_info": "正在加载您的信息",
     "processing": "正在处理您的注册",
     "processing_subtitle": "这可能需要一些时间",

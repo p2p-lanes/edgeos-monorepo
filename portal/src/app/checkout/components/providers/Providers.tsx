@@ -3,7 +3,6 @@
 import "@/i18n/config"
 import type { ReactNode } from "react"
 import { TooltipProvider } from "@/components/ui/tooltip"
-import { LanguageProvider } from "@/providers/languageProvider"
 import QueryProvider from "@/providers/queryProvider"
 
 interface ProvidersProps {
@@ -13,9 +12,7 @@ interface ProvidersProps {
 const Providers = ({ children }: ProvidersProps) => {
   return (
     <QueryProvider>
-      <LanguageProvider>
-        <TooltipProvider>{children}</TooltipProvider>
-      </LanguageProvider>
+      <TooltipProvider>{children}</TooltipProvider>
     </QueryProvider>
   )
 }

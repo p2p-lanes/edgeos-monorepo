@@ -71,6 +71,7 @@
     "network_error": "Network error. Please check your connection."
   },
   "form": {
+    "email": "Email",
     "first_name": "First Name",
     "first_name_placeholder": "Enter your first name",
     "first_name_required": "First name is required",
@@ -164,6 +165,8 @@
   "checkout": {
     "title": "Checkout",
     "express_title": "Express Checkout",
+    "buyer_step_title": "Your information",
+    "buyer_step_description": "Complete your information before payment.",
     "loading_info": "Loading your information",
     "processing": "Processing your registration",
     "processing_subtitle": "This might take a few moments",
