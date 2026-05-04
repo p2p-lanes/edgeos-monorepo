@@ -25,6 +25,7 @@ export type AITranslateRequest = {
 export type ApiKeyCreate = {
     name: string;
     expires_at?: (string | null);
+    scopes?: Array<('events:read' | 'events:write' | 'rsvp:write')>;
 };
 
 /**
@@ -35,6 +36,7 @@ export type ApiKeyCreated = {
     id: string;
     name: string;
     prefix: string;
+    scopes: Array<('events:read' | 'events:write' | 'rsvp:write')>;
     created_at: string;
     last_used_at?: (string | null);
     expires_at?: (string | null);
@@ -49,6 +51,7 @@ export type ApiKeyPublic = {
     id: string;
     name: string;
     prefix: string;
+    scopes: Array<('events:read' | 'events:write' | 'rsvp:write')>;
     created_at: string;
     last_used_at?: (string | null);
     expires_at?: (string | null);
@@ -4185,6 +4188,20 @@ export type HumansUpdateHumanData = {
 };
 
 export type HumansUpdateHumanResponse = (HumanPublic);
+
+export type HumansRevokeHumanApiKeysData = {
+    humanId: string;
+    xTenantId?: (string | null);
+};
+
+export type HumansRevokeHumanApiKeysResponse = (void);
+
+export type HumansListHumanApiKeysData = {
+    humanId: string;
+    xTenantId?: (string | null);
+};
+
+export type HumansListHumanApiKeysResponse = (Array<ApiKeyPublic>);
 
 export type PaymentsListPaymentsData = {
     applicationId?: (string | null);

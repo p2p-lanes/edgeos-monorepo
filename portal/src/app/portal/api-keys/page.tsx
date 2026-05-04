@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
   DialogContent,
@@ -18,7 +19,54 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useApiKeys } from "@/hooks/useApiKeys"
-import type { ApiKeyCreated, ApiKeyPublic } from "@/lib/apiKeysService"
+import type {
+  ApiKeyCreated,
+  ApiKeyPublic,
+  ApiKeyScope,
+} from "@/lib/apiKeysService"
+
+const DEFAULT_SCOPES: ApiKeyScope[] = ["events:read"]
+
+function toDateInputValue(date: Date) {
+  return date.toISOString().slice(0, 10)
+}
+
+function defaultWriteExpiryDate() {
+  const date = new Date()
+  date.setDate(date.getDate() + 7)
+  return toDateInputValue(date)
+}
+
+function expiryDateToIso(date: string) {
+  if (!date) return null
+  return new Date(`${date}T23:59:59.999Z`).toISOString()
+}
+
+const SCOPE_OPTIONS: Array<{
+  value: ApiKeyScope
+  label: string
+  description: string
+  risky?: boolean
+}> = [
+  {
+    value: "events:read",
+    label: "Read events",
+    description:
+      "List events and read the context needed for event automation.",
+  },
+  {
+    value: "events:write",
+    label: "Create/manage my events",
+    description:
+      "Create events through the API. Write-capable keys are rate-limited and event creation still requires approval.",
+    risky: true,
+  },
+  {
+    value: "rsvp:write",
+    label: "RSVP to events",
+    description: "Register or cancel attendance for events.",
+  },
+]
 
 export default function ApiKeysPage() {
   const { t } = useTranslation()
@@ -34,17 +82,41 @@ export default function ApiKeysPage() {
 
   const [createOpen, setCreateOpen] = useState(false)
   const [newKeyName, setNewKeyName] = useState("")
+  const [selectedScopes, setSelectedScopes] =
+    useState<ApiKeyScope[]>(DEFAULT_SCOPES)
+  const [expiryDate, setExpiryDate] = useState("")
   const [createdKey, setCreatedKey] = useState<ApiKeyCreated | null>(null)
   const [copied, setCopied] = useState(false)
   const [pendingRevoke, setPendingRevoke] = useState<ApiKeyPublic | null>(null)
+
+  const toggleScope = (scope: ApiKeyScope, checked: boolean) => {
+    setSelectedScopes((current) => {
+      if (scope === "events:read" && !checked) {
+        return current
+      }
+      if (checked) {
+        if (scope === "events:write" && !expiryDate) {
+          setExpiryDate(defaultWriteExpiryDate())
+        }
+        return current.includes(scope) ? current : [...current, scope]
+      }
+      return current.filter((item) => item !== scope)
+    })
+  }
 
   const onCreate = async () => {
     const name = newKeyName.trim()
     if (!name) return
     try {
-      const created = await createKey({ name })
+      const created = await createKey({
+        name,
+        scopes: selectedScopes,
+        expires_at: expiryDateToIso(expiryDate),
+      })
       setCreatedKey(created)
       setNewKeyName("")
+      setSelectedScopes(DEFAULT_SCOPES)
+      setExpiryDate("")
       setCreateOpen(false)
     } catch {
       toast.error(
@@ -81,6 +153,8 @@ export default function ApiKeysPage() {
   const isActive = (k: ApiKeyPublic) =>
     k.revoked_at === null &&
     (k.expires_at === null || new Date(k.expires_at) > new Date())
+
+  const writeScopeSelected = selectedScopes.includes("events:write")
 
   return (
     <div className="flex-1 p-6 bg-background">
@@ -164,6 +238,10 @@ export default function ApiKeysPage() {
                   <CardContent className="text-sm text-muted-foreground space-y-1">
                     <div className="font-mono text-xs">{k.prefix}…</div>
                     <div>
+                      {t("api_keys.scopes", { defaultValue: "Scopes" })}:{" "}
+                      {k.scopes.join(", ")}
+                    </div>
+                    <div>
                       {t("api_keys.created", { defaultValue: "Created" })}:{" "}
                       {format(new Date(k.created_at), "PP")}
                     </div>
@@ -201,7 +279,6 @@ export default function ApiKeysPage() {
         )}
       </div>
 
-      {/* Create dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -230,13 +307,92 @@ export default function ApiKeysPage() {
               autoFocus
             />
           </div>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1">
+              <Label>
+                {t("api_keys.scopes_label", { defaultValue: "Permissions" })}
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                {t("api_keys.scopes_description", {
+                  defaultValue:
+                    "New keys start with read-only access. Only enable broader permissions when you really need them.",
+                })}
+              </p>
+            </div>
+            <div className="space-y-3 rounded-md border p-3">
+              {SCOPE_OPTIONS.map((scope) => {
+                const checked = selectedScopes.includes(scope.value)
+                const checkboxId = `scope-${scope.value}`
+                return (
+                  <div key={scope.value} className="flex items-start gap-3">
+                    <Checkbox
+                      id={checkboxId}
+                      checked={checked}
+                      disabled={scope.value === "events:read"}
+                      onCheckedChange={(value) =>
+                        toggleScope(scope.value, value === true)
+                      }
+                    />
+                    <div className="space-y-1">
+                      <Label
+                        htmlFor={checkboxId}
+                        className="text-sm font-medium cursor-pointer"
+                      >
+                        {t(`api_keys.scope.${scope.value}.label`, {
+                          defaultValue: scope.label,
+                        })}
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        {t(`api_keys.scope.${scope.value}.description`, {
+                          defaultValue: scope.description,
+                        })}
+                      </p>
+                      {scope.risky && checked && (
+                        <p className="text-xs text-amber-600">
+                          {t("api_keys.scope_risky_warning", {
+                            defaultValue:
+                              "Write-capable keys are rate-limited and should only be shared with tools you trust.",
+                          })}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            {writeScopeSelected && (
+              <div className="space-y-2">
+                <Label htmlFor="api-key-expiry">
+                  {t("api_keys.expiry_label", { defaultValue: "Expiry date" })}
+                </Label>
+                <Input
+                  id="api-key-expiry"
+                  type="date"
+                  value={expiryDate}
+                  min={toDateInputValue(new Date())}
+                  onChange={(e) => setExpiryDate(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {t("api_keys.expiry_description", {
+                    defaultValue:
+                      "Write-capable keys must expire. Choose a short-lived date; the backend rejects anything beyond 30 days.",
+                  })}
+                </p>
+              </div>
+            )}
+          </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setCreateOpen(false)}>
               {t("common.cancel", { defaultValue: "Cancel" })}
             </Button>
             <Button
               onClick={onCreate}
-              disabled={!newKeyName.trim() || isCreating}
+              disabled={
+                !newKeyName.trim() ||
+                isCreating ||
+                selectedScopes.length === 0 ||
+                (writeScopeSelected && !expiryDate)
+              }
             >
               {isCreating && <Loader2 className="size-4 animate-spin mr-1" />}
               {t("api_keys.create", { defaultValue: "Create" })}
@@ -245,7 +401,6 @@ export default function ApiKeysPage() {
         </DialogContent>
       </Dialog>
 
-      {/* One-time reveal dialog */}
       <Dialog
         open={createdKey !== null}
         onOpenChange={(open) => {
@@ -267,7 +422,16 @@ export default function ApiKeysPage() {
             </DialogDescription>
           </DialogHeader>
           {createdKey && (
-            <div className="space-y-2">
+            <div className="space-y-3">
+              <div className="rounded-md border bg-muted/40 p-3 text-xs text-muted-foreground">
+                {t("api_keys.created_scopes", {
+                  defaultValue: "Permissions",
+                })}
+                :{" "}
+                <span className="font-mono">
+                  {createdKey.scopes.join(", ")}
+                </span>
+              </div>
               <div className="flex items-center gap-2">
                 <code className="flex-1 px-3 py-2 bg-muted rounded text-xs break-all font-mono">
                   {createdKey.key}
@@ -295,7 +459,6 @@ export default function ApiKeysPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Revoke confirm */}
       <Dialog
         open={pendingRevoke !== null}
         onOpenChange={(open) => {

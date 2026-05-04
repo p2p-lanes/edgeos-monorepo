@@ -85,6 +85,7 @@ def create_for_human(
     human_id: uuid.UUID,
     name: str,
     expires_at: datetime | None,
+    scopes: list[str],
 ) -> tuple[ApiKeys, str]:
     """Mint and persist a new key. Returns (row, raw_token)."""
     raw = generate_raw_key()
@@ -94,6 +95,7 @@ def create_for_human(
         name=name,
         key_hash=hash_key(raw),
         prefix=display_prefix(raw),
+        scopes=scopes,
         expires_at=expires_at,
     )
     session.add(row)
@@ -109,6 +111,25 @@ def revoke(session: Session, row: ApiKeys) -> ApiKeys:
         session.commit()
         session.refresh(row)
     return row
+
+
+def revoke_all_for_human(session: Session, human_id: uuid.UUID) -> int:
+    rows = list(
+        session.exec(
+            select(ApiKeys)
+            .where(ApiKeys.human_id == human_id)
+            .where(ApiKeys.revoked_at.is_(None))
+        ).all()
+    )
+    if not rows:
+        return 0
+
+    now = datetime.now(UTC)
+    for row in rows:
+        row.revoked_at = now
+        session.add(row)
+    session.commit()
+    return len(rows)
 
 
 # Debounce window for last_used_at — at most one write per minute per key,

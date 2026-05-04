@@ -31,11 +31,23 @@ def _require_jwt(
 JwtOnly = Annotated[None, Depends(_require_jwt)]
 
 
+def _require_human_can_manage_api_keys(current_human: CurrentHuman) -> None:
+    if current_human.red_flag:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Blocked humans cannot create or manage API keys.",
+        )
+
+
+HumanCanManageApiKeys = Annotated[None, Depends(_require_human_can_manage_api_keys)]
+
+
 @router.get("", response_model=list[ApiKeyPublic])
 async def list_api_keys(
     db: HumanTenantSession,
     current_human: CurrentHuman,
     _: JwtOnly,
+    __: HumanCanManageApiKeys,
 ) -> list[ApiKeyPublic]:
     rows = crud.list_for_human(db, current_human.id)
     return [ApiKeyPublic.model_validate(r) for r in rows]
@@ -47,6 +59,7 @@ async def create_api_key(
     db: HumanTenantSession,
     current_human: CurrentHuman,
     _: JwtOnly,
+    __: HumanCanManageApiKeys,
 ) -> ApiKeyCreated:
     row, raw = crud.create_for_human(
         db,
@@ -54,6 +67,7 @@ async def create_api_key(
         human_id=current_human.id,
         name=payload.name.strip(),
         expires_at=payload.expires_at,
+        scopes=payload.scopes,
     )
     return ApiKeyCreated.model_validate({**row.model_dump(), "key": raw})
 
@@ -64,6 +78,7 @@ async def revoke_api_key(
     db: HumanTenantSession,
     current_human: CurrentHuman,
     _: JwtOnly,
+    __: HumanCanManageApiKeys,
 ) -> None:
     row = crud.get_for_human(db, key_id, current_human.id)
     if not row:
