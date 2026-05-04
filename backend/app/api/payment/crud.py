@@ -207,18 +207,18 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         popup: "Popups",
         form_data: dict[str, Any],
     ) -> None:
-        """Validate required buyer fields against the popup form schema."""
-        required_field_ids = {
-            str(field.id)
+        """Validate required custom buyer fields. form_data is keyed by raw field name; base fields (email/first_name/last_name) live top-level on BuyerInfo and are validated by Pydantic."""
+        required_field_names = {
+            field.name
             for section in popup.form_sections
             for field in section.form_fields
             if section.kind == "standard" and field.required
         }
 
         missing = [
-            field_id
-            for field_id in required_field_ids
-            if form_data.get(field_id) in (None, "", [])
+            field_name
+            for field_name in required_field_names
+            if form_data.get(field_name) in (None, "", [])
         ]
         if missing:
             raise HTTPException(
@@ -226,16 +226,18 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 detail="Missing required form fields",
             )
 
-        popup_field_ids = {
-            str(field.id)
+        popup_field_names = {
+            field.name
             for section in popup.form_sections
             for field in section.form_fields
             if section.kind == "standard"
         }
-        invalid_ids = [
-            field_id for field_id in form_data if field_id not in popup_field_ids
+        invalid_names = [
+            field_name
+            for field_name in form_data
+            if field_name not in popup_field_names
         ]
-        if invalid_ids:
+        if invalid_names:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="Form data contains unknown fields",
@@ -266,7 +268,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                         "field_name": field.name,
                         "field_label": field.label,
                         "field_type": field.field_type,
-                        "value": form_data.get(str(field.id)),
+                        "value": form_data.get(field.name),
                     }
                 )
 

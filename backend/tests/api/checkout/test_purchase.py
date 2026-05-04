@@ -119,7 +119,7 @@ def test_purchase_happy_path_creates_payment_and_attendees(
                     "email": "buyer@test.com",
                     "first_name": "Matias",
                     "last_name": "Walter",
-                    "form_data": {str(field.id): "Matias"},
+                    "form_data": {field.name: "Matias"},
                 },
             },
         )
@@ -229,7 +229,7 @@ def test_purchase_provider_failure_returns_502(
                     "email": "buyer@test.com",
                     "first_name": "Matias",
                     "last_name": "Walter",
-                    "form_data": {str(field.id): "Matias"},
+                    "form_data": {field.name: "Matias"},
                 },
             },
         )
@@ -261,7 +261,7 @@ def test_purchase_rate_limit_returns_429(
                     "email": "buyer@test.com",
                     "first_name": "Matias",
                     "last_name": "Walter",
-                    "form_data": {str(field.id): "Matias"},
+                    "form_data": {field.name: "Matias"},
                 },
             },
             headers={"X-Forwarded-For": "7.7.7.7"},

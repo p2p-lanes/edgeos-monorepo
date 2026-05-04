@@ -156,8 +156,8 @@ def test_create_open_ticketing_payment_creates_main_and_companions(
         last_name="Walter",
         products=[(product, 3)],
         form_data={
-            str(first_name_field.id): "Matias",
-            str(dietary_field.id): ["vegetarian", "gluten_free"],
+            first_name_field.name: "Matias",
+            dietary_field.name: ["vegetarian", "gluten_free"],
         },
     )
 
@@ -243,7 +243,7 @@ def test_create_open_ticketing_payment_respects_explicit_attendee_categories(
         first_name="Buyer",
         last_name="Person",
         products=[(main_product, 1), (spouse_product, 1)],
-        form_data={str(name_field.id): "Buyer"},
+        form_data={name_field.name: "Buyer"},
     )
 
     with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
@@ -308,7 +308,7 @@ def test_create_open_ticketing_payment_does_not_overwrite_existing_human(
         first_name="New",
         last_name="Buyer",
         products=[(product, 1)],
-        form_data={str(name_field.id): "New"},
+        form_data={name_field.name: "New"},
     )
 
     with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
@@ -350,7 +350,7 @@ def test_create_open_ticketing_payment_rolls_back_payment_artifacts_on_provider_
         first_name="Rollback",
         last_name="Case",
         products=[(product, 2)],
-        form_data={str(name_field.id): "Rollback"},
+        form_data={name_field.name: "Rollback"},
     )
 
     with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
