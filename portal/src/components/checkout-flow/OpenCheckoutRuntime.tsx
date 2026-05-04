@@ -13,6 +13,7 @@ import { CheckoutProvider } from "@/providers/checkoutProvider"
 import { CityContext } from "@/providers/cityProvider"
 import { DiscountContext } from "@/providers/discountProvider"
 import PassesProvider from "@/providers/passesProvider"
+import ThemeProvider from "@/providers/themeProvider"
 import type { AttendeePassState } from "@/types/Attendee"
 import { setActiveCurrency } from "@/types/checkout"
 import type { DiscountProps } from "@/types/discounts"
@@ -157,64 +158,66 @@ export function OpenCheckoutRuntime({
         popupsLoaded: true,
       }}
     >
-      <ApplicationContext.Provider
-        value={{
-          applications: null,
-          participation: null,
-          getRelevantApplication: () => null,
-          getAttendees: () => [],
-          updateApplication: () => {},
-        }}
-      >
-        <DiscountContext.Provider
+      <ThemeProvider>
+        <ApplicationContext.Provider
           value={{
-            discountApplied,
-            setDiscount: (discount) => setDiscountApplied(discount),
-            resetDiscount: () =>
-              setDiscountApplied({
-                discount_value: 0,
-                discount_type: "percentage",
-                discount_code: null,
-                city_id: popup.id,
-              }),
+            applications: null,
+            participation: null,
+            getRelevantApplication: () => null,
+            getAttendees: () => [],
+            updateApplication: () => {},
           }}
         >
-          <PassesProvider
-            attendees={attendees}
-            restoreFromCart={false}
-            productsOverride={products}
-            purchasesOverride={[]}
+          <DiscountContext.Provider
+            value={{
+              discountApplied,
+              setDiscount: (discount) => setDiscountApplied(discount),
+              resetDiscount: () =>
+                setDiscountApplied({
+                  discount_value: 0,
+                  discount_type: "percentage",
+                  discount_code: null,
+                  city_id: popup.id,
+                }),
+            }}
           >
-            <CheckoutProvider
-              initialStep="passes"
+            <PassesProvider
+              attendees={attendees}
+              restoreFromCart={false}
               productsOverride={products}
-              configuredStepsOverride={runtime.ticketing_steps}
-              accountCreditOverride={0}
-              buyerFormSchema={buyerFormSchema}
-              initialBuyerValues={
-                buyerFormSchema
-                  ? buildInitialBuyerValues(buyerFormSchema, prefilledBuyer)
-                  : {}
-              }
-              cartPersistenceEnabled={false}
-              cartUiEnabled={false}
-              validatePromoCodeOverride={async (code) => {
-                const result = await CouponsService.validateCouponPublic({
-                  requestBody: {
-                    popup_slug: popupSlug,
-                    code,
-                  },
-                })
-                return Number(result.discount_value)
-              }}
-              submitMode="open-ticketing"
-              submitPopupSlug={popupSlug}
+              purchasesOverride={[]}
             >
-              <ScrollyCheckoutFlow />
-            </CheckoutProvider>
-          </PassesProvider>
-        </DiscountContext.Provider>
-      </ApplicationContext.Provider>
+              <CheckoutProvider
+                initialStep="passes"
+                productsOverride={products}
+                configuredStepsOverride={runtime.ticketing_steps}
+                accountCreditOverride={0}
+                buyerFormSchema={buyerFormSchema}
+                initialBuyerValues={
+                  buyerFormSchema
+                    ? buildInitialBuyerValues(buyerFormSchema, prefilledBuyer)
+                    : {}
+                }
+                cartPersistenceEnabled={false}
+                cartUiEnabled={false}
+                validatePromoCodeOverride={async (code) => {
+                  const result = await CouponsService.validateCouponPublic({
+                    requestBody: {
+                      popup_slug: popupSlug,
+                      code,
+                    },
+                  })
+                  return Number(result.discount_value)
+                }}
+                submitMode="open-ticketing"
+                submitPopupSlug={popupSlug}
+              >
+                <ScrollyCheckoutFlow />
+              </CheckoutProvider>
+            </PassesProvider>
+          </DiscountContext.Provider>
+        </ApplicationContext.Provider>
+      </ThemeProvider>
     </CityContext.Provider>
   )
 }
