@@ -31,12 +31,6 @@ function toDateInputValue(date: Date) {
   return date.toISOString().slice(0, 10)
 }
 
-function defaultWriteExpiryDate() {
-  const date = new Date()
-  date.setDate(date.getDate() + 7)
-  return toDateInputValue(date)
-}
-
 function expiryDateToIso(date: string) {
   if (!date) return null
   return new Date(`${date}T23:59:59.999Z`).toISOString()
@@ -46,20 +40,12 @@ const SCOPE_OPTIONS: Array<{
   value: ApiKeyScope
   label: string
   description: string
-  risky?: boolean
 }> = [
   {
     value: "events:read",
     label: "Read events",
     description:
       "List events and read the context needed for event automation.",
-  },
-  {
-    value: "events:write",
-    label: "Create/manage my events",
-    description:
-      "Create events through the API. Write-capable keys are rate-limited and event creation still requires approval.",
-    risky: true,
   },
   {
     value: "rsvp:write",
@@ -95,9 +81,6 @@ export default function ApiKeysPage() {
         return current
       }
       if (checked) {
-        if (scope === "events:write" && !expiryDate) {
-          setExpiryDate(defaultWriteExpiryDate())
-        }
         return current.includes(scope) ? current : [...current, scope]
       }
       return current.filter((item) => item !== scope)
@@ -151,10 +134,7 @@ export default function ApiKeysPage() {
   }
 
   const isActive = (k: ApiKeyPublic) =>
-    k.revoked_at === null &&
-    (k.expires_at === null || new Date(k.expires_at) > new Date())
-
-  const writeScopeSelected = selectedScopes.includes("events:write")
+    !k.revoked_at && (!k.expires_at || new Date(k.expires_at) > new Date())
 
   return (
     <div className="flex-1 p-6 bg-background">
@@ -347,39 +327,31 @@ export default function ApiKeysPage() {
                           defaultValue: scope.description,
                         })}
                       </p>
-                      {scope.risky && checked && (
-                        <p className="text-xs text-amber-600">
-                          {t("api_keys.scope_risky_warning", {
-                            defaultValue:
-                              "Write-capable keys are rate-limited and should only be shared with tools you trust.",
-                          })}
-                        </p>
-                      )}
                     </div>
                   </div>
                 )
               })}
             </div>
-            {writeScopeSelected && (
-              <div className="space-y-2">
-                <Label htmlFor="api-key-expiry">
-                  {t("api_keys.expiry_label", { defaultValue: "Expiry date" })}
-                </Label>
-                <Input
-                  id="api-key-expiry"
-                  type="date"
-                  value={expiryDate}
-                  min={toDateInputValue(new Date())}
-                  onChange={(e) => setExpiryDate(e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground">
-                  {t("api_keys.expiry_description", {
-                    defaultValue:
-                      "Write-capable keys must expire. Choose a short-lived date; the backend rejects anything beyond 30 days.",
-                  })}
-                </p>
-              </div>
-            )}
+            <div className="space-y-2">
+              <Label htmlFor="api-key-expiry">
+                {t("api_keys.expiry_label", {
+                  defaultValue: "Expiry date (optional)",
+                })}
+              </Label>
+              <Input
+                id="api-key-expiry"
+                type="date"
+                value={expiryDate}
+                min={toDateInputValue(new Date())}
+                onChange={(e) => setExpiryDate(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                {t("api_keys.expiry_description", {
+                  defaultValue:
+                    "Leave empty for a key that never expires, or set a date to auto-revoke.",
+                })}
+              </p>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setCreateOpen(false)}>
@@ -390,8 +362,7 @@ export default function ApiKeysPage() {
               disabled={
                 !newKeyName.trim() ||
                 isCreating ||
-                selectedScopes.length === 0 ||
-                (writeScopeSelected && !expiryDate)
+                selectedScopes.length === 0
               }
             >
               {isCreating && <Loader2 className="size-4 animate-spin mr-1" />}
