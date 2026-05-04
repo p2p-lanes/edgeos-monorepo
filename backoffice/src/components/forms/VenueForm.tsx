@@ -55,7 +55,7 @@ interface VenueFormProps {
 
 // Booking mode options
 const BOOKING_MODE_OPTIONS: { value: VenueBookingMode; label: string }[] = [
-  { value: "free", label: "Free" },
+  { value: "free", label: "Permissionless" },
   { value: "approval_required", label: "Approval required" },
   { value: "unbookable", label: "Unbookable" },
 ]

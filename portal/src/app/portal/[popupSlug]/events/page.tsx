@@ -157,11 +157,30 @@ export default function EventsPage() {
   // has already ended, the list still shows its events instead of being
   // empty. Falls back to a 180-day window from today before the popup
   // record loads.
+  //
+  // Bounds use UTC midnight of the popup's first day and UTC midnight of
+  // the day *after* end_date — independent of the browser's timezone — so
+  // the filter always covers the whole calendar day starting at 00:00Z and
+  // doesn't drift if the user opens the portal from a different region.
   const listWindow = useMemo(() => {
-    if (city?.start_date && city?.end_date) {
+    const parseUtcMidnight = (s: string | null | undefined) => {
+      if (!s) return null
+      const m = s.slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/)
+      if (!m) return null
+      return new Date(
+        Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 0, 0, 0, 0),
+      )
+    }
+    const startUtc = parseUtcMidnight(city?.start_date)
+    const endUtc = parseUtcMidnight(city?.end_date)
+    // For end, advance by one UTC day so events on the last day are included.
+    const endExclusive = endUtc
+      ? new Date(endUtc.getTime() + 24 * 60 * 60 * 1000)
+      : null
+    if (startUtc && endExclusive) {
       return {
-        startAfter: new Date(city.start_date).toISOString(),
-        startBefore: new Date(city.end_date).toISOString(),
+        startAfter: startUtc.toISOString(),
+        startBefore: endExclusive.toISOString(),
       }
     }
     const start = new Date()
@@ -169,14 +188,8 @@ export default function EventsPage() {
     const end = new Date(start)
     end.setUTCDate(end.getUTCDate() + 180)
     return {
-      startAfter: (city?.start_date
-        ? new Date(city.start_date)
-        : start
-      ).toISOString(),
-      startBefore: (city?.end_date
-        ? new Date(city.end_date)
-        : end
-      ).toISOString(),
+      startAfter: (startUtc ?? start).toISOString(),
+      startBefore: (endExclusive ?? end).toISOString(),
     }
   }, [city?.start_date, city?.end_date])
 

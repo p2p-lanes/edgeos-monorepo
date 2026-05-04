@@ -2,7 +2,9 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
+  AlertTriangle,
   ArrowLeft,
+  CalendarCheck,
   CalendarPlus,
   CheckCircle,
   Clock,
@@ -41,6 +43,7 @@ import { cn } from "@/lib/utils"
 import { useCityProvider } from "@/providers/cityProvider"
 import { AddToCalendarModal } from "../lib/AddToCalendarModal"
 import { summarizeRrule } from "../lib/summarizeRrule"
+import { useCalendarAddedFlag } from "../lib/useCalendarAddedFlag"
 import { useEventTimezone } from "../lib/useEventTimezone"
 
 export default function EventDetailPage() {
@@ -166,6 +169,12 @@ export default function EventDetailPage() {
 
   const [emailsInput, setEmailsInput] = useState("")
   const [addToCalOpen, setAddToCalOpen] = useState(false)
+  // Tracks whether the user has clicked through one of the provider
+  // options. We can't verify the calendar entry was actually saved, so
+  // we treat "clicked Google/Outlook/Yahoo/.ics" as added and let them
+  // manually clear the flag from the modal if they remove it later.
+  const [calendarAdded, markCalendarAdded, markCalendarRemoved] =
+    useCalendarAddedFlag(event?.id, occParam)
 
   const bulkInviteMutation = useMutation({
     mutationFn: async () => {
@@ -304,6 +313,20 @@ export default function EventDetailPage() {
         )}
       </div>
 
+      {event.status === "pending_approval" && (
+        <div className="flex items-start gap-2.5 rounded-xl border border-amber-300 bg-amber-50 p-3 text-amber-900 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-100">
+          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
+          <div className="text-sm">
+            <p className="font-semibold">
+              {t("events.detail.pending_approval_banner_title")}
+            </p>
+            <p className="text-amber-900/90 dark:text-amber-100/90">
+              {t("events.detail.pending_approval_banner_message")}
+            </p>
+          </div>
+        </div>
+      )}
+
       {coverUrl && (
         <div>
           <div className="w-full h-40 sm:h-52 rounded-xl overflow-hidden">
@@ -324,17 +347,19 @@ export default function EventDetailPage() {
 
       <div>
         <div className="flex items-center gap-2 mb-1 flex-wrap">
-          <Badge
-            variant="secondary"
-            className={cn(
-              "px-3 py-1 text-xs shadow-sm capitalize cursor-default",
-              event.status === "published"
-                ? "bg-primary/10 text-primary hover:bg-primary/10"
-                : "hover:bg-secondary",
-            )}
-          >
-            {event.status}
-          </Badge>
+          {event.status !== "pending_approval" && (
+            <Badge
+              variant="secondary"
+              className={cn(
+                "px-3 py-1 text-xs shadow-sm capitalize cursor-default",
+                event.status === "published"
+                  ? "bg-primary/10 text-primary hover:bg-primary/10"
+                  : "hover:bg-secondary",
+              )}
+            >
+              {event.status}
+            </Badge>
+          )}
           {event.kind && (
             <Badge
               variant="outline"
@@ -361,10 +386,20 @@ export default function EventDetailPage() {
           variant="outline"
           size="sm"
           onClick={() => setAddToCalOpen(true)}
-          className="absolute top-3 right-3"
+          className={cn(
+            "absolute top-3 right-3",
+            calendarAdded &&
+              "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800",
+          )}
         >
-          <CalendarPlus className="mr-2 h-4 w-4" />
-          {t("events.detail.add_to_calendar_button")}
+          {calendarAdded ? (
+            <CalendarCheck className="mr-2 h-4 w-4" />
+          ) : (
+            <CalendarPlus className="mr-2 h-4 w-4" />
+          )}
+          {calendarAdded
+            ? t("events.detail.added_to_calendar_button")
+            : t("events.detail.add_to_calendar_button")}
         </Button>
         <div className="flex items-center gap-2.5 pr-36">
           <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
@@ -442,6 +477,9 @@ export default function EventDetailPage() {
               .filter(Boolean)
               .join(" — ") || null,
         }}
+        isAdded={calendarAdded}
+        onAdded={markCalendarAdded}
+        onRemoved={markCalendarRemoved}
       />
 
       {event.content && (

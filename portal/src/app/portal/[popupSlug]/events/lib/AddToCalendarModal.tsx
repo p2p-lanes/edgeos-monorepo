@@ -1,6 +1,6 @@
 "use client"
 
-import { Download } from "lucide-react"
+import { Download, X } from "lucide-react"
 import type { ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 
@@ -26,6 +26,15 @@ interface Props {
   eventId: string
   /** Raw event fields used to build provider URLs. */
   event: CalendarLinkInput
+  /** Fired when the user picks any provider (Google/Outlook/Yahoo/.ics).
+   * Used by callers to flip a "Added to calendar" flag in localStorage. */
+  onAdded?: () => void
+  /** Whether the event is already marked as added. When true, the modal
+   * surfaces a "Remove from my calendar" action that calls
+   * ``onRemoved``. */
+  isAdded?: boolean
+  /** Fired when the user explicitly clears the added flag. */
+  onRemoved?: () => void
 }
 
 /**
@@ -39,8 +48,14 @@ export function AddToCalendarModal({
   onOpenChange,
   eventId,
   event,
+  onAdded,
+  isAdded,
+  onRemoved,
 }: Props) {
   const { t } = useTranslation()
+  const handleAdded = () => {
+    onAdded?.()
+  }
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-sm">
@@ -55,22 +70,26 @@ export function AddToCalendarModal({
             href={googleCalendarUrl(event)}
             icon={<GoogleIcon />}
             label={t("events.add_to_calendar.google_calendar")}
+            onClick={handleAdded}
           />
           <ProviderButton
             href={outlookCalendarUrl(event)}
             icon={<OutlookIcon />}
             label={t("events.add_to_calendar.outlook")}
+            onClick={handleAdded}
           />
           <ProviderButton
             href={yahooCalendarUrl(event)}
             icon={<YahooIcon />}
             label={t("events.add_to_calendar.yahoo")}
+            onClick={handleAdded}
           />
           <Button
             variant="outline"
             className="justify-start gap-3"
             onClick={() => {
               downloadEventIcs({ eventId, title: event.title })
+              handleAdded()
               onOpenChange(false)
             }}
           >
@@ -83,12 +102,27 @@ export function AddToCalendarModal({
             className="justify-start gap-3 text-muted-foreground"
             onClick={() => {
               downloadEventIcs({ eventId, title: event.title })
+              handleAdded()
               onOpenChange(false)
             }}
           >
             <Download className="h-4 w-4" />
             {t("events.add_to_calendar.download_ics")}
           </Button>
+          {isAdded && onRemoved && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="justify-start gap-3 text-destructive hover:text-destructive mt-1"
+              onClick={() => {
+                onRemoved()
+                onOpenChange(false)
+              }}
+            >
+              <X className="h-4 w-4" />
+              {t("events.add_to_calendar.mark_removed")}
+            </Button>
+          )}
         </div>
       </DialogContent>
     </Dialog>
@@ -99,14 +133,21 @@ function ProviderButton({
   href,
   icon,
   label,
+  onClick,
 }: {
   href: string
   icon: ReactNode
   label: string
+  onClick?: () => void
 }) {
   return (
     <Button variant="outline" className="justify-start gap-3" asChild>
-      <a href={href} target="_blank" rel="noopener noreferrer">
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={onClick}
+      >
         {icon}
         {label}
       </a>

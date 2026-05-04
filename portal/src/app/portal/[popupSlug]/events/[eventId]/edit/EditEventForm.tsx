@@ -125,6 +125,7 @@ export function EditEventForm({
     isVenueClosedOnDay,
     selectedDateIsClosed,
     startOptions,
+    nearbyStartOptions,
     withinOpenHours,
     availability,
     availabilityData,
@@ -235,6 +236,8 @@ export function EditEventForm({
           availability={availability}
           availabilityLoaded={!!availabilityData}
           startOptionsCount={startOptions.length}
+          nearbyStartOptions={nearbyStartOptions}
+          onSuggestionPick={setTimeStr}
           disabled={venueDisabled}
         />
 

@@ -330,6 +330,7 @@ async def _notify_rsvp(
             human_id=human.id,
             method=method,
             occurrence_start=occurrence_start,
+            is_self_rsvp=method == "REQUEST",
         )
     except Exception as exc:  # pragma: no cover - defensive
         logger.warning("iTIP {} delivery to {} failed: {}", method, human.email, exc)
