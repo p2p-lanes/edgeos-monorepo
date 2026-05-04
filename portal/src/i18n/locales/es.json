@@ -42,7 +42,8 @@
     "in_review": "Editar aplicación",
     "accepted": "Ver pases",
     "rejected": "",
-    "withdrawn": "Retomar aplicación"
+    "withdrawn": "Retomar aplicación",
+    "buy_tickets": "Comprar tickets"
   },
   "portal": {
     "no_active_popups": "Sin eventos activos",
@@ -350,6 +351,7 @@
   },
   "sidebar": {
     "your_participation": "Tu Participación",
+    "event": "Evento",
     "coming_soon": "(Próximamente)",
     "soon_badge": "Próximamente",
     "application": "Aplicación",

@@ -42,7 +42,8 @@
     "in_review": "Edit Application",
     "accepted": "Go to Passes",
     "rejected": "",
-    "withdrawn": "Resume Application"
+    "withdrawn": "Resume Application",
+    "buy_tickets": "Buy Tickets"
   },
   "portal": {
     "no_active_popups": "No Active Popups",
@@ -350,6 +351,7 @@
   },
   "sidebar": {
     "your_participation": "Your Participation",
+    "event": "Event",
     "coming_soon": "(Coming Soon)",
     "soon_badge": "Soon",
     "application": "Application",

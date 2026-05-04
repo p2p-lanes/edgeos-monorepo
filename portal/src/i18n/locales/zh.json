@@ -42,7 +42,8 @@
     "in_review": "编辑申请",
     "accepted": "查看通行证",
     "rejected": "",
-    "withdrawn": "恢复申请"
+    "withdrawn": "恢复申请",
+    "buy_tickets": "购买门票"
   },
   "portal": {
     "no_active_popups": "暂无活动",
@@ -350,6 +351,7 @@
   },
   "sidebar": {
     "your_participation": "您的参与",
+    "event": "活动",
     "coming_soon": "（即将推出）",
     "soon_badge": "即将推出",
     "application": "申请",

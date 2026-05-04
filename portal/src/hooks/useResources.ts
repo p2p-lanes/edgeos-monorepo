@@ -18,11 +18,12 @@ const useResources = () => {
   const companionCanSeePasses = isCompanion
 
   // Direct-sale popups have no application and no reviewer-controlled
-  // attendees — just checkout + passes browsing once logged in.
+  // attendees — just an event overview that links to checkout, plus a
+  // passes view for managing existing purchases.
   if (city?.sale_type === "direct" && user) {
     const resources: Resource[] = [
       {
-        name: t("sidebar.checkout", { defaultValue: "Checkout" }),
+        name: t("sidebar.event", { defaultValue: "Event" }),
         icon: Ticket,
         status: "active",
         path: `/portal/${city?.slug}`,
