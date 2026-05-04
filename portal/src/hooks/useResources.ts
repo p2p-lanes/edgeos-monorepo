@@ -1,5 +1,6 @@
-import { CalendarDays, FileText, MapPin, Ticket, Users } from "lucide-react"
+import { BookOpen, CalendarDays, FileText, Key, MapPin, Ticket, Users } from "lucide-react"
 import { useTranslation } from "react-i18next"
+import { usePortalEventSettings } from "@/app/portal/[popupSlug]/events/lib/useEventTimezone"
 import useAuth from "@/hooks/useAuth"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
@@ -12,6 +13,8 @@ const useResources = () => {
   const { user } = useAuth()
   const application = getRelevantApplication()
   const city = getCity()
+  const { data: eventSettings } = usePortalEventSettings(city?.id)
+  const eventsEnabled = eventSettings?.event_enabled ?? true
 
   const isCompanion = participation?.type === "companion"
   const canSeeAttendees = application?.status === "accepted"
@@ -23,10 +26,26 @@ const useResources = () => {
   if (city?.sale_type === "direct" && user) {
     const resources: Resource[] = [
       {
-        name: t("sidebar.event", { defaultValue: "Event" }),
+        name: t("sidebar.overview", { defaultValue: "Overview" }),
         icon: Ticket,
         status: "active",
         path: `/portal/${city?.slug}`,
+        children: eventsEnabled
+          ? [
+              {
+                name: t("sidebar.api_keys", { defaultValue: "API Keys" }),
+                icon: Key,
+                status: "active",
+                path: "/portal/api-keys",
+              },
+              {
+                name: t("sidebar.api_docs", { defaultValue: "API Docs" }),
+                icon: BookOpen,
+                status: "active",
+                path: "/docs",
+              },
+            ]
+          : undefined,
       },
       {
         name: t("sidebar.passes"),
@@ -94,14 +113,26 @@ const useResources = () => {
     {
       name: t("sidebar.events"),
       icon: CalendarDays,
-      status: canSeeAttendees ? "active" : "hidden",
+      status: canSeeAttendees && eventsEnabled ? "active" : "hidden",
       path: `/portal/${city?.slug}/events`,
       children: [
         {
           name: t("sidebar.venues"),
           icon: MapPin,
-          status: canSeeAttendees ? "active" : "hidden",
+          status: canSeeAttendees && eventsEnabled ? "active" : "hidden",
           path: `/portal/${city?.slug}/events/venues`,
+        },
+        {
+          name: t("sidebar.api_keys", { defaultValue: "API Keys" }),
+          icon: Key,
+          status: canSeeAttendees && eventsEnabled ? "active" : "hidden",
+          path: "/portal/api-keys",
+        },
+        {
+          name: t("sidebar.api_docs", { defaultValue: "API Docs" }),
+          icon: BookOpen,
+          status: canSeeAttendees && eventsEnabled ? "active" : "hidden",
+          path: "/docs",
         },
       ],
     },
