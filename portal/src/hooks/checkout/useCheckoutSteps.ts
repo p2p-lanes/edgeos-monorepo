@@ -13,10 +13,12 @@ interface UseCheckoutStepsParams {
   dynamicItemsCount: number
   isEditing: boolean
   allProducts?: ProductsPass[]
+  buyerInfoComplete?: boolean
 }
 
 const KNOWN_STEPS = new Set([
   "tickets",
+  "buyer",
   "housing",
   "merch",
   "patron",
@@ -31,6 +33,8 @@ function toCheckoutStep(stepType: string): CheckoutStep | null {
   switch (stepType) {
     case "tickets":
       return "passes"
+    case "buyer":
+      return "buyer"
     case "housing":
       return "housing"
     case "merch":
@@ -54,6 +58,7 @@ export function useCheckoutSteps({
   dynamicItemsCount,
   isEditing,
   allProducts = [],
+  buyerInfoComplete = true,
 }: UseCheckoutStepsParams) {
   const [currentStep, setCurrentStep] = useState<CheckoutStep>(initialStep)
 
@@ -130,9 +135,20 @@ export function useCheckoutSteps({
         return false
       }
 
+      const buyerIndex = availableSteps.indexOf("buyer")
+      if (buyerIndex >= 0 && targetIndex > buyerIndex && !buyerInfoComplete) {
+        return false
+      }
+
       return true
     },
-    [selectedPassesCount, dynamicItemsCount, availableSteps, isEditing],
+    [
+      selectedPassesCount,
+      dynamicItemsCount,
+      availableSteps,
+      isEditing,
+      buyerInfoComplete,
+    ],
   )
 
   const isStepComplete = useCallback(

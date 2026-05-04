@@ -217,6 +217,29 @@
       "confirm": "Revisar y Confirmar"
     }
   },
+  "openCheckout": {
+    "loading": "Cargando checkout...",
+    "unavailable_title": "Checkout no disponible",
+    "unavailable_description": "El link es inválido o este evento ya no está disponible.",
+    "tickets_title": "Tickets",
+    "tickets_subtitle": "Elegí cuántos tickets querés comprar.",
+    "coupon_title": "Cupón",
+    "coupon_subtitle": "Si tenés un código de descuento, aplicalo acá.",
+    "coupon_placeholder": "FESTIVAL10",
+    "coupon_validating": "Validando...",
+    "coupon_apply": "Aplicar",
+    "coupon_applied": "Cupón aplicado: {{code}} ({{percent}}% OFF)",
+    "summary_title": "Resumen",
+    "summary_tickets": "Tickets",
+    "summary_subtotal": "Subtotal",
+    "summary_discount": "Descuento",
+    "summary_total": "Total",
+    "summary_redirecting": "Redirigiendo...",
+    "summary_pay": "Pagar",
+    "thank_you_title": "Pago completado",
+    "thank_you_description": "Gracias por tu compra. Si querés seguir gestionando tus tickets, podés continuar en el portal.",
+    "thank_you_cta": "Ir al portal"
+  },
   "passes": {
     "your_passes": "Tus Pases",
     "buy_passes": "Comprar Pases",

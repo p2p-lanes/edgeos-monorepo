@@ -1,15 +1,10 @@
 "use client"
 
 import { useQueryClient } from "@tanstack/react-query"
-import { useParams } from "next/navigation"
 import { useCallback, useEffect, useState } from "react"
 import { toast } from "sonner"
 import type { CheckoutMode } from "@/checkout/popupCheckoutPolicy"
-import { PaymentsService } from "@/client"
-import {
-  markPurchasePending,
-  savePendingPaymentRedirectState,
-} from "@/hooks/usePaymentRedirect"
+import { CheckoutService, PaymentsService } from "@/client"
 import { queryKeys } from "@/lib/query-keys"
 import type { AttendeePassState } from "@/types/Attendee"
 import type {
@@ -25,6 +20,7 @@ import { buildPaymentProducts } from "./buildPaymentProducts"
 interface UsePaymentSubmitParams {
   applicationId: string | undefined
   popupId: string | null
+  popupSlug: string | null
   appCredit: string | number | null | undefined
   checkoutMode: CheckoutMode
   attendeePasses: AttendeePassState[]
@@ -42,6 +38,13 @@ interface UsePaymentSubmitParams {
   setCurrentStep: (step: CheckoutStep) => void
   setPromoError: (error: string | null) => void
   paymentCompleteRef: React.MutableRefObject<boolean>
+  submitMode: "application" | "open-ticketing"
+  buyerData: {
+    email: string
+    firstName: string
+    lastName: string
+    formData: Record<string, unknown>
+  } | null
 }
 
 interface PaymentSubmitResult {
@@ -52,6 +55,7 @@ interface PaymentSubmitResult {
 export function usePaymentSubmit({
   applicationId,
   popupId,
+  popupSlug,
   appCredit,
   checkoutMode,
   attendeePasses,
@@ -69,9 +73,10 @@ export function usePaymentSubmit({
   setCurrentStep,
   setPromoError,
   paymentCompleteRef,
+  submitMode,
+  buyerData,
 }: UsePaymentSubmitParams) {
   const queryClient = useQueryClient()
-  const params = useParams<{ popupSlug: string }>()
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Reset isSubmitting when page is restored from bfcache
@@ -87,13 +92,12 @@ export function usePaymentSubmit({
   }, [])
 
   const submitPayment = useCallback(async (): Promise<PaymentSubmitResult> => {
-    // Direct-sale flow: no application_id, but we do have a popup_id. We POST
-    // to /payments/direct with a minimal product list (no housing/merch/etc.
-    // in Feature 1 scope — those extras come with checkout_mode work).
-    const isDirectSale = !applicationId && !!popupId
-
-    if (!isDirectSale && !applicationId) {
+    if (submitMode === "application" && !applicationId) {
       return { success: false, error: "Application not available" }
+    }
+
+    if (submitMode === "open-ticketing" && (!popupSlug || !buyerData)) {
+      return { success: false, error: "Buyer information not available" }
     }
 
     if (selectedPasses.length === 0) {
@@ -123,40 +127,55 @@ export function usePaymentSubmit({
         },
       )
 
-      const result = isDirectSale
-        ? await PaymentsService.createDirectPayment({
-            requestBody: {
-              popup_id: popupId!,
-              products: productsToSend.map((p) => ({
-                product_id: p.product_id,
-                quantity: p.quantity,
-              })),
-            },
-          })
-        : await PaymentsService.createMyPayment({
-            requestBody: {
-              application_id: applicationId!,
-              products: productsToSend,
-              coupon_code: promoCodeValid ? promoCode : undefined,
-              edit_passes: isEditing || isMonthUpgrade ? true : undefined,
-              insurance: insurance || undefined,
-            },
-          })
+      const result =
+        submitMode === "open-ticketing"
+          ? await CheckoutService.purchaseOpenTicketing({
+              slug: popupSlug!,
+              requestBody: {
+                products: Object.values(
+                  productsToSend.reduce<
+                    Record<string, { product_id: string; quantity: number }>
+                  >((acc, product) => {
+                    const quantity = product.quantity ?? 1
+                    const existing = acc[product.product_id]
+                    if (existing) {
+                      existing.quantity += quantity
+                    } else {
+                      acc[product.product_id] = {
+                        product_id: product.product_id,
+                        quantity,
+                      }
+                    }
+                    return acc
+                  }, {}),
+                ),
+                buyer: {
+                  email: buyerData!.email,
+                  first_name: buyerData!.firstName,
+                  last_name: buyerData!.lastName,
+                  form_data: buyerData!.formData,
+                },
+                coupon_code: promoCodeValid ? promoCode : undefined,
+              },
+            })
+          : await PaymentsService.createMyPayment({
+              requestBody: {
+                application_id: applicationId,
+                products: productsToSend,
+                coupon_code: promoCodeValid ? promoCode : undefined,
+                edit_passes: isEditing || isMonthUpgrade ? true : undefined,
+                insurance: insurance || undefined,
+              },
+            })
 
       const data = result as {
         id?: string
+        payment_id?: string
         status?: string
         checkout_url?: string | null
       }
 
       if (data.status === "pending" && data.checkout_url) {
-        if (isDirectSale && data.id && params.popupSlug) {
-          savePendingPaymentRedirectState({
-            paymentId: data.id,
-            popupSlug: params.popupSlug,
-          })
-        }
-        markPurchasePending()
         window.location.href = data.checkout_url
         return { success: true }
       }
@@ -203,6 +222,7 @@ export function usePaymentSubmit({
     }
   }, [
     applicationId,
+    buyerData,
     appCredit,
     checkoutMode,
     selectedPasses,
@@ -222,7 +242,8 @@ export function usePaymentSubmit({
     setPromoError,
     paymentCompleteRef,
     popupId,
-    params.popupSlug,
+    popupSlug,
+    submitMode,
   ])
 
   return { submitPayment, isSubmitting }

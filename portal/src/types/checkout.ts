@@ -6,6 +6,7 @@ import type { ProductsPass } from "./Products"
 export type CheckoutStep =
   | "passes"
   | "tickets"
+  | "buyer"
   | "housing"
   | "merch"
   | "patron"

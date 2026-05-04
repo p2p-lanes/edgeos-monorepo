@@ -1,11 +1,14 @@
 "use client"
 
 import { CheckCircle, Home } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
+import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
 
-export default function CheckoutSuccessPage() {
+export default function OpenCheckoutThankYouPage() {
+  const { t } = useTranslation()
   const router = useRouter()
+  const params = useParams<{ popupSlug: string }>()
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-6 py-12">
@@ -15,17 +18,16 @@ export default function CheckoutSuccessPage() {
         </div>
 
         <h1 className="text-3xl font-semibold tracking-tight">
-          Payment completed successfully
+          {t("openCheckout.thank_you_title")}
         </h1>
         <p className="mt-3 text-sm text-muted-foreground">
-          Your payment was confirmed. You can continue in the portal to review
-          your event information.
+          {t("openCheckout.thank_you_description")}
         </p>
 
         <div className="mt-8 flex justify-center">
-          <Button onClick={() => router.push("/portal")}>
+          <Button onClick={() => router.push(`/portal/${params.popupSlug}`)}>
             <Home className="size-4" />
-            Go to portal
+            {t("openCheckout.thank_you_cta")}
           </Button>
         </div>
       </div>

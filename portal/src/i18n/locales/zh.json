@@ -217,6 +217,29 @@
       "confirm": "审核并确认"
     }
   },
+  "openCheckout": {
+    "loading": "正在加载结账...",
+    "unavailable_title": "结账不可用",
+    "unavailable_description": "此链接无效或此活动已不可用。",
+    "tickets_title": "门票",
+    "tickets_subtitle": "选择您要购买的门票数量。",
+    "coupon_title": "优惠券",
+    "coupon_subtitle": "如果您有折扣码，请在此使用。",
+    "coupon_placeholder": "FESTIVAL10",
+    "coupon_validating": "正在验证...",
+    "coupon_apply": "应用",
+    "coupon_applied": "优惠券已应用：{{code}} ({{percent}}% OFF)",
+    "summary_title": "摘要",
+    "summary_tickets": "门票",
+    "summary_subtotal": "小计",
+    "summary_discount": "折扣",
+    "summary_total": "合计",
+    "summary_redirecting": "正在跳转...",
+    "summary_pay": "支付",
+    "thank_you_title": "付款已完成",
+    "thank_you_description": "感谢您的购买。如果您想继续管理您的门票，可以前往门户。",
+    "thank_you_cta": "前往门户"
+  },
   "passes": {
     "your_passes": "我的通行证",
     "buy_passes": "购买通行证",

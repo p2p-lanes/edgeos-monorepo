@@ -41,4 +41,9 @@ export const queryKeys = {
   formSchema: {
     portal: (popupId: string) => ["form-schema", "portal", popupId] as const,
   },
+  checkout: {
+    runtime: (slug: string) => ["checkout", "runtime", slug] as const,
+    coupon: (slug: string, code: string) =>
+      ["checkout", "coupon", slug, code] as const,
+  },
 } as const

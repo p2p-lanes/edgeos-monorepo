@@ -37,6 +37,8 @@ export default function ConfirmStep() {
     termsAccepted,
     setTermsAccepted,
     stepConfigs,
+    buyerValues,
+    buyerGeneralError,
   } = useCheckout()
   const { getCity } = useCityProvider()
   const popup = getCity()
@@ -77,7 +79,12 @@ export default function ConfirmStep() {
 
   const getAttendeeName = (attendeeId: string): string => {
     const attendee = attendees.find((a) => a.id === attendeeId)
-    return attendee?.name || "Unknown"
+    if (attendee?.name) return attendee.name
+    const firstName = String(buyerValues.first_name ?? "").trim()
+    const lastName = String(buyerValues.last_name ?? "").trim()
+    const buyerFullName = `${firstName} ${lastName}`.trim()
+    if (buyerFullName) return buyerFullName
+    return "Unknown"
   }
 
   const passesByAttendee = cart.passes.reduce(
@@ -139,6 +146,16 @@ export default function ConfirmStep() {
 
   return (
     <div className="space-y-4">
+      {buyerGeneralError ? (
+        <div className="bg-destructive/10 border border-destructive rounded-2xl p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+          <div>
+            <h4 className="font-medium text-destructive">Error</h4>
+            <p className="text-sm text-destructive">{buyerGeneralError}</p>
+          </div>
+        </div>
+      ) : null}
+
       {checkoutError && (
         <div className="bg-destructive/10 border border-destructive rounded-2xl p-4 flex items-start gap-3">
           <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />

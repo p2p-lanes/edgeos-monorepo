@@ -45,6 +45,8 @@ interface PassesProviderProps {
    */
   attendees: AttendeePassState[]
   restoreFromCart?: boolean
+  productsOverride?: ProductsPass[]
+  purchasesOverride?: AttendeePurchases[]
 }
 
 /**
@@ -232,12 +234,15 @@ const PassesProvider = ({
   children,
   attendees,
   restoreFromCart = false,
+  productsOverride,
+  purchasesOverride,
 }: PassesProviderProps) => {
   const { discountApplied } = useDiscount()
   const [attendeePasses, setAttendeePasses] = useState<AttendeePassState[]>([])
 
   const [isEditing, setIsEditing] = useState(false)
-  const { products } = useGetPassesData()
+  const { products: queriedProducts } = useGetPassesData()
+  const products = productsOverride ?? queriedProducts
   const { getCity } = useCityProvider()
   const city = getCity()
   const checkoutPolicy = resolvePopupCheckoutPolicy(city)
@@ -248,7 +253,8 @@ const PassesProvider = ({
   const { data: savedCartPasses } = useCart(restoreFromCart ? cityId : null)
 
   // Dedicated purchases query — granular invalidation after payment
-  const { data: purchasesData } = usePurchasesQuery(cityId)
+  const { data: queriedPurchasesData } = usePurchasesQuery(cityId)
+  const purchasesData = purchasesOverride ?? queriedPurchasesData
   const purchasesMap = useMemo(
     () => buildPurchasesMap(purchasesData),
     [purchasesData],

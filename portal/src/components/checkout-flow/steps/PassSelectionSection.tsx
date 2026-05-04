@@ -31,10 +31,12 @@ import {
 } from "@/components/ui/QuantitySelector"
 import { formatDate } from "@/helpers/dates"
 import { cn } from "@/lib/utils"
+import { useApplication } from "@/providers/applicationProvider"
 import { useCheckout } from "@/providers/checkoutProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import { usePassesProvider } from "@/providers/passesProvider"
 import type { AttendeeCategory, AttendeePassState } from "@/types/Attendee"
+import { formatCurrency } from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
 
 /** Smooth-scroll to an attendee card. Defers one frame so layout settles first. */
@@ -111,11 +113,13 @@ const stripedPatternStyle = {
 export default function PassSelectionSection() {
   const { attendeePasses, toggleProduct, isEditing } = usePassesProvider()
   const { editCredit } = useCheckout()
+  const { getRelevantApplication } = useApplication()
   const { getCity } = useCityProvider()
   const policy = resolvePopupCheckoutPolicy(getCity())
   const [focusedAttendeeId, setFocusedAttendeeId] = useState<string | null>(
     null,
   )
+  const canManageAttendees = !isEditing && !!getRelevantApplication()
 
   const groupedByCategory = useMemo(() => {
     const map = new Map<string, AttendeePassState[]>()
@@ -150,7 +154,7 @@ export default function PassSelectionSection() {
             {editCredit > 0 && (
               <div className="bg-primary/20 px-3 py-1.5 rounded-lg">
                 <p className="text-sm font-semibold text-primary">
-                  Credit: ${editCredit.toLocaleString()}
+                  Credit: {formatCurrency(editCredit)}
                 </p>
               </div>
             )}
@@ -159,7 +163,7 @@ export default function PassSelectionSection() {
       )}
 
       {/* Toolbar: Add Family Members */}
-      {!isEditing && (
+      {canManageAttendees && (
         <AddAttendeeButtons onAttendeeAdded={setFocusedAttendeeId} />
       )}
 
@@ -566,7 +570,7 @@ function TierPhaseRow({
             isInactive ? "text-muted-foreground" : "text-foreground",
           )}
         >
-          ${product.price.toLocaleString()}
+          {formatCurrency(product.price)}
         </p>
 
         {isAvailable && !purchased && (
@@ -988,8 +992,8 @@ function PassOption({
             )}
           >
             {isEditedForCredit
-              ? `+$${product.price.toLocaleString()}`
-              : `$${product.price.toLocaleString()}`}
+              ? `+${formatCurrency(product.price)}`
+              : formatCurrency(product.price)}
           </p>
           {isEditedForCredit && (
             <p className="text-[10px] text-orange-500 font-medium">credit</p>
@@ -1049,7 +1053,7 @@ function PassOption({
       <div className="text-right shrink-0">
         {hasDiscount && (
           <p className="text-xs text-muted-foreground line-through">
-            ${comparePrice?.toLocaleString()}
+            {comparePrice != null ? formatCurrency(comparePrice) : ""}
           </p>
         )}
         <p
@@ -1058,7 +1062,7 @@ function PassOption({
             isSelected ? "font-bold" : "font-semibold",
           )}
         >
-          ${product.price.toLocaleString()}
+          {formatCurrency(product.price)}
         </p>
       </div>
     </button>
@@ -1178,8 +1182,8 @@ function QuantityPassOption({
             )}
           >
             {isEditedForCredit
-              ? `+$${creditAmount.toLocaleString()}`
-              : `$${creditAmount.toLocaleString()}`}
+              ? `+${formatCurrency(creditAmount)}`
+              : formatCurrency(creditAmount)}
           </p>
         </div>
       </button>
@@ -1248,7 +1252,7 @@ function QuantityPassOption({
       <div className="text-right shrink-0">
         {hasDiscount && (
           <p className="text-xs text-muted-foreground line-through">
-            ${comparePrice?.toLocaleString()}
+            {comparePrice != null ? formatCurrency(comparePrice) : ""}
           </p>
         )}
         <p
@@ -1257,7 +1261,7 @@ function QuantityPassOption({
             hasQuantity ? "font-bold" : "font-semibold",
           )}
         >
-          ${product.price.toLocaleString()}
+          {formatCurrency(product.price)}
         </p>
       </div>
     </div>
@@ -1372,8 +1376,8 @@ function DayPassOption({
             )}
           >
             {isEditedForCredit
-              ? `+$${creditAmount.toLocaleString()}`
-              : `$${creditAmount.toLocaleString()}`}
+              ? `+${formatCurrency(creditAmount)}`
+              : formatCurrency(creditAmount)}
           </p>
           {isEditedForCredit && (
             <p className="text-[10px] text-orange-500 font-medium">credit</p>
@@ -1443,7 +1447,7 @@ function DayPassOption({
       <div className="text-right shrink-0">
         {hasDiscount && (
           <p className="text-xs text-muted-foreground line-through">
-            ${comparePrice?.toLocaleString()}
+            {comparePrice != null ? formatCurrency(comparePrice) : ""}
           </p>
         )}
         <p
@@ -1452,7 +1456,7 @@ function DayPassOption({
             hasQuantity ? "font-bold" : "font-semibold",
           )}
         >
-          ${product.price.toLocaleString()}
+          {formatCurrency(product.price)}
         </p>
       </div>
     </div>
