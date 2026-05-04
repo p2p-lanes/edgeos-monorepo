@@ -8,12 +8,92 @@ from app.api.coupon.models import Coupons
 from app.api.coupon.schemas import CouponCreate, CouponUpdate
 from app.api.shared.crud import BaseCRUD
 
+# Uniform error message for all invalid/expired/unknown coupon states on the
+# public endpoint — NEVER differentiate between states (prevents enumeration).
+_PUBLIC_COUPON_ERROR = "Invalid or expired coupon"
+
 
 class CouponsCRUD(BaseCRUD[Coupons, CouponCreate, CouponUpdate]):
     """CRUD operations for Coupons."""
 
     def __init__(self) -> None:
         super().__init__(Coupons)
+
+    def validate_public(
+        self,
+        session: Session,
+        popup_slug: str,
+        code: str,
+    ) -> "CouponValidatePublicResponse":
+        """Validate a coupon code for an anonymous (public) checkout request.
+
+        Rules:
+        - Resolves popup by slug; popup must have sale_type="direct" (else 403).
+        - ANY failure state (not found, inactive, expired, maxed-out) raises 400
+          with the UNIFORM message "Invalid or expired coupon" — never differentiates.
+        - On success, returns CouponValidatePublicResponse.
+        """
+        from app.api.coupon.schemas import CouponValidatePublicResponse
+        from app.api.popup.models import Popups
+        from app.api.shared.enums import SaleType
+
+        popup = session.exec(
+            select(Popups).where(Popups.slug == popup_slug)
+        ).first()
+
+        if popup is None:
+            # Unknown popup — return uniform coupon error (don't reveal popup existence)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=_PUBLIC_COUPON_ERROR,
+            )
+
+        if popup.sale_type != SaleType.direct.value:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="This endpoint is only available for direct-sale popups",
+            )
+
+        # Attempt coupon lookup — any failure → uniform 400
+        coupon = self.get_by_code(session, code, popup.id)
+        if coupon is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=_PUBLIC_COUPON_ERROR,
+            )
+
+        if not coupon.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=_PUBLIC_COUPON_ERROR,
+            )
+
+        now = datetime.now(UTC)
+
+        if coupon.start_date and now < coupon.start_date:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=_PUBLIC_COUPON_ERROR,
+            )
+
+        if coupon.end_date and now > coupon.end_date:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=_PUBLIC_COUPON_ERROR,
+            )
+
+        if coupon.max_uses is not None and coupon.current_uses >= coupon.max_uses:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=_PUBLIC_COUPON_ERROR,
+            )
+
+        return CouponValidatePublicResponse(
+            code=coupon.code,
+            discount_type="percent",
+            discount_value=str(coupon.discount_value),
+            valid=True,
+        )
 
     def get_by_code(
         self, session: Session, code: str, popup_id: uuid.UUID

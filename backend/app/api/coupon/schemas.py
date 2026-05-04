@@ -89,3 +89,24 @@ class CouponValidate(BaseModel):
     def validate_code(cls, v: str) -> str:
         """Code should be uppercase and stripped."""
         return v.strip().upper()
+
+
+class CouponValidatePublicRequest(BaseModel):
+    """Request schema for public coupon validation (anonymous, no JWT)."""
+
+    popup_slug: str
+    code: str
+
+    @field_validator("code")
+    @classmethod
+    def normalize_code(cls, v: str) -> str:
+        return v.strip().upper()
+
+
+class CouponValidatePublicResponse(BaseModel):
+    """Response schema for public coupon validation."""
+
+    code: str
+    discount_type: str  # always "percent" in v1
+    discount_value: str  # string representation of the discount percentage
+    valid: bool

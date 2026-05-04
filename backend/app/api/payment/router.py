@@ -9,7 +9,6 @@ from app.api.payment.crud import payments_crud
 from app.api.payment.models import Payments
 from app.api.payment.schemas import (
     ApplicationFeeCreate,
-    DirectPurchaseCreate,
     PaymentCreate,
     PaymentFilter,
     PaymentPreview,
@@ -737,44 +736,18 @@ async def create_my_payment(
     return PaymentPublic.model_validate(payment)
 
 
-@router.post(
-    "/direct",
-    response_model=PaymentPublic,
-    status_code=status.HTTP_201_CREATED,
-)
-async def create_direct_payment(
-    purchase_in: DirectPurchaseCreate,
-    db: HumanTenantSession,
-    current_human: CurrentHuman,
-) -> PaymentPublic:
-    """Create a direct-sale payment for the current human (Portal).
+@router.post("/direct", include_in_schema=False)
+async def create_direct_payment_gone() -> None:
+    """Legacy direct payment tombstone.
 
-    Used for popups with sale_type="direct". No application required. The
-    server resolves the Attendee from CurrentHuman automatically and creates
-    a SimpleFI payment request (or auto-approves if the total is zero).
+    Without this explicit POST handler, `/payments/{payment_id}` keeps the path
+    shape reserved and Starlette returns 405 for POST /payments/direct.
+    We want a hard 404 contract for the removed legacy surface.
     """
-    from app.api.human.crud import humans_crud
-    from app.api.tenant.crud import tenants_crud
-
-    # Load human + tenant (the request session is already tenant-scoped, but
-    # we need the Tenants ORM instance for the SimpleFI call)
-    human = humans_crud.get(db, current_human.id)
-    if not human:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Human not found",
-        )
-    tenant = tenants_crud.get(db, current_human.tenant_id)
-    if not tenant:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Tenant not found",
-        )
-
-    payment = payments_crud.create_direct_payment(
-        db, obj=purchase_in, human=human, tenant=tenant
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="Not Found",
     )
-    return PaymentPublic.model_validate(payment)
 
 
 @router.post("/webhook/simplefi", status_code=status.HTTP_200_OK)

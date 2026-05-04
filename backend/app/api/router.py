@@ -8,6 +8,7 @@ from app.api import (
     auth,
     base_field_config,
     cart,
+    checkout,
     coupon,
     dashboard,
     email_template,
@@ -62,6 +63,9 @@ api_router.include_router(cart.router)
 
 # Translations (i18n)
 api_router.include_router(translation.router)
+
+# Open-ticketing checkout (public, anonymous)
+api_router.include_router(checkout.router)
 
 # Utility resources
 api_router.include_router(upload.router)
