@@ -253,7 +253,9 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         count_statement = select(func.count()).select_from(base_statement.subquery())
         total = session.exec(count_statement).one()
 
-        # Eager load relationships to avoid N+1 queries
+        # Eager load relationships to avoid N+1 queries.
+        # selectinload(Attendees.popup) covers direct-sale attendees (application_id=NULL)
+        # so list_my_tickets can use attendee.popup safely for both legs.
         statement = (
             base_statement.options(
                 selectinload(Attendees.attendee_products).selectinload(  # type: ignore[arg-type]
@@ -262,6 +264,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
                 selectinload(Attendees.application).selectinload(  # type: ignore[arg-type]
                     Applications.popup  # ty: ignore[invalid-argument-type]
                 ),
+                selectinload(Attendees.popup),  # type: ignore[arg-type]
             )
             .offset(skip)
             .limit(limit)
@@ -299,22 +302,97 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         )
         return session.exec(statement).first()
 
+    def _human_popup_attendee_ids(
+        self,
+        session: Session,
+        human_id: uuid.UUID,
+        popup_id: uuid.UUID,
+    ):
+        """Return a subquery of Attendee IDs owned by (human_id, popup_id).
+
+        Uses a UNION of two ownership legs:
+        1. Application-linked leg: attendees whose Application.human_id == human_id
+           AND Application.popup_id == popup_id.
+        2. Direct-sale leg: attendees with human_id == human_id AND popup_id == popup_id
+           AND application_id IS NULL.
+
+        Shared by find_purchases_by_human_popup and find_by_human_popup so both
+        functions use the same dual-path ownership predicate.
+        """
+        from app.api.application.models import Applications
+
+        app_leg = (
+            select(Attendees.id)
+            .join(Applications, Attendees.application_id == Applications.id)  # type: ignore[arg-type]
+            .where(
+                Applications.human_id == human_id,
+                Applications.popup_id == popup_id,
+            )
+        )
+
+        direct_leg = select(Attendees.id).where(
+            Attendees.human_id == human_id,
+            Attendees.popup_id == popup_id,
+            Attendees.application_id.is_(None),  # type: ignore[union-attr]
+        )
+
+        return app_leg.union(direct_leg).subquery()
+
+    def find_by_human_popup(
+        self,
+        session: Session,
+        human_id: uuid.UUID,
+        popup_id: uuid.UUID,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> tuple[list[Attendees], int]:
+        """Return ALL attendees owned by (human_id, popup_id), both legs.
+
+        Uses the UNION subquery from _human_popup_attendee_ids so the same
+        dual-path ownership predicate is applied consistently with
+        find_purchases_by_human_popup. Eager-loads attendee_products → product
+        so callers can build AttendeeWithOriginPublic without extra queries.
+
+        Returns (rows, total_count) for paginated response building.
+        """
+        union_ids = self._human_popup_attendee_ids(session, human_id, popup_id)
+
+        count_statement = select(func.count()).where(
+            Attendees.id.in_(select(union_ids.c.id))  # type: ignore[arg-type]
+        )
+        total = session.exec(count_statement).one()
+
+        statement = (
+            select(Attendees)
+            .where(Attendees.id.in_(select(union_ids.c.id)))  # type: ignore[arg-type]
+            .options(
+                selectinload(Attendees.attendee_products).selectinload(  # type: ignore[arg-type]
+                    AttendeeProducts.product  # ty: ignore[invalid-argument-type]
+                ),
+            )
+            .offset(skip)
+            .limit(limit)
+        )
+        results = list(session.exec(statement).all())
+        return results, total
+
     def find_purchases_by_human_popup(
         self,
         session: Session,
         human_id: uuid.UUID,
         popup_id: uuid.UUID,
     ) -> list[Attendees]:
-        """Find attendees with purchased products for a human+popup combination."""
-        from app.api.application.models import Applications
+        """Find attendees with purchased products for a human+popup combination.
+
+        Includes both application-linked attendees (via Applications.human_id) and
+        direct-sale attendees (application_id IS NULL, keyed by human_id + popup_id).
+        Uses a UNION subquery so both legs are covered without duplicates.
+        """
+        union_ids = self._human_popup_attendee_ids(session, human_id, popup_id)
 
         statement = (
             select(Attendees)
-            .join(Applications, Attendees.application_id == Applications.id)  # type: ignore[arg-type]
-            .where(
-                Applications.human_id == human_id,
-                Applications.popup_id == popup_id,
-            )
+            .where(Attendees.id.in_(select(union_ids.c.id)))  # type: ignore[arg-type]
             .options(
                 selectinload(Attendees.attendee_products).selectinload(  # type: ignore[arg-type]
                     AttendeeProducts.product  # ty: ignore[invalid-argument-type]

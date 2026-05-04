@@ -6,6 +6,7 @@ import type { ProductsPass } from "./Products"
 export type CheckoutStep =
   | "passes"
   | "tickets"
+  | "buyer"
   | "housing"
   | "merch"
   | "patron"
@@ -161,12 +162,26 @@ export function calculateNights(checkIn: string, checkOut: string): number {
   return Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)))
 }
 
-export function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat("en-US", {
+const CURRENCY_LOCALES: Record<string, string> = {
+  USD: "en-US",
+  EUR: "es-ES",
+  ARS: "es-AR",
+}
+
+let _activeCurrency = "USD"
+
+export function setActiveCurrency(currency: string | null | undefined): void {
+  _activeCurrency = (currency || "USD").toUpperCase()
+}
+
+export function formatCurrency(amount: number, currency?: string): string {
+  const normalized = (currency || _activeCurrency).toUpperCase()
+  const locale = CURRENCY_LOCALES[normalized] ?? "en-US"
+  return new Intl.NumberFormat(locale, {
     style: "currency",
-    currency: "USD",
+    currency: normalized,
     minimumFractionDigits: 0,
-    maximumFractionDigits: 1,
+    maximumFractionDigits: 2,
   }).format(amount)
 }
 

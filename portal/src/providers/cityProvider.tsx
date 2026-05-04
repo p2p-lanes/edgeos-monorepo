@@ -12,6 +12,7 @@ import {
 } from "react"
 import type { PopupPublic } from "@/client"
 import { usePopupsQuery, usePublicPopupsQuery } from "@/hooks/useGetPopups"
+import { setActiveCurrency } from "@/types/checkout"
 
 interface CityContext_interface {
   getCity: () => PopupPublic | null
@@ -51,6 +52,9 @@ const CityProvider = ({
       setLastValidCity(cityFromUrl)
     }
   }, [cityFromUrl])
+
+  const activePopup = cityFromUrl ?? lastValidCity ?? popups[0] ?? null
+  setActiveCurrency(activePopup?.currency ?? "USD")
 
   const getCity = useCallback((): PopupPublic | null => {
     const city = getValidCity()

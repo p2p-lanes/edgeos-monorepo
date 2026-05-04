@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import useAttendee from "@/hooks/useAttendee"
+import type { HumanPopupAccess } from "@/hooks/useHumanPopupAccess"
 import { cn } from "@/lib/utils"
-import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import { usePassesProvider } from "@/providers/passesProvider"
 import type { AttendeePassState } from "@/types/Attendee"
@@ -20,10 +20,11 @@ import Special from "../components/common/Products/Special"
 import useModal from "../hooks/useModal"
 
 interface YourPassesProps {
+  access: Extract<HumanPopupAccess, { state: "allowed" }>
   onSwitchToBuy: () => void
 }
 
-const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
+const YourPasses = ({ access, onSwitchToBuy }: YourPassesProps) => {
   const { t } = useTranslation()
   const { attendeePasses: attendees, products } = usePassesProvider()
   const mainAttendee = attendees.find((a) => a.category === "main")
@@ -34,9 +35,12 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
   const isDayCheckout = searchParams.has("day-passes")
   const { getCity } = useCityProvider()
   const city = getCity()
-  const { getAttendees } = useApplication()
-  const applicationAttendees = getAttendees()
-  const hasSpouse = applicationAttendees.some((a) => a.category === "spouse")
+  // Add Spouse / Add Children are only available to Humans who accessed via
+  // an accepted application (CAP-L). Festival/direct-sale humans whose source
+  // is "attendee", "payment", or "companion" must not see these buttons.
+  const canAddCompanions =
+    access.source === "application" && access.applicationStatus === "accepted"
+  const hasSpouse = attendees.some((a) => a.category === "spouse")
   const { handleOpenModal, handleCloseModal, modal } = useModal()
   const { addAttendee } = useAttendee()
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false)
@@ -46,7 +50,10 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
   )
 
   const mainTickets = products.filter(
-    (p) => p.category === TICKET_CATEGORY && p.attendee_category === "main",
+    (p) =>
+      p.category === TICKET_CATEGORY &&
+      p.attendee_category === "main" &&
+      p.is_active !== false,
   )
   const minPrice =
     mainTickets.length > 0 ? Math.min(...mainTickets.map((p) => p.price)) : null
@@ -77,7 +84,7 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
 
         {/* Inline Text Links */}
         <div className="flex flex-wrap items-center gap-3 text-sm mt-2">
-          {city?.allows_spouse && (
+          {canAddCompanions && city?.allows_spouse && (
             <>
               <button
                 type="button"
@@ -88,7 +95,7 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
                     : "text-pass-text hover:text-pass-title",
                 )}
                 onClick={() => !hasSpouse && handleOpenModal("spouse")}
-                disabled={!applicationAttendees.length || hasSpouse}
+                disabled={hasSpouse}
               >
                 <div
                   className={cn(
@@ -103,13 +110,12 @@ const YourPasses = ({ onSwitchToBuy }: YourPassesProps) => {
               <span className="text-gray-300">|</span>
             </>
           )}
-          {city?.allows_children && (
+          {canAddCompanions && city?.allows_children && (
             <>
               <button
                 type="button"
                 className="flex items-center gap-1.5 text-pass-text hover:text-pass-title transition-colors whitespace-nowrap group"
                 onClick={() => handleOpenModal("kid")}
-                disabled={!applicationAttendees.length}
               >
                 <div className="bg-muted p-0.5 rounded-full group-hover:bg-muted transition-colors">
                   <Plus className="w-3 h-3" />

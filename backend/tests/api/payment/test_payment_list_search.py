@@ -1,6 +1,6 @@
+import uuid
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-import uuid
 
 from fastapi.testclient import TestClient
 from sqlmodel import Session
@@ -91,13 +91,15 @@ def _create_payment(
     external_id: str,
     created_at: datetime,
     attendee_specs: list[dict[str, str]],
+    amount: Decimal = Decimal("100.00"),
+    status: PaymentStatus = PaymentStatus.APPROVED,
 ) -> Payments:
     payment = Payments(
         tenant_id=tenant.id,
         popup_id=popup.id,
         external_id=external_id,
-        status=PaymentStatus.APPROVED.value,
-        amount=Decimal("100.00"),
+        status=status.value,
+        amount=amount,
         currency="USD",
         source="SimpleFI",
         created_at=created_at,
@@ -143,6 +145,99 @@ def _create_payment(
 
 
 class TestPaymentListSearch:
+    def test_status_filter_limits_results_across_full_popup_dataset(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        popup = _create_popup(db, tenant_a, suffix="status-filter")
+        approved_payment = _create_payment(
+            db,
+            tenant_a,
+            popup,
+            external_id="STATUS-APPROVED",
+            created_at=datetime.now(UTC),
+            attendee_specs=[{"name": "Approved", "email": "approved@test.com"}],
+            status=PaymentStatus.APPROVED,
+        )
+        _create_payment(
+            db,
+            tenant_a,
+            popup,
+            external_id="STATUS-PENDING",
+            created_at=datetime.now(UTC) + timedelta(minutes=1),
+            attendee_specs=[{"name": "Pending", "email": "pending@test.com"}],
+            status=PaymentStatus.PENDING,
+        )
+
+        response = client.get(
+            "/api/v1/payments",
+            params={"popup_id": str(popup.id), "payment_status": "approved"},
+            headers=_admin_headers(admin_token_tenant_a),
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["paging"]["total"] == 1
+        assert [item["id"] for item in payload["results"]] == [str(approved_payment.id)]
+
+    def test_sorting_by_amount_uses_full_dataset_not_current_page_only(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        popup = _create_popup(db, tenant_a, suffix="sort-amount")
+        base_time = datetime.now(UTC)
+
+        low_payment = _create_payment(
+            db,
+            tenant_a,
+            popup,
+            external_id="SORT-AMOUNT-LOW",
+            created_at=base_time,
+            attendee_specs=[{"name": "Low", "email": "low@test.com"}],
+            amount=Decimal("50.00"),
+        )
+        _create_payment(
+            db,
+            tenant_a,
+            popup,
+            external_id="SORT-AMOUNT-MID",
+            created_at=base_time + timedelta(minutes=1),
+            attendee_specs=[{"name": "Mid", "email": "mid@test.com"}],
+            amount=Decimal("75.00"),
+        )
+        _create_payment(
+            db,
+            tenant_a,
+            popup,
+            external_id="SORT-AMOUNT-HIGH",
+            created_at=base_time + timedelta(minutes=2),
+            attendee_specs=[{"name": "High", "email": "high@test.com"}],
+            amount=Decimal("150.00"),
+        )
+
+        response = client.get(
+            "/api/v1/payments",
+            params={
+                "popup_id": str(popup.id),
+                "skip": 0,
+                "limit": 1,
+                "sort_by": "amount",
+                "sort_order": "asc",
+            },
+            headers=_admin_headers(admin_token_tenant_a),
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["paging"] == {"offset": 0, "limit": 1, "total": 3}
+        assert [item["id"] for item in payload["results"]] == [str(low_payment.id)]
+
     def test_search_matches_external_id_across_full_popup_dataset(
         self,
         client: TestClient,

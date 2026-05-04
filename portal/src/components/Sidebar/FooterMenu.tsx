@@ -1,5 +1,5 @@
 import { BookOpen, Github, Key, Star, User } from "lucide-react"
-import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 import {
@@ -26,6 +26,7 @@ async function getGitHubStars() {
 
 const FooterMenu = () => {
   const { t } = useTranslation()
+  const router = useRouter()
   const [stars, setStars] = useState<number | null>(null)
 
   useEffect(() => {
@@ -42,54 +43,50 @@ const FooterMenu = () => {
       <SidebarMenu>
         {stars !== null && (
           <SidebarMenuItem>
-            <SidebarMenuButton asChild>
-              <a href={REPO_URL} target="_blank" rel="noopener noreferrer">
-                <Github className="size-4 text-nav-text-secondary" />
-                <span className="ml-3 text-xs font-semibold text-nav-text-secondary group-data-[collapsible=icon]:hidden">
-                  EdgeOS
-                </span>
-                <div className="ml-auto flex items-center gap-1 group-data-[collapsible=icon]:hidden">
-                  <Star className="size-3.5 fill-amber-400 text-amber-400" />
-                  <span className="font-medium">{stars}</span>
-                </div>
-              </a>
+            <SidebarMenuButton
+              onClick={() =>
+                window.open(REPO_URL, "_blank", "noopener,noreferrer")
+              }
+            >
+              <Github className="size-4" />
+              <span className="ml-3 text-xs font-semibold group-data-[collapsible=icon]:hidden">
+                EdgeOS
+              </span>
+              <div className="ml-auto flex items-center gap-1 group-data-[collapsible=icon]:hidden">
+                <Star className="size-3.5 fill-amber-400 text-amber-400" />
+                <span className="font-medium">{stars}</span>
+              </div>
             </SidebarMenuButton>
           </SidebarMenuItem>
         )}
         <SidebarMenuItem>
-          <SidebarMenuButton asChild>
-            <Link
-              href="/portal/api-keys"
-              className="mt-4 text-nav-text-secondary"
-            >
-              <Key className="size-4" />
-              <span className="text-sm font-medium">
-                {t("sidebar.api_keys", { defaultValue: "API Keys" })}
-              </span>
-            </Link>
+          <SidebarMenuButton
+            className="mt-4"
+            onClick={() => router.push("/portal/api-keys")}
+          >
+            <Key className="size-4" />
+            <span className="text-sm font-medium">
+              {t("sidebar.api_keys", { defaultValue: "API Keys" })}
+            </span>
           </SidebarMenuButton>
         </SidebarMenuItem>
         <SidebarMenuItem>
-          <SidebarMenuButton asChild>
-            <Link href="/docs" className="text-nav-text-secondary">
-              <BookOpen className="size-4" />
-              <span className="text-sm font-medium">
-                {t("sidebar.api_docs", { defaultValue: "API Docs" })}
-              </span>
-            </Link>
+          <SidebarMenuButton onClick={() => router.push("/docs")}>
+            <BookOpen className="size-4" />
+            <span className="text-sm font-medium">
+              {t("sidebar.api_docs", { defaultValue: "API Docs" })}
+            </span>
           </SidebarMenuButton>
         </SidebarMenuItem>
         <SidebarMenuItem>
-          <SidebarMenuButton asChild>
-            <Link
-              href="/portal/profile"
-              className="mb-4 text-nav-text-secondary"
-            >
-              <User className="size-4" />
-              <span className="text-sm font-medium">
-                {t("profile.my_profile")}
-              </span>
-            </Link>
+          <SidebarMenuButton
+            className="mb-4"
+            onClick={() => router.push("/portal/profile")}
+          >
+            <User className="size-4" />
+            <span className="text-sm font-medium">
+              {t("profile.my_profile")}
+            </span>
           </SidebarMenuButton>
         </SidebarMenuItem>
       </SidebarMenu>

@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.api.coupon import crud
 from app.api.coupon.schemas import (
@@ -8,6 +8,8 @@ from app.api.coupon.schemas import (
     CouponPublic,
     CouponUpdate,
     CouponValidate,
+    CouponValidatePublicRequest,
+    CouponValidatePublicResponse,
 )
 from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
@@ -18,8 +20,34 @@ from app.core.dependencies.users import (
     SessionDep,
     TenantSession,
 )
+from app.core.rate_limit import RateLimit
 
 router = APIRouter(prefix="/coupons", tags=["coupons"])
+
+
+@router.post(
+    "/validate-public",
+    response_model=CouponValidatePublicResponse,
+    tags=["coupons"],
+    dependencies=[
+        Depends(RateLimit(limit=30, window_sec=60, key_prefix="rl:coupon-public")),
+    ],
+)
+async def validate_coupon_public(
+    request_in: CouponValidatePublicRequest,
+    db: SessionDep,
+) -> CouponValidatePublicResponse:
+    """Validate a coupon code for an anonymous open-ticketing checkout (no JWT required).
+
+    Returns coupon details on success. Returns 400 with uniform message for
+    any invalid/expired/unknown state. Returns 403 if popup is not direct-sale.
+    Rate-limited 30/min/IP.
+    """
+    return crud.coupons_crud.validate_public(
+        db,
+        popup_slug=request_in.popup_slug,
+        code=request_in.code,
+    )
 
 
 @router.get("", response_model=ListModel[CouponPublic])

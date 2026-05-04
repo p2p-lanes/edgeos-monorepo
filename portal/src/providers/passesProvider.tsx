@@ -45,12 +45,14 @@ interface PassesProviderProps {
    */
   attendees: AttendeePassState[]
   restoreFromCart?: boolean
+  productsOverride?: ProductsPass[]
+  purchasesOverride?: AttendeePurchases[]
 }
 
 /**
  * Build a Map<attendeeId, ProductsPass[]> from the purchases query data.
  */
-function buildPurchasesMap(
+export function buildPurchasesMap(
   purchasesData: AttendeePurchases[] | undefined,
 ): Map<string, ProductsPass[]> {
   const map = new Map<string, ProductsPass[]>()
@@ -68,12 +70,29 @@ function buildPurchasesMap(
   return map
 }
 
+function mergeAvailableAndPurchasedProducts(
+  attendeeCategory: AttendeePassState["category"],
+  products: ProductsPass[],
+  purchased: ProductsPass[],
+): ProductsPass[] {
+  const activeProducts = products.filter(
+    (product) =>
+      product.attendee_category === attendeeCategory && product.is_active,
+  )
+
+  const missingPurchasedProducts = purchased.filter(
+    (product) => !activeProducts.some((active) => active.id === product.id),
+  )
+
+  return [...activeProducts, ...missingPurchasedProducts]
+}
+
 /**
  * Builds the base attendeePasses structure from server data (attendees + products).
  * All products start with `selected: false`. Purchase rules and prices are applied.
  * Uses purchasesMap (from dedicated purchases endpoint) for purchased product state.
  */
-function buildBaseAttendeePasses(
+export function buildBaseAttendeePasses(
   attendees: AttendeePassState[],
   products: ProductsPass[],
   discountValue: number,
@@ -88,39 +107,38 @@ function buildBaseAttendeePasses(
 
     const hasPatreonPurchased = purchased.some((p) => p.category === "patreon")
 
-    const attendeeProducts = products
-      .filter(
-        (product: ProductsPass) =>
-          product.attendee_category === attendee.category && product.is_active,
-      )
-      .map((product: ProductsPass) => {
-        const isMultiUnit =
-          product.duration_type !== "day" &&
-          supportsQuantitySelector(product.max_quantity)
-        const originalQuantity =
-          product.duration_type === "day"
-            ? (purchased.find((p) => p.id === product.id)?.quantity ?? 0)
-            : 1
-        // Multi-unit non-day products start at 0 so the UI shows them as "empty";
-        // single-unit non-day keep the legacy init of 1 so existing toggle code paths
-        // multiply by 1 and downstream totals remain unchanged.
-        const initialQuantity = isMultiUnit ? 0 : originalQuantity
+    const attendeeProducts = mergeAvailableAndPurchasedProducts(
+      attendee.category,
+      products,
+      purchased,
+    ).map((product: ProductsPass) => {
+      const isMultiUnit =
+        product.duration_type !== "day" &&
+        supportsQuantitySelector(product.max_quantity)
+      const originalQuantity =
+        product.duration_type === "day"
+          ? (purchased.find((p) => p.id === product.id)?.quantity ?? 0)
+          : 1
+      // Multi-unit non-day products start at 0 so the UI shows them as "empty";
+      // single-unit non-day keep the legacy init of 1 so existing toggle code paths
+      // multiply by 1 and downstream totals remain unchanged.
+      const initialQuantity = isMultiUnit ? 0 : originalQuantity
 
-        return {
-          ...product,
-          original_quantity: originalQuantity,
-          quantity: initialQuantity,
-          selected: false,
-          attendee_id: attendee.id,
-          original_price: product.price,
-          disabled: false,
-          price: priceStrategy.calculatePrice(
-            product,
-            hasPatreonPurchased,
-            discountValue,
-          ),
-        }
-      })
+      return {
+        ...product,
+        original_quantity: originalQuantity,
+        quantity: initialQuantity,
+        selected: false,
+        attendee_id: attendee.id,
+        original_price: product.price,
+        disabled: false,
+        price: priceStrategy.calculatePrice(
+          product,
+          hasPatreonPurchased,
+          discountValue,
+        ),
+      }
+    })
 
     return {
       ...attendee,
@@ -216,12 +234,15 @@ const PassesProvider = ({
   children,
   attendees,
   restoreFromCart = false,
+  productsOverride,
+  purchasesOverride,
 }: PassesProviderProps) => {
   const { discountApplied } = useDiscount()
   const [attendeePasses, setAttendeePasses] = useState<AttendeePassState[]>([])
 
   const [isEditing, setIsEditing] = useState(false)
-  const { products } = useGetPassesData()
+  const { products: queriedProducts } = useGetPassesData()
+  const products = productsOverride ?? queriedProducts
   const { getCity } = useCityProvider()
   const city = getCity()
   const checkoutPolicy = resolvePopupCheckoutPolicy(city)
@@ -232,7 +253,8 @@ const PassesProvider = ({
   const { data: savedCartPasses } = useCart(restoreFromCart ? cityId : null)
 
   // Dedicated purchases query — granular invalidation after payment
-  const { data: purchasesData } = usePurchasesQuery(cityId)
+  const { data: queriedPurchasesData } = usePurchasesQuery(cityId)
+  const purchasesData = purchasesOverride ?? queriedPurchasesData
   const purchasesMap = useMemo(
     () => buildPurchasesMap(purchasesData),
     [purchasesData],

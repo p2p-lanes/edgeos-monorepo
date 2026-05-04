@@ -506,8 +506,8 @@ function PassRow({
           )}
         >
           {isEditedForCredit
-            ? `+$${product.price.toLocaleString()}`
-            : `$${product.price.toLocaleString()}`}
+            ? `+${formatCurrency(product.price)}`
+            : formatCurrency(product.price)}
         </p>
       </button>
     )
@@ -595,7 +595,7 @@ function PassRow({
       <div className="text-right shrink-0">
         {hasDiscount && (
           <p className="text-xs text-muted-foreground line-through">
-            ${comparePrice?.toLocaleString()}
+            {comparePrice != null ? formatCurrency(comparePrice) : ""}
           </p>
         )}
         <p
@@ -604,7 +604,7 @@ function PassRow({
             rowIsActive ? "font-bold" : "font-semibold",
           )}
         >
-          ${product.price.toLocaleString()}
+          {formatCurrency(product.price)}
         </p>
       </div>
     </button>
@@ -728,8 +728,8 @@ function DayPassRow({
           )}
         >
           {isEditedForCredit
-            ? `+$${credit.toLocaleString()}`
-            : `$${credit.toLocaleString()}`}
+            ? `+${formatCurrency(credit)}`
+            : formatCurrency(credit)}
         </p>
       </button>
     )
@@ -782,7 +782,7 @@ function DayPassRow({
       <div className="text-right shrink-0">
         {hasDiscount && (
           <p className="text-xs text-muted-foreground line-through">
-            ${comparePrice?.toLocaleString()}
+            {comparePrice != null ? formatCurrency(comparePrice) : ""}
           </p>
         )}
         <p
@@ -791,7 +791,7 @@ function DayPassRow({
             hasQuantity ? "text-primary" : "text-foreground",
           )}
         >
-          ${product.price.toLocaleString()}
+          {formatCurrency(product.price)}
         </p>
       </div>
     </div>

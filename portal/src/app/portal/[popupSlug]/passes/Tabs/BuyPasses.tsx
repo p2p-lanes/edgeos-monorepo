@@ -64,7 +64,7 @@ const BuyPasses = ({
   const isDayCheckout = searchParams.has("day-passes")
   const mainAttendee = attendees.find((a) => a.category === "main")
   const specialProduct = mainAttendee?.products.find(
-    (p) => p.category === "patreon",
+    (p) => p.category === "patreon" && p.is_active !== false,
   )
   const someProductSelected = attendees.some((a) =>
     a.products.some(

@@ -3,7 +3,7 @@
 import type { CancelablePromise } from './core/CancelablePromise';
 import { OpenAPI } from './core/OpenAPI';
 import { request as __request } from './core/request';
-import type { ApiKeysListApiKeysResponse, ApiKeysCreateApiKeyData, ApiKeysCreateApiKeyResponse, ApiKeysRevokeApiKeyData, ApiKeysRevokeApiKeyResponse, ApplicationReviewsListReviewsData, ApplicationReviewsListReviewsResponse, ApplicationReviewsSubmitReviewData, ApplicationReviewsSubmitReviewResponse, ApplicationReviewsGetReviewSummaryData, ApplicationReviewsGetReviewSummaryResponse, ApplicationReviewsListPendingReviewsData, ApplicationReviewsListPendingReviewsResponse, ApplicationReviewsListMyReviewsData, ApplicationReviewsListMyReviewsResponse, ApplicationsListApplicationsData, ApplicationsListApplicationsResponse, ApplicationsCreateApplicationAdminData, ApplicationsCreateApplicationAdminResponse, ApplicationsGetApplicationData, ApplicationsGetApplicationResponse, ApplicationsListMyApplicationsData, ApplicationsListMyApplicationsResponse, ApplicationsListMyTicketsResponse, ApplicationsGetMyParticipationData, ApplicationsGetMyParticipationResponse, ApplicationsGetMyPurchasesData, ApplicationsGetMyPurchasesResponse, ApplicationsGetMyApplicationData, ApplicationsGetMyApplicationResponse, ApplicationsUpdateMyApplicationData, ApplicationsUpdateMyApplicationResponse, ApplicationsCreateMyApplicationData, ApplicationsCreateMyApplicationResponse, ApplicationsListAttendeesDirectoryData, ApplicationsListAttendeesDirectoryResponse, ApplicationsExportAttendeesDirectoryCsvData, ApplicationsExportAttendeesDirectoryCsvResponse, ApplicationsAddMyAttendeeData, ApplicationsAddMyAttendeeResponse, ApplicationsUpdateMyAttendeeData, ApplicationsUpdateMyAttendeeResponse, ApplicationsDeleteMyAttendeeData, ApplicationsDeleteMyAttendeeResponse, ApplicationsReviewScholarshipData, ApplicationsReviewScholarshipResponse, ApprovalStrategiesGetApprovalStrategyData, ApprovalStrategiesGetApprovalStrategyResponse, ApprovalStrategiesCreateOrUpdateApprovalStrategyData, ApprovalStrategiesCreateOrUpdateApprovalStrategyResponse, ApprovalStrategiesUpdateApprovalStrategyData, ApprovalStrategiesUpdateApprovalStrategyResponse, ApprovalStrategiesDeleteApprovalStrategyData, ApprovalStrategiesDeleteApprovalStrategyResponse, AttendeesListAttendeesData, AttendeesListAttendeesResponse, AttendeesGetAttendeeData, AttendeesGetAttendeeResponse, AttendeesUpdateAttendeeData, AttendeesUpdateAttendeeResponse, AttendeesDeleteAttendeeData, AttendeesDeleteAttendeeResponse, AttendeesGetByCheckInCodeData, AttendeesGetByCheckInCodeResponse, AttendeesGetTicketsByEmailData, AttendeesGetTicketsByEmailResponse, AuthUserLoginData, AuthUserLoginResponse, AuthUserAuthenticateData, AuthUserAuthenticateResponse, AuthHumanLoginData, AuthHumanLoginResponse, AuthHumanAuthenticateData, AuthHumanAuthenticateResponse, BaseFieldConfigsListBaseFieldConfigsData, BaseFieldConfigsListBaseFieldConfigsResponse, BaseFieldConfigsUpdateBaseFieldConfigData, BaseFieldConfigsUpdateBaseFieldConfigResponse, CartsListAbandonedCartsData, CartsListAbandonedCartsResponse, CartsGetMyCartData, CartsGetMyCartResponse, CartsUpdateMyCartData, CartsUpdateMyCartResponse, CartsDeleteMyCartData, CartsDeleteMyCartResponse, CouponsListCouponsData, CouponsListCouponsResponse, CouponsCreateCouponData, CouponsCreateCouponResponse, CouponsGetCouponData, CouponsGetCouponResponse, CouponsUpdateCouponData, CouponsUpdateCouponResponse, CouponsDeleteCouponData, CouponsDeleteCouponResponse, CouponsValidateCouponData, CouponsValidateCouponResponse, DashboardGetDashboardStatsData, DashboardGetDashboardStatsResponse, DashboardGetEnrichedDashboardData, DashboardGetEnrichedDashboardResponse, EmailTemplatesListTemplateTypesResponse, EmailTemplatesGetDefaultTemplateData, EmailTemplatesGetDefaultTemplateResponse, EmailTemplatesPreviewTemplateData, EmailTemplatesPreviewTemplateResponse, EmailTemplatesSendTestEmailData, EmailTemplatesSendTestEmailResponse, EmailTemplatesListEmailTemplatesData, EmailTemplatesListEmailTemplatesResponse, EmailTemplatesCreateEmailTemplateData, EmailTemplatesCreateEmailTemplateResponse, EmailTemplatesGetEmailTemplateData, EmailTemplatesGetEmailTemplateResponse, EmailTemplatesUpdateEmailTemplateData, EmailTemplatesUpdateEmailTemplateResponse, EmailTemplatesDeleteEmailTemplateData, EmailTemplatesDeleteEmailTemplateResponse, EventParticipantsListParticipantsData, EventParticipantsListParticipantsResponse, EventParticipantsAdminAddParticipantData, EventParticipantsAdminAddParticipantResponse, EventParticipantsUpdateParticipantData, EventParticipantsUpdateParticipantResponse, EventParticipantsDeleteParticipantData, EventParticipantsDeleteParticipantResponse, EventParticipantsListPortalParticipantsData, EventParticipantsListPortalParticipantsResponse, EventParticipantsRegisterForEventData, EventParticipantsRegisterForEventResponse, EventParticipantsCancelRegistrationData, EventParticipantsCancelRegistrationResponse, EventParticipantsCheckInData, EventParticipantsCheckInResponse, EventsListEventsData, EventsListEventsResponse, EventsCreateEventData, EventsCreateEventResponse, EventsGetEventData, EventsGetEventResponse, EventsUpdateEventData, EventsUpdateEventResponse, EventsDeleteEventData, EventsDeleteEventResponse, EventsCancelEventData, EventsCancelEventResponse, EventsSetRecurrenceData, EventsSetRecurrenceResponse, EventsDetachOccurrenceData, EventsDetachOccurrenceResponse, EventsDeleteOccurrenceData, EventsDeleteOccurrenceResponse, EventsCheckAvailabilityData, EventsCheckAvailabilityResponse, EventsCheckAvailabilityPortalData, EventsCheckAvailabilityPortalResponse, EventsListInvitationsData, EventsListInvitationsResponse, EventsBulkInviteData, EventsBulkInviteResponse, EventsDeleteInvitationData, EventsDeleteInvitationResponse, EventsListPortalInvitationsData, EventsListPortalInvitationsResponse, EventsBulkInvitePortalData, EventsBulkInvitePortalResponse, EventsApproveEventData, EventsApproveEventResponse, EventsRejectEventData, EventsRejectEventResponse, EventsDeletePortalInvitationData, EventsDeletePortalInvitationResponse, EventsExportEventIcsData, EventsExportEventIcsResponse, EventsListPortalEventsData, EventsListPortalEventsResponse, EventsCreatePortalEventData, EventsCreatePortalEventResponse, EventsPortalHiddenEventsCountData, EventsPortalHiddenEventsCountResponse, EventsGetPortalEventData, EventsGetPortalEventResponse, EventsUpdatePortalEventData, EventsUpdatePortalEventResponse, EventsHidePortalEventData, EventsHidePortalEventResponse, EventsUnhidePortalEventData, EventsUnhidePortalEventResponse, EventsExportPortalEventIcsData, EventsExportPortalEventIcsResponse, EventSettingsGetEventSettingsData, EventSettingsGetEventSettingsResponse, EventSettingsUpsertEventSettingsData, EventSettingsUpsertEventSettingsResponse, EventSettingsUpdateEventSettingsData, EventSettingsUpdateEventSettingsResponse, EventSettingsGetPortalEventSettingsData, EventSettingsGetPortalEventSettingsResponse, EventVenuesListVenuesData, EventVenuesListVenuesResponse, EventVenuesCreateVenueData, EventVenuesCreateVenueResponse, EventVenuesGetVenueData, EventVenuesGetVenueResponse, EventVenuesUpdateVenueData, EventVenuesUpdateVenueResponse, EventVenuesDeleteVenueData, EventVenuesDeleteVenueResponse, EventVenuesSetWeeklyHoursData, EventVenuesSetWeeklyHoursResponse, EventVenuesListExceptionsData, EventVenuesListExceptionsResponse, EventVenuesCreateExceptionData, EventVenuesCreateExceptionResponse, EventVenuesUpdateExceptionData, EventVenuesUpdateExceptionResponse, EventVenuesDeleteExceptionData, EventVenuesDeleteExceptionResponse, EventVenuesListPhotosData, EventVenuesListPhotosResponse, EventVenuesAddPhotoData, EventVenuesAddPhotoResponse, EventVenuesUpdatePhotoData, EventVenuesUpdatePhotoResponse, EventVenuesDeletePhotoData, EventVenuesDeletePhotoResponse, EventVenuesGetAvailabilityData, EventVenuesGetAvailabilityResponse, EventVenuesGetPortalAvailabilityData, EventVenuesGetPortalAvailabilityResponse, EventVenuesListPortalVenuesData, EventVenuesListPortalVenuesResponse, EventVenuesCreatePortalVenueData, EventVenuesCreatePortalVenueResponse, EventVenuesUpdatePortalVenueData, EventVenuesUpdatePortalVenueResponse, FormFieldsListFormFieldsData, FormFieldsListFormFieldsResponse, FormFieldsCreateFormFieldData, FormFieldsCreateFormFieldResponse, FormFieldsListAvailableBaseFieldsData, FormFieldsListAvailableBaseFieldsResponse, FormFieldsCreateBaseFieldConfigData, FormFieldsCreateBaseFieldConfigResponse, FormFieldsGetFormFieldData, FormFieldsGetFormFieldResponse, FormFieldsUpdateFormFieldData, FormFieldsUpdateFormFieldResponse, FormFieldsDeleteFormFieldData, FormFieldsDeleteFormFieldResponse, FormFieldsGetApplicationSchemaData, FormFieldsGetApplicationSchemaResponse, FormFieldsGetPortalApplicationSchemaData, FormFieldsGetPortalApplicationSchemaResponse, FormSectionsListFormSectionsData, FormSectionsListFormSectionsResponse, FormSectionsCreateFormSectionData, FormSectionsCreateFormSectionResponse, FormSectionsGetFormSectionData, FormSectionsGetFormSectionResponse, FormSectionsUpdateFormSectionData, FormSectionsUpdateFormSectionResponse, FormSectionsDeleteFormSectionData, FormSectionsDeleteFormSectionResponse, GroupsListGroupsData, GroupsListGroupsResponse, GroupsCreateGroupData, GroupsCreateGroupResponse, GroupsGetGroupData, GroupsGetGroupResponse, GroupsUpdateGroupData, GroupsUpdateGroupResponse, GroupsDeleteGroupData, GroupsDeleteGroupResponse, GroupsListMyGroupsData, GroupsListMyGroupsResponse, GroupsGetMyGroupData, GroupsGetMyGroupResponse, GroupsUpdateMyGroupData, GroupsUpdateMyGroupResponse, GroupsAddGroupMemberData, GroupsAddGroupMemberResponse, GroupsAddGroupMembersBatchData, GroupsAddGroupMembersBatchResponse, GroupsUpdateGroupMemberData, GroupsUpdateGroupMemberResponse, GroupsRemoveGroupMemberData, GroupsRemoveGroupMemberResponse, GroupsGetGroupPublicData, GroupsGetGroupPublicResponse, HumansListHumansData, HumansListHumansResponse, HumansCreateHumanData, HumansCreateHumanResponse, HumansGetCurrentHumanInfoResponse, HumansUpdateCurrentHumanData, HumansUpdateCurrentHumanResponse, HumansGetHumanData, HumansGetHumanResponse, HumansUpdateHumanData, HumansUpdateHumanResponse, PaymentsListPaymentsData, PaymentsListPaymentsResponse, PaymentsGetPaymentData, PaymentsGetPaymentResponse, PaymentsUpdatePaymentData, PaymentsUpdatePaymentResponse, PaymentsGetPaymentInvoiceData, PaymentsGetPaymentInvoiceResponse, PaymentsCreateMyApplicationFeeData, PaymentsCreateMyApplicationFeeResponse, PaymentsGetMyLatestPaymentData, PaymentsGetMyLatestPaymentResponse, PaymentsGetMyPaymentStatusData, PaymentsGetMyPaymentStatusResponse, PaymentsListMyPaymentsData, PaymentsListMyPaymentsResponse, PaymentsGetMyInvoiceData, PaymentsGetMyInvoiceResponse, PaymentsPreviewMyPaymentData, PaymentsPreviewMyPaymentResponse, PaymentsCreateMyPaymentData, PaymentsCreateMyPaymentResponse, PaymentsCreateDirectPaymentData, PaymentsCreateDirectPaymentResponse, PaymentsSimplefiWebhookResponse, PopupReviewersListReviewersData, PopupReviewersListReviewersResponse, PopupReviewersAddReviewerData, PopupReviewersAddReviewerResponse, PopupReviewersUpdateReviewerData, PopupReviewersUpdateReviewerResponse, PopupReviewersRemoveReviewerData, PopupReviewersRemoveReviewerResponse, PopupsListPopupsData, PopupsListPopupsResponse, PopupsCreatePopupData, PopupsCreatePopupResponse, PopupsListPublicPopupsData, PopupsListPublicPopupsResponse, PopupsGetPopupData, PopupsGetPopupResponse, PopupsUpdatePopupData, PopupsUpdatePopupResponse, PopupsDeletePopupData, PopupsDeletePopupResponse, PopupsListPortalPopupsData, PopupsListPortalPopupsResponse, PopupsGetPortalPopupData, PopupsGetPortalPopupResponse, ProductsListProductCategoriesData, ProductsListProductCategoriesResponse, ProductsListProductsData, ProductsListProductsResponse, ProductsCreateProductData, ProductsCreateProductResponse, ProductsCreateProductsBatchData, ProductsCreateProductsBatchResponse, ProductsGetProductData, ProductsGetProductResponse, ProductsUpdateProductData, ProductsUpdateProductResponse, ProductsDeleteProductData, ProductsDeleteProductResponse, ProductsListPortalProductsData, ProductsListPortalProductsResponse, TenantsGetTenantByDomainData, TenantsGetTenantByDomainResponse, TenantsGetTenantBySlugData, TenantsGetTenantBySlugResponse, TenantsListTenantsData, TenantsListTenantsResponse, TenantsCreateTenantData, TenantsCreateTenantResponse, TenantsGetTenantData, TenantsGetTenantResponse, TenantsUpdateTenantData, TenantsUpdateTenantResponse, TenantsDeleteTenantData, TenantsDeleteTenantResponse, TenantsGetCredentialsData, TenantsGetCredentialsResponse, TenantsDeleteCredentialsData, TenantsDeleteCredentialsResponse, TicketingStepsListPortalTicketingStepsData, TicketingStepsListPortalTicketingStepsResponse, TicketingStepsListTicketingStepsData, TicketingStepsListTicketingStepsResponse, TicketingStepsCreateTicketingStepData, TicketingStepsCreateTicketingStepResponse, TicketingStepsGetTicketingStepData, TicketingStepsGetTicketingStepResponse, TicketingStepsUpdateTicketingStepData, TicketingStepsUpdateTicketingStepResponse, TicketingStepsDeleteTicketingStepData, TicketingStepsDeleteTicketingStepResponse, TicketTierGroupsCreateTierGroupData, TicketTierGroupsCreateTierGroupResponse, TicketTierGroupsListTierGroupsData, TicketTierGroupsListTierGroupsResponse, TicketTierGroupsGetTierGroupData, TicketTierGroupsGetTierGroupResponse, TicketTierGroupsUpdateTierGroupData, TicketTierGroupsUpdateTierGroupResponse, TicketTierGroupsDeleteTierGroupData, TicketTierGroupsDeleteTierGroupResponse, TicketTierGroupsCreateTierPhaseData, TicketTierGroupsCreateTierPhaseResponse, TicketTierGroupsUpdateTierPhaseData, TicketTierGroupsUpdateTierPhaseResponse, TicketTierGroupsDeleteTierPhaseData, TicketTierGroupsDeleteTierPhaseResponse, TracksListTracksData, TracksListTracksResponse, TracksCreateTrackData, TracksCreateTrackResponse, TracksGetTrackData, TracksGetTrackResponse, TracksUpdateTrackData, TracksUpdateTrackResponse, TracksDeleteTrackData, TracksDeleteTrackResponse, TracksListTrackEventsData, TracksListTrackEventsResponse, TracksListPortalTracksData, TracksListPortalTracksResponse, TracksGetPortalTrackData, TracksGetPortalTrackResponse, TracksListPortalTrackEventsData, TracksListPortalTrackEventsResponse, TranslationsListTranslationsData, TranslationsListTranslationsResponse, TranslationsUpsertTranslationData, TranslationsUpsertTranslationResponse, TranslationsAiTranslateData, TranslationsAiTranslateResponse, TranslationsDeleteTranslationData, TranslationsDeleteTranslationResponse, UploadsGetPresignedUploadUrlData, UploadsGetPresignedUploadUrlResponse, UploadsGetPresignedUploadUrlPortalData, UploadsGetPresignedUploadUrlPortalResponse, UsersListUsersData, UsersListUsersResponse, UsersCreateUserData, UsersCreateUserResponse, UsersGetCurrentUserInfoResponse, UsersGetUserData, UsersGetUserResponse, UsersUpdateUserData, UsersUpdateUserResponse, UsersDeleteUserData, UsersDeleteUserResponse, UtilsResolveUrlData, UtilsResolveUrlResponse, VenuePropertyTypesListPropertyTypesData, VenuePropertyTypesListPropertyTypesResponse, VenuePropertyTypesCreatePropertyTypeData, VenuePropertyTypesCreatePropertyTypeResponse, VenuePropertyTypesUpdatePropertyTypeData, VenuePropertyTypesUpdatePropertyTypeResponse, VenuePropertyTypesDeletePropertyTypeData, VenuePropertyTypesDeletePropertyTypeResponse, VenuePropertyTypesListPropertyTypesPortalResponse } from './types.gen';
+import type { ApiKeysListApiKeysResponse, ApiKeysCreateApiKeyData, ApiKeysCreateApiKeyResponse, ApiKeysRevokeApiKeyData, ApiKeysRevokeApiKeyResponse, ApplicationReviewsListReviewsData, ApplicationReviewsListReviewsResponse, ApplicationReviewsSubmitReviewData, ApplicationReviewsSubmitReviewResponse, ApplicationReviewsGetReviewSummaryData, ApplicationReviewsGetReviewSummaryResponse, ApplicationReviewsListPendingReviewsData, ApplicationReviewsListPendingReviewsResponse, ApplicationReviewsListMyReviewsData, ApplicationReviewsListMyReviewsResponse, ApplicationsListApplicationsData, ApplicationsListApplicationsResponse, ApplicationsCreateApplicationAdminData, ApplicationsCreateApplicationAdminResponse, ApplicationsGetApplicationData, ApplicationsGetApplicationResponse, ApplicationsListMyApplicationsData, ApplicationsListMyApplicationsResponse, ApplicationsListMyTicketsResponse, ApplicationsGetMyParticipationData, ApplicationsGetMyParticipationResponse, ApplicationsGetMyPurchasesData, ApplicationsGetMyPurchasesResponse, ApplicationsGetMyApplicationData, ApplicationsGetMyApplicationResponse, ApplicationsUpdateMyApplicationData, ApplicationsUpdateMyApplicationResponse, ApplicationsCreateMyApplicationData, ApplicationsCreateMyApplicationResponse, ApplicationsListAttendeesDirectoryData, ApplicationsListAttendeesDirectoryResponse, ApplicationsExportAttendeesDirectoryCsvData, ApplicationsExportAttendeesDirectoryCsvResponse, ApplicationsAddMyAttendeeData, ApplicationsAddMyAttendeeResponse, ApplicationsUpdateMyAttendeeData, ApplicationsUpdateMyAttendeeResponse, ApplicationsDeleteMyAttendeeData, ApplicationsDeleteMyAttendeeResponse, ApplicationsReviewScholarshipData, ApplicationsReviewScholarshipResponse, ApprovalStrategiesGetApprovalStrategyData, ApprovalStrategiesGetApprovalStrategyResponse, ApprovalStrategiesCreateOrUpdateApprovalStrategyData, ApprovalStrategiesCreateOrUpdateApprovalStrategyResponse, ApprovalStrategiesUpdateApprovalStrategyData, ApprovalStrategiesUpdateApprovalStrategyResponse, ApprovalStrategiesDeleteApprovalStrategyData, ApprovalStrategiesDeleteApprovalStrategyResponse, AttendeesListMyAttendeesByPopupData, AttendeesListMyAttendeesByPopupResponse, AttendeesCreateMyAttendeeForPopupData, AttendeesCreateMyAttendeeForPopupResponse, AttendeesUpdateMyAttendeeForPopupData, AttendeesUpdateMyAttendeeForPopupResponse, AttendeesDeleteMyAttendeeForPopupData, AttendeesDeleteMyAttendeeForPopupResponse, AttendeesListAttendeesData, AttendeesListAttendeesResponse, AttendeesGetAttendeeData, AttendeesGetAttendeeResponse, AttendeesUpdateAttendeeData, AttendeesUpdateAttendeeResponse, AttendeesDeleteAttendeeData, AttendeesDeleteAttendeeResponse, AttendeesGetByCheckInCodeData, AttendeesGetByCheckInCodeResponse, AttendeesGetTicketsByEmailData, AttendeesGetTicketsByEmailResponse, AuthUserLoginData, AuthUserLoginResponse, AuthUserAuthenticateData, AuthUserAuthenticateResponse, AuthHumanLoginData, AuthHumanLoginResponse, AuthHumanAuthenticateData, AuthHumanAuthenticateResponse, BaseFieldConfigsListBaseFieldConfigsData, BaseFieldConfigsListBaseFieldConfigsResponse, BaseFieldConfigsUpdateBaseFieldConfigData, BaseFieldConfigsUpdateBaseFieldConfigResponse, CartsListAbandonedCartsData, CartsListAbandonedCartsResponse, CartsGetMyCartData, CartsGetMyCartResponse, CartsUpdateMyCartData, CartsUpdateMyCartResponse, CartsDeleteMyCartData, CartsDeleteMyCartResponse, CheckoutGetRuntimeData, CheckoutGetRuntimeResponse, CheckoutPurchaseOpenTicketingData, CheckoutPurchaseOpenTicketingResponse, CouponsValidateCouponPublicData, CouponsValidateCouponPublicResponse, CouponsListCouponsData, CouponsListCouponsResponse, CouponsCreateCouponData, CouponsCreateCouponResponse, CouponsGetCouponData, CouponsGetCouponResponse, CouponsUpdateCouponData, CouponsUpdateCouponResponse, CouponsDeleteCouponData, CouponsDeleteCouponResponse, CouponsValidateCouponData, CouponsValidateCouponResponse, DashboardGetDashboardStatsData, DashboardGetDashboardStatsResponse, DashboardGetEnrichedDashboardData, DashboardGetEnrichedDashboardResponse, EmailTemplatesListTemplateTypesResponse, EmailTemplatesGetDefaultTemplateData, EmailTemplatesGetDefaultTemplateResponse, EmailTemplatesPreviewTemplateData, EmailTemplatesPreviewTemplateResponse, EmailTemplatesSendTestEmailData, EmailTemplatesSendTestEmailResponse, EmailTemplatesListEmailTemplatesData, EmailTemplatesListEmailTemplatesResponse, EmailTemplatesCreateEmailTemplateData, EmailTemplatesCreateEmailTemplateResponse, EmailTemplatesGetEmailTemplateData, EmailTemplatesGetEmailTemplateResponse, EmailTemplatesUpdateEmailTemplateData, EmailTemplatesUpdateEmailTemplateResponse, EmailTemplatesDeleteEmailTemplateData, EmailTemplatesDeleteEmailTemplateResponse, EventParticipantsListParticipantsData, EventParticipantsListParticipantsResponse, EventParticipantsAdminAddParticipantData, EventParticipantsAdminAddParticipantResponse, EventParticipantsUpdateParticipantData, EventParticipantsUpdateParticipantResponse, EventParticipantsDeleteParticipantData, EventParticipantsDeleteParticipantResponse, EventParticipantsListPortalParticipantsData, EventParticipantsListPortalParticipantsResponse, EventParticipantsRegisterForEventData, EventParticipantsRegisterForEventResponse, EventParticipantsCancelRegistrationData, EventParticipantsCancelRegistrationResponse, EventParticipantsCheckInData, EventParticipantsCheckInResponse, EventsListEventsData, EventsListEventsResponse, EventsCreateEventData, EventsCreateEventResponse, EventsGetEventData, EventsGetEventResponse, EventsUpdateEventData, EventsUpdateEventResponse, EventsDeleteEventData, EventsDeleteEventResponse, EventsCancelEventData, EventsCancelEventResponse, EventsSetRecurrenceData, EventsSetRecurrenceResponse, EventsDetachOccurrenceData, EventsDetachOccurrenceResponse, EventsDeleteOccurrenceData, EventsDeleteOccurrenceResponse, EventsCheckAvailabilityData, EventsCheckAvailabilityResponse, EventsCheckAvailabilityPortalData, EventsCheckAvailabilityPortalResponse, EventsListInvitationsData, EventsListInvitationsResponse, EventsBulkInviteData, EventsBulkInviteResponse, EventsDeleteInvitationData, EventsDeleteInvitationResponse, EventsListPortalInvitationsData, EventsListPortalInvitationsResponse, EventsBulkInvitePortalData, EventsBulkInvitePortalResponse, EventsApproveEventData, EventsApproveEventResponse, EventsRejectEventData, EventsRejectEventResponse, EventsDeletePortalInvitationData, EventsDeletePortalInvitationResponse, EventsExportEventIcsData, EventsExportEventIcsResponse, EventsListPortalEventsData, EventsListPortalEventsResponse, EventsCreatePortalEventData, EventsCreatePortalEventResponse, EventsPortalHiddenEventsCountData, EventsPortalHiddenEventsCountResponse, EventsGetPortalEventData, EventsGetPortalEventResponse, EventsUpdatePortalEventData, EventsUpdatePortalEventResponse, EventsHidePortalEventData, EventsHidePortalEventResponse, EventsUnhidePortalEventData, EventsUnhidePortalEventResponse, EventsExportPortalEventIcsData, EventsExportPortalEventIcsResponse, EventSettingsGetEventSettingsData, EventSettingsGetEventSettingsResponse, EventSettingsUpsertEventSettingsData, EventSettingsUpsertEventSettingsResponse, EventSettingsUpdateEventSettingsData, EventSettingsUpdateEventSettingsResponse, EventSettingsGetPortalEventSettingsData, EventSettingsGetPortalEventSettingsResponse, EventVenuesListVenuesData, EventVenuesListVenuesResponse, EventVenuesCreateVenueData, EventVenuesCreateVenueResponse, EventVenuesGetVenueData, EventVenuesGetVenueResponse, EventVenuesUpdateVenueData, EventVenuesUpdateVenueResponse, EventVenuesDeleteVenueData, EventVenuesDeleteVenueResponse, EventVenuesSetWeeklyHoursData, EventVenuesSetWeeklyHoursResponse, EventVenuesListExceptionsData, EventVenuesListExceptionsResponse, EventVenuesCreateExceptionData, EventVenuesCreateExceptionResponse, EventVenuesUpdateExceptionData, EventVenuesUpdateExceptionResponse, EventVenuesDeleteExceptionData, EventVenuesDeleteExceptionResponse, EventVenuesListPhotosData, EventVenuesListPhotosResponse, EventVenuesAddPhotoData, EventVenuesAddPhotoResponse, EventVenuesUpdatePhotoData, EventVenuesUpdatePhotoResponse, EventVenuesDeletePhotoData, EventVenuesDeletePhotoResponse, EventVenuesGetAvailabilityData, EventVenuesGetAvailabilityResponse, EventVenuesGetPortalAvailabilityData, EventVenuesGetPortalAvailabilityResponse, EventVenuesListPortalVenuesData, EventVenuesListPortalVenuesResponse, EventVenuesCreatePortalVenueData, EventVenuesCreatePortalVenueResponse, EventVenuesUpdatePortalVenueData, EventVenuesUpdatePortalVenueResponse, FormFieldsListFormFieldsData, FormFieldsListFormFieldsResponse, FormFieldsCreateFormFieldData, FormFieldsCreateFormFieldResponse, FormFieldsListAvailableBaseFieldsData, FormFieldsListAvailableBaseFieldsResponse, FormFieldsCreateBaseFieldConfigData, FormFieldsCreateBaseFieldConfigResponse, FormFieldsGetFormFieldData, FormFieldsGetFormFieldResponse, FormFieldsUpdateFormFieldData, FormFieldsUpdateFormFieldResponse, FormFieldsDeleteFormFieldData, FormFieldsDeleteFormFieldResponse, FormFieldsGetApplicationSchemaData, FormFieldsGetApplicationSchemaResponse, FormFieldsGetPortalApplicationSchemaData, FormFieldsGetPortalApplicationSchemaResponse, FormSectionsListFormSectionsData, FormSectionsListFormSectionsResponse, FormSectionsCreateFormSectionData, FormSectionsCreateFormSectionResponse, FormSectionsGetFormSectionData, FormSectionsGetFormSectionResponse, FormSectionsUpdateFormSectionData, FormSectionsUpdateFormSectionResponse, FormSectionsDeleteFormSectionData, FormSectionsDeleteFormSectionResponse, GroupsListGroupsData, GroupsListGroupsResponse, GroupsCreateGroupData, GroupsCreateGroupResponse, GroupsGetGroupData, GroupsGetGroupResponse, GroupsUpdateGroupData, GroupsUpdateGroupResponse, GroupsDeleteGroupData, GroupsDeleteGroupResponse, GroupsListMyGroupsData, GroupsListMyGroupsResponse, GroupsGetMyGroupData, GroupsGetMyGroupResponse, GroupsUpdateMyGroupData, GroupsUpdateMyGroupResponse, GroupsAddGroupMemberData, GroupsAddGroupMemberResponse, GroupsAddGroupMembersBatchData, GroupsAddGroupMembersBatchResponse, GroupsUpdateGroupMemberData, GroupsUpdateGroupMemberResponse, GroupsRemoveGroupMemberData, GroupsRemoveGroupMemberResponse, GroupsGetGroupPublicData, GroupsGetGroupPublicResponse, HumansListHumansData, HumansListHumansResponse, HumansCreateHumanData, HumansCreateHumanResponse, HumansGetCurrentHumanInfoResponse, HumansUpdateCurrentHumanData, HumansUpdateCurrentHumanResponse, HumansGetHumanData, HumansGetHumanResponse, HumansUpdateHumanData, HumansUpdateHumanResponse, PaymentsListPaymentsData, PaymentsListPaymentsResponse, PaymentsGetPaymentData, PaymentsGetPaymentResponse, PaymentsUpdatePaymentData, PaymentsUpdatePaymentResponse, PaymentsGetPaymentInvoiceData, PaymentsGetPaymentInvoiceResponse, PaymentsCreateMyApplicationFeeData, PaymentsCreateMyApplicationFeeResponse, PaymentsListMyPaymentsByPopupData, PaymentsListMyPaymentsByPopupResponse, PaymentsGetMyLatestPaymentData, PaymentsGetMyLatestPaymentResponse, PaymentsGetMyPaymentStatusData, PaymentsGetMyPaymentStatusResponse, PaymentsListMyPaymentsData, PaymentsListMyPaymentsResponse, PaymentsGetMyInvoiceData, PaymentsGetMyInvoiceResponse, PaymentsPreviewMyPaymentData, PaymentsPreviewMyPaymentResponse, PaymentsCreateMyPaymentData, PaymentsCreateMyPaymentResponse, PaymentsSimplefiWebhookResponse, PopupReviewersListReviewersData, PopupReviewersListReviewersResponse, PopupReviewersAddReviewerData, PopupReviewersAddReviewerResponse, PopupReviewersUpdateReviewerData, PopupReviewersUpdateReviewerResponse, PopupReviewersRemoveReviewerData, PopupReviewersRemoveReviewerResponse, PopupsListPopupsData, PopupsListPopupsResponse, PopupsCreatePopupData, PopupsCreatePopupResponse, PopupsListPublicPopupsData, PopupsListPublicPopupsResponse, PopupsGetPopupData, PopupsGetPopupResponse, PopupsUpdatePopupData, PopupsUpdatePopupResponse, PopupsDeletePopupData, PopupsDeletePopupResponse, PopupsListPortalPopupsData, PopupsListPortalPopupsResponse, PopupsGetPortalPopupData, PopupsGetPortalPopupResponse, PortalGetPopupAccessData, PortalGetPopupAccessResponse, ProductsListProductCategoriesData, ProductsListProductCategoriesResponse, ProductsListProductsData, ProductsListProductsResponse, ProductsCreateProductData, ProductsCreateProductResponse, ProductsCreateProductsBatchData, ProductsCreateProductsBatchResponse, ProductsGetProductData, ProductsGetProductResponse, ProductsUpdateProductData, ProductsUpdateProductResponse, ProductsDeleteProductData, ProductsDeleteProductResponse, ProductsListPortalProductsData, ProductsListPortalProductsResponse, TenantsGetTenantByDomainData, TenantsGetTenantByDomainResponse, TenantsGetTenantBySlugData, TenantsGetTenantBySlugResponse, TenantsListTenantsData, TenantsListTenantsResponse, TenantsCreateTenantData, TenantsCreateTenantResponse, TenantsGetTenantData, TenantsGetTenantResponse, TenantsUpdateTenantData, TenantsUpdateTenantResponse, TenantsDeleteTenantData, TenantsDeleteTenantResponse, TenantsGetCredentialsData, TenantsGetCredentialsResponse, TenantsDeleteCredentialsData, TenantsDeleteCredentialsResponse, TicketingStepsListPortalTicketingStepsData, TicketingStepsListPortalTicketingStepsResponse, TicketingStepsListTicketingStepsData, TicketingStepsListTicketingStepsResponse, TicketingStepsCreateTicketingStepData, TicketingStepsCreateTicketingStepResponse, TicketingStepsGetTicketingStepData, TicketingStepsGetTicketingStepResponse, TicketingStepsUpdateTicketingStepData, TicketingStepsUpdateTicketingStepResponse, TicketingStepsDeleteTicketingStepData, TicketingStepsDeleteTicketingStepResponse, TicketTierGroupsCreateTierGroupData, TicketTierGroupsCreateTierGroupResponse, TicketTierGroupsListTierGroupsData, TicketTierGroupsListTierGroupsResponse, TicketTierGroupsGetTierGroupData, TicketTierGroupsGetTierGroupResponse, TicketTierGroupsUpdateTierGroupData, TicketTierGroupsUpdateTierGroupResponse, TicketTierGroupsDeleteTierGroupData, TicketTierGroupsDeleteTierGroupResponse, TicketTierGroupsCreateTierPhaseData, TicketTierGroupsCreateTierPhaseResponse, TicketTierGroupsUpdateTierPhaseData, TicketTierGroupsUpdateTierPhaseResponse, TicketTierGroupsDeleteTierPhaseData, TicketTierGroupsDeleteTierPhaseResponse, TracksListTracksData, TracksListTracksResponse, TracksCreateTrackData, TracksCreateTrackResponse, TracksGetTrackData, TracksGetTrackResponse, TracksUpdateTrackData, TracksUpdateTrackResponse, TracksDeleteTrackData, TracksDeleteTrackResponse, TracksListTrackEventsData, TracksListTrackEventsResponse, TracksListPortalTracksData, TracksListPortalTracksResponse, TracksGetPortalTrackData, TracksGetPortalTrackResponse, TracksListPortalTrackEventsData, TracksListPortalTrackEventsResponse, TranslationsListTranslationsData, TranslationsListTranslationsResponse, TranslationsUpsertTranslationData, TranslationsUpsertTranslationResponse, TranslationsAiTranslateData, TranslationsAiTranslateResponse, TranslationsDeleteTranslationData, TranslationsDeleteTranslationResponse, UploadsGetPresignedUploadUrlData, UploadsGetPresignedUploadUrlResponse, UploadsGetPresignedUploadUrlPortalData, UploadsGetPresignedUploadUrlPortalResponse, UsersListUsersData, UsersListUsersResponse, UsersCreateUserData, UsersCreateUserResponse, UsersGetCurrentUserInfoResponse, UsersGetUserData, UsersGetUserResponse, UsersUpdateUserData, UsersUpdateUserResponse, UsersDeleteUserData, UsersDeleteUserResponse, UtilsResolveUrlData, UtilsResolveUrlResponse, VenuePropertyTypesListPropertyTypesData, VenuePropertyTypesListPropertyTypesResponse, VenuePropertyTypesCreatePropertyTypeData, VenuePropertyTypesCreatePropertyTypeResponse, VenuePropertyTypesUpdatePropertyTypeData, VenuePropertyTypesUpdatePropertyTypeResponse, VenuePropertyTypesDeletePropertyTypeData, VenuePropertyTypesDeletePropertyTypeResponse, VenuePropertyTypesListPropertyTypesPortalResponse } from './types.gen';
 
 export class ApiKeysService {
     /**
@@ -727,6 +727,127 @@ export class ApprovalStrategiesService {
 
 export class AttendeesService {
     /**
+     * List My Attendees By Popup
+     * List all attendees owned by the current Human for a specific popup.
+     *
+     * Returns both application-linked and direct-sale attendees, each with an
+     * `origin` discriminator. Empty result is valid (not 404).
+     * Requires OTP-authenticated Human token.
+     * @param data The data for the request.
+     * @param data.popupId
+     * @param data.skip Number of items to skip
+     * @param data.limit Max attendees to return
+     * @returns ListModel_AttendeeWithOriginPublic_ Successful Response
+     * @throws ApiError
+     */
+    public static listMyAttendeesByPopup(data: AttendeesListMyAttendeesByPopupData): CancelablePromise<AttendeesListMyAttendeesByPopupResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/attendees/my/popup/{popup_id}',
+            path: {
+                popup_id: data.popupId
+            },
+            query: {
+                skip: data.skip,
+                limit: data.limit
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Create My Attendee For Popup
+     * Create a companion attendee (spouse/child) for the current Human's application.
+     *
+     * Requires:
+     * - Application popup (sale_type check enforced as defense-in-depth)
+     * - Valid accepted Application for (current_human, popup_id)
+     *
+     * Returns 422 with code='application_required' if no application exists or the
+     * popup is not an application popup.
+     * @param data The data for the request.
+     * @param data.popupId
+     * @param data.requestBody
+     * @returns AttendeeWithOriginPublic Successful Response
+     * @throws ApiError
+     */
+    public static createMyAttendeeForPopup(data: AttendeesCreateMyAttendeeForPopupData): CancelablePromise<AttendeesCreateMyAttendeeForPopupResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/attendees/my/popup/{popup_id}',
+            path: {
+                popup_id: data.popupId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Update My Attendee For Popup
+     * Update a companion attendee using the dual-path auth predicate.
+     *
+     * Authorization: attendee.popup_id == popup_id AND (
+     * attendee.human_id == current_human.id
+     * OR attendee.application.human_id == current_human.id
+     * ).
+     * Returns 404 if attendee not found, popup_id mismatch, or predicate fails
+     * (do not expose existence to unauthorized callers).
+     * @param data The data for the request.
+     * @param data.popupId
+     * @param data.attendeeId
+     * @param data.requestBody
+     * @returns AttendeeWithOriginPublic Successful Response
+     * @throws ApiError
+     */
+    public static updateMyAttendeeForPopup(data: AttendeesUpdateMyAttendeeForPopupData): CancelablePromise<AttendeesUpdateMyAttendeeForPopupResponse> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/api/v1/attendees/my/popup/{popup_id}/{attendee_id}',
+            path: {
+                popup_id: data.popupId,
+                attendee_id: data.attendeeId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Delete My Attendee For Popup
+     * Delete a companion attendee using the dual-path auth predicate.
+     *
+     * Returns 404 if attendee not found or predicate fails.
+     * Returns 400 with code='attendee_has_products' if attendee has purchased products.
+     * @param data The data for the request.
+     * @param data.popupId
+     * @param data.attendeeId
+     * @returns unknown Successful Response
+     * @throws ApiError
+     */
+    public static deleteMyAttendeeForPopup(data: AttendeesDeleteMyAttendeeForPopupData): CancelablePromise<AttendeesDeleteMyAttendeeForPopupResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/v1/attendees/my/popup/{popup_id}/{attendee_id}',
+            path: {
+                popup_id: data.popupId,
+                attendee_id: data.attendeeId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
      * List Attendees
      * List attendees with optional filters (BO only).
      * @param data The data for the request.
@@ -1123,7 +1244,81 @@ export class CartsService {
     }
 }
 
+export class CheckoutService {
+    /**
+     * Get Runtime
+     * Return popup metadata, products, buyer form, and ticketing steps for anonymous checkout.
+     *
+     * Fully public endpoint (no JWT). Only serves sale_type=direct active popups.
+     * Rate-limited 120/min/IP.
+     * @param data The data for the request.
+     * @param data.slug
+     * @returns CheckoutRuntimeResponse Successful Response
+     * @throws ApiError
+     */
+    public static getRuntime(data: CheckoutGetRuntimeData): CancelablePromise<CheckoutGetRuntimeResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/checkout/{slug}/runtime',
+            path: {
+                slug: data.slug
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Purchase Open Ticketing
+     * Create an anonymous open-ticketing payment and return provider checkout data.
+     * @param data The data for the request.
+     * @param data.slug
+     * @param data.requestBody
+     * @returns OpenTicketingPurchaseResponse Successful Response
+     * @throws ApiError
+     */
+    public static purchaseOpenTicketing(data: CheckoutPurchaseOpenTicketingData): CancelablePromise<CheckoutPurchaseOpenTicketingResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/checkout/{slug}/purchase',
+            path: {
+                slug: data.slug
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+}
+
 export class CouponsService {
+    /**
+     * Validate Coupon Public
+     * Validate a coupon code for an anonymous open-ticketing checkout (no JWT required).
+     *
+     * Returns coupon details on success. Returns 400 with uniform message for
+     * any invalid/expired/unknown state. Returns 403 if popup is not direct-sale.
+     * Rate-limited 30/min/IP.
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns CouponValidatePublicResponse Successful Response
+     * @throws ApiError
+     */
+    public static validateCouponPublic(data: CouponsValidateCouponPublicData): CancelablePromise<CouponsValidateCouponPublicResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/coupons/validate-public',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
     /**
      * List Coupons
      * List all coupons with optional filters (BO only).
@@ -3936,6 +4131,8 @@ export class PaymentsService {
      * @param data.externalId
      * @param data.paymentStatus
      * @param data.search
+     * @param data.sortBy
+     * @param data.sortOrder
      * @param data.skip Number of items to skip
      * @param data.limit Maximum number of items to return
      * @param data.xTenantId
@@ -3955,6 +4152,8 @@ export class PaymentsService {
                 external_id: data.externalId,
                 payment_status: data.paymentStatus,
                 search: data.search,
+                sort_by: data.sortBy,
+                sort_order: data.sortOrder,
                 skip: data.skip,
                 limit: data.limit
             },
@@ -4061,6 +4260,39 @@ export class PaymentsService {
             url: '/api/v1/payments/my/application-fee',
             body: data.requestBody,
             mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * List My Payments By Popup
+     * List all payments owned by the current Human for a specific popup (Portal).
+     *
+     * Ownership is resolved via dual-path predicate:
+     * - Application leg: payment.application.human_id == current_human.id
+     * - Direct-sale leg: payment_products.attendee.human_id == current_human.id
+     *
+     * Requires OTP-authenticated Human token. Empty result is valid (not 404).
+     * @param data The data for the request.
+     * @param data.popupId
+     * @param data.skip Number of payments to skip
+     * @param data.limit Max payments to return (max 100)
+     * @returns ListModel_PaymentPublic_ Successful Response
+     * @throws ApiError
+     */
+    public static listMyPaymentsByPopup(data: PaymentsListMyPaymentsByPopupData): CancelablePromise<PaymentsListMyPaymentsByPopupResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/payments/my/popup/{popup_id}',
+            path: {
+                popup_id: data.popupId
+            },
+            query: {
+                skip: data.skip,
+                limit: data.limit
+            },
             errors: {
                 422: 'Validation Error'
             }
@@ -4198,30 +4430,6 @@ export class PaymentsService {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/api/v1/payments/my',
-            body: data.requestBody,
-            mediaType: 'application/json',
-            errors: {
-                422: 'Validation Error'
-            }
-        });
-    }
-    
-    /**
-     * Create Direct Payment
-     * Create a direct-sale payment for the current human (Portal).
-     *
-     * Used for popups with sale_type="direct". No application required. The
-     * server resolves the Attendee from CurrentHuman automatically and creates
-     * a SimpleFI payment request (or auto-approves if the total is zero).
-     * @param data The data for the request.
-     * @param data.requestBody
-     * @returns PaymentPublic Successful Response
-     * @throws ApiError
-     */
-    public static createDirectPayment(data: PaymentsCreateDirectPaymentData): CancelablePromise<PaymentsCreateDirectPaymentResponse> {
-        return __request(OpenAPI, {
-            method: 'POST',
-            url: '/api/v1/payments/direct',
             body: data.requestBody,
             mediaType: 'application/json',
             errors: {
@@ -4552,6 +4760,158 @@ export class PopupsService {
             },
             headers: {
                 'Accept-Language': data.acceptLanguage
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+}
+
+export class PortalService {
+    /**
+     * Get Popup Access
+     * Resolve access for the authenticated Human to a specific popup.
+     *
+     * Runs the 7-step access ladder and returns a structured tristate response:
+     * - allowed: bool
+     * - source: which ladder step granted access (application/attendee/payment/companion)
+     * - application_status: the application's status when an application exists
+     * - reason: denial reason (no_access/application_pending/application_rejected)
+     *
+     * Requires OTP-authenticated Human token. Always returns 200 (never 404).
+     * @param data The data for the request.
+     * @param data.popupId
+     * @returns PopupAccessResponse Successful Response
+     * @throws ApiError
+     */
+    public static getPopupAccess(data: PortalGetPopupAccessData): CancelablePromise<PortalGetPopupAccessResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/portal/popup/{popup_id}/access',
+            path: {
+                popup_id: data.popupId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * List My Attendees By Popup
+     * List all attendees owned by the current Human for a specific popup.
+     *
+     * Returns both application-linked and direct-sale attendees, each with an
+     * `origin` discriminator. Empty result is valid (not 404).
+     * Requires OTP-authenticated Human token.
+     * @param data The data for the request.
+     * @param data.popupId
+     * @param data.skip Number of items to skip
+     * @param data.limit Max attendees to return
+     * @returns ListModel_AttendeeWithOriginPublic_ Successful Response
+     * @throws ApiError
+     */
+    public static attendeesListMyAttendeesByPopup(data: AttendeesListMyAttendeesByPopupData): CancelablePromise<AttendeesListMyAttendeesByPopupResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/attendees/my/popup/{popup_id}',
+            path: {
+                popup_id: data.popupId
+            },
+            query: {
+                skip: data.skip,
+                limit: data.limit
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Create My Attendee For Popup
+     * Create a companion attendee (spouse/child) for the current Human's application.
+     *
+     * Requires:
+     * - Application popup (sale_type check enforced as defense-in-depth)
+     * - Valid accepted Application for (current_human, popup_id)
+     *
+     * Returns 422 with code='application_required' if no application exists or the
+     * popup is not an application popup.
+     * @param data The data for the request.
+     * @param data.popupId
+     * @param data.requestBody
+     * @returns AttendeeWithOriginPublic Successful Response
+     * @throws ApiError
+     */
+    public static attendeesCreateMyAttendeeForPopup(data: AttendeesCreateMyAttendeeForPopupData): CancelablePromise<AttendeesCreateMyAttendeeForPopupResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/attendees/my/popup/{popup_id}',
+            path: {
+                popup_id: data.popupId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Update My Attendee For Popup
+     * Update a companion attendee using the dual-path auth predicate.
+     *
+     * Authorization: attendee.popup_id == popup_id AND (
+     * attendee.human_id == current_human.id
+     * OR attendee.application.human_id == current_human.id
+     * ).
+     * Returns 404 if attendee not found, popup_id mismatch, or predicate fails
+     * (do not expose existence to unauthorized callers).
+     * @param data The data for the request.
+     * @param data.popupId
+     * @param data.attendeeId
+     * @param data.requestBody
+     * @returns AttendeeWithOriginPublic Successful Response
+     * @throws ApiError
+     */
+    public static attendeesUpdateMyAttendeeForPopup(data: AttendeesUpdateMyAttendeeForPopupData): CancelablePromise<AttendeesUpdateMyAttendeeForPopupResponse> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/api/v1/attendees/my/popup/{popup_id}/{attendee_id}',
+            path: {
+                popup_id: data.popupId,
+                attendee_id: data.attendeeId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Delete My Attendee For Popup
+     * Delete a companion attendee using the dual-path auth predicate.
+     *
+     * Returns 404 if attendee not found or predicate fails.
+     * Returns 400 with code='attendee_has_products' if attendee has purchased products.
+     * @param data The data for the request.
+     * @param data.popupId
+     * @param data.attendeeId
+     * @returns unknown Successful Response
+     * @throws ApiError
+     */
+    public static attendeesDeleteMyAttendeeForPopup(data: AttendeesDeleteMyAttendeeForPopupData): CancelablePromise<AttendeesDeleteMyAttendeeForPopupResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/v1/attendees/my/popup/{popup_id}/{attendee_id}',
+            path: {
+                popup_id: data.popupId,
+                attendee_id: data.attendeeId
             },
             errors: {
                 422: 'Validation Error'

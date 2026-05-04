@@ -42,7 +42,8 @@
     "in_review": "Edit Application",
     "accepted": "Go to Passes",
     "rejected": "",
-    "withdrawn": "Resume Application"
+    "withdrawn": "Resume Application",
+    "buy_tickets": "Buy Tickets"
   },
   "portal": {
     "no_active_popups": "No Active Popups",
@@ -219,6 +220,29 @@
       "confirm": "Review & Confirm"
     }
   },
+  "openCheckout": {
+    "loading": "Loading checkout...",
+    "unavailable_title": "Checkout unavailable",
+    "unavailable_description": "This link is invalid or this event is no longer available.",
+    "tickets_title": "Tickets",
+    "tickets_subtitle": "Choose how many tickets you want to buy.",
+    "coupon_title": "Coupon",
+    "coupon_subtitle": "If you have a discount code, apply it here.",
+    "coupon_placeholder": "FESTIVAL10",
+    "coupon_validating": "Validating...",
+    "coupon_apply": "Apply",
+    "coupon_applied": "Coupon applied: {{code}} ({{percent}}% OFF)",
+    "summary_title": "Summary",
+    "summary_tickets": "Tickets",
+    "summary_subtotal": "Subtotal",
+    "summary_discount": "Discount",
+    "summary_total": "Total",
+    "summary_redirecting": "Redirecting...",
+    "summary_pay": "Pay",
+    "thank_you_title": "Payment completed",
+    "thank_you_description": "Thank you for your purchase. If you want to keep managing your tickets, you can continue in the portal.",
+    "thank_you_cta": "Go to portal"
+  },
   "passes": {
     "your_passes": "Your Passes",
     "buy_passes": "Buy Passes",
@@ -263,8 +287,8 @@
     "starting_at": "Starting at {{price}}",
     "adventure_awaits": "Your adventure awaits",
     "village_subtitle": "Join the village for people building a brighter future.",
-    "people_registered": "100+ people already registered",
-    "builders_registered": "500+ builders registered",
+    "people_registered": "Registration is now open",
+    "builders_registered": "Join this experience",
     "buy": "Buy",
     "need_more_passes": "Need more passes?",
     "add_family_or_weeks": "Add family members or more weeks",
@@ -329,6 +353,7 @@
   },
   "sidebar": {
     "your_participation": "Your Participation",
+    "event": "Event",
     "coming_soon": "(Coming Soon)",
     "soon_badge": "Soon",
     "application": "Application",
