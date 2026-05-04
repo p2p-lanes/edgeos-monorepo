@@ -26,7 +26,8 @@ class EventVenuesCRUD(BaseCRUD[EventVenues, EventVenueCreate, EventVenueUpdate])
         if search:
             term = f"%{search}%"
             statement = statement.where(
-                col(EventVenues.title).ilike(term) | col(EventVenues.location).ilike(term)
+                col(EventVenues.title).ilike(term)
+                | col(EventVenues.location).ilike(term)
             )
 
         count_statement = select(func.count()).select_from(statement.subquery())

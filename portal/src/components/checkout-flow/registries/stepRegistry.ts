@@ -3,6 +3,7 @@ import type { TicketingStepPublic } from "@/client"
 import ConfirmStep from "../steps/ConfirmStep"
 import HousingStep from "../steps/HousingStep"
 import MerchSection from "../steps/MerchSection"
+import OpenCheckoutBuyerStep from "../steps/OpenCheckoutBuyerStep"
 import PatronSection from "../steps/PatronSection"
 
 /**
@@ -20,6 +21,7 @@ export const STEP_COMPONENT_REGISTRY: Record<
   housing: HousingStep,
   merch: MerchSection,
   patron: PatronSection,
+  buyer: OpenCheckoutBuyerStep,
   confirm: ConfirmStep,
 }
 

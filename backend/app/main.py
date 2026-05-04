@@ -12,6 +12,7 @@ from starlette.middleware.cors import CORSMiddleware
 import app.models  # noqa: F401 - Register all models with SQLAlchemy
 from app.api.router import api_router
 from app.core.config import Environment, settings
+from app.core.rate_limit import RateLimitExceeded
 
 
 def custom_generate_unique_id(route: APIRoute) -> str:
@@ -25,6 +26,15 @@ application = FastAPI(
     title=settings.PROJECT_NAME,
     generate_unique_id_function=custom_generate_unique_id,
 )
+
+
+@application.exception_handler(RateLimitExceeded)
+def handle_rate_limit_exceeded(_: Request, exc: RateLimitExceeded) -> JSONResponse:
+    return JSONResponse(
+        status_code=429,
+        content={"detail": "Too many requests", "retry_after": exc.retry_after},
+        headers={"Retry-After": str(exc.retry_after)},
+    )
 
 
 @application.exception_handler(ValidationError)

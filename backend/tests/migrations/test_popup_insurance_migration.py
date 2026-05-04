@@ -10,6 +10,7 @@ Scenarios:
   - Products with pct > 0 get insurance_eligible=true
   - Products with pct = 0 or null stay insurance_eligible=false
 """
+
 import importlib.util
 from pathlib import Path
 
@@ -111,14 +112,18 @@ class TestPopupInsuranceMigrationBackfill:
             f"SELECT insurance_enabled, insurance_percentage FROM popups_{suffix} WHERE id = %s",
             (popup_id,),
         ).fetchone()
-        assert popup_row[0] is True, "insurance_enabled should be true for single-value popup"
+        assert popup_row[0] is True, (
+            "insurance_enabled should be true for single-value popup"
+        )
         assert float(popup_row[1]) == 5.00, "insurance_percentage should be 5.00"
 
         products_rows = conn.exec_driver_sql(
             f"SELECT insurance_eligible FROM products_{suffix} WHERE popup_id = %s",
             (popup_id,),
         ).fetchall()
-        assert all(r[0] is True for r in products_rows), "all products should be eligible"
+        assert all(r[0] is True for r in products_rows), (
+            "all products should be eligible"
+        )
 
         conn.exec_driver_sql(f"DROP TABLE products_{suffix}")
         conn.exec_driver_sql(f"DROP TABLE popups_{suffix}")
@@ -203,7 +208,9 @@ class TestPopupInsuranceMigrationBackfill:
             f"SELECT insurance_eligible FROM products_{suffix} WHERE popup_id = %s ORDER BY id",
             (popup_id,),
         ).fetchall()
-        assert all(r[0] is True for r in products_rows), "all products with pct > 0 should be eligible"
+        assert all(r[0] is True for r in products_rows), (
+            "all products with pct > 0 should be eligible"
+        )
 
         conn.exec_driver_sql(f"DROP TABLE products_{suffix}")
         conn.exec_driver_sql(f"DROP TABLE popups_{suffix}")
@@ -289,7 +296,9 @@ class TestPopupInsuranceMigrationBackfill:
             f"SELECT insurance_eligible FROM products_{suffix} WHERE popup_id = %s",
             (popup_id,),
         ).fetchall()
-        assert all(r[0] is False for r in products_rows), "products with pct <= 0 should not be eligible"
+        assert all(r[0] is False for r in products_rows), (
+            "products with pct <= 0 should not be eligible"
+        )
 
         conn.exec_driver_sql(f"DROP TABLE products_{suffix}")
         conn.exec_driver_sql(f"DROP TABLE popups_{suffix}")

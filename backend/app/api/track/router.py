@@ -33,11 +33,19 @@ async def list_tracks(
 ) -> ListModel[TrackPublic]:
     if popup_id:
         tracks, total = crud.tracks_crud.find_by_popup(
-            db, popup_id=popup_id, skip=skip, limit=limit, search=search,
+            db,
+            popup_id=popup_id,
+            skip=skip,
+            limit=limit,
+            search=search,
         )
     else:
         tracks, total = crud.tracks_crud.find(
-            db, skip=skip, limit=limit, search=search, search_fields=["name"],
+            db,
+            skip=skip,
+            limit=limit,
+            search=search,
+            search_fields=["name"],
         )
     return ListModel[TrackPublic](
         results=[TrackPublic.model_validate(t) for t in tracks],
@@ -53,7 +61,9 @@ async def get_track(
 ) -> TrackPublic:
     track = crud.tracks_crud.get(db, track_id)
     if not track:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Track not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Track not found"
+        )
     return TrackPublic.model_validate(track)
 
 
@@ -69,7 +79,9 @@ async def create_track(
 
     popup = popups_crud.get(db, track_in.popup_id)
     if not popup:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Popup not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Popup not found"
+        )
 
     tenant_id = (
         popup.tenant_id
@@ -98,7 +110,9 @@ async def update_track(
 ) -> TrackPublic:
     track = crud.tracks_crud.get(db, track_id)
     if not track:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Track not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Track not found"
+        )
     updated = crud.tracks_crud.update(db, track, track_in)
     return TrackPublic.model_validate(updated)
 
@@ -111,7 +125,9 @@ async def delete_track(
 ) -> None:
     track = crud.tracks_crud.get(db, track_id)
     if not track:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Track not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Track not found"
+        )
     crud.tracks_crud.delete(db, track)
 
 
@@ -127,7 +143,9 @@ async def list_track_events(
 
     track = crud.tracks_crud.get(db, track_id)
     if not track:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Track not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Track not found"
+        )
 
     events, total = events_crud.find_by_popup(
         db,
@@ -157,7 +175,11 @@ async def list_portal_tracks(
     limit: PaginationLimit = 100,
 ) -> ListModel[TrackPublic]:
     tracks, total = crud.tracks_crud.find_by_popup(
-        db, popup_id=popup_id, skip=skip, limit=limit, search=search,
+        db,
+        popup_id=popup_id,
+        skip=skip,
+        limit=limit,
+        search=search,
     )
     return ListModel[TrackPublic](
         results=[TrackPublic.model_validate(t) for t in tracks],
@@ -173,7 +195,9 @@ async def get_portal_track(
 ) -> TrackPublic:
     track = crud.tracks_crud.get(db, track_id)
     if not track:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Track not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Track not found"
+        )
     return TrackPublic.model_validate(track)
 
 
@@ -193,7 +217,9 @@ async def list_portal_track_events(
 
     track = crud.tracks_crud.get(db, track_id)
     if not track:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Track not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Track not found"
+        )
 
     events, total = events_crud.find_by_popup(
         db,

@@ -703,19 +703,26 @@ async def delete_product(
             detail="Product not found",
         )
 
-    has_history = db.exec(
-        select(func.count())
-        .select_from(AttendeeProducts)
-        .where(AttendeeProducts.product_id == product.id)
-    ).one() > 0 or db.exec(
-        select(func.count())
-        .select_from(PaymentProducts)
-        .where(PaymentProducts.product_id == product.id)
-    ).one() > 0 or db.exec(
-        select(func.count())
-        .select_from(TicketTierPhase)
-        .where(TicketTierPhase.product_id == product.id)
-    ).one() > 0
+    has_history = (
+        db.exec(
+            select(func.count())
+            .select_from(AttendeeProducts)
+            .where(AttendeeProducts.product_id == product.id)
+        ).one()
+        > 0
+        or db.exec(
+            select(func.count())
+            .select_from(PaymentProducts)
+            .where(PaymentProducts.product_id == product.id)
+        ).one()
+        > 0
+        or db.exec(
+            select(func.count())
+            .select_from(TicketTierPhase)
+            .where(TicketTierPhase.product_id == product.id)
+        ).one()
+        > 0
+    )
 
     if has_history:
         crud.products_crud.soft_delete(db, product)

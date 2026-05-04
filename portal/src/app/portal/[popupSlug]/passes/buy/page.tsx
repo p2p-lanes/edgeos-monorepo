@@ -1,28 +1,36 @@
 "use client"
 
-import { useRouter } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { useEffect } from "react"
-import { resolvePopupCheckoutPolicy } from "@/checkout/popupCheckoutPolicy"
 import { Loader } from "@/components/ui/Loader"
+import { useHumanPopupAccess } from "@/hooks/useHumanPopupAccess"
 import { useCityProvider } from "@/providers/cityProvider"
-import usePermission from "../hooks/usePermission"
 import BuyPassesContent from "./components/BuyPassesContent"
 
 export default function BuyPassesPage() {
-  usePermission()
-
+  const params = useParams()
   const router = useRouter()
   const { getCity } = useCityProvider()
   const city = getCity()
-  const policy = resolvePopupCheckoutPolicy(city)
+  const isDirectSale = city?.sale_type === "direct"
+
+  // Gate access via the unified access ladder; redirect on denial.
+  const access = useHumanPopupAccess(city?.id ? String(city.id) : null)
 
   useEffect(() => {
-    if (policy.saleType === "direct" && city?.slug) {
-      router.replace(`/portal/${city.slug}`)
+    // Direct-sale popups own their checkout flow at /checkout/[slug]; this
+    // route is application-only. Forward direct-sale buyers to the canonical
+    // anonymous flow (which prefills buyer info when authed).
+    if (isDirectSale) {
+      router.replace(`/checkout/${params.popupSlug}`)
+      return
     }
-  }, [policy.saleType, city?.slug, router])
+    if (access.state === "denied") {
+      router.replace(`/portal/${params.popupSlug}`)
+    }
+  }, [access.state, isDirectSale, params.popupSlug, router])
 
-  if (policy.saleType === "direct") {
+  if (isDirectSale || access.state === "loading" || access.state === "denied") {
     return <Loader />
   }
 

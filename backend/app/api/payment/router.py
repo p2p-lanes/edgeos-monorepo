@@ -1,15 +1,14 @@
 import uuid
 from decimal import Decimal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Annotated, Literal
 
-from fastapi import APIRouter, HTTPException, Request, Response, status
+from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 from sqlmodel import Session
 
 from app.api.payment.crud import payments_crud
 from app.api.payment.models import Payments
 from app.api.payment.schemas import (
     ApplicationFeeCreate,
-    DirectPurchaseCreate,
     PaymentCreate,
     PaymentFilter,
     PaymentPreview,
@@ -157,7 +156,9 @@ def _build_payment_confirmed_context(
         discount_value=int(payment.discount_value) if payment.discount_value else None,
         original_amount=original_amount,
         attendees=attendees,
-        order_summary=compute_order_summary(payment) if payment.products_snapshot else None,
+        order_summary=compute_order_summary(payment)
+        if payment.products_snapshot
+        else None,
         portal_url=portal_url,
     )
 
@@ -335,6 +336,8 @@ async def list_payments(
     external_id: str | None = None,
     payment_status: PaymentStatus | None = None,
     search: str | None = None,
+    sort_by: str | None = None,
+    sort_order: Literal["asc", "desc"] = "desc",
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[PaymentPublic]:
@@ -347,6 +350,8 @@ async def list_payments(
             limit=limit,
             status_filter=payment_status,
             search=search,
+            sort_by=sort_by,
+            sort_order=sort_order,
         )
     else:
         filters = PaymentFilter(
@@ -355,7 +360,12 @@ async def list_payments(
             status=payment_status,
         )
         payments, total = payments_crud.find_by_filter(
-            db, filters=filters, skip=skip, limit=limit
+            db,
+            filters=filters,
+            skip=skip,
+            limit=limit,
+            sort_by=sort_by,
+            sort_order=sort_order,
         )
 
     return ListModel[PaymentPublic](
@@ -506,6 +516,34 @@ async def create_my_application_fee(
     popup = application.popup
     payment = payments_crud.create_fee_payment(db, application, popup)
     return PaymentPublic.model_validate(payment)
+
+
+@router.get("/my/popup/{popup_id}", response_model=ListModel[PaymentPublic])
+async def list_my_payments_by_popup(
+    popup_id: uuid.UUID,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+    skip: Annotated[int, Query(ge=0, description="Number of payments to skip")] = 0,
+    limit: Annotated[
+        int, Query(ge=1, le=100, description="Max payments to return (max 100)")
+    ] = 50,
+) -> ListModel[PaymentPublic]:
+    """List all payments owned by the current Human for a specific popup (Portal).
+
+    Ownership is resolved via dual-path predicate:
+    - Application leg: payment.application.human_id == current_human.id
+    - Direct-sale leg: payment_products.attendee.human_id == current_human.id
+
+    Requires OTP-authenticated Human token. Empty result is valid (not 404).
+    """
+    payments, total = payments_crud.find_by_human_popup(
+        db, human_id=current_human.id, popup_id=popup_id, skip=skip, limit=limit
+    )
+    results = [PaymentPublic.model_validate(p) for p in payments]
+    return ListModel[PaymentPublic](
+        results=results,
+        paging=Paging(offset=skip, limit=limit, total=total),
+    )
 
 
 @router.get("/my/latest", response_model=PaymentStatusCheck)
@@ -698,44 +736,18 @@ async def create_my_payment(
     return PaymentPublic.model_validate(payment)
 
 
-@router.post(
-    "/direct",
-    response_model=PaymentPublic,
-    status_code=status.HTTP_201_CREATED,
-)
-async def create_direct_payment(
-    purchase_in: DirectPurchaseCreate,
-    db: HumanTenantSession,
-    current_human: CurrentHuman,
-) -> PaymentPublic:
-    """Create a direct-sale payment for the current human (Portal).
+@router.post("/direct", include_in_schema=False)
+async def create_direct_payment_gone() -> None:
+    """Legacy direct payment tombstone.
 
-    Used for popups with sale_type="direct". No application required. The
-    server resolves the Attendee from CurrentHuman automatically and creates
-    a SimpleFI payment request (or auto-approves if the total is zero).
+    Without this explicit POST handler, `/payments/{payment_id}` keeps the path
+    shape reserved and Starlette returns 405 for POST /payments/direct.
+    We want a hard 404 contract for the removed legacy surface.
     """
-    from app.api.human.crud import humans_crud
-    from app.api.tenant.crud import tenants_crud
-
-    # Load human + tenant (the request session is already tenant-scoped, but
-    # we need the Tenants ORM instance for the SimpleFI call)
-    human = humans_crud.get(db, current_human.id)
-    if not human:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Human not found",
-        )
-    tenant = tenants_crud.get(db, current_human.tenant_id)
-    if not tenant:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Tenant not found",
-        )
-
-    payment = payments_crud.create_direct_payment(
-        db, obj=purchase_in, human=human, tenant=tenant
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="Not Found",
     )
-    return PaymentPublic.model_validate(payment)
 
 
 @router.post("/webhook/simplefi", status_code=status.HTTP_200_OK)
@@ -755,7 +767,12 @@ async def simplefi_webhook(
 
     raw_body = await request.json()
     event_type = raw_body.get("event_type")
-    logger.info("SimpleFI webhook received, event_type: {}", event_type)
+    logger.info(
+        "SimpleFI webhook received: event_type={} entity_type={} entity_id={}",
+        event_type,
+        raw_body.get("entity_type"),
+        raw_body.get("entity_id"),
+    )
 
     if event_type == "installment_plan_completed":
         return await _handle_installment_plan_completed(raw_body, db, webhook_cache)
@@ -765,6 +782,10 @@ async def simplefi_webhook(
 
     if event_type == "installment_plan_cancelled":
         return await _handle_installment_plan_cancelled(raw_body, db, webhook_cache)
+
+    if event_type == "payment_request_expired":
+        payload = SimpleFIWebhookPayload(**raw_body)
+        return await _handle_payment_request_expired(payload, db, webhook_cache)
 
     if event_type not in ("new_payment", "new_card_payment"):
         logger.info("Unhandled event type: {}. Ignoring.", event_type)
@@ -800,9 +821,10 @@ async def _handle_regular_payment(
         return {"message": "Webhook already processed"}
 
     logger.info(
-        "Regular payment - payment_request_id: %s, event_type: %s",
+        "SimpleFI regular payment webhook processing: payment_request_id=%s event_type=%s provider_status=%s",
         payment_request_id,
         event_type,
+        payload.data.payment_request.status,
     )
 
     payment = payments_crud.get_by_external_id(db, payment_request_id)
@@ -814,6 +836,15 @@ async def _handle_regular_payment(
         )
 
     payment_request_status = payload.data.payment_request.status
+
+    logger.info(
+        "SimpleFI payment matched local payment: payment_id={} external_id={} current_status={} provider_status={} payment_type={}",
+        payment.id,
+        payment.external_id,
+        payment.status,
+        payment_request_status,
+        payment.payment_type,
+    )
 
     if payment.status == payment_request_status:
         logger.info(
@@ -853,6 +884,60 @@ async def _handle_regular_payment(
         )
 
     return {"message": "Payment status updated successfully"}
+
+
+async def _handle_payment_request_expired(
+    payload: SimpleFIWebhookPayload,
+    db: Session,
+    webhook_cache: WebhookCache,
+) -> dict:
+    """Handle SimpleFI payment request expiration webhooks."""
+    from loguru import logger
+
+    payment_request_id = payload.data.payment_request.id
+    fingerprint = f"simplefi:{payment_request_id}:{payload.event_type}"
+    if not webhook_cache.add(fingerprint):
+        logger.info(
+            "Webhook already processed (fingerprint: %s). Skipping...", fingerprint
+        )
+        return {"message": "Webhook already processed"}
+
+    payment = payments_crud.get_by_external_id(db, payment_request_id)
+    if not payment:
+        logger.warning(
+            "Payment not found for expired external_id: {}", payment_request_id
+        )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Payment not found",
+        )
+
+    if payment.status == PaymentStatus.APPROVED.value:
+        logger.warning(
+            "Ignoring expiration webhook for already-approved payment {}",
+            payment.id,
+        )
+        return {"message": "Payment already approved"}
+
+    if payment.status == PaymentStatus.EXPIRED.value:
+        logger.info("Payment {} already expired. Skipping...", payment.id)
+        return {"message": "Payment status unchanged"}
+
+    logger.info(
+        "SimpleFI expiration webhook matched local payment: payment_id={} external_id={} current_status={} provider_status={}",
+        payment.id,
+        payment.external_id,
+        payment.status,
+        payload.data.payment_request.status,
+    )
+
+    payments_crud.update(db, payment, PaymentUpdate(status=PaymentStatus.EXPIRED))
+    logger.info(
+        "Payment {} marked as expired via SimpleFI webhook (external_id: {})",
+        payment.id,
+        payment_request_id,
+    )
+    return {"message": "Payment marked as expired"}
 
 
 async def _handle_fee_payment_approved(

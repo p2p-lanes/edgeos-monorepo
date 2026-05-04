@@ -1303,9 +1303,7 @@ def run_import(
 
             # Duration type from source category
             duration_type = (
-                duration_map.get(src_category)
-                if category == CATEGORY_TICKET
-                else None
+                duration_map.get(src_category) if category == CATEGORY_TICKET else None
             )
 
             # Attendee category

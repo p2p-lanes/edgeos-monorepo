@@ -106,9 +106,7 @@ async def list_form_fields(
             db, popup_id, skip=0, limit=1000
         )
         # Unsectioned fields (section_id is None) sort last by using +inf.
-        section_order_by_id: dict[uuid.UUID, int] = {
-            s.id: s.order for s in sections
-        }
+        section_order_by_id: dict[uuid.UUID, int] = {s.id: s.order for s in sections}
         all_fields.sort(
             key=lambda f: (
                 section_order_by_id.get(f.section_id, float("inf"))

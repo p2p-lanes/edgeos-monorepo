@@ -39,10 +39,7 @@ export function Pill({
   ...props
 }: PillProps) {
   return (
-    <span
-      className={cn(pillVariants({ variant, tone }), className)}
-      {...props}
-    >
+    <span className={cn(pillVariants({ variant, tone }), className)} {...props}>
       {icon}
       {children}
     </span>

@@ -7,6 +7,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
+import { formatCurrency } from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
 
 // HOC para manejar la l├│gica de presentaci├│n
@@ -68,7 +69,7 @@ const ProductPrice = ({ product, selected, disabled }: ProductPriceProps) => (
       disabled && "text-neutral-300",
     )}
   >
-    ${product.price.toLocaleString()}
+    {formatCurrency(product.price)}
   </span>
 )
 

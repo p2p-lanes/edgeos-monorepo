@@ -42,7 +42,8 @@
     "in_review": "编辑申请",
     "accepted": "查看通行证",
     "rejected": "",
-    "withdrawn": "恢复申请"
+    "withdrawn": "恢复申请",
+    "buy_tickets": "购买门票"
   },
   "portal": {
     "no_active_popups": "暂无活动",
@@ -219,6 +220,29 @@
       "confirm": "审核并确认"
     }
   },
+  "openCheckout": {
+    "loading": "正在加载结账...",
+    "unavailable_title": "结账不可用",
+    "unavailable_description": "此链接无效或此活动已不可用。",
+    "tickets_title": "门票",
+    "tickets_subtitle": "选择您要购买的门票数量。",
+    "coupon_title": "优惠券",
+    "coupon_subtitle": "如果您有折扣码，请在此使用。",
+    "coupon_placeholder": "FESTIVAL10",
+    "coupon_validating": "正在验证...",
+    "coupon_apply": "应用",
+    "coupon_applied": "优惠券已应用：{{code}} ({{percent}}% OFF)",
+    "summary_title": "摘要",
+    "summary_tickets": "门票",
+    "summary_subtotal": "小计",
+    "summary_discount": "折扣",
+    "summary_total": "合计",
+    "summary_redirecting": "正在跳转...",
+    "summary_pay": "支付",
+    "thank_you_title": "付款已完成",
+    "thank_you_description": "感谢您的购买。如果您想继续管理您的门票，可以前往门户。",
+    "thank_you_cta": "前往门户"
+  },
   "passes": {
     "your_passes": "我的通行证",
     "buy_passes": "购买通行证",
@@ -263,8 +287,8 @@
     "starting_at": "起价 {{price}}",
     "adventure_awaits": "您的冒险正在等待",
     "village_subtitle": "加入建设更美好未来的村庄。",
-    "people_registered": "已有100多人注册",
-    "builders_registered": "已有500多位建设者注册",
+    "people_registered": "报名现已开放",
+    "builders_registered": "加入这场体验",
     "buy": "购买",
     "need_more_passes": "需要更多通行证？",
     "add_family_or_weeks": "添加家庭成员或更多周次",
@@ -329,6 +353,7 @@
   },
   "sidebar": {
     "your_participation": "您的参与",
+    "event": "活动",
     "coming_soon": "（即将推出）",
     "soon_badge": "即将推出",
     "application": "申请",

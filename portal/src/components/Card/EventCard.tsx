@@ -136,12 +136,13 @@ function Progress() {
 
 interface ApplyButtonProps {
   onClick: () => void
+  labelKey?: string
 }
 
-function ApplyButton({ onClick }: ApplyButtonProps) {
+function ApplyButton({ onClick, labelKey }: ApplyButtonProps) {
   const { status } = useEventCard()
   const { t } = useTranslation()
-  const key = CTA_KEYS[status]
+  const key = labelKey ?? CTA_KEYS[status]
   if (!key) return null
 
   return (

@@ -1,4 +1,5 @@
 import uuid
+from datetime import UTC, datetime
 from decimal import ROUND_HALF_UP, Decimal
 from typing import TYPE_CHECKING, Any
 
@@ -12,14 +13,17 @@ from app.api.application.models import Applications
 from app.api.human.models import Humans
 
 if TYPE_CHECKING:
+    from app.api.checkout.schemas import OpenTicketingPurchaseCreate
     from app.api.group.models import Groups
     from app.api.human.models import Humans
-    from app.api.payment.schemas import DirectPurchaseCreate
     from app.api.popup.models import Popups
     from app.api.tenant.models import Tenants
 from app.api.application.schemas import ApplicationStatus, ScholarshipStatus
+from app.api.attendee.crud import generate_check_in_code
 from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.coupon.crud import coupons_crud
+from app.api.form_section.models import FormSections
+from app.api.human.crud import humans_crud
 from app.api.payment.models import PaymentProducts, Payments
 from app.api.payment.schemas import (
     PaymentCreate,
@@ -188,6 +192,8 @@ def _calculate_price(
 class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
     """CRUD operations for Payments."""
 
+    SORT_FIELDS = {"amount", "status", "created_at"}
+
     def __init__(self) -> None:
         super().__init__(Payments)
 
@@ -195,6 +201,366 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         """Get a payment by external ID."""
         statement = select(Payments).where(Payments.external_id == external_id)
         return session.exec(statement).first()
+
+    def _validate_open_ticketing_form_data(
+        self,
+        popup: "Popups",
+        form_data: dict[str, Any],
+    ) -> None:
+        """Validate required buyer fields against the popup form schema."""
+        required_field_ids = {
+            str(field.id)
+            for section in popup.form_sections
+            for field in section.form_fields
+            if section.kind == "standard" and field.required
+        }
+
+        missing = [
+            field_id
+            for field_id in required_field_ids
+            if form_data.get(field_id) in (None, "", [])
+        ]
+        if missing:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Missing required form fields",
+            )
+
+        popup_field_ids = {
+            str(field.id)
+            for section in popup.form_sections
+            for field in section.form_fields
+            if section.kind == "standard"
+        }
+        invalid_ids = [
+            field_id for field_id in form_data if field_id not in popup_field_ids
+        ]
+        if invalid_ids:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Form data contains unknown fields",
+            )
+
+    def _build_buyer_snapshot(
+        self,
+        popup: "Popups",
+        form_data: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Build immutable buyer snapshot JSONB for open ticketing payments."""
+        sections_snapshot: list[dict[str, Any]] = []
+
+        ordered_sections = sorted(
+            [section for section in popup.form_sections if section.kind == "standard"],
+            key=lambda section: section.order,
+        )
+
+        for section in ordered_sections:
+            ordered_fields = sorted(
+                section.form_fields, key=lambda field: field.position
+            )
+            fields_snapshot = []
+            for field in ordered_fields:
+                fields_snapshot.append(
+                    {
+                        "field_id": str(field.id),
+                        "field_name": field.name,
+                        "field_label": field.label,
+                        "field_type": field.field_type,
+                        "value": form_data.get(str(field.id)),
+                    }
+                )
+
+            sections_snapshot.append(
+                {
+                    "section_id": str(section.id),
+                    "section_label": section.label,
+                    "section_order": section.order,
+                    "fields": fields_snapshot,
+                }
+            )
+
+        return {
+            "schema_version": 1,
+            "submitted_at": datetime.now(UTC).isoformat(),
+            "sections": sections_snapshot,
+        }
+
+    def create_open_ticketing_payment(
+        self,
+        session: Session,
+        obj: "OpenTicketingPurchaseCreate",
+        popup: "Popups",
+        tenant: "Tenants",
+    ) -> tuple[Payments, str]:
+        """Create an anonymous open-ticketing payment with per-ticket attendees."""
+        from app.api.popup.schemas import PopupStatus
+        from app.api.shared.enums import SaleType
+        from app.api.tenant.utils import get_portal_url
+        from app.services.simplefi import get_simplefi_client
+
+        popup_statement = (
+            select(FormSections)
+            .where(FormSections.popup_id == popup.id)
+            .options(selectinload(FormSections.form_fields))  # ty: ignore[invalid-argument-type]
+            .order_by(FormSections.order)  # type: ignore[arg-type]
+        )
+        popup.form_sections = list(session.exec(popup_statement).all())
+
+        if popup.status != PopupStatus.active.value:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Popup is not active",
+            )
+        if popup.sale_type != SaleType.direct.value:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Popup does not support open ticketing",
+            )
+
+        buyer = humans_crud.find_or_create(
+            session,
+            email=obj.buyer.email,
+            tenant_id=tenant.id,
+            default_first_name=obj.buyer.first_name,
+            default_last_name=obj.buyer.last_name,
+        )
+
+        self._validate_open_ticketing_form_data(popup, obj.buyer.form_data)
+
+        product_ids = [line.product_id for line in obj.products]
+        products_statement = select(Products).where(
+            Products.id.in_(product_ids),  # type: ignore[attr-defined]
+            Products.popup_id == popup.id,
+            Products.is_active == True,  # noqa: E712
+            Products.deleted_at.is_(None),  # type: ignore[attr-defined]
+        )
+        valid_products = list(session.exec(products_statement).all())
+        if {product.id for product in valid_products} != set(product_ids):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Some products are not available or inactive",
+            )
+
+        products_map = {product.id: product for product in valid_products}
+        fabricated_requests = [
+            PaymentProductRequest(
+                product_id=line.product_id,
+                attendee_id=uuid.uuid4(),
+                quantity=line.quantity,
+            )
+            for line in obj.products
+        ]
+        self._validate_product_availability(
+            session, fabricated_requests, valid_products
+        )
+        self._decrement_shared_tier_stocks(session, fabricated_requests)
+
+        buyer_snapshot = self._build_buyer_snapshot(popup, obj.buyer.form_data)
+        buyer_name = (
+            f"{obj.buyer.first_name} {obj.buyer.last_name}".strip() or obj.buyer.email
+        )
+        amount = Decimal("0")
+
+        payment = Payments(
+            tenant_id=tenant.id,
+            application_id=None,
+            popup_id=popup.id,
+            status=PaymentStatus.PENDING.value,
+            amount=Decimal("0"),
+            currency=popup.currency,
+            source=PaymentSource.SIMPLEFI.value,
+            buyer_snapshot=buyer_snapshot,
+        )
+        session.add(payment)
+        session.flush()
+
+        created_attendees: list[Attendees] = []
+        first_slot = True
+        try:
+            for line in obj.products:
+                product = products_map[line.product_id]
+                amount += product.price * line.quantity
+
+                for _ in range(line.quantity):
+                    attendee_name = buyer_name if first_slot else ""
+                    attendee_email = obj.buyer.email if first_slot else None
+                    attendee_category = (
+                        "main"
+                        if first_slot
+                        else (
+                            product.attendee_category.value
+                            if product.attendee_category
+                            else "main"
+                        )
+                    )
+
+                    attendee = Attendees(
+                        tenant_id=tenant.id,
+                        application_id=None,
+                        popup_id=popup.id,
+                        human_id=buyer.id,
+                        name=attendee_name,
+                        category=attendee_category,
+                        email=attendee_email,
+                        check_in_code=generate_check_in_code(
+                            (popup.slug or "")[:3].upper()
+                        ),
+                    )
+                    session.add(attendee)
+                    session.flush()
+                    created_attendees.append(attendee)
+
+                    session.add(
+                        AttendeeProducts(
+                            tenant_id=tenant.id,
+                            attendee_id=attendee.id,
+                            product_id=product.id,
+                            quantity=1,
+                        )
+                    )
+                    session.add(
+                        PaymentProducts(
+                            tenant_id=tenant.id,
+                            payment_id=payment.id,
+                            product_id=product.id,
+                            attendee_id=attendee.id,
+                            quantity=1,
+                            product_name=product.name,
+                            product_description=product.description,
+                            product_price=product.price,
+                            product_category=product.category or "",
+                            product_currency=popup.currency,
+                        )
+                    )
+
+                    first_slot = False
+
+            amount = amount.quantize(MONEY_PRECISION, rounding=ROUND_HALF_UP)
+            payment.amount = amount
+
+            if not popup.simplefi_api_key:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Payment provider not configured for this popup",
+                )
+
+            portal_base = get_portal_url(tenant)
+            simplefi_client = get_simplefi_client(popup.simplefi_api_key)
+            success_url = (
+                f"{portal_base}/checkout/{popup.slug}/thank-you?payment_id={payment.id}"
+            )
+            cancel_url = f"{portal_base}/checkout/{popup.slug}?cancelled=1"
+            reference = {
+                "email": buyer.email,
+                "human_id": str(buyer.id),
+                "popup_id": str(popup.id),
+                "type": "open_ticketing",
+                "payment_id": str(payment.id),
+                "products": [
+                    {
+                        "product_id": str(line.product_id),
+                        "name": products_map[line.product_id].name,
+                        "quantity": line.quantity,
+                    }
+                    for line in obj.products
+                ],
+            }
+
+            simplefi_response = simplefi_client.create_payment(
+                amount=amount,
+                popup_slug=popup.slug,
+                tenant_slug=tenant.slug,
+                currency=popup.currency,
+                reference=reference,
+                memo=f"{popup.name} — open ticketing",
+                portal_base_override=portal_base,
+                success_path=success_url,
+                cancel_path=cancel_url,
+            )
+
+            payment.external_id = simplefi_response.id
+            payment.status = simplefi_response.status
+            payment.checkout_url = simplefi_response.checkout_url
+            session.add(payment)
+            session.commit()
+            session.refresh(payment)
+            return payment, simplefi_response.checkout_url
+        except HTTPException:
+            session.rollback()
+            raise
+        except Exception as exc:
+            session.rollback()
+            logger.error(f"Failed to create open ticketing payment: {exc}")
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Failed to create payment with payment provider",
+            ) from exc
+
+    def find_by_human_popup(
+        self,
+        session: Session,
+        human_id: uuid.UUID,
+        popup_id: uuid.UUID,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> tuple[list[Payments], int]:
+        """Find all payments owned by (human_id, popup_id) via dual-path predicate.
+
+        Ownership is resolved through two legs:
+        1. Application leg: payment.application.human_id == human_id
+           AND payment.popup_id == popup_id (via popup_id denorm column).
+        2. Direct-sale leg: payment has no application, but has a PaymentProducts
+           row pointing to an Attendee with human_id == human_id AND popup_id == popup_id.
+
+        A UNION of payment IDs from both legs avoids duplicates. Ordered by
+        created_at DESC. Returns (rows, total_count) for paginated response.
+        """
+        from app.api.attendee.models import Attendees
+
+        # Application leg: payment has an application owned by this human for this popup
+        app_leg = (
+            select(Payments.id)
+            .join(Applications, Payments.application_id == Applications.id)  # type: ignore[arg-type]
+            .where(
+                Applications.human_id == human_id,
+                Applications.popup_id == popup_id,
+            )
+        )
+
+        # Direct-sale leg: payment has a product snapshot linked to an attendee
+        # with human_id == human_id and popup_id == popup_id (no application)
+        direct_leg = (
+            select(Payments.id)
+            .join(PaymentProducts, PaymentProducts.payment_id == Payments.id)  # type: ignore[arg-type]
+            .join(Attendees, PaymentProducts.attendee_id == Attendees.id)  # type: ignore[arg-type]
+            .where(
+                Attendees.human_id == human_id,
+                Attendees.popup_id == popup_id,
+                Attendees.application_id.is_(None),  # type: ignore[union-attr]
+            )
+        )
+
+        union_ids = app_leg.union(direct_leg).subquery()
+
+        count_statement = select(func.count()).where(
+            Payments.id.in_(select(union_ids.c.id))  # type: ignore[arg-type]
+        )
+        total = session.exec(count_statement).one()
+
+        statement = (
+            select(Payments)
+            .where(Payments.id.in_(select(union_ids.c.id)))  # type: ignore[arg-type]
+            .order_by(desc(Payments.created_at))  # type: ignore[arg-type]
+            .options(
+                selectinload(Payments.products_snapshot).selectinload(  # ty: ignore[invalid-argument-type]
+                    PaymentProducts.attendee  # ty: ignore[invalid-argument-type]
+                ),
+            )
+            .offset(skip)
+            .limit(limit)
+        )
+        results = list(session.exec(statement).all())
+        return results, total
 
     def find_by_application(
         self,
@@ -403,6 +769,16 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         }
 
         try:
+            logger.info(
+                "Creating SimpleFI application fee payment: application_id={} popup_id={} tenant_id={} amount={} currency={} success_path={} cancel_path={}",
+                application.id,
+                popup.id,
+                application.tenant_id,
+                fee_amount,
+                popup.currency,
+                success_path,
+                cancel_path,
+            )
             simplefi_response = simplefi_client.create_payment(
                 amount=fee_amount,
                 popup_slug=popup.slug,
@@ -413,6 +789,13 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 portal_base_override=portal_base,
                 success_path=success_path,
                 cancel_path=cancel_path,
+            )
+            logger.info(
+                "SimpleFI application fee payment created: application_id={} external_id={} provider_status={} checkout_url={}",
+                application.id,
+                simplefi_response.id,
+                simplefi_response.status,
+                simplefi_response.checkout_url,
             )
         except Exception as e:
             logger.error(f"Failed to create SimpleFI fee payment: {e}")
@@ -438,6 +821,15 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         session.commit()
         session.refresh(payment)
 
+        logger.info(
+            "Application fee payment persisted: payment_id={} application_id={} external_id={} status={} amount={}",
+            payment.id,
+            payment.application_id,
+            payment.external_id,
+            payment.status,
+            payment.amount,
+        )
+
         return payment
 
     def find_by_popup(
@@ -448,6 +840,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         limit: int = 100,
         status_filter: PaymentStatus | None = None,
         search: str | None = None,
+        sort_by: str | None = None,
+        sort_order: str = "desc",
     ) -> tuple[list[Payments], int]:
         """Find payments by popup_id via the denormalized popup_id column.
 
@@ -485,7 +879,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         count_statement = select(func.count()).select_from(statement.subquery())
         total = session.exec(count_statement).one()
 
-        statement = statement.order_by(desc(Payments.created_at))  # type: ignore[arg-type]
+        validated_sort = sort_by if sort_by in self.SORT_FIELDS else "created_at"
+        statement = self._apply_sorting(statement, validated_sort, sort_order)
         statement = statement.offset(skip).limit(limit)
         statement = statement.options(
             selectinload(Payments.products_snapshot).selectinload(  # ty: ignore[invalid-argument-type]
@@ -502,6 +897,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         filters: PaymentFilter,
         skip: int = 0,
         limit: int = 100,
+        sort_by: str | None = None,
+        sort_order: str = "desc",
     ) -> tuple[list[Payments], int]:
         """Find payments with filters."""
         statement = select(Payments)
@@ -518,7 +915,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         count_statement = select(func.count()).select_from(statement.subquery())
         total = session.exec(count_statement).one()
 
-        statement = statement.order_by(desc(Payments.created_at))  # type: ignore[arg-type]
+        validated_sort = sort_by if sort_by in self.SORT_FIELDS else "created_at"
+        statement = self._apply_sorting(statement, validated_sort, sort_order)
         statement = statement.offset(skip).limit(limit)
         statement = statement.options(
             selectinload(Payments.products_snapshot).selectinload(  # ty: ignore[invalid-argument-type]
@@ -1096,6 +1494,18 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         try:
             from app.api.tenant.utils import get_portal_url
 
+            logger.info(
+                "Creating SimpleFI pass payment: application_id={} popup_id={} tenant_id={} amount={} currency={} product_count={} coupon_code={} edit_passes={} insurance={}",
+                application.id,
+                application.popup_id,
+                application.tenant_id,
+                preview.amount,
+                preview.currency,
+                len(obj.products),
+                obj.coupon_code,
+                obj.edit_passes,
+                obj.insurance,
+            )
             simplefi_response = simplefi_client.create_payment(
                 amount=preview.amount,
                 popup_slug=application.popup.slug,
@@ -1104,6 +1514,13 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 reference=reference,
                 memo=application.popup.tenant.name,
                 portal_base_override=get_portal_url(application.popup.tenant),
+            )
+            logger.info(
+                "SimpleFI pass payment created: application_id={} external_id={} provider_status={} checkout_url={}",
+                application.id,
+                simplefi_response.id,
+                simplefi_response.status,
+                simplefi_response.checkout_url,
             )
         except Exception as e:
             logger.error(f"Failed to create SimpleFI payment: {e}")
@@ -1159,242 +1576,22 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         session.commit()
         session.refresh(payment)
 
+        logger.info(
+            "Pass payment persisted: payment_id={} application_id={} external_id={} status={} amount={} product_count={}",
+            payment.id,
+            payment.application_id,
+            payment.external_id,
+            payment.status,
+            payment.amount,
+            len(obj.products),
+        )
+
         # Update preview with SimpleFI response data
         preview.status = simplefi_response.status
         preview.external_id = simplefi_response.id
         preview.checkout_url = simplefi_response.checkout_url
 
         return payment, preview
-
-    def create_direct_payment(
-        self,
-        session: Session,
-        obj: "DirectPurchaseCreate",
-        human: "Humans",
-        tenant: "Tenants",
-    ) -> Payments:
-        """Create a payment for a direct-sale popup.
-
-        - Validates popup exists, is active, and has sale_type="direct".
-        - Validates requested products belong to the popup and are active.
-        - Reuses or creates the Attendee record bound to (human, popup).
-        - Calculates amount (no application-level discounts in v1 — no group,
-          no coupon, no scholarship).
-        - Zero-amount purchase: auto-approves, assigns products, no SimpleFI call.
-        - Non-zero: creates a SimpleFI payment request and stores the checkout_url.
-        """
-        from app.api.attendee.crud import attendees_crud
-        from app.api.popup.models import Popups
-        from app.api.popup.schemas import PopupStatus
-        from app.api.shared.enums import SaleType
-        from app.api.tenant.utils import get_portal_url
-        from app.services.simplefi import get_simplefi_client
-
-        # 1. Validate popup
-        popup = session.get(Popups, obj.popup_id)
-        if not popup:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Popup not found",
-            )
-        if popup.status != PopupStatus.active.value:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Popup is not active",
-            )
-        if popup.sale_type != SaleType.direct.value:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Popup does not support direct purchases",
-            )
-
-        # 2. Validate products belong to popup and are active
-        product_ids = [p.product_id for p in obj.products]
-        statement = select(Products).where(
-            Products.id.in_(product_ids),  # type: ignore[attr-defined]
-            Products.popup_id == popup.id,
-            Products.is_active == True,  # noqa: E712
-            Products.deleted_at.is_(None),  # type: ignore[attr-defined]
-        )
-        valid_products = list(session.exec(statement).all())
-        if {p.id for p in valid_products} != set(product_ids):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Some products are not available or inactive",
-            )
-
-        products_map = {p.id: p for p in valid_products}
-
-        # 3. Validate availability (max_quantity vs sold+pending)
-        fabricated_requests = [
-            # reuse existing helpers which expect PaymentProductRequest —
-            # we fabricate one with a placeholder attendee_id since the
-            # helper only reads product_id and quantity.
-            PaymentProductRequest(
-                product_id=p.product_id,
-                attendee_id=uuid.uuid4(),
-                quantity=p.quantity,
-            )
-            for p in obj.products
-        ]
-        self._validate_product_availability(
-            session,
-            fabricated_requests,
-            valid_products,
-        )
-
-        # 3b. Reserve shared tier-group stock atomically before creating
-        # payment rows or calling SimpleFI. A 409 from a sold-out group
-        # rolls the whole transaction back.
-        self._decrement_shared_tier_stocks(session, fabricated_requests)
-
-        # 4. Get or create the direct-sale attendee
-        attendee = attendees_crud.find_direct_attendee(
-            session, human_id=human.id, popup_id=popup.id
-        )
-        if not attendee:
-            name = (
-                f"{human.first_name or ''} {human.last_name or ''}".strip()
-                or human.email
-            )
-            attendee = attendees_crud.create_direct_attendee(
-                session,
-                human_id=human.id,
-                popup_id=popup.id,
-                tenant_id=tenant.id,
-                name=name,
-                email=human.email,
-            )
-
-        # 5. Calculate amount (no discount pipeline in v1 for direct-sale)
-        amount = Decimal("0")
-        for req_prod in obj.products:
-            product = products_map[req_prod.product_id]
-            amount += product.price * req_prod.quantity
-        amount = amount.quantize(MONEY_PRECISION, rounding=ROUND_HALF_UP)
-
-        # 6. Zero-amount: auto-approve, assign products directly
-        if amount <= 0:
-            payment = Payments(
-                tenant_id=tenant.id,
-                application_id=None,
-                popup_id=popup.id,
-                status=PaymentStatus.APPROVED.value,
-                amount=Decimal("0"),
-                currency=popup.currency,
-                source=None,
-            )
-            session.add(payment)
-            session.flush()
-
-            for req_prod in obj.products:
-                product = products_map[req_prod.product_id]
-                pp = PaymentProducts(
-                    tenant_id=tenant.id,
-                    payment_id=payment.id,
-                    product_id=req_prod.product_id,
-                    attendee_id=attendee.id,
-                    quantity=req_prod.quantity,
-                    product_name=product.name,
-                    product_description=product.description,
-                    product_price=product.price,
-                    product_category=product.category or "",
-                    product_currency=popup.currency,
-                )
-                session.add(pp)
-
-            self._add_products_to_attendees(
-                session,
-                [
-                    PaymentProductRequest(
-                        product_id=rp.product_id,
-                        attendee_id=attendee.id,
-                        quantity=rp.quantity,
-                    )
-                    for rp in obj.products
-                ],
-            )
-
-            session.commit()
-            session.refresh(payment)
-            return payment
-
-        # 7. Non-zero: create SimpleFI payment request
-        if not popup.simplefi_api_key:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Payment provider not configured for this popup",
-            )
-
-        simplefi_client = get_simplefi_client(popup.simplefi_api_key)
-        reference = {
-            "email": human.email,
-            "human_id": str(human.id),
-            "popup_id": str(popup.id),
-            "type": "direct",
-            "products": [
-                {
-                    "product_id": str(rp.product_id),
-                    "name": products_map[rp.product_id].name,
-                    "quantity": rp.quantity,
-                    "attendee_id": str(attendee.id),
-                }
-                for rp in obj.products
-            ],
-        }
-
-        portal_base = get_portal_url(tenant)
-
-        try:
-            simplefi_response = simplefi_client.create_payment(
-                amount=amount,
-                popup_slug=popup.slug,
-                tenant_slug=tenant.slug,
-                currency=popup.currency,
-                reference=reference,
-                memo=f"{popup.name} — direct purchase",
-                portal_base_override=portal_base,
-            )
-        except Exception as e:
-            logger.error(f"Failed to create SimpleFI direct payment: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="Failed to create payment with payment provider",
-            ) from e
-
-        payment = Payments(
-            tenant_id=tenant.id,
-            application_id=None,
-            popup_id=popup.id,
-            status=simplefi_response.status,
-            amount=amount,
-            currency=popup.currency,
-            external_id=simplefi_response.id,
-            checkout_url=simplefi_response.checkout_url,
-            source=PaymentSource.SIMPLEFI.value,
-        )
-        session.add(payment)
-        session.flush()
-
-        for req_prod in obj.products:
-            product = products_map[req_prod.product_id]
-            pp = PaymentProducts(
-                tenant_id=tenant.id,
-                payment_id=payment.id,
-                product_id=req_prod.product_id,
-                attendee_id=attendee.id,
-                quantity=req_prod.quantity,
-                product_name=product.name,
-                product_description=product.description,
-                product_price=product.price,
-                product_category=product.category or "",
-                product_currency=popup.currency,
-            )
-            session.add(pp)
-
-        session.commit()
-        session.refresh(payment)
-        return payment
 
     def approve_payment(
         self,

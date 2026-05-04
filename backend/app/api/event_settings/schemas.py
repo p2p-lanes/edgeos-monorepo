@@ -42,11 +42,13 @@ class EventSettingsBase(SQLModel):
     )
     # Email that receives notifications when an event or venue is submitted
     # and requires approval. Falls back to the popup owner if unset.
-    approval_notification_email: str | None = Field(
-        default=None, sa_type=Text()
+    approval_notification_email: str | None = Field(default=None, sa_type=Text())
+    created_at: datetime = Field(
+        default_factory=datetime.utcnow, sa_type=DateTime(timezone=True)
     )
-    created_at: datetime = Field(default_factory=datetime.utcnow, sa_type=DateTime(timezone=True))
-    updated_at: datetime = Field(default_factory=datetime.utcnow, sa_type=DateTime(timezone=True))
+    updated_at: datetime = Field(
+        default_factory=datetime.utcnow, sa_type=DateTime(timezone=True)
+    )
 
 
 class EventSettingsPublic(EventSettingsBase):

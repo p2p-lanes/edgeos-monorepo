@@ -63,9 +63,7 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
             # (which would fail with "operator does not exist: jsonb ?| jsonb").
             from sqlalchemy.dialects.postgresql import array
 
-            statement = statement.where(
-                Events.tags.op("?|")(array(list(tags)))
-            )
+            statement = statement.where(Events.tags.op("?|")(array(list(tags))))
         # Recurring masters (``rrule IS NOT NULL``) must bypass the start_time
         # window filter: a series whose master row starts before the window
         # can still have occurrences inside it. ``_expand_rows_in_window``
@@ -271,11 +269,12 @@ def _expand_rows_in_window(
     return result
 
 
-def _clone_as_occurrence(master: Events, occ_start: datetime, duration: timedelta) -> Events:
+def _clone_as_occurrence(
+    master: Events, occ_start: datetime, duration: timedelta
+) -> Events:
     """Build a detached Events instance representing a single occurrence."""
     data = {
-        column.name: getattr(master, column.name)
-        for column in master.__table__.columns
+        column.name: getattr(master, column.name) for column in master.__table__.columns
     }
     data["start_time"] = occ_start
     data["end_time"] = occ_start + duration
@@ -348,7 +347,9 @@ def _ts_in_window(
     return True
 
 
-def expanded_events_with_occurrence_id(events: Iterable[Events]) -> list[tuple[Events, str | None]]:
+def expanded_events_with_occurrence_id(
+    events: Iterable[Events],
+) -> list[tuple[Events, str | None]]:
     """Pair each event with its synthetic ``occurrence_id`` (or ``None``)."""
     return [(e, e.__dict__.get("_occurrence_id")) for e in events]
 

@@ -16,6 +16,7 @@ Contract with the caller:
 - One ICS is generated **per recipient** because the ATTENDEE line
   identifies the target; clients rely on seeing their own address there.
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -163,10 +164,10 @@ def build_event_ics(
     # the invitee hasn't answered yet. Clients still add the entry to the
     # calendar regardless of what the user clicks.
     attendee_params = [
-        'CUTYPE=INDIVIDUAL',
-        'ROLE=REQ-PARTICIPANT',
-        'PARTSTAT=NEEDS-ACTION',
-        'RSVP=TRUE',
+        "CUTYPE=INDIVIDUAL",
+        "ROLE=REQ-PARTICIPANT",
+        "PARTSTAT=NEEDS-ACTION",
+        "RSVP=TRUE",
     ]
     if recipient_name:
         attendee_params.append(f'CN="{_escape(recipient_name)}"')

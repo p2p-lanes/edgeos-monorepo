@@ -4,6 +4,7 @@ We deliberately keep this dead-simple — a plain HTML snippet with the
 relevant links. Moving to a templated email system makes sense once the
 product wants branded styling or per-tenant localization.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -34,9 +35,7 @@ def _resolve_admin_recipient(
         to = getattr(popup.tenant, "contact_email", None) or getattr(
             popup.tenant, "sender_email", None
         )
-    from_address = (
-        popup.tenant.sender_email if popup and popup.tenant else None
-    )
+    from_address = popup.tenant.sender_email if popup and popup.tenant else None
     from_name = popup.tenant.sender_name if popup and popup.tenant else None
     return to, from_address, from_name
 
@@ -58,9 +57,7 @@ async def notify_event_pending_approval(
         return
     popup_name = popup.name if popup else "event"
     subject = f"[{popup_name}] Event pending approval: {event.title}"
-    review_url = (
-        f"{app_settings.BACKOFFICE_URL.rstrip('/')}/events/{event.id}/edit"
-    )
+    review_url = f"{app_settings.BACKOFFICE_URL.rstrip('/')}/events/{event.id}/edit"
     html = (
         f"<p>A new event has been submitted and is pending approval.</p>"
         f"<ul>"
@@ -106,8 +103,7 @@ async def notify_venue_pending_approval(
     popup_name = popup.name if popup else "venue"
     subject = f"[{popup_name}] Venue pending approval: {venue.title}"
     review_url = (
-        f"{app_settings.BACKOFFICE_URL.rstrip('/')}"
-        f"/events/venues/{venue.id}/edit"
+        f"{app_settings.BACKOFFICE_URL.rstrip('/')}/events/venues/{venue.id}/edit"
     )
     html = (
         f"<p>A new venue has been submitted and is pending approval.</p>"
@@ -126,9 +122,7 @@ async def notify_venue_pending_approval(
             from_address=from_address,
             from_name=from_name,
         )
-        logger.info(
-            "Sent venue approval notice to {} for venue {}", to, venue.id
-        )
+        logger.info("Sent venue approval notice to {} for venue {}", to, venue.id)
     except Exception as exc:  # pragma: no cover
         logger.warning(
             "Failed to send venue approval notice to {} for venue {}: {}",

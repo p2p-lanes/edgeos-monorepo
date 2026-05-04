@@ -181,9 +181,7 @@ class TestVenueCreationGate:
         tenant_a: Tenants,
     ) -> None:
         popup = _make_popup(db, tenant_a)
-        _set_event_settings(
-            db, tenant_a, popup, humans_can_create_venues=False
-        )
+        _set_event_settings(db, tenant_a, popup, humans_can_create_venues=False)
         human = _make_human(db, tenant_a)
 
         resp = client.post(

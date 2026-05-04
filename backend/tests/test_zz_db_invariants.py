@@ -117,9 +117,7 @@ class TestParticipantInvariants:
 class TestVenueInvariants:
     """Structural invariants on ``venue_weekly_hours`` and ``venue_photos``."""
 
-    def test_weekly_hours_day_of_week_is_unique_per_venue(
-        self, db: Session
-    ) -> None:
+    def test_weekly_hours_day_of_week_is_unique_per_venue(self, db: Session) -> None:
         _assert_no_rows(
             db,
             """

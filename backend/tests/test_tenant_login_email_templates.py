@@ -132,7 +132,9 @@ def test_portal_login_templates_can_be_managed_without_popup_and_are_unique_per_
     )
 
 
-def test_backoffice_login_template_is_not_customizable(client, admin_token_tenant_a: str):
+def test_backoffice_login_template_is_not_customizable(
+    client, admin_token_tenant_a: str
+):
     response = _create_auth_template(
         client,
         admin_token_tenant_a,

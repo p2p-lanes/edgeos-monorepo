@@ -34,14 +34,21 @@ class EventVenueBase(SQLModel):
     capacity: int | None = Field(default=None)
     start_date: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))
     end_date: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))
-    tags: list[str] = Field(default_factory=list, sa_column=Column(JSONB, nullable=False, server_default="[]"))
+    tags: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSONB, nullable=False, server_default="[]"),
+    )
     image_url: str | None = Field(default=None, sa_type=Text())
     booking_mode: VenueBookingMode = Field(default=VenueBookingMode.FREE, max_length=30)
     setup_time_minutes: int = Field(default=0)
     teardown_time_minutes: int = Field(default=0)
     status: VenueStatus = Field(default=VenueStatus.ACTIVE, max_length=20)
-    created_at: datetime = Field(default_factory=datetime.utcnow, sa_type=DateTime(timezone=True))
-    updated_at: datetime = Field(default_factory=datetime.utcnow, sa_type=DateTime(timezone=True))
+    created_at: datetime = Field(
+        default_factory=datetime.utcnow, sa_type=DateTime(timezone=True)
+    )
+    updated_at: datetime = Field(
+        default_factory=datetime.utcnow, sa_type=DateTime(timezone=True)
+    )
 
 
 class VenuePropertyRef(BaseModel):

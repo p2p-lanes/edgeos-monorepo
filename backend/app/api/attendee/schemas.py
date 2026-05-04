@@ -171,6 +171,23 @@ class AttendeeWithTickets(BaseModel):
     products: list[TicketProduct]
 
 
+class AttendeeWithOriginPublic(AttendeePublic):
+    """Attendee response with an origin discriminator field.
+
+    Used by GET /attendees/my/popup/{popup_id} and related human-scoped
+    endpoints. Extends AttendeePublic with:
+    - products: list of AttendeeProductPublic items (overwrites the base Any list)
+    - origin: "application" when application_id IS NOT NULL, "direct_sale" otherwise
+
+    The origin is set by the router after fetching from the CRUD layer.
+    """
+
+    products: list[AttendeeProductPublic] = []
+    origin: str = (
+        ""  # "application" | "direct_sale" — set by router after model_validate
+    )
+
+
 class AttendeePurchases(BaseModel):
     """Purchased products grouped by attendee."""
 

@@ -7,6 +7,7 @@ import QuantitySelector, {
 import { formatDate } from "@/helpers/dates"
 import { cn } from "@/lib/utils"
 import { usePassesProvider } from "@/providers/passesProvider"
+import { formatCurrency } from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
 import ProductDay from "./ProductDay"
 
@@ -150,7 +151,7 @@ const Product = ({
                     disabled && "text-neutral-300",
                   )}
                 >
-                  ${originalPrice.toLocaleString()}
+                  {formatCurrency(originalPrice)}
                 </p>
               ) : (
                 originalPrice !== product.compare_price &&
@@ -161,7 +162,9 @@ const Product = ({
                       disabled && "text-neutral-300",
                     )}
                   >
-                    ${product.compare_price?.toLocaleString()}
+                    {product.compare_price != null
+                      ? formatCurrency(product.compare_price)
+                      : ""}
                   </p>
                 )
               )}
@@ -171,7 +174,7 @@ const Product = ({
                   disabled && "text-neutral-300",
                 )}
               >
-                $ {product.price?.toLocaleString()}
+                {product.price != null ? formatCurrency(product.price) : ""}
               </p>
             </>
           )}

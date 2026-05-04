@@ -1,10 +1,10 @@
 "use client"
 
 import type { ReactNode } from "react"
-import PublicCheckoutProviders from "@/components/providers/PublicCheckoutProviders"
+import Providers from "./components/providers/Providers"
 
 const layout = ({ children }: { children: ReactNode }) => {
-  return <PublicCheckoutProviders>{children}</PublicCheckoutProviders>
+  return <Providers>{children}</Providers>
 }
 
 export default layout

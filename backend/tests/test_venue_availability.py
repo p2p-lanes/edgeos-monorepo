@@ -192,9 +192,7 @@ class TestVenueAvailability:
         got = data["open_ranges"][0]
         expected_start = datetime(2026, 4, 13, 9, 0, tzinfo=tz).astimezone(UTC)
         expected_end = datetime(2026, 4, 13, 17, 0, tzinfo=tz).astimezone(UTC)
-        assert (
-            datetime.fromisoformat(got["start"]).astimezone(UTC) == expected_start
-        )
+        assert datetime.fromisoformat(got["start"]).astimezone(UTC) == expected_start
         assert datetime.fromisoformat(got["end"]).astimezone(UTC) == expected_end
 
     def test_overnight_hours_span_day_boundary(
@@ -363,9 +361,7 @@ class TestVenueAvailability:
         admin_token_tenant_a: str,
     ) -> None:
         popup = _make_popup(db, tenant_a, tz="UTC")
-        venue = _make_venue(
-            db, tenant_a, popup, setup_minutes=30, teardown_minutes=15
-        )
+        venue = _make_venue(db, tenant_a, popup, setup_minutes=30, teardown_minutes=15)
         _add_weekly(db, venue, 0, open_t=time(9), close_t=time(17))
 
         ev_start = datetime(2026, 4, 13, 12, 0, tzinfo=UTC)
@@ -399,9 +395,7 @@ class TestVenueAvailability:
         busy = data["busy"][0]
         assert busy["source"] == "event"
         assert busy["label"] == "Busy Event"
-        assert datetime.fromisoformat(busy["start"]) == ev_start - timedelta(
-            minutes=30
-        )
+        assert datetime.fromisoformat(busy["start"]) == ev_start - timedelta(minutes=30)
         assert datetime.fromisoformat(busy["end"]) == ev_end + timedelta(minutes=15)
 
     def test_cancelled_event_excluded_from_busy(

@@ -27,9 +27,7 @@ def hash_key(raw_key: str) -> str:
     """Peppered sha256 of the raw token. The pepper (SECRET_KEY) means a
     DB leak alone is insufficient to reverse-engineer keys — the attacker
     also needs the app secret."""
-    return hashlib.sha256(
-        f"{settings.SECRET_KEY}:{raw_key}".encode()
-    ).hexdigest()
+    return hashlib.sha256(f"{settings.SECRET_KEY}:{raw_key}".encode()).hexdigest()
 
 
 def display_prefix(raw_key: str) -> str:
@@ -76,9 +74,7 @@ def get_for_human(
     session: Session, key_id: uuid.UUID, human_id: uuid.UUID
 ) -> ApiKeys | None:
     return session.exec(
-        select(ApiKeys)
-        .where(ApiKeys.id == key_id)
-        .where(ApiKeys.human_id == human_id)
+        select(ApiKeys).where(ApiKeys.id == key_id).where(ApiKeys.human_id == human_id)
     ).first()
 
 

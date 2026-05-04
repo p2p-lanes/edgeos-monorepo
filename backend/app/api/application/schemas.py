@@ -428,6 +428,26 @@ class AssociatedAttendee(BaseModel):
     email: str | None = None
 
 
+class PopupAccessResponse(BaseModel):
+    """Response schema for GET /portal/popup/{popup_id}/access.
+
+    Encodes the result of the 7-step access ladder for the authenticated Human.
+    allowed=True means the Human can view the passes page.
+    source indicates which ladder step granted access (None when denied).
+    application_status carries the Application status string when one exists.
+    reason explains the denial when allowed=False.
+    """
+
+    allowed: bool
+    source: Literal["application", "attendee", "payment", "companion"] | None = None
+    application_status: (
+        Literal["accepted", "submitted", "in review", "rejected"] | None
+    ) = None
+    reason: (
+        Literal["no_access", "application_pending", "application_rejected"] | None
+    ) = None
+
+
 class AttendeesDirectoryEntry(BaseModel):
     """Single entry in the attendees directory."""
 

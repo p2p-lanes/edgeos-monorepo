@@ -5,6 +5,7 @@ Verifies that when a new popup is created, its confirm step:
   - insurance sub-config has all 4 required defaults: card_title, card_subtitle,
     toggle_label, benefits
 """
+
 import uuid
 
 from fastapi.testclient import TestClient
@@ -103,4 +104,6 @@ class TestConfirmStepInsuranceSeed:
             )
         ).first()
 
-        assert step is None, "insurance_checkout step must NOT be seeded (removed in batch 4)"
+        assert step is None, (
+            "insurance_checkout step must NOT be seeded (removed in batch 4)"
+        )

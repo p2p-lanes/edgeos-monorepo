@@ -1,8 +1,6 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import BuyPassesContent from "@/app/portal/[popupSlug]/passes/buy/components/BuyPassesContent"
-import { resolvePopupCheckoutPolicy } from "@/checkout/popupCheckoutPolicy"
 import type { CompanionParticipation } from "@/client"
 import { EventCard } from "@/components/Card/EventCard"
 import type { EventStatus } from "@/components/Card/EventProgressBar"
@@ -17,15 +15,12 @@ export default function Home() {
   const router = useRouter()
   const city = getCity()
   const relevantApplication = getRelevantApplication()
-  const policy = resolvePopupCheckoutPolicy(city)
 
   if (!city) return null
 
-  if (policy.saleType === "direct") {
-    return <BuyPassesContent />
-  }
+  const isDirectSale = city.sale_type === "direct"
 
-  if (participation?.type === "companion") {
+  if (!isDirectSale && participation?.type === "companion") {
     return (
       <section className="container mx-auto">
         <div className="space-y-6 max-w-5xl p-6 mx-auto">
@@ -37,9 +32,15 @@ export default function Home() {
     )
   }
 
-  const status = (relevantApplication?.status as EventStatus) ?? "not_started"
+  const status: EventStatus = isDirectSale
+    ? "not_started"
+    : ((relevantApplication?.status as EventStatus) ?? "not_started")
 
   const onClickApply = () => {
+    if (isDirectSale) {
+      router.push(`/checkout/${city.slug}`)
+      return
+    }
     if (status === "accepted") {
       router.push(`/portal/${city.slug}/passes`)
       return
@@ -57,14 +58,17 @@ export default function Home() {
             <EventCard.Tagline />
             <EventCard.Location />
             <EventCard.DateRange />
-            <EventCard.Progress />
-            {relevantApplication && (
+            {!isDirectSale && <EventCard.Progress />}
+            {!isDirectSale && relevantApplication && (
               <ScholarshipStatusBadge
                 application={relevantApplication}
                 popup={city}
               />
             )}
-            <EventCard.ApplyButton onClick={onClickApply} />
+            <EventCard.ApplyButton
+              onClick={onClickApply}
+              labelKey={isDirectSale ? "cta.buy_tickets" : undefined}
+            />
           </EventCard.Content>
         </EventCard>
       </div>

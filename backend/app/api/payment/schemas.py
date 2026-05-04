@@ -5,6 +5,7 @@ from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 from sqlalchemy import Integer, Numeric, String, Text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Column, Field, SQLModel
 
 
@@ -84,6 +85,10 @@ class PaymentBase(SQLModel):
     )
     source: str | None = Field(default=None, nullable=True)
     checkout_url: str | None = Field(default=None, nullable=True)
+    buyer_snapshot: dict | None = Field(
+        default=None,
+        sa_column=Column(JSONB, nullable=True),
+    )
 
     # Discount tracking
     coupon_id: uuid.UUID | None = Field(
@@ -141,10 +146,8 @@ class PaymentProductResponse(BaseModel):
 class PaymentCreate(BaseModel):
     """Schema for creating a payment.
 
-    Either application_id (application-based flow) or popup_id (direct-sale)
-    must be provided — at least one source is required. The existing
-    application-based flow always passes application_id; direct-sale uses
-    DirectPurchaseCreate, which is translated into this shape server-side.
+    Either application_id (application-based flow) or popup_id must be
+    provided — at least one source is required.
     """
 
     application_id: uuid.UUID | None = None
@@ -169,34 +172,6 @@ class PaymentCreate(BaseModel):
         if self.application_id is None and self.popup_id is None:
             raise ValueError("Either application_id or popup_id is required")
         return self
-
-
-class DirectProductRequest(BaseModel):
-    """Product selection for a direct purchase (no attendee_id — server creates)."""
-
-    product_id: uuid.UUID
-    quantity: int = 1
-
-
-class DirectPurchaseCreate(BaseModel):
-    """Schema for creating a direct-sale payment.
-
-    Used for popups with sale_type="direct". Auth is via CurrentHuman — the
-    server creates/reuses the Attendee from Human data automatically.
-    """
-
-    popup_id: uuid.UUID
-    products: list[DirectProductRequest]
-
-    @field_validator("products", mode="before")
-    @classmethod
-    def validate_products(
-        cls,
-        v: list[DirectProductRequest],
-    ) -> list[DirectProductRequest]:
-        if not v:
-            raise ValueError("At least one product must be selected")
-        return v
 
 
 class PaymentPreview(BaseModel):

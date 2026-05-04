@@ -82,9 +82,7 @@ class EventHiddenByHuman(SQLModel, table=True):
 
     __tablename__ = "event_hidden_by_human"
     __table_args__ = (
-        Index(
-            "uq_event_hidden_human_event", "human_id", "event_id", unique=True
-        ),
+        Index("uq_event_hidden_human_event", "human_id", "event_id", unique=True),
     )
 
     id: uuid.UUID = Field(

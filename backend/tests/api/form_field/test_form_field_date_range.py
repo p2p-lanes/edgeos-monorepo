@@ -2,6 +2,7 @@
 
 Phase 1 — RED: tests are written before implementation.
 """
+
 import uuid
 
 from fastapi.testclient import TestClient

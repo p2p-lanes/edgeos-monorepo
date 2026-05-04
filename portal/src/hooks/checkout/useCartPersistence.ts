@@ -36,6 +36,7 @@ interface RestorationSetters {
 }
 
 interface UseCartPersistenceParams {
+  enabled?: boolean
   cityId: string | null
   initialStep: CheckoutStep
   products: ProductsPass[]
@@ -48,6 +49,7 @@ interface UseCartPersistenceParams {
 }
 
 export function useCartPersistence({
+  enabled = true,
   cityId,
   initialStep,
   products,
@@ -58,11 +60,13 @@ export function useCartPersistence({
   paymentCompleteRef,
 }: UseCartPersistenceParams) {
   const queryClient = useQueryClient()
+  const effectiveCityId = enabled ? cityId : null
 
   // Cart API hooks (internalized)
-  const { data: savedCart, isSuccess: cartLoaded } = useCart(cityId)
-  const { save, saveImmediate, cancelPendingSave } = useSaveCart(cityId)
-  const clearCartMutation = useClearCart(cityId)
+  const { data: savedCart, isSuccess: cartLoaded } = useCart(effectiveCityId)
+  const { save, saveImmediate, cancelPendingSave } =
+    useSaveCart(effectiveCityId)
+  const clearCartMutation = useClearCart(effectiveCityId)
 
   // --- Build CartState from the ref's current value ---
   const buildCartState = useCallback((): CartState => {
@@ -102,6 +106,7 @@ export function useCartPersistence({
   const saveCart = useCallback(() => {
     if (
       !cityId ||
+      !enabled ||
       !hasRestoredCheckoutRef.current ||
       paymentCompleteRef.current
     )
@@ -115,19 +120,28 @@ export function useCartPersistence({
     saveImmediate,
     hasRestoredCheckoutRef,
     paymentCompleteRef,
+    enabled,
   ])
 
   // --- Schedule a debounced save (for auto-save on state changes) ---
   const scheduleSave = useCallback(() => {
     if (
       !cityId ||
+      !enabled ||
       !hasRestoredCheckoutRef.current ||
       paymentCompleteRef.current
     )
       return
 
     save(buildCartState())
-  }, [cityId, save, buildCartState, hasRestoredCheckoutRef, paymentCompleteRef])
+  }, [
+    cityId,
+    save,
+    buildCartState,
+    hasRestoredCheckoutRef,
+    paymentCompleteRef,
+    enabled,
+  ])
 
   // --- Clear cart ---
   const clearCart = useCallback(() => {
@@ -137,7 +151,8 @@ export function useCartPersistence({
 
   // --- Cart restoration from DB ---
   useEffect(() => {
-    if (hasRestoredCheckoutRef.current || !cartLoaded || !savedCart) return
+    if (!enabled || hasRestoredCheckoutRef.current || !cartLoaded || !savedCart)
+      return
     if (!products.length) return
 
     hasRestoredCheckoutRef.current = true
@@ -252,6 +267,7 @@ export function useCartPersistence({
     // Step restore is deferred — availableSteps depends on products loading
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
+    enabled,
     cartLoaded,
     savedCart,
     products,
