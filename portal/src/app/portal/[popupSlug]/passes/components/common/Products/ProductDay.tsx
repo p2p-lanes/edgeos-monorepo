@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import { usePassesProvider } from "@/providers/passesProvider"
+import { formatCurrency } from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
 
 type VariantStyles = "selected" | "purchased" | "edit" | "disabled" | "default"
@@ -126,7 +127,7 @@ const Product = ({
                       disabled && "text-neutral-300",
                     )}
                   >
-                    ${originalPrice.toLocaleString()}
+                    {formatCurrency(originalPrice)}
                   </p>
                 )}
                 <p
@@ -135,7 +136,7 @@ const Product = ({
                     disabled && "text-neutral-300",
                   )}
                 >
-                  $ {product.price.toLocaleString()}
+                  {formatCurrency(product.price)}
                 </p>
               </>
             )}

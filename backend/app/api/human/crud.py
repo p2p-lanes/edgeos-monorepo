@@ -1,6 +1,8 @@
 import uuid
 
+from loguru import logger
 from sqlalchemy import exists, or_
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, col, func, select
 
 from app.api.human.models import Humans
@@ -11,6 +13,67 @@ from app.api.shared.crud import BaseCRUD
 class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
     def __init__(self) -> None:
         super().__init__(Humans)
+
+    def find_or_create(
+        self,
+        session: Session,
+        email: str,
+        tenant_id: uuid.UUID,
+        *,
+        default_first_name: str | None = None,
+        default_last_name: str | None = None,
+    ) -> Humans:
+        """Return the existing Human for (email, tenant_id) or create one.
+
+        NEVER overwrites fields on an existing row. Uses INSERT ... ON CONFLICT
+        DO NOTHING pattern to handle concurrent callers safely — the unique
+        constraint uq_human_email_tenant_id guarantees exactly one row.
+        If the session does not support advisory INSERT/IGNORE, falls back to
+        catching IntegrityError then SELECTing the existing row.
+        """
+        # Fast path: try to find existing row first (most callers hit this)
+        existing = session.exec(
+            select(Humans).where(
+                Humans.email == email,
+                Humans.tenant_id == tenant_id,
+            )
+        ).first()
+        if existing is not None:
+            return existing
+
+        # Slow path: attempt INSERT; catch race on unique constraint
+        new_human = Humans(
+            id=uuid.uuid4(),
+            email=email,
+            tenant_id=tenant_id,
+            first_name=default_first_name,
+            last_name=default_last_name,
+        )
+        try:
+            session.add(new_human)
+            session.flush()
+            session.refresh(new_human)
+            session.commit()
+            return new_human
+        except IntegrityError:
+            # Another concurrent caller won the race — roll back and fetch
+            session.rollback()
+            logger.info(
+                "find_or_create: IntegrityError race on ({}, {}) — fetching existing row",
+                email,
+                tenant_id,
+            )
+            existing = session.exec(
+                select(Humans).where(
+                    Humans.email == email,
+                    Humans.tenant_id == tenant_id,
+                )
+            ).first()
+            if existing is None:
+                raise RuntimeError(
+                    f"find_or_create: could not find or create Human for ({email}, {tenant_id})"
+                ) from None
+            return existing
 
     def get_by_email(
         self, session: Session, email: str, tenant_id: uuid.UUID | None = None

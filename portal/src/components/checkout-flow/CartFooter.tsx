@@ -44,6 +44,8 @@ export default function CartFooter({
     isEditing,
     editCredit,
     termsAccepted,
+    isBuyerInfoComplete,
+    cartUiEnabled,
   } = useCheckout()
   const { getCity } = useCityProvider()
   const popup = getCity()
@@ -70,11 +72,12 @@ export default function CartFooter({
     : isEditing
       ? cart.passes.length > 0
       : isConfirmStep
-        ? cart.passes.length > 0 ||
-          !!cart.housing ||
-          cart.merch.length > 0 ||
-          !!cart.patron ||
-          hasDynamicItems
+        ? (cart.passes.length > 0 ||
+            !!cart.housing ||
+            cart.merch.length > 0 ||
+            !!cart.patron ||
+            hasDynamicItems) &&
+          isBuyerInfoComplete
         : nextStepId
           ? canProceedToStep(nextStepId)
           : false
@@ -94,7 +97,7 @@ export default function CartFooter({
 
   return (
     <div className="z-30">
-      {isExpanded && (
+      {cartUiEnabled && isExpanded && (
         <button
           type="button"
           aria-label={t("checkout.cart.close_aria")}
@@ -107,7 +110,7 @@ export default function CartFooter({
       <div
         className={cn(
           "bg-checkout-card-bg shadow-2xl transition-all duration-300 ease-in-out overflow-hidden rounded-2xl mb-2 relative z-30",
-          isExpanded ? "max-h-[60vh]" : "max-h-0",
+          cartUiEnabled && isExpanded ? "max-h-[60vh]" : "max-h-0",
         )}
       >
         <div className="px-4 py-4 overflow-y-auto max-h-[calc(60vh-80px)]">
@@ -119,22 +122,28 @@ export default function CartFooter({
       <div className="mb-4">
         <div className="backdrop-blur-xl bg-checkout-bottom-bar-bg rounded-2xl shadow-2xl border border-white/10 p-3 lg:p-4">
           <div className="flex items-center gap-2 lg:gap-3">
-            {/* Back button */}
-            <button
-              type="button"
-              onClick={isFirstStep ? onBack : goToPreviousStep}
-              className="flex items-center justify-center p-2.5 lg:px-3 lg:py-2 text-checkout-bottom-bar-text/60 hover:text-checkout-bottom-bar-text hover:bg-white/10 rounded-lg transition-colors shrink-0"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span className="hidden lg:inline text-sm font-medium ml-1.5">
-                {t("common.back")}
-              </span>
-            </button>
+            {/* Back button — hidden on the first step when there's no upstream onBack handler */}
+            {(!isFirstStep || onBack) && (
+              <button
+                type="button"
+                onClick={isFirstStep ? onBack : goToPreviousStep}
+                className="flex items-center justify-center p-2.5 lg:px-3 lg:py-2 text-checkout-bottom-bar-text/60 hover:text-checkout-bottom-bar-text hover:bg-white/10 rounded-lg transition-colors shrink-0"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span className="hidden lg:inline text-sm font-medium ml-1.5">
+                  {t("common.back")}
+                </span>
+              </button>
+            )}
 
             {/* Center: Total */}
             <button
               type="button"
-              onClick={() => setIsExpanded(!isExpanded)}
+              onClick={() => {
+                if (cartUiEnabled) {
+                  setIsExpanded(!isExpanded)
+                }
+              }}
               className="flex-1 flex items-center gap-2 min-w-0 overflow-hidden hover:opacity-80 transition-opacity"
             >
               <div className="flex flex-col items-start min-w-0 overflow-hidden">
@@ -142,7 +151,8 @@ export default function CartFooter({
                   <span className="text-[10px] lg:text-xs text-checkout-bottom-bar-text/60 uppercase tracking-wider font-medium">
                     {isEditing ? t("checkout.to_pay") : t("common.total")}
                   </span>
-                  {hasItems &&
+                  {cartUiEnabled &&
+                    hasItems &&
                     (isExpanded ? (
                       <ChevronDown className="w-3 h-3 text-checkout-bottom-bar-text/60 shrink-0" />
                     ) : (

@@ -25,28 +25,6 @@ describe("resolvePopupCheckoutPolicy", () => {
     expect(policy.isPassSystem).toBe(true)
     expect(policy.isSimpleQuantity).toBe(false)
   })
-
-  it("defaults checkout OTP to enabled", () => {
-    expect(resolvePopupCheckoutPolicy({}).checkoutOtpEnabled).toBe(true)
-  })
-
-  it("respects an explicit checkout OTP disable flag", () => {
-    expect(
-      resolvePopupCheckoutPolicy({
-        sale_type: SALE_TYPE.DIRECT,
-        checkout_otp_enabled: false,
-      }).checkoutOtpEnabled,
-    ).toBe(false)
-  })
-
-  it("keeps checkout OTP enabled for application popups", () => {
-    expect(
-      resolvePopupCheckoutPolicy({
-        sale_type: SALE_TYPE.APPLICATION,
-        checkout_otp_enabled: false,
-      }).checkoutOtpEnabled,
-    ).toBe(true)
-  })
 })
 
 describe("getEffectiveCheckoutMode", () => {

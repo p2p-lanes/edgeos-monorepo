@@ -8,6 +8,7 @@ from app.api import (
     auth,
     base_field_config,
     cart,
+    checkout,
     coupon,
     dashboard,
     email_template,
@@ -25,6 +26,7 @@ from app.api import (
     upload,
     user,
 )
+from app.api.application.router import portal_router
 
 api_router = APIRouter()
 
@@ -54,12 +56,16 @@ api_router.include_router(application_review.router)
 
 # Application flow resources
 api_router.include_router(application.router)
+api_router.include_router(portal_router)
 api_router.include_router(attendee.router)
 api_router.include_router(payment.router)
 api_router.include_router(cart.router)
 
 # Translations (i18n)
 api_router.include_router(translation.router)
+
+# Open-ticketing checkout (public, anonymous)
+api_router.include_router(checkout.router)
 
 # Utility resources
 api_router.include_router(upload.router)

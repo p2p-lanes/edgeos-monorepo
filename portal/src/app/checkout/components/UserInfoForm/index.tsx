@@ -25,7 +25,6 @@ import PersonalInfoForm from "./PersonalInfoForm"
 interface UserInfoFormProps {
   popupId: string
   popupName: string
-  otpEnabled: boolean
   schema?: ApplicationFormSchema
   onSubmit: (
     data: DefaultCheckoutFormData | CheckoutApplicationValues,
@@ -36,7 +35,6 @@ interface UserInfoFormProps {
 const UserInfoForm = ({
   popupId,
   popupName,
-  otpEnabled,
   schema,
   onSubmit,
   isSubmitting,
@@ -79,7 +77,6 @@ const UserInfoForm = ({
   }, [applicationData])
 
   const {
-    otpEnabled: isOtpEnabled,
     showVerificationInput,
     verificationCode,
     setVerificationCode,
@@ -92,8 +89,6 @@ const UserInfoForm = ({
     handleResendCode,
     handleChangeEmail,
   } = useEmailVerification({
-    popupId,
-    otpEnabled,
     email: String(formData.email ?? ""),
     onVerificationSuccess: (_token) => {
       setEmailVerified(String(formData.email ?? ""))
@@ -111,8 +106,20 @@ const UserInfoForm = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
+    if (
+      !emailVerified &&
+      formData.email &&
+      !/^\S+@\S+\.\S+$/.test(String(formData.email))
+    ) {
+      setErrors((prev) => ({
+        ...prev,
+        email: t("auth.invalid_email"),
+      }))
+      return
+    }
+
     if (!emailVerified) {
-      if (!showVerificationInput || !isOtpEnabled) {
+      if (!showVerificationInput) {
         await handleSendVerificationCode()
       } else {
         await handleVerifyCode()
@@ -198,7 +205,6 @@ const UserInfoForm = ({
         <CardContent className="space-y-4">
           {!emailVerified && (
             <EmailVerification
-              otpEnabled={isOtpEnabled}
               email={String(formData.email ?? "")}
               showVerificationInput={showVerificationInput}
               verificationCode={verificationCode}
@@ -231,8 +237,7 @@ const UserInfoForm = ({
             className="w-full"
             disabled={
               isSubmitting ||
-              (isOtpEnabled &&
-                showVerificationInput &&
+              (showVerificationInput &&
                 verificationCode.length !== 6 &&
                 !emailVerified) ||
               isSendingCode ||
@@ -243,11 +248,9 @@ const UserInfoForm = ({
               ? t("common.processing")
               : emailVerified
                 ? t("common.continue")
-                : isOtpEnabled && showVerificationInput
+                : showVerificationInput
                   ? t("checkout.verify_code")
-                  : isOtpEnabled
-                    ? t("checkout.send_code")
-                    : t("common.continue")}
+                  : t("checkout.send_code")}
           </Button>
         </CardFooter>
       </form>

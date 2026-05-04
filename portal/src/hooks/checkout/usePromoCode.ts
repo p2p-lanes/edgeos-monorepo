@@ -17,6 +17,7 @@ interface UsePromoCodeParams {
   resetDiscount: () => void
   savedCart: CartState | null | undefined
   hasRestoredCheckoutRef: MutableRefObject<boolean>
+  validatePromoCodeOverride?: (code: string) => Promise<number | null>
 }
 
 export function usePromoCode({
@@ -26,6 +27,7 @@ export function usePromoCode({
   resetDiscount,
   savedCart,
   hasRestoredCheckoutRef,
+  validatePromoCodeOverride,
 }: UsePromoCodeParams) {
   const [promoCode, setPromoCode] = useState("")
   const [promoCodeValid, setPromoCodeValid] = useState(false)
@@ -36,20 +38,22 @@ export function usePromoCode({
 
   const applyPromoCode = useCallback(
     async (code: string): Promise<boolean> => {
-      if (!cityId) return false
+      if (!cityId && !validatePromoCodeOverride) return false
 
       setIsLoading(true)
       setError(null)
 
       try {
-        const result = await CouponsService.validateCoupon({
-          requestBody: {
-            popup_id: cityId!,
-            code: code.toUpperCase(),
-          },
-        })
-
-        const discountValue = result.discount_value ?? 0
+        const discountValue = validatePromoCodeOverride
+          ? ((await validatePromoCodeOverride(code.toUpperCase())) ?? 0)
+          : ((
+              await CouponsService.validateCoupon({
+                requestBody: {
+                  popup_id: cityId!,
+                  code: code.toUpperCase(),
+                },
+              })
+            ).discount_value ?? 0)
 
         if (discountValue >= discountAppliedValue) {
           setPromoCode(code.toUpperCase())
@@ -72,7 +76,7 @@ export function usePromoCode({
         setIsLoading(false)
       }
     },
-    [cityId, discountAppliedValue, setDiscount],
+    [cityId, discountAppliedValue, setDiscount, validatePromoCodeOverride],
   )
 
   const clearPromoCode = useCallback(() => {
@@ -87,7 +91,7 @@ export function usePromoCode({
   useEffect(() => {
     if (hasRevalidatedPromoRef.current || !hasRestoredCheckoutRef.current)
       return
-    if (!savedCart?.promo_code || !cityId) return
+    if (!savedCart?.promo_code || !cityId || validatePromoCodeOverride) return
 
     hasRevalidatedPromoRef.current = true
 
@@ -112,7 +116,13 @@ export function usePromoCode({
       .catch(() => {
         toast.info("Your promo code is no longer valid")
       })
-  }, [savedCart, cityId, setDiscount, hasRestoredCheckoutRef.current])
+  }, [
+    savedCart,
+    cityId,
+    setDiscount,
+    hasRestoredCheckoutRef.current,
+    validatePromoCodeOverride,
+  ])
 
   return {
     promoCode,

@@ -1,39 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { useTranslation } from "react-i18next"
 import { ApiError, AuthService } from "@/client"
 import { dispatchAuthChange } from "@/hooks/useIsAuthenticated"
 import { configureApiClient } from "@/lib/api-client"
 import { useTenant } from "@/providers/tenantProvider"
 
 interface UseEmailVerificationProps {
-  popupId: string
-  otpEnabled: boolean
   email: string
   onVerificationSuccess: (token: string) => void
 }
 
-const OTP_REQUIRED_CODE = "otp_required"
-
-function isOtpRequiredError(error: unknown): boolean {
-  if (!(error instanceof ApiError) || error.status !== 409) {
-    return false
-  }
-  const detail = (error.body as { detail?: unknown } | undefined)?.detail
-  if (detail && typeof detail === "object" && "code" in detail) {
-    return (detail as { code?: unknown }).code === OTP_REQUIRED_CODE
-  }
-  return false
-}
-
 export const useEmailVerification = ({
-  popupId,
-  otpEnabled,
   email,
   onVerificationSuccess,
 }: UseEmailVerificationProps) => {
-  const { t } = useTranslation()
   const { tenantId } = useTenant()
-  const [otpRequiredFallback, setOtpRequiredFallback] = useState(false)
   const [showVerificationInput, setShowVerificationInput] = useState(false)
   const [verificationCode, setVerificationCode] = useState("")
   const [isSendingCode, setIsSendingCode] = useState(false)
@@ -43,10 +23,6 @@ export const useEmailVerification = ({
   )
   const [countdown, setCountdown] = useState(0)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
-
-  // Once the backend forces OTP for this email (existing account), keep using
-  // the OTP flow even if the popup itself has the no-OTP shortcut enabled.
-  const effectiveOtpEnabled = otpEnabled || otpRequiredFallback
 
   useEffect(() => {
     return () => {
@@ -76,25 +52,14 @@ export const useEmailVerification = ({
     }, 1000)
   }
 
-  const sendOtpLogin = async () => {
-    await AuthService.humanLogin({
-      requestBody: {
-        tenant_id: tenantId ?? "",
-        email: email.toLowerCase(),
-      },
-    })
-    setShowVerificationInput(true)
-    startCountdown()
-  }
-
   const handleSendVerificationCode = async () => {
     if (!email) {
-      setVerificationError(t("auth.email_required", "Email is required"))
+      setVerificationError("Email is required")
       return
     }
 
-    if (effectiveOtpEnabled && !/^\S+@\S+\.\S+$/.test(email)) {
-      setVerificationError(t("auth.invalid_email"))
+    if (!/^\S+@\S+\.\S+$/.test(email)) {
+      setVerificationError("Invalid email")
       return
     }
 
@@ -102,42 +67,20 @@ export const useEmailVerification = ({
       setIsSendingCode(true)
       setVerificationError(null)
 
-      if (!effectiveOtpEnabled) {
-        try {
-          const result = await AuthService.humanCheckoutAuthenticate({
-            requestBody: {
-              popup_id: popupId,
-              email: email.toLowerCase(),
-            },
-          })
+      await AuthService.humanLogin({
+        requestBody: {
+          tenant_id: tenantId ?? "",
+          email: email.toLowerCase(),
+        },
+      })
 
-          const token = result.access_token
-          configureApiClient(token)
-          window?.localStorage?.setItem("token", token)
-          dispatchAuthChange()
-          setShowVerificationInput(false)
-          onVerificationSuccess(token)
-          return
-        } catch (error) {
-          if (!isOtpRequiredError(error)) {
-            throw error
-          }
-          // Backend told us this email already has an account in the
-          // tenant. The no-OTP shortcut is no longer safe — fall back to
-          // the regular OTP flow transparently.
-          setOtpRequiredFallback(true)
-          setVerificationError(
-            t("auth.otp_required_for_existing_account"),
-          )
-          await sendOtpLogin()
-          return
-        }
-      }
-
-      await sendOtpLogin()
+      setShowVerificationInput(true)
+      startCountdown()
     } catch (error) {
       console.error("Error sending verification code:", error)
-      setVerificationError(t("auth.failed_to_send_code"))
+      setVerificationError(
+        "Failed to send verification code. Please try again.",
+      )
     } finally {
       setIsSendingCode(false)
     }
@@ -145,7 +88,7 @@ export const useEmailVerification = ({
 
   const handleVerifyCode = useCallback(async () => {
     if (verificationCode.length !== 6) {
-      setVerificationError(t("auth.code_must_be_6_digits"))
+      setVerificationError("Please enter the full 6-digit code")
       return
     }
 
@@ -180,19 +123,23 @@ export const useEmailVerification = ({
 
       if (error instanceof ApiError) {
         if (error.status === 401) {
-          setVerificationError(t("auth.invalid_code"))
+          setVerificationError("Invalid verification code. Please try again.")
         } else if (error.status === 404) {
-          setVerificationError(t("auth.code_expired"))
+          setVerificationError(
+            "Verification code not found. Please request a new code.",
+          )
         } else {
-          setVerificationError(t("auth.failed_to_verify"))
+          setVerificationError("Failed to verify code. Please try again.")
         }
       } else {
-        setVerificationError(t("auth.network_error"))
+        setVerificationError(
+          "Network error. Please check your connection and try again.",
+        )
       }
     } finally {
       setIsVerifyingCode(false)
     }
-  }, [email, verificationCode, onVerificationSuccess, tenantId, t])
+  }, [email, verificationCode, onVerificationSuccess, tenantId])
 
   useEffect(() => {
     if (
@@ -216,7 +163,9 @@ export const useEmailVerification = ({
       await handleSendVerificationCode()
     } catch (error) {
       console.error("Error resending code:", error)
-      setVerificationError(t("auth.failed_to_send_code"))
+      setVerificationError(
+        "Failed to resend verification code. Please try again.",
+      )
     }
   }
 
@@ -224,7 +173,6 @@ export const useEmailVerification = ({
     setShowVerificationInput(false)
     setVerificationCode("")
     setVerificationError(null)
-    setOtpRequiredFallback(false)
 
     if (timerRef.current) {
       clearInterval(timerRef.current)
@@ -234,7 +182,6 @@ export const useEmailVerification = ({
   }
 
   return {
-    otpEnabled: effectiveOtpEnabled,
     showVerificationInput,
     verificationCode,
     setVerificationCode,

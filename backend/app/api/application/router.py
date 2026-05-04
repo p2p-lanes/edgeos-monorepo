@@ -21,6 +21,7 @@ from app.api.application.schemas import (
     DirectoryProduct,
     NoParticipation,
     ParticipationResponse,
+    PopupAccessResponse,
     ScholarshipDecisionRequest,
 )
 from app.api.application_review.crud import application_reviews_crud
@@ -44,6 +45,9 @@ from app.core.dependencies.users import (
 from app.services.email_helpers import send_application_status_email
 
 router = APIRouter(prefix="/applications", tags=["applications"])
+
+# Portal router — separate prefix for the access endpoint
+portal_router = APIRouter(prefix="/portal", tags=["portal"])
 
 
 def _build_application_public(
@@ -232,8 +236,11 @@ async def list_my_tickets(
 
     results = []
     for attendee in attendees:
-        # Get popup info through application
-        popup = attendee.application.popup
+        # Use the direct Attendees→Popups relationship so this works for both
+        # application-linked attendees (application_id IS NOT NULL) and direct-sale
+        # attendees (application_id IS NULL). The attendee.application path would
+        # raise AttributeError for direct-sale attendees.
+        popup = attendee.popup
 
         # Build product list
         products = []
@@ -854,3 +861,30 @@ async def review_scholarship(
         )
 
     return _build_application_public(application)
+
+
+# ---------------------------------------------------------------------------
+# Portal access endpoint (CAP-A)
+# ---------------------------------------------------------------------------
+
+
+@portal_router.get(
+    "/popup/{popup_id}/access",
+    response_model=PopupAccessResponse,
+)
+async def get_popup_access(
+    popup_id: uuid.UUID,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+) -> PopupAccessResponse:
+    """Resolve access for the authenticated Human to a specific popup.
+
+    Runs the 7-step access ladder and returns a structured tristate response:
+    - allowed: bool
+    - source: which ladder step granted access (application/attendee/payment/companion)
+    - application_status: the application's status when an application exists
+    - reason: denial reason (no_access/application_pending/application_rejected)
+
+    Requires OTP-authenticated Human token. Always returns 200 (never 404).
+    """
+    return crud.applications_crud.resolve_popup_access(db, current_human.id, popup_id)

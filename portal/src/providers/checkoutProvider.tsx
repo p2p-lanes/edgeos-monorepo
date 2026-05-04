@@ -34,6 +34,7 @@ import {
 } from "@/hooks/checkout"
 import useGetPassesData from "@/hooks/useGetPassesData"
 import { useIsAuthenticated } from "@/hooks/useIsAuthenticated"
+import { buildFormZodSchema } from "@/lib/form-schema-builder"
 import type { AttendeePassState } from "@/types/Attendee"
 import type {
   CheckoutCartState,
@@ -42,6 +43,7 @@ import type {
   SelectedDynamicItem,
   SelectedPassItem,
 } from "@/types/checkout"
+import type { ApplicationFormSchema } from "@/types/form-schema"
 import type { ProductsPass } from "@/types/Products"
 import { useApplication } from "./applicationProvider"
 import { useCityProvider } from "./cityProvider"
@@ -102,6 +104,13 @@ interface CheckoutContextValue {
     productId: string,
     qty: number,
   ) => void
+  buyerFormSchema: ApplicationFormSchema | null
+  buyerValues: Record<string, unknown>
+  buyerErrors: Record<string, string>
+  buyerGeneralError: string | null
+  setBuyerField: (fieldName: string, value: unknown) => void
+  isBuyerInfoComplete: boolean
+  cartUiEnabled: boolean
 }
 
 const CheckoutContext = createContext<CheckoutContextValue | null>(null)
@@ -109,21 +118,42 @@ const CheckoutContext = createContext<CheckoutContextValue | null>(null)
 interface CheckoutProviderProps {
   children: ReactNode
   initialStep?: CheckoutStep
+  productsOverride?: ProductsPass[]
+  configuredStepsOverride?: TicketingStepPublic[]
+  accountCreditOverride?: number
+  validatePromoCodeOverride?: (code: string) => Promise<number | null>
+  submitMode?: "application" | "open-ticketing"
+  submitPopupSlug?: string | null
+  buyerFormSchema?: ApplicationFormSchema | null
+  initialBuyerValues?: Record<string, unknown>
+  cartPersistenceEnabled?: boolean
+  cartUiEnabled?: boolean
 }
 
 export function CheckoutProvider({
   children,
   initialStep = "passes",
+  productsOverride,
+  configuredStepsOverride,
+  accountCreditOverride,
+  validatePromoCodeOverride,
+  submitMode = "application",
+  submitPopupSlug = null,
+  buyerFormSchema = null,
+  initialBuyerValues = {},
+  cartPersistenceEnabled = true,
+  cartUiEnabled = true,
 }: CheckoutProviderProps) {
   const { attendeePasses, toggleProduct, isEditing, toggleEditing } =
     usePassesProvider()
   const { discountApplied, setDiscount, resetDiscount } = useDiscount()
   const { getRelevantApplication } = useApplication()
   const { getCity } = useCityProvider()
-  const { products } = useGetPassesData()
+  const { products: queriedProducts } = useGetPassesData()
+  const products = productsOverride ?? queriedProducts
   const isAuthenticated = useIsAuthenticated()
   const application = getRelevantApplication()
-  const appCredit = application?.credit
+  const appCredit = accountCreditOverride ?? application?.credit
   const city = getCity()
   const checkoutPolicy = resolvePopupCheckoutPolicy(city)
   const cityId = city?.id ? String(city.id) : null
@@ -131,6 +161,12 @@ export function CheckoutProvider({
   const hasRestoredCheckoutRef = useRef(false)
   const previousCityIdRef = useRef(cityId)
   const paymentCompleteRef = useRef(false)
+  const [buyerValues, setBuyerValues] =
+    useState<Record<string, unknown>>(initialBuyerValues)
+  const [buyerErrors, setBuyerErrors] = useState<Record<string, string>>({})
+  const [buyerGeneralError, setBuyerGeneralError] = useState<string | null>(
+    null,
+  )
 
   // Ticketing step configuration from API
   const { data: stepsData } = useQuery({
@@ -139,9 +175,53 @@ export function CheckoutProvider({
       TicketingStepsService.listPortalTicketingSteps({
         popupId: cityId!,
       }),
-    enabled: !!cityId && isAuthenticated,
+    enabled: !configuredStepsOverride && !!cityId && isAuthenticated,
   })
-  const configuredSteps = stepsData?.results ?? []
+  const configuredSteps = configuredStepsOverride ?? stepsData?.results ?? []
+  const effectiveConfiguredSteps = useMemo(() => {
+    if (!buyerFormSchema || submitMode !== "open-ticketing") {
+      return configuredSteps
+    }
+
+    const buyerStep: TicketingStepPublic = {
+      id: "buyer-step",
+      tenant_id: cityId ?? "",
+      popup_id: cityId ?? "",
+      step_type: "buyer",
+      title: "Your information",
+      description: "Complete your information before payment.",
+      order: 9998,
+      is_enabled: true,
+      protected: true,
+      product_category: null,
+      template: null,
+      template_config: null,
+      watermark: null,
+      show_title: true,
+      show_watermark: true,
+    }
+
+    const withoutBuyer = configuredSteps.filter(
+      (step) => step.step_type !== "buyer",
+    )
+    const confirmIndex = withoutBuyer.findIndex(
+      (step) => step.step_type === "confirm",
+    )
+
+    if (confirmIndex === -1) {
+      return [...withoutBuyer, buyerStep]
+    }
+
+    return [
+      ...withoutBuyer.slice(0, confirmIndex),
+      buyerStep,
+      ...withoutBuyer.slice(confirmIndex),
+    ]
+  }, [buyerFormSchema, cityId, configuredSteps, submitMode])
+
+  const isBuyerInfoComplete =
+    !buyerFormSchema ||
+    buildFormZodSchema(buyerFormSchema, false).safeParse(buyerValues).success
 
   // Product categories
   const { passProducts, housingProducts, merchProducts, patronProducts } =
@@ -237,6 +317,7 @@ export function CheckoutProvider({
     scheduleSave,
     clearCart: clearPersistedCart,
   } = useCartPersistence({
+    enabled: cartPersistenceEnabled,
     cityId,
     initialStep,
     products,
@@ -272,6 +353,7 @@ export function CheckoutProvider({
     resetDiscount,
     savedCart,
     hasRestoredCheckoutRef,
+    validatePromoCodeOverride,
   })
 
   // Step management
@@ -286,7 +368,7 @@ export function CheckoutProvider({
     isStepComplete: isStepCompleteFn,
   } = useCheckoutSteps({
     initialStep,
-    configuredSteps,
+    configuredSteps: effectiveConfiguredSteps,
     patronCount: patronProducts.length,
     housingCount: housingProducts.length,
     merchCount: merchProducts.length,
@@ -294,6 +376,7 @@ export function CheckoutProvider({
     dynamicItemsCount: Object.values(dynamicItems).flat().length,
     isEditing,
     allProducts: products,
+    buyerInfoComplete: isBuyerInfoComplete,
   })
 
   // Keep selection state ref in sync — promoCode, promoCodeValid, currentStep
@@ -582,6 +665,7 @@ export function CheckoutProvider({
   const { submitPayment, isSubmitting } = usePaymentSubmit({
     applicationId: application?.id,
     popupId: cityId,
+    popupSlug: submitPopupSlug,
     appCredit,
     checkoutMode: checkoutPolicy.checkoutMode,
     attendeePasses,
@@ -599,6 +683,23 @@ export function CheckoutProvider({
     setCurrentStep,
     setPromoError,
     paymentCompleteRef,
+    submitMode,
+    buyerData:
+      submitMode === "open-ticketing"
+        ? {
+            email:
+              typeof buyerValues.email === "string" ? buyerValues.email : "",
+            firstName:
+              typeof buyerValues.first_name === "string"
+                ? buyerValues.first_name
+                : "",
+            lastName:
+              typeof buyerValues.last_name === "string"
+                ? buyerValues.last_name
+                : "",
+            formData: buyerValues,
+          }
+        : null,
   })
 
   const finalSummary = useMemo(
@@ -614,7 +715,7 @@ export function CheckoutProvider({
   const value: CheckoutContextValue = {
     currentStep,
     availableSteps,
-    stepConfigs: configuredSteps,
+    stepConfigs: effectiveConfiguredSteps,
     cart,
     summary: finalSummary,
     passProducts,
@@ -653,6 +754,21 @@ export function CheckoutProvider({
     addDynamicItem,
     removeDynamicItem,
     updateDynamicQuantity,
+    buyerFormSchema,
+    buyerValues,
+    buyerErrors,
+    buyerGeneralError,
+    setBuyerField: (fieldName, value) => {
+      setBuyerValues((current) => ({ ...current, [fieldName]: value }))
+      setBuyerErrors((current) => {
+        const next = { ...current }
+        delete next[fieldName]
+        return next
+      })
+      setBuyerGeneralError(null)
+    },
+    isBuyerInfoComplete,
+    cartUiEnabled,
   }
 
   return (

@@ -42,7 +42,8 @@
     "in_review": "Edit Application",
     "accepted": "Go to Passes",
     "rejected": "",
-    "withdrawn": "Resume Application"
+    "withdrawn": "Resume Application",
+    "buy_tickets": "Buy Tickets"
   },
   "portal": {
     "no_active_popups": "No Active Popups",
@@ -67,8 +68,7 @@
     "invalid_code": "Invalid verification code. Please try again.",
     "code_expired": "Code expired. Please request a new one.",
     "failed_to_verify": "Failed to verify code. Please try again.",
-    "network_error": "Network error. Please check your connection.",
-    "otp_required_for_existing_account": "An account already exists for this email. We sent you a 6-digit verification code."
+    "network_error": "Network error. Please check your connection."
   },
   "form": {
     "first_name": "First Name",
@@ -182,10 +182,6 @@
     "resend_hint": "Didn't receive the code? Check your spam folder or click \"Resend Code\" after the timer expires.",
     "success_title": "Tickets Purchased!",
     "success_description": "Thank you for your purchase. Your tickets are now ready for use.",
-    "success_email_hint": "We sent a confirmation with the details to your email.",
-    "success_portal_login_hint": "To view your tickets in the portal, sign in with the verification code we email you.",
-    "go_to_portal_signin": "Sign in to view your tickets",
-    "express_subtitle": "Sign in to continue to checkout.",
     "steps": {
       "passes_title": "Select Your Passes",
       "passes_subtitle": "Choose passes for yourself and family members",
@@ -221,6 +217,29 @@
       "patron": "Patron",
       "confirm": "Review & Confirm"
     }
+  },
+  "openCheckout": {
+    "loading": "Loading checkout...",
+    "unavailable_title": "Checkout unavailable",
+    "unavailable_description": "This link is invalid or this event is no longer available.",
+    "tickets_title": "Tickets",
+    "tickets_subtitle": "Choose how many tickets you want to buy.",
+    "coupon_title": "Coupon",
+    "coupon_subtitle": "If you have a discount code, apply it here.",
+    "coupon_placeholder": "FESTIVAL10",
+    "coupon_validating": "Validating...",
+    "coupon_apply": "Apply",
+    "coupon_applied": "Coupon applied: {{code}} ({{percent}}% OFF)",
+    "summary_title": "Summary",
+    "summary_tickets": "Tickets",
+    "summary_subtotal": "Subtotal",
+    "summary_discount": "Discount",
+    "summary_total": "Total",
+    "summary_redirecting": "Redirecting...",
+    "summary_pay": "Pay",
+    "thank_you_title": "Payment completed",
+    "thank_you_description": "Thank you for your purchase. If you want to keep managing your tickets, you can continue in the portal.",
+    "thank_you_cta": "Go to portal"
   },
   "passes": {
     "your_passes": "Your Passes",
@@ -332,6 +351,7 @@
   },
   "sidebar": {
     "your_participation": "Your Participation",
+    "event": "Event",
     "coming_soon": "(Coming Soon)",
     "soon_badge": "Soon",
     "application": "Application",

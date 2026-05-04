@@ -16,13 +16,12 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { formatDate } from "@/helpers/dates"
-import { useApplication } from "@/providers/applicationProvider"
+import useAuth from "@/hooks/useAuth"
 import type { PaymentsProps } from "@/types/passes"
 
 const PaymentHistory = ({ payments }: { payments: PaymentsProps[] }) => {
   const { t } = useTranslation()
-  const { getRelevantApplication } = useApplication()
-  const application = getRelevantApplication()
+  const { user } = useAuth()
   const approvedPayments = payments?.filter(
     (payment) => payment.status === "approved",
   )
@@ -43,7 +42,7 @@ const PaymentHistory = ({ payments }: { payments: PaymentsProps[] }) => {
   }
 
   const handleDownloadInvoice = async (payment: PaymentsProps) => {
-    if (!application) return
+    if (!user) return
 
     setDownloadingId(payment.id)
     try {
@@ -71,10 +70,11 @@ const PaymentHistory = ({ payments }: { payments: PaymentsProps[] }) => {
       const link = document.createElement("a")
       link.href = blobUrl
 
-      const clientName = application.human
-        ? `${application.human.first_name ?? ""} ${application.human.last_name ?? ""}`.trim()
-        : "invoice"
-      link.download = `${clientName}-invoice.pdf`
+      const firstName = user.first_name ?? ""
+      const lastName = user.last_name ?? ""
+      const safeName =
+        [firstName, lastName].filter(Boolean).join("-").trim() || user.email
+      link.download = `${safeName}-invoice.pdf`
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)

@@ -1,60 +1,70 @@
 "use client"
 
-import { useParams, useRouter, useSearchParams } from "next/navigation"
-import { useEffect } from "react"
-import { getBackgroundProps } from "@/lib/background-image"
-import { getPublicGroupPath } from "@/lib/group-route"
-import { useCityProvider } from "@/providers/cityProvider"
-import { PopupCheckoutContent } from "../components/PopupCheckoutContent"
+import { useParams } from "next/navigation"
+import { useTranslation } from "react-i18next"
+import { OpenCheckoutRuntime } from "@/components/checkout-flow/OpenCheckoutRuntime"
+import { SidebarProvider } from "@/components/Sidebar/SidebarComponents"
+import useAuth from "@/hooks/useAuth"
+import { useCheckoutRuntime } from "./hooks/useCheckoutRuntime"
 
-const LoadingFallback = () => (
-  <div className="flex items-center justify-center h-screen">
-    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500" />
-  </div>
-)
-
-const PopupCheckoutPage = () => {
+export default function OpenTicketingCheckoutPage() {
+  const { t } = useTranslation()
   const params = useParams<{ popupSlug: string }>()
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const { getPopups, popupsLoaded } = useCityProvider()
-  const groupSlug = searchParams.get("group")
+  const popupSlug = params.popupSlug
+  const { data: runtime, isLoading, isError } = useCheckoutRuntime(popupSlug)
+  const { user } = useAuth()
 
-  useEffect(() => {
-    if (!groupSlug) return
+  const prefilledBuyer = user
+    ? {
+        email: user.email,
+        firstName: user.first_name ?? "",
+        lastName: user.last_name ?? "",
+      }
+    : undefined
 
-    router.replace(getPublicGroupPath(groupSlug))
-  }, [groupSlug, router])
-
-  if (groupSlug) {
-    return <LoadingFallback />
-  }
-
-  const popups = getPopups()
-  const popupFromSlug = popups.find((item) => item.slug === params.popupSlug)
-
-  if (!popupsLoaded) {
-    return <LoadingFallback />
-  }
-
-  if (!popupFromSlug) {
+  if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-neutral-100 p-6">
-        <div className="max-w-md rounded-2xl bg-white p-8 text-center shadow-sm">
-          <h1 className="text-2xl font-bold text-neutral-900">
-            Event not found
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-sm text-muted-foreground">
+          {t("openCheckout.loading")}
+        </div>
+      </div>
+    )
+  }
+
+  if (isError || !runtime) {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-6">
+        <div className="rounded-2xl border bg-card p-8 text-center shadow-sm">
+          <h1 className="text-2xl font-semibold">
+            {t("openCheckout.unavailable_title")}
           </h1>
-          <p className="mt-3 text-sm text-neutral-600">
-            The checkout link is invalid or this event is no longer available.
+          <p className="mt-2 text-sm text-muted-foreground">
+            {t("openCheckout.unavailable_description")}
           </p>
         </div>
       </div>
     )
   }
 
-  const background = getBackgroundProps(popupFromSlug)
-
-  return <PopupCheckoutContent popup={popupFromSlug} background={background} />
+  return (
+    <SidebarProvider
+      defaultOpen={false}
+      className="block min-h-0"
+      style={
+        {
+          "--sidebar-width": "0px",
+          "--sidebar-width-icon": "0px",
+        } as React.CSSProperties
+      }
+    >
+      <main className="h-svh overflow-y-auto bg-background">
+        <OpenCheckoutRuntime
+          runtime={runtime}
+          popupSlug={popupSlug}
+          prefilledBuyer={prefilledBuyer}
+        />
+      </main>
+    </SidebarProvider>
+  )
 }
-
-export default PopupCheckoutPage

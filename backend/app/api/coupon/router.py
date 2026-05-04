@@ -1,5 +1,4 @@
 import uuid
-from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
@@ -9,20 +8,46 @@ from app.api.coupon.schemas import (
     CouponPublic,
     CouponUpdate,
     CouponValidate,
+    CouponValidatePublicRequest,
+    CouponValidatePublicResponse,
 )
 from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
-    CurrentHumanForCheckout,
+    CurrentHuman,
     CurrentUser,
     CurrentWriter,
     SessionDep,
     TenantSession,
-    enforce_checkout_popup_match,
 )
-from app.core.security import TokenPayload, get_token_payload
+from app.core.rate_limit import RateLimit
 
 router = APIRouter(prefix="/coupons", tags=["coupons"])
+
+
+@router.post(
+    "/validate-public",
+    response_model=CouponValidatePublicResponse,
+    tags=["coupons"],
+    dependencies=[
+        Depends(RateLimit(limit=30, window_sec=60, key_prefix="rl:coupon-public")),
+    ],
+)
+async def validate_coupon_public(
+    request_in: CouponValidatePublicRequest,
+    db: SessionDep,
+) -> CouponValidatePublicResponse:
+    """Validate a coupon code for an anonymous open-ticketing checkout (no JWT required).
+
+    Returns coupon details on success. Returns 400 with uniform message for
+    any invalid/expired/unknown state. Returns 403 if popup is not direct-sale.
+    Rate-limited 30/min/IP.
+    """
+    return crud.coupons_crud.validate_public(
+        db,
+        popup_slug=request_in.popup_slug,
+        code=request_in.code,
+    )
 
 
 @router.get("", response_model=ListModel[CouponPublic])
@@ -78,8 +103,7 @@ async def get_coupon(
 async def validate_coupon(
     coupon_in: CouponValidate,
     db: SessionDep,
-    _: CurrentHumanForCheckout,
-    token_payload: Annotated[TokenPayload, Depends(get_token_payload)],
+    _: CurrentHuman,
 ) -> CouponPublic:
     """
     Validate a coupon code (Portal - Human only).
@@ -87,7 +111,6 @@ async def validate_coupon(
     This endpoint is used by the ticketing portal to check if a coupon is valid
     before applying it to a payment.
     """
-    enforce_checkout_popup_match(token_payload, coupon_in.popup_id)
     coupon = crud.coupons_crud.validate_coupon(db, coupon_in.code, coupon_in.popup_id)
     return CouponPublic.model_validate(coupon)
 

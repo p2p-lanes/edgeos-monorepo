@@ -21,7 +21,7 @@ interface DiscountContextType {
   resetDiscount: () => void
 }
 
-const DiscountContext = createContext<DiscountContextType | null>(null)
+export const DiscountContext = createContext<DiscountContextType | null>(null)
 
 const DiscountProvider = ({ children }: { children: ReactNode }) => {
   const { getCity } = useCityProvider()

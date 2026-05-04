@@ -27,17 +27,6 @@ class HumanAuth(BaseModel):
     red_flag: bool = False
 
 
-class HumanCheckoutAuth(BaseModel):
-    """Request to authenticate directly for a popup checkout when OTP is disabled."""
-
-    popup_id: uuid.UUID
-    email: str = Field(min_length=1)
-
-    @property
-    def normalized_email(self) -> str:
-        return self.email.lower().strip()
-
-
 class HumanVerify(BaseModel):
     """Request to verify human authentication code."""
 

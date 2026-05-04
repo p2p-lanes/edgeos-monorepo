@@ -3,11 +3,7 @@ import { ApplicationsService } from "@/client"
 import { useIsAuthenticated } from "@/hooks/useIsAuthenticated"
 import { queryKeys } from "@/lib/query-keys"
 
-interface UseApplicationsQueryOptions {
-  enabled?: boolean
-}
-
-export function useApplicationsQuery(options: UseApplicationsQueryOptions = {}) {
+export function useApplicationsQuery() {
   const isAuthenticated = useIsAuthenticated()
   return useQuery({
     queryKey: queryKeys.applications.mine(),
@@ -15,7 +11,7 @@ export function useApplicationsQuery(options: UseApplicationsQueryOptions = {}) 
       const result = await ApplicationsService.listMyApplications()
       return result.results
     },
-    enabled: isAuthenticated && options.enabled !== false,
+    enabled: isAuthenticated,
   })
 }
 

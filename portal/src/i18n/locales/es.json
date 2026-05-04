@@ -42,7 +42,8 @@
     "in_review": "Editar aplicación",
     "accepted": "Ver pases",
     "rejected": "",
-    "withdrawn": "Retomar aplicación"
+    "withdrawn": "Retomar aplicación",
+    "buy_tickets": "Comprar tickets"
   },
   "portal": {
     "no_active_popups": "Sin eventos activos",
@@ -67,8 +68,7 @@
     "invalid_code": "Código de verificación inválido. Por favor, intentá de nuevo.",
     "code_expired": "El código expiró. Por favor, solicitá uno nuevo.",
     "failed_to_verify": "Error al verificar el código. Por favor, intentá de nuevo.",
-    "network_error": "Error de red. Por favor, verificá tu conexión.",
-    "otp_required_for_existing_account": "Ya existe una cuenta con este email. Te enviamos un código de 6 dígitos para verificar."
+    "network_error": "Error de red. Por favor, verificá tu conexión."
   },
   "form": {
     "first_name": "Nombre",
@@ -182,10 +182,6 @@
     "resend_hint": "¿No recibiste el código? Revisá tu carpeta de spam o hacé clic en \"Reenviar código\" después de que expire el temporizador.",
     "success_title": "¡Tickets comprados!",
     "success_description": "Gracias por tu compra. Tus tickets ya están listos para usar.",
-    "success_email_hint": "Te enviamos los detalles por mail.",
-    "success_portal_login_hint": "Para ver tus tickets en el portal, ingresá con el código de verificación que te enviamos por mail.",
-    "go_to_portal_signin": "Ingresá para ver tus tickets",
-    "express_subtitle": "Ingresá para continuar con la compra.",
     "steps": {
       "passes_title": "Seleccioná tus Pases",
       "passes_subtitle": "Elegí pases para vos y tu familia",
@@ -221,6 +217,29 @@
       "patron": "Patrono",
       "confirm": "Revisar y Confirmar"
     }
+  },
+  "openCheckout": {
+    "loading": "Cargando checkout...",
+    "unavailable_title": "Checkout no disponible",
+    "unavailable_description": "El link es inválido o este evento ya no está disponible.",
+    "tickets_title": "Tickets",
+    "tickets_subtitle": "Elegí cuántos tickets querés comprar.",
+    "coupon_title": "Cupón",
+    "coupon_subtitle": "Si tenés un código de descuento, aplicalo acá.",
+    "coupon_placeholder": "FESTIVAL10",
+    "coupon_validating": "Validando...",
+    "coupon_apply": "Aplicar",
+    "coupon_applied": "Cupón aplicado: {{code}} ({{percent}}% OFF)",
+    "summary_title": "Resumen",
+    "summary_tickets": "Tickets",
+    "summary_subtotal": "Subtotal",
+    "summary_discount": "Descuento",
+    "summary_total": "Total",
+    "summary_redirecting": "Redirigiendo...",
+    "summary_pay": "Pagar",
+    "thank_you_title": "Pago completado",
+    "thank_you_description": "Gracias por tu compra. Si querés seguir gestionando tus tickets, podés continuar en el portal.",
+    "thank_you_cta": "Ir al portal"
   },
   "passes": {
     "your_passes": "Tus Pases",
@@ -332,6 +351,7 @@
   },
   "sidebar": {
     "your_participation": "Tu Participación",
+    "event": "Evento",
     "coming_soon": "(Próximamente)",
     "soon_badge": "Próximamente",
     "application": "Aplicación",

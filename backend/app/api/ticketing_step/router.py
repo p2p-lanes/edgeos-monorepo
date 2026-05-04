@@ -1,7 +1,6 @@
 import uuid
-from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, HTTPException, status
 
 from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
@@ -12,27 +11,23 @@ from app.api.ticketing_step.schemas import (
     TicketingStepUpdate,
 )
 from app.core.dependencies.users import (
-    CheckoutHumanTenantSession,
-    CurrentHumanForCheckout,
+    CurrentHuman,
     CurrentUser,
     CurrentWriter,
+    HumanTenantSession,
     TenantSession,
-    enforce_checkout_popup_match,
 )
-from app.core.security import TokenPayload, get_token_payload
 
 router = APIRouter(prefix="/ticketing-steps", tags=["ticketing-steps"])
 
 
 @router.get("/portal", response_model=ListModel[TicketingStepPublic])
 async def list_portal_ticketing_steps(
-    db: CheckoutHumanTenantSession,
-    _: CurrentHumanForCheckout,
-    token_payload: Annotated[TokenPayload, Depends(get_token_payload)],
+    db: HumanTenantSession,
+    _: CurrentHuman,
     popup_id: uuid.UUID,
 ) -> ListModel[TicketingStepPublic]:
     """List enabled ticketing steps for a popup (portal-facing)."""
-    enforce_checkout_popup_match(token_payload, popup_id)
     steps = crud.ticketing_steps_crud.find_portal_by_popup(db, popup_id=popup_id)
     return ListModel[TicketingStepPublic](
         results=[TicketingStepPublic.model_validate(s) for s in steps],

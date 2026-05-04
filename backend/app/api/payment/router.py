@@ -2,14 +2,13 @@ import uuid
 from decimal import Decimal
 from typing import TYPE_CHECKING, Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 from sqlmodel import Session
 
 from app.api.payment.crud import payments_crud
 from app.api.payment.models import Payments
 from app.api.payment.schemas import (
     ApplicationFeeCreate,
-    DirectPurchaseCreate,
     PaymentCreate,
     PaymentFilter,
     PaymentPreview,
@@ -23,18 +22,14 @@ from app.api.payment.schemas import (
 )
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
-    CheckoutHumanTenantSession,
     CurrentHuman,
-    CurrentHumanForCheckout,
     CurrentUser,
     CurrentWriter,
     HumanTenantSession,
     SessionDep,
     TenantSession,
-    enforce_checkout_popup_match,
 )
 from app.core.redis import WebhookCache
-from app.core.security import TokenPayload, get_token_payload
 from app.services.email import (
     EmailAttachment,
     PaymentAttendeeItem,
@@ -47,7 +42,6 @@ from app.services.email_helpers import send_application_status_email
 
 if TYPE_CHECKING:
     from app.api.human.models import Humans
-    from app.api.human.schemas import HumanPublic
     from app.api.popup.models import Popups
 
 router = APIRouter(prefix="/payments", tags=["payments"])
@@ -276,9 +270,9 @@ async def _send_payment_confirmed_email(payment, db_session=None) -> None:
 
 
 def _get_portal_owned_payment_or_404(
-    db: Session,
+    db: HumanTenantSession,
     payment_id: uuid.UUID,
-    current_human: "HumanPublic",
+    current_human: CurrentHuman,
 ) -> Payments:
     payment = payments_crud.get_portal_owned_payment(db, payment_id, current_human.id)
     if payment is None:
@@ -290,9 +284,9 @@ def _get_portal_owned_payment_or_404(
 
 
 def _get_portal_payment_context_or_404(
-    db: Session,
+    db: HumanTenantSession,
     payment_id: uuid.UUID,
-    current_human: "HumanPublic",
+    current_human: CurrentHuman,
 ) -> tuple[Payments, "Popups", "Humans | None"]:
     payment = _get_portal_owned_payment_or_404(db, payment_id, current_human)
 
@@ -524,6 +518,34 @@ async def create_my_application_fee(
     return PaymentPublic.model_validate(payment)
 
 
+@router.get("/my/popup/{popup_id}", response_model=ListModel[PaymentPublic])
+async def list_my_payments_by_popup(
+    popup_id: uuid.UUID,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+    skip: Annotated[int, Query(ge=0, description="Number of payments to skip")] = 0,
+    limit: Annotated[
+        int, Query(ge=1, le=100, description="Max payments to return (max 100)")
+    ] = 50,
+) -> ListModel[PaymentPublic]:
+    """List all payments owned by the current Human for a specific popup (Portal).
+
+    Ownership is resolved via dual-path predicate:
+    - Application leg: payment.application.human_id == current_human.id
+    - Direct-sale leg: payment_products.attendee.human_id == current_human.id
+
+    Requires OTP-authenticated Human token. Empty result is valid (not 404).
+    """
+    payments, total = payments_crud.find_by_human_popup(
+        db, human_id=current_human.id, popup_id=popup_id, skip=skip, limit=limit
+    )
+    results = [PaymentPublic.model_validate(p) for p in payments]
+    return ListModel[PaymentPublic](
+        results=results,
+        paging=Paging(offset=skip, limit=limit, total=total),
+    )
+
+
 @router.get("/my/latest", response_model=PaymentStatusCheck)
 async def get_my_latest_payment(
     application_id: uuid.UUID,
@@ -557,17 +579,11 @@ async def get_my_latest_payment(
 @router.get("/my/{payment_id}/status", response_model=PaymentStatusCheck)
 async def get_my_payment_status(
     payment_id: uuid.UUID,
-    db: CheckoutHumanTenantSession,
-    current_human: CurrentHumanForCheckout,
-    token_payload: Annotated[TokenPayload, Depends(get_token_payload)],
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
 ) -> PaymentStatusCheck:
-    """Get the current status for an owned payment (Portal).
-
-    Reachable from the checkout allowlist: the polling step after creating
-    a direct payment needs to keep working with the lighter checkout token.
-    """
+    """Get the current status for an owned payment (Portal)."""
     payment = _get_portal_owned_payment_or_404(db, payment_id, current_human)
-    enforce_checkout_popup_match(token_payload, payment.popup_id)
 
     return PaymentStatusCheck(
         id=payment.id,
@@ -720,47 +736,18 @@ async def create_my_payment(
     return PaymentPublic.model_validate(payment)
 
 
-@router.post(
-    "/direct",
-    response_model=PaymentPublic,
-    status_code=status.HTTP_201_CREATED,
-)
-async def create_direct_payment(
-    purchase_in: DirectPurchaseCreate,
-    db: CheckoutHumanTenantSession,
-    current_human: CurrentHumanForCheckout,
-    token_payload: Annotated[TokenPayload, Depends(get_token_payload)],
-) -> PaymentPublic:
-    """Create a direct-sale payment for the current human (Portal).
+@router.post("/direct", include_in_schema=False)
+async def create_direct_payment_gone() -> None:
+    """Legacy direct payment tombstone.
 
-    Used for popups with sale_type="direct". No application required. The
-    server resolves the Attendee from CurrentHuman automatically and creates
-    a SimpleFI payment request (or auto-approves if the total is zero).
+    Without this explicit POST handler, `/payments/{payment_id}` keeps the path
+    shape reserved and Starlette returns 405 for POST /payments/direct.
+    We want a hard 404 contract for the removed legacy surface.
     """
-    from app.api.human.crud import humans_crud
-    from app.api.tenant.crud import tenants_crud
-
-    enforce_checkout_popup_match(token_payload, purchase_in.popup_id)
-
-    # Load human + tenant (the request session is already tenant-scoped, but
-    # we need the Tenants ORM instance for the SimpleFI call)
-    human = humans_crud.get(db, current_human.id)
-    if not human:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Human not found",
-        )
-    tenant = tenants_crud.get(db, current_human.tenant_id)
-    if not tenant:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Tenant not found",
-        )
-
-    payment = payments_crud.create_direct_payment(
-        db, obj=purchase_in, human=human, tenant=tenant
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="Not Found",
     )
-    return PaymentPublic.model_validate(payment)
 
 
 @router.post("/webhook/simplefi", status_code=status.HTTP_200_OK)
