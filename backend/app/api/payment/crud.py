@@ -438,6 +438,18 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     first_slot = False
 
             amount = amount.quantize(MONEY_PRECISION, rounding=ROUND_HALF_UP)
+
+            if obj.coupon_code:
+                coupon = coupons_crud.validate_coupon(
+                    session, code=obj.coupon_code, popup_id=popup.id
+                )
+                discount_value = Decimal(str(coupon.discount_value))
+                amount = _get_discounted_price(amount, discount_value)
+                payment.coupon_id = coupon.id
+                payment.coupon_code = coupon.code
+                payment.discount_value = discount_value
+                coupons_crud.use_coupon(session, coupon.id)
+
             payment.amount = amount
 
             if not popup.simplefi_api_key:
