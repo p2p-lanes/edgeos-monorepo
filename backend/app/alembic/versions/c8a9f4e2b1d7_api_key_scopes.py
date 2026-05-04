@@ -1,7 +1,7 @@
 """Add scopes to api_keys for least-privilege PAT authorization.
 
 Revision ID: c8a9f4e2b1d7
-Revises: 0041_events_require_approval
+Revises: 439d14566eae
 Create Date: 2026-04-27
 """
 
@@ -12,7 +12,7 @@ from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision: str = "c8a9f4e2b1d7"
-down_revision: str | None = "0041_events_require_approval"
+down_revision: str | None = "439d14566eae"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
