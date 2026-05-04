@@ -82,11 +82,11 @@ export default function EventsPage() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const view: EventsView =
-    (searchParams.get("view") as EventsView | null) ?? "day"
+    (searchParams.get("view") as EventsView | null) ?? "list"
   const setView = useCallback(
     (next: EventsView) => {
       const params = new URLSearchParams(searchParams.toString())
-      if (next === "day") params.delete("view")
+      if (next === "list") params.delete("view")
       else params.set("view", next)
       const qs = params.toString()
       router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
