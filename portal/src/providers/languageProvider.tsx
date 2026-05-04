@@ -14,7 +14,9 @@ import { useTranslation } from "react-i18next"
 import { SUPPORTED_LANGUAGES } from "@/i18n/config"
 import { CityContext } from "./cityProvider"
 
-const STORAGE_KEY = "portal_language"
+// Bumped from "portal_language": prior versions auto-wrote on every render,
+// leaving stale "en" values that override the popup default_language.
+const STORAGE_KEY = "portal_language_v2"
 const PORTAL_LANGUAGES = Object.keys(SUPPORTED_LANGUAGES)
 const DEFAULT_LANGUAGE = "en"
 
@@ -109,11 +111,12 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
             supportedLanguages,
           )
     const browserLanguage = detectBrowserLanguage(supportedLanguages)
+    // Popup default beats browser locale: organizer intent over visitor OS.
     const nextLanguage =
       urlLanguage ??
       storedLanguage ??
-      browserLanguage ??
       defaultLanguage ??
+      browserLanguage ??
       DEFAULT_LANGUAGE
 
     if (nextLanguage !== currentLanguage) {
@@ -121,13 +124,11 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     }
   }, [searchParams, supportedLanguages, defaultLanguage, currentLanguage])
 
-  // Sync i18n instance, localStorage, and invalidate queries on language change
+  // localStorage is written only by setLanguage (manual choice) — not here, to avoid
+  // clobbering the popup default during auto-resolve and bouncing back on next render.
   useEffect(() => {
     if (i18n.language !== currentLanguage) {
       i18n.changeLanguage(currentLanguage)
-    }
-    if (typeof window !== "undefined") {
-      localStorage.setItem(STORAGE_KEY, currentLanguage)
     }
     document.documentElement.lang = currentLanguage
 
@@ -144,6 +145,9 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const setLanguage = (lang: string) => {
     const resolvedLanguage = resolveLanguageCandidate(lang, supportedLanguages)
     if (resolvedLanguage) {
+      if (typeof window !== "undefined") {
+        localStorage.setItem(STORAGE_KEY, resolvedLanguage)
+      }
       setCurrentLanguage(resolvedLanguage)
     }
   }
