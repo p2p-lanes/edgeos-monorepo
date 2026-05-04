@@ -19,8 +19,8 @@ import {
   HumansService,
 } from "@/client"
 import { LucideIcon } from "@/components/LucideIcon"
-import { VenueHoursPreview } from "@/components/VenueHoursPreview"
 import { Pill } from "@/components/ui/pill"
+import { VenueHoursPreview } from "@/components/VenueHoursPreview"
 import { useCityProvider } from "@/providers/cityProvider"
 
 export default function PortalVenueDetailPage() {
