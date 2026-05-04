@@ -462,6 +462,18 @@ export type BaseFieldConfigUpdate = {
 };
 
 /**
+ * Buyer identification and form data for open-ticketing purchase.
+ */
+export type BuyerInfo = {
+    email: string;
+    first_name: string;
+    last_name: string;
+    form_data?: {
+        [key: string]: unknown;
+    };
+};
+
+/**
  * Embedded human info for abandoned cart listing.
  */
 export type CartHumanInfo = {
@@ -580,7 +592,73 @@ export type CategoryBreakdown = {
     revenue?: string;
 };
 
+/**
+ * Public buyer-form field for the checkout runtime.
+ */
+export type CheckoutBuyerField = {
+    id: string;
+    name: string;
+    label: string;
+    field_type: string;
+    required?: boolean;
+    options?: (Array<(string)> | null);
+    placeholder?: (string | null);
+    help_text?: (string | null);
+    min_date?: (string | null);
+    max_date?: (string | null);
+    position?: number;
+};
+
+/**
+ * Public buyer-form section for the checkout runtime.
+ */
+export type CheckoutBuyerSection = {
+    id: string;
+    label: string;
+    description?: (string | null);
+    order?: number;
+    kind?: string;
+    form_fields?: Array<CheckoutBuyerField>;
+};
+
 export type CheckoutMode = 'pass_system' | 'simple_quantity';
+
+/**
+ * Public product available in the checkout runtime.
+ */
+export type CheckoutRuntimeProduct = {
+    tenant_id: string;
+    popup_id: string;
+    id: string;
+    name: string;
+    slug: string;
+    description?: (string | null);
+    price: string;
+    compare_price?: (string | null);
+    image_url?: (string | null);
+    category?: string;
+    currency?: string;
+    attendee_category?: (string | null);
+    duration_type?: (string | null);
+    start_date?: (unknown | null);
+    end_date?: (unknown | null);
+    max_quantity?: (number | null);
+    is_active?: boolean;
+    exclusive?: boolean;
+    insurance_eligible?: boolean;
+    tier_group?: (TierGroupPublic | null);
+    phase?: (TierPhasePublic | null);
+};
+
+/**
+ * Full response for GET /checkout/{slug}/runtime.
+ */
+export type CheckoutRuntimeResponse = {
+    popup: PopupPublic;
+    products: Array<CheckoutRuntimeProduct>;
+    buyer_form: Array<CheckoutBuyerSection>;
+    ticketing_steps: Array<TicketingStepPublic>;
+};
 
 /**
  * Schema for creating companion attendees (spouse/kids) during application.
@@ -653,6 +731,24 @@ export type CouponValidate = {
     code: string;
 };
 
+/**
+ * Request schema for public coupon validation (anonymous, no JWT).
+ */
+export type CouponValidatePublicRequest = {
+    popup_slug: string;
+    code: string;
+};
+
+/**
+ * Response schema for public coupon validation.
+ */
+export type CouponValidatePublicResponse = {
+    code: string;
+    discount_type: string;
+    discount_value: string;
+    valid: boolean;
+};
+
 export type CredentialInfo = {
     credential_type: CredentialType;
     db_username: string;
@@ -689,25 +785,6 @@ export type DirectoryProduct = {
     duration_type?: (string | null);
     start_date?: (string | null);
     end_date?: (string | null);
-};
-
-/**
- * Product selection for a direct purchase (no attendee_id — server creates).
- */
-export type DirectProductRequest = {
-    product_id: string;
-    quantity?: number;
-};
-
-/**
- * Schema for creating a direct-sale payment.
- *
- * Used for popups with sale_type="direct". Auth is via CurrentHuman — the
- * server creates/reuses the Attendee from Human data automatically.
- */
-export type DirectPurchaseCreate = {
-    popup_id: string;
-    products: Array<DirectProductRequest>;
 };
 
 /**
@@ -1209,6 +1286,26 @@ export type NoParticipation = {
     type?: "none";
 };
 
+/**
+ * Request schema for POST /checkout/{slug}/purchase.
+ */
+export type OpenTicketingPurchaseCreate = {
+    products: Array<ProductLine>;
+    buyer: BuyerInfo;
+    coupon_code?: (string | null);
+};
+
+/**
+ * Response schema for POST /checkout/{slug}/purchase.
+ */
+export type OpenTicketingPurchaseResponse = {
+    payment_id: string;
+    status: string;
+    checkout_url: string;
+    amount: string;
+    currency: string;
+};
+
 export type Paging = {
     limit: number;
     offset: number;
@@ -1218,10 +1315,8 @@ export type Paging = {
 /**
  * Schema for creating a payment.
  *
- * Either application_id (application-based flow) or popup_id (direct-sale)
- * must be provided — at least one source is required. The existing
- * application-based flow always passes application_id; direct-sale uses
- * DirectPurchaseCreate, which is translated into this shape server-side.
+ * Either application_id (application-based flow) or popup_id must be
+ * provided — at least one source is required.
  */
 export type PaymentCreate = {
     application_id?: (string | null);
@@ -1294,6 +1389,9 @@ export type PaymentPublic = {
     rate?: (string | null);
     source?: (string | null);
     checkout_url?: (string | null);
+    buyer_snapshot?: ({
+    [key: string]: unknown;
+} | null);
     coupon_id?: (string | null);
     coupon_code?: (string | null);
     discount_value?: (string | null);
@@ -1712,6 +1810,14 @@ export type ProductCreate = {
     exclusive?: boolean;
     max_quantity?: (number | null);
     insurance_eligible?: boolean;
+};
+
+/**
+ * A single product + quantity in an open-ticketing purchase request.
+ */
+export type ProductLine = {
+    product_id: string;
+    quantity?: number;
 };
 
 /**
@@ -2575,6 +2681,25 @@ export type CartsDeleteMyCartData = {
 
 export type CartsDeleteMyCartResponse = (void);
 
+export type CheckoutGetRuntimeData = {
+    slug: string;
+};
+
+export type CheckoutGetRuntimeResponse = (CheckoutRuntimeResponse);
+
+export type CheckoutPurchaseOpenTicketingData = {
+    requestBody: OpenTicketingPurchaseCreate;
+    slug: string;
+};
+
+export type CheckoutPurchaseOpenTicketingResponse = (OpenTicketingPurchaseResponse);
+
+export type CouponsValidateCouponPublicData = {
+    requestBody: CouponValidatePublicRequest;
+};
+
+export type CouponsValidateCouponPublicResponse = (CouponValidatePublicResponse);
+
 export type CouponsListCouponsData = {
     isActive?: (boolean | null);
     /**
@@ -3098,12 +3223,6 @@ export type PaymentsCreateMyPaymentData = {
 };
 
 export type PaymentsCreateMyPaymentResponse = (PaymentPublic);
-
-export type PaymentsCreateDirectPaymentData = {
-    requestBody: DirectPurchaseCreate;
-};
-
-export type PaymentsCreateDirectPaymentResponse = (PaymentPublic);
 
 export type PaymentsSimplefiWebhookResponse = ({
     [key: string]: unknown;

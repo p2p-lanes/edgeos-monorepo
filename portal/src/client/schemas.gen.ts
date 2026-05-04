@@ -2275,6 +2275,34 @@ export const BaseFieldConfigUpdateSchema = {
     title: 'BaseFieldConfigUpdate'
 } as const;
 
+export const BuyerInfoSchema = {
+    properties: {
+        email: {
+            type: 'string',
+            format: 'email',
+            title: 'Email'
+        },
+        first_name: {
+            type: 'string',
+            title: 'First Name'
+        },
+        last_name: {
+            type: 'string',
+            title: 'Last Name'
+        },
+        form_data: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Form Data',
+            default: {}
+        }
+    },
+    type: 'object',
+    required: ['email', 'first_name', 'last_name'],
+    title: 'BuyerInfo',
+    description: 'Buyer identification and form data for open-ticketing purchase.'
+} as const;
+
 export const CartHumanInfoSchema = {
     properties: {
         id: {
@@ -2660,10 +2688,351 @@ export const CategoryBreakdownSchema = {
     description: 'Aggregated breakdown by product category.'
 } as const;
 
+export const CheckoutBuyerFieldSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        label: {
+            type: 'string',
+            title: 'Label'
+        },
+        field_type: {
+            type: 'string',
+            title: 'Field Type'
+        },
+        required: {
+            type: 'boolean',
+            title: 'Required',
+            default: false
+        },
+        options: {
+            anyOf: [
+                {
+                    items: {
+                        type: 'string'
+                    },
+                    type: 'array'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Options'
+        },
+        placeholder: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Placeholder'
+        },
+        help_text: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Help Text'
+        },
+        min_date: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Min Date'
+        },
+        max_date: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Date'
+        },
+        position: {
+            type: 'integer',
+            title: 'Position',
+            default: 0
+        }
+    },
+    type: 'object',
+    required: ['id', 'name', 'label', 'field_type'],
+    title: 'CheckoutBuyerField',
+    description: 'Public buyer-form field for the checkout runtime.'
+} as const;
+
+export const CheckoutBuyerSectionSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        label: {
+            type: 'string',
+            title: 'Label'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        order: {
+            type: 'integer',
+            title: 'Order',
+            default: 0
+        },
+        kind: {
+            type: 'string',
+            title: 'Kind',
+            default: 'standard'
+        },
+        form_fields: {
+            items: {
+                '$ref': '#/components/schemas/CheckoutBuyerField'
+            },
+            type: 'array',
+            title: 'Form Fields',
+            default: []
+        }
+    },
+    type: 'object',
+    required: ['id', 'label'],
+    title: 'CheckoutBuyerSection',
+    description: 'Public buyer-form section for the checkout runtime.'
+} as const;
+
 export const CheckoutModeSchema = {
     type: 'string',
     enum: ['pass_system', 'simple_quantity'],
     title: 'CheckoutMode'
+} as const;
+
+export const CheckoutRuntimeProductSchema = {
+    properties: {
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        slug: {
+            type: 'string',
+            title: 'Slug'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        price: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Price'
+        },
+        compare_price: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Compare Price'
+        },
+        image_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Image Url'
+        },
+        category: {
+            type: 'string',
+            title: 'Category',
+            default: 'ticket'
+        },
+        currency: {
+            type: 'string',
+            title: 'Currency',
+            default: 'USD'
+        },
+        attendee_category: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Attendee Category'
+        },
+        duration_type: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Duration Type'
+        },
+        start_date: {
+            anyOf: [
+                {},
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Start Date'
+        },
+        end_date: {
+            anyOf: [
+                {},
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'End Date'
+        },
+        max_quantity: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Quantity'
+        },
+        is_active: {
+            type: 'boolean',
+            title: 'Is Active',
+            default: true
+        },
+        exclusive: {
+            type: 'boolean',
+            title: 'Exclusive',
+            default: false
+        },
+        insurance_eligible: {
+            type: 'boolean',
+            title: 'Insurance Eligible',
+            default: false
+        },
+        tier_group: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TierGroupPublic'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        phase: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/TierPhasePublic'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        }
+    },
+    type: 'object',
+    required: ['tenant_id', 'popup_id', 'id', 'name', 'slug', 'price'],
+    title: 'CheckoutRuntimeProduct',
+    description: 'Public product available in the checkout runtime.'
+} as const;
+
+export const CheckoutRuntimeResponseSchema = {
+    properties: {
+        popup: {
+            '$ref': '#/components/schemas/PopupPublic'
+        },
+        products: {
+            items: {
+                '$ref': '#/components/schemas/CheckoutRuntimeProduct'
+            },
+            type: 'array',
+            title: 'Products'
+        },
+        buyer_form: {
+            items: {
+                '$ref': '#/components/schemas/CheckoutBuyerSection'
+            },
+            type: 'array',
+            title: 'Buyer Form'
+        },
+        ticketing_steps: {
+            items: {
+                '$ref': '#/components/schemas/TicketingStepPublic'
+            },
+            type: 'array',
+            title: 'Ticketing Steps'
+        }
+    },
+    type: 'object',
+    required: ['popup', 'products', 'buyer_form', 'ticketing_steps'],
+    title: 'CheckoutRuntimeResponse',
+    description: 'Full response for GET /checkout/{slug}/runtime.'
 } as const;
 
 export const CompanionCreateSchema = {
@@ -2964,6 +3333,48 @@ export const CouponValidateSchema = {
     description: 'Schema for validating a coupon code.'
 } as const;
 
+export const CouponValidatePublicRequestSchema = {
+    properties: {
+        popup_slug: {
+            type: 'string',
+            title: 'Popup Slug'
+        },
+        code: {
+            type: 'string',
+            title: 'Code'
+        }
+    },
+    type: 'object',
+    required: ['popup_slug', 'code'],
+    title: 'CouponValidatePublicRequest',
+    description: 'Request schema for public coupon validation (anonymous, no JWT).'
+} as const;
+
+export const CouponValidatePublicResponseSchema = {
+    properties: {
+        code: {
+            type: 'string',
+            title: 'Code'
+        },
+        discount_type: {
+            type: 'string',
+            title: 'Discount Type'
+        },
+        discount_value: {
+            type: 'string',
+            title: 'Discount Value'
+        },
+        valid: {
+            type: 'boolean',
+            title: 'Valid'
+        }
+    },
+    type: 'object',
+    required: ['code', 'discount_type', 'discount_value', 'valid'],
+    title: 'CouponValidatePublicResponse',
+    description: 'Response schema for public coupon validation.'
+} as const;
+
 export const CredentialInfoSchema = {
     properties: {
         credential_type: {
@@ -3029,49 +3440,6 @@ export const DashboardStatsSchema = {
     required: ['applications', 'attendees', 'payments'],
     title: 'DashboardStats',
     description: 'Complete dashboard statistics.'
-} as const;
-
-export const DirectProductRequestSchema = {
-    properties: {
-        product_id: {
-            type: 'string',
-            format: 'uuid',
-            title: 'Product Id'
-        },
-        quantity: {
-            type: 'integer',
-            title: 'Quantity',
-            default: 1
-        }
-    },
-    type: 'object',
-    required: ['product_id'],
-    title: 'DirectProductRequest',
-    description: 'Product selection for a direct purchase (no attendee_id — server creates).'
-} as const;
-
-export const DirectPurchaseCreateSchema = {
-    properties: {
-        popup_id: {
-            type: 'string',
-            format: 'uuid',
-            title: 'Popup Id'
-        },
-        products: {
-            items: {
-                '$ref': '#/components/schemas/DirectProductRequest'
-            },
-            type: 'array',
-            title: 'Products'
-        }
-    },
-    type: 'object',
-    required: ['popup_id', 'products'],
-    title: 'DirectPurchaseCreate',
-    description: `Schema for creating a direct-sale payment.
-
-Used for popups with sale_type="direct". Auth is via CurrentHuman — the
-server creates/reuses the Attendee from Human data automatically.`
 } as const;
 
 export const DirectoryProductSchema = {
@@ -5679,6 +6047,68 @@ export const NoParticipationSchema = {
     description: 'Response when human has no participation in the popup.'
 } as const;
 
+export const OpenTicketingPurchaseCreateSchema = {
+    properties: {
+        products: {
+            items: {
+                '$ref': '#/components/schemas/ProductLine'
+            },
+            type: 'array',
+            minItems: 1,
+            title: 'Products'
+        },
+        buyer: {
+            '$ref': '#/components/schemas/BuyerInfo'
+        },
+        coupon_code: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Coupon Code'
+        }
+    },
+    type: 'object',
+    required: ['products', 'buyer'],
+    title: 'OpenTicketingPurchaseCreate',
+    description: 'Request schema for POST /checkout/{slug}/purchase.'
+} as const;
+
+export const OpenTicketingPurchaseResponseSchema = {
+    properties: {
+        payment_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Payment Id'
+        },
+        status: {
+            type: 'string',
+            title: 'Status'
+        },
+        checkout_url: {
+            type: 'string',
+            title: 'Checkout Url'
+        },
+        amount: {
+            type: 'string',
+            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
+            title: 'Amount'
+        },
+        currency: {
+            type: 'string',
+            title: 'Currency'
+        }
+    },
+    type: 'object',
+    required: ['payment_id', 'status', 'checkout_url', 'amount', 'currency'],
+    title: 'OpenTicketingPurchaseResponse',
+    description: 'Response schema for POST /checkout/{slug}/purchase.'
+} as const;
+
 export const PagingSchema = {
     properties: {
         limit: {
@@ -5759,10 +6189,8 @@ export const PaymentCreateSchema = {
     title: 'PaymentCreate',
     description: `Schema for creating a payment.
 
-Either application_id (application-based flow) or popup_id (direct-sale)
-must be provided — at least one source is required. The existing
-application-based flow always passes application_id; direct-sale uses
-DirectPurchaseCreate, which is translated into this shape server-side.`
+Either application_id (application-based flow) or popup_id must be
+provided — at least one source is required.`
 } as const;
 
 export const PaymentPreviewSchema = {
@@ -6089,6 +6517,18 @@ export const PaymentPublicSchema = {
                 }
             ],
             title: 'Checkout Url'
+        },
+        buyer_snapshot: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Buyer Snapshot'
         },
         coupon_id: {
             anyOf: [
@@ -8587,6 +9027,26 @@ export const ProductCreateSchema = {
     required: ['popup_id', 'name', 'price'],
     title: 'ProductCreate',
     description: 'Product schema for creation.'
+} as const;
+
+export const ProductLineSchema = {
+    properties: {
+        product_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Product Id'
+        },
+        quantity: {
+            type: 'integer',
+            minimum: 1,
+            title: 'Quantity',
+            default: 1
+        }
+    },
+    type: 'object',
+    required: ['product_id'],
+    title: 'ProductLine',
+    description: 'A single product + quantity in an open-ticketing purchase request.'
 } as const;
 
 export const ProductPublicSchema = {
