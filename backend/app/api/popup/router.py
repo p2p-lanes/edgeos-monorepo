@@ -33,6 +33,8 @@ from app.api.translation.service import (
     get_translations_bulk,
     get_translations_for_entity,
 )
+from sqlalchemy.exc import IntegrityError
+
 from app.core.dependencies.users import (
     CurrentHuman,
     CurrentUser,
@@ -189,11 +191,26 @@ async def create_popup(
     existing = crud.get_by_slug(db, popup_in.slug)
     if existing:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="A popup with this slug already exists",
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "popup_slug_conflict",
+                "message": "A popup with this slug already exists in this tenant.",
+            },
         )
 
-    popup = crud.create(db, popup_in)
+    try:
+        popup = crud.create(db, popup_in)
+    except IntegrityError as exc:
+        db.rollback()
+        if "uq_popups_tenant_slug" in str(getattr(exc, "orig", exc)):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "popup_slug_conflict",
+                    "message": "A popup with this slug already exists in this tenant.",
+                },
+            )
+        raise
 
     # Direct-sale popups skip the application-centric bootstrap (no approval
     # strategy, no form sections, no base field configs). Only ticketing steps
@@ -225,8 +242,11 @@ async def update_popup(
         existing = crud.get_by_slug(db, popup_in.slug)
         if existing:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="A popup with this slug already exists",
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "popup_slug_conflict",
+                    "message": "A popup with this slug already exists in this tenant.",
+                },
             )
 
     sale_type_change_requested = (
@@ -255,7 +275,19 @@ async def update_popup(
         and (popup_in.allows_spouse is True or popup_in.allows_children is True)
     )
 
-    updated = crud.update(db, popup, popup_in)
+    try:
+        updated = crud.update(db, popup, popup_in)
+    except IntegrityError as exc:
+        db.rollback()
+        if "uq_popups_tenant_slug" in str(getattr(exc, "orig", exc)):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "popup_slug_conflict",
+                    "message": "A popup with this slug already exists in this tenant.",
+                },
+            )
+        raise
 
     if updated.sale_type == SaleType.application.value:
         _seed_application_defaults(db, updated)
