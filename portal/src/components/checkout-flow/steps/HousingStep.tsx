@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import ExpandableDescription from "@/components/ui/ExpandableDescription"
 import QuantitySelector, {
+  resolveMaxQuantity,
   supportsQuantitySelector,
 } from "@/components/ui/QuantitySelector"
 import { cn } from "@/lib/utils"
@@ -217,8 +218,8 @@ function PropertyCard({
   const showStepper =
     isSelected &&
     !!onQuantityChange &&
-    supportsQuantitySelector(product.max_quantity)
-  const maxQty = product.max_quantity ?? Number.POSITIVE_INFINITY
+    supportsQuantitySelector(product.max_per_order)
+  const maxQty = resolveMaxQuantity(product)
   const basePrice = product.price * nights
   const totalPrice = basePrice * quantity
   const compareBase = product.compare_price

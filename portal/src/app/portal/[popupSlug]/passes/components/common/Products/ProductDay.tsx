@@ -47,7 +47,7 @@ const Product = ({
   const originalPrice = product.compare_price ?? product.price
   const { purchased, selected } = product
 
-  const showStepper = supportsQuantitySelector(product.max_quantity)
+  const showStepper = supportsQuantitySelector(product.max_per_order)
   const maxQuantity = resolveMaxQuantity(product, {
     dayPassFallbackToDateRange: true,
   })
@@ -66,7 +66,7 @@ const Product = ({
   }
 
   const handleToggleClick = () => {
-    // max_quantity === 1 path — behaves as a toggle.
+    // max_per_order === 1 path — behaves as a toggle.
     onClick(product.attendee_id, {
       ...product,
       quantity: selected ? 0 : 1,

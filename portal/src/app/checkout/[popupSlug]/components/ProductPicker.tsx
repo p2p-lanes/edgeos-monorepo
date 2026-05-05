@@ -4,6 +4,7 @@ import { Minus, Plus } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import type { CheckoutRuntimeProduct } from "@/client"
 import { Button } from "@/components/ui/button"
+import { resolveMaxQuantity } from "@/components/ui/QuantitySelector"
 import { formatCurrency } from "@/types/checkout"
 
 interface ProductPickerProps {
@@ -32,7 +33,7 @@ export function ProductPicker({
       <div className="space-y-4">
         {products.map((product) => {
           const quantity = quantities[product.id] ?? 0
-          const maxQuantity = product.max_quantity ?? 99
+          const maxQuantity = resolveMaxQuantity(product)
 
           return (
             <div

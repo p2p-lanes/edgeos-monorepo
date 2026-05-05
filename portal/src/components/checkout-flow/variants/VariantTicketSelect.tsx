@@ -415,7 +415,7 @@ function PassRow({
   // of scope (plan decision), so we only show the stepper for non-purchased rows.
   const showStepper =
     !!onQuantityChange &&
-    supportsQuantitySelector(product.max_quantity) &&
+    supportsQuantitySelector(product.max_per_order) &&
     !purchased
   const currentQuantity = product.quantity ?? 0
   const maxQuantity = resolveMaxQuantity(product)
@@ -852,7 +852,7 @@ function CompactAttendeeCard({
           {visibleProducts.map((p) => {
             const isDayPass = p.duration_type === "day"
             const hasStepper =
-              isDayPass || supportsQuantitySelector(p.max_quantity)
+              isDayPass || supportsQuantitySelector(p.max_per_order)
 
             if (hasStepper) {
               const qty = p.quantity ?? 0

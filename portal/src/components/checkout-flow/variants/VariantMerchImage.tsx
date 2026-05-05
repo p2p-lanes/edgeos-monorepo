@@ -5,6 +5,7 @@ import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import ExpandableDescription from "@/components/ui/ExpandableDescription"
 import QuantitySelector, {
+  resolveMaxQuantity,
   supportsQuantitySelector,
 } from "@/components/ui/QuantitySelector"
 import { cn } from "@/lib/utils"
@@ -22,17 +23,17 @@ interface MerchQtyControlProps {
 }
 
 /**
- * Renders the shared QuantitySelector for merch items whose max_quantity
+ * Renders the shared QuantitySelector for merch items whose max_per_order
  * allows more than one unit; renders a single-shot Add/Added toggle button
- * when max_quantity === 1.
+ * when max_per_order === 1.
  */
 function MerchQtyControl({
   product,
   quantity,
   onQuantityChange,
 }: MerchQtyControlProps) {
-  const showStepper = supportsQuantitySelector(product.max_quantity)
-  const max = product.max_quantity ?? Number.POSITIVE_INFINITY
+  const showStepper = supportsQuantitySelector(product.max_per_order)
+  const max = resolveMaxQuantity(product)
 
   if (showStepper) {
     return (

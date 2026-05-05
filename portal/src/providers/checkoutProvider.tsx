@@ -285,12 +285,12 @@ export function CheckoutProvider({
           const isDayPass = product.duration_type === "day"
           const quantity =
             checkoutPolicy.checkoutMode === CHECKOUT_MODE.SIMPLE_QUANTITY
-              ? supportsQuantitySelector(product.max_quantity) || isDayPass
+              ? supportsQuantitySelector(product.max_per_order) || isDayPass
                 ? (product.quantity ?? 1)
                 : 1
               : isDayPass
                 ? (product.quantity ?? 1) - (product.original_quantity ?? 0)
-                : supportsQuantitySelector(product.max_quantity)
+                : supportsQuantitySelector(product.max_per_order)
                   ? (product.quantity ?? 1)
                   : 1
 

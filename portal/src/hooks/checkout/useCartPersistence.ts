@@ -6,6 +6,7 @@ import {
   useClearCart,
   useSaveCart,
 } from "@/hooks/useCartApi"
+import { resolveMaxQuantity } from "@/components/ui/QuantitySelector"
 import { checkAndClearPurchasePending } from "@/hooks/usePaymentRedirect"
 import { queryKeys } from "@/lib/query-keys"
 import type {
@@ -204,7 +205,7 @@ export function useCartPersistence({
           Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)),
         )
         const savedQuantity = savedCart.housing.quantity ?? 1
-        const maxQty = product.max_quantity ?? Number.POSITIVE_INFINITY
+        const maxQty = resolveMaxQuantity(product)
         const quantity = Math.max(1, Math.min(savedQuantity, maxQty))
         const basePrice = housingPricePerDay
           ? product.price * nights
