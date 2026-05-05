@@ -484,8 +484,38 @@ class TierPhasesCRUD(BaseCRUD[TicketTierPhase, TierPhaseCreate, TierPhaseUpdate]
         A placeholder order (max+1) is used during insert to respect the
         (group_id, order) UNIQUE constraint; `_rebalance_order` then
         assigns the final ordering based on `sale_starts_at` ASC NULLS LAST.
+
+        Enforces the cross-inventory conflict rule (D1): if the product has a
+        total_stock_cap set and the destination group has a shared_stock_cap,
+        raises HTTP 422.
         """
+        from app.api.product.validators import assert_no_total_vs_shared_stock_conflict
+
         assert obj_in.group_id is not None, "group_id must be injected by the router"
+
+        # Resolve the product's total_stock_cap to check for conflict.
+        product = session.get(Products, obj_in.product_id)
+        if product is not None:
+            # Check conflict: adding this product to the group would create
+            # a coexistence of total_stock_cap + group shared_stock_cap.
+            # We check the group's shared_stock_cap directly here since the
+            # phase row doesn't exist yet (product_id not yet in tier_phase).
+            group = session.get(TicketTierGroup, obj_in.group_id)
+            if (
+                group is not None
+                and group.shared_stock_cap is not None
+                and product.total_stock_cap is not None
+            ):
+                from fastapi import HTTPException
+
+                raise HTTPException(
+                    status_code=422,
+                    detail=(
+                        "total_stock_cap cannot coexist with a tier-group shared_stock_cap. "
+                        "Choose one inventory model per product."
+                    ),
+                )
+
         placeholder_order = self._next_placeholder_order(session, obj_in.group_id)
         phase = TicketTierPhase(
             group_id=obj_in.group_id,
