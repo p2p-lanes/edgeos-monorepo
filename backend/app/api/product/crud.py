@@ -156,6 +156,101 @@ class ProductsCRUD(BaseCRUD[Products, ProductCreate, ProductUpdate]):
         session.refresh(db_obj)
         return db_obj
 
+    def decrement_total_stock(
+        self,
+        session: Session,
+        product_id: uuid.UUID,
+        quantity: int = 1,
+    ) -> Products:
+        """Atomically decrement total_stock_remaining by quantity.
+
+        Mirrors TierGroupsCRUD.decrement_shared_stock verbatim. Single
+        UPDATE ... WHERE remaining >= :n RETURNING — race-free under
+        PostgreSQL MVCC. Caller owns the transaction; this method does
+        NOT commit, so it can participate in a larger purchase transaction
+        that rolls back on failure.
+
+        Behavior matrix:
+          - Product not found              → HTTP 404
+          - total_stock_remaining IS NULL  → no-op, returns product unchanged (unlimited)
+          - remaining < quantity           → HTTP 409 "Sold out"
+          - success                        → returns refreshed product
+
+        Why SELECT-then-UPDATE?
+        A single UPDATE ... WHERE remaining >= :qty cannot distinguish
+        "NULL means unlimited, do nothing" from "cap is 0, sold out" because
+        PostgreSQL evaluates NULL >= :qty as UNKNOWN → row excluded.
+        The explicit NULL fast-path check is therefore required.
+        """
+        # Fast path: no decrement needed for unlimited products.
+        product = session.get(Products, product_id)
+        if product is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Product not found",
+            )
+        if product.total_stock_remaining is None:
+            return product  # unlimited — no counter to move
+
+        result = session.exec(  # type: ignore[call-overload]
+            text(
+                "UPDATE products "
+                "SET total_stock_remaining = total_stock_remaining - :qty "
+                "WHERE id = :id AND total_stock_remaining >= :qty "
+                "RETURNING total_stock_remaining"
+            ).bindparams(qty=quantity, id=product_id)
+        ).first()
+
+        if result is None:
+            # Re-read to discriminate: deleted? unlocked to NULL? sold out?
+            session.expire(product)
+            product = session.get(Products, product_id)
+            if product is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Product not found",
+                )
+            if product.total_stock_remaining is None:
+                # Race: someone cleared the cap between our SELECT and UPDATE.
+                # Treat as unlimited.
+                return product
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Sold out — '{product.name}' has insufficient stock",
+            )
+
+        session.flush()
+        session.refresh(product)
+        return product
+
+    def restore_total_stock(
+        self,
+        session: Session,
+        product_id: uuid.UUID,
+        quantity: int,
+    ) -> None:
+        """Restore total_stock_remaining after expiry/cancel.
+
+        Clamped to total_stock_cap via LEAST to prevent drift past the original
+        cap when webhooks fire more than once. Silent no-op for unlimited products
+        (cap IS NULL or remaining IS NULL).
+
+        Caller owns the transaction; this method does NOT commit.
+        Idempotency contract: must only be called after the payment status guard
+        confirms the transition is valid (see design §4). Does NOT check payment
+        status itself.
+        """
+        session.exec(  # type: ignore[call-overload]
+            text(
+                "UPDATE products "
+                "SET total_stock_remaining = LEAST(total_stock_cap, total_stock_remaining + :qty) "
+                "WHERE id = :id "
+                "  AND total_stock_remaining IS NOT NULL "
+                "  AND total_stock_cap IS NOT NULL"
+            ).bindparams(qty=quantity, id=product_id)
+        )
+        session.flush()
+
 
 products_crud = ProductsCRUD()
 
@@ -265,6 +360,31 @@ class TierGroupsCRUD(BaseCRUD[TicketTierGroup, TierGroupCreate, TierGroupUpdate]
         if group is not None:
             session.refresh(group)
         return group  # type: ignore[return-value]
+
+    def restore_shared_stock(
+        self,
+        session: Session,
+        group_id: uuid.UUID,
+        quantity: int,
+    ) -> None:
+        """Restore shared_stock_remaining after expiry/cancel.
+
+        Same LEAST-clamp pattern as ProductsCRUD.restore_total_stock: clamped to
+        shared_stock_cap to prevent drift past cap on double-fired webhooks.
+        Silent no-op when cap IS NULL or remaining IS NULL (unlimited / untracked).
+
+        Caller owns the transaction; this method does NOT commit.
+        """
+        session.exec(  # type: ignore[call-overload]
+            text(
+                "UPDATE ticket_tier_group "
+                "SET shared_stock_remaining = LEAST(shared_stock_cap, shared_stock_remaining + :qty) "
+                "WHERE id = :id "
+                "  AND shared_stock_remaining IS NOT NULL "
+                "  AND shared_stock_cap IS NOT NULL"
+            ).bindparams(qty=quantity, id=group_id)
+        )
+        session.flush()
 
 
 tier_groups_crud = TierGroupsCRUD()
@@ -455,11 +575,13 @@ def enrich_product_with_tier(
         p.id: tier_phases_crud.get_sold_count(session, p.id) for p in all_phases
     }
 
-    # Resolve max_quantity per phase via the linked product (avoids relationship load)
+    # Resolve total_stock_cap per phase via the linked product (avoids relationship load).
+    # For tier-grouped products the migration sets total_stock_cap = NULL,
+    # so phase-level cap defers to the group's shared_stock_remaining.
     product_ids_for_phases = [p.product_id for p in all_phases]
     products_map = products_crud.get_by_ids(session, product_ids_for_phases)
     max_quantities: dict[uuid.UUID, int | None] = {
-        p.id: products_map[p.product_id].max_quantity
+        p.id: products_map[p.product_id].total_stock_cap
         if p.product_id in products_map
         else None
         for p in all_phases

@@ -994,15 +994,19 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         requested_products: list[PaymentProductRequest],
         valid_products: list[Products],
     ) -> None:
-        """Validate that requested quantities don't exceed product max_quantity.
+        """Validate that requested quantities don't exceed product total_stock_remaining.
+
+        DEPRECATED: This read-then-check method is race-prone and will be replaced
+        by the atomic decrement_total_stock in Slice 2 (product-inventory-redesign).
+        Updated to read total_stock_remaining instead of the dropped max_quantity column.
 
         Checks against already sold (approved) and reserved (pending) quantities.
         """
         products_map = {p.id: p for p in valid_products}
 
-        # Get product IDs that have max_quantity set
+        # Get product IDs that have total_stock_remaining set (tracked stock)
         product_ids_with_limit = [
-            p.id for p in valid_products if p.max_quantity is not None
+            p.id for p in valid_products if p.total_stock_remaining is not None
         ]
         if not product_ids_with_limit:
             return
@@ -1038,11 +1042,16 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         # Check availability for each product
         for product_id, requested_qty in requested_map.items():
             product = products_map[product_id]
-            max_qty = product.max_quantity
+            # total_stock_remaining is the live atomic counter (already has sold deducted
+            # from previous payments). Add back sold from current in-progress payments to
+            # avoid double-counting. This is the legacy read-then-check path;
+            # Slice 2 replaces this with an atomic UPDATE.
+            stock_remaining = product.total_stock_remaining
             sold_qty = sold_map.get(product_id, 0)
-            available_qty = max_qty - sold_qty  # type: ignore[operator]
+            available_qty = (stock_remaining or 0) + sold_qty  # approximate
+            max_qty = stock_remaining  # kept for log compat
 
-            if requested_qty > available_qty:
+            if stock_remaining is not None and requested_qty > stock_remaining:
                 logger.error(
                     "Product %s (%s) quantity exceeded. "
                     "Requested: %d, Available: %d, Max: %d, Sold: %d",
@@ -1056,7 +1065,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"Product '{product.name}' has insufficient availability. "
-                    f"Requested: {requested_qty}, Available: {available_qty}",
+                    f"Requested: {requested_qty}, Available: {stock_remaining}",
                 )
 
     def _decrement_shared_tier_stocks(
