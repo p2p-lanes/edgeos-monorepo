@@ -291,3 +291,329 @@ class TestValidateProductAvailabilityRemoved:
         assert "_validate_product_availability" not in source, (
             "_validate_product_availability still referenced in payment/crud.py"
         )
+
+
+# ---------------------------------------------------------------------------
+# 4.1 / 4.2  create_open_ticketing_payment enforcement
+# ---------------------------------------------------------------------------
+
+
+def _make_ot_popup(db: Session, tenant: Tenants) -> Popups:
+    """Create an active direct-sale popup for open ticketing tests."""
+    from app.api.shared.enums import SaleType
+
+    popup = Popups(
+        tenant_id=tenant.id,
+        name=f"OT Popup {uuid.uuid4().hex[:6]}",
+        slug=f"ot-enf-{uuid.uuid4().hex[:6]}",
+        sale_type=SaleType.direct.value,
+        status="active",
+        simplefi_api_key="test_simplefi_key",
+        currency="ARS",
+    )
+    db.add(popup)
+    db.commit()
+    db.refresh(popup)
+    return popup
+
+
+def _make_ot_product(
+    db: Session,
+    popup: Popups,
+    *,
+    total_stock_remaining: int | None = None,
+    total_stock_cap: int | None = None,
+    max_per_order: int | None = None,
+    price: str = "100.00",
+) -> Products:
+    from decimal import Decimal
+
+    product = Products(
+        tenant_id=popup.tenant_id,
+        popup_id=popup.id,
+        name=f"OT Product {uuid.uuid4().hex[:6]}",
+        slug=f"ot-prod-{uuid.uuid4().hex[:6]}",
+        price=Decimal(price),
+        category="ticket",
+        is_active=True,
+        total_stock_cap=total_stock_cap,
+        total_stock_remaining=total_stock_remaining,
+        max_per_order=max_per_order,
+    )
+    db.add(product)
+    db.commit()
+    db.refresh(product)
+    return product
+
+
+def _ot_purchase(popup: Popups, product: Products, qty: int = 1):
+    from app.api.checkout.schemas import BuyerInfo, OpenTicketingPurchaseCreate, ProductLine
+
+    return OpenTicketingPurchaseCreate(
+        products=[ProductLine(product_id=product.id, quantity=qty)],
+        buyer=BuyerInfo(
+            email=f"buyer-{uuid.uuid4().hex[:6]}@test.com",
+            first_name="Test",
+            last_name="Buyer",
+            form_data={},
+        ),
+    )
+
+
+class TestOpenTicketingPaymentEnforcement:
+    """Spec §Domain 2 — create_open_ticketing_payment decrements stock."""
+
+    def test_sold_out_product_raises_409(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        """total_stock_remaining=0 → 409 before SimpleFI is called."""
+        from unittest.mock import patch
+
+        popup = _make_ot_popup(db, tenant_a)
+        product = _make_ot_product(
+            db, popup,
+            total_stock_cap=1,
+            total_stock_remaining=0,
+        )
+        obj = _ot_purchase(popup, product, qty=1)
+
+        with patch("app.services.simplefi.get_simplefi_client") as mock_sf:
+            with pytest.raises(HTTPException) as exc_info:
+                payments_crud.create_open_ticketing_payment(
+                    db, obj=obj, popup=popup, tenant=tenant_a
+                )
+        assert exc_info.value.status_code == 409
+        # SimpleFI must NOT have been called
+        mock_sf.assert_not_called()
+
+    def test_sufficient_stock_decrements_counter(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        """Successful payment → total_stock_remaining decremented atomically."""
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        popup = _make_ot_popup(db, tenant_a)
+        product = _make_ot_product(
+            db, popup,
+            total_stock_cap=10,
+            total_stock_remaining=10,
+        )
+        obj = _ot_purchase(popup, product, qty=2)
+
+        simplefi_response = SimpleNamespace(
+            id=f"sf-{uuid.uuid4().hex[:8]}",
+            status="pending",
+            checkout_url="https://simplefi.test/checkout/enf",
+        )
+
+        with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
+            mock_get_client.return_value.create_payment.return_value = simplefi_response
+            payments_crud.create_open_ticketing_payment(
+                db, obj=obj, popup=popup, tenant=tenant_a
+            )
+
+        db.expire_all()
+        refreshed = db.get(Products, product.id)
+        assert refreshed.total_stock_remaining == 8, (
+            f"Expected 8, got {refreshed.total_stock_remaining}"
+        )
+
+    def test_unlimited_stock_passes_without_decrement(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        """NULL stock (unlimited) → no decrement, payment created."""
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        popup = _make_ot_popup(db, tenant_a)
+        product = _make_ot_product(
+            db, popup,
+            total_stock_cap=None,
+            total_stock_remaining=None,
+        )
+        obj = _ot_purchase(popup, product, qty=5)
+
+        simplefi_response = SimpleNamespace(
+            id=f"sf-{uuid.uuid4().hex[:8]}",
+            status="pending",
+            checkout_url="https://simplefi.test/checkout/unlimited",
+        )
+
+        with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
+            mock_get_client.return_value.create_payment.return_value = simplefi_response
+            payment, _ = payments_crud.create_open_ticketing_payment(
+                db, obj=obj, popup=popup, tenant=tenant_a
+            )
+
+        assert payment is not None
+        db.expire_all()
+        refreshed = db.get(Products, product.id)
+        assert refreshed.total_stock_remaining is None
+
+    def test_max_per_order_exceeded_raises_422(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        """qty > max_per_order → 422."""
+        from unittest.mock import patch
+
+        popup = _make_ot_popup(db, tenant_a)
+        product = _make_ot_product(
+            db, popup,
+            total_stock_cap=100,
+            total_stock_remaining=100,
+            max_per_order=2,
+        )
+        obj = _ot_purchase(popup, product, qty=3)
+
+        with patch("app.services.simplefi.get_simplefi_client"):
+            with pytest.raises(HTTPException) as exc_info:
+                payments_crud.create_open_ticketing_payment(
+                    db, obj=obj, popup=popup, tenant=tenant_a
+                )
+        assert exc_info.value.status_code == 422
+
+    def test_concurrent_decrements_exactly_one_wins(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+        test_engine,
+    ) -> None:
+        """Concurrent calls on remaining=1: exactly one succeeds, one 409."""
+        from sqlmodel import Session as SyncSession
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        popup = _make_ot_popup(db, tenant_a)
+        product = _make_ot_product(
+            db, popup,
+            total_stock_cap=1,
+            total_stock_remaining=1,
+        )
+
+        successes: list[bool] = []
+        conflicts: list[bool] = []
+        lock = threading.Lock()
+
+        def one_purchase() -> None:
+            obj = _ot_purchase(popup, product, qty=1)
+            simplefi_response = SimpleNamespace(
+                id=f"sf-{uuid.uuid4().hex[:8]}",
+                status="pending",
+                checkout_url="https://simplefi.test/checkout/conc",
+            )
+            with SyncSession(test_engine) as session:
+                with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
+                    mock_get_client.return_value.create_payment.return_value = simplefi_response
+                    try:
+                        payments_crud.create_open_ticketing_payment(
+                            session, obj=obj, popup=popup, tenant=tenant_a
+                        )
+                        with lock:
+                            successes.append(True)
+                    except HTTPException as exc:
+                        if exc.status_code == 409:
+                            with lock:
+                                conflicts.append(True)
+                        else:
+                            raise
+
+        t1 = threading.Thread(target=one_purchase)
+        t2 = threading.Thread(target=one_purchase)
+        t1.start()
+        t2.start()
+        t1.join()
+        t2.join()
+
+        assert len(successes) == 1, f"Expected 1 success, got {successes}"
+        assert len(conflicts) == 1, f"Expected 1 conflict, got {conflicts}"
+
+        db.expire_all()
+        refreshed = db.get(Products, product.id)
+        assert refreshed.total_stock_remaining == 0
+
+
+# ---------------------------------------------------------------------------
+# 4.3 / 4.4  create_payment enforcement
+# ---------------------------------------------------------------------------
+
+
+class TestCreatePaymentEnforcement:
+    """Spec §Domain 2 — create_payment decrements total stock."""
+
+    def test_sold_out_product_raises_409(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+        popup_tenant_a: Popups,
+    ) -> None:
+        """total_stock_remaining=0 via create_payment → 409, no payment row."""
+        from unittest.mock import patch
+        from app.api.payment.schemas import PaymentCreate, PaymentProductRequest
+
+        product = _make_product(
+            db, tenant_a, popup_tenant_a,
+            total_stock_cap=1,
+            total_stock_remaining=0,
+        )
+
+        # We need a real application+attendee to call create_payment
+        app = _get_or_create_application(db, tenant_a, popup_tenant_a)
+        attendee = _make_attendee(db, app)
+
+        pay_obj = PaymentCreate(
+            application_id=app.id,
+            products=[
+                PaymentProductRequest(
+                    product_id=product.id,
+                    attendee_id=attendee.id,
+                    quantity=1,
+                )
+            ],
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            payments_crud.create_payment(db, pay_obj)
+        assert exc_info.value.status_code == 409
+
+    def test_max_per_order_exceeded_raises_422(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+        popup_tenant_a: Popups,
+    ) -> None:
+        """qty > max_per_order via create_payment → 422."""
+        from app.api.payment.schemas import PaymentCreate, PaymentProductRequest
+
+        product = _make_product(
+            db, tenant_a, popup_tenant_a,
+            total_stock_cap=100,
+            total_stock_remaining=100,
+            max_per_order=2,
+        )
+
+        app = _get_or_create_application(db, tenant_a, popup_tenant_a)
+        attendee = _make_attendee(db, app)
+
+        pay_obj = PaymentCreate(
+            application_id=app.id,
+            products=[
+                PaymentProductRequest(
+                    product_id=product.id,
+                    attendee_id=attendee.id,
+                    quantity=5,
+                )
+            ],
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            payments_crud.create_payment(db, pay_obj)
+        assert exc_info.value.status_code == 422
