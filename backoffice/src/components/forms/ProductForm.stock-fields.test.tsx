@@ -115,6 +115,7 @@ describe("ProductForm — two-field stock layout (6.5)", () => {
 
     mockListTierGroups.mockResolvedValue({
       results: [],
+      paging: { offset: 0, limit: 100, total: 0 },
     } as Awaited<ReturnType<typeof TicketTierGroupsService.listTierGroups>>)
 
     mockCreateProduct.mockResolvedValue({
