@@ -185,11 +185,14 @@ class TestTenantScopedPopupSlugDowngradeSafety:
             with pytest.raises(RuntimeError, match="cross-tenant duplicate slug"):
                 module.downgrade()
 
-    def test_downgrade_proceeds_when_no_duplicates_exist(self) -> None:
-        """downgrade must NOT raise when no cross-tenant slug duplicates exist."""
+    def test_downgrade_uses_concurrently_in_production_path(self) -> None:
+        """Production path (non-transactional bind) must wrap DROP INDEX in autocommit_block."""
         module = _load_migration_module()
 
         mock_bind = MagicMock()
+        # Force the production branch: _is_transactional_connection() reads
+        # bind.in_transaction(), so mock that explicitly to False.
+        mock_bind.in_transaction.return_value = False
         mock_result = MagicMock()
         mock_result.first.return_value = None
         mock_bind.execute.return_value = mock_result
@@ -198,18 +201,38 @@ class TestTenantScopedPopupSlugDowngradeSafety:
         mock_context.__enter__ = MagicMock(return_value=None)
         mock_context.__exit__ = MagicMock(return_value=False)
 
-        with (
-            patch.object(module, "op") as mock_op,
-        ):
+        with patch.object(module, "op") as mock_op:
             mock_op.get_bind.return_value = mock_bind
             mock_op.get_context.return_value.autocommit_block.return_value = (
                 mock_context
             )
-            mock_op.get_context.return_value.in_transaction.return_value = False
 
-            # Should not raise — just call DDL ops
             module.downgrade()
 
+            mock_op.get_context.return_value.autocommit_block.assert_called_once()
+            mock_op.drop_index.assert_called()
+            mock_op.create_index.assert_called()
+            mock_op.create_unique_constraint.assert_called_with(
+                "popups_slug_key", "popups", ["slug"]
+            )
+
+    def test_downgrade_skips_concurrently_in_test_path(self) -> None:
+        """Test-env path (transactional bind) must NOT call autocommit_block."""
+        module = _load_migration_module()
+
+        mock_bind = MagicMock()
+        # Test branch: connection is already inside a BEGIN block.
+        mock_bind.in_transaction.return_value = True
+        mock_result = MagicMock()
+        mock_result.first.return_value = None
+        mock_bind.execute.return_value = mock_result
+
+        with patch.object(module, "op") as mock_op:
+            mock_op.get_bind.return_value = mock_bind
+
+            module.downgrade()
+
+            mock_op.get_context.return_value.autocommit_block.assert_not_called()
             mock_op.drop_index.assert_called()
             mock_op.create_index.assert_called()
             mock_op.create_unique_constraint.assert_called_with(
