@@ -2,6 +2,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Header, HTTPException, status
+from sqlalchemy.exc import IntegrityError
 
 from app.api.approval_strategy.crud import approval_strategies_crud
 from app.api.approval_strategy.schemas import (
@@ -33,8 +34,6 @@ from app.api.translation.service import (
     get_translations_bulk,
     get_translations_for_entity,
 )
-from sqlalchemy.exc import IntegrityError
-
 from app.core.dependencies.users import (
     CurrentHuman,
     CurrentUser,
