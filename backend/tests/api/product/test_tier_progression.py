@@ -21,15 +21,19 @@ def _phase(
     sale_ends_at: datetime | None = None,
     max_quantity: int | None = None,
 ) -> MagicMock:
-    """Build a minimal TicketTierPhase-like mock."""
+    """Build a minimal TicketTierPhase-like mock.
+
+    max_quantity is kept as the parameter name for backwards compatibility with
+    existing test call-sites; it maps to total_stock_cap on the new model.
+    """
     ph = MagicMock()
     ph.id = id_n
     ph.order = order
     ph.sale_starts_at = sale_starts_at
     ph.sale_ends_at = sale_ends_at
-    # Embed max_quantity via the linked product mock
+    # Embed total_stock_cap via the linked product mock (replaces old max_quantity)
     ph.product = MagicMock()
-    ph.product.max_quantity = max_quantity
+    ph.product.total_stock_cap = max_quantity
     return ph
 
 

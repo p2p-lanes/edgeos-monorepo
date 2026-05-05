@@ -268,7 +268,8 @@ def _seed_products(
                 ),
                 is_active=product_data.get("is_active", True),
                 exclusive=product_data.get("exclusive", False),
-                max_quantity=product_data.get("max_quantity"),
+                total_stock_cap=product_data.get("total_stock_cap"),
+                total_stock_remaining=product_data.get("total_stock_cap"),  # init remaining = cap
             )
             session.add(product)
             session.commit()

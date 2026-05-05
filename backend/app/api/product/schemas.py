@@ -67,7 +67,13 @@ class ProductBase(SQLModel):
     )
     is_active: bool = Field(default=True)
     exclusive: bool = Field(default=False)
-    max_quantity: int | None = Field(default=None, nullable=True)
+    # Inventory fields — replaces the ambiguous max_quantity column.
+    # total_stock_cap:       Admin-set inventory ceiling. NULL = unlimited.
+    # total_stock_remaining: Live atomic counter. NULL = unlimited (no tracking).
+    # max_per_order:         Per-cart cap. NULL = unlimited. Pure validator; no counter.
+    total_stock_cap: int | None = Field(default=None, nullable=True)
+    total_stock_remaining: int | None = Field(default=None, nullable=True)
+    max_per_order: int | None = Field(default=None, nullable=True)
     insurance_eligible: bool = Field(
         default=False,
         sa_column=Column(Boolean, nullable=False, server_default="false"),
@@ -99,7 +105,9 @@ class ProductCreate(BaseModel):
     end_date: datetime | None = None
     is_active: bool = True
     exclusive: bool = False
-    max_quantity: int | None = None
+    total_stock_cap: int | None = Field(default=None, ge=1)
+    total_stock_remaining: int | None = Field(default=None, ge=0)
+    max_per_order: int | None = Field(default=None, ge=1)
     insurance_eligible: bool = False
 
     model_config = ConfigDict(str_strip_whitespace=True)
@@ -133,7 +141,9 @@ class ProductUpdate(BaseModel):
     end_date: datetime | None = None
     is_active: bool | None = None
     exclusive: bool | None = None
-    max_quantity: int | None = None
+    total_stock_cap: int | None = Field(default=None, ge=1)
+    total_stock_remaining: int | None = Field(default=None, ge=0)
+    max_per_order: int | None = Field(default=None, ge=1)
     insurance_eligible: bool | None = None
 
 
@@ -153,7 +163,9 @@ class ProductBatchItem(BaseModel):
     end_date: datetime | None = None
     is_active: bool = True
     exclusive: bool = False
-    max_quantity: int | None = None
+    total_stock_cap: int | None = Field(default=None, ge=1)
+    total_stock_remaining: int | None = Field(default=None, ge=0)
+    max_per_order: int | None = Field(default=None, ge=1)
     insurance_eligible: bool = False
 
     model_config = ConfigDict(str_strip_whitespace=True)

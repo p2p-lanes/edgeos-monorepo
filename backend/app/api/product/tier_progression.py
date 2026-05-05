@@ -7,7 +7,7 @@ sold quantities, returns a PhaseState result per phase.
 Derivation rules (SP-2, evaluated in order per phase):
   1. sale_ends_at set and now >= sale_ends_at  → expired
   2. sale_starts_at set and now < sale_starts_at → upcoming
-  3. phase-level stock exhausted (sold >= max_quantity) → sold_out
+  3. phase-level stock exhausted (sold >= total_stock_cap) → sold_out
   4. shared group cap is 0 → sold_out
   5. otherwise → available
 
@@ -57,13 +57,13 @@ def derive_phase_states(
         group: TicketTierGroup-like object with `.shared_stock_remaining`.
         phases: List of TicketTierPhase-like objects, each with:
             `.id`, `.order`, `.sale_starts_at`, `.sale_ends_at`.
-            If the object also has `.product.max_quantity` that will be used
+            If the object also has `.product.total_stock_cap` that will be used
             as a fallback when max_quantities is not supplied.
         now: Current UTC datetime (timezone-aware or naive — must match the
             timezone conventions used in sale_starts_at / sale_ends_at).
         sold_counts: Dict mapping phase.id → units already sold/pending.
-        max_quantities: Optional dict mapping phase.id → max_quantity (int or None).
-            When provided, takes precedence over phase.product.max_quantity.
+        max_quantities: Optional dict mapping phase.id → total_stock_cap (int or None).
+            When provided, takes precedence over phase.product.total_stock_cap.
             Use this when phase objects are ORM rows without a loaded `product`
             relationship.
 
@@ -116,12 +116,12 @@ def _get_max_qty(
     phase: Any,
     max_quantities: dict[Any, int | None] | None,
 ) -> int | None:
-    """Resolve max_quantity for a phase: explicit dict > phase.product.max_quantity > None."""
+    """Resolve total_stock_cap for a phase: explicit dict > phase.product.total_stock_cap > None."""
     if max_quantities is not None:
         return max_quantities.get(phase.id)
-    # Fallback: duck-type access for mocks / objects with .product.max_quantity
+    # Fallback: duck-type access for mocks / objects with .product.total_stock_cap
     try:
-        return getattr(phase.product, "max_quantity", None)
+        return getattr(phase.product, "total_stock_cap", None)
     except AttributeError:
         return None
 
