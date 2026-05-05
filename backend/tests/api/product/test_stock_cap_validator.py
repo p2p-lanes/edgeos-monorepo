@@ -327,3 +327,81 @@ class TestServiceLayerValidatorAssociationDirection:
         # cleanup
         db.delete(phase)
         db.commit()
+
+
+# ---------------------------------------------------------------------------
+# 2.5  ProductsCRUD.update wiring
+# ---------------------------------------------------------------------------
+
+
+class TestProductsCRUDUpdateWiring:
+    """Task 2.5 — validator is enforced when updating a product via ProductsCRUD.update.
+
+    When a product that belongs to a tier group with shared_stock_cap is updated
+    to set total_stock_cap, ProductsCRUD.update must raise 422.
+    """
+
+    def test_update_sets_total_stock_cap_on_grouped_product_raises_422(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+        popup_tenant_a: Popups,
+    ) -> None:
+        """ProductsCRUD.update with total_stock_cap on a tier-grouped product → 422."""
+        from app.api.product.crud import products_crud
+        from app.api.product.schemas import ProductUpdate
+
+        product = _make_product(db, tenant_a, popup_tenant_a)
+        group = _make_tier_group(db, tenant_a, shared_stock_cap=100)
+        _link_product_to_group(db, product, group)
+
+        with pytest.raises(HTTPException) as exc_info:
+            products_crud.update(
+                db,
+                product,
+                ProductUpdate(total_stock_cap=50),
+            )
+        assert exc_info.value.status_code == 422
+
+    def test_update_clears_total_stock_cap_on_grouped_product_passes(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+        popup_tenant_a: Popups,
+    ) -> None:
+        """ProductsCRUD.update setting total_stock_cap=None on tier-grouped product → allowed."""
+        from app.api.product.crud import products_crud
+        from app.api.product.schemas import ProductUpdate
+
+        # Product already has no total_stock_cap; updating with None is a no-op allowed.
+        product = _make_product(db, tenant_a, popup_tenant_a)
+        group = _make_tier_group(db, tenant_a, shared_stock_cap=100)
+        _link_product_to_group(db, product, group)
+
+        # Should NOT raise — setting cap to None (unlimited) is always allowed.
+        updated = products_crud.update(
+            db,
+            product,
+            ProductUpdate(total_stock_cap=None),
+        )
+        assert updated.total_stock_cap is None
+
+    def test_update_standalone_product_with_total_stock_cap_passes(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+        popup_tenant_a: Popups,
+    ) -> None:
+        """Updating a standalone product with total_stock_cap → allowed."""
+        from app.api.product.crud import products_crud
+        from app.api.product.schemas import ProductUpdate
+
+        product = _make_product(db, tenant_a, popup_tenant_a)
+
+        # Should NOT raise — no tier group, no conflict.
+        updated = products_crud.update(
+            db,
+            product,
+            ProductUpdate(total_stock_cap=200, total_stock_remaining=200),
+        )
+        assert updated.total_stock_cap == 200
