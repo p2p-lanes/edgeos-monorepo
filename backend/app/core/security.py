@@ -10,11 +10,6 @@ from sqlmodel import Session
 
 from app.core.config import settings
 from app.core.db import engine
-from app.core.redis import (
-    pat_event_create_daily_rate_limiter,
-    pat_event_create_rate_limiter,
-    pat_event_write_rate_limiter,
-)
 
 # Defined here (not in app.api.api_key.schemas) to avoid an import cycle:
 # api_key.router imports from core.dependencies.users which imports from
@@ -91,42 +86,6 @@ def _enforce_api_key_policy(request: Request, payload: TokenPayload) -> None:
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"API key lacks required scope: {required_scope}",
         )
-
-    identifier = payload.api_key_id or payload.sub
-    if method in {"POST", "PATCH", "PUT", "DELETE"}:
-        is_allowed, _remaining = pat_event_write_rate_limiter.is_allowed(identifier)
-        if not is_allowed:
-            ttl = pat_event_write_rate_limiter.get_ttl(identifier)
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="API key write limit exceeded for event automation.",
-                headers={"Retry-After": str(ttl)},
-            )
-
-    if method == "POST" and path == "/api/v1/events/portal/events":
-        create_identifier = f"create:{identifier}"
-        is_allowed, _remaining = pat_event_create_rate_limiter.is_allowed(
-            create_identifier
-        )
-        if not is_allowed:
-            ttl = pat_event_create_rate_limiter.get_ttl(create_identifier)
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="API key event creation limit exceeded.",
-                headers={"Retry-After": str(ttl)},
-            )
-
-        daily_identifier = f"create-daily:{identifier}"
-        is_allowed, _remaining = pat_event_create_daily_rate_limiter.is_allowed(
-            daily_identifier
-        )
-        if not is_allowed:
-            ttl = pat_event_create_daily_rate_limiter.get_ttl(daily_identifier)
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="API key daily event creation limit exceeded.",
-                headers={"Retry-After": str(ttl)},
-            )
 
 
 def create_access_token(
