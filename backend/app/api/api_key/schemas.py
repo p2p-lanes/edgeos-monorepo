@@ -1,10 +1,9 @@
 import uuid
 from datetime import UTC, datetime, timedelta
-from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-ApiKeyScope = Literal["events:read", "events:write", "rsvp:write"]
+from app.core.security import ApiKeyScope
 
 ALLOWED_API_KEY_SCOPES = {"events:read", "events:write", "rsvp:write"}
 DEFAULT_API_KEY_SCOPES: list[ApiKeyScope] = ["events:read"]

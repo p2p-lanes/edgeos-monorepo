@@ -1,6 +1,6 @@
 import uuid
 from datetime import UTC, datetime, timedelta
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 import jwt
 from fastapi import Depends, HTTPException, Request, status
@@ -8,7 +8,6 @@ from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel, Field
 from sqlmodel import Session
 
-from app.api.api_key.schemas import ApiKeyScope
 from app.core.config import settings
 from app.core.db import engine
 from app.core.redis import (
@@ -16,6 +15,11 @@ from app.core.redis import (
     pat_event_create_rate_limiter,
     pat_event_write_rate_limiter,
 )
+
+# Defined here (not in app.api.api_key.schemas) to avoid an import cycle:
+# api_key.router imports from core.dependencies.users which imports from
+# core.security, so security cannot import back into the api_key package.
+ApiKeyScope = Literal["events:read", "events:write", "rsvp:write"]
 
 ALGORITHM = "HS256"
 
