@@ -126,6 +126,7 @@ function ScrollyCheckoutFlowInner({
     }
   }, [allSections, activeSection])
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: isInitialLoading must trigger a re-run when sections mount in the DOM, even though it's not read inside.
   useEffect(() => {
     const findScrollContainer = (): HTMLElement | null => {
       const anchor = document.getElementById(allSections[0]?.id ?? "passes")
@@ -252,10 +253,6 @@ function ScrollyCheckoutFlowInner({
       releaseScrollTarget()
       scrollToIndexRef.current = null
     }
-    // isInitialLoading gates whether sections are mounted in the DOM. Without
-    // it, the effect runs once during the spinner phase, finds no section
-    // anchor, aborts, and never re-runs after sections appear — leaving
-    // scrollToIndexRef.current null forever.
   }, [allSections, isInitialLoading])
 
   const renderSectionContent = (stepId: string) => {
