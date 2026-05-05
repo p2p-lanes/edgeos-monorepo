@@ -59,7 +59,7 @@ def test_create_popup_409_on_same_tenant_slug_conflict(
 
     assert response2.status_code == 409, response2.text
     body = response2.json()
-    assert body["detail"]["code"] == "popup_slug_conflict"
+    assert "slug" in body["detail"].lower()
 
 
 def test_create_popup_201_on_cross_tenant_slug(
@@ -111,7 +111,7 @@ def test_create_popup_race_condition_returns_409_not_500(
 
     assert response.status_code == 409, response.text
     body = response.json()
-    assert body["detail"]["code"] == "popup_slug_conflict"
+    assert "slug" in body["detail"].lower()
 
 
 def test_update_popup_409_on_same_tenant_slug_conflict(
@@ -148,7 +148,7 @@ def test_update_popup_409_on_same_tenant_slug_conflict(
 
     assert response3.status_code == 409, response3.text
     body = response3.json()
-    assert body["detail"]["code"] == "popup_slug_conflict"
+    assert "slug" in body["detail"].lower()
 
 
 def test_update_popup_race_condition_returns_409_not_500(
@@ -185,4 +185,4 @@ def test_update_popup_race_condition_returns_409_not_500(
 
     assert response2.status_code == 409, response2.text
     body = response2.json()
-    assert body["detail"]["code"] == "popup_slug_conflict"
+    assert "slug" in body["detail"].lower()

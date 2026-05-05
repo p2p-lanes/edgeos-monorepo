@@ -192,10 +192,7 @@ async def create_popup(
     if existing:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail={
-                "code": "popup_slug_conflict",
-                "message": "A popup with this slug already exists in this tenant.",
-            },
+            detail="A popup with this slug already exists in this tenant",
         )
 
     try:
@@ -205,10 +202,7 @@ async def create_popup(
         if "uq_popups_tenant_slug" in str(getattr(exc, "orig", exc)):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail={
-                    "code": "popup_slug_conflict",
-                    "message": "A popup with this slug already exists in this tenant.",
-                },
+                detail="A popup with this slug already exists in this tenant",
             )
         raise
 
@@ -243,10 +237,7 @@ async def update_popup(
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail={
-                    "code": "popup_slug_conflict",
-                    "message": "A popup with this slug already exists in this tenant.",
-                },
+                detail="A popup with this slug already exists in this tenant",
             )
 
     sale_type_change_requested = (
@@ -282,10 +273,7 @@ async def update_popup(
         if "uq_popups_tenant_slug" in str(getattr(exc, "orig", exc)):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail={
-                    "code": "popup_slug_conflict",
-                    "message": "A popup with this slug already exists in this tenant.",
-                },
+                detail="A popup with this slug already exists in this tenant",
             )
         raise
 
