@@ -16,6 +16,8 @@ from app.api.product.models import Products
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 
+from tests.conftest import with_origin
+
 
 def _make_popup(
     db: Session,
@@ -122,6 +124,7 @@ def test_purchase_happy_path_creates_payment_and_attendees(
                     "form_data": {field.name: "Matias"},
                 },
             },
+            headers={"X-Tenant-Id": str(tenant_a.id)},
         )
 
     assert response.status_code == 200, response.text
@@ -139,7 +142,7 @@ def test_purchase_happy_path_creates_payment_and_attendees(
     assert len(attendees) == 2
 
 
-def test_purchase_unknown_slug_returns_404(client: TestClient) -> None:
+def test_purchase_unknown_slug_returns_404(client: TestClient, tenant_a: Tenants) -> None:
     response = client.post(
         "/api/v1/checkout/does-not-exist/purchase",
         json={
@@ -151,6 +154,7 @@ def test_purchase_unknown_slug_returns_404(client: TestClient) -> None:
                 "form_data": {},
             },
         },
+        headers={"X-Tenant-Id": str(tenant_a.id)},
     )
     assert response.status_code == 404, response.text
 
@@ -177,6 +181,7 @@ def test_purchase_application_popup_returns_403(
                 "form_data": {},
             },
         },
+        headers={"X-Tenant-Id": str(tenant_a.id)},
     )
     assert response.status_code == 403, response.text
 
@@ -203,6 +208,7 @@ def test_purchase_missing_required_field_returns_422(
                 "form_data": {},
             },
         },
+        headers={"X-Tenant-Id": str(tenant_a.id)},
     )
     assert response.status_code == 422, response.text
 
@@ -232,6 +238,7 @@ def test_purchase_provider_failure_returns_502(
                     "form_data": {field.name: "Matias"},
                 },
             },
+            headers={"X-Tenant-Id": str(tenant_a.id)},
         )
 
     assert response.status_code == 502, response.text
@@ -264,8 +271,77 @@ def test_purchase_rate_limit_returns_429(
                     "form_data": {field.name: "Matias"},
                 },
             },
-            headers={"X-Forwarded-For": "7.7.7.7"},
+            headers={"X-Forwarded-For": "7.7.7.7", "X-Tenant-Id": str(tenant_a.id)},
         )
 
     assert response.status_code == 429, response.text
     assert "Retry-After" in response.headers
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 — Tenant-scoped purchase tests (T-3.1)
+# ---------------------------------------------------------------------------
+
+
+def test_purchase_resolves_per_tenant(
+    client: TestClient,
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    """Purchase with origin resolving to tenant A hits tenant A's popup."""
+    popup = _make_popup(db, tenant_a, slug_prefix="per-tenant")
+    product = _make_product(db, popup, price="50.00")
+    section = _make_section(db, popup)
+    field = _make_field(db, popup, section)
+    db.commit()
+
+    mock_redis = __import__("unittest.mock", fromlist=["MagicMock"]).MagicMock()
+    mock_redis.get.return_value = None  # no prior requests — bypass rate limit
+    mock_redis.ttl.return_value = -1
+
+    with (
+        patch("app.services.simplefi.get_simplefi_client") as mock_client,
+        patch("app.core.rate_limit.get_redis", return_value=mock_redis),
+    ):
+        mock_client.return_value.create_payment.return_value = SimpleNamespace(
+            id="sf_per_tenant_1",
+            status="pending",
+            checkout_url="https://simplefi.test/checkout/per-tenant",
+        )
+
+        response = client.post(
+            f"/api/v1/checkout/{popup.slug}/purchase",
+            json={
+                "products": [{"product_id": str(product.id), "quantity": 1}],
+                "buyer": {
+                    "email": "buyer@test.com",
+                    "first_name": "Test",
+                    "last_name": "User",
+                    "form_data": {field.name: "Test"},
+                },
+            },
+            headers=with_origin("test-tenant-a.localhost"),
+        )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["status"] == "pending"
+
+
+def test_purchase_unknown_origin_returns_404(
+    client: TestClient,
+) -> None:
+    """No Origin and no X-Tenant-Id → 404 from resolver, no payment created."""
+    response = client.post(
+        "/api/v1/checkout/summer-fest/purchase",
+        json={
+            "products": [{"product_id": str(uuid.uuid4()), "quantity": 1}],
+            "buyer": {
+                "email": "buyer@test.com",
+                "first_name": "Test",
+                "last_name": "User",
+                "form_data": {},
+            },
+        },
+    )
+    assert response.status_code == 404, response.text
