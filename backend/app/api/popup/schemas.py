@@ -67,7 +67,7 @@ class PopupBase(SQLModel):
     name: str = Field(index=True)
     tagline: str | None = None
     location: str | None = None
-    slug: str = Field(unique=True, index=True)
+    slug: str = Field(index=True)
     tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
     start_date: datetime | None = None
     end_date: datetime | None = None
