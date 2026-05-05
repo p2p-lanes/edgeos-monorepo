@@ -350,15 +350,13 @@ class TestApiKeyPolicy:
         expires_at = (datetime.now(UTC) + timedelta(days=45)).isoformat()
 
         resp = client.post(
-          "/api/v1/api-keys",
-          headers={"Authorization": f"Bearer {token}"},
-          json={
-              {
-                  "name": "writer",
-                  "scopes": ["events:read", "events:write"],
-                  "expires_at": expires_at,
-              }
-          },
+            "/api/v1/api-keys",
+            headers={"Authorization": f"Bearer {token}"},
+            json={
+                "name": "writer",
+                "scopes": ["events:read", "events:write"],
+                "expires_at": expires_at,
+            },
         )
 
         assert resp.status_code == 422, resp.text
