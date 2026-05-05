@@ -24,8 +24,7 @@ export function useEventsApiAccess(): { allowed: boolean } {
   const canSeeAttendees = application?.status === "accepted"
 
   return {
-    allowed:
-      !isDirectSale && !isCompanion && eventsEnabled && canSeeAttendees,
+    allowed: !isDirectSale && !isCompanion && eventsEnabled && canSeeAttendees,
   }
 }
 
