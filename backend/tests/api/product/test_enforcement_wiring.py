@@ -113,10 +113,13 @@ def _get_or_create_application(
         )
         db.add(human)
         db.flush()
+        from app.api.application.schemas import ApplicationStatus
+
         app = Applications(
             tenant_id=tenant.id,
             popup_id=popup.id,
             human_id=human.id,
+            status=ApplicationStatus.ACCEPTED.value,
         )
         db.add(app)
         db.commit()
