@@ -10,7 +10,8 @@ from sqlmodel import Session, create_engine, select
 from testcontainers.postgres import PostgresContainer
 
 from app.api.popup.models import Popups
-from app.api.shared.enums import UserRole
+from app.api.popup.schemas import PopupStatus
+from app.api.shared.enums import SaleType, UserRole
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
 from app.core.dependencies.users import get_session
@@ -260,3 +261,52 @@ def popup_tenant_b(db: Session, tenant_b: Tenants) -> Popups:
         db.refresh(popup)
 
     return popup
+
+
+@pytest.fixture(scope="session")
+def popup_tenant_a_summer_fest(db: Session, tenant_a: Tenants) -> Popups:
+    popup = db.exec(
+        select(Popups).where(
+            Popups.slug == "summer-fest",
+            Popups.tenant_id == tenant_a.id,
+        )
+    ).first()
+    if popup is None:
+        popup = Popups(
+            name="Summer Fest A",
+            slug="summer-fest",
+            tenant_id=tenant_a.id,
+            sale_type=SaleType.direct,
+            status=PopupStatus.active,
+        )
+        db.add(popup)
+        db.commit()
+        db.refresh(popup)
+    return popup
+
+
+@pytest.fixture(scope="session")
+def popup_tenant_b_summer_fest(db: Session, tenant_b: Tenants) -> Popups:
+    popup = db.exec(
+        select(Popups).where(
+            Popups.slug == "summer-fest",
+            Popups.tenant_id == tenant_b.id,
+        )
+    ).first()
+    if popup is None:
+        popup = Popups(
+            name="Summer Fest B",
+            slug="summer-fest",
+            tenant_id=tenant_b.id,
+            sale_type=SaleType.direct,
+            status=PopupStatus.active,
+        )
+        db.add(popup)
+        db.commit()
+        db.refresh(popup)
+    return popup
+
+
+def with_origin(host: str) -> dict[str, str]:
+    """Return a headers dict with an Origin pointing at the given host."""
+    return {"Origin": f"https://{host}"}

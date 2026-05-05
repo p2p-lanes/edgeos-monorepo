@@ -1,6 +1,7 @@
 import uuid
 from typing import TYPE_CHECKING, Optional
 
+from sqlalchemy import UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlmodel import Column, Field, Relationship
 
@@ -25,6 +26,10 @@ if TYPE_CHECKING:
 
 
 class Popups(PopupBase, table=True):
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "slug", name="uq_popups_tenant_slug"),
+    )
+
     id: uuid.UUID = Field(
         default_factory=uuid.uuid4,
         sa_column=Column(
