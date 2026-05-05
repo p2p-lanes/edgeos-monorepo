@@ -9,6 +9,7 @@ import { type EventVenuePublic, EventVenuesService } from "@/client"
 import { LucideIcon } from "@/components/LucideIcon"
 import { Button } from "@/components/ui/button"
 import { useCityProvider } from "@/providers/cityProvider"
+import { CoverImage } from "../lib/CoverImage"
 import { usePortalEventSettings } from "../lib/useEventTimezone"
 
 export default function PortalVenuesPage() {
@@ -78,18 +79,14 @@ export default function PortalVenuesPage() {
               href={`/portal/${city?.slug}/events/venues/${venue.id}`}
               className="group flex flex-col overflow-hidden rounded-xl border bg-card transition-shadow hover:shadow-md"
             >
-              {venue.image_url ? (
-                // biome-ignore lint/performance/noImgElement: portal uses plain imgs for cover photos uploaded to S3
-                <img
-                  src={venue.image_url}
-                  alt={venue.title}
-                  className="aspect-[16/9] w-full object-cover"
-                />
-              ) : (
-                <div className="flex aspect-[16/9] w-full items-center justify-center bg-muted">
+              <CoverImage
+                src={venue.image_url}
+                alt={venue.title}
+                className="aspect-[16/9] w-full object-cover"
+                fallback={
                   <MapPin className="h-8 w-8 text-muted-foreground/40" />
-                </div>
-              )}
+                }
+              />
               <div className="flex-1 p-4">
                 <h3 className="font-semibold text-base mb-1 group-hover:text-primary transition-colors">
                   {venue.title || t("events.venues.list.untitled_venue")}

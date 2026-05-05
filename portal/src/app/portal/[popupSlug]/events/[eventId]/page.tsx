@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   CalendarCheck,
+  CalendarDays,
   CalendarPlus,
   CheckCircle,
   Clock,
@@ -42,6 +43,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import { useCityProvider } from "@/providers/cityProvider"
 import { AddToCalendarModal } from "../lib/AddToCalendarModal"
+import { CoverImage } from "../lib/CoverImage"
 import { summarizeRrule } from "../lib/summarizeRrule"
 import { useCalendarAddedFlag } from "../lib/useCalendarAddedFlag"
 import { useEventTimezone } from "../lib/useEventTimezone"
@@ -330,11 +332,13 @@ export default function EventDetailPage() {
       {coverUrl && (
         <div>
           <div className="w-full h-40 sm:h-52 rounded-xl overflow-hidden">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <CoverImage
               src={coverUrl}
               alt={event.title}
               className="w-full h-full object-cover"
+              fallback={
+                <CalendarDays className="h-10 w-10 text-muted-foreground/40" />
+              }
             />
           </div>
           {coverCredit && (

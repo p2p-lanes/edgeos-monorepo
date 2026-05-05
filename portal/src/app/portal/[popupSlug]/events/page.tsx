@@ -126,7 +126,11 @@ export default function EventsPage() {
     useEventTimezone(city?.id)
 
   const { data: eventSettings } = usePortalEventSettings(city?.id)
-  const eventsEnabled = eventSettings?.event_enabled ?? true
+  // Popup-level kill switch hides the whole events module.
+  const moduleEnabled = city?.events_enabled ?? true
+  // event_settings.event_enabled gates creation only; existing events
+  // stay browsable so users can review what's already published.
+  const creationEnabled = eventSettings?.event_enabled ?? true
 
   const { data: tracksData } = useQuery({
     queryKey: ["portal-tracks", city?.id],
@@ -229,7 +233,7 @@ export default function EventsPage() {
         startBefore: listWindow.startBefore,
         limit: 200,
       }),
-    enabled: !!city?.id && eventsEnabled && view === "list" && useAllChannel,
+    enabled: !!city?.id && moduleEnabled && view === "list" && useAllChannel,
   })
 
   const mineQuery = useQuery({
@@ -257,7 +261,7 @@ export default function EventsPage() {
         startBefore: listWindow.startBefore,
         limit: 200,
       }),
-    enabled: !!city?.id && eventsEnabled && view === "list" && useMineChannel,
+    enabled: !!city?.id && moduleEnabled && view === "list" && useMineChannel,
   })
 
   const rsvpedQuery = useQuery({
@@ -285,7 +289,7 @@ export default function EventsPage() {
         startBefore: listWindow.startBefore,
         limit: 200,
       }),
-    enabled: !!city?.id && eventsEnabled && view === "list" && useRsvpedChannel,
+    enabled: !!city?.id && moduleEnabled && view === "list" && useRsvpedChannel,
   })
 
   const isLoading =
@@ -296,7 +300,7 @@ export default function EventsPage() {
   const { data: hiddenCountData } = useQuery({
     queryKey: ["portal-events-hidden-count", city?.id],
     queryFn: () => EventsService.portalHiddenEventsCount({ popupId: city!.id }),
-    enabled: !!city?.id && eventsEnabled,
+    enabled: !!city?.id && moduleEnabled,
     staleTime: 30 * 1000,
   })
 
@@ -376,7 +380,7 @@ export default function EventsPage() {
   ])
   const grouped = groupByDate(events, formatDayKey)
 
-  if (!eventsEnabled) {
+  if (!moduleEnabled) {
     return (
       <div className="flex flex-col h-full max-w-4xl mx-auto p-4 sm:p-6">
         <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -406,20 +410,21 @@ export default function EventsPage() {
           <h1 className="text-2xl font-bold tracking-tight">
             {t("events.list.heading")}
           </h1>
-          {(eventSettings?.can_publish_event ?? "everyone") === "everyone" && (
-            <Button asChild size="sm" className="shrink-0 px-2 sm:px-3">
-              <Link
-                href={`/portal/${city?.slug}/events/new`}
-                aria-label={t("events.toolbar.create_event")}
-                title={t("events.toolbar.create_event")}
-              >
-                <Plus className="h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline">
-                  {t("events.toolbar.create_event")}
-                </span>
-              </Link>
-            </Button>
-          )}
+          {creationEnabled &&
+            (eventSettings?.can_publish_event ?? "everyone") === "everyone" && (
+              <Button asChild size="sm" className="shrink-0 px-2 sm:px-3">
+                <Link
+                  href={`/portal/${city?.slug}/events/new`}
+                  aria-label={t("events.toolbar.create_event")}
+                  title={t("events.toolbar.create_event")}
+                >
+                  <Plus className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">
+                    {t("events.toolbar.create_event")}
+                  </span>
+                </Link>
+              </Button>
+            )}
         </div>
         <p className="text-sm text-muted-foreground mt-1">
           {timezone

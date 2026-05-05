@@ -37,6 +37,7 @@ import {
 } from "@/client"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { CoverImage } from "./CoverImage"
 import { summarizeRrule } from "./summarizeRrule"
 import { useEventTimezone } from "./useEventTimezone"
 
@@ -283,12 +284,14 @@ export function CalendarBody({
                       >
                         <div className="flex items-start gap-3">
                           {event.venue_image_url && (
-                            <div className="h-12 w-12 rounded-md overflow-hidden shrink-0 bg-muted">
-                              {/* biome-ignore lint/performance/noImgElement: external S3 URL, next/image not configured */}
-                              <img
+                            <div className="h-12 w-12 rounded-md overflow-hidden shrink-0">
+                              <CoverImage
                                 src={event.venue_image_url}
                                 alt={event.venue_title ?? ""}
                                 className="h-full w-full object-cover"
+                                fallback={
+                                  <MapPin className="h-5 w-5 text-muted-foreground/40" />
+                                }
                               />
                             </div>
                           )}

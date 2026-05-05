@@ -75,6 +75,10 @@ def client(
         patch("app.core.tenant_db.settings.POSTGRES_DB", "test_db"),
         patch("app.core.tenant_db.settings.POSTGRES_SSL_MODE", "disable"),
         patch("app.core.dependencies.users.engine", test_engine),
+        # PAT auth bypasses get_session and resolves the key on the global
+        # engine in app.core.security; patch that bind to the testcontainer
+        # so test_api_key_policy.py doesn't hit a real localhost Postgres.
+        patch("app.core.security.engine", test_engine),
     ):
         with TestClient(application) as c:
             yield c

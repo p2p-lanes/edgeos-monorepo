@@ -71,7 +71,8 @@ export default function NewPortalEventPage() {
   // ---- settings-driven gates ------------------------------------------
   const { data: settings, isLoading: settingsLoading } =
     usePortalEventSettings(popupId)
-  const eventsEnabled = settings?.event_enabled ?? true
+  const moduleEnabled = city?.events_enabled ?? true
+  const creationEnabled = settings?.event_enabled ?? true
   const canCreate = (settings?.can_publish_event ?? "everyone") === "everyone"
 
   // ---- form state -----------------------------------------------------
@@ -252,7 +253,7 @@ export default function NewPortalEventPage() {
       </div>
     )
   }
-  if (!eventsEnabled) {
+  if (!moduleEnabled || !creationEnabled) {
     return (
       <GatedMessage
         title={t("events.list.events_disabled_heading")}
