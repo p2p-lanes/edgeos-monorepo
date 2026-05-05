@@ -22,6 +22,7 @@ import { LucideIcon } from "@/components/LucideIcon"
 import { Pill } from "@/components/ui/pill"
 import { VenueHoursPreview } from "@/components/VenueHoursPreview"
 import { useCityProvider } from "@/providers/cityProvider"
+import { CoverImage } from "../../lib/CoverImage"
 
 export default function PortalVenueDetailPage() {
   const { t } = useTranslation()
@@ -108,11 +109,13 @@ export default function PortalVenueDetailPage() {
       {/* Cover */}
       {venue.image_url && (
         <div className="overflow-hidden rounded-xl border">
-          {/* biome-ignore lint/performance/noImgElement: user-uploaded S3 image */}
-          <img
+          <CoverImage
             src={venue.image_url}
             alt={venue.title}
             className="aspect-[21/9] w-full object-cover"
+            fallback={
+              <MapPin className="h-10 w-10 text-muted-foreground/40" />
+            }
           />
         </div>
       )}
