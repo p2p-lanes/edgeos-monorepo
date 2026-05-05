@@ -1,39 +1,98 @@
 {% extends "base.html" %}
 
-{% block title %}You're invited to {{ event_title }}{% endblock %}
+{% block title %}{% if is_cancelled %}Event cancelled: {{ event_title }}{% elif is_update %}Event updated: {{ event_title }}{% elif is_self_rsvp %}You're in! {{ event_title }}{% else %}You're invited to {{ event_title }}{% endif %}{% endblock %}
 
 {% block content %}
+{% if is_cancelled %}
+<h1>This event was cancelled</h1>
+
+<p>Hi {{ first_name or "there" }},</p>
+
+<p>
+    The event below has been cancelled and the entry has been removed from your calendar.
+</p>
+{% elif is_update %}
+<h1>This event was updated</h1>
+
+<p>Hi {{ first_name or "there" }},</p>
+
+<p>
+    The event below has been updated. Highlighted rows show what changed.
+</p>
+{% elif is_self_rsvp %}
+<h1>You're in!</h1>
+
+<p>Hi {{ first_name or "there" }},</p>
+
+<p>
+    You're going to the event below{% if popup_name %} at <strong>{{ popup_name }}</strong>{% endif %}.
+</p>
+{% else %}
 <h1>You're invited!</h1>
 
 <p>Hi {{ first_name or "there" }},</p>
 
 <p>
-    You have been invited to <strong>{{ event_title }}</strong>{% if popup_name %}
-    at <strong>{{ popup_name }}</strong>{% endif %}.
+    You have been invited to the event below{% if popup_name %} at <strong>{{ popup_name }}</strong>{% endif %}.
 </p>
+{% endif %}
 
+{% set highlight_style = "background-color: #fff3cd;" %}
+{% set diff_old_style = "color: #999; text-decoration: line-through;" %}
+{% set diff_arrow_style = "color: #999;" %}
 <div style="background-color: #f8f9fa; border-radius: 8px; padding: 20px; margin: 20px 0;">
     <table style="width: 100%; border-collapse: collapse;">
-        {% if event_when %}
-        <tr>
-            <td style="padding: 8px 0; color: #666;">When</td>
-            <td style="padding: 8px 0; font-weight: 600;">{{ event_when }}</td>
+        {% set event_change = changes.event if changes else None %}
+        <tr {% if event_change %}style="{{ highlight_style }}"{% endif %}>
+            <td style="padding: 8px 12px; color: #666; vertical-align: top; width: 110px;">Event:</td>
+            <td style="padding: 8px 12px; font-weight: 600;">
+                {% if event_change %}
+                <span style="{{ diff_old_style }}">{{ event_change.before }}</span>
+                <span style="{{ diff_arrow_style }}"> → </span>
+                <strong>{{ event_change.after }}</strong>
+                {% else %}
+                {{ event_title }}
+                {% endif %}
+            </td>
+        </tr>
+        {% set time_change = changes.time if changes else None %}
+        {% if time_change or event_when %}
+        <tr {% if time_change %}style="{{ highlight_style }}"{% endif %}>
+            <td style="padding: 8px 12px; color: #666; vertical-align: top;">Time:</td>
+            <td style="padding: 8px 12px; font-weight: 600;">
+                {% if time_change %}
+                <span style="{{ diff_old_style }}">{{ time_change.before }}</span>
+                <span style="{{ diff_arrow_style }}"> → </span>
+                <strong>{{ time_change.after }}</strong>
+                {% else %}
+                {{ event_when }}
+                {% endif %}
+            </td>
         </tr>
         {% endif %}
-        {% if venue_title %}
-        <tr>
-            <td style="padding: 8px 0; color: #666;">Venue</td>
-            <td style="padding: 8px 0; font-weight: 600;">{{ venue_title }}</td>
+        {% set location_change = changes.location if changes else None %}
+        {% if location_change or venue_title %}
+        <tr {% if location_change %}style="{{ highlight_style }}"{% endif %}>
+            <td style="padding: 8px 12px; color: #666; vertical-align: top;">Location:</td>
+            <td style="padding: 8px 12px; font-weight: 600;">
+                {% if location_change %}
+                <span style="{{ diff_old_style }}">{{ location_change.before }}</span>
+                <span style="{{ diff_arrow_style }}"> → </span>
+                <strong>{{ location_change.after }}</strong>
+                {% else %}
+                {{ venue_title }}
+                {% endif %}
+            </td>
         </tr>
         {% endif %}
     </table>
 </div>
 
-{% if event_url %}
+{% if event_url and not is_cancelled %}
 <p class="text-center">
-    <a href="{{ event_url }}" class="button">View event &amp; RSVP</a>
+    <a href="{{ event_url }}" class="button">{% if is_update or is_self_rsvp %}View event details{% else %}View event &amp; RSVP{% endif %}</a>
 </p>
 {% endif %}
 
-<p>See you there!</p>
+{% if not is_cancelled %}<p>See you there!</p>{% endif %}
 {% endblock %}

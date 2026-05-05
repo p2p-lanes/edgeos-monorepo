@@ -71,6 +71,7 @@
     "network_error": "Network error. Please check your connection."
   },
   "form": {
+    "email": "Email",
     "first_name": "First Name",
     "first_name_placeholder": "Enter your first name",
     "first_name_required": "First name is required",
@@ -164,6 +165,8 @@
   "checkout": {
     "title": "Checkout",
     "express_title": "Express Checkout",
+    "buyer_step_title": "Your information",
+    "buyer_step_description": "Complete your information before payment.",
     "loading_info": "Loading your information",
     "processing": "Processing your registration",
     "processing_subtitle": "This might take a few moments",
@@ -485,7 +488,8 @@
       "outlook": "Outlook",
       "yahoo": "Yahoo",
       "apple_calendar": "Apple Calendar / other (.ics)",
-      "download_ics": "Download .ics file"
+      "download_ics": "Download .ics file",
+      "mark_removed": "I removed it from my calendar"
     },
     "rsvp": {
       "going": "Going",
@@ -508,6 +512,7 @@
       "inviting_button": "Inviting...",
       "join_meeting": "Join meeting",
       "add_to_calendar_button": "Add to calendar",
+      "added_to_calendar_button": "Added to calendar",
       "invitations_heading": "Invitations ({{count}})",
       "invitations_empty": "No invitations yet",
       "participants_heading": "Participants",
@@ -519,7 +524,9 @@
       "remove_invitation_error": "Failed to remove",
       "enter_at_least_one_email": "Enter at least one email",
       "remove_invitation_aria": "Remove invitation for {{email}}",
-      "edit_event_button": "Edit event"
+      "edit_event_button": "Edit event",
+      "pending_approval_banner_title": "Pending approval",
+      "pending_approval_banner_message": "Your event is pending approval and not yet visible to others."
     },
     "form": {
       "create_heading": "Create event",
@@ -531,8 +538,8 @@
       "venue_label": "Venue",
       "venue_placeholder": "No venue",
       "venue_not_bookable": "This venue is not bookable.",
-      "venue_approval_required": "This venue requires admin approval for new events.",
-      "venue_setup_teardown": "Venue is blocked{{setupTime}}min before & after each scheduled session for setup/teardown",
+      "venue_approval_required": "Events at this venue need admin approval. Your event will be pending review and won't be visible to others until an admin approves it.",
+      "venue_setup_teardown": "Venue is blocked {{setupTime}}min before & after each scheduled session for setup/teardown",
       "venue_closed_warning": "The selected date falls on a day the venue is closed.",
       "view_pictures_button": "View pictures",
       "venue_pictures_heading": "{{venue}} — pictures",
@@ -555,6 +562,8 @@
       "hours": "Hours",
       "no_venue_open_hours": "Venue has no open hours on this day (check weekly hours or exceptions).",
       "start_time_outside_venue_hours": "Start time falls outside the venue's open hours.",
+      "start_time_conflict": "There is already an event at this time.",
+      "try_nearby_slots": "Try one of these nearby times:",
       "visibility_label": "Visibility",
       "visibility_public": "Public",
       "visibility_private": "Private (invitees only)",
@@ -577,6 +586,7 @@
       "create_button": "Create event",
       "save_button": "Save changes",
       "event_created_success": "Event created",
+      "event_created_pending_approval_success": "Event submitted and pending approval. It's not visible to others yet.",
       "event_updated_success": "Event updated",
       "image_uploaded_success": "Image uploaded",
       "required_title": "Title is required",

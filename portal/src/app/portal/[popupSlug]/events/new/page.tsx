@@ -128,6 +128,7 @@ export default function NewPortalEventPage() {
     isVenueClosedOnDay,
     selectedDateIsClosed,
     startOptions,
+    nearbyStartOptions,
     withinOpenHours,
     availability,
     availabilityData,
@@ -180,7 +181,11 @@ export default function NewPortalEventPage() {
       })
     },
     onSuccess: (event) => {
-      toast.success(t("events.form.event_created_success"))
+      const messageKey =
+        event.status === "pending_approval"
+          ? "events.form.event_created_pending_approval_success"
+          : "events.form.event_created_success"
+      toast.success(t(messageKey))
       router.push(`/portal/${city?.slug}/events/${event.id}`)
     },
     onError: (err) => {
@@ -415,6 +420,8 @@ export default function NewPortalEventPage() {
           availability={availability}
           availabilityLoaded={!!availabilityData}
           startOptionsCount={startOptions.length}
+          nearbyStartOptions={nearbyStartOptions}
+          onSuggestionPick={setTimeStr}
           disabled={venueDisabled}
         />
 

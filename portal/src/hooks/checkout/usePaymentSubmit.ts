@@ -153,7 +153,15 @@ export function usePaymentSubmit({
                   email: buyerData!.email,
                   first_name: buyerData!.firstName,
                   last_name: buyerData!.lastName,
-                  form_data: buyerData!.formData,
+                  // form_data carries only custom field values; strip the form's "custom_" prefix to send raw field names.
+                  form_data: Object.fromEntries(
+                    Object.entries(buyerData!.formData).flatMap(
+                      ([key, value]) =>
+                        key.startsWith("custom_")
+                          ? [[key.slice("custom_".length), value]]
+                          : [],
+                    ),
+                  ),
                 },
                 coupon_code: promoCodeValid ? promoCode : undefined,
               },

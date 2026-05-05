@@ -89,10 +89,13 @@ def build_event_ics(
       or replaces the entry keyed on UID.
     - ``CANCEL``: event was cancelled. Calendar removes the entry.
 
-    ``occurrence_start`` shifts the calendar entry to a specific instance
-    of a recurring event: DTSTART/DTEND are recomputed using the master's
-    duration, and the UID is suffixed with the occurrence timestamp so
-    each instance is a distinct entry in the recipient's calendar.
+    ``occurrence_start`` scopes the entry to a specific instance of a
+    recurring event: DTSTART/DTEND are recomputed using the master's
+    duration. The UID stays master-stable (``{event.id}@edgeos``) and a
+    ``RECURRENCE-ID`` line identifies which instance is being addressed,
+    per RFC 5546. Keeping the UID stable is what lets later organiser
+    updates (REQUEST with bumped SEQUENCE) patch the entry the recipient
+    already has on their calendar instead of leaving an orphaned copy.
     """
     title = _escape(getattr(event, "title", "") or "Event")
 
@@ -116,15 +119,12 @@ def build_event_ics(
         master_duration = event.end_time - event.start_time
         effective_start = occurrence_start
         effective_end = occurrence_start + master_duration
-        # Distinct UID per instance so the recipient's calendar imports
-        # each occurrence as its own appointment instead of overwriting
-        # the previous one.
-        uid_suffix = f"_{occurrence_start.strftime('%Y%m%dT%H%M%SZ')}"
+        recurrence_id = _fmt_utc(occurrence_start)
     else:
         effective_start = event.start_time
         effective_end = event.end_time
-        uid_suffix = ""
-    uid = f"{event.id}{uid_suffix}@edgeos"
+        recurrence_id = None
+    uid = f"{event.id}@edgeos"
     now = _fmt_utc(datetime.now(UTC))
     dtstart = _fmt_utc(effective_start)
     dtend = _fmt_utc(effective_end)
@@ -141,13 +141,19 @@ def build_event_ics(
         f"METHOD:{method}",
         "BEGIN:VEVENT",
         f"UID:{uid}",
-        f"DTSTAMP:{now}",
-        f"DTSTART:{dtstart}",
-        f"DTEND:{dtend}",
-        f"LAST-MODIFIED:{last_modified}",
-        f"SEQUENCE:{seq}",
-        f"SUMMARY:{title}",
     ]
+    if recurrence_id is not None:
+        lines.append(f"RECURRENCE-ID:{recurrence_id}")
+    lines.extend(
+        [
+            f"DTSTAMP:{now}",
+            f"DTSTART:{dtstart}",
+            f"DTEND:{dtend}",
+            f"LAST-MODIFIED:{last_modified}",
+            f"SEQUENCE:{seq}",
+            f"SUMMARY:{title}",
+        ]
+    )
     if description:
         lines.append(f"DESCRIPTION:{description}")
     if location:

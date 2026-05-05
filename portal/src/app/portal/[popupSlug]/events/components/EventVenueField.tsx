@@ -1,6 +1,6 @@
 "use client"
 
-import { Images } from "lucide-react"
+import { AlertTriangle, Images } from "lucide-react"
 import { useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import type { EventVenuePublic } from "@/client"
@@ -63,6 +63,12 @@ export function EventVenueField({
         venues={venues}
         selectedVenueLabel={selectedVenueLabel}
       />
+      {selectedVenue?.booking_mode === "approval_required" && (
+        <div className="flex items-start gap-2.5 rounded-md border border-amber-300 bg-amber-50 p-2.5 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-100">
+          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
+          <p>{t("events.form.venue_approval_required")}</p>
+        </div>
+      )}
       {selectedVenue && (
         <div className="text-xs text-muted-foreground space-y-2">
           {pictures.length > 0 && (
@@ -83,9 +89,6 @@ export function EventVenueField({
             <p className="text-destructive">
               {t("events.form.venue_not_bookable")}
             </p>
-          )}
-          {selectedVenue.booking_mode === "approval_required" && (
-            <p>{t("events.form.venue_approval_required")}</p>
           )}
           {(selectedVenue.setup_time_minutes ?? 0) > 0 ||
           (selectedVenue.teardown_time_minutes ?? 0) > 0 ? (

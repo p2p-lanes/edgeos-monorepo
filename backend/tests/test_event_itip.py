@@ -262,6 +262,96 @@ class TestBuildEventIcs:
 
         assert r"SUMMARY:Party\, with\; surprises" in ics
 
+    def test_uid_stable_across_invite_and_update(self) -> None:
+        """For non-recurring events the UID must not drift between the
+        first REQUEST (invite) and a later REQUEST with bumped SEQUENCE
+        (update) — otherwise Gmail/Apple/Outlook can't correlate the two
+        and the user ends up with a duplicate calendar entry instead of
+        a patched one.
+        """
+        start = datetime(2026, 5, 5, 14, 0, tzinfo=UTC)
+        event = self._minimal_event(start=start, end=start + timedelta(hours=1))
+
+        invite = build_event_ics(
+            event, recipient_email="alice@example.com", method="REQUEST", sequence=0
+        )
+        update = build_event_ics(
+            event, recipient_email="alice@example.com", method="REQUEST", sequence=1
+        )
+
+        assert f"UID:{event.id}@edgeos" in invite
+        assert f"UID:{event.id}@edgeos" in update
+        # And no RECURRENCE-ID for one-offs.
+        assert "RECURRENCE-ID:" not in invite
+        assert "RECURRENCE-ID:" not in update
+
+    def test_recurring_rsvp_uses_recurrence_id(self) -> None:
+        """When a participant RSVPs to one instance of a recurring series,
+        the per-recipient ICS must keep the master UID and add a
+        RECURRENCE-ID line targeting the chosen instance — that's the
+        RFC 5546 mechanism every major client uses to bind the entry to
+        the master series so future REQUESTs patch it in place.
+        """
+        master_start = datetime(2026, 5, 5, 14, 0, tzinfo=UTC)
+        event = self._minimal_event(
+            start=master_start, end=master_start + timedelta(hours=1)
+        )
+        occurrence = master_start + timedelta(weeks=2)
+
+        ics = build_event_ics(
+            event,
+            recipient_email="alice@example.com",
+            method="REQUEST",
+            occurrence_start=occurrence,
+        )
+
+        assert f"UID:{event.id}@edgeos" in ics
+        assert f"_{occurrence.strftime('%Y%m%dT%H%M%SZ')}@edgeos" not in ics
+        assert f"RECURRENCE-ID:{occurrence.strftime('%Y%m%dT%H%M%SZ')}" in ics
+        # DTSTART/DTEND shifted to the occurrence + duration.
+        assert "DTSTART:20260519T140000Z" in ics
+        assert "DTEND:20260519T150000Z" in ics
+
+    def test_update_after_recurring_rsvp_keeps_uid(self) -> None:
+        """Simulate the RSVP → organiser-update pipeline: the update
+        REQUEST emitted to a per-occurrence RSVPer must carry the same
+        master UID and the same RECURRENCE-ID as the original invite,
+        with SEQUENCE bumped. This is the contract that makes Google
+        Calendar update the existing entry instead of creating a sibling.
+        """
+        master_start = datetime(2026, 5, 5, 14, 0, tzinfo=UTC)
+        event = self._minimal_event(
+            start=master_start, end=master_start + timedelta(hours=1)
+        )
+        occurrence = master_start + timedelta(weeks=2)
+
+        invite = build_event_ics(
+            event,
+            recipient_email="alice@example.com",
+            method="REQUEST",
+            sequence=0,
+            occurrence_start=occurrence,
+        )
+        # Organiser shifts the master start later — service bumps SEQUENCE
+        # and re-sends. Per-recipient ICS is generated again with the same
+        # occurrence_start the user RSVPd to.
+        event.start_time = master_start + timedelta(hours=3)
+        event.end_time = event.start_time + timedelta(hours=1)
+        update = build_event_ics(
+            event,
+            recipient_email="alice@example.com",
+            method="REQUEST",
+            sequence=1,
+            occurrence_start=occurrence,
+        )
+
+        assert f"UID:{event.id}@edgeos" in invite
+        assert f"UID:{event.id}@edgeos" in update
+        assert f"RECURRENCE-ID:{occurrence.strftime('%Y%m%dT%H%M%SZ')}" in invite
+        assert f"RECURRENCE-ID:{occurrence.strftime('%Y%m%dT%H%M%SZ')}" in update
+        assert "SEQUENCE:0" in invite
+        assert "SEQUENCE:1" in update
+
 
 # ---------------------------------------------------------------------------
 # Unit: gather_event_recipients
@@ -647,3 +737,156 @@ class TestCancelAndDeleteDispatchCancel:
         # Row actually deleted.
         db.expire_all()
         assert db.get(Events, event_id) is None
+
+
+# ---------------------------------------------------------------------------
+# Integration: recurrence-, detach-, skip-, approve- triggered iTIP
+# ---------------------------------------------------------------------------
+
+
+class TestRecurrenceMutationsDispatch:
+    """The plan's missing endpoints all need to fan out iTIP messages so
+    a user who RSVPd before the change still gets an updated calendar
+    entry. Each test patches the iTIP send boundary and asserts a single
+    call with the right METHOD."""
+
+    def test_set_recurrence_dispatches_request(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        event = _make_event(db, tenant_a, popup)
+        _invite(db, event, _make_human(db, tenant_a))
+
+        send_mock = AsyncMock(return_value=None)
+        with _patch_send_everywhere(send_mock):
+            resp = client.patch(
+                f"/api/v1/events/{event.id}/recurrence",
+                headers=_auth(admin_token_tenant_a),
+                json={
+                    "recurrence": {
+                        "freq": "WEEKLY",
+                        "interval": 1,
+                        "count": 4,
+                    }
+                },
+            )
+
+        assert resp.status_code == 200, resp.text
+        assert send_mock.await_count == 1
+        assert send_mock.await_args.kwargs["method"] == "REQUEST"
+
+    def test_clearing_recurrence_to_same_value_does_not_dispatch(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        # Event starts with no rrule. Clearing it again is a no-op → no
+        # iTIP fan-out so users aren't spammed.
+        popup = _make_popup(db, tenant_a)
+        event = _make_event(db, tenant_a, popup)
+        _invite(db, event, _make_human(db, tenant_a))
+
+        send_mock = AsyncMock(return_value=None)
+        with _patch_send_everywhere(send_mock):
+            resp = client.patch(
+                f"/api/v1/events/{event.id}/recurrence",
+                headers=_auth(admin_token_tenant_a),
+                json={"recurrence": None},
+            )
+
+        assert resp.status_code == 200, resp.text
+        assert send_mock.await_count == 0
+
+    def test_delete_occurrence_dispatches_per_occurrence_cancel(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        # Set up a recurring weekly series and one RSVPer for a specific
+        # instance.
+        start = datetime(2026, 5, 5, 14, 0, tzinfo=UTC)
+        event = Events(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            owner_id=uuid.uuid4(),
+            title="Weekly meetup",
+            start_time=start,
+            end_time=start + timedelta(hours=1),
+            timezone="UTC",
+            visibility=EventVisibility.PUBLIC,
+            status=EventStatus.PUBLISHED,
+            rrule="FREQ=WEEKLY;COUNT=4",
+        )
+        db.add(event)
+        db.commit()
+        db.refresh(event)
+        rsvper = _make_human(db, tenant_a, email="rsvper@test.com")
+        # Participant for the second occurrence.
+        target_occurrence = start + timedelta(weeks=1)
+        p = EventParticipants(
+            tenant_id=tenant_a.id,
+            event_id=event.id,
+            profile_id=rsvper.id,
+            occurrence_start=target_occurrence,
+            status=ParticipantStatus.REGISTERED,
+        )
+        db.add(p)
+        db.commit()
+
+        send_mock = AsyncMock(return_value=None)
+        with _patch_send_everywhere(send_mock):
+            resp = client.request(
+                "DELETE",
+                f"/api/v1/events/{event.id}/occurrence",
+                headers=_auth(admin_token_tenant_a),
+                json={"occurrence_start": target_occurrence.isoformat()},
+            )
+
+        assert resp.status_code == 204, resp.text
+        assert send_mock.await_count == 1
+        kwargs = send_mock.await_args.kwargs
+        assert kwargs["method"] == "CANCEL"
+        # The per-occurrence dispatch is keyed on the same occurrence the
+        # user RSVPd to, and only that user is targeted.
+        assert kwargs["occurrence_start"] == target_occurrence
+        recipients = send_mock.await_args.args[2]
+        assert {r["email"] for r in recipients} == {"rsvper@test.com"}
+
+    def test_approve_dispatches_request_to_invitees(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        # Pending-approval event with one invitation already on it (the
+        # most common shape: org member created the event for review).
+        event = _make_event(db, tenant_a, popup, status=EventStatus.PENDING_APPROVAL)
+        _invite(db, event, _make_human(db, tenant_a, email="inv@test.com"))
+
+        send_mock = AsyncMock(return_value=None)
+        with _patch_send_everywhere(send_mock):
+            resp = client.post(
+                f"/api/v1/events/{event.id}/approve",
+                headers=_auth(admin_token_tenant_a),
+                json={"reason": "looks good"},
+            )
+
+        assert resp.status_code == 200, resp.text
+        # _send_event_approval_email is best-effort and silenced when
+        # SMTP isn't configured, so we assert only the iTIP fan-out.
+        assert send_mock.await_count >= 1
+        kwargs = send_mock.await_args_list[-1].kwargs
+        assert kwargs["method"] == "REQUEST"
+        recipients = send_mock.await_args_list[-1].args[2]
+        assert "inv@test.com" in {r["email"] for r in recipients}

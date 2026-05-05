@@ -5,6 +5,7 @@ import {
   dayBoundsInTz,
   durationFits,
   freeIntervalsForDay,
+  type SlotOption,
 } from "@edgeos/shared-events"
 import { useQuery } from "@tanstack/react-query"
 import { useEffect, useMemo, useRef, useState } from "react"
@@ -45,6 +46,12 @@ export interface UseVenueAvailabilityResult {
   isVenueClosedOnDay: ((date: Date) => boolean) | undefined
   selectedDateIsClosed: boolean
   startOptions: ReturnType<typeof availableStartOptionsForDuration>
+  /**
+   * Up to 3 bookable starts closest to the user's current pick. Surfaced so
+   * the form can offer one-click alternatives when the chosen time is in
+   * conflict or outside open hours.
+   */
+  nearbyStartOptions: SlotOption[]
   withinOpenHours: boolean
   availability: Availability
   availabilityData:
@@ -215,6 +222,20 @@ export function useVenueAvailability(
     setTimeStr(startOptions[0].label)
   }, [venueId, startOptions, setTimeStr])
 
+  const nearbyStartOptions = useMemo(() => {
+    if (startOptions.length === 0) return []
+    const targetMs = startIso ? Date.parse(startIso) : Number.NaN
+    const anchor = Number.isFinite(targetMs)
+      ? targetMs
+      : (dayBounds?.start.getTime() ?? 0)
+    return [...startOptions]
+      .map((opt) => ({ opt, t: Date.parse(opt.isoUtc) }))
+      .sort((a, b) => Math.abs(a.t - anchor) - Math.abs(b.t - anchor))
+      .slice(0, 3)
+      .sort((a, b) => a.t - b.t)
+      .map(({ opt }) => opt)
+  }, [startOptions, startIso, dayBounds])
+
   const withinOpenHours = useMemo(() => {
     if (!venueId) return true
     if (!startIso) return true
@@ -256,6 +277,7 @@ export function useVenueAvailability(
     isVenueClosedOnDay,
     selectedDateIsClosed,
     startOptions,
+    nearbyStartOptions,
     withinOpenHours,
     availability,
     availabilityData,

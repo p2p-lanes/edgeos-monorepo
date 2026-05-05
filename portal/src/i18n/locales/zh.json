@@ -71,6 +71,7 @@
     "network_error": "网络错误，请检查您的连接。"
   },
   "form": {
+    "email": "电子邮件",
     "first_name": "名",
     "first_name_placeholder": "输入您的名字",
     "first_name_required": "请输入名字",
@@ -164,6 +165,8 @@
   "checkout": {
     "title": "结账",
     "express_title": "快速结账",
+    "buyer_step_title": "您的信息",
+    "buyer_step_description": "请在付款前填写您的信息。",
     "loading_info": "正在加载您的信息",
     "processing": "正在处理您的注册",
     "processing_subtitle": "这可能需要一些时间",
@@ -485,7 +488,8 @@
       "outlook": "Outlook",
       "yahoo": "Yahoo",
       "apple_calendar": "Apple 日历 / 其他 (.ics)",
-      "download_ics": "下载 .ics 文件"
+      "download_ics": "下载 .ics 文件",
+      "mark_removed": "我已从日历中移除"
     },
     "rsvp": {
       "going": "已报名",
@@ -508,6 +512,7 @@
       "inviting_button": "邀请中...",
       "join_meeting": "加入会议",
       "add_to_calendar_button": "添加到日历",
+      "added_to_calendar_button": "已添加到日历",
       "invitations_heading": "邀请 ({{count}})",
       "invitations_empty": "暂无邀请",
       "participants_heading": "参与者",
@@ -519,7 +524,9 @@
       "remove_invitation_error": "移除失败",
       "enter_at_least_one_email": "请至少输入一个邮箱",
       "remove_invitation_aria": "移除 {{email}} 的邀请",
-      "edit_event_button": "编辑活动"
+      "edit_event_button": "编辑活动",
+      "pending_approval_banner_title": "等待审批",
+      "pending_approval_banner_message": "你的活动正在等待审批,其他人暂时无法查看。"
     },
     "form": {
       "create_heading": "创建活动",
@@ -531,7 +538,7 @@
       "venue_label": "场地",
       "venue_placeholder": "无场地",
       "venue_not_bookable": "此场地不可预订。",
-      "venue_approval_required": "此场地的新活动需要管理员审核。",
+      "venue_approval_required": "此场地的活动需要管理员审核。在管理员批准前,你的活动将处于审核中,其他人无法查看。",
       "venue_setup_teardown": "开始前锁定 {{setupTime}} 分钟,结束后锁定 {{teardownTime}} 分钟用于布置/撤场。",
       "venue_closed_warning": "所选日期为场地不营业的日期。",
       "view_pictures_button": "查看图片",
@@ -555,6 +562,8 @@
       "hours": "小时",
       "no_venue_open_hours": "场地当天无营业时间(请检查周计划或例外)。",
       "start_time_outside_venue_hours": "开始时间不在场地营业时间内。",
+      "start_time_conflict": "该时间已有其他活动。",
+      "try_nearby_slots": "可尝试以下相近时间:",
       "visibility_label": "可见性",
       "visibility_public": "公开",
       "visibility_private": "私密(仅限受邀者)",
@@ -577,6 +586,7 @@
       "create_button": "创建活动",
       "save_button": "保存更改",
       "event_created_success": "活动已创建",
+      "event_created_pending_approval_success": "活动已提交,等待审批。其他人暂时无法查看。",
       "event_updated_success": "活动已更新",
       "image_uploaded_success": "图片已上传",
       "required_title": "标题必填",

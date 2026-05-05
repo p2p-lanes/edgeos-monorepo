@@ -1,5 +1,6 @@
 "use client"
 
+import type { SlotOption } from "@edgeos/shared-events"
 import { Loader2 } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { DatePicker } from "@/components/ui/date-picker"
@@ -33,6 +34,13 @@ interface EventScheduleFieldsProps {
   /** True once `getPortalAvailability` has returned for the current day. */
   availabilityLoaded: boolean
   startOptionsCount: number
+  /**
+   * Up to 3 bookable starts close to the current pick. Rendered as
+   * click-to-apply pills under the conflict / outside-hours error.
+   */
+  nearbyStartOptions?: SlotOption[]
+  /** Called with the chosen suggestion's HH:mm label. */
+  onSuggestionPick?: (label: string) => void
   /** When true, the inputs render in a disabled state (e.g. unbookable venue). */
   disabled?: boolean
 }
@@ -53,9 +61,20 @@ export function EventScheduleFields({
   availability,
   availabilityLoaded,
   startOptionsCount,
+  nearbyStartOptions,
+  onSuggestionPick,
   disabled,
 }: EventScheduleFieldsProps) {
   const { t } = useTranslation()
+
+  const showSuggestions =
+    !!venueId &&
+    !!timeStr &&
+    !disabled &&
+    (!withinOpenHours || availability === "conflict") &&
+    !!nearbyStartOptions &&
+    nearbyStartOptions.length > 0 &&
+    !!onSuggestionPick
 
   return (
     <>
@@ -116,9 +135,28 @@ export function EventScheduleFields({
             withinOpenHours &&
             availability === "conflict" && (
               <p className="text-xs text-destructive">
-                There is already an event at this time.
+                {t("events.form.start_time_conflict")}
               </p>
             )}
+          {showSuggestions && nearbyStartOptions && onSuggestionPick && (
+            <div className="space-y-1.5">
+              <p className="text-xs text-muted-foreground">
+                {t("events.form.try_nearby_slots")}
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {nearbyStartOptions.map((opt) => (
+                  <button
+                    key={opt.isoUtc}
+                    type="button"
+                    onClick={() => onSuggestionPick(opt.label)}
+                    className="inline-flex items-center rounded-full border border-input bg-background px-2.5 py-0.5 text-xs font-medium text-foreground hover:bg-muted"
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
         <div className="space-y-2">
           <Label>{t("events.form.duration_label")}</Label>

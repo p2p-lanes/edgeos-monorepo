@@ -46,6 +46,9 @@ from app.services.event_itip import (
 from app.services.event_itip import (
     calendar_fields_changed as _event_calendar_fields_changed,
 )
+from app.services.event_itip import (
+    gather_event_recipients as _gather_event_recipients,
+)
 from app.services.event_itip import send_event_itip as _send_event_itip
 
 router = APIRouter(prefix="/events", tags=["events"])
@@ -613,11 +616,12 @@ async def update_event(
         "start_time": event.start_time,
         "end_time": event.end_time,
         "venue_id": event.venue_id,
+        "content": event.content,
     }
     updated = crud.events_crud.update(db, event, event_in)
 
     if _event_calendar_fields_changed(before, updated):
-        await _bump_and_dispatch_itip_update(db, updated)
+        await _bump_and_dispatch_itip_update(db, updated, before=before)
 
     return _to_public(updated)
 
@@ -694,6 +698,7 @@ async def set_recurrence(
         )
 
     new_rrule = format_rrule(payload.recurrence) if payload.recurrence else None
+    old_rrule = event.rrule
 
     if event.venue_id is not None:
         _check_recurrence_conflicts(
@@ -711,6 +716,14 @@ async def set_recurrence(
     db.add(event)
     db.commit()
     db.refresh(event)
+
+    # Series schedule changed → re-broadcast the master REQUEST so each
+    # attendee's calendar refreshes. Per-occurrence RSVPers' instance
+    # entries stay intact (master UID + their RECURRENCE-ID); the master
+    # SEQUENCE bump is what nudges Google/Apple/Outlook to re-render the
+    # series.
+    if old_rrule != new_rrule:
+        await _bump_and_dispatch_itip_update(db, event)
     return _to_public(event)
 
 
@@ -777,6 +790,37 @@ async def detach_occurrence(
     db.add(child)
     db.commit()
     db.refresh(child)
+
+    # The detached instance has its own row now → tell anyone who RSVPd
+    # to that occurrence to drop the master+RECURRENCE-ID entry, then
+    # send a fresh REQUEST under the child's UID so the entry re-imports
+    # against the override row. Best-effort; SMTP failures don't roll back
+    # the detach.
+    try:
+        await _bump_and_dispatch_itip_cancel(db, master, occurrence_start=occ_start)
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.warning(
+            "iTIP CANCEL on detach for {} occ={} failed: {}",
+            master.id,
+            occ_start,
+            exc,
+        )
+    try:
+        master_recipients = _gather_event_recipients(
+            db, master, occurrence_start=occ_start
+        )
+        # Re-target recipients at the new child row; UID will be
+        # ``{child.id}@edgeos`` because we strip per-recipient
+        # ``occurrence_start`` (the child is standalone, no RECURRENCE-ID).
+        child_recipients = [{**r, "occurrence_start": None} for r in master_recipients]
+        if child_recipients:
+            await _send_event_itip(db, child, child_recipients, method="REQUEST")
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.warning(
+            "iTIP REQUEST for detached child {} failed: {}",
+            child.id,
+            exc,
+        )
     return _to_public(child)
 
 
@@ -807,6 +851,20 @@ async def delete_occurrence(
     master.recurrence_exdates = existing
     db.add(master)
     db.commit()
+    # Tell anyone RSVPd to this single instance to drop it; the rest of
+    # the series is unaffected because the per-recipient ICS carries the
+    # matching RECURRENCE-ID.
+    try:
+        await _bump_and_dispatch_itip_cancel(
+            db, master, occurrence_start=payload.occurrence_start
+        )
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.warning(
+            "iTIP CANCEL on skip for {} occ={} failed: {}",
+            master.id,
+            payload.occurrence_start,
+            exc,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -1160,6 +1218,22 @@ async def approve_event(
     db.commit()
     db.refresh(event)
     await _send_event_approval_email(db, event, approved=True, reason=payload.reason)
+
+    # Now that the event is live, push the calendar invite to anyone who
+    # had been invited or RSVPd while it was pending. Both paths go to
+    # ``send_event_itip`` so the per-recipient occurrence_start (for any
+    # recurring-instance RSVPers) and stable master UID land correctly.
+    try:
+        recipients = _gather_event_recipients(db, event)
+        if recipients:
+            await _send_event_itip(db, event, recipients, method="REQUEST")
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.warning(
+            "Failed to dispatch iTIP REQUEST on approve for {}: {}",
+            event.id,
+            exc,
+        )
+
     return _to_public(event)
 
 
@@ -1736,10 +1810,11 @@ async def update_portal_event(
         "start_time": event.start_time,
         "end_time": event.end_time,
         "venue_id": event.venue_id,
+        "content": event.content,
     }
     updated = crud.events_crud.update(db, event, event_in)
     if _event_calendar_fields_changed(before, updated):
-        await _bump_and_dispatch_itip_update(db, updated)
+        await _bump_and_dispatch_itip_update(db, updated, before=before)
     return _to_public(updated)
 
 

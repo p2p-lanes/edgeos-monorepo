@@ -71,6 +71,7 @@
     "network_error": "Error de red. Por favor, verificá tu conexión."
   },
   "form": {
+    "email": "Email",
     "first_name": "Nombre",
     "first_name_placeholder": "Ingresá tu nombre",
     "first_name_required": "El nombre es obligatorio",
@@ -164,6 +165,8 @@
   "checkout": {
     "title": "Checkout",
     "express_title": "Checkout Express",
+    "buyer_step_title": "Tu información",
+    "buyer_step_description": "Completá tus datos antes del pago.",
     "loading_info": "Cargando tu información",
     "processing": "Procesando tu registro",
     "processing_subtitle": "Esto puede tardar unos momentos",
@@ -485,7 +488,8 @@
       "outlook": "Outlook",
       "yahoo": "Yahoo",
       "apple_calendar": "Apple Calendar u otro (.ics)",
-      "download_ics": "Descargar archivo .ics"
+      "download_ics": "Descargar archivo .ics",
+      "mark_removed": "Lo quité de mi calendario"
     },
     "rsvp": {
       "going": "Asistiré",
@@ -508,6 +512,7 @@
       "inviting_button": "Invitando...",
       "join_meeting": "Unirse a la reunión",
       "add_to_calendar_button": "Agregar al calendario",
+      "added_to_calendar_button": "Agregado al calendario",
       "invitations_heading": "Invitaciones ({{count}})",
       "invitations_empty": "Aún no hay invitaciones",
       "participants_heading": "Participantes",
@@ -519,7 +524,9 @@
       "remove_invitation_error": "No se pudo quitar",
       "enter_at_least_one_email": "Ingresá al menos un email",
       "remove_invitation_aria": "Quitar invitación para {{email}}",
-      "edit_event_button": "Editar evento"
+      "edit_event_button": "Editar evento",
+      "pending_approval_banner_title": "Pendiente de aprobación",
+      "pending_approval_banner_message": "Tu evento está pendiente de aprobación y aún no es visible para otros."
     },
     "form": {
       "create_heading": "Crear evento",
@@ -531,7 +538,7 @@
       "venue_label": "Lugar",
       "venue_placeholder": "Sin lugar",
       "venue_not_bookable": "Este lugar no es reservable.",
-      "venue_approval_required": "Este lugar requiere aprobación del admin para eventos nuevos.",
+      "venue_approval_required": "Los eventos en este lugar requieren aprobación del admin. Tu evento quedará pendiente de revisión y no será visible para otros hasta que un admin lo apruebe.",
       "venue_setup_teardown": "Bloqueado {{setupTime}}m antes de inicio y {{teardownTime}}m después del fin para setup/teardown.",
       "venue_closed_warning": "La fecha elegida cae en un día que el lugar está cerrado.",
       "view_pictures_button": "Ver fotos",
@@ -555,6 +562,8 @@
       "hours": "Horas",
       "no_venue_open_hours": "El lugar no abre este día (revisá horarios semanales o excepciones).",
       "start_time_outside_venue_hours": "La hora de inicio queda fuera del horario del lugar.",
+      "start_time_conflict": "Ya hay un evento en ese horario.",
+      "try_nearby_slots": "Probá uno de estos horarios cercanos:",
       "visibility_label": "Visibilidad",
       "visibility_public": "Público",
       "visibility_private": "Privado (solo invitados)",
@@ -577,6 +586,7 @@
       "create_button": "Crear evento",
       "save_button": "Guardar cambios",
       "event_created_success": "Evento creado",
+      "event_created_pending_approval_success": "Evento enviado y pendiente de aprobación. Aún no es visible para otros.",
       "event_updated_success": "Evento actualizado",
       "image_uploaded_success": "Imagen subida",
       "required_title": "El título es obligatorio",
