@@ -352,9 +352,11 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             )
             for line in obj.products
         ]
-        self._validate_product_availability(
-            session, fabricated_requests, valid_products
-        )
+        # Validate per-order caps (cheap in-memory check, fail fast before DB).
+        self._validate_max_per_order(fabricated_requests, valid_products)
+        # Atomically decrement total-stock counters (409 if sold out).
+        self._decrement_total_stocks(session, fabricated_requests, valid_products)
+        # Atomically decrement shared tier-group counters (409 if group sold out).
         self._decrement_shared_tier_stocks(session, fabricated_requests)
 
         buyer_snapshot = self._build_buyer_snapshot(popup, obj.buyer.form_data)
@@ -988,86 +990,6 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         return valid_products
 
-    def _validate_product_availability(
-        self,
-        session: Session,
-        requested_products: list[PaymentProductRequest],
-        valid_products: list[Products],
-    ) -> None:
-        """Validate that requested quantities don't exceed product total_stock_remaining.
-
-        DEPRECATED: This read-then-check method is race-prone and will be replaced
-        by the atomic decrement_total_stock in Slice 2 (product-inventory-redesign).
-        Updated to read total_stock_remaining instead of the dropped max_quantity column.
-
-        Checks against already sold (approved) and reserved (pending) quantities.
-        """
-        products_map = {p.id: p for p in valid_products}
-
-        # Get product IDs that have total_stock_remaining set (tracked stock)
-        product_ids_with_limit = [
-            p.id for p in valid_products if p.total_stock_remaining is not None
-        ]
-        if not product_ids_with_limit:
-            return
-
-        # Count sold quantities (approved payments) for products with limits
-        sold_statement = (
-            select(
-                PaymentProducts.product_id,
-                func.sum(PaymentProducts.quantity).label("total_sold"),
-            )
-            .join(Payments, PaymentProducts.payment_id == Payments.id)
-            .where(
-                PaymentProducts.product_id.in_(product_ids_with_limit),  # type: ignore[attr-defined]
-                Payments.status.in_(  # type: ignore[attr-defined]
-                    [PaymentStatus.APPROVED.value, PaymentStatus.PENDING.value]
-                ),
-            )
-            .group_by(PaymentProducts.product_id)
-        )
-        sold_results = session.exec(sold_statement).all()
-        sold_map: dict[uuid.UUID, int] = {
-            row.product_id: int(row.total_sold) for row in sold_results
-        }
-
-        # Aggregate requested quantities per product
-        requested_map: dict[uuid.UUID, int] = {}
-        for req_prod in requested_products:
-            if req_prod.product_id in product_ids_with_limit:
-                requested_map[req_prod.product_id] = (
-                    requested_map.get(req_prod.product_id, 0) + req_prod.quantity
-                )
-
-        # Check availability for each product
-        for product_id, requested_qty in requested_map.items():
-            product = products_map[product_id]
-            # total_stock_remaining is the live atomic counter (already has sold deducted
-            # from previous payments). Add back sold from current in-progress payments to
-            # avoid double-counting. This is the legacy read-then-check path;
-            # Slice 2 replaces this with an atomic UPDATE.
-            stock_remaining = product.total_stock_remaining
-            sold_qty = sold_map.get(product_id, 0)
-            available_qty = (stock_remaining or 0) + sold_qty  # approximate
-            max_qty = stock_remaining  # kept for log compat
-
-            if stock_remaining is not None and requested_qty > stock_remaining:
-                logger.error(
-                    "Product %s (%s) quantity exceeded. "
-                    "Requested: %d, Available: %d, Max: %d, Sold: %d",
-                    product.name,
-                    product_id,
-                    requested_qty,
-                    available_qty,
-                    max_qty,
-                    sold_qty,
-                )
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Product '{product.name}' has insufficient availability. "
-                    f"Requested: {requested_qty}, Available: {stock_remaining}",
-                )
-
     def _decrement_shared_tier_stocks(
         self,
         session: Session,
@@ -1123,6 +1045,58 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         for group in groups_with_cap:
             qty = group_quantities[group.id]
             tier_groups_crud.decrement_shared_stock(session, group.id, qty)
+
+    def _validate_max_per_order(
+        self,
+        requested_products: list[PaymentProductRequest],
+        valid_products: list[Products],
+    ) -> None:
+        """Validate that no line item exceeds the product's max_per_order cap.
+
+        Pure in-memory check — no DB access. Raises HTTP 422 on violation.
+        Called BEFORE any stock decrement so the failure is cheap and clean.
+        """
+        products_map = {p.id: p for p in valid_products}
+        for req in requested_products:
+            product = products_map.get(req.product_id)
+            if product is None:
+                continue
+            if product.max_per_order is not None and req.quantity > product.max_per_order:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        f"Quantity {req.quantity} exceeds max_per_order "
+                        f"({product.max_per_order}) for '{product.name}'"
+                    ),
+                )
+
+    def _decrement_total_stocks(
+        self,
+        session: Session,
+        requested_products: list[PaymentProductRequest],
+        valid_products: list[Products],
+    ) -> None:
+        """Atomically decrement total_stock_remaining for each requested product.
+
+        Aggregates quantities per product (multiple line items for the same product
+        are summed), then issues one atomic UPDATE per product via
+        `products_crud.decrement_total_stock`. No-op for products with NULL cap
+        (unlimited). Raises HTTP 409 if any product is sold out.
+
+        Caller's transaction rolls back on any exception.
+        """
+        from app.api.product.crud import products_crud
+
+        products_map = {p.id: p for p in valid_products}
+
+        # Aggregate quantities per product
+        qty_map: dict[uuid.UUID, int] = {}
+        for req in requested_products:
+            if req.product_id in products_map:
+                qty_map[req.product_id] = qty_map.get(req.product_id, 0) + req.quantity
+
+        for product_id, qty in qty_map.items():
+            products_crud.decrement_total_stock(session, product_id, qty)
 
     def _validate_attendees(
         self,
@@ -1326,7 +1300,6 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         self._validate_application(application)
         valid_products = self._validate_products(session, obj.products, application)
         self._validate_attendees(session, obj.products, application)
-        self._validate_product_availability(session, obj.products, valid_products)
         already_patreon = self._check_patreon_status(
             application, valid_products, obj.edit_passes
         )
@@ -1368,11 +1341,28 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         """
         preview = self.preview_payment(session, obj)
 
+        # Fetch products once for both validation and decrement helpers.
+        product_ids = [p.product_id for p in obj.products]
+        products_statement = select(Products).where(
+            Products.id.in_(product_ids),  # type: ignore[attr-defined]
+            Products.deleted_at.is_(None),  # type: ignore[attr-defined]
+        )
+        valid_products = list(session.exec(products_statement).all())
+
+        # Validate per-order caps (in-memory, fail fast, 422 on violation).
+        self._validate_max_per_order(obj.products, valid_products)
+
         # Reserve shared tier-group stock atomically before taking any
         # irreversible action (creating payment rows, calling SimpleFI). If a
         # linked group is sold out the 409 propagates and the transaction
         # rolls back cleanly.
         self._decrement_shared_tier_stocks(session, obj.products)
+
+        # Atomically decrement total-stock counters. Must run inside the same
+        # transaction as _decrement_shared_tier_stocks so a failure rolls both
+        # back via MVCC abort. Order: tier-group first (existing behavior
+        # preserved), then per-product.
+        self._decrement_total_stocks(session, obj.products, valid_products)
 
         # Use eager loading to avoid N+1 when accessing application relationships
         application = self._get_application_with_products(
