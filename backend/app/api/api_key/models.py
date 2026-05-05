@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import Index
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlmodel import Column, DateTime, Field, SQLModel
 
 
@@ -26,9 +26,19 @@ class ApiKeys(SQLModel, table=True):
     name: str = Field(max_length=100)
     key_hash: str = Field(max_length=64, unique=True)
     prefix: str = Field(max_length=20)
-    last_used_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))
-    revoked_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))
-    expires_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))
+    scopes: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSONB, nullable=False, server_default="[]"),
+    )
+    last_used_at: datetime | None = Field(
+        default=None, sa_type=DateTime(timezone=True)
+    )
+    revoked_at: datetime | None = Field(
+        default=None, sa_type=DateTime(timezone=True)
+    )
+    expires_at: datetime | None = Field(
+        default=None, sa_type=DateTime(timezone=True)
+    )
     created_at: datetime = Field(
         default_factory=datetime.utcnow, sa_type=DateTime(timezone=True)
     )

@@ -110,9 +110,9 @@ function EventSettingsForm() {
       <div className="space-y-2">
         <div className="flex items-center justify-between rounded-lg border p-4">
           <div className="space-y-0.5">
-            <Label className="text-base">Events Enabled</Label>
+            <Label className="text-base">Allow new event creation</Label>
             <p className="text-sm text-muted-foreground">
-              Allow event creation for this pop-up
+              Hide the Create Event button in the portal
             </p>
           </div>
           <Switch
@@ -127,8 +127,9 @@ function EventSettingsForm() {
           />
         </div>
         <p className="text-sm text-muted-foreground">
-          When off, the events section is hidden in the portal for humans and no
-          one can create events. Who can create controls permission when on.
+          When off, humans can still browse existing events but the Create Event
+          button is hidden. To hide the events section entirely, toggle the
+          popup-level "Events module" feature flag in the popup settings.
         </p>
       </div>
 

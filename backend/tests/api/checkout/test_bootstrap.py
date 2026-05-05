@@ -14,6 +14,7 @@ Scenarios:
 import uuid
 from unittest.mock import patch
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
@@ -24,6 +25,7 @@ from app.api.product.models import Products
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.api.ticketing_step.models import TicketingSteps
+from tests.conftest import with_origin
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -153,7 +155,10 @@ def test_runtime_valid_direct_popup(
     _make_ticketing_step(db, popup, step_type="tickets", title="Choose Tickets")
     db.commit()
 
-    response = client.get(f"/api/v1/checkout/{popup.slug}/runtime")
+    response = client.get(
+        f"/api/v1/checkout/{popup.slug}/runtime",
+        headers={"X-Tenant-Id": str(tenant_a.id)},
+    )
 
     assert response.status_code == 200, response.text
     body = response.json()
@@ -190,16 +195,22 @@ def test_runtime_only_enabled_ticketing_steps(
     )
     db.commit()
 
-    response = client.get(f"/api/v1/checkout/{popup.slug}/runtime")
+    response = client.get(
+        f"/api/v1/checkout/{popup.slug}/runtime",
+        headers={"X-Tenant-Id": str(tenant_a.id)},
+    )
 
     assert response.status_code == 200, response.text
     body = response.json()
     assert [step["title"] for step in body["ticketing_steps"]] == ["Visible Step"]
 
 
-def test_runtime_unknown_slug_returns_404(client: TestClient) -> None:
+def test_runtime_unknown_slug_returns_404(client: TestClient, tenant_a: Tenants) -> None:
     """Unknown popup slug returns 404."""
-    response = client.get("/api/v1/checkout/does-not-exist-xyz/runtime")
+    response = client.get(
+        "/api/v1/checkout/does-not-exist-xyz/runtime",
+        headers={"X-Tenant-Id": str(tenant_a.id)},
+    )
     assert response.status_code == 404, response.text
 
 
@@ -219,7 +230,10 @@ def test_runtime_application_popup_returns_403(
     db.add(popup)
     db.commit()
 
-    response = client.get(f"/api/v1/checkout/{popup.slug}/runtime")
+    response = client.get(
+        f"/api/v1/checkout/{popup.slug}/runtime",
+        headers={"X-Tenant-Id": str(tenant_a.id)},
+    )
     assert response.status_code == 403, response.text
 
 
@@ -230,7 +244,10 @@ def test_runtime_inactive_direct_popup_returns_403(
     popup = _make_direct_popup(db, tenant_a, status="draft")
     db.commit()
 
-    response = client.get(f"/api/v1/checkout/{popup.slug}/runtime")
+    response = client.get(
+        f"/api/v1/checkout/{popup.slug}/runtime",
+        headers={"X-Tenant-Id": str(tenant_a.id)},
+    )
     assert response.status_code == 403, response.text
 
 
@@ -243,7 +260,10 @@ def test_runtime_only_active_products(
     _make_product(db, popup, name="Inactive VIP", is_active=False)
     db.commit()
 
-    response = client.get(f"/api/v1/checkout/{popup.slug}/runtime")
+    response = client.get(
+        f"/api/v1/checkout/{popup.slug}/runtime",
+        headers={"X-Tenant-Id": str(tenant_a.id)},
+    )
 
     assert response.status_code == 200, response.text
     body = response.json()
@@ -266,8 +286,85 @@ def test_runtime_rate_limit_triggers_429(
     with patch("app.core.rate_limit.get_redis", return_value=mock_redis):
         response = client.get(
             f"/api/v1/checkout/{popup.slug}/runtime",
-            headers={"X-Forwarded-For": "8.8.8.8"},
+            headers={"X-Forwarded-For": "8.8.8.8", "X-Tenant-Id": str(tenant_a.id)},
         )
 
     assert response.status_code == 429, response.text
     assert "Retry-After" in response.headers
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 — Tenant-scoped runtime tests (T-3.1)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.usefixtures("popup_tenant_b_summer_fest")
+def test_runtime_resolves_per_tenant_slug_collision(
+    client: TestClient,
+    popup_tenant_a_summer_fest: Popups,
+) -> None:
+    """Slug collision: origin resolves to tenant A → tenant A's popup returned."""
+    response = client.get(
+        "/api/v1/checkout/summer-fest/runtime",
+        headers=with_origin("test-tenant-a.localhost"),
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["popup"]["id"] == str(popup_tenant_a_summer_fest.id)
+
+
+@pytest.mark.usefixtures("tenant_a")
+def test_runtime_cross_tenant_slug_returns_404(
+    client: TestClient,
+    db: Session,
+    popup_tenant_b_summer_fest: Popups,
+) -> None:
+    """Slug exists under tenant B but not A; origin resolves to A → 404."""
+    # This test relies on a slug that tenant_a does NOT have.
+    # We use a unique slug so it only exists under tenant_b.
+    import uuid as _uuid
+    unique_slug = f"only-b-{_uuid.uuid4().hex[:8]}"
+    from app.api.popup.models import Popups as _Popups
+    from app.api.shared.enums import SaleType as _SaleType
+    tenant_b_only = _Popups(
+        id=_uuid.uuid4(),
+        tenant_id=popup_tenant_b_summer_fest.tenant_id,
+        name="Only B Popup",
+        slug=unique_slug,
+        sale_type=_SaleType.direct.value,
+        status="active",
+    )
+    db.add(tenant_b_only)
+    db.commit()
+
+    response = client.get(
+        f"/api/v1/checkout/{unique_slug}/runtime",
+        headers=with_origin("test-tenant-a.localhost"),
+    )
+
+    assert response.status_code == 404, response.text
+
+
+def test_runtime_unknown_origin_returns_404(
+    client: TestClient,
+) -> None:
+    """No Origin header and no X-Tenant-Id → 404 from resolver."""
+    response = client.get("/api/v1/checkout/summer-fest/runtime")
+    assert response.status_code == 404, response.text
+
+
+def test_runtime_x_tenant_id_fallback(
+    client: TestClient,
+    popup_tenant_a_summer_fest: Popups,
+    tenant_a: Tenants,
+) -> None:
+    """No Origin header, X-Tenant-Id present → returns correct popup."""
+    response = client.get(
+        "/api/v1/checkout/summer-fest/runtime",
+        headers={"X-Tenant-Id": str(tenant_a.id)},
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["popup"]["id"] == str(popup_tenant_a_summer_fest.id)

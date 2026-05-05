@@ -257,6 +257,7 @@ export default function SnapFooter({
         nextSectionLabel={nextSectionLabel}
         onContinue={onGoToNextSection}
         isLastSection={isOnConfirm}
+        activeSectionId={activeSection}
       />
     ),
     stripe: (

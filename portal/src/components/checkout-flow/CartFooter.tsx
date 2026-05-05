@@ -12,6 +12,7 @@ import { useTranslation } from "react-i18next"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
 import { useCityProvider } from "@/providers/cityProvider"
+import type { CheckoutStep } from "@/types/checkout"
 import { formatCurrency } from "@/types/checkout"
 import CartItemList from "./CartItemList"
 
@@ -21,6 +22,7 @@ interface CartFooterProps {
   nextSectionLabel?: string
   onContinue?: () => void
   isLastSection?: boolean
+  activeSectionId?: string
 }
 
 export default function CartFooter({
@@ -29,6 +31,7 @@ export default function CartFooter({
   nextSectionLabel,
   onContinue,
   isLastSection = false,
+  activeSectionId,
 }: CartFooterProps) {
   const { t } = useTranslation()
   const {
@@ -52,9 +55,14 @@ export default function CartFooter({
 
   const [isExpanded, setIsExpanded] = useState(false)
 
-  const isConfirmStep = currentStep === "confirm" || isLastSection
-  const isFirstStep = currentStep === "passes"
-  const currentIndex = availableSteps.indexOf(currentStep)
+  // In scrolly mode `currentStep` stays at the initial value while the user
+  // scrolls. `activeSectionId` reflects the section actually in view, so
+  // position-based gating (next step, first step, etc.) must use it when
+  // provided to avoid letting users skip required steps like buyer info.
+  const positionStep = (activeSectionId ?? currentStep) as CheckoutStep
+  const isConfirmStep = positionStep === "confirm" || isLastSection
+  const isFirstStep = positionStep === "passes"
+  const currentIndex = availableSteps.indexOf(positionStep)
   const nextStepId =
     currentIndex < availableSteps.length - 1
       ? availableSteps[currentIndex + 1]

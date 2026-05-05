@@ -14,6 +14,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
@@ -21,6 +22,7 @@ from app.api.coupon.models import Coupons
 from app.api.popup.models import Popups
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
+from tests.conftest import with_origin
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -101,6 +103,7 @@ def test_validate_public_valid_coupon(
     response = client.post(
         "/api/v1/coupons/validate-public",
         json={"popup_slug": popup.slug, "code": "FEST10"},
+        headers={"X-Tenant-Id": str(tenant_a.id)},
     )
 
     assert response.status_code == 200, response.text
@@ -121,6 +124,7 @@ def test_validate_public_unknown_code_returns_400(
     response = client.post(
         "/api/v1/coupons/validate-public",
         json={"popup_slug": popup.slug, "code": "DOESNOTEXIST"},
+        headers={"X-Tenant-Id": str(tenant_a.id)},
     )
 
     assert response.status_code == 400, response.text
@@ -139,6 +143,7 @@ def test_validate_public_expired_coupon_same_shape(
     response = client.post(
         "/api/v1/coupons/validate-public",
         json={"popup_slug": popup.slug, "code": "EXPIRED99"},
+        headers={"X-Tenant-Id": str(tenant_a.id)},
     )
 
     assert response.status_code == 400, response.text
@@ -156,6 +161,7 @@ def test_validate_public_application_popup_returns_403(
     response = client.post(
         "/api/v1/coupons/validate-public",
         json={"popup_slug": popup.slug, "code": "ANY"},
+        headers={"X-Tenant-Id": str(tenant_a.id)},
     )
 
     assert response.status_code == 403, response.text
@@ -178,8 +184,62 @@ def test_validate_public_rate_limit_triggers_429(
         response = client.post(
             "/api/v1/coupons/validate-public",
             json={"popup_slug": popup.slug, "code": "VALID1"},
-            headers={"X-Forwarded-For": "9.9.9.9"},
+            headers={"X-Forwarded-For": "9.9.9.9", "X-Tenant-Id": str(tenant_a.id)},
         )
 
     assert response.status_code == 429, response.text
     assert "Retry-After" in response.headers
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 — Tenant-scoped coupon validation tests (T-4.1)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.usefixtures("tenant_a")
+def test_coupon_validate_resolves_per_tenant(
+    client: TestClient,
+    db: Session,
+    popup_tenant_a_summer_fest: Popups,
+) -> None:
+    """Coupon on tenant A's popup, origin=tenant A → 200 with discount."""
+    _make_coupon(db, popup_tenant_a_summer_fest, code="SUMMERFEST10")
+    db.commit()
+
+    response = client.post(
+        "/api/v1/coupons/validate-public",
+        json={"popup_slug": "summer-fest", "code": "SUMMERFEST10"},
+        headers=with_origin("test-tenant-a.localhost"),
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["code"] == "SUMMERFEST10"
+    assert body["valid"] is True
+
+
+@pytest.mark.usefixtures("popup_tenant_a_summer_fest", "popup_tenant_b_summer_fest")
+def test_coupon_validate_cross_tenant_returns_invalid(
+    client: TestClient,
+) -> None:
+    """Coupon exists on tenant A's popup; request from tenant B → uniform 400 (not found)."""
+    response = client.post(
+        "/api/v1/coupons/validate-public",
+        json={"popup_slug": "summer-fest", "code": "SUMMERFEST10"},
+        headers=with_origin("test-tenant-b.localhost"),
+    )
+
+    assert response.status_code == 400, response.text
+    assert response.json()["detail"] == "Invalid or expired coupon"
+
+
+def test_coupon_validate_unknown_origin_returns_404(
+    client: TestClient,
+) -> None:
+    """No Origin and no X-Tenant-Id → 404 from resolver before coupon logic."""
+    response = client.post(
+        "/api/v1/coupons/validate-public",
+        json={"popup_slug": "summer-fest", "code": "ANY"},
+    )
+
+    assert response.status_code == 404, response.text

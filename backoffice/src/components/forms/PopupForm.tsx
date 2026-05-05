@@ -5,6 +5,7 @@ import {
   Baby,
   Building2,
   Calendar,
+  CalendarDays,
   DollarSign,
   FileText,
   Globe,
@@ -219,6 +220,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         defaultValues?.insurance_percentage?.toString() ?? "",
       tier_progression_enabled:
         defaultValues?.tier_progression_enabled ?? false,
+      events_enabled: defaultValues?.events_enabled ?? true,
     },
     onSubmit: ({ value }) => {
       if (readOnly) return
@@ -262,6 +264,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
           ? value.insurance_percentage || null
           : null,
         tier_progression_enabled: value.tier_progression_enabled,
+        events_enabled: value.events_enabled,
       }
       if (isEdit) {
         updateMutation.mutate(payload)
@@ -1089,6 +1092,30 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
               >
                 <Switch
                   id="tier_progression_enabled"
+                  checked={field.state.value}
+                  onCheckedChange={(checked) => field.handleChange(checked)}
+                  disabled={readOnly}
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+        </InlineSection>
+
+        <Separator />
+
+        {/* Events module feature flag */}
+        <InlineSection title="Events module">
+          <form.Field name="events_enabled">
+            {(field) => (
+              <InlineRow
+                icon={
+                  <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                }
+                label="Enable events module"
+                description="Show the Events section in the portal (calendar, venues, RSVPs). When off, the entire section is hidden — to only block creating new events without hiding existing ones, use the Event Settings page instead."
+              >
+                <Switch
+                  id="events_enabled"
                   checked={field.state.value}
                   onCheckedChange={(checked) => field.handleChange(checked)}
                   disabled={readOnly}

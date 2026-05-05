@@ -1,8 +1,8 @@
 """Router for the open-ticketing checkout API.
 
 Endpoints:
-- GET  /checkout/{slug}/bootstrap — public, anonymous, rate-limited 120/min/IP
-- POST /checkout/{slug}/purchase  — public, anonymous, rate-limited 10/min/IP
+- GET  /checkout/{slug}/runtime  — public, anonymous, rate-limited 120/min/IP
+- POST /checkout/{slug}/purchase — public, anonymous, rate-limited 10/min/IP
 """
 
 from fastapi import APIRouter, Depends
@@ -14,7 +14,7 @@ from app.api.checkout.schemas import (
     OpenTicketingPurchaseResponse,
 )
 from app.api.payment.crud import payments_crud
-from app.api.tenant.models import Tenants
+from app.core.dependencies.tenants import PublicTenant
 from app.core.dependencies.users import SessionDep
 from app.core.rate_limit import RateLimit
 
@@ -33,13 +33,14 @@ router = APIRouter(prefix="/checkout", tags=["checkout"])
 async def get_runtime(
     slug: str,
     db: SessionDep,
+    tenant: PublicTenant,
 ) -> CheckoutRuntimeResponse:
     """Return popup metadata, products, buyer form, and ticketing steps for anonymous checkout.
 
     Fully public endpoint (no JWT). Only serves sale_type=direct active popups.
     Rate-limited 120/min/IP.
     """
-    return runtime_for_slug(db, slug)
+    return runtime_for_slug(db, slug, tenant.id)
 
 
 @router.post(
@@ -53,12 +54,10 @@ async def purchase_open_ticketing(
     slug: str,
     request_in: OpenTicketingPurchaseCreate,
     db: SessionDep,
+    tenant: PublicTenant,
 ) -> OpenTicketingPurchaseResponse:
     """Create an anonymous open-ticketing payment and return provider checkout data."""
-    popup = get_open_ticketing_popup(db, slug)
-    tenant = db.get(Tenants, popup.tenant_id)
-    if tenant is None:
-        raise ValueError(f"Tenant not found for popup {popup.id}")
+    popup = get_open_ticketing_popup(db, slug, tenant.id)
 
     payment, checkout_url = payments_crud.create_open_ticketing_payment(
         db,

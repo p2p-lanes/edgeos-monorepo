@@ -1,8 +1,9 @@
 import { useForm } from "@tanstack/react-form"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import { AlertTriangle, Mail, MapPin, User } from "lucide-react"
 import {
+  type ApiKeyPublic,
   type HumanCreate,
   type HumanPublic,
   HumansService,
@@ -96,6 +97,35 @@ export function HumanForm({ defaultValues, onSuccess }: HumanFormProps) {
       onSuccess()
     },
     onError: createErrorHandler(showErrorToast),
+  })
+
+  const revokeApiKeysMutation = useMutation({
+    mutationFn: async () => {
+      if (!defaultValues) throw new Error("Human not found")
+      return HumansService.revokeHumanApiKeys({
+        humanId: defaultValues.id,
+      })
+    },
+    onSuccess: () => {
+      showSuccessToast("All API keys revoked successfully")
+      queryClient.invalidateQueries({ queryKey: ["humans"] })
+      queryClient.invalidateQueries({ queryKey: ["humans", defaultValues?.id] })
+      queryClient.invalidateQueries({
+        queryKey: ["humans", defaultValues?.id, "api-keys"],
+      })
+    },
+    onError: createErrorHandler(showErrorToast),
+  })
+
+  const { data: apiKeys = [] } = useQuery<ApiKeyPublic[]>({
+    queryKey: ["humans", defaultValues?.id, "api-keys"],
+    queryFn: async () => {
+      if (!defaultValues) return []
+      return HumansService.listHumanApiKeys({
+        humanId: defaultValues.id,
+      })
+    },
+    enabled: isEdit && isAdmin && !!defaultValues,
   })
 
   const form = useForm({
@@ -471,6 +501,99 @@ export function HumanForm({ defaultValues, onSuccess }: HumanFormProps) {
                         {values.red_flag ? "Flagged" : "Normal"}
                       </Badge>
                     </div>
+
+                    {isEdit && isAdmin && defaultValues && (
+                      <>
+                        <Separator />
+                        <div className="space-y-3">
+                          <div>
+                            <p className="text-sm text-muted-foreground">
+                              API keys
+                            </p>
+                            <p className="font-medium">
+                              {apiKeys.length === 0
+                                ? "No keys issued"
+                                : `${apiKeys.length} key${apiKeys.length === 1 ? "" : "s"}`}
+                            </p>
+                          </div>
+                          <div className="space-y-2">
+                            {apiKeys.length === 0 ? (
+                              <p className="text-sm text-muted-foreground">
+                                This human has no API key history.
+                              </p>
+                            ) : (
+                              apiKeys.map((key) => {
+                                const status = key.revoked_at
+                                  ? "Revoked"
+                                  : key.expires_at &&
+                                      new Date(key.expires_at) <= new Date()
+                                    ? "Expired"
+                                    : "Active"
+                                return (
+                                  <div
+                                    key={key.id}
+                                    className="rounded-md border p-3 text-xs space-y-1"
+                                  >
+                                    <div className="flex items-center justify-between gap-2">
+                                      <span className="font-medium text-foreground">
+                                        {key.name}
+                                      </span>
+                                      <Badge
+                                        variant={
+                                          status === "Active"
+                                            ? "default"
+                                            : status === "Revoked"
+                                              ? "destructive"
+                                              : "secondary"
+                                        }
+                                      >
+                                        {status}
+                                      </Badge>
+                                    </div>
+                                    <div className="font-mono text-muted-foreground">
+                                      {key.prefix}…
+                                    </div>
+                                    <div className="text-muted-foreground">
+                                      Scopes: {key.scopes.join(", ")}
+                                    </div>
+                                    <div className="text-muted-foreground">
+                                      Created:{" "}
+                                      {new Date(
+                                        key.created_at,
+                                      ).toLocaleString()}
+                                    </div>
+                                    {key.last_used_at && (
+                                      <div className="text-muted-foreground">
+                                        Last used:{" "}
+                                        {new Date(
+                                          key.last_used_at,
+                                        ).toLocaleString()}
+                                      </div>
+                                    )}
+                                    {key.expires_at && (
+                                      <div className="text-muted-foreground">
+                                        Expires:{" "}
+                                        {new Date(
+                                          key.expires_at,
+                                        ).toLocaleString()}
+                                      </div>
+                                    )}
+                                    {key.revoked_at && (
+                                      <div className="text-muted-foreground">
+                                        Revoked:{" "}
+                                        {new Date(
+                                          key.revoked_at,
+                                        ).toLocaleString()}
+                                      </div>
+                                    )}
+                                  </div>
+                                )
+                              })
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </CardContent>
                 </Card>
               )}
@@ -493,6 +616,36 @@ export function HumanForm({ defaultValues, onSuccess }: HumanFormProps) {
                       {defaultValues.id}
                     </p>
                   </div>
+                  {isAdmin && (
+                    <>
+                      <Separator />
+                      <div className="space-y-3">
+                        <div>
+                          <p className="text-sm font-medium">
+                            API key kill switch
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Revoke every active API key for this human
+                            immediately.
+                          </p>
+                        </div>
+                        <LoadingButton
+                          type="button"
+                          variant="destructive"
+                          loading={revokeApiKeysMutation.isPending}
+                          onClick={() => {
+                            const confirmed = window.confirm(
+                              "Revoke all API keys for this human? Anything using those tokens will stop working immediately.",
+                            )
+                            if (!confirmed) return
+                            revokeApiKeysMutation.mutate()
+                          }}
+                        >
+                          Revoke all API keys
+                        </LoadingButton>
+                      </div>
+                    </>
+                  )}
                 </CardContent>
               </Card>
             )}

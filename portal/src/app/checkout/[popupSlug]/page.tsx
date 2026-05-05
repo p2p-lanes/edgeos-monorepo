@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next"
 import { OpenCheckoutRuntime } from "@/components/checkout-flow/OpenCheckoutRuntime"
 import { SidebarProvider } from "@/components/Sidebar/SidebarComponents"
 import useAuth from "@/hooks/useAuth"
+import { getBackgroundProps } from "@/lib/background-image"
 import { useCheckoutRuntime } from "./hooks/useCheckoutRuntime"
 
 export default function OpenTicketingCheckoutPage() {
@@ -47,6 +48,8 @@ export default function OpenTicketingCheckoutPage() {
     )
   }
 
+  const background = getBackgroundProps(runtime.popup)
+
   return (
     <SidebarProvider
       defaultOpen={false}
@@ -58,7 +61,10 @@ export default function OpenTicketingCheckoutPage() {
         } as React.CSSProperties
       }
     >
-      <main className="h-svh overflow-y-auto bg-background">
+      <main
+        className={`h-svh overflow-y-auto ${background.className}`.trim()}
+        style={background.style}
+      >
         <OpenCheckoutRuntime
           runtime={runtime}
           popupSlug={popupSlug}

@@ -11,6 +11,7 @@ import {
   useRef,
   useState,
 } from "react"
+import { useTranslation } from "react-i18next"
 import {
   CHECKOUT_MODE,
   resolvePopupCheckoutPolicy,
@@ -145,6 +146,7 @@ export function CheckoutProvider({
   cartPersistenceEnabled = true,
   cartUiEnabled = true,
 }: CheckoutProviderProps) {
+  const { t } = useTranslation()
   const { attendeePasses, toggleProduct, isEditing, toggleEditing } =
     usePassesProvider()
   const { discountApplied, setDiscount, resetDiscount } = useDiscount()
@@ -185,13 +187,19 @@ export function CheckoutProvider({
       return configuredSteps
     }
 
+    // Inherit show_title/show_watermark from confirm: buyer sits adjacent to it
+    // and admins typically want consistent display between the two.
+    const confirmStep = configuredSteps.find(
+      (step) => step.step_type === "confirm",
+    )
+
     const buyerStep: TicketingStepPublic = {
       id: "buyer-step",
       tenant_id: cityId ?? "",
       popup_id: cityId ?? "",
       step_type: "buyer",
-      title: "Your information",
-      description: "Complete your information before payment.",
+      title: t("checkout.buyer_step_title"),
+      description: t("checkout.buyer_step_description"),
       order: 9998,
       is_enabled: true,
       protected: true,
@@ -199,8 +207,8 @@ export function CheckoutProvider({
       template: null,
       template_config: null,
       watermark: null,
-      show_title: true,
-      show_watermark: true,
+      show_title: confirmStep?.show_title ?? true,
+      show_watermark: confirmStep?.show_watermark ?? true,
     }
 
     const withoutBuyer = configuredSteps.filter(
@@ -219,7 +227,7 @@ export function CheckoutProvider({
       buyerStep,
       ...withoutBuyer.slice(confirmIndex),
     ]
-  }, [buyerFormSchema, cityId, configuredSteps, submitMode])
+  }, [buyerFormSchema, cityId, configuredSteps, submitMode, t])
 
   const isBuyerInfoComplete =
     !buyerFormSchema ||

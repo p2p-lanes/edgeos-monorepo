@@ -25,7 +25,7 @@ memory/
 # Local notes / scratch (not shared)
 TODO.local.md
 *.local.md
-docs/
+/docs/
 
 # Environment
 .env*

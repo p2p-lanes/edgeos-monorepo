@@ -1,4 +1,4 @@
-import { BookOpen, Github, Key, Star, User } from "lucide-react"
+import { Github, Star, User } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
@@ -61,26 +61,7 @@ const FooterMenu = () => {
         )}
         <SidebarMenuItem>
           <SidebarMenuButton
-            className="mt-4"
-            onClick={() => router.push("/portal/api-keys")}
-          >
-            <Key className="size-4" />
-            <span className="text-sm font-medium">
-              {t("sidebar.api_keys", { defaultValue: "API Keys" })}
-            </span>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
-        <SidebarMenuItem>
-          <SidebarMenuButton onClick={() => router.push("/docs")}>
-            <BookOpen className="size-4" />
-            <span className="text-sm font-medium">
-              {t("sidebar.api_docs", { defaultValue: "API Docs" })}
-            </span>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
-        <SidebarMenuItem>
-          <SidebarMenuButton
-            className="mb-4"
+            className="mb-4 mt-4"
             onClick={() => router.push("/portal/profile")}
           >
             <User className="size-4" />

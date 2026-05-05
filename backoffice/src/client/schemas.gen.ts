@@ -95,6 +95,14 @@ export const ApiKeyCreateSchema = {
                 }
             ],
             title: 'Expires At'
+        },
+        scopes: {
+            items: {
+                type: 'string',
+                enum: ['events:read', 'events:write', 'rsvp:write']
+            },
+            type: 'array',
+            title: 'Scopes'
         }
     },
     type: 'object',
@@ -117,6 +125,14 @@ export const ApiKeyCreatedSchema = {
         prefix: {
             type: 'string',
             title: 'Prefix'
+        },
+        scopes: {
+            items: {
+                type: 'string',
+                enum: ['events:read', 'events:write', 'rsvp:write']
+            },
+            type: 'array',
+            title: 'Scopes'
         },
         created_at: {
             type: 'string',
@@ -165,7 +181,7 @@ export const ApiKeyCreatedSchema = {
         }
     },
     type: 'object',
-    required: ['id', 'name', 'prefix', 'created_at', 'key'],
+    required: ['id', 'name', 'prefix', 'scopes', 'created_at', 'key'],
     title: 'ApiKeyCreated',
     description: `Response returned only at creation. \`\`key\`\` is the raw token; it is
 shown to the user exactly once and never persisted in plaintext.`
@@ -185,6 +201,14 @@ export const ApiKeyPublicSchema = {
         prefix: {
             type: 'string',
             title: 'Prefix'
+        },
+        scopes: {
+            items: {
+                type: 'string',
+                enum: ['events:read', 'events:write', 'rsvp:write']
+            },
+            type: 'array',
+            title: 'Scopes'
         },
         created_at: {
             type: 'string',
@@ -229,7 +253,7 @@ export const ApiKeyPublicSchema = {
         }
     },
     type: 'object',
-    required: ['id', 'name', 'prefix', 'created_at'],
+    required: ['id', 'name', 'prefix', 'scopes', 'created_at'],
     title: 'ApiKeyPublic',
     description: 'Safe representation of an API key — never includes the raw secret.'
 } as const;

@@ -57,25 +57,18 @@ export function OpenTicketingBuyerForm({
 
   return (
     <section className="space-y-6 rounded-2xl border bg-card p-6 shadow-sm">
-      <div>
-        <h2 className="text-xl font-semibold">{t("checkout.express_title")}</h2>
-        <p className="text-sm text-muted-foreground">
-          {t("checkout.express_description", {
-            defaultValue: "Complete your information to continue to checkout.",
-          })}
-        </p>
-      </div>
-
       {sections.map((section) => (
         <section key={section.id} className="space-y-4">
-          <div>
-            <h3 className="text-base font-semibold">{section.title}</h3>
-            {section.subtitle ? (
-              <p className="text-sm text-muted-foreground">
-                {section.subtitle}
-              </p>
-            ) : null}
-          </div>
+          {sections.length > 1 ? (
+            <div>
+              <h3 className="text-base font-semibold">{section.title}</h3>
+              {section.subtitle ? (
+                <p className="text-sm text-muted-foreground">
+                  {section.subtitle}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
 
           <div className="grid gap-4 md:grid-cols-2">
             {section.fields.map(({ name, field }) => {
