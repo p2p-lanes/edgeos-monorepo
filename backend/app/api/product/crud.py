@@ -156,6 +156,37 @@ class ProductsCRUD(BaseCRUD[Products, ProductCreate, ProductUpdate]):
         session.refresh(db_obj)
         return db_obj
 
+    def update(
+        self,
+        session: Session,
+        db_obj: Products,
+        obj_in: ProductUpdate,
+    ) -> Products:
+        """Override BaseCRUD.update to enforce cross-inventory conflict rule (D1).
+
+        If the caller is setting total_stock_cap on a product that belongs to a
+        tier group with shared_stock_cap, raise HTTP 422. This is the product-
+        direction check; the association-direction check lives in
+        TierPhasesCRUD.create_for_group.
+        """
+        from app.api.product.validators import assert_no_total_vs_shared_stock_conflict
+
+        update_data = obj_in.model_dump(exclude_unset=True)
+        proposed_cap = update_data.get("total_stock_cap", None)
+        # Only check when total_stock_cap is explicitly included in the update.
+        if "total_stock_cap" in update_data:
+            assert_no_total_vs_shared_stock_conflict(
+                session, db_obj.id, proposed_cap
+            )
+
+        for field, value in update_data.items():
+            setattr(db_obj, field, value)
+
+        session.add(db_obj)
+        session.commit()
+        session.refresh(db_obj)
+        return db_obj
+
     def decrement_total_stock(
         self,
         session: Session,
