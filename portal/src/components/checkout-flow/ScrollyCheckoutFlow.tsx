@@ -252,7 +252,11 @@ function ScrollyCheckoutFlowInner({
       releaseScrollTarget()
       scrollToIndexRef.current = null
     }
-  }, [allSections])
+    // isInitialLoading gates whether sections are mounted in the DOM. Without
+    // it, the effect runs once during the spinner phase, finds no section
+    // anchor, aborts, and never re-runs after sections appear — leaving
+    // scrollToIndexRef.current null forever.
+  }, [allSections, isInitialLoading])
 
   const renderSectionContent = (stepId: string) => {
     if (stepId === "passes" || stepId === "tickets") {
