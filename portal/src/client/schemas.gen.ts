@@ -13876,6 +13876,11 @@ export const VenueBusySlotSchema = {
                 }
             ],
             title: 'Event End'
+        },
+        highlighted: {
+            type: 'boolean',
+            title: 'Highlighted',
+            default: false
         }
     },
     type: 'object',

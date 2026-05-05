@@ -1,13 +1,20 @@
-import { useQuery, useSuspenseQuery } from "@tanstack/react-query"
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  useSuspenseQuery,
+} from "@tanstack/react-query"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { CalendarX, Tag, Users } from "lucide-react"
 import { Suspense, useState } from "react"
+import { toast } from "sonner"
 
 import {
   EventParticipantsService,
   EventSettingsService,
   EventsService,
   EventVenuesService,
+  PopupsService,
 } from "@/client"
 import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
@@ -34,6 +41,7 @@ export const Route = createFileRoute("/_layout/events/day-by-venue")({
 
 function DayByVenueContent({ popupId }: { popupId: string }) {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { data: venues } = useSuspenseQuery({
     queryKey: ["event-venues", { popupId, limit: 200 }],
     queryFn: () => EventVenuesService.listVenues({ popupId, limit: 200 }),
@@ -42,7 +50,27 @@ function DayByVenueContent({ popupId }: { popupId: string }) {
     queryKey: ["event-settings", popupId],
     queryFn: () => EventSettingsService.getEventSettings({ popupId }),
   })
+  const { data: popup } = useSuspenseQuery({
+    queryKey: ["popup", popupId],
+    queryFn: () => PopupsService.getPopup({ popupId }),
+  })
   const timezone = settings?.timezone || "UTC"
+
+  const toggleHighlight = useMutation({
+    mutationFn: ({ eventId, next }: { eventId: string; next: boolean }) =>
+      EventsService.updateEvent({
+        eventId,
+        requestBody: { highlighted: next },
+      }),
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["venue-availability"] })
+      queryClient.invalidateQueries({ queryKey: ["event", vars.eventId] })
+      toast.success(vars.next ? "Event highlighted" : "Highlight removed")
+    },
+    onError: () => {
+      toast.error("Could not update highlight")
+    },
+  })
 
   const venueList = (venues?.results ?? []).map((v) => ({
     id: v.id,
@@ -78,9 +106,14 @@ function DayByVenueContent({ popupId }: { popupId: string }) {
       <VenueDayCalendar
         venues={venueList}
         timezone={timezone}
+        popupStartDate={popup?.start_date}
+        popupEndDate={popup?.end_date}
         onCreateAt={(venueId, startIso) => setCreateAt({ venueId, startIso })}
         onEventClick={setActiveEventId}
         onExceptionClick={(reason) => setExceptionReason(reason ?? "")}
+        onToggleHighlight={(eventId, next) =>
+          toggleHighlight.mutate({ eventId, next })
+        }
       />
 
       <Dialog

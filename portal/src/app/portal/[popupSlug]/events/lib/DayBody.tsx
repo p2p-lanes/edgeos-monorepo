@@ -4,17 +4,18 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { addDays, format, startOfDay, subDays } from "date-fns"
 import {
   CalendarClock,
+  CalendarIcon,
   CheckCircle,
   ChevronLeft,
   ChevronRight,
   Clock,
+  Crown,
   Layers,
   Repeat,
-  Star,
   Tag,
 } from "lucide-react"
 import Link from "next/link"
-import { Fragment, useEffect, useMemo, useRef } from "react"
+import { Fragment, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 
 import {
@@ -22,9 +23,17 @@ import {
   type EventPublic,
   EventsService,
   EventVenuesService,
+  HumansService,
 } from "@/client"
 import { Button } from "@/components/ui/button"
+import { Calendar } from "@/components/ui/calendar"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
+import type { EventsScrollSnapshot } from "./eventsViewState"
 import { summarizeRrule } from "./summarizeRrule"
 import { useEventTimezone } from "./useEventTimezone"
 
@@ -39,6 +48,22 @@ interface DayBodyProps {
   onSelectedDateChange: (date: Date) => void
   /** Fallback when no `?date=` URL param is present. Defaults to today. */
   defaultDate?: Date | null
+  /**
+   * If present, the body restores these scroll positions on its first
+   * render after returning from event detail and skips the
+   * auto-scroll-to-earliest effect for that one mount. Subsequent date
+   * changes resume the normal auto-scroll behavior.
+   */
+  restoredScroll?: EventsScrollSnapshot
+  /**
+   * Called right before the user follows an event link into the detail
+   * page. The body owns its dayKey and inner-scroll positions.
+   */
+  onEventLinkClick?: (
+    view: "day",
+    dayKey: string,
+    scroll: EventsScrollSnapshot,
+  ) => void
 }
 
 const HOUR_PX = 56
@@ -85,6 +110,8 @@ export function DayBody({
   selectedDate: selectedDateProp,
   onSelectedDateChange,
   defaultDate,
+  restoredScroll,
+  onEventLinkClick,
 }: DayBodyProps) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
@@ -122,6 +149,12 @@ export function DayBody({
     const d = String(selectedDate.getDate()).padStart(2, "0")
     return `${y}-${m}-${d}`
   }, [selectedDate])
+
+  const { data: currentHuman } = useQuery({
+    queryKey: ["current-human"],
+    queryFn: () => HumansService.getCurrentHumanInfo(),
+    staleTime: 5 * 60 * 1000,
+  })
 
   const { data: venuesData } = useQuery({
     queryKey: ["portal-venues-day", popupId],
@@ -197,6 +230,24 @@ export function DayBody({
       return h * 60 + m
     }
   }, [timezone])
+
+  // "Now" indicator: a red line that marks the current time on the
+  // current day's grid. Only rendered when the selected day matches
+  // today in the popup timezone. `now` ticks once a minute so the line
+  // creeps down as time passes without re-rendering on every frame.
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60_000)
+    return () => clearInterval(id)
+  }, [])
+  const isViewingToday = useMemo(
+    () => formatDayKey(now.toISOString()) === dayKey,
+    [formatDayKey, now, dayKey],
+  )
+  const nowMin = useMemo(
+    () => minutesInTz(now.toISOString()),
+    [minutesInTz, now],
+  )
 
   // Filter to events whose popup-timezone day matches the selected day.
   const dayEvents = useMemo(() => {
@@ -291,11 +342,44 @@ export function DayBody({
       ? `${base}&occ=${encodeURIComponent(event.start_time)}`
       : base
   }
+  const handleEventClick = () => {
+    if (!onEventLinkClick) return
+    const main =
+      typeof document !== "undefined" ? document.querySelector("main") : null
+    onEventLinkClick("day", dayKey, {
+      outer: main?.scrollTop ?? 0,
+      innerVertical: scrollRef.current?.scrollTop ?? 0,
+      innerHorizontal: mobileScrollRef.current?.scrollLeft ?? 0,
+    })
+  }
 
   // Auto-scroll to the earliest event of the day. On desktop we scroll
   // the venue grid vertically; on mobile (transposed) we scroll the venue
   // rows horizontally. On empty days settle near 8:00 instead of 00:00.
+  //
+  // When returning from event detail with a sessionStorage snapshot, we
+  // instead restore the previous inner scroll positions and consume the
+  // snapshot. Subsequent columnEvents updates (e.g., user navigates to
+  // another day) resume the normal auto-scroll behavior. Restore is
+  // gated on at least one scroll container being mounted, so a render
+  // while `isLoading` is true (grid replaced by a spinner) defers the
+  // restore until the grid is actually in the DOM.
+  const restorePendingRef = useRef<EventsScrollSnapshot | null>(
+    restoredScroll ?? null,
+  )
   useEffect(() => {
+    if (restorePendingRef.current) {
+      if (!scrollRef.current && !mobileScrollRef.current) return
+      const snap = restorePendingRef.current
+      restorePendingRef.current = null
+      if (snap.innerVertical != null && scrollRef.current) {
+        scrollRef.current.scrollTop = snap.innerVertical
+      }
+      if (snap.innerHorizontal != null && mobileScrollRef.current) {
+        mobileScrollRef.current.scrollLeft = snap.innerHorizontal
+      }
+      return
+    }
     let earliest = Number.POSITIVE_INFINITY
     for (const items of columnEvents.values()) {
       if (items.length > 0 && items[0].startMin < earliest) {
@@ -315,6 +399,7 @@ export function DayBody({
 
   const goPrev = () => setSelectedDate((d) => subDays(d, 1))
   const goNext = () => setSelectedDate((d) => addDays(d, 1))
+  const [datePickerOpen, setDatePickerOpen] = useState(false)
 
   const hours = Array.from({ length: 24 }, (_, i) => i)
   const venueCount = columns.length
@@ -345,9 +430,35 @@ export function DayBody({
           </Button>
         </div>
         <div className="flex flex-col items-end min-w-0">
-          <h2 className="text-sm font-semibold capitalize truncate">
-            {format(selectedDate, "EEEE, MMMM d, yyyy")}
-          </h2>
+          <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 text-sm font-semibold capitalize truncate hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                aria-label={t("events.day.pick_date")}
+                title={t("events.day.pick_date")}
+              >
+                <span className="truncate">
+                  {format(selectedDate, "EEEE, MMMM d, yyyy")}
+                </span>
+                <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                mode="single"
+                selected={selectedDate}
+                defaultMonth={selectedDate}
+                onSelect={(d) => {
+                  if (d) {
+                    setSelectedDate(startOfDay(d))
+                    setDatePickerOpen(false)
+                  }
+                }}
+                autoFocus
+              />
+            </PopoverContent>
+          </Popover>
           <span className="text-[11px] text-muted-foreground">
             {t("events.day.event_count", { count: totalEvents })}
             {timezone ? ` · ${timezone}` : ""}
@@ -427,6 +538,13 @@ export function DayBody({
                         className="absolute left-0 right-0 border-t border-border/50 first:border-t-0"
                       />
                     ))}
+                    {isViewingToday && (
+                      <div
+                        className="absolute left-0 right-0 z-10 h-0.5 bg-red-500 pointer-events-none"
+                        style={{ top: nowMin * MIN_PX }}
+                        aria-hidden="true"
+                      />
+                    )}
                     {items.map(
                       ({ event, startMin, endMin, laneIndex, laneCount }) => {
                         const top = startMin * MIN_PX
@@ -446,10 +564,14 @@ export function DayBody({
                           !!event.my_rsvp_status &&
                           event.my_rsvp_status !== "cancelled"
                         const isHighlighted = event.highlighted === true
+                        const isOwner =
+                          currentHuman != null &&
+                          event.owner_id === currentHuman.id
                         return (
                           <Link
                             key={event.id}
                             href={eventHref(event)}
+                            onClick={handleEventClick}
                             className={cn(
                               "absolute rounded-md border transition-colors p-1.5 overflow-hidden text-xs",
                               isHighlighted
@@ -469,12 +591,10 @@ export function DayBody({
                                 isShort ? "truncate" : "line-clamp-2",
                               )}
                             >
-                              {isHighlighted && (
-                                <Star
-                                  className="h-3 w-3 shrink-0 fill-amber-400 text-amber-500"
-                                  aria-label={t(
-                                    "events.list.highlighted_title",
-                                  )}
+                              {isOwner && (
+                                <Crown
+                                  className="h-3 w-3 shrink-0 text-amber-500"
+                                  aria-label={t("events.list.owned_title")}
                                 />
                               )}
                               <span
@@ -640,6 +760,13 @@ export function DayBody({
                           style={{ left: h * M_HOUR_W }}
                         />
                       ))}
+                      {isViewingToday && (
+                        <div
+                          className="absolute top-0 bottom-0 z-10 w-0.5 bg-red-500 pointer-events-none"
+                          style={{ left: nowMin * M_MIN_W }}
+                          aria-hidden="true"
+                        />
+                      )}
                       {items.map(({ event, startMin, endMin, laneIndex }) => {
                         const left = startMin * M_MIN_W
                         const width = Math.max(
@@ -653,10 +780,14 @@ export function DayBody({
                           !!event.my_rsvp_status &&
                           event.my_rsvp_status !== "cancelled"
                         const isHighlighted = event.highlighted === true
+                        const isOwner =
+                          currentHuman != null &&
+                          event.owner_id === currentHuman.id
                         return (
                           <Link
                             key={event.id}
                             href={eventHref(event)}
+                            onClick={handleEventClick}
                             className={cn(
                               "absolute rounded-md border transition-colors px-1.5 py-1 overflow-hidden",
                               isHighlighted
@@ -671,9 +802,9 @@ export function DayBody({
                             }}
                           >
                             <div className="font-medium text-[11px] leading-tight truncate flex items-center gap-1">
-                              {isHighlighted && (
-                                <Star
-                                  className="h-2.5 w-2.5 shrink-0 fill-amber-400 text-amber-500"
+                              {isOwner && (
+                                <Crown
+                                  className="h-2.5 w-2.5 shrink-0 text-amber-500"
                                   aria-hidden="true"
                                 />
                               )}

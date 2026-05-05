@@ -41,10 +41,27 @@ function formatDateTime(
   }
 }
 
-const statusVariant: Record<string, "default" | "secondary" | "destructive"> = {
-  published: "default",
+const statusVariant: Record<
+  string,
+  "default" | "secondary" | "destructive" | "outline"
+> = {
   draft: "secondary",
   cancelled: "destructive",
+}
+
+const visibilityVariant: Record<
+  string,
+  "default" | "secondary" | "destructive" | "outline"
+> = {
+  public: "outline",
+  unlisted: "secondary",
+  private: "outline",
+}
+
+const visibilityLabel: Record<string, string> = {
+  public: "Public",
+  unlisted: "Unlisted",
+  private: "Private",
 }
 
 function TrackEventsList({ trackId }: { trackId: string }) {
@@ -112,9 +129,28 @@ function TrackEventsList({ trackId }: { trackId: string }) {
               {formatDateTime(event.start_time, popupTz)}
             </span>
           </div>
-          <Badge variant={statusVariant[event.status as string] ?? "secondary"}>
-            {event.status}
-          </Badge>
+          {event.status === "published" ? (
+            <Badge
+              variant={
+                visibilityVariant[(event.visibility as string) ?? "public"] ??
+                "outline"
+              }
+              className={
+                event.visibility === "private"
+                  ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 border-transparent"
+                  : undefined
+              }
+            >
+              {visibilityLabel[(event.visibility as string) ?? "public"] ??
+                event.visibility}
+            </Badge>
+          ) : (
+            <Badge
+              variant={statusVariant[event.status as string] ?? "secondary"}
+            >
+              {event.status}
+            </Badge>
+          )}
         </li>
       ))}
     </ul>

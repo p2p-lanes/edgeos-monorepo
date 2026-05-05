@@ -1145,9 +1145,12 @@ async def _send_event_approval_email(
     venue_title = getattr(getattr(event, "venue", None), "title", "") or ""
 
     event_url = ""
-    if popup_slug:
+    if popup_slug and popup and popup.tenant:
+        from app.api.tenant.utils import get_portal_url
+
+        portal_base = get_portal_url(popup.tenant)
         event_url = (
-            f"{settings.PORTAL_URL.rstrip('/')}/portal/{popup_slug}/events/{event.id}"
+            f"{portal_base.rstrip('/')}/portal/{popup_slug}/events/{event.id}"
         )
 
     when = event.start_time.strftime("%b %d, %Y at %H:%M") if event.start_time else ""

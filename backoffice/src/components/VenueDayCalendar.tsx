@@ -1,8 +1,8 @@
 import { tzOffsetMinutes } from "@edgeos/shared-events"
 import { useQueries } from "@tanstack/react-query"
-import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
+import { ChevronLeft, ChevronRight, Loader2, Star } from "lucide-react"
 import type * as React from "react"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 
 import {
   EventVenuesService,
@@ -80,6 +80,7 @@ type PositionedBlock = {
   eventId?: string | null
   setupMinutes?: number
   teardownMinutes?: number
+  highlighted?: boolean
 }
 
 function slotToBlocks(
@@ -91,6 +92,7 @@ function slotToBlocks(
     event_id?: string | null
     event_start?: string | null
     event_end?: string | null
+    highlighted?: boolean
   },
   tz: string,
   idx: number,
@@ -126,6 +128,7 @@ function slotToBlocks(
         eventId: slot.event_id ?? null,
         setupMinutes,
         teardownMinutes,
+        highlighted: slot.highlighted ?? false,
       },
     ]
   }
@@ -205,24 +208,67 @@ export type DayCalendarVenue = {
   title: string
 }
 
+function parseYmd(value: string | null | undefined): Date | null {
+  if (!value) return null
+  // Accept either "YYYY-MM-DD" or full ISO; we only care about the calendar
+  // day, so trim to the first 10 chars and reconstruct in UTC to match the
+  // dayAnchor convention used throughout this component.
+  const ymd = value.slice(0, 10)
+  const [y, m, d] = ymd.split("-").map(Number)
+  if (!y || !m || !d) return null
+  return new Date(Date.UTC(y, m - 1, d))
+}
+
+function clampDay(d: Date, min: Date | null, max: Date | null): Date {
+  if (min && d.getTime() < min.getTime()) return min
+  if (max && d.getTime() > max.getTime()) return max
+  return d
+}
+
 export function VenueDayCalendar({
   venues,
   timezone,
+  popupStartDate,
+  popupEndDate,
   onCreateAt,
   onEventClick,
   onExceptionClick,
+  onToggleHighlight,
 }: {
   venues: DayCalendarVenue[]
   timezone: string
+  popupStartDate?: string | null
+  popupEndDate?: string | null
   onCreateAt?: (venueId: string, startIso: string) => void
   onEventClick?: (eventId: string) => void
   onExceptionClick?: (reason: string | null) => void
+  onToggleHighlight?: (eventId: string, next: boolean) => void
 }) {
-  const [dayAnchor, setDayAnchor] = useState<Date>(() => tzToday(timezone))
+  const minDay = useMemo(() => parseYmd(popupStartDate), [popupStartDate])
+  const maxDay = useMemo(() => parseYmd(popupEndDate), [popupEndDate])
+
+  // Default to today when it falls inside the popup window; otherwise anchor
+  // to the popup's first day so users land on a meaningful slice instead of
+  // a blank "today" outside the event range.
+  const [dayAnchor, setDayAnchor] = useState<Date>(() => {
+    const today = tzToday(timezone)
+    return clampDay(today, minDay, maxDay)
+  })
+
+  // If the popup bounds change (e.g. user switches workspaces), re-clamp.
+  useEffect(() => {
+    setDayAnchor((prev) => clampDay(prev, minDay, maxDay))
+  }, [minDay, maxDay])
+
   const todayInTz = useMemo(() => tzToday(timezone), [timezone])
   const dayKey = dayAnchor.toISOString().slice(0, 10)
   const todayKey = todayInTz.toISOString().slice(0, 10)
   const isToday = dayKey === todayKey
+  const atMin = !!minDay && dayAnchor.getTime() <= minDay.getTime()
+  const atMax = !!maxDay && dayAnchor.getTime() >= maxDay.getTime()
+  const todayWithinRange =
+    (!minDay || todayInTz.getTime() >= minDay.getTime()) &&
+    (!maxDay || todayInTz.getTime() <= maxDay.getTime())
 
   // Bracket the day in UTC; backend re-interprets in the popup TZ. Pad by
   // 24h on each side so events that cross midnight in the local TZ are
@@ -287,7 +333,10 @@ export function VenueDayCalendar({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setDayAnchor((d) => addDays(d, -1))}
+            onClick={() =>
+              setDayAnchor((d) => clampDay(addDays(d, -1), minDay, maxDay))
+            }
+            disabled={atMin}
             aria-label="Previous day"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -295,14 +344,25 @@ export function VenueDayCalendar({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setDayAnchor(tzToday(timezone))}
+            onClick={() =>
+              setDayAnchor(clampDay(tzToday(timezone), minDay, maxDay))
+            }
+            disabled={!todayWithinRange}
+            title={
+              todayWithinRange
+                ? undefined
+                : "Today is outside the event date range"
+            }
           >
             Today
           </Button>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setDayAnchor((d) => addDays(d, 1))}
+            onClick={() =>
+              setDayAnchor((d) => clampDay(addDays(d, 1), minDay, maxDay))
+            }
+            disabled={atMax}
             aria-label="Next day"
           >
             <ChevronRight className="h-4 w-4" />
@@ -436,6 +496,7 @@ export function VenueDayCalendar({
 
                     {busyBlocks.map((b) => {
                       const isClosedException = b.source === "exception"
+                      const isEvent = !isClosedException && !!b.eventId
                       const setupH = ((b.setupMinutes ?? 0) / 60) * HOUR_HEIGHT
                       const teardownH =
                         ((b.teardownMinutes ?? 0) / 60) * HOUR_HEIGHT
@@ -450,9 +511,16 @@ export function VenueDayCalendar({
                           onEventClick(b.eventId)
                         }
                       }
+                      const handleStarClick = (ev: React.SyntheticEvent) => {
+                        ev.stopPropagation()
+                        if (b.eventId && onToggleHighlight) {
+                          onToggleHighlight(b.eventId, !b.highlighted)
+                        }
+                      }
                       const clickable =
                         (isClosedException && !!onExceptionClick) ||
                         (!!b.eventId && !!onEventClick)
+                      const showStar = isEvent && !!onToggleHighlight
                       return (
                         // biome-ignore lint/a11y/noStaticElementInteractions: absolute-positioned event block; <button> would cascade unwanted styles
                         <div
@@ -469,7 +537,9 @@ export function VenueDayCalendar({
                             "absolute left-1 right-1 rounded-md text-[11px] font-medium leading-tight overflow-hidden shadow-sm flex flex-col",
                             isClosedException
                               ? "bg-zinc-300 text-zinc-800 border border-zinc-500 border-dashed dark:bg-zinc-700 dark:text-zinc-100 dark:border-zinc-400"
-                              : "bg-sky-600 text-white border border-sky-700 dark:bg-sky-500 dark:text-white dark:border-sky-400",
+                              : b.highlighted
+                                ? "bg-amber-500 text-white border border-amber-600 dark:bg-amber-500 dark:text-white dark:border-amber-400"
+                                : "bg-sky-600 text-white border border-sky-700 dark:bg-sky-500 dark:text-white dark:border-sky-400",
                             clickable && "cursor-pointer",
                           )}
                         >
@@ -481,11 +551,50 @@ export function VenueDayCalendar({
                                   "repeating-linear-gradient(135deg, rgba(255,255,255,0.18) 0 4px, transparent 4px 8px)",
                               }}
                               aria-hidden
-                              className="bg-sky-900 border-b border-sky-950 dark:bg-sky-900 dark:border-sky-950"
+                              className={cn(
+                                "border-b",
+                                b.highlighted
+                                  ? "bg-amber-700 border-amber-800 dark:bg-amber-700 dark:border-amber-800"
+                                  : "bg-sky-900 border-sky-950 dark:bg-sky-900 dark:border-sky-950",
+                              )}
                               title="Setup"
                             />
                           )}
-                          <div className="px-1.5 py-1 truncate">{b.label}</div>
+                          <div className="flex items-start gap-1 px-1.5 py-1">
+                            <span className="truncate flex-1">{b.label}</span>
+                            {showStar && (
+                              <button
+                                type="button"
+                                onClick={handleStarClick}
+                                onKeyDown={(ev) => {
+                                  if (ev.key === "Enter" || ev.key === " ") {
+                                    handleStarClick(ev)
+                                  }
+                                }}
+                                title={
+                                  b.highlighted
+                                    ? "Remove highlight"
+                                    : "Highlight in portal"
+                                }
+                                aria-label={
+                                  b.highlighted
+                                    ? "Remove highlight"
+                                    : "Highlight in portal"
+                                }
+                                aria-pressed={b.highlighted ?? false}
+                                className="shrink-0 -mr-0.5 -mt-0.5 rounded p-0.5 hover:bg-white/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/60"
+                              >
+                                <Star
+                                  className={cn(
+                                    "h-3 w-3",
+                                    b.highlighted
+                                      ? "fill-white text-white"
+                                      : "text-white/80",
+                                  )}
+                                />
+                              </button>
+                            )}
+                          </div>
                           {teardownH > 1 && (
                             <div
                               style={{
@@ -494,7 +603,12 @@ export function VenueDayCalendar({
                                   "repeating-linear-gradient(135deg, rgba(255,255,255,0.18) 0 4px, transparent 4px 8px)",
                               }}
                               aria-hidden
-                              className="bg-sky-900 border-t border-sky-950 dark:bg-sky-900 dark:border-sky-950 mt-auto"
+                              className={cn(
+                                "border-t mt-auto",
+                                b.highlighted
+                                  ? "bg-amber-700 border-amber-800 dark:bg-amber-700 dark:border-amber-800"
+                                  : "bg-sky-900 border-sky-950 dark:bg-sky-900 dark:border-sky-950",
+                              )}
                               title="Teardown"
                             />
                           )}
@@ -513,6 +627,12 @@ export function VenueDayCalendar({
         <div className="flex items-center gap-1.5">
           <span className="h-3 w-3 rounded-sm bg-sky-600 dark:bg-sky-500" />
           Event
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="inline-flex h-3 w-3 items-center justify-center rounded-sm bg-amber-500 dark:bg-amber-500">
+            <Star className="h-2 w-2 fill-white text-white" />
+          </span>
+          Highlighted
         </div>
         <div className="flex items-center gap-1.5">
           <span

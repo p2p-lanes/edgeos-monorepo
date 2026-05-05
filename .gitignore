@@ -20,6 +20,7 @@ Thumbs.db
 AGENTS.md
 CLAUDE.md
 tasks/*
+memory/
 
 # Local notes / scratch (not shared)
 TODO.local.md

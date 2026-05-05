@@ -852,15 +852,30 @@ export function EventForm({
                       disabled={readOnly}
                     >
                       <SelectTrigger className="w-auto border-0 bg-transparent p-0 shadow-none focus:ring-0">
-                        <Badge
-                          variant={
-                            statusField.state.value === "published"
-                              ? "default"
-                              : "secondary"
-                          }
-                        >
-                          <SelectValue />
-                        </Badge>
+                        {statusField.state.value === "published" ? (
+                          <Badge
+                            variant={
+                              visibilityValue === "unlisted"
+                                ? "secondary"
+                                : "outline"
+                            }
+                            className={
+                              visibilityValue === "private"
+                                ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 border-transparent"
+                                : undefined
+                            }
+                          >
+                            {visibilityValue === "unlisted"
+                              ? "Unlisted"
+                              : visibilityValue === "private"
+                                ? "Private"
+                                : "Public"}
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary">
+                            <SelectValue />
+                          </Badge>
+                        )}
                       </SelectTrigger>
                       <SelectContent>
                         {EVENT_STATUSES.map((s) => (

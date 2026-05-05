@@ -279,6 +279,9 @@ class VenueBusySlot(BaseModel):
     event_id: uuid.UUID | None = None
     event_start: datetime | None = None
     event_end: datetime | None = None
+    # Mirrors ``Events.highlighted`` so calendar views can flag spotlight
+    # events without an extra round-trip per slot.
+    highlighted: bool = False
 
 
 class VenueOpenRange(BaseModel):
