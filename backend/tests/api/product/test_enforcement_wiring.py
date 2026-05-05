@@ -77,9 +77,11 @@ def _make_attendee(
 ) -> Attendees:
     """Create a minimal attendee linked to an application."""
     attendee = Attendees(
+        tenant_id=application.tenant_id,
         application_id=application.id,
-        first_name="Test",
-        last_name="Attendee",
+        popup_id=application.popup_id,
+        name="Test Attendee",
+        category="main",
         email=f"attendee-{uuid.uuid4().hex[:8]}@test.com",
         check_in_code=f"T{uuid.uuid4().hex[:4].upper()}",
     )
