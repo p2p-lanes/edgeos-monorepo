@@ -256,6 +256,29 @@ products_crud = ProductsCRUD()
 
 
 # ---------------------------------------------------------------------------
+# Module-level helpers
+# ---------------------------------------------------------------------------
+
+
+def _resolve_tier_group(session: Session, product_id: uuid.UUID) -> uuid.UUID | None:
+    """Return the group_id of the TicketTierGroup that owns product_id, or None.
+
+    A product belongs to at most one tier group (enforced by the unique constraint
+    on ticket_tier_phase.product_id).  Used by enforcement and restore sites to
+    decide whether to also decrement/restore the shared group counter.
+
+    Returns None for:
+      - standalone products (no ticket_tier_phase row)
+      - non-existent product_id (no row to join on)
+    """
+    stmt = select(TicketTierPhase.group_id).where(
+        TicketTierPhase.product_id == product_id
+    )
+    row = session.exec(stmt).first()
+    return row if row is not None else None
+
+
+# ---------------------------------------------------------------------------
 # Tier Group CRUD
 # ---------------------------------------------------------------------------
 
