@@ -27,15 +27,6 @@ import type {
 
 const DEFAULT_SCOPES: ApiKeyScope[] = ["events:read"]
 
-function toDateInputValue(date: Date) {
-  return date.toISOString().slice(0, 10)
-}
-
-function expiryDateToIso(date: string) {
-  if (!date) return null
-  return new Date(`${date}T23:59:59.999Z`).toISOString()
-}
-
 const SCOPE_OPTIONS: Array<{
   value: ApiKeyScope
   label: string
@@ -70,7 +61,6 @@ export default function ApiKeysPage() {
   const [newKeyName, setNewKeyName] = useState("")
   const [selectedScopes, setSelectedScopes] =
     useState<ApiKeyScope[]>(DEFAULT_SCOPES)
-  const [expiryDate, setExpiryDate] = useState("")
   const [createdKey, setCreatedKey] = useState<ApiKeyCreated | null>(null)
   const [copied, setCopied] = useState(false)
   const [pendingRevoke, setPendingRevoke] = useState<ApiKeyPublic | null>(null)
@@ -94,12 +84,11 @@ export default function ApiKeysPage() {
       const created = await createKey({
         name,
         scopes: selectedScopes,
-        expires_at: expiryDateToIso(expiryDate),
+        expires_at: null,
       })
       setCreatedKey(created)
       setNewKeyName("")
       setSelectedScopes(DEFAULT_SCOPES)
-      setExpiryDate("")
       setCreateOpen(false)
     } catch {
       toast.error(
@@ -331,26 +320,6 @@ export default function ApiKeysPage() {
                   </div>
                 )
               })}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="api-key-expiry">
-                {t("api_keys.expiry_label", {
-                  defaultValue: "Expiry date (optional)",
-                })}
-              </Label>
-              <Input
-                id="api-key-expiry"
-                type="date"
-                value={expiryDate}
-                min={toDateInputValue(new Date())}
-                onChange={(e) => setExpiryDate(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                {t("api_keys.expiry_description", {
-                  defaultValue:
-                    "Leave empty for a key that never expires, or set a date to auto-revoke.",
-                })}
-              </p>
             </div>
           </div>
           <DialogFooter>
