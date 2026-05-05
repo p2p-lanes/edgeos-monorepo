@@ -14,6 +14,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
@@ -21,7 +22,6 @@ from app.api.coupon.models import Coupons
 from app.api.popup.models import Popups
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
-
 from tests.conftest import with_origin
 
 # ---------------------------------------------------------------------------
@@ -196,10 +196,10 @@ def test_validate_public_rate_limit_triggers_429(
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.usefixtures("tenant_a")
 def test_coupon_validate_resolves_per_tenant(
     client: TestClient,
     db: Session,
-    tenant_a: Tenants,
     popup_tenant_a_summer_fest: Popups,
 ) -> None:
     """Coupon on tenant A's popup, origin=tenant A → 200 with discount."""
@@ -218,10 +218,9 @@ def test_coupon_validate_resolves_per_tenant(
     assert body["valid"] is True
 
 
+@pytest.mark.usefixtures("popup_tenant_a_summer_fest", "popup_tenant_b_summer_fest")
 def test_coupon_validate_cross_tenant_returns_invalid(
     client: TestClient,
-    popup_tenant_a_summer_fest: Popups,
-    popup_tenant_b_summer_fest: Popups,
 ) -> None:
     """Coupon exists on tenant A's popup; request from tenant B → uniform 400 (not found)."""
     response = client.post(

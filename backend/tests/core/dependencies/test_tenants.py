@@ -22,7 +22,6 @@ import uuid
 from typing import Any
 from unittest.mock import ANY, MagicMock, patch
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 

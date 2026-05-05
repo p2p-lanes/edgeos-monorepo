@@ -15,7 +15,6 @@ from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
-
 from tests.conftest import with_origin
 
 

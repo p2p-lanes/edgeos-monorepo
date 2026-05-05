@@ -14,6 +14,7 @@ Scenarios:
 import uuid
 from unittest.mock import patch
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
@@ -24,7 +25,6 @@ from app.api.product.models import Products
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.api.ticketing_step.models import TicketingSteps
-
 from tests.conftest import with_origin
 
 # ---------------------------------------------------------------------------
@@ -298,10 +298,10 @@ def test_runtime_rate_limit_triggers_429(
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.usefixtures("popup_tenant_b_summer_fest")
 def test_runtime_resolves_per_tenant_slug_collision(
     client: TestClient,
     popup_tenant_a_summer_fest: Popups,
-    popup_tenant_b_summer_fest: Popups,
 ) -> None:
     """Slug collision: origin resolves to tenant A → tenant A's popup returned."""
     response = client.get(
@@ -314,11 +314,11 @@ def test_runtime_resolves_per_tenant_slug_collision(
     assert body["popup"]["id"] == str(popup_tenant_a_summer_fest.id)
 
 
+@pytest.mark.usefixtures("tenant_a")
 def test_runtime_cross_tenant_slug_returns_404(
     client: TestClient,
     db: Session,
     popup_tenant_b_summer_fest: Popups,
-    tenant_a: Tenants,
 ) -> None:
     """Slug exists under tenant B but not A; origin resolves to A → 404."""
     # This test relies on a slug that tenant_a does NOT have.
