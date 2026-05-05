@@ -2,6 +2,7 @@
 
 import { describe, expect, it } from "vitest"
 import { CHECKOUT_MODE } from "@/checkout/popupCheckoutPolicy"
+import type { ProductWithQuantity } from "@/client"
 import {
   buildBaseAttendeePasses,
   buildPurchasesMap,
@@ -46,7 +47,7 @@ describe("buildBaseAttendeePasses", () => {
             name: "Inactive Ticket",
             is_active: false,
             quantity: 1,
-          }),
+          }) as unknown as ProductWithQuantity,
         ],
       },
     ])

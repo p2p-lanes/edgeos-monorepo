@@ -14,10 +14,10 @@ HTTP-level integration tests (POPUP-6 Scenario 5):
   - POST /api/v1/payments/my/preview with insurance=True verifies that the
     insurance_amount in the response equals popup.insurance_percentage × eligible subtotal.
 """
+
 import uuid
 from decimal import Decimal
 
-import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 

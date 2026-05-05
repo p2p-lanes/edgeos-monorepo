@@ -180,6 +180,7 @@ export function ThemeConfigForm({
           </p>
 
           {/* Mode toggle */}
+          {/* biome-ignore lint/a11y/noStaticElementInteractions: hover-only preview highlight; no keyboard interaction required. */}
           <div
             className="flex items-center justify-between rounded-md border bg-background px-3 py-2.5"
             onMouseEnter={() => handleHover(["mode"])}
@@ -271,6 +272,18 @@ export function ThemeConfigForm({
               onReset={() => handleResetColor("checkout_navbar_bg")}
               onHover={handleHover}
               isHighlighted={highlightedKeys.has("checkout_navbar_bg")}
+              disabled={readOnly}
+            />
+            <ColorField
+              colorKey="checkout_subtitle_color"
+              label="Checkout subtitle"
+              description="Optional color for checkout subtitles and section labels (e.g. step descriptions, category headings). Use this to boost contrast when the page background washes out the default muted gray."
+              value={colors.checkout_subtitle_color ?? ""}
+              defaultValue=""
+              onChange={(v) => handleColorChange("checkout_subtitle_color", v)}
+              onReset={() => handleResetColor("checkout_subtitle_color")}
+              onHover={handleHover}
+              isHighlighted={highlightedKeys.has("checkout_subtitle_color")}
               disabled={readOnly}
             />
           </div>

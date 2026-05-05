@@ -1303,9 +1303,7 @@ def run_import(
 
             # Duration type from source category
             duration_type = (
-                duration_map.get(src_category)
-                if category == CATEGORY_TICKET
-                else None
+                duration_map.get(src_category) if category == CATEGORY_TICKET else None
             )
 
             # Attendee category
@@ -1710,7 +1708,7 @@ if __name__ == "__main__":
     )
     conn.close()
 
-    skip_tables = set(x.strip() for x in args.skip_tables.split(",") if x.strip())
+    skip_tables = {x.strip() for x in args.skip_tables.split(",") if x.strip()}
 
     if args.sync_popup_only:
         sync_popup(

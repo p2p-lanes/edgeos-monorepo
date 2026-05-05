@@ -278,9 +278,11 @@ function PropertyCard({
               )}
             </div>
             <div className="text-left min-w-0">
-              <p className="font-medium text-pass-title text-sm sm:text-base truncate">
-                {product.name}
-              </p>
+              <ExpandableDescription
+                text={product.name}
+                clamp={2}
+                className="font-medium text-pass-title text-sm sm:text-base leading-tight"
+              />
               <p className="text-xs sm:text-sm text-pass-text">
                 {formatCurrency(product.price)}/night
               </p>
@@ -299,9 +301,6 @@ function PropertyCard({
               )}
             >
               {formatCurrency(totalPrice)}
-            </p>
-            <p className="text-xs text-pass-text">
-              {quantity > 1 ? `${quantity} × total` : "total"}
             </p>
           </div>
         </button>

@@ -75,9 +75,9 @@ export function TierGroupPicker({
 
   if (isLoading) {
     return (
-      <div role="status" className="text-sm text-muted-foreground">
+      <output className="text-sm text-muted-foreground">
         Loading tier groups…
-      </div>
+      </output>
     )
   }
 

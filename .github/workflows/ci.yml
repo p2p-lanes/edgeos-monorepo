@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (lint + tests)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies (uv workspace)
+        run: uv sync --dev
+
+      - name: Ruff lint
+        working-directory: backend
+        run: uv run ruff check .
+
+      - name: Pytest
+        working-directory: backend
+        # The Settings() validator requires these env vars at import time
+        # even though the test fixtures override Postgres via testcontainers.
+        # Values are placeholders — the real Postgres URL is supplied by the
+        # test container, and SECRET_KEY / SUPERADMIN aren't exercised by
+        # the test suite.
+        env:
+          SECRET_KEY: test-ci-secret-key
+          PROJECT_NAME: edgeos-ci
+          POSTGRES_SERVER: localhost
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: edgeos_ci
+          SUPERADMIN: ci@example.com
+          BACKOFFICE_URL: http://localhost
+          PORTAL_URL: http://localhost
+        run: uv run pytest -v
+
+  frontend:
+    name: Frontend (biome + tsc)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # biome ci is the check-only variant of `pnpm lint` (which would
+      # auto-fix in place). Infos/warnings don't fail the job; errors do.
+      - name: Biome (backoffice)
+        run: pnpm --filter backoffice exec biome ci .
+
+      - name: Biome (portal)
+        run: pnpm --filter portal exec biome ci .
+
+      - name: Typecheck (backoffice)
+        run: pnpm --filter backoffice exec tsc -p tsconfig.build.json --noEmit
+
+      - name: Typecheck (portal)
+        run: pnpm --filter portal exec tsc --noEmit

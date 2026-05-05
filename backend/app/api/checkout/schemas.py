@@ -5,10 +5,10 @@ from decimal import Decimal
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
+
 from app.api.popup.schemas import PopupPublic
 from app.api.product.schemas import TierGroupPublic, TierPhasePublic
 from app.api.ticketing_step.schemas import TicketingStepPublic
-
 
 # ---------------------------------------------------------------------------
 # Runtime schemas (GET /checkout/{slug}/runtime)

@@ -7,10 +7,12 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
+from fastapi import HTTPException
 from sqlmodel import Session, select
 
 from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.checkout.schemas import BuyerInfo, OpenTicketingPurchaseCreate, ProductLine
+from app.api.coupon.models import Coupons
 from app.api.form_field.models import FormFields
 from app.api.form_section.models import FormSections
 from app.api.human.models import Humans
@@ -63,7 +65,9 @@ def _make_product(
     return product
 
 
-def _make_section(db: Session, popup: Popups, *, label: str, order: int = 0) -> FormSections:
+def _make_section(
+    db: Session, popup: Popups, *, label: str, order: int = 0
+) -> FormSections:
     section = FormSections(
         id=uuid.uuid4(),
         tenant_id=popup.tenant_id,
@@ -104,7 +108,35 @@ def _make_field(
     return field
 
 
-def _purchase_create(*, email: str, first_name: str, last_name: str, products: list[tuple[Products, int]], form_data: dict[str, object]) -> OpenTicketingPurchaseCreate:
+def _make_coupon(
+    db: Session,
+    popup: Popups,
+    *,
+    code: str,
+    discount_value: int,
+) -> Coupons:
+    coupon = Coupons(
+        id=uuid.uuid4(),
+        tenant_id=popup.tenant_id,
+        popup_id=popup.id,
+        code=code,
+        discount_value=discount_value,
+        is_active=True,
+    )
+    db.add(coupon)
+    db.flush()
+    return coupon
+
+
+def _purchase_create(
+    *,
+    email: str,
+    first_name: str,
+    last_name: str,
+    products: list[tuple[Products, int]],
+    form_data: dict[str, object],
+    coupon_code: str | None = None,
+) -> OpenTicketingPurchaseCreate:
     return OpenTicketingPurchaseCreate(
         products=[
             ProductLine(product_id=product.id, quantity=quantity)
@@ -116,6 +148,7 @@ def _purchase_create(*, email: str, first_name: str, last_name: str, products: l
             last_name=last_name,
             form_data=form_data,
         ),
+        coupon_code=coupon_code,
     )
 
 
@@ -126,7 +159,9 @@ def test_create_open_ticketing_payment_creates_main_and_companions(
     popup = _make_popup(db, tenant_a, slug_prefix="main-comp")
     product = _make_product(db, popup, name="GA", price="120.00")
     section = _make_section(db, popup, label="Buyer Info")
-    first_name_field = _make_field(db, popup, section, name="first_name", label="Nombre", required=True)
+    first_name_field = _make_field(
+        db, popup, section, name="first_name", label="Nombre", required=True
+    )
     dietary_field = _make_field(
         db,
         popup,
@@ -144,8 +179,8 @@ def test_create_open_ticketing_payment_creates_main_and_companions(
         last_name="Walter",
         products=[(product, 3)],
         form_data={
-            str(first_name_field.id): "Matias",
-            str(dietary_field.id): ["vegetarian", "gluten_free"],
+            first_name_field.name: "Matias",
+            dietary_field.name: ["vegetarian", "gluten_free"],
         },
     )
 
@@ -183,13 +218,17 @@ def test_create_open_ticketing_payment_creates_main_and_companions(
     assert all(attendee.human_id == attendees[0].human_id for attendee in attendees)
 
     attendee_products = list(
-        db.exec(select(AttendeeProducts).where(AttendeeProducts.product_id == product.id)).all()
+        db.exec(
+            select(AttendeeProducts).where(AttendeeProducts.product_id == product.id)
+        ).all()
     )
     assert len(attendee_products) == 3
     assert all(link.quantity == 1 for link in attendee_products)
 
     payment_products = list(
-        db.exec(select(PaymentProducts).where(PaymentProducts.payment_id == payment.id)).all()
+        db.exec(
+            select(PaymentProducts).where(PaymentProducts.payment_id == payment.id)
+        ).all()
     )
     assert len(payment_products) == 3
     assert all(link.quantity == 1 for link in payment_products)
@@ -217,7 +256,9 @@ def test_create_open_ticketing_payment_respects_explicit_attendee_categories(
         attendee_category=TicketAttendeeCategory.SPOUSE,
     )
     section = _make_section(db, popup, label="Buyer Info")
-    name_field = _make_field(db, popup, section, name="first_name", label="Nombre", required=True)
+    name_field = _make_field(
+        db, popup, section, name="first_name", label="Nombre", required=True
+    )
     db.commit()
 
     obj = _purchase_create(
@@ -225,7 +266,7 @@ def test_create_open_ticketing_payment_respects_explicit_attendee_categories(
         first_name="Buyer",
         last_name="Person",
         products=[(main_product, 1), (spouse_product, 1)],
-        form_data={str(name_field.id): "Buyer"},
+        form_data={name_field.name: "Buyer"},
     )
 
     with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
@@ -254,9 +295,13 @@ def test_create_open_ticketing_payment_respects_explicit_attendee_categories(
     assert attendees[1].category == "spouse"
 
     payment_products = list(
-        db.exec(select(PaymentProducts).where(PaymentProducts.payment_id == payment.id)).all()
+        db.exec(
+            select(PaymentProducts).where(PaymentProducts.payment_id == payment.id)
+        ).all()
     )
-    spouse_link = next(pp for pp in payment_products if pp.product_id == spouse_product.id)
+    spouse_link = next(
+        pp for pp in payment_products if pp.product_id == spouse_product.id
+    )
     assert spouse_link.attendee_id == attendees[1].id
 
 
@@ -267,7 +312,9 @@ def test_create_open_ticketing_payment_does_not_overwrite_existing_human(
     popup = _make_popup(db, tenant_a, slug_prefix="existing-human")
     product = _make_product(db, popup, name="GA", price="50.00")
     section = _make_section(db, popup, label="Buyer Info")
-    name_field = _make_field(db, popup, section, name="first_name", label="Nombre", required=True)
+    name_field = _make_field(
+        db, popup, section, name="first_name", label="Nombre", required=True
+    )
 
     existing = Humans(
         id=uuid.uuid4(),
@@ -284,7 +331,7 @@ def test_create_open_ticketing_payment_does_not_overwrite_existing_human(
         first_name="New",
         last_name="Buyer",
         products=[(product, 1)],
-        form_data={str(name_field.id): "New"},
+        form_data={name_field.name: "New"},
     )
 
     with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
@@ -294,7 +341,9 @@ def test_create_open_ticketing_payment_does_not_overwrite_existing_human(
             checkout_url="https://simplefi.test/checkout/3",
         )
 
-        payments_crud.create_open_ticketing_payment(db, obj=obj, popup=popup, tenant=tenant_a)
+        payments_crud.create_open_ticketing_payment(
+            db, obj=obj, popup=popup, tenant=tenant_a
+        )
 
     db.expire(existing)
     db.refresh(existing)
@@ -314,7 +363,9 @@ def test_create_open_ticketing_payment_rolls_back_payment_artifacts_on_provider_
     popup = _make_popup(db, tenant_a, slug_prefix="rollback")
     product = _make_product(db, popup, name="GA", price="99.00")
     section = _make_section(db, popup, label="Buyer Info")
-    name_field = _make_field(db, popup, section, name="first_name", label="Nombre", required=True)
+    name_field = _make_field(
+        db, popup, section, name="first_name", label="Nombre", required=True
+    )
     db.commit()
 
     obj = _purchase_create(
@@ -322,13 +373,13 @@ def test_create_open_ticketing_payment_rolls_back_payment_artifacts_on_provider_
         first_name="Rollback",
         last_name="Case",
         products=[(product, 2)],
-        form_data={str(name_field.id): "Rollback"},
+        form_data={name_field.name: "Rollback"},
     )
 
     with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
         mock_get_client.return_value.create_payment.side_effect = RuntimeError("boom")
 
-        with pytest.raises(Exception):
+        with pytest.raises(HTTPException):
             payments_crud.create_open_ticketing_payment(
                 db,
                 obj=obj,
@@ -336,8 +387,12 @@ def test_create_open_ticketing_payment_rolls_back_payment_artifacts_on_provider_
                 tenant=tenant_a,
             )
 
-    payments = list(db.exec(select(Payments).where(Payments.popup_id == popup.id)).all())
-    attendees = list(db.exec(select(Attendees).where(Attendees.popup_id == popup.id)).all())
+    payments = list(
+        db.exec(select(Payments).where(Payments.popup_id == popup.id)).all()
+    )
+    attendees = list(
+        db.exec(select(Attendees).where(Attendees.popup_id == popup.id)).all()
+    )
     payment_products = list(
         db.exec(
             select(PaymentProducts)
@@ -357,3 +412,77 @@ def test_create_open_ticketing_payment_rolls_back_payment_artifacts_on_provider_
     assert attendees == []
     assert payment_products == []
     assert attendee_products == []
+
+
+def test_create_open_ticketing_payment_applies_coupon_discount(
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    popup = _make_popup(db, tenant_a, slug_prefix="coupon")
+    product = _make_product(db, popup, name="GA", price="100.00")
+    coupon = _make_coupon(db, popup, code="DISCOUNT10", discount_value=10)
+    db.commit()
+
+    obj = _purchase_create(
+        email="buyer@test.com",
+        first_name="Matias",
+        last_name="Walter",
+        products=[(product, 2)],
+        form_data={},
+        coupon_code="DISCOUNT10",
+    )
+
+    with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
+        mock_get_client.return_value.create_payment.return_value = SimpleNamespace(
+            id="sf_open_ticketing_coupon",
+            status="pending",
+            checkout_url="https://simplefi.test/checkout/coupon",
+        )
+
+        payment, _ = payments_crud.create_open_ticketing_payment(
+            db,
+            obj=obj,
+            popup=popup,
+            tenant=tenant_a,
+        )
+
+    # 2 × $100 = $200, minus 10% = $180
+    assert payment.amount == Decimal("180.00")
+    assert payment.coupon_id == coupon.id
+    assert payment.coupon_code == "DISCOUNT10"
+    assert payment.discount_value == Decimal("10")
+
+    db.expire(coupon)
+    db.refresh(coupon)
+    assert coupon.current_uses == 1
+
+
+def test_create_open_ticketing_payment_rejects_invalid_coupon(
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    popup = _make_popup(db, tenant_a, slug_prefix="badcoupon")
+    product = _make_product(db, popup, name="GA", price="50.00")
+    db.commit()
+
+    obj = _purchase_create(
+        email="buyer@test.com",
+        first_name="Matias",
+        last_name="Walter",
+        products=[(product, 1)],
+        form_data={},
+        coupon_code="NOPE",
+    )
+
+    with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
+        with pytest.raises(HTTPException) as exc_info:
+            payments_crud.create_open_ticketing_payment(
+                db, obj=obj, popup=popup, tenant=tenant_a
+            )
+
+    assert exc_info.value.status_code == 404
+    mock_get_client.assert_not_called()
+    assert (
+        db.exec(select(Payments).where(Payments.popup_id == popup.id)).first()
+        is None
+    )

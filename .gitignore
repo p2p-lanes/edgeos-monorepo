@@ -21,6 +21,11 @@ AGENTS.md
 CLAUDE.md
 tasks/*
 
+# Local notes / scratch (not shared)
+TODO.local.md
+*.local.md
+/docs/
+
 # Environment
 .env*
 !.env.example

@@ -70,6 +70,25 @@ const ICON_SIZES: Record<NonNullable<QuantitySelectorProps["size"]>, string> = {
   md: "w-4 h-4",
 }
 
+// Empty-slot "Add" is the primary CTA for selecting a product, so it's
+// rendered larger and as a filled brand tile to stand out against the +/-
+// adjustment buttons below.
+const ADD_BUTTON_SIZES: Record<
+  NonNullable<QuantitySelectorProps["size"]>,
+  string
+> = {
+  sm: "w-7 h-7",
+  md: "w-8 h-8",
+}
+
+const ADD_ICON_SIZES: Record<
+  NonNullable<QuantitySelectorProps["size"]>,
+  string
+> = {
+  sm: "w-4 h-4",
+  md: "w-5 h-5",
+}
+
 const VALUE_SIZES: Record<
   NonNullable<QuantitySelectorProps["size"]>,
   string
@@ -100,7 +119,8 @@ const QuantitySelector = ({
   const isMinReached = value <= min
   const isMaxReached = value >= max
 
-  // Empty-slot state: single "+" add button
+  // Empty-slot state: single "+" add button — filled tile CTA, sized larger
+  // than the +/- adjustment buttons so it reads as the primary action.
   if (value === 0 && onAdd && !disabled) {
     return (
       <div className={cn("flex items-center", className)}>
@@ -111,13 +131,13 @@ const QuantitySelector = ({
             onAdd()
           }}
           className={cn(
-            "transition-all duration-300 ease-in-out transform hover:scale-110 flex items-center justify-center rounded",
-            BUTTON_SIZES[size],
+            "transition-all duration-200 ease-out transform hover:scale-110 active:scale-95 hover:bg-primary/30 flex items-center justify-center rounded-full bg-primary/20 text-primary shadow-sm",
+            ADD_BUTTON_SIZES[size],
           )}
           aria-label="Add item"
           tabIndex={0}
         >
-          <Plus className={ICON_SIZES[size]} />
+          <Plus className={cn(ADD_ICON_SIZES[size], "stroke-[2.5]")} />
         </button>
       </div>
     )

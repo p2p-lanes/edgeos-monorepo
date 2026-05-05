@@ -16,7 +16,6 @@ Scenarios covered:
 import uuid
 from decimal import Decimal
 
-import pytest
 from sqlmodel import Session
 
 from app.api.attendee.models import Attendees
@@ -26,7 +25,6 @@ from app.api.payment.models import PaymentProducts, Payments
 from app.api.payment.schemas import PaymentStatus
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -199,9 +197,7 @@ class TestFindByHumanPopupPayments:
         assert len(results) == 1
         assert results[0].id == payment.id
 
-    def test_direct_sale_payment_returned(
-        self, db: Session, tenant_a: Tenants
-    ) -> None:
+    def test_direct_sale_payment_returned(self, db: Session, tenant_a: Tenants) -> None:
         """Direct-sale payments are returned via attendee.human_id match."""
         popup = _make_popup(db, tenant_a, suffix="direct-pay")
         human = _make_human(db, tenant_a, suffix="direct-pay")

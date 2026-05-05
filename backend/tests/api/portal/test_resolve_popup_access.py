@@ -19,17 +19,15 @@ Covers all 10 spec scenarios (one per ladder step / edge case):
 import uuid
 from decimal import Decimal
 
-import pytest
 from sqlmodel import Session
 
 from app.api.application.schemas import ApplicationStatus
 from app.api.attendee.models import Attendees
 from app.api.human.models import Humans
-from app.api.payment.models import PaymentProducts, Payments
+from app.api.payment.models import Payments
 from app.api.payment.schemas import PaymentStatus
 from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -203,7 +201,9 @@ class TestResolvePopupAccess:
 
         popup = _make_popup(db, tenant_a, suffix="acc-app")
         human = _make_human(db, tenant_a, suffix="acc-app")
-        _make_application(db, tenant_a, popup, human, status=ApplicationStatus.ACCEPTED.value)
+        _make_application(
+            db, tenant_a, popup, human, status=ApplicationStatus.ACCEPTED.value
+        )
         db.commit()
 
         result = applications_crud.resolve_popup_access(db, human.id, popup.id)
@@ -239,7 +239,9 @@ class TestResolvePopupAccess:
 
         popup = _make_popup(db, tenant_a, suffix="rev-app")
         human = _make_human(db, tenant_a, suffix="rev-app")
-        _make_application(db, tenant_a, popup, human, status=ApplicationStatus.IN_REVIEW.value)
+        _make_application(
+            db, tenant_a, popup, human, status=ApplicationStatus.IN_REVIEW.value
+        )
         db.commit()
 
         result = applications_crud.resolve_popup_access(db, human.id, popup.id)
@@ -257,7 +259,9 @@ class TestResolvePopupAccess:
 
         popup = _make_popup(db, tenant_a, suffix="rej-app")
         human = _make_human(db, tenant_a, suffix="rej-app")
-        _make_application(db, tenant_a, popup, human, status=ApplicationStatus.REJECTED.value)
+        _make_application(
+            db, tenant_a, popup, human, status=ApplicationStatus.REJECTED.value
+        )
         db.commit()
 
         result = applications_crud.resolve_popup_access(db, human.id, popup.id)

@@ -116,7 +116,7 @@ async def delete_translation(
     translation_id: uuid.UUID,
     db: TenantSession,
     _current_user: CurrentWriter,
-    x_tenant_id: Annotated[str | None, Header(alias="X-Tenant-Id")] = None,
+    _x_tenant_id: Annotated[str | None, Header(alias="X-Tenant-Id")] = None,
 ) -> None:
     """Delete a translation."""
     translation = translations_crud.get(db, translation_id)

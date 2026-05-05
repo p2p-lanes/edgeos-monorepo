@@ -32,7 +32,8 @@ function ScrollyCheckoutFlowInner({
   onBack,
   navExtraContent,
 }: ScrollyCheckoutFlowProps) {
-  const { availableSteps, submitPayment, stepConfigs } = useCheckout()
+  const { availableSteps, submitPayment, stepConfigs, isInitialLoading } =
+    useCheckout()
 
   const getStepConfig = (stepType: string) =>
     stepConfigs.find(
@@ -288,6 +289,14 @@ function ScrollyCheckoutFlowInner({
         <SuccessStep
           paymentStatus={redirectStateRestored ? paymentStatus : "verifying"}
         />
+      </div>
+    )
+  }
+
+  if (isInitialLoading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-current opacity-60" />
       </div>
     )
   }

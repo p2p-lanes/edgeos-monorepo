@@ -140,7 +140,9 @@ def test_compute_order_summary_uses_snapshot_currency() -> None:
     assert "BTC" not in summary
 
 
-def test_build_payment_confirmed_context_populates_attendees_and_order_summary() -> None:
+def test_build_payment_confirmed_context_populates_attendees_and_order_summary() -> (
+    None
+):
     payment = SimpleNamespace(
         id="payment-1",
         amount=Decimal("230.00"),

@@ -234,8 +234,8 @@ function CompactCard({
     <button
       type="button"
       onClick={() => {
-        if (supportsQty) {
-          if (quantity === 0) onIncrement()
+        if (supportsQty && quantity === 0) {
+          onIncrement()
         } else {
           onSelect()
         }
@@ -286,9 +286,11 @@ function CompactCard({
       </div>
 
       <div className="flex-1 min-w-0">
-        <p className="font-medium text-sm text-pass-title truncate">
-          {product.name}
-        </p>
+        <ExpandableDescription
+          text={product.name}
+          clamp={2}
+          className="font-medium text-sm text-pass-title leading-tight"
+        />
         {pricePerDay && (
           <p className="text-xs text-pass-text">
             {formatCurrency(product.price)}/night
@@ -310,7 +312,6 @@ function CompactCard({
         >
           {formatCurrency(totalPrice)}
         </p>
-        <p className="text-xs text-pass-text">total</p>
       </div>
     </button>
   )
@@ -350,8 +351,8 @@ function GridCard({
     <button
       type="button"
       onClick={() => {
-        if (supportsQty) {
-          if (quantity === 0) onIncrement()
+        if (supportsQty && quantity === 0) {
+          onIncrement()
         } else {
           onSelect()
         }
@@ -528,8 +529,8 @@ function DefaultSectionCard({
               key={product.id}
               type="button"
               onClick={() => {
-                if (supportsQty) {
-                  if (quantity === 0) onIncrement(product.id)
+                if (supportsQty && quantity === 0) {
+                  onIncrement(product.id)
                 } else {
                   onProductSelect(product.id)
                 }
@@ -567,9 +568,11 @@ function DefaultSectionCard({
                   </div>
                 )}
                 <div className="min-w-0">
-                  <p className="font-medium text-pass-title text-sm truncate">
-                    {product.name}
-                  </p>
+                  <ExpandableDescription
+                    text={product.name}
+                    clamp={2}
+                    className="font-medium text-pass-title text-sm leading-tight"
+                  />
                   {pricePerDay && (
                     <p className="text-xs text-pass-text">
                       {formatCurrency(product.price)}/night
@@ -591,7 +594,6 @@ function DefaultSectionCard({
                 >
                   {formatCurrency(totalPrice)}
                 </p>
-                <p className="text-xs text-pass-text">total</p>
               </div>
             </button>
           )
@@ -724,8 +726,8 @@ function ShowcaseSectionCard({
                 key={product.id}
                 type="button"
                 onClick={() => {
-                  if (supportsQty) {
-                    if (quantity === 0) onIncrement(product.id)
+                  if (supportsQty && quantity === 0) {
+                    onIncrement(product.id)
                   } else {
                     onProductSelect(product.id)
                   }
@@ -749,9 +751,11 @@ function ShowcaseSectionCard({
                 )}
 
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm text-pass-title truncate">
-                    {product.name}
-                  </p>
+                  <ExpandableDescription
+                    text={product.name}
+                    clamp={2}
+                    className="font-semibold text-sm text-pass-title leading-tight"
+                  />
                   {product.description && (
                     <ExpandableDescription
                       text={product.description}
@@ -780,7 +784,6 @@ function ShowcaseSectionCard({
                   >
                     {formatCurrency(totalPrice)}
                   </p>
-                  <p className="text-xs text-pass-text">total</p>
                 </div>
 
                 {supportsQty ? (

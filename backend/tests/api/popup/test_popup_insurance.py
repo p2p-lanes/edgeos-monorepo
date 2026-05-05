@@ -10,6 +10,7 @@ Phase 3 — Integration:
   - idempotent call → no error
   - no step row → no error
 """
+
 import uuid
 from decimal import Decimal
 
@@ -17,7 +18,6 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.api.popup.schemas import validate_popup_insurance_config
-
 
 # ---------------------------------------------------------------------------
 # Unit tests: validate_popup_insurance_config (Phase 1)
@@ -175,5 +175,3 @@ class TestPopupInsuranceApi:
         )
         assert update_resp.status_code == 200
         assert update_resp.json()["insurance_enabled"] is False
-
-

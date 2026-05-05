@@ -1,5 +1,6 @@
 import uuid
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from fastapi import HTTPException, status
 from sqlmodel import Session, col, select
@@ -7,6 +8,9 @@ from sqlmodel import Session, col, select
 from app.api.coupon.models import Coupons
 from app.api.coupon.schemas import CouponCreate, CouponUpdate
 from app.api.shared.crud import BaseCRUD
+
+if TYPE_CHECKING:
+    from app.api.coupon.schemas import CouponValidatePublicResponse
 
 # Uniform error message for all invalid/expired/unknown coupon states on the
 # public endpoint — NEVER differentiate between states (prevents enumeration).
@@ -24,11 +28,12 @@ class CouponsCRUD(BaseCRUD[Coupons, CouponCreate, CouponUpdate]):
         session: Session,
         popup_slug: str,
         code: str,
+        tenant_id: uuid.UUID,
     ) -> "CouponValidatePublicResponse":
         """Validate a coupon code for an anonymous (public) checkout request.
 
         Rules:
-        - Resolves popup by slug; popup must have sale_type="direct" (else 403).
+        - Resolves popup by (slug, tenant_id); popup must have sale_type="direct" (else 403).
         - ANY failure state (not found, inactive, expired, maxed-out) raises 400
           with the UNIFORM message "Invalid or expired coupon" — never differentiates.
         - On success, returns CouponValidatePublicResponse.
@@ -38,7 +43,10 @@ class CouponsCRUD(BaseCRUD[Coupons, CouponCreate, CouponUpdate]):
         from app.api.shared.enums import SaleType
 
         popup = session.exec(
-            select(Popups).where(Popups.slug == popup_slug)
+            select(Popups).where(
+                Popups.slug == popup_slug,
+                Popups.tenant_id == tenant_id,
+            )
         ).first()
 
         if popup is None:

@@ -3,6 +3,8 @@ from typing import TYPE_CHECKING, Annotated
 
 from fastapi import APIRouter, Header, HTTPException, status
 
+from app.api.api_key import crud as api_key_crud
+from app.api.api_key.schemas import ApiKeyPublic
 from app.api.human import crud
 from app.api.human.schemas import (
     HumanCreate,
@@ -181,6 +183,8 @@ async def update_human(
         from app.api.application.crud import applications_crud
         from app.api.application.schemas import ApplicationStatus
 
+        api_key_crud.revoke_all_for_human(db, human_id)
+
         applications, _ = applications_crud.find_by_human(db, human_id)
         rejected_apps = []
         for app in applications:
@@ -198,3 +202,36 @@ async def update_human(
                 await send_application_status_email(app, app.human, db)
 
     return HumanPublic.model_validate(updated)
+
+
+@router.post("/{human_id}/api-keys/revoke", status_code=status.HTTP_204_NO_CONTENT)
+async def revoke_human_api_keys(
+    human_id: uuid.UUID,
+    db: TenantSession,
+    _current_user: CurrentWriter,
+) -> None:
+    human = crud.get(db, human_id)
+    if not human:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Human not found",
+        )
+
+    api_key_crud.revoke_all_for_human(db, human_id)
+
+
+@router.get("/{human_id}/api-keys", response_model=list[ApiKeyPublic])
+async def list_human_api_keys(
+    human_id: uuid.UUID,
+    db: TenantSession,
+    _current_user: CurrentWriter,
+) -> list[ApiKeyPublic]:
+    human = crud.get(db, human_id)
+    if not human:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Human not found",
+        )
+
+    rows = api_key_crud.list_for_human(db, human_id)
+    return [ApiKeyPublic.model_validate(row) for row in rows]

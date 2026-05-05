@@ -3,7 +3,60 @@
 import type { CancelablePromise } from './core/CancelablePromise';
 import { OpenAPI } from './core/OpenAPI';
 import { request as __request } from './core/request';
-import type { ApplicationReviewsListReviewsData, ApplicationReviewsListReviewsResponse, ApplicationReviewsSubmitReviewData, ApplicationReviewsSubmitReviewResponse, ApplicationReviewsGetReviewSummaryData, ApplicationReviewsGetReviewSummaryResponse, ApplicationReviewsListPendingReviewsData, ApplicationReviewsListPendingReviewsResponse, ApplicationReviewsListMyReviewsData, ApplicationReviewsListMyReviewsResponse, ApplicationsListApplicationsData, ApplicationsListApplicationsResponse, ApplicationsCreateApplicationAdminData, ApplicationsCreateApplicationAdminResponse, ApplicationsGetApplicationData, ApplicationsGetApplicationResponse, ApplicationsListMyApplicationsData, ApplicationsListMyApplicationsResponse, ApplicationsListMyTicketsResponse, ApplicationsGetMyParticipationData, ApplicationsGetMyParticipationResponse, ApplicationsGetMyPurchasesData, ApplicationsGetMyPurchasesResponse, ApplicationsGetMyApplicationData, ApplicationsGetMyApplicationResponse, ApplicationsUpdateMyApplicationData, ApplicationsUpdateMyApplicationResponse, ApplicationsCreateMyApplicationData, ApplicationsCreateMyApplicationResponse, ApplicationsListAttendeesDirectoryData, ApplicationsListAttendeesDirectoryResponse, ApplicationsExportAttendeesDirectoryCsvData, ApplicationsExportAttendeesDirectoryCsvResponse, ApplicationsAddMyAttendeeData, ApplicationsAddMyAttendeeResponse, ApplicationsUpdateMyAttendeeData, ApplicationsUpdateMyAttendeeResponse, ApplicationsDeleteMyAttendeeData, ApplicationsDeleteMyAttendeeResponse, ApplicationsReviewScholarshipData, ApplicationsReviewScholarshipResponse, ApprovalStrategiesGetApprovalStrategyData, ApprovalStrategiesGetApprovalStrategyResponse, ApprovalStrategiesCreateOrUpdateApprovalStrategyData, ApprovalStrategiesCreateOrUpdateApprovalStrategyResponse, ApprovalStrategiesUpdateApprovalStrategyData, ApprovalStrategiesUpdateApprovalStrategyResponse, ApprovalStrategiesDeleteApprovalStrategyData, ApprovalStrategiesDeleteApprovalStrategyResponse, AttendeesListMyAttendeesByPopupData, AttendeesListMyAttendeesByPopupResponse, AttendeesCreateMyAttendeeForPopupData, AttendeesCreateMyAttendeeForPopupResponse, AttendeesUpdateMyAttendeeForPopupData, AttendeesUpdateMyAttendeeForPopupResponse, AttendeesDeleteMyAttendeeForPopupData, AttendeesDeleteMyAttendeeForPopupResponse, AttendeesListAttendeesData, AttendeesListAttendeesResponse, AttendeesGetAttendeeData, AttendeesGetAttendeeResponse, AttendeesUpdateAttendeeData, AttendeesUpdateAttendeeResponse, AttendeesDeleteAttendeeData, AttendeesDeleteAttendeeResponse, AttendeesGetByCheckInCodeData, AttendeesGetByCheckInCodeResponse, AttendeesGetTicketsByEmailData, AttendeesGetTicketsByEmailResponse, AuthUserLoginData, AuthUserLoginResponse, AuthUserAuthenticateData, AuthUserAuthenticateResponse, AuthHumanLoginData, AuthHumanLoginResponse, AuthHumanAuthenticateData, AuthHumanAuthenticateResponse, BaseFieldConfigsListBaseFieldConfigsData, BaseFieldConfigsListBaseFieldConfigsResponse, BaseFieldConfigsUpdateBaseFieldConfigData, BaseFieldConfigsUpdateBaseFieldConfigResponse, CartsListAbandonedCartsData, CartsListAbandonedCartsResponse, CartsGetMyCartData, CartsGetMyCartResponse, CartsUpdateMyCartData, CartsUpdateMyCartResponse, CartsDeleteMyCartData, CartsDeleteMyCartResponse, CheckoutGetRuntimeData, CheckoutGetRuntimeResponse, CheckoutPurchaseOpenTicketingData, CheckoutPurchaseOpenTicketingResponse, CouponsValidateCouponPublicData, CouponsValidateCouponPublicResponse, CouponsListCouponsData, CouponsListCouponsResponse, CouponsCreateCouponData, CouponsCreateCouponResponse, CouponsGetCouponData, CouponsGetCouponResponse, CouponsUpdateCouponData, CouponsUpdateCouponResponse, CouponsDeleteCouponData, CouponsDeleteCouponResponse, CouponsValidateCouponData, CouponsValidateCouponResponse, DashboardGetDashboardStatsData, DashboardGetDashboardStatsResponse, DashboardGetEnrichedDashboardData, DashboardGetEnrichedDashboardResponse, EmailTemplatesListTemplateTypesResponse, EmailTemplatesGetDefaultTemplateData, EmailTemplatesGetDefaultTemplateResponse, EmailTemplatesPreviewTemplateData, EmailTemplatesPreviewTemplateResponse, EmailTemplatesSendTestEmailData, EmailTemplatesSendTestEmailResponse, EmailTemplatesListEmailTemplatesData, EmailTemplatesListEmailTemplatesResponse, EmailTemplatesCreateEmailTemplateData, EmailTemplatesCreateEmailTemplateResponse, EmailTemplatesGetEmailTemplateData, EmailTemplatesGetEmailTemplateResponse, EmailTemplatesUpdateEmailTemplateData, EmailTemplatesUpdateEmailTemplateResponse, EmailTemplatesDeleteEmailTemplateData, EmailTemplatesDeleteEmailTemplateResponse, FormFieldsListFormFieldsData, FormFieldsListFormFieldsResponse, FormFieldsCreateFormFieldData, FormFieldsCreateFormFieldResponse, FormFieldsListAvailableBaseFieldsData, FormFieldsListAvailableBaseFieldsResponse, FormFieldsCreateBaseFieldConfigData, FormFieldsCreateBaseFieldConfigResponse, FormFieldsGetFormFieldData, FormFieldsGetFormFieldResponse, FormFieldsUpdateFormFieldData, FormFieldsUpdateFormFieldResponse, FormFieldsDeleteFormFieldData, FormFieldsDeleteFormFieldResponse, FormFieldsGetApplicationSchemaData, FormFieldsGetApplicationSchemaResponse, FormFieldsGetPortalApplicationSchemaData, FormFieldsGetPortalApplicationSchemaResponse, FormSectionsListFormSectionsData, FormSectionsListFormSectionsResponse, FormSectionsCreateFormSectionData, FormSectionsCreateFormSectionResponse, FormSectionsGetFormSectionData, FormSectionsGetFormSectionResponse, FormSectionsUpdateFormSectionData, FormSectionsUpdateFormSectionResponse, FormSectionsDeleteFormSectionData, FormSectionsDeleteFormSectionResponse, GroupsListGroupsData, GroupsListGroupsResponse, GroupsCreateGroupData, GroupsCreateGroupResponse, GroupsGetGroupData, GroupsGetGroupResponse, GroupsUpdateGroupData, GroupsUpdateGroupResponse, GroupsDeleteGroupData, GroupsDeleteGroupResponse, GroupsListMyGroupsData, GroupsListMyGroupsResponse, GroupsGetMyGroupData, GroupsGetMyGroupResponse, GroupsUpdateMyGroupData, GroupsUpdateMyGroupResponse, GroupsAddGroupMemberData, GroupsAddGroupMemberResponse, GroupsAddGroupMembersBatchData, GroupsAddGroupMembersBatchResponse, GroupsUpdateGroupMemberData, GroupsUpdateGroupMemberResponse, GroupsRemoveGroupMemberData, GroupsRemoveGroupMemberResponse, GroupsGetGroupPublicData, GroupsGetGroupPublicResponse, HumansListHumansData, HumansListHumansResponse, HumansCreateHumanData, HumansCreateHumanResponse, HumansGetCurrentHumanInfoResponse, HumansUpdateCurrentHumanData, HumansUpdateCurrentHumanResponse, HumansGetHumanData, HumansGetHumanResponse, HumansUpdateHumanData, HumansUpdateHumanResponse, PaymentsListPaymentsData, PaymentsListPaymentsResponse, PaymentsGetPaymentData, PaymentsGetPaymentResponse, PaymentsUpdatePaymentData, PaymentsUpdatePaymentResponse, PaymentsGetPaymentInvoiceData, PaymentsGetPaymentInvoiceResponse, PaymentsCreateMyApplicationFeeData, PaymentsCreateMyApplicationFeeResponse, PaymentsListMyPaymentsByPopupData, PaymentsListMyPaymentsByPopupResponse, PaymentsGetMyLatestPaymentData, PaymentsGetMyLatestPaymentResponse, PaymentsGetMyPaymentStatusData, PaymentsGetMyPaymentStatusResponse, PaymentsListMyPaymentsData, PaymentsListMyPaymentsResponse, PaymentsGetMyInvoiceData, PaymentsGetMyInvoiceResponse, PaymentsPreviewMyPaymentData, PaymentsPreviewMyPaymentResponse, PaymentsCreateMyPaymentData, PaymentsCreateMyPaymentResponse, PaymentsSimplefiWebhookResponse, PopupReviewersListReviewersData, PopupReviewersListReviewersResponse, PopupReviewersAddReviewerData, PopupReviewersAddReviewerResponse, PopupReviewersUpdateReviewerData, PopupReviewersUpdateReviewerResponse, PopupReviewersRemoveReviewerData, PopupReviewersRemoveReviewerResponse, PopupsListPopupsData, PopupsListPopupsResponse, PopupsCreatePopupData, PopupsCreatePopupResponse, PopupsListPublicPopupsData, PopupsListPublicPopupsResponse, PopupsGetPopupData, PopupsGetPopupResponse, PopupsUpdatePopupData, PopupsUpdatePopupResponse, PopupsDeletePopupData, PopupsDeletePopupResponse, PopupsListPortalPopupsData, PopupsListPortalPopupsResponse, PopupsGetPortalPopupData, PopupsGetPortalPopupResponse, PortalGetPopupAccessData, PortalGetPopupAccessResponse, ProductsListProductCategoriesData, ProductsListProductCategoriesResponse, ProductsListProductsData, ProductsListProductsResponse, ProductsCreateProductData, ProductsCreateProductResponse, ProductsCreateProductsBatchData, ProductsCreateProductsBatchResponse, ProductsGetProductData, ProductsGetProductResponse, ProductsUpdateProductData, ProductsUpdateProductResponse, ProductsDeleteProductData, ProductsDeleteProductResponse, ProductsListPortalProductsData, ProductsListPortalProductsResponse, TenantsGetTenantByDomainData, TenantsGetTenantByDomainResponse, TenantsGetTenantBySlugData, TenantsGetTenantBySlugResponse, TenantsListTenantsData, TenantsListTenantsResponse, TenantsCreateTenantData, TenantsCreateTenantResponse, TenantsGetTenantData, TenantsGetTenantResponse, TenantsUpdateTenantData, TenantsUpdateTenantResponse, TenantsDeleteTenantData, TenantsDeleteTenantResponse, TenantsGetCredentialsData, TenantsGetCredentialsResponse, TenantsDeleteCredentialsData, TenantsDeleteCredentialsResponse, TicketingStepsListPortalTicketingStepsData, TicketingStepsListPortalTicketingStepsResponse, TicketingStepsListTicketingStepsData, TicketingStepsListTicketingStepsResponse, TicketingStepsCreateTicketingStepData, TicketingStepsCreateTicketingStepResponse, TicketingStepsGetTicketingStepData, TicketingStepsGetTicketingStepResponse, TicketingStepsUpdateTicketingStepData, TicketingStepsUpdateTicketingStepResponse, TicketingStepsDeleteTicketingStepData, TicketingStepsDeleteTicketingStepResponse, TicketTierGroupsCreateTierGroupData, TicketTierGroupsCreateTierGroupResponse, TicketTierGroupsListTierGroupsData, TicketTierGroupsListTierGroupsResponse, TicketTierGroupsGetTierGroupData, TicketTierGroupsGetTierGroupResponse, TicketTierGroupsUpdateTierGroupData, TicketTierGroupsUpdateTierGroupResponse, TicketTierGroupsDeleteTierGroupData, TicketTierGroupsDeleteTierGroupResponse, TicketTierGroupsCreateTierPhaseData, TicketTierGroupsCreateTierPhaseResponse, TicketTierGroupsUpdateTierPhaseData, TicketTierGroupsUpdateTierPhaseResponse, TicketTierGroupsDeleteTierPhaseData, TicketTierGroupsDeleteTierPhaseResponse, TranslationsListTranslationsData, TranslationsListTranslationsResponse, TranslationsUpsertTranslationData, TranslationsUpsertTranslationResponse, TranslationsAiTranslateData, TranslationsAiTranslateResponse, TranslationsDeleteTranslationData, TranslationsDeleteTranslationResponse, UploadsGetPresignedUploadUrlData, UploadsGetPresignedUploadUrlResponse, UsersListUsersData, UsersListUsersResponse, UsersCreateUserData, UsersCreateUserResponse, UsersGetCurrentUserInfoResponse, UsersGetUserData, UsersGetUserResponse, UsersUpdateUserData, UsersUpdateUserResponse, UsersDeleteUserData, UsersDeleteUserResponse } from './types.gen';
+import type { ApiKeysListApiKeysResponse, ApiKeysCreateApiKeyData, ApiKeysCreateApiKeyResponse, ApiKeysRevokeApiKeyData, ApiKeysRevokeApiKeyResponse, ApplicationReviewsListReviewsData, ApplicationReviewsListReviewsResponse, ApplicationReviewsSubmitReviewData, ApplicationReviewsSubmitReviewResponse, ApplicationReviewsGetReviewSummaryData, ApplicationReviewsGetReviewSummaryResponse, ApplicationReviewsListPendingReviewsData, ApplicationReviewsListPendingReviewsResponse, ApplicationReviewsListMyReviewsData, ApplicationReviewsListMyReviewsResponse, ApplicationsListApplicationsData, ApplicationsListApplicationsResponse, ApplicationsCreateApplicationAdminData, ApplicationsCreateApplicationAdminResponse, ApplicationsGetApplicationData, ApplicationsGetApplicationResponse, ApplicationsListMyApplicationsData, ApplicationsListMyApplicationsResponse, ApplicationsListMyTicketsResponse, ApplicationsGetMyParticipationData, ApplicationsGetMyParticipationResponse, ApplicationsGetMyPurchasesData, ApplicationsGetMyPurchasesResponse, ApplicationsGetMyApplicationData, ApplicationsGetMyApplicationResponse, ApplicationsUpdateMyApplicationData, ApplicationsUpdateMyApplicationResponse, ApplicationsCreateMyApplicationData, ApplicationsCreateMyApplicationResponse, ApplicationsListAttendeesDirectoryData, ApplicationsListAttendeesDirectoryResponse, ApplicationsExportAttendeesDirectoryCsvData, ApplicationsExportAttendeesDirectoryCsvResponse, ApplicationsAddMyAttendeeData, ApplicationsAddMyAttendeeResponse, ApplicationsUpdateMyAttendeeData, ApplicationsUpdateMyAttendeeResponse, ApplicationsDeleteMyAttendeeData, ApplicationsDeleteMyAttendeeResponse, ApplicationsReviewScholarshipData, ApplicationsReviewScholarshipResponse, ApprovalStrategiesGetApprovalStrategyData, ApprovalStrategiesGetApprovalStrategyResponse, ApprovalStrategiesCreateOrUpdateApprovalStrategyData, ApprovalStrategiesCreateOrUpdateApprovalStrategyResponse, ApprovalStrategiesUpdateApprovalStrategyData, ApprovalStrategiesUpdateApprovalStrategyResponse, ApprovalStrategiesDeleteApprovalStrategyData, ApprovalStrategiesDeleteApprovalStrategyResponse, AttendeesListMyAttendeesByPopupData, AttendeesListMyAttendeesByPopupResponse, AttendeesCreateMyAttendeeForPopupData, AttendeesCreateMyAttendeeForPopupResponse, AttendeesUpdateMyAttendeeForPopupData, AttendeesUpdateMyAttendeeForPopupResponse, AttendeesDeleteMyAttendeeForPopupData, AttendeesDeleteMyAttendeeForPopupResponse, AttendeesListAttendeesData, AttendeesListAttendeesResponse, AttendeesGetAttendeeData, AttendeesGetAttendeeResponse, AttendeesUpdateAttendeeData, AttendeesUpdateAttendeeResponse, AttendeesDeleteAttendeeData, AttendeesDeleteAttendeeResponse, AttendeesGetByCheckInCodeData, AttendeesGetByCheckInCodeResponse, AttendeesGetTicketsByEmailData, AttendeesGetTicketsByEmailResponse, AuthUserLoginData, AuthUserLoginResponse, AuthUserAuthenticateData, AuthUserAuthenticateResponse, AuthHumanLoginData, AuthHumanLoginResponse, AuthHumanAuthenticateData, AuthHumanAuthenticateResponse, BaseFieldConfigsListBaseFieldConfigsData, BaseFieldConfigsListBaseFieldConfigsResponse, BaseFieldConfigsUpdateBaseFieldConfigData, BaseFieldConfigsUpdateBaseFieldConfigResponse, CartsListAbandonedCartsData, CartsListAbandonedCartsResponse, CartsGetMyCartData, CartsGetMyCartResponse, CartsUpdateMyCartData, CartsUpdateMyCartResponse, CartsDeleteMyCartData, CartsDeleteMyCartResponse, CheckoutGetRuntimeData, CheckoutGetRuntimeResponse, CheckoutPurchaseOpenTicketingData, CheckoutPurchaseOpenTicketingResponse, CouponsValidateCouponPublicData, CouponsValidateCouponPublicResponse, CouponsListCouponsData, CouponsListCouponsResponse, CouponsCreateCouponData, CouponsCreateCouponResponse, CouponsGetCouponData, CouponsGetCouponResponse, CouponsUpdateCouponData, CouponsUpdateCouponResponse, CouponsDeleteCouponData, CouponsDeleteCouponResponse, CouponsValidateCouponData, CouponsValidateCouponResponse, DashboardGetDashboardStatsData, DashboardGetDashboardStatsResponse, DashboardGetEnrichedDashboardData, DashboardGetEnrichedDashboardResponse, EmailTemplatesListTemplateTypesResponse, EmailTemplatesGetDefaultTemplateData, EmailTemplatesGetDefaultTemplateResponse, EmailTemplatesPreviewTemplateData, EmailTemplatesPreviewTemplateResponse, EmailTemplatesSendTestEmailData, EmailTemplatesSendTestEmailResponse, EmailTemplatesListEmailTemplatesData, EmailTemplatesListEmailTemplatesResponse, EmailTemplatesCreateEmailTemplateData, EmailTemplatesCreateEmailTemplateResponse, EmailTemplatesGetEmailTemplateData, EmailTemplatesGetEmailTemplateResponse, EmailTemplatesUpdateEmailTemplateData, EmailTemplatesUpdateEmailTemplateResponse, EmailTemplatesDeleteEmailTemplateData, EmailTemplatesDeleteEmailTemplateResponse, EventParticipantsListParticipantsData, EventParticipantsListParticipantsResponse, EventParticipantsAdminAddParticipantData, EventParticipantsAdminAddParticipantResponse, EventParticipantsUpdateParticipantData, EventParticipantsUpdateParticipantResponse, EventParticipantsDeleteParticipantData, EventParticipantsDeleteParticipantResponse, EventParticipantsListPortalParticipantsData, EventParticipantsListPortalParticipantsResponse, EventParticipantsRegisterForEventData, EventParticipantsRegisterForEventResponse, EventParticipantsCancelRegistrationData, EventParticipantsCancelRegistrationResponse, EventParticipantsCheckInData, EventParticipantsCheckInResponse, EventsListEventsData, EventsListEventsResponse, EventsCreateEventData, EventsCreateEventResponse, EventsGetEventData, EventsGetEventResponse, EventsUpdateEventData, EventsUpdateEventResponse, EventsDeleteEventData, EventsDeleteEventResponse, EventsCancelEventData, EventsCancelEventResponse, EventsSetRecurrenceData, EventsSetRecurrenceResponse, EventsDetachOccurrenceData, EventsDetachOccurrenceResponse, EventsDeleteOccurrenceData, EventsDeleteOccurrenceResponse, EventsCheckAvailabilityData, EventsCheckAvailabilityResponse, EventsCheckAvailabilityPortalData, EventsCheckAvailabilityPortalResponse, EventsListInvitationsData, EventsListInvitationsResponse, EventsBulkInviteData, EventsBulkInviteResponse, EventsDeleteInvitationData, EventsDeleteInvitationResponse, EventsListPortalInvitationsData, EventsListPortalInvitationsResponse, EventsBulkInvitePortalData, EventsBulkInvitePortalResponse, EventsApproveEventData, EventsApproveEventResponse, EventsRejectEventData, EventsRejectEventResponse, EventsDeletePortalInvitationData, EventsDeletePortalInvitationResponse, EventsExportEventIcsData, EventsExportEventIcsResponse, EventsListPortalEventsData, EventsListPortalEventsResponse, EventsCreatePortalEventData, EventsCreatePortalEventResponse, EventsPortalHiddenEventsCountData, EventsPortalHiddenEventsCountResponse, EventsGetPortalEventData, EventsGetPortalEventResponse, EventsUpdatePortalEventData, EventsUpdatePortalEventResponse, EventsHidePortalEventData, EventsHidePortalEventResponse, EventsUnhidePortalEventData, EventsUnhidePortalEventResponse, EventsExportPortalEventIcsData, EventsExportPortalEventIcsResponse, EventSettingsGetEventSettingsData, EventSettingsGetEventSettingsResponse, EventSettingsUpsertEventSettingsData, EventSettingsUpsertEventSettingsResponse, EventSettingsUpdateEventSettingsData, EventSettingsUpdateEventSettingsResponse, EventSettingsGetPortalEventSettingsData, EventSettingsGetPortalEventSettingsResponse, EventVenuesListVenuesData, EventVenuesListVenuesResponse, EventVenuesCreateVenueData, EventVenuesCreateVenueResponse, EventVenuesGetVenueData, EventVenuesGetVenueResponse, EventVenuesUpdateVenueData, EventVenuesUpdateVenueResponse, EventVenuesDeleteVenueData, EventVenuesDeleteVenueResponse, EventVenuesSetWeeklyHoursData, EventVenuesSetWeeklyHoursResponse, EventVenuesListExceptionsData, EventVenuesListExceptionsResponse, EventVenuesCreateExceptionData, EventVenuesCreateExceptionResponse, EventVenuesUpdateExceptionData, EventVenuesUpdateExceptionResponse, EventVenuesDeleteExceptionData, EventVenuesDeleteExceptionResponse, EventVenuesListPhotosData, EventVenuesListPhotosResponse, EventVenuesAddPhotoData, EventVenuesAddPhotoResponse, EventVenuesUpdatePhotoData, EventVenuesUpdatePhotoResponse, EventVenuesDeletePhotoData, EventVenuesDeletePhotoResponse, EventVenuesGetAvailabilityData, EventVenuesGetAvailabilityResponse, EventVenuesGetPortalAvailabilityData, EventVenuesGetPortalAvailabilityResponse, EventVenuesListPortalVenuesData, EventVenuesListPortalVenuesResponse, EventVenuesCreatePortalVenueData, EventVenuesCreatePortalVenueResponse, EventVenuesUpdatePortalVenueData, EventVenuesUpdatePortalVenueResponse, FormFieldsListFormFieldsData, FormFieldsListFormFieldsResponse, FormFieldsCreateFormFieldData, FormFieldsCreateFormFieldResponse, FormFieldsListAvailableBaseFieldsData, FormFieldsListAvailableBaseFieldsResponse, FormFieldsCreateBaseFieldConfigData, FormFieldsCreateBaseFieldConfigResponse, FormFieldsGetFormFieldData, FormFieldsGetFormFieldResponse, FormFieldsUpdateFormFieldData, FormFieldsUpdateFormFieldResponse, FormFieldsDeleteFormFieldData, FormFieldsDeleteFormFieldResponse, FormFieldsGetApplicationSchemaData, FormFieldsGetApplicationSchemaResponse, FormFieldsGetPortalApplicationSchemaData, FormFieldsGetPortalApplicationSchemaResponse, FormSectionsListFormSectionsData, FormSectionsListFormSectionsResponse, FormSectionsCreateFormSectionData, FormSectionsCreateFormSectionResponse, FormSectionsGetFormSectionData, FormSectionsGetFormSectionResponse, FormSectionsUpdateFormSectionData, FormSectionsUpdateFormSectionResponse, FormSectionsDeleteFormSectionData, FormSectionsDeleteFormSectionResponse, GroupsListGroupsData, GroupsListGroupsResponse, GroupsCreateGroupData, GroupsCreateGroupResponse, GroupsGetGroupData, GroupsGetGroupResponse, GroupsUpdateGroupData, GroupsUpdateGroupResponse, GroupsDeleteGroupData, GroupsDeleteGroupResponse, GroupsListMyGroupsData, GroupsListMyGroupsResponse, GroupsGetMyGroupData, GroupsGetMyGroupResponse, GroupsUpdateMyGroupData, GroupsUpdateMyGroupResponse, GroupsAddGroupMemberData, GroupsAddGroupMemberResponse, GroupsAddGroupMembersBatchData, GroupsAddGroupMembersBatchResponse, GroupsUpdateGroupMemberData, GroupsUpdateGroupMemberResponse, GroupsRemoveGroupMemberData, GroupsRemoveGroupMemberResponse, GroupsGetGroupPublicData, GroupsGetGroupPublicResponse, HumansListHumansData, HumansListHumansResponse, HumansCreateHumanData, HumansCreateHumanResponse, HumansGetCurrentHumanInfoResponse, HumansUpdateCurrentHumanData, HumansUpdateCurrentHumanResponse, HumansGetHumanData, HumansGetHumanResponse, HumansUpdateHumanData, HumansUpdateHumanResponse, HumansRevokeHumanApiKeysData, HumansRevokeHumanApiKeysResponse, HumansListHumanApiKeysData, HumansListHumanApiKeysResponse, PaymentsListPaymentsData, PaymentsListPaymentsResponse, PaymentsGetPaymentData, PaymentsGetPaymentResponse, PaymentsUpdatePaymentData, PaymentsUpdatePaymentResponse, PaymentsGetPaymentInvoiceData, PaymentsGetPaymentInvoiceResponse, PaymentsCreateMyApplicationFeeData, PaymentsCreateMyApplicationFeeResponse, PaymentsListMyPaymentsByPopupData, PaymentsListMyPaymentsByPopupResponse, PaymentsGetMyLatestPaymentData, PaymentsGetMyLatestPaymentResponse, PaymentsGetMyPaymentStatusData, PaymentsGetMyPaymentStatusResponse, PaymentsListMyPaymentsData, PaymentsListMyPaymentsResponse, PaymentsGetMyInvoiceData, PaymentsGetMyInvoiceResponse, PaymentsPreviewMyPaymentData, PaymentsPreviewMyPaymentResponse, PaymentsCreateMyPaymentData, PaymentsCreateMyPaymentResponse, PaymentsSimplefiWebhookResponse, PopupReviewersListReviewersData, PopupReviewersListReviewersResponse, PopupReviewersAddReviewerData, PopupReviewersAddReviewerResponse, PopupReviewersUpdateReviewerData, PopupReviewersUpdateReviewerResponse, PopupReviewersRemoveReviewerData, PopupReviewersRemoveReviewerResponse, PopupsListPopupsData, PopupsListPopupsResponse, PopupsCreatePopupData, PopupsCreatePopupResponse, PopupsListPublicPopupsData, PopupsListPublicPopupsResponse, PopupsGetPopupData, PopupsGetPopupResponse, PopupsUpdatePopupData, PopupsUpdatePopupResponse, PopupsDeletePopupData, PopupsDeletePopupResponse, PopupsListPortalPopupsData, PopupsListPortalPopupsResponse, PopupsGetPortalPopupData, PopupsGetPortalPopupResponse, PortalGetPopupAccessData, PortalGetPopupAccessResponse, ProductsListProductCategoriesData, ProductsListProductCategoriesResponse, ProductsListProductsData, ProductsListProductsResponse, ProductsCreateProductData, ProductsCreateProductResponse, ProductsCreateProductsBatchData, ProductsCreateProductsBatchResponse, ProductsGetProductData, ProductsGetProductResponse, ProductsUpdateProductData, ProductsUpdateProductResponse, ProductsDeleteProductData, ProductsDeleteProductResponse, ProductsListPortalProductsData, ProductsListPortalProductsResponse, TenantsGetTenantByDomainData, TenantsGetTenantByDomainResponse, TenantsGetTenantBySlugData, TenantsGetTenantBySlugResponse, TenantsListTenantsData, TenantsListTenantsResponse, TenantsCreateTenantData, TenantsCreateTenantResponse, TenantsGetTenantData, TenantsGetTenantResponse, TenantsUpdateTenantData, TenantsUpdateTenantResponse, TenantsDeleteTenantData, TenantsDeleteTenantResponse, TenantsGetCredentialsData, TenantsGetCredentialsResponse, TenantsDeleteCredentialsData, TenantsDeleteCredentialsResponse, TicketingStepsListPortalTicketingStepsData, TicketingStepsListPortalTicketingStepsResponse, TicketingStepsListTicketingStepsData, TicketingStepsListTicketingStepsResponse, TicketingStepsCreateTicketingStepData, TicketingStepsCreateTicketingStepResponse, TicketingStepsGetTicketingStepData, TicketingStepsGetTicketingStepResponse, TicketingStepsUpdateTicketingStepData, TicketingStepsUpdateTicketingStepResponse, TicketingStepsDeleteTicketingStepData, TicketingStepsDeleteTicketingStepResponse, TicketTierGroupsCreateTierGroupData, TicketTierGroupsCreateTierGroupResponse, TicketTierGroupsListTierGroupsData, TicketTierGroupsListTierGroupsResponse, TicketTierGroupsGetTierGroupData, TicketTierGroupsGetTierGroupResponse, TicketTierGroupsUpdateTierGroupData, TicketTierGroupsUpdateTierGroupResponse, TicketTierGroupsDeleteTierGroupData, TicketTierGroupsDeleteTierGroupResponse, TicketTierGroupsCreateTierPhaseData, TicketTierGroupsCreateTierPhaseResponse, TicketTierGroupsUpdateTierPhaseData, TicketTierGroupsUpdateTierPhaseResponse, TicketTierGroupsDeleteTierPhaseData, TicketTierGroupsDeleteTierPhaseResponse, TracksListTracksData, TracksListTracksResponse, TracksCreateTrackData, TracksCreateTrackResponse, TracksGetTrackData, TracksGetTrackResponse, TracksUpdateTrackData, TracksUpdateTrackResponse, TracksDeleteTrackData, TracksDeleteTrackResponse, TracksListTrackEventsData, TracksListTrackEventsResponse, TracksListPortalTracksData, TracksListPortalTracksResponse, TracksGetPortalTrackData, TracksGetPortalTrackResponse, TracksListPortalTrackEventsData, TracksListPortalTrackEventsResponse, TranslationsListTranslationsData, TranslationsListTranslationsResponse, TranslationsUpsertTranslationData, TranslationsUpsertTranslationResponse, TranslationsAiTranslateData, TranslationsAiTranslateResponse, TranslationsDeleteTranslationData, TranslationsDeleteTranslationResponse, UploadsGetPresignedUploadUrlData, UploadsGetPresignedUploadUrlResponse, UploadsGetPresignedUploadUrlPortalData, UploadsGetPresignedUploadUrlPortalResponse, UsersListUsersData, UsersListUsersResponse, UsersCreateUserData, UsersCreateUserResponse, UsersGetCurrentUserInfoResponse, UsersGetUserData, UsersGetUserResponse, UsersUpdateUserData, UsersUpdateUserResponse, UsersDeleteUserData, UsersDeleteUserResponse, UtilsResolveUrlData, UtilsResolveUrlResponse, VenuePropertyTypesListPropertyTypesData, VenuePropertyTypesListPropertyTypesResponse, VenuePropertyTypesCreatePropertyTypeData, VenuePropertyTypesCreatePropertyTypeResponse, VenuePropertyTypesUpdatePropertyTypeData, VenuePropertyTypesUpdatePropertyTypeResponse, VenuePropertyTypesDeletePropertyTypeData, VenuePropertyTypesDeletePropertyTypeResponse, VenuePropertyTypesListPropertyTypesPortalResponse } from './types.gen';
+
+export class ApiKeysService {
+    /**
+     * List Api Keys
+     * @returns ApiKeyPublic Successful Response
+     * @throws ApiError
+     */
+    public static listApiKeys(): CancelablePromise<ApiKeysListApiKeysResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/api-keys'
+        });
+    }
+    
+    /**
+     * Create Api Key
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns ApiKeyCreated Successful Response
+     * @throws ApiError
+     */
+    public static createApiKey(data: ApiKeysCreateApiKeyData): CancelablePromise<ApiKeysCreateApiKeyResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/api-keys',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Revoke Api Key
+     * @param data The data for the request.
+     * @param data.keyId
+     * @returns void Successful Response
+     * @throws ApiError
+     */
+    public static revokeApiKey(data: ApiKeysRevokeApiKeyData): CancelablePromise<ApiKeysRevokeApiKeyResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/v1/api-keys/{key_id}',
+            path: {
+                key_id: data.keyId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+}
 
 export class ApplicationReviewsService {
     /**
@@ -1683,6 +1736,1563 @@ export class EmailTemplatesService {
     }
 }
 
+export class EventParticipantsService {
+    /**
+     * List Participants
+     * List participants with optional event filter (backoffice).
+     * @param data The data for the request.
+     * @param data.eventId
+     * @param data.skip Number of items to skip
+     * @param data.limit Maximum number of items to return
+     * @param data.xTenantId
+     * @returns ListModel_EventParticipantPublic_ Successful Response
+     * @throws ApiError
+     */
+    public static listParticipants(data: EventParticipantsListParticipantsData = {}): CancelablePromise<EventParticipantsListParticipantsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/event-participants',
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            query: {
+                event_id: data.eventId,
+                skip: data.skip,
+                limit: data.limit
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Admin Add Participant
+     * Admin adds a participant to an event (backoffice).
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @param data.xTenantId
+     * @returns EventParticipantPublic Successful Response
+     * @throws ApiError
+     */
+    public static adminAddParticipant(data: EventParticipantsAdminAddParticipantData): CancelablePromise<EventParticipantsAdminAddParticipantResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/event-participants',
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Update Participant
+     * Update a participant (backoffice).
+     * @param data The data for the request.
+     * @param data.participantId
+     * @param data.requestBody
+     * @param data.xTenantId
+     * @returns EventParticipantPublic Successful Response
+     * @throws ApiError
+     */
+    public static updateParticipant(data: EventParticipantsUpdateParticipantData): CancelablePromise<EventParticipantsUpdateParticipantResponse> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/api/v1/event-participants/{participant_id}',
+            path: {
+                participant_id: data.participantId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Delete Participant
+     * Delete a participant (backoffice).
+     * @param data The data for the request.
+     * @param data.participantId
+     * @param data.xTenantId
+     * @returns void Successful Response
+     * @throws ApiError
+     */
+    public static deleteParticipant(data: EventParticipantsDeleteParticipantData): CancelablePromise<EventParticipantsDeleteParticipantResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/v1/event-participants/{participant_id}',
+            path: {
+                participant_id: data.participantId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * List Portal Participants
+     * List participants for an event (portal).
+     *
+     * When ``occurrence_start`` is provided, scope the result to that single
+     * occurrence; otherwise return every participant row of the event (used
+     * by the admin/owner participants section that wants the full picture).
+     * @param data The data for the request.
+     * @param data.eventId
+     * @param data.skip Number of items to skip
+     * @param data.limit Maximum number of items to return
+     * @param data.occurrenceStart
+     * @returns ListModel_EventParticipantPublic_ Successful Response
+     * @throws ApiError
+     */
+    public static listPortalParticipants(data: EventParticipantsListPortalParticipantsData): CancelablePromise<EventParticipantsListPortalParticipantsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/event-participants/portal/participants',
+            query: {
+                event_id: data.eventId,
+                skip: data.skip,
+                limit: data.limit,
+                occurrence_start: data.occurrenceStart
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Register For Event
+     * Register current human for an event (portal).
+     * @param data The data for the request.
+     * @param data.eventId
+     * @param data.requestBody
+     * @returns EventParticipantPublic Successful Response
+     * @throws ApiError
+     */
+    public static registerForEvent(data: EventParticipantsRegisterForEventData): CancelablePromise<EventParticipantsRegisterForEventResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/event-participants/portal/register/{event_id}',
+            path: {
+                event_id: data.eventId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Cancel Registration
+     * Cancel current human's registration (portal).
+     *
+     * Body is reused from RegisterRequest for the optional ``occurrence_start``
+     * field; ``role``/``message`` are ignored on cancel.
+     * @param data The data for the request.
+     * @param data.eventId
+     * @param data.requestBody
+     * @returns EventParticipantPublic Successful Response
+     * @throws ApiError
+     */
+    public static cancelRegistration(data: EventParticipantsCancelRegistrationData): CancelablePromise<EventParticipantsCancelRegistrationResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/event-participants/portal/cancel-registration/{event_id}',
+            path: {
+                event_id: data.eventId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Check In
+     * Check in current human for an event (portal).
+     * @param data The data for the request.
+     * @param data.eventId
+     * @param data.requestBody
+     * @returns EventParticipantPublic Successful Response
+     * @throws ApiError
+     */
+    public static checkIn(data: EventParticipantsCheckInData): CancelablePromise<EventParticipantsCheckInResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/event-participants/portal/check-in/{event_id}',
+            path: {
+                event_id: data.eventId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+}
+
+export class EventsService {
+    /**
+     * List Events
+     * List events with optional filters (backoffice).
+     * @param data The data for the request.
+     * @param data.popupId
+     * @param data.eventStatus
+     * @param data.kind
+     * @param data.venueId
+     * @param data.trackIds
+     * @param data.startAfter
+     * @param data.startBefore
+     * @param data.search
+     * @param data.skip Number of items to skip
+     * @param data.limit Maximum number of items to return
+     * @param data.xTenantId
+     * @returns ListModel_EventPublic_ Successful Response
+     * @throws ApiError
+     */
+    public static listEvents(data: EventsListEventsData = {}): CancelablePromise<EventsListEventsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/events',
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            query: {
+                popup_id: data.popupId,
+                event_status: data.eventStatus,
+                kind: data.kind,
+                venue_id: data.venueId,
+                track_ids: data.trackIds,
+                start_after: data.startAfter,
+                start_before: data.startBefore,
+                search: data.search,
+                skip: data.skip,
+                limit: data.limit
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Create Event
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @param data.xTenantId
+     * @returns EventPublic Successful Response
+     * @throws ApiError
+     */
+    public static createEvent(data: EventsCreateEventData): CancelablePromise<EventsCreateEventResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/events',
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get Event
+     * @param data The data for the request.
+     * @param data.eventId
+     * @param data.xTenantId
+     * @returns EventPublic Successful Response
+     * @throws ApiError
+     */
+    public static getEvent(data: EventsGetEventData): CancelablePromise<EventsGetEventResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/events/{event_id}',
+            path: {
+                event_id: data.eventId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Update Event
+     * @param data The data for the request.
+     * @param data.eventId
+     * @param data.requestBody
+     * @param data.xTenantId
+     * @returns EventPublic Successful Response
+     * @throws ApiError
+     */
+    public static updateEvent(data: EventsUpdateEventData): CancelablePromise<EventsUpdateEventResponse> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/api/v1/events/{event_id}',
+            path: {
+                event_id: data.eventId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Delete Event
+     * @param data The data for the request.
+     * @param data.eventId
+     * @param data.xTenantId
+     * @returns void Successful Response
+     * @throws ApiError
+     */
+    public static deleteEvent(data: EventsDeleteEventData): CancelablePromise<EventsDeleteEventResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/v1/events/{event_id}',
+            path: {
+                event_id: data.eventId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Cancel Event
+     * @param data The data for the request.
+     * @param data.eventId
+     * @param data.xTenantId
+     * @returns EventPublic Successful Response
+     * @throws ApiError
+     */
+    public static cancelEvent(data: EventsCancelEventData): CancelablePromise<EventsCancelEventResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/events/{event_id}/cancel',
+            path: {
+                event_id: data.eventId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Set Recurrence
+     * Set/replace/clear the RRULE on a series master.
+     *
+     * Sending ``{"recurrence": null}`` clears the rule (the event becomes a
+     * one-off). Sending a ``RecurrenceRule`` sets/replaces it. EXDATEs are
+     * cleared when the rule changes to avoid stale skips.
+     * @param data The data for the request.
+     * @param data.eventId
+     * @param data.requestBody
+     * @param data.xTenantId
+     * @returns EventPublic Successful Response
+     * @throws ApiError
+     */
+    public static setRecurrence(data: EventsSetRecurrenceData): CancelablePromise<EventsSetRecurrenceResponse> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/api/v1/events/{event_id}/recurrence',
+            path: {
+                event_id: data.eventId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Detach Occurrence
+     * Materialize a single occurrence of a recurring series as its own row.
+     *
+     * Adds ``occurrence_start`` to the master's ``recurrence_exdates`` so the
+     * expander stops emitting it, and creates a child event row with
+     * ``recurrence_master_id = event_id`` copying fields from the master but
+     * with its ``start_time``/``end_time`` set to the chosen occurrence window.
+     * The child has NO ``rrule`` — it's a standalone override.
+     * @param data The data for the request.
+     * @param data.eventId
+     * @param data.requestBody
+     * @param data.xTenantId
+     * @returns EventPublic Successful Response
+     * @throws ApiError
+     */
+    public static detachOccurrence(data: EventsDetachOccurrenceData): CancelablePromise<EventsDetachOccurrenceResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/events/{event_id}/detach-occurrence',
+            path: {
+                event_id: data.eventId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Delete Occurrence
+     * Skip a single occurrence by appending it to the master's EXDATEs.
+     *
+     * Does NOT delete the master series. If you want to delete the whole
+     * series, call DELETE /events/{id}.
+     * @param data The data for the request.
+     * @param data.eventId
+     * @param data.requestBody
+     * @param data.xTenantId
+     * @returns void Successful Response
+     * @throws ApiError
+     */
+    public static deleteOccurrence(data: EventsDeleteOccurrenceData): CancelablePromise<EventsDeleteOccurrenceResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/v1/events/{event_id}/occurrence',
+            path: {
+                event_id: data.eventId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Check Availability
+     * Check whether a venue is free for a candidate time window.
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @param data.xTenantId
+     * @returns EventAvailabilityResult Successful Response
+     * @throws ApiError
+     */
+    public static checkAvailability(data: EventsCheckAvailabilityData): CancelablePromise<EventsCheckAvailabilityResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/events/check-availability',
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Check Availability Portal
+     * Portal-facing variant of /check-availability authenticated as a human.
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns EventAvailabilityResult Successful Response
+     * @throws ApiError
+     */
+    public static checkAvailabilityPortal(data: EventsCheckAvailabilityPortalData): CancelablePromise<EventsCheckAvailabilityPortalResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/events/portal/events/check-availability',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * List Invitations
+     * @param data The data for the request.
+     * @param data.eventId
+     * @param data.xTenantId
+     * @returns EventInvitationPublic Successful Response
+     * @throws ApiError
+     */
+    public static listInvitations(data: EventsListInvitationsData): CancelablePromise<EventsListInvitationsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/events/{event_id}/invitations',
+            path: {
+                event_id: data.eventId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Bulk Invite
+     * @param data The data for the request.
+     * @param data.eventId
+     * @param data.requestBody
+     * @param data.xTenantId
+     * @returns EventInvitationBulkResult Successful Response
+     * @throws ApiError
+     */
+    public static bulkInvite(data: EventsBulkInviteData): CancelablePromise<EventsBulkInviteResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/events/{event_id}/invitations',
+            path: {
+                event_id: data.eventId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Delete Invitation
+     * @param data The data for the request.
+     * @param data.eventId
+     * @param data.invitationId
+     * @param data.xTenantId
+     * @returns void Successful Response
+     * @throws ApiError
+     */
+    public static deleteInvitation(data: EventsDeleteInvitationData): CancelablePromise<EventsDeleteInvitationResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/v1/events/{event_id}/invitations/{invitation_id}',
+            path: {
+                event_id: data.eventId,
+                invitation_id: data.invitationId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * List Portal Invitations
+     * @param data The data for the request.
+     * @param data.eventId
+     * @returns EventInvitationPublic Successful Response
+     * @throws ApiError
+     */
+    public static listPortalInvitations(data: EventsListPortalInvitationsData): CancelablePromise<EventsListPortalInvitationsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/events/portal/events/{event_id}/invitations',
+            path: {
+                event_id: data.eventId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Bulk Invite Portal
+     * @param data The data for the request.
+     * @param data.eventId
+     * @param data.requestBody
+     * @returns EventInvitationBulkResult Successful Response
+     * @throws ApiError
+     */
+    public static bulkInvitePortal(data: EventsBulkInvitePortalData): CancelablePromise<EventsBulkInvitePortalResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/events/portal/events/{event_id}/invitations',
+            path: {
+                event_id: data.eventId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Approve Event
+     * @param data The data for the request.
+     * @param data.eventId
+     * @param data.requestBody
+     * @param data.xTenantId
+     * @returns EventPublic Successful Response
+     * @throws ApiError
+     */
+    public static approveEvent(data: EventsApproveEventData): CancelablePromise<EventsApproveEventResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/events/{event_id}/approve',
+            path: {
+                event_id: data.eventId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Reject Event
+     * @param data The data for the request.
+     * @param data.eventId
+     * @param data.requestBody
+     * @param data.xTenantId
+     * @returns EventPublic Successful Response
+     * @throws ApiError
+     */
+    public static rejectEvent(data: EventsRejectEventData): CancelablePromise<EventsRejectEventResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/events/{event_id}/reject',
+            path: {
+                event_id: data.eventId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Delete Portal Invitation
+     * @param data The data for the request.
+     * @param data.eventId
+     * @param data.invitationId
+     * @returns void Successful Response
+     * @throws ApiError
+     */
+    public static deletePortalInvitation(data: EventsDeletePortalInvitationData): CancelablePromise<EventsDeletePortalInvitationResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/v1/events/portal/events/{event_id}/invitations/{invitation_id}',
+            path: {
+                event_id: data.eventId,
+                invitation_id: data.invitationId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Export Event Ics
+     * @param data The data for the request.
+     * @param data.eventId
+     * @param data.xTenantId
+     * @returns unknown Successful Response
+     * @throws ApiError
+     */
+    public static exportEventIcs(data: EventsExportEventIcsData): CancelablePromise<EventsExportEventIcsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/events/{event_id}/ics',
+            path: {
+                event_id: data.eventId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * List Portal Events
+     * @param data The data for the request.
+     * @param data.popupId
+     * @param data.eventStatus
+     * @param data.kind
+     * @param data.venueId
+     * @param data.trackIds
+     * @param data.tags
+     * @param data.startAfter
+     * @param data.startBefore
+     * @param data.search
+     * @param data.rsvpedOnly
+     * @param data.includeHidden
+     * @param data.skip Number of items to skip
+     * @param data.limit Maximum number of items to return
+     * @returns ListModel_EventPublic_ Successful Response
+     * @throws ApiError
+     */
+    public static listPortalEvents(data: EventsListPortalEventsData = {}): CancelablePromise<EventsListPortalEventsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/events/portal/events',
+            query: {
+                popup_id: data.popupId,
+                event_status: data.eventStatus,
+                kind: data.kind,
+                venue_id: data.venueId,
+                track_ids: data.trackIds,
+                tags: data.tags,
+                start_after: data.startAfter,
+                start_before: data.startBefore,
+                search: data.search,
+                rsvped_only: data.rsvpedOnly,
+                include_hidden: data.includeHidden,
+                skip: data.skip,
+                limit: data.limit
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Create Portal Event
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns EventPublic Successful Response
+     * @throws ApiError
+     */
+    public static createPortalEvent(data: EventsCreatePortalEventData): CancelablePromise<EventsCreatePortalEventResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/events/portal/events',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Portal Hidden Events Count
+     * Return how many events the human has hidden (optionally for a popup).
+     *
+     * Used by the portal toolbar to render ``Hidden (n)`` without having to
+     * fetch the full list twice.
+     * @param data The data for the request.
+     * @param data.popupId
+     * @returns number Successful Response
+     * @throws ApiError
+     */
+    public static portalHiddenEventsCount(data: EventsPortalHiddenEventsCountData = {}): CancelablePromise<EventsPortalHiddenEventsCountResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/events/portal/events/hidden-count',
+            query: {
+                popup_id: data.popupId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get Portal Event
+     * Fetch a single event for the portal.
+     *
+     * ``occurrence_start`` scopes the user's RSVP lookup to a specific
+     * instance of a recurring event so the detail page reflects the
+     * occurrence's status (not the series' first instance).
+     * @param data The data for the request.
+     * @param data.eventId
+     * @param data.occurrenceStart
+     * @returns EventPublic Successful Response
+     * @throws ApiError
+     */
+    public static getPortalEvent(data: EventsGetPortalEventData): CancelablePromise<EventsGetPortalEventResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/events/portal/events/{event_id}',
+            path: {
+                event_id: data.eventId
+            },
+            query: {
+                occurrence_start: data.occurrenceStart
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Update Portal Event
+     * @param data The data for the request.
+     * @param data.eventId
+     * @param data.requestBody
+     * @returns EventPublic Successful Response
+     * @throws ApiError
+     */
+    public static updatePortalEvent(data: EventsUpdatePortalEventData): CancelablePromise<EventsUpdatePortalEventResponse> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/api/v1/events/portal/events/{event_id}',
+            path: {
+                event_id: data.eventId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Hide Portal Event
+     * Hide an event from the current human's portal.
+     *
+     * If the event is an expanded recurrence occurrence (virtual id like
+     * ``{master}_{ts}``), we can't persist it directly — hide the master
+     * instead. If it's a real exception override with a master, hide the
+     * master so all siblings disappear together.
+     * @param data The data for the request.
+     * @param data.eventId
+     * @returns void Successful Response
+     * @throws ApiError
+     */
+    public static hidePortalEvent(data: EventsHidePortalEventData): CancelablePromise<EventsHidePortalEventResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/events/portal/events/{event_id}/hide',
+            path: {
+                event_id: data.eventId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Unhide Portal Event
+     * Undo a prior hide.
+     * @param data The data for the request.
+     * @param data.eventId
+     * @returns void Successful Response
+     * @throws ApiError
+     */
+    public static unhidePortalEvent(data: EventsUnhidePortalEventData): CancelablePromise<EventsUnhidePortalEventResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/v1/events/portal/events/{event_id}/hide',
+            path: {
+                event_id: data.eventId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Export Portal Event Ics
+     * @param data The data for the request.
+     * @param data.eventId
+     * @returns unknown Successful Response
+     * @throws ApiError
+     */
+    public static exportPortalEventIcs(data: EventsExportPortalEventIcsData): CancelablePromise<EventsExportPortalEventIcsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/events/portal/events/{event_id}/ics',
+            path: {
+                event_id: data.eventId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+}
+
+export class EventSettingsService {
+    /**
+     * Get Event Settings
+     * Get event settings for a popup (backoffice).
+     * @param data The data for the request.
+     * @param data.popupId
+     * @param data.xTenantId
+     * @returns EventSettingsPublic Successful Response
+     * @throws ApiError
+     */
+    public static getEventSettings(data: EventSettingsGetEventSettingsData): CancelablePromise<EventSettingsGetEventSettingsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/event-settings/{popup_id}',
+            path: {
+                popup_id: data.popupId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Upsert Event Settings
+     * Create or update event settings for a popup (backoffice).
+     * @param data The data for the request.
+     * @param data.popupId
+     * @param data.requestBody
+     * @param data.xTenantId
+     * @returns EventSettingsPublic Successful Response
+     * @throws ApiError
+     */
+    public static upsertEventSettings(data: EventSettingsUpsertEventSettingsData): CancelablePromise<EventSettingsUpsertEventSettingsResponse> {
+        return __request(OpenAPI, {
+            method: 'PUT',
+            url: '/api/v1/event-settings/{popup_id}',
+            path: {
+                popup_id: data.popupId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Update Event Settings
+     * Partial update of event settings (backoffice).
+     * @param data The data for the request.
+     * @param data.popupId
+     * @param data.requestBody
+     * @param data.xTenantId
+     * @returns EventSettingsPublic Successful Response
+     * @throws ApiError
+     */
+    public static updateEventSettings(data: EventSettingsUpdateEventSettingsData): CancelablePromise<EventSettingsUpdateEventSettingsResponse> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/api/v1/event-settings/{popup_id}',
+            path: {
+                popup_id: data.popupId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get Portal Event Settings
+     * Get event settings for a popup (portal). Returns null if not configured.
+     * @param data The data for the request.
+     * @param data.popupId
+     * @returns unknown Successful Response
+     * @throws ApiError
+     */
+    public static getPortalEventSettings(data: EventSettingsGetPortalEventSettingsData): CancelablePromise<EventSettingsGetPortalEventSettingsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/event-settings/portal/settings/{popup_id}',
+            path: {
+                popup_id: data.popupId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+}
+
+export class EventVenuesService {
+    /**
+     * List Venues
+     * List venues (backoffice).
+     * @param data The data for the request.
+     * @param data.popupId
+     * @param data.search
+     * @param data.skip Number of items to skip
+     * @param data.limit Maximum number of items to return
+     * @param data.xTenantId
+     * @returns ListModel_EventVenuePublic_ Successful Response
+     * @throws ApiError
+     */
+    public static listVenues(data: EventVenuesListVenuesData = {}): CancelablePromise<EventVenuesListVenuesResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/event-venues',
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            query: {
+                popup_id: data.popupId,
+                search: data.search,
+                skip: data.skip,
+                limit: data.limit
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Create Venue
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @param data.xTenantId
+     * @returns EventVenuePublic Successful Response
+     * @throws ApiError
+     */
+    public static createVenue(data: EventVenuesCreateVenueData): CancelablePromise<EventVenuesCreateVenueResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/event-venues',
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get Venue
+     * @param data The data for the request.
+     * @param data.venueId
+     * @param data.xTenantId
+     * @returns EventVenuePublic Successful Response
+     * @throws ApiError
+     */
+    public static getVenue(data: EventVenuesGetVenueData): CancelablePromise<EventVenuesGetVenueResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/event-venues/{venue_id}',
+            path: {
+                venue_id: data.venueId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Update Venue
+     * @param data The data for the request.
+     * @param data.venueId
+     * @param data.requestBody
+     * @param data.xTenantId
+     * @returns EventVenuePublic Successful Response
+     * @throws ApiError
+     */
+    public static updateVenue(data: EventVenuesUpdateVenueData): CancelablePromise<EventVenuesUpdateVenueResponse> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/api/v1/event-venues/{venue_id}',
+            path: {
+                venue_id: data.venueId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Delete Venue
+     * @param data The data for the request.
+     * @param data.venueId
+     * @param data.xTenantId
+     * @returns void Successful Response
+     * @throws ApiError
+     */
+    public static deleteVenue(data: EventVenuesDeleteVenueData): CancelablePromise<EventVenuesDeleteVenueResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/v1/event-venues/{venue_id}',
+            path: {
+                venue_id: data.venueId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Set Weekly Hours
+     * @param data The data for the request.
+     * @param data.venueId
+     * @param data.requestBody
+     * @param data.xTenantId
+     * @returns unknown Successful Response
+     * @throws ApiError
+     */
+    public static setWeeklyHours(data: EventVenuesSetWeeklyHoursData): CancelablePromise<EventVenuesSetWeeklyHoursResponse> {
+        return __request(OpenAPI, {
+            method: 'PUT',
+            url: '/api/v1/event-venues/{venue_id}/weekly-hours',
+            path: {
+                venue_id: data.venueId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * List Exceptions
+     * @param data The data for the request.
+     * @param data.venueId
+     * @param data.xTenantId
+     * @returns VenueExceptionPublic Successful Response
+     * @throws ApiError
+     */
+    public static listExceptions(data: EventVenuesListExceptionsData): CancelablePromise<EventVenuesListExceptionsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/event-venues/{venue_id}/exceptions',
+            path: {
+                venue_id: data.venueId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Create Exception
+     * @param data The data for the request.
+     * @param data.venueId
+     * @param data.requestBody
+     * @param data.xTenantId
+     * @returns VenueExceptionPublic Successful Response
+     * @throws ApiError
+     */
+    public static createException(data: EventVenuesCreateExceptionData): CancelablePromise<EventVenuesCreateExceptionResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/event-venues/{venue_id}/exceptions',
+            path: {
+                venue_id: data.venueId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Update Exception
+     * @param data The data for the request.
+     * @param data.venueId
+     * @param data.exceptionId
+     * @param data.requestBody
+     * @param data.xTenantId
+     * @returns VenueExceptionPublic Successful Response
+     * @throws ApiError
+     */
+    public static updateException(data: EventVenuesUpdateExceptionData): CancelablePromise<EventVenuesUpdateExceptionResponse> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/api/v1/event-venues/{venue_id}/exceptions/{exception_id}',
+            path: {
+                venue_id: data.venueId,
+                exception_id: data.exceptionId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Delete Exception
+     * @param data The data for the request.
+     * @param data.venueId
+     * @param data.exceptionId
+     * @param data.xTenantId
+     * @returns void Successful Response
+     * @throws ApiError
+     */
+    public static deleteException(data: EventVenuesDeleteExceptionData): CancelablePromise<EventVenuesDeleteExceptionResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/v1/event-venues/{venue_id}/exceptions/{exception_id}',
+            path: {
+                venue_id: data.venueId,
+                exception_id: data.exceptionId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * List Photos
+     * @param data The data for the request.
+     * @param data.venueId
+     * @param data.xTenantId
+     * @returns VenuePhotoPublic Successful Response
+     * @throws ApiError
+     */
+    public static listPhotos(data: EventVenuesListPhotosData): CancelablePromise<EventVenuesListPhotosResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/event-venues/{venue_id}/photos',
+            path: {
+                venue_id: data.venueId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Add Photo
+     * @param data The data for the request.
+     * @param data.venueId
+     * @param data.requestBody
+     * @param data.xTenantId
+     * @returns VenuePhotoPublic Successful Response
+     * @throws ApiError
+     */
+    public static addPhoto(data: EventVenuesAddPhotoData): CancelablePromise<EventVenuesAddPhotoResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/event-venues/{venue_id}/photos',
+            path: {
+                venue_id: data.venueId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Update Photo
+     * @param data The data for the request.
+     * @param data.venueId
+     * @param data.photoId
+     * @param data.requestBody
+     * @param data.xTenantId
+     * @returns VenuePhotoPublic Successful Response
+     * @throws ApiError
+     */
+    public static updatePhoto(data: EventVenuesUpdatePhotoData): CancelablePromise<EventVenuesUpdatePhotoResponse> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/api/v1/event-venues/{venue_id}/photos/{photo_id}',
+            path: {
+                venue_id: data.venueId,
+                photo_id: data.photoId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Delete Photo
+     * @param data The data for the request.
+     * @param data.venueId
+     * @param data.photoId
+     * @param data.xTenantId
+     * @returns void Successful Response
+     * @throws ApiError
+     */
+    public static deletePhoto(data: EventVenuesDeletePhotoData): CancelablePromise<EventVenuesDeletePhotoResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/v1/event-venues/{venue_id}/photos/{photo_id}',
+            path: {
+                venue_id: data.venueId,
+                photo_id: data.photoId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get Availability
+     * Return open windows and busy slots for a venue in the given range.
+     * @param data The data for the request.
+     * @param data.venueId
+     * @param data.start
+     * @param data.end
+     * @param data.excludeEventId
+     * @param data.xTenantId
+     * @returns VenueAvailability Successful Response
+     * @throws ApiError
+     */
+    public static getAvailability(data: EventVenuesGetAvailabilityData): CancelablePromise<EventVenuesGetAvailabilityResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/event-venues/{venue_id}/availability',
+            path: {
+                venue_id: data.venueId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            query: {
+                start: data.start,
+                end: data.end,
+                exclude_event_id: data.excludeEventId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get Portal Availability
+     * Portal-side availability query — same shape as the backoffice one,
+     * used by the event-creation form to show open/busy slots per day.
+     * @param data The data for the request.
+     * @param data.venueId
+     * @param data.start
+     * @param data.end
+     * @param data.excludeEventId
+     * @returns VenueAvailability Successful Response
+     * @throws ApiError
+     */
+    public static getPortalAvailability(data: EventVenuesGetPortalAvailabilityData): CancelablePromise<EventVenuesGetPortalAvailabilityResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/event-venues/portal/venues/{venue_id}/availability',
+            path: {
+                venue_id: data.venueId
+            },
+            query: {
+                start: data.start,
+                end: data.end,
+                exclude_event_id: data.excludeEventId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * List Portal Venues
+     * @param data The data for the request.
+     * @param data.popupId
+     * @param data.search
+     * @param data.skip Number of items to skip
+     * @param data.limit Maximum number of items to return
+     * @returns ListModel_EventVenuePublic_ Successful Response
+     * @throws ApiError
+     */
+    public static listPortalVenues(data: EventVenuesListPortalVenuesData): CancelablePromise<EventVenuesListPortalVenuesResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/event-venues/portal/venues',
+            query: {
+                popup_id: data.popupId,
+                search: data.search,
+                skip: data.skip,
+                limit: data.limit
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Create Portal Venue
+     * Create a venue as a human (portal). Respects popup event settings.
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns EventVenuePublic Successful Response
+     * @throws ApiError
+     */
+    public static createPortalVenue(data: EventVenuesCreatePortalVenueData): CancelablePromise<EventVenuesCreatePortalVenueResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/event-venues/portal/venues',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Update Portal Venue
+     * Let a human edit a venue they created from the portal. Admin-only
+     * fields (``status``) are ignored on this endpoint — re-approval lives in
+     * the backoffice.
+     * @param data The data for the request.
+     * @param data.venueId
+     * @param data.requestBody
+     * @returns EventVenuePublic Successful Response
+     * @throws ApiError
+     */
+    public static updatePortalVenue(data: EventVenuesUpdatePortalVenueData): CancelablePromise<EventVenuesUpdatePortalVenueResponse> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/api/v1/event-venues/portal/venues/{venue_id}',
+            path: {
+                venue_id: data.venueId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+}
+
 export class FormFieldsService {
     /**
      * List Form Fields
@@ -2504,6 +4114,54 @@ export class HumansService {
             },
             body: data.requestBody,
             mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Revoke Human Api Keys
+     * @param data The data for the request.
+     * @param data.humanId
+     * @param data.xTenantId
+     * @returns void Successful Response
+     * @throws ApiError
+     */
+    public static revokeHumanApiKeys(data: HumansRevokeHumanApiKeysData): CancelablePromise<HumansRevokeHumanApiKeysResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/humans/{human_id}/api-keys/revoke',
+            path: {
+                human_id: data.humanId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * List Human Api Keys
+     * @param data The data for the request.
+     * @param data.humanId
+     * @param data.xTenantId
+     * @returns ApiKeyPublic Successful Response
+     * @throws ApiError
+     */
+    public static listHumanApiKeys(data: HumansListHumanApiKeysData): CancelablePromise<HumansListHumanApiKeysResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/humans/{human_id}/api-keys',
+            path: {
+                human_id: data.humanId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
             errors: {
                 422: 'Validation Error'
             }
@@ -4108,6 +5766,238 @@ export class TicketTierGroupsService {
     }
 }
 
+export class TracksService {
+    /**
+     * List Tracks
+     * @param data The data for the request.
+     * @param data.popupId
+     * @param data.search
+     * @param data.skip Number of items to skip
+     * @param data.limit Maximum number of items to return
+     * @param data.xTenantId
+     * @returns ListModel_TrackPublic_ Successful Response
+     * @throws ApiError
+     */
+    public static listTracks(data: TracksListTracksData = {}): CancelablePromise<TracksListTracksResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/tracks',
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            query: {
+                popup_id: data.popupId,
+                search: data.search,
+                skip: data.skip,
+                limit: data.limit
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Create Track
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @param data.xTenantId
+     * @returns TrackPublic Successful Response
+     * @throws ApiError
+     */
+    public static createTrack(data: TracksCreateTrackData): CancelablePromise<TracksCreateTrackResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/tracks',
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get Track
+     * @param data The data for the request.
+     * @param data.trackId
+     * @param data.xTenantId
+     * @returns TrackPublic Successful Response
+     * @throws ApiError
+     */
+    public static getTrack(data: TracksGetTrackData): CancelablePromise<TracksGetTrackResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/tracks/{track_id}',
+            path: {
+                track_id: data.trackId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Update Track
+     * @param data The data for the request.
+     * @param data.trackId
+     * @param data.requestBody
+     * @param data.xTenantId
+     * @returns TrackPublic Successful Response
+     * @throws ApiError
+     */
+    public static updateTrack(data: TracksUpdateTrackData): CancelablePromise<TracksUpdateTrackResponse> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/api/v1/tracks/{track_id}',
+            path: {
+                track_id: data.trackId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Delete Track
+     * @param data The data for the request.
+     * @param data.trackId
+     * @param data.xTenantId
+     * @returns void Successful Response
+     * @throws ApiError
+     */
+    public static deleteTrack(data: TracksDeleteTrackData): CancelablePromise<TracksDeleteTrackResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/v1/tracks/{track_id}',
+            path: {
+                track_id: data.trackId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * List Track Events
+     * @param data The data for the request.
+     * @param data.trackId
+     * @param data.skip Number of items to skip
+     * @param data.limit Maximum number of items to return
+     * @param data.xTenantId
+     * @returns ListModel_EventPublic_ Successful Response
+     * @throws ApiError
+     */
+    public static listTrackEvents(data: TracksListTrackEventsData): CancelablePromise<TracksListTrackEventsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/tracks/{track_id}/events',
+            path: {
+                track_id: data.trackId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            query: {
+                skip: data.skip,
+                limit: data.limit
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * List Portal Tracks
+     * @param data The data for the request.
+     * @param data.popupId
+     * @param data.search
+     * @param data.skip Number of items to skip
+     * @param data.limit Maximum number of items to return
+     * @returns ListModel_TrackPublic_ Successful Response
+     * @throws ApiError
+     */
+    public static listPortalTracks(data: TracksListPortalTracksData): CancelablePromise<TracksListPortalTracksResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/tracks/portal/tracks',
+            query: {
+                popup_id: data.popupId,
+                search: data.search,
+                skip: data.skip,
+                limit: data.limit
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get Portal Track
+     * @param data The data for the request.
+     * @param data.trackId
+     * @returns TrackPublic Successful Response
+     * @throws ApiError
+     */
+    public static getPortalTrack(data: TracksGetPortalTrackData): CancelablePromise<TracksGetPortalTrackResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/tracks/portal/tracks/{track_id}',
+            path: {
+                track_id: data.trackId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * List Portal Track Events
+     * @param data The data for the request.
+     * @param data.trackId
+     * @param data.skip Number of items to skip
+     * @param data.limit Maximum number of items to return
+     * @returns ListModel_EventPublic_ Successful Response
+     * @throws ApiError
+     */
+    public static listPortalTrackEvents(data: TracksListPortalTrackEventsData): CancelablePromise<TracksListPortalTrackEventsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/tracks/portal/tracks/{track_id}/events',
+            path: {
+                track_id: data.trackId
+            },
+            query: {
+                skip: data.skip,
+                limit: data.limit
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+}
+
 export class TranslationsService {
     /**
      * List Translations
@@ -4213,12 +6103,7 @@ export class TranslationsService {
 export class UploadsService {
     /**
      * Get Presigned Upload Url
-     * Generate a presigned URL for direct upload to storage.
-     *
-     * The client should:
-     * 1. Call this endpoint to get an upload URL
-     * 2. PUT the file directly to the upload_url with the correct Content-Type
-     * 3. Use the returned key or public_url when saving to the database
+     * Generate a presigned URL for direct upload (backoffice staff).
      * @param data The data for the request.
      * @param data.requestBody
      * @returns PresignedUrlResponse Successful Response
@@ -4228,6 +6113,26 @@ export class UploadsService {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/api/v1/uploads/presigned-url',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get Presigned Upload Url Portal
+     * Generate a presigned URL for direct upload (portal humans).
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns PresignedUrlResponse Successful Response
+     * @throws ApiError
+     */
+    public static getPresignedUploadUrlPortal(data: UploadsGetPresignedUploadUrlPortalData): CancelablePromise<UploadsGetPresignedUploadUrlPortalResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/uploads/portal/presigned-url',
             body: data.requestBody,
             mediaType: 'application/json',
             errors: {
@@ -4357,6 +6262,137 @@ export class UsersService {
             errors: {
                 422: 'Validation Error'
             }
+        });
+    }
+}
+
+export class UtilsService {
+    /**
+     * Resolve Url
+     * Follow redirects on a short URL and return the final resolved URL.
+     * @param data The data for the request.
+     * @param data.url Short URL to resolve
+     * @returns unknown Successful Response
+     * @throws ApiError
+     */
+    public static resolveUrl(data: UtilsResolveUrlData): CancelablePromise<UtilsResolveUrlResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/utils/resolve-url',
+            query: {
+                url: data.url
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+}
+
+export class VenuePropertyTypesService {
+    /**
+     * List Property Types
+     * @param data The data for the request.
+     * @param data.xTenantId
+     * @returns VenuePropertyTypePublic Successful Response
+     * @throws ApiError
+     */
+    public static listPropertyTypes(data: VenuePropertyTypesListPropertyTypesData = {}): CancelablePromise<VenuePropertyTypesListPropertyTypesResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/venue-property-types',
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Create Property Type
+     * @param data The data for the request.
+     * @param data.xTenantId
+     * @param data.requestBody
+     * @returns VenuePropertyTypePublic Successful Response
+     * @throws ApiError
+     */
+    public static createPropertyType(data: VenuePropertyTypesCreatePropertyTypeData): CancelablePromise<VenuePropertyTypesCreatePropertyTypeResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/venue-property-types',
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Update Property Type
+     * @param data The data for the request.
+     * @param data.propertyTypeId
+     * @param data.requestBody
+     * @param data.xTenantId
+     * @returns VenuePropertyTypePublic Successful Response
+     * @throws ApiError
+     */
+    public static updatePropertyType(data: VenuePropertyTypesUpdatePropertyTypeData): CancelablePromise<VenuePropertyTypesUpdatePropertyTypeResponse> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/api/v1/venue-property-types/{property_type_id}',
+            path: {
+                property_type_id: data.propertyTypeId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Delete Property Type
+     * @param data The data for the request.
+     * @param data.propertyTypeId
+     * @param data.xTenantId
+     * @returns void Successful Response
+     * @throws ApiError
+     */
+    public static deletePropertyType(data: VenuePropertyTypesDeletePropertyTypeData): CancelablePromise<VenuePropertyTypesDeletePropertyTypeResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/v1/venue-property-types/{property_type_id}',
+            path: {
+                property_type_id: data.propertyTypeId
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * List Property Types Portal
+     * @returns VenuePropertyTypePublic Successful Response
+     * @throws ApiError
+     */
+    public static listPropertyTypesPortal(): CancelablePromise<VenuePropertyTypesListPropertyTypesPortalResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/venue-property-types/portal'
         });
     }
 }

@@ -2,15 +2,20 @@ import { useQuery } from "@tanstack/react-query"
 import {
   Building2,
   Calendar,
+  CalendarDays,
   CreditCard,
   FileText,
   FormInput,
   Home,
   LayoutList,
+  ListTree,
   Mail,
+  MapPin,
   Package,
   Palette,
+  Settings,
   ShoppingCart,
+  Sparkles,
   Tag,
   User,
   Users,
@@ -53,7 +58,7 @@ function getAdminItems(tenantId: string | null | undefined): Item[] {
 const coreItems: Item[] = [{ icon: Home, title: "Dashboard", path: "/" }]
 
 const popupItems: Item[] = [
-  { icon: Calendar, title: "Events", path: "/popups" },
+  { icon: Calendar, title: "Pop-ups", path: "/popups" },
   { icon: Package, title: "Products", path: "/products" },
   { icon: Tag, title: "Coupons", path: "/coupons" },
   { icon: UsersRound, title: "Groups", path: "/groups" },
@@ -61,6 +66,14 @@ const popupItems: Item[] = [
   { icon: LayoutList, title: "Ticketing Steps", path: "/ticketing-steps" },
   { icon: Palette, title: "Theme", path: "/theme" },
   { icon: Mail, title: "Email Templates", path: "/email-templates" },
+]
+
+const eventItems: Item[] = [
+  { icon: CalendarDays, title: "Events", path: "/events" },
+  { icon: MapPin, title: "Venues", path: "/events/venues" },
+  { icon: Sparkles, title: "Venue Properties", path: "/events/properties" },
+  { icon: ListTree, title: "Tracks", path: "/events/tracks" },
+  { icon: Settings, title: "Event Settings", path: "/events/settings" },
 ]
 
 // Admin items (admins and superadmins)
@@ -149,7 +162,7 @@ export function AppSidebar() {
 
         {/* Popup management section */}
         <SidebarGroup>
-          <SidebarGroupLabel>Event Management</SidebarGroupLabel>
+          <SidebarGroupLabel>Pop-up Management</SidebarGroupLabel>
           <Main items={popupItems} />
         </SidebarGroup>
 
@@ -157,6 +170,12 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupLabel>Registrations</SidebarGroupLabel>
           <Main items={registrationItemsWithBadges} />
+        </SidebarGroup>
+
+        {/* Events section */}
+        <SidebarGroup>
+          <SidebarGroupLabel>Events</SidebarGroupLabel>
+          <Main items={eventItems} />
         </SidebarGroup>
 
         {/* Admin section (visible to admins+) */}

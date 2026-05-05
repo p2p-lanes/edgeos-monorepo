@@ -1,6 +1,7 @@
 import uuid
 from typing import TYPE_CHECKING, Optional
 
+from sqlalchemy import UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlmodel import Column, Field, Relationship
 
@@ -13,6 +14,7 @@ if TYPE_CHECKING:
     from app.api.base_field_config.models import BaseFieldConfigs
     from app.api.coupon.models import Coupons
     from app.api.email_template.models import EmailTemplates
+    from app.api.event.models import Events
     from app.api.form_field.models import FormFields
     from app.api.form_section.models import FormSections
     from app.api.group.models import Groups
@@ -24,6 +26,10 @@ if TYPE_CHECKING:
 
 
 class Popups(PopupBase, table=True):
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "slug", name="uq_popups_tenant_slug"),
+    )
+
     id: uuid.UUID = Field(
         default_factory=uuid.uuid4,
         sa_column=Column(
@@ -72,6 +78,9 @@ class Popups(PopupBase, table=True):
     base_field_configs: list["BaseFieldConfigs"] = Relationship(
         back_populates="popup", cascade_delete=True
     )
+
+    # Events
+    events: list["Events"] = Relationship(back_populates="popup", cascade_delete=True)
 
     # Ticketing step configuration
     ticketing_steps: list["TicketingSteps"] = Relationship(

@@ -184,6 +184,68 @@ class EditPassesConfirmedContext(BaseModel):
     portal_url: str | None = None
 
 
+class EventChangeRow(BaseModel):
+    """Before/after pair surfaced as an inline diff in update emails."""
+
+    before: str
+    after: str
+
+
+class EventInvitationContext(BaseModel):
+    """Context for event/invitation.html template.
+
+    Re-used for four flows: organiser-side invitations (default),
+    self-RSVP confirmations (``is_self_rsvp``), event-update
+    notifications (``is_update`` + ``changes``), and cancellations
+    (``is_cancelled``).
+    """
+
+    first_name: str = ""
+    event_title: str
+    popup_name: str = ""
+    # Pre-formatted time range like "May 5, 2026 at 14:00 – 15:00" in the
+    # event's display TZ. Falls back to start-only when no end is known.
+    event_when: str = ""
+    venue_title: str = ""
+    event_url: str = ""
+    is_self_rsvp: bool = False
+    is_update: bool = False
+    is_cancelled: bool = False
+    # Mapping from canonical row key ("event", "time", "location") to the
+    # before/after pair, populated only on update emails so the matching
+    # row in the metadata block renders the inline diff.
+    changes: dict[str, EventChangeRow] = {}
+
+
+class EventApprovalApprovedContext(BaseModel):
+    """Context for event/approval_approved.html template.
+
+    Sent to the event creator when an admin approves a venue-approval-required event.
+    """
+
+    first_name: str = ""
+    event_title: str
+    popup_name: str = ""
+    event_when: str = ""
+    venue_title: str = ""
+    event_url: str = ""
+    reason: str = ""
+
+
+class EventApprovalRejectedContext(BaseModel):
+    """Context for event/approval_rejected.html template.
+
+    Sent to the event creator when an admin rejects the event request.
+    """
+
+    first_name: str = ""
+    event_title: str
+    popup_name: str = ""
+    event_when: str = ""
+    venue_title: str = ""
+    reason: str = ""
+
+
 class EmailTemplates:
     # Auth
     LOGIN_CODE_USER = "auth/login_code_user.html"
@@ -204,6 +266,11 @@ class EmailTemplates:
     ABANDONED_CART = "payment/abandoned_cart.html"
     EDIT_PASSES_CONFIRMED = "payment/edit_passes_confirmed.html"
 
+    # Event
+    EVENT_INVITATION = "event/invitation.html"
+    EVENT_APPROVAL_APPROVED = "event/approval_approved.html"
+    EVENT_APPROVAL_REJECTED = "event/approval_rejected.html"
+
 
 TEMPLATE_TYPE_TO_FILE: dict[EmailTemplateType, str] = {
     EmailTemplateType.LOGIN_CODE_USER: "auth/login_code_user.html",
@@ -217,6 +284,9 @@ TEMPLATE_TYPE_TO_FILE: dict[EmailTemplateType, str] = {
     EmailTemplateType.PAYMENT_CONFIRMED: "payment/confirmed.html",
     EmailTemplateType.ABANDONED_CART: "payment/abandoned_cart.html",
     EmailTemplateType.EDIT_PASSES_CONFIRMED: "payment/edit_passes_confirmed.html",
+    EmailTemplateType.EVENT_INVITATION: "event/invitation.html",
+    EmailTemplateType.EVENT_APPROVAL_APPROVED: "event/approval_approved.html",
+    EmailTemplateType.EVENT_APPROVAL_REJECTED: "event/approval_rejected.html",
 }
 
 
@@ -853,6 +923,196 @@ POPUP_TEMPLATE_METADATA: list[dict[str, Any]] = [
                 "description": "Link to the attendee portal",
                 "required": False,
                 "group": "General",
+            },
+            *_POPUP_EVENT_VARIABLES,
+        ],
+    },
+    {
+        "type": EmailTemplateType.EVENT_INVITATION,
+        "label": "Event Invitation",
+        "description": "Sent when a human is invited to a private or unlisted event.",
+        "category": "Event",
+        "default_subject": "You're invited to {{ event_title }}",
+        "variables": [
+            {
+                "name": "first_name",
+                "label": "First Name",
+                "type": "string",
+                "description": "Recipient's first name",
+                "required": False,
+                "group": "Recipient",
+            },
+            {
+                "name": "event_title",
+                "label": "Event Title",
+                "type": "string",
+                "description": "Title of the event",
+                "required": True,
+                "group": "Event",
+            },
+            {
+                "name": "event_when",
+                "label": "When",
+                "type": "string",
+                "description": "Formatted start date/time",
+                "required": False,
+                "group": "Event",
+            },
+            {
+                "name": "venue_title",
+                "label": "Venue",
+                "type": "string",
+                "description": "Venue name (may be empty)",
+                "required": False,
+                "group": "Event",
+            },
+            {
+                "name": "event_url",
+                "label": "Event URL",
+                "type": "string",
+                "description": "Deep link to the event page in the portal",
+                "required": False,
+                "group": "Event",
+            },
+            {
+                "name": "is_self_rsvp",
+                "label": "Self-RSVP confirmation",
+                "type": "boolean",
+                "description": "True when this is the confirmation sent after the recipient RSVPed themselves (not an organiser invitation)",
+                "required": False,
+                "group": "Event",
+            },
+            {
+                "name": "is_update",
+                "label": "Event update notification",
+                "type": "boolean",
+                "description": "True when this email is announcing a change to an existing event",
+                "required": False,
+                "group": "Event",
+            },
+            {
+                "name": "is_cancelled",
+                "label": "Event cancellation notification",
+                "type": "boolean",
+                "description": "True when this email is announcing that the event was cancelled",
+                "required": False,
+                "group": "Event",
+            },
+            {
+                "name": "changes",
+                "label": "Changes",
+                "type": "object",
+                "description": "Mapping from row key ('event', 'time', 'location') to {before, after} describing what changed (only set when is_update=true)",
+                "required": False,
+                "group": "Event",
+            },
+            *_POPUP_EVENT_VARIABLES,
+        ],
+    },
+    {
+        "type": EmailTemplateType.EVENT_APPROVAL_APPROVED,
+        "label": "Event Approved",
+        "description": "Sent to the event creator when an admin approves their request.",
+        "category": "Event",
+        "default_subject": 'Your event "{{ event_title }}" was approved',
+        "variables": [
+            {
+                "name": "first_name",
+                "label": "First Name",
+                "type": "string",
+                "description": "Creator's first name",
+                "required": False,
+                "group": "Creator",
+            },
+            {
+                "name": "event_title",
+                "label": "Event Title",
+                "type": "string",
+                "description": "Title of the event",
+                "required": True,
+                "group": "Event",
+            },
+            {
+                "name": "event_when",
+                "label": "When",
+                "type": "string",
+                "description": "Formatted start date/time",
+                "required": False,
+                "group": "Event",
+            },
+            {
+                "name": "venue_title",
+                "label": "Venue",
+                "type": "string",
+                "description": "Venue name",
+                "required": False,
+                "group": "Event",
+            },
+            {
+                "name": "event_url",
+                "label": "Event URL",
+                "type": "string",
+                "description": "Deep link to the event page",
+                "required": False,
+                "group": "Event",
+            },
+            {
+                "name": "reason",
+                "label": "Reason",
+                "type": "string",
+                "description": "Optional note from the admin",
+                "required": False,
+                "group": "Decision",
+            },
+            *_POPUP_EVENT_VARIABLES,
+        ],
+    },
+    {
+        "type": EmailTemplateType.EVENT_APPROVAL_REJECTED,
+        "label": "Event Rejected",
+        "description": "Sent to the event creator when an admin rejects their request.",
+        "category": "Event",
+        "default_subject": 'Your event "{{ event_title }}" was not approved',
+        "variables": [
+            {
+                "name": "first_name",
+                "label": "First Name",
+                "type": "string",
+                "description": "Creator's first name",
+                "required": False,
+                "group": "Creator",
+            },
+            {
+                "name": "event_title",
+                "label": "Event Title",
+                "type": "string",
+                "description": "Title of the event",
+                "required": True,
+                "group": "Event",
+            },
+            {
+                "name": "event_when",
+                "label": "When",
+                "type": "string",
+                "description": "Formatted start date/time",
+                "required": False,
+                "group": "Event",
+            },
+            {
+                "name": "venue_title",
+                "label": "Venue",
+                "type": "string",
+                "description": "Venue name",
+                "required": False,
+                "group": "Event",
+            },
+            {
+                "name": "reason",
+                "label": "Reason",
+                "type": "string",
+                "description": "Optional explanation from the admin",
+                "required": False,
+                "group": "Decision",
             },
             *_POPUP_EVENT_VARIABLES,
         ],

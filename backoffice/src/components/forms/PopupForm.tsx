@@ -5,6 +5,7 @@ import {
   Baby,
   Building2,
   Calendar,
+  CalendarDays,
   DollarSign,
   FileText,
   Globe,
@@ -13,6 +14,7 @@ import {
   Image,
   Key,
   Languages,
+  Link as LinkIcon,
   Lock,
   Mail,
   MapPin,
@@ -20,7 +22,6 @@ import {
   ShieldCheck,
   ShoppingCart,
   Ticket,
-  Twitter,
 } from "lucide-react"
 import {
   ApprovalStrategiesService,
@@ -134,7 +135,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
     mutationFn: (data: PopupCreate) =>
       PopupsService.createPopup({ requestBody: data }),
     onSuccess: (data) => {
-      showSuccessToast("Event created successfully", {
+      showSuccessToast("Pop-up created successfully", {
         label: "View",
         onClick: () =>
           navigate({ to: "/popups/$id/edit", params: { id: data.id } }),
@@ -153,7 +154,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         requestBody: data,
       }),
     onSuccess: () => {
-      showSuccessToast("Event updated successfully")
+      showSuccessToast("Pop-up updated successfully")
       queryClient.invalidateQueries({ queryKey: ["popups"] })
       queryClient.invalidateQueries({ queryKey: ["form-fields"] })
       queryClient.invalidateQueries({ queryKey: ["form-sections"] })
@@ -166,7 +167,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
   const deleteMutation = useMutation({
     mutationFn: () => PopupsService.deletePopup({ popupId: defaultValues!.id }),
     onSuccess: () => {
-      showSuccessToast("Event deleted successfully")
+      showSuccessToast("Pop-up deleted successfully")
       queryClient.invalidateQueries({ queryKey: ["popups"] })
       navigate({ to: "/popups" })
     },
@@ -219,6 +220,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         defaultValues?.insurance_percentage?.toString() ?? "",
       tier_progression_enabled:
         defaultValues?.tier_progression_enabled ?? false,
+      events_enabled: defaultValues?.events_enabled ?? true,
     },
     onSubmit: ({ value }) => {
       if (readOnly) return
@@ -262,6 +264,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
           ? value.insurance_percentage || null
           : null,
         tier_progression_enabled: value.tier_progression_enabled,
+        events_enabled: value.events_enabled,
       }
       if (isEdit) {
         updateMutation.mutate(payload)
@@ -289,7 +292,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         <FormErrorSummary
           form={form}
           fieldLabels={{
-            name: "Event Name",
+            name: "Pop-up Name",
             tagline: "Tagline",
             location: "Location",
             slug: "Slug",
@@ -310,7 +313,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
             {(field) => (
               <div>
                 <HeroInput
-                  placeholder="Event Name"
+                  placeholder="Pop-up Name"
                   value={field.state.value}
                   onBlur={field.handleBlur}
                   onChange={(e) => field.handleChange(e.target.value)}
@@ -347,7 +350,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                   Location
                 </Label>
                 <Input
-                  placeholder="Event location or venue"
+                  placeholder="Pop-up location or venue"
                   value={field.state.value}
                   onBlur={field.handleBlur}
                   onChange={(e) => field.handleChange(e.target.value)}
@@ -517,7 +520,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         <Separator />
 
         {/* Event Details */}
-        <InlineSection title="Event Details">
+        <InlineSection title="Pop-up Details">
           <form.Field
             name="start_date"
             validators={{
@@ -613,7 +616,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         <Separator />
 
         {/* Event Options */}
-        <InlineSection title="Event Options">
+        <InlineSection title="Pop-up Options">
           <form.Field name="allows_spouse">
             {(field) => (
               <InlineRow
@@ -653,7 +656,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
               <InlineRow
                 icon={<Ticket className="h-4 w-4 text-muted-foreground" />}
                 label="Discount Coupons"
-                description="Enable discount coupons for this event"
+                description="Enable discount coupons for this pop-up"
               >
                 <Switch
                   id="allows_coupons"
@@ -885,7 +888,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
           <form.Field name="twitter_url">
             {(field) => (
               <InlineRow
-                icon={<Twitter className="h-4 w-4 text-muted-foreground" />}
+                icon={<LinkIcon className="h-4 w-4 text-muted-foreground" />}
                 label="Twitter"
               >
                 <Input
@@ -1089,6 +1092,30 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
               >
                 <Switch
                   id="tier_progression_enabled"
+                  checked={field.state.value}
+                  onCheckedChange={(checked) => field.handleChange(checked)}
+                  disabled={readOnly}
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+        </InlineSection>
+
+        <Separator />
+
+        {/* Events module feature flag */}
+        <InlineSection title="Events module">
+          <form.Field name="events_enabled">
+            {(field) => (
+              <InlineRow
+                icon={
+                  <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                }
+                label="Enable events module"
+                description="Show the Events section in the portal (calendar, venues, RSVPs). When off, the entire section is hidden — to only block creating new events without hiding existing ones, use the Event Settings page instead."
+              >
+                <Switch
+                  id="events_enabled"
                   checked={field.state.value}
                   onCheckedChange={(checked) => field.handleChange(checked)}
                   disabled={readOnly}

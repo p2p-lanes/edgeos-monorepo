@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.api import (
+    api_key,
     application,
     application_review,
     approval_strategy,
@@ -12,6 +13,10 @@ from app.api import (
     coupon,
     dashboard,
     email_template,
+    event,
+    event_participant,
+    event_settings,
+    event_venue,
     form_field,
     form_section,
     group,
@@ -22,6 +27,7 @@ from app.api import (
     product,
     tenant,
     ticketing_step,
+    track,
     translation,
     upload,
     user,
@@ -35,6 +41,7 @@ api_router.include_router(user.router)
 api_router.include_router(auth.router)
 api_router.include_router(tenant.router)
 api_router.include_router(human.router)
+api_router.include_router(api_key.router)
 api_router.include_router(popup.router)
 
 # Popup-related resources
@@ -69,6 +76,15 @@ api_router.include_router(checkout.router)
 
 # Utility resources
 api_router.include_router(upload.router)
+
+# Events module
+api_router.include_router(event.router)
+api_router.include_router(event_participant.router)
+api_router.include_router(event_venue.router)
+api_router.include_router(event_venue.utils_router)
+api_router.include_router(event_venue.property_types_router)
+api_router.include_router(event_settings.router)
+api_router.include_router(track.router)
 
 # Dashboard
 api_router.include_router(dashboard.router)

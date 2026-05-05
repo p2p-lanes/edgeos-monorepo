@@ -48,6 +48,13 @@ vi.mock("@/providers/checkoutProvider", () => ({
     merchProducts: [],
     patronProducts: [],
     submitPayment: vi.fn().mockResolvedValue({ success: true }),
+    cart: {
+      passes: [],
+      housing: null,
+      merch: [],
+      patron: null,
+      dynamicItems: {},
+    },
   }),
 }))
 

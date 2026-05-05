@@ -13,6 +13,7 @@ from app.api.coupon.schemas import (
 )
 from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
+from app.core.dependencies.tenants import PublicTenant
 from app.core.dependencies.users import (
     CurrentHuman,
     CurrentUser,
@@ -36,6 +37,7 @@ router = APIRouter(prefix="/coupons", tags=["coupons"])
 async def validate_coupon_public(
     request_in: CouponValidatePublicRequest,
     db: SessionDep,
+    tenant: PublicTenant,
 ) -> CouponValidatePublicResponse:
     """Validate a coupon code for an anonymous open-ticketing checkout (no JWT required).
 
@@ -47,6 +49,7 @@ async def validate_coupon_public(
         db,
         popup_slug=request_in.popup_slug,
         code=request_in.code,
+        tenant_id=tenant.id,
     )
 
 

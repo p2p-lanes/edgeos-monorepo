@@ -33,6 +33,7 @@ interface ThemeColors {
   secondary_color?: string
   accent_color?: string
   checkout_navbar_bg?: string
+  checkout_subtitle_color?: string
 }
 
 interface ThemeConfig {
@@ -91,6 +92,9 @@ function computeThemeVars(
     vars["--checkout-navbar-bg"] = colors.checkout_navbar_bg
     vars["--checkout-nav-bg"] = colors.checkout_navbar_bg
   }
+  if (colors.checkout_subtitle_color) {
+    vars["--checkout-subtitle"] = colors.checkout_subtitle_color
+  }
 
   // If no mode/primary is set, stop here — rest of the palette stays on the
   // globals.css defaults.
@@ -133,7 +137,8 @@ function computeThemeVars(
 
     // ─ Checkout neutrals
     "--checkout-title": palette.foreground,
-    "--checkout-subtitle": palette.foregroundSecondary,
+    "--checkout-subtitle":
+      colors.checkout_subtitle_color || palette.foregroundSecondary,
     "--checkout-watermark": mix(palette.background, palette.foreground, 92),
     "--checkout-navbar-bg":
       colors.checkout_navbar_bg || mix(palette.background, "transparent", 85),

@@ -22,8 +22,6 @@ function makeStep(
     watermark: overrides.watermark ?? null,
     show_title: overrides.show_title ?? true,
     show_watermark: overrides.show_watermark ?? true,
-    created_at: overrides.created_at ?? "2026-04-17T00:00:00Z",
-    updated_at: overrides.updated_at ?? "2026-04-17T00:00:00Z",
   } as TicketingStepPublic
 }
 

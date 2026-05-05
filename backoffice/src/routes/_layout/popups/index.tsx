@@ -79,7 +79,7 @@ export const Route = createFileRoute("/_layout/popups/")({
   component: Popups,
   validateSearch: validateTableSearch,
   head: () => ({
-    meta: [{ title: "Events - EdgeOS" }],
+    meta: [{ title: "Pop-ups - EdgeOS" }],
   }),
 })
 
@@ -88,7 +88,7 @@ function AddPopupButton() {
     <Button asChild>
       <Link to="/popups/new">
         <Plus className="mr-2 h-4 w-4" />
-        Add Event
+        Add Pop-up
       </Link>
     </Button>
   )
@@ -108,7 +108,7 @@ function DeletePopup({
   const mutation = useMutation({
     mutationFn: () => PopupsService.deletePopup({ popupId: popup.id }),
     onSuccess: () => {
-      showSuccessToast("Event deleted successfully")
+      showSuccessToast("Pop-up deleted successfully")
       setIsOpen(false)
       onSuccess()
     },
@@ -128,7 +128,7 @@ function DeletePopup({
       </DropdownMenuItem>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Delete Event</DialogTitle>
+          <DialogTitle>Delete Pop-up</DialogTitle>
           <DialogDescription>
             Are you sure you want to delete "{popup.name}"? This action cannot
             be undone.
@@ -160,7 +160,7 @@ function PopupActionsMenu({ popup }: { popup: PopupAdmin }) {
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="Event actions">
+        <Button variant="ghost" size="icon" aria-label="Pop-up actions">
           <EllipsisVertical className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
@@ -318,13 +318,13 @@ function PopupsTableContent() {
         !search ? (
           <EmptyState
             icon={CalendarDays}
-            title="No events yet"
-            description="Create your first event to start managing them."
+            title="No pop-ups yet"
+            description="Create your first pop-up to start managing them."
             action={
               <Button asChild>
                 <Link to="/popups/new">
                   <Plus className="mr-2 h-4 w-4" />
-                  Add Event
+                  Add Pop-up
                 </Link>
               </Button>
             }
@@ -358,15 +358,15 @@ function Popups() {
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Select a tenant</AlertTitle>
           <AlertDescription>
-            Please select a tenant from the sidebar to view and manage events.
+            Please select a tenant from the sidebar to view and manage pop-ups.
           </AlertDescription>
         </Alert>
       )}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Events</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Pop-ups</h1>
           <p className="text-muted-foreground">
-            Manage your events and their configurations
+            Manage your pop-ups and their configurations
           </p>
         </div>
         {canManagePopups && <AddPopupButton />}

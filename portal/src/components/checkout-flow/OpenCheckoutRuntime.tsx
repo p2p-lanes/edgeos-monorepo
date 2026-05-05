@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
+import { useTranslation } from "react-i18next"
 import {
   type CheckoutRuntimeProduct,
   type CheckoutRuntimeResponse,
@@ -8,11 +9,14 @@ import {
   type ProductPublic,
 } from "@/client"
 import ScrollyCheckoutFlow from "@/components/checkout-flow/ScrollyCheckoutFlow"
+import { LanguageSwitcher } from "@/components/common/LanguageSwitcher"
 import { ApplicationContext } from "@/providers/applicationProvider"
 import { CheckoutProvider } from "@/providers/checkoutProvider"
 import { CityContext } from "@/providers/cityProvider"
 import { DiscountContext } from "@/providers/discountProvider"
+import { LanguageProvider } from "@/providers/languageProvider"
 import PassesProvider from "@/providers/passesProvider"
+import ThemeProvider from "@/providers/themeProvider"
 import type { AttendeePassState } from "@/types/Attendee"
 import { setActiveCurrency } from "@/types/checkout"
 import type { DiscountProps } from "@/types/discounts"
@@ -90,6 +94,7 @@ function buildInitialBuyerValues(
 
 function buildOpenBuyerSchema(
   runtime: CheckoutRuntimeResponse,
+  t: (key: string) => string,
 ): ApplicationFormSchema {
   const runtimeFormSchema = (
     runtime as CheckoutRuntimeResponse & {
@@ -101,21 +106,21 @@ function buildOpenBuyerSchema(
     ...(runtimeFormSchema?.base_fields ?? {}),
     email: {
       type: "email",
-      label: "Email",
+      label: t("form.email"),
       required: true,
       target: "human",
       position: 0,
     },
     first_name: {
       type: "text",
-      label: "First name",
+      label: t("form.first_name"),
       required: true,
       target: "human",
       position: 1,
     },
     last_name: {
       type: "text",
-      label: "Last name",
+      label: t("form.last_name"),
       required: true,
       target: "human",
       position: 2,
@@ -134,6 +139,7 @@ export function OpenCheckoutRuntime({
   popupSlug,
   prefilledBuyer,
 }: OpenCheckoutRuntimeProps) {
+  const { t } = useTranslation()
   const [discountApplied, setDiscountApplied] = useState<DiscountProps>({
     discount_value: 0,
     discount_type: "percentage",
@@ -142,9 +148,18 @@ export function OpenCheckoutRuntime({
   })
 
   const popup = runtime.popup
-  const products = runtime.products.map(toProductsPass)
-  const attendees = [buildVirtualBuyerAttendee(runtime)]
-  const buyerFormSchema = buildOpenBuyerSchema(runtime)
+  const products = useMemo(
+    () => runtime.products.map(toProductsPass),
+    [runtime.products],
+  )
+  const attendees = useMemo(
+    () => [buildVirtualBuyerAttendee(runtime)],
+    [runtime],
+  )
+  const buyerFormSchema = useMemo(
+    () => buildOpenBuyerSchema(runtime, t),
+    [runtime, t],
+  )
 
   setActiveCurrency(popup.currency ?? "USD")
 
@@ -157,64 +172,68 @@ export function OpenCheckoutRuntime({
         popupsLoaded: true,
       }}
     >
-      <ApplicationContext.Provider
-        value={{
-          applications: null,
-          participation: null,
-          getRelevantApplication: () => null,
-          getAttendees: () => [],
-          updateApplication: () => {},
-        }}
-      >
-        <DiscountContext.Provider
-          value={{
-            discountApplied,
-            setDiscount: (discount) => setDiscountApplied(discount),
-            resetDiscount: () =>
-              setDiscountApplied({
-                discount_value: 0,
-                discount_type: "percentage",
-                discount_code: null,
-                city_id: popup.id,
-              }),
-          }}
-        >
-          <PassesProvider
-            attendees={attendees}
-            restoreFromCart={false}
-            productsOverride={products}
-            purchasesOverride={[]}
+      <ThemeProvider>
+        <LanguageProvider>
+          <ApplicationContext.Provider
+            value={{
+              applications: null,
+              participation: null,
+              getRelevantApplication: () => null,
+              getAttendees: () => [],
+              updateApplication: () => {},
+            }}
           >
-            <CheckoutProvider
-              initialStep="passes"
-              productsOverride={products}
-              configuredStepsOverride={runtime.ticketing_steps}
-              accountCreditOverride={0}
-              buyerFormSchema={buyerFormSchema}
-              initialBuyerValues={
-                buyerFormSchema
-                  ? buildInitialBuyerValues(buyerFormSchema, prefilledBuyer)
-                  : {}
-              }
-              cartPersistenceEnabled={false}
-              cartUiEnabled={false}
-              validatePromoCodeOverride={async (code) => {
-                const result = await CouponsService.validateCouponPublic({
-                  requestBody: {
-                    popup_slug: popupSlug,
-                    code,
-                  },
-                })
-                return Number(result.discount_value)
+            <DiscountContext.Provider
+              value={{
+                discountApplied,
+                setDiscount: (discount) => setDiscountApplied(discount),
+                resetDiscount: () =>
+                  setDiscountApplied({
+                    discount_value: 0,
+                    discount_type: "percentage",
+                    discount_code: null,
+                    city_id: popup.id,
+                  }),
               }}
-              submitMode="open-ticketing"
-              submitPopupSlug={popupSlug}
             >
-              <ScrollyCheckoutFlow />
-            </CheckoutProvider>
-          </PassesProvider>
-        </DiscountContext.Provider>
-      </ApplicationContext.Provider>
+              <PassesProvider
+                attendees={attendees}
+                restoreFromCart={false}
+                productsOverride={products}
+                purchasesOverride={[]}
+              >
+                <CheckoutProvider
+                  initialStep="passes"
+                  productsOverride={products}
+                  configuredStepsOverride={runtime.ticketing_steps}
+                  accountCreditOverride={0}
+                  buyerFormSchema={buyerFormSchema}
+                  initialBuyerValues={
+                    buyerFormSchema
+                      ? buildInitialBuyerValues(buyerFormSchema, prefilledBuyer)
+                      : {}
+                  }
+                  cartPersistenceEnabled={false}
+                  cartUiEnabled={false}
+                  validatePromoCodeOverride={async (code) => {
+                    const result = await CouponsService.validateCouponPublic({
+                      requestBody: {
+                        popup_slug: popupSlug,
+                        code,
+                      },
+                    })
+                    return Number(result.discount_value)
+                  }}
+                  submitMode="open-ticketing"
+                  submitPopupSlug={popupSlug}
+                >
+                  <ScrollyCheckoutFlow navExtraContent={<LanguageSwitcher />} />
+                </CheckoutProvider>
+              </PassesProvider>
+            </DiscountContext.Provider>
+          </ApplicationContext.Provider>
+        </LanguageProvider>
+      </ThemeProvider>
     </CityContext.Provider>
   )
 }

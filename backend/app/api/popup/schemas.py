@@ -9,6 +9,14 @@ from sqlalchemy import Boolean, Column, Numeric
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlmodel import Field, SQLModel, String
 
+from app.api.shared.enums import (
+    ApplicationLayout,
+    CheckoutMode,
+    SaleType,
+    derive_checkout_mode,
+)
+from app.utils.utils import slugify
+
 
 def validate_popup_insurance_config(enabled: bool, pct: "Decimal | None") -> None:
     """Validate insurance_percentage bounds when insurance is enabled.
@@ -26,14 +34,6 @@ def validate_popup_insurance_config(enabled: bool, pct: "Decimal | None") -> Non
             "insurance_percentage must be <= 100 (it represents a percentage)"
         )
 
-
-from app.api.shared.enums import (
-    ApplicationLayout,
-    CheckoutMode,
-    SaleType,
-    derive_checkout_mode,
-)
-from app.utils.utils import slugify
 
 ALLOWED_CURRENCIES = ("USD", "ARS", "EUR")
 
@@ -67,7 +67,7 @@ class PopupBase(SQLModel):
     name: str = Field(index=True)
     tagline: str | None = None
     location: str | None = None
-    slug: str = Field(unique=True, index=True)
+    slug: str = Field(index=True)
     tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
     start_date: datetime | None = None
     end_date: datetime | None = None
@@ -136,6 +136,10 @@ class PopupBase(SQLModel):
         default=False,
         sa_column=Column(Boolean, nullable=False, server_default="false"),
     )
+    events_enabled: bool = Field(
+        default=True,
+        sa_column=Column(Boolean, nullable=False, server_default="true"),
+    )
 
     @field_validator("currency")
     @classmethod
@@ -180,6 +184,7 @@ class PopupCreate(SQLModel):
     insurance_percentage: Decimal | None = None
     application_layout: ApplicationLayout = ApplicationLayout.single_page
     tier_progression_enabled: bool = False
+    events_enabled: bool = True
 
     @field_validator("currency")
     @classmethod
@@ -238,6 +243,7 @@ class PopupUpdate(SQLModel):
     insurance_percentage: Decimal | None = None
     application_layout: ApplicationLayout | None = None
     tier_progression_enabled: bool | None = None
+    events_enabled: bool | None = None
 
     @field_validator("currency")
     @classmethod
@@ -302,6 +308,7 @@ class PopupPublic(SQLModel):
     insurance_percentage: Decimal | None = None
     application_layout: ApplicationLayout = ApplicationLayout.single_page
     tier_progression_enabled: bool = False
+    events_enabled: bool = True
 
 
 class PopupAdmin(PopupBase):

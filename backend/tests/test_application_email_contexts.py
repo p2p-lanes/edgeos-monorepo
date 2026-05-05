@@ -22,7 +22,9 @@ def test_application_received_email_uses_application_human_and_submitted_at(
     monkeypatch,
 ):
     fake_service = _FakeEmailService()
-    monkeypatch.setattr("app.services.email_helpers.get_email_service", lambda: fake_service)
+    monkeypatch.setattr(
+        "app.services.email_helpers.get_email_service", lambda: fake_service
+    )
 
     application = SimpleNamespace(
         status=ApplicationStatus.IN_REVIEW.value,
@@ -64,7 +66,9 @@ def test_application_received_email_uses_application_human_and_submitted_at(
 
 def test_application_rejected_email_uses_application_human_details(monkeypatch):
     fake_service = _FakeEmailService()
-    monkeypatch.setattr("app.services.email_helpers.get_email_service", lambda: fake_service)
+    monkeypatch.setattr(
+        "app.services.email_helpers.get_email_service", lambda: fake_service
+    )
 
     application = SimpleNamespace(
         status=ApplicationStatus.REJECTED.value,

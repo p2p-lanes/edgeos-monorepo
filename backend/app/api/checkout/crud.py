@@ -1,5 +1,7 @@
 """CRUD aggregator for the open-ticketing checkout bootstrap endpoint (CAP-A)."""
 
+import uuid
+
 from fastapi import HTTPException, status
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
@@ -10,7 +12,6 @@ from app.api.checkout.schemas import (
     CheckoutRuntimeProduct,
     CheckoutRuntimeResponse,
 )
-from app.api.form_field.models import FormFields
 from app.api.form_field.crud import form_fields_crud
 from app.api.form_section.models import FormSections
 from app.api.popup.models import Popups
@@ -22,15 +23,15 @@ from app.api.ticketing_step.models import TicketingSteps
 from app.api.ticketing_step.schemas import TicketingStepPublic
 
 
-def get_open_ticketing_popup(session: Session, slug: str) -> Popups:
-    """Resolve an active direct-sale popup by slug for open ticketing.
+def get_open_ticketing_popup(session: Session, slug: str, tenant_id: uuid.UUID) -> Popups:
+    """Resolve an active direct-sale popup by slug and tenant for open ticketing.
 
     Raises:
-        404 — popup not found by slug
+        404 — popup not found by slug + tenant_id
         403 — popup is not sale_type=direct OR is not active
     """
     popup = session.exec(
-        select(Popups).where(Popups.slug == slug)
+        select(Popups).where(Popups.slug == slug, Popups.tenant_id == tenant_id)
     ).first()
 
     if popup is None:
@@ -54,9 +55,9 @@ def get_open_ticketing_popup(session: Session, slug: str) -> Popups:
     return popup
 
 
-def runtime_for_slug(session: Session, slug: str) -> CheckoutRuntimeResponse:
+def runtime_for_slug(session: Session, slug: str, tenant_id: uuid.UUID) -> CheckoutRuntimeResponse:
     """Load the public runtime data for an open-ticketing checkout page."""
-    popup = get_open_ticketing_popup(session, slug)
+    popup = get_open_ticketing_popup(session, slug, tenant_id)
 
     # Load active products
     products = list(

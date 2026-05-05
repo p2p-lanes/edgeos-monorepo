@@ -331,6 +331,24 @@ login_rate_limiter = RateLimiter(
     window_seconds=15 * 60,  # 5 requests per 15 minutes
 )
 
+pat_event_write_rate_limiter = RateLimiter(
+    prefix="pat-event-write",
+    max_requests=20,
+    window_seconds=60 * 60,  # 20 mutating event requests per hour
+)
+
+pat_event_create_rate_limiter = RateLimiter(
+    prefix="pat-event-create",
+    max_requests=5,
+    window_seconds=60 * 60,  # 5 event creations per hour
+)
+
+pat_event_create_daily_rate_limiter = RateLimiter(
+    prefix="pat-event-create-daily",
+    max_requests=10,
+    window_seconds=24 * 60 * 60,  # 10 event creations per day
+)
+
 # Auth code store
 auth_code_store = AuthCodeStore(expiration_minutes=15, max_attempts=5)
 

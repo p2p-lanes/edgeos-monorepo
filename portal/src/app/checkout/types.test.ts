@@ -108,7 +108,7 @@ describe("checkout application schema helpers", () => {
           target: "human",
         },
         markdown_notes: {
-          type: "markdown",
+          type: "textarea",
           label: "Notes",
           required: false,
           target: "application",

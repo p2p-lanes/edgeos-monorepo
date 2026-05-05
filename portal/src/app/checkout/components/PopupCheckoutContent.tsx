@@ -221,7 +221,7 @@ export const PopupCheckoutContent = ({
         <PassesProvider attendees={attendees} restoreFromCart>
           <CheckoutProvider initialStep="passes">
             <div
-              className={`h-svh overflow-y-auto ${background.className}`}
+              className={`h-dvh overflow-y-auto ${background.className}`}
               style={background.style}
             >
               <ScrollyCheckoutFlow

@@ -29,6 +29,9 @@ from app.services.email.templates import (
     ApplicationRejectedContext,
     EditPassesConfirmedContext,
     EmailTemplates,
+    EventApprovalApprovedContext,
+    EventApprovalRejectedContext,
+    EventInvitationContext,
     LoginCodeHumanContext,
     LoginCodeUserContext,
     PaymentConfirmedContext,
@@ -656,6 +659,81 @@ class EmailService:
             subject=subject,
             template_type=EmailTemplateType.EDIT_PASSES_CONFIRMED,
             template_name=EmailTemplates.EDIT_PASSES_CONFIRMED,
+            context=context.model_dump(exclude_none=True),
+            from_address=from_address,
+            from_name=from_name,
+            popup_id=popup_id,
+            db_session=db_session,
+        )
+
+    async def send_event_invitation(
+        self,
+        to: str,
+        subject: str,
+        context: EventInvitationContext,
+        from_address: str | None = None,
+        from_name: str | None = None,
+        popup_id: uuid.UUID | None = None,
+        db_session: Session | None = None,
+        attachments: list[EmailAttachment] | None = None,
+        ical_body: str | None = None,
+        ical_method: str = "REQUEST",
+    ) -> bool:
+        """Send event invitation email with optional inline iTIP body."""
+        return await self._send_with_fallback(
+            to=to,
+            subject=subject,
+            template_type=EmailTemplateType.EVENT_INVITATION,
+            template_name=EmailTemplates.EVENT_INVITATION,
+            context=context.model_dump(exclude_none=True),
+            from_address=from_address,
+            from_name=from_name,
+            popup_id=popup_id,
+            db_session=db_session,
+            attachments=attachments,
+            ical_body=ical_body,
+            ical_method=ical_method,
+        )
+
+    async def send_event_approval_approved(
+        self,
+        to: str,
+        subject: str,
+        context: EventApprovalApprovedContext,
+        from_address: str | None = None,
+        from_name: str | None = None,
+        popup_id: uuid.UUID | None = None,
+        db_session: Session | None = None,
+    ) -> bool:
+        """Send event approved email to the event creator."""
+        return await self._send_with_fallback(
+            to=to,
+            subject=subject,
+            template_type=EmailTemplateType.EVENT_APPROVAL_APPROVED,
+            template_name=EmailTemplates.EVENT_APPROVAL_APPROVED,
+            context=context.model_dump(exclude_none=True),
+            from_address=from_address,
+            from_name=from_name,
+            popup_id=popup_id,
+            db_session=db_session,
+        )
+
+    async def send_event_approval_rejected(
+        self,
+        to: str,
+        subject: str,
+        context: EventApprovalRejectedContext,
+        from_address: str | None = None,
+        from_name: str | None = None,
+        popup_id: uuid.UUID | None = None,
+        db_session: Session | None = None,
+    ) -> bool:
+        """Send event rejected email to the event creator."""
+        return await self._send_with_fallback(
+            to=to,
+            subject=subject,
+            template_type=EmailTemplateType.EVENT_APPROVAL_REJECTED,
+            template_name=EmailTemplates.EVENT_APPROVAL_REJECTED,
             context=context.model_dump(exclude_none=True),
             from_address=from_address,
             from_name=from_name,
