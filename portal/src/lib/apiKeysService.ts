@@ -1,8 +1,8 @@
 import {
-  ApiKeysService as GeneratedApiKeysService,
   type ApiKeyCreate,
   type ApiKeyCreated,
   type ApiKeyPublic,
+  ApiKeysService as GeneratedApiKeysService,
 } from "@/client"
 
 export type ApiKeyScope = "events:read" | "events:write" | "rsvp:write"

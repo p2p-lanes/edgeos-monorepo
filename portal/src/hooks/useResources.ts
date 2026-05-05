@@ -1,4 +1,12 @@
-import { BookOpen, CalendarDays, FileText, Key, MapPin, Ticket, Users } from "lucide-react"
+import {
+  BookOpen,
+  CalendarDays,
+  FileText,
+  Key,
+  MapPin,
+  Ticket,
+  Users,
+} from "lucide-react"
 import { useTranslation } from "react-i18next"
 import useAuth from "@/hooks/useAuth"
 import { useApplication } from "@/providers/applicationProvider"

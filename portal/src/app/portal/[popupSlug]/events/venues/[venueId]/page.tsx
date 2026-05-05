@@ -113,9 +113,7 @@ export default function PortalVenueDetailPage() {
             src={venue.image_url}
             alt={venue.title}
             className="aspect-[21/9] w-full object-cover"
-            fallback={
-              <MapPin className="h-10 w-10 text-muted-foreground/40" />
-            }
+            fallback={<MapPin className="h-10 w-10 text-muted-foreground/40" />}
           />
         </div>
       )}

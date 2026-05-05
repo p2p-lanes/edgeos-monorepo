@@ -127,9 +127,9 @@ function EventSettingsForm() {
           />
         </div>
         <p className="text-sm text-muted-foreground">
-          When off, humans can still browse existing events but the Create
-          Event button is hidden. To hide the events section entirely, toggle
-          the popup-level "Events module" feature flag in the popup settings.
+          When off, humans can still browse existing events but the Create Event
+          button is hidden. To hide the events section entirely, toggle the
+          popup-level "Events module" feature flag in the popup settings.
         </p>
       </div>
 

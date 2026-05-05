@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useRef, useState } from "react"
 
 interface CoverImageProps {
   src: string | null | undefined
@@ -15,21 +15,21 @@ interface CoverImageProps {
  * background with whatever node the caller passes (typically a lucide
  * icon sized for the slot).
  */
-export function CoverImage({
-  src,
-  alt,
-  className,
-  fallback,
-}: CoverImageProps) {
+export function CoverImage({ src, alt, className, fallback }: CoverImageProps) {
   const [errored, setErrored] = useState(false)
-
-  useEffect(() => {
+  // Reset the error flag during render when src changes — preferred over
+  // useEffect per the React docs ("Adjusting state when a prop changes"),
+  // and keeps the dependency-list lint quiet.
+  const prevSrcRef = useRef(src)
+  if (prevSrcRef.current !== src) {
+    prevSrcRef.current = src
     setErrored(false)
-  }, [src])
+  }
 
   if (!src || errored) {
     return (
       <div
+        role="img"
         aria-label={alt}
         className={`flex items-center justify-center bg-muted ${className ?? ""}`}
       >

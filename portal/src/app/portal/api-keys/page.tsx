@@ -329,9 +329,7 @@ export default function ApiKeysPage() {
             <Button
               onClick={onCreate}
               disabled={
-                !newKeyName.trim() ||
-                isCreating ||
-                selectedScopes.length === 0
+                !newKeyName.trim() || isCreating || selectedScopes.length === 0
               }
             >
               {isCreating && <Loader2 className="size-4 animate-spin mr-1" />}

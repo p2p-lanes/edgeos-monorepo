@@ -47,7 +47,9 @@ function Endpoint({
       </div>
       <div className="px-4 py-3 space-y-3">
         <p className="text-sm text-muted-foreground">{summary}</p>
-        {params && params.length > 0 && <FieldList title="Query" items={params} />}
+        {params && params.length > 0 && (
+          <FieldList title="Query" items={params} />
+        )}
         {body && body.length > 0 && <FieldList title="Body" items={body} />}
       </div>
     </div>
@@ -71,7 +73,9 @@ function FieldList({
           <li key={p.name} className="font-mono text-xs">
             <span className="text-foreground font-semibold">{p.name}</span>
             <span className="text-muted-foreground"> · {p.type}</span>
-            {p.note && <span className="text-muted-foreground"> — {p.note}</span>}
+            {p.note && (
+              <span className="text-muted-foreground"> — {p.note}</span>
+            )}
           </li>
         ))}
       </ul>
@@ -99,7 +103,10 @@ function Section({
 const ERRORS: { code: string; meaning: string }[] = [
   { code: "401", meaning: "Missing, malformed, revoked, or expired key." },
   { code: "403", meaning: "Key lacks the required scope for this route." },
-  { code: "404", meaning: "Resource is hidden from the caller or doesn't exist." },
+  {
+    code: "404",
+    meaning: "Resource is hidden from the caller or doesn't exist.",
+  },
   { code: "422", meaning: "Body or query failed validation." },
   { code: "429", meaning: "Rate limit exceeded — see Retry-After header." },
 ]
@@ -268,7 +275,13 @@ export default function ApiDocsPage() {
   )
 }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
+function Row({
+  label,
+  children,
+}: {
+  label: string
+  children: React.ReactNode
+}) {
   return (
     <div className="flex items-baseline gap-4 px-4 py-2">
       <span className="text-xs font-semibold uppercase text-muted-foreground w-32 shrink-0">
