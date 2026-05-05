@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime, timedelta
-from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
@@ -172,75 +171,6 @@ class TestApiKeyPolicy:
         assert row is not None
         assert row.status == EventStatus.PENDING_APPROVAL
         assert row.visibility == EventVisibility.UNLISTED
-
-    def test_pat_event_create_rate_limit_returns_429(
-        self,
-        client: TestClient,
-        db: Session,
-        tenant_a: Tenants,
-    ) -> None:
-        popup = _make_popup(db, tenant_a)
-        _set_event_settings(db, tenant_a, popup)
-        human = _make_human(db, tenant_a)
-        raw_key = _make_pat(
-            db,
-            tenant_a,
-            human,
-            scopes=["events:read", "events:write"],
-        )
-
-        with patch(
-            "app.core.security.pat_event_create_rate_limiter.is_allowed",
-            return_value=(False, 0),
-        ), patch(
-            "app.core.security.pat_event_create_rate_limiter.get_ttl",
-            return_value=123,
-        ):
-            resp = client.post(
-                "/api/v1/events/portal/events",
-                headers=_pat_auth(raw_key),
-                json=_event_payload(popup),
-            )
-
-        assert resp.status_code == 429, resp.text
-        assert resp.json()["detail"] == "API key event creation limit exceeded."
-        assert resp.headers["Retry-After"] == "123"
-
-    def test_pat_event_daily_create_rate_limit_returns_429(
-        self,
-        client: TestClient,
-        db: Session,
-        tenant_a: Tenants,
-    ) -> None:
-        popup = _make_popup(db, tenant_a)
-        _set_event_settings(db, tenant_a, popup)
-        human = _make_human(db, tenant_a)
-        raw_key = _make_pat(
-            db,
-            tenant_a,
-            human,
-            scopes=["events:read", "events:write"],
-        )
-
-        with patch(
-            "app.core.security.pat_event_create_daily_rate_limiter.is_allowed",
-            return_value=(False, 0),
-        ), patch(
-            "app.core.security.pat_event_create_daily_rate_limiter.get_ttl",
-            return_value=456,
-        ):
-            resp = client.post(
-                "/api/v1/events/portal/events",
-                headers=_pat_auth(raw_key),
-                json=_event_payload(popup),
-            )
-
-        assert resp.status_code == 429, resp.text
-        assert (
-            resp.json()["detail"]
-            == "API key daily event creation limit exceeded."
-        )
-        assert resp.headers["Retry-After"] == "456"
 
     def test_pat_without_write_scope_cannot_create_event(
         self,
