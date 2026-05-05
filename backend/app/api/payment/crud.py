@@ -1852,6 +1852,44 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         session.flush()
 
+    def _restore_payment_stock(
+        self,
+        session: Session,
+        payment: Payments,
+    ) -> None:
+        """Restore total_stock_remaining and shared_stock_remaining for every
+        product/tier in the payment.
+
+        Source of truth for per-product quantities: payment.products_snapshot
+        (PaymentProducts rows keyed by payment_id).  SimpleFI's webhook payload
+        carries only the external payment_request.id — no per-product data.
+        We look up the local Payments row and iterate its snapshot here.
+
+        Idempotency contract: callers MUST verify that the payment is currently
+        in a stock-holding status (PENDING) before calling this method.  The
+        LEAST-clamp in restore_total_stock / restore_shared_stock provides a
+        structural backstop against double-restore drift past the cap, but the
+        status guard prevents the semantic double-count.
+
+        APPROVED → CANCELLED (refund flow) is OUT OF SCOPE: callers must not
+        invoke this method when old_status == APPROVED.  That path requires a
+        separate refund-stock decision and is intentionally not wired here.
+        See design §4.2 and proposal locked decisions.
+        """
+        from app.api.product.crud import _resolve_tier_group, products_crud, tier_groups_crud
+
+        if not payment.products_snapshot:
+            return
+
+        for pp in payment.products_snapshot:
+            # Restore per-product total stock counter (no-op for unlimited products).
+            products_crud.restore_total_stock(session, pp.product_id, pp.quantity)
+
+            # Restore shared tier-group counter if this product belongs to a group.
+            group_id = _resolve_tier_group(session, pp.product_id)
+            if group_id is not None:
+                tier_groups_crud.restore_shared_stock(session, group_id, pp.quantity)
+
     def update_status(
         self,
         session: Session,
@@ -1867,6 +1905,17 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             )
 
         old_status = payment.status
+
+        # Restore stock when transitioning OUT of PENDING into a terminal non-approved
+        # state.  Idempotency guard: only restore when old_status was PENDING.
+        # APPROVED → CANCELLED (refund flow) is explicitly OUT OF SCOPE per design
+        # §4.2 — no stock restoration in that path (separate future feature).
+        if (
+            new_status in (PaymentStatus.CANCELLED, PaymentStatus.REJECTED, PaymentStatus.EXPIRED)
+            and old_status == PaymentStatus.PENDING.value
+        ):
+            self._restore_payment_stock(session, payment)
+
         payment.status = new_status.value
 
         # If approving, add products to attendees

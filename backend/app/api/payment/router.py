@@ -919,8 +919,22 @@ async def _handle_payment_request_expired(
         )
         return {"message": "Payment already approved"}
 
-    if payment.status == PaymentStatus.EXPIRED.value:
-        logger.info("Payment {} already expired. Skipping...", payment.id)
+    # Extend early-return to cover all already-finalized statuses.
+    # EXPIRED: duplicate webhook delivery — stock already restored on first fire.
+    # CANCELLED / REJECTED: admin already finalized the payment via update_status
+    # (which ran _restore_payment_stock at that time) — no second restore needed.
+    # LEAST-clamp in restore helpers is a structural backstop, but we also guard
+    # semantically here so we don't double-count the same expiry event.
+    if payment.status in (
+        PaymentStatus.EXPIRED.value,
+        PaymentStatus.CANCELLED.value,
+        PaymentStatus.REJECTED.value,
+    ):
+        logger.info(
+            "Payment {} already finalized (status={}). Skipping expiry webhook.",
+            payment.id,
+            payment.status,
+        )
         return {"message": "Payment status unchanged"}
 
     logger.info(
@@ -931,7 +945,11 @@ async def _handle_payment_request_expired(
         payload.data.payment_request.status,
     )
 
-    payments_crud.update(db, payment, PaymentUpdate(status=PaymentStatus.EXPIRED))
+    # Delegate to update_status which runs _restore_payment_stock (guarded by
+    # old_status == PENDING) before marking the payment EXPIRED.
+    # Source of truth for per-product quantities: payment.products_snapshot
+    # (PaymentProducts rows). SimpleFI's payload only carries payment_request.id.
+    payments_crud.update_status(db, payment.id, PaymentStatus.EXPIRED)
     logger.info(
         "Payment {} marked as expired via SimpleFI webhook (external_id: {})",
         payment.id,
