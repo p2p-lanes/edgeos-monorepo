@@ -1,12 +1,12 @@
 import { useQueryClient } from "@tanstack/react-query"
 import { type MutableRefObject, useCallback, useEffect } from "react"
+import { resolveMaxQuantity } from "@/components/ui/QuantitySelector"
 import {
   type CartState,
   useCart,
   useClearCart,
   useSaveCart,
 } from "@/hooks/useCartApi"
-import { resolveMaxQuantity } from "@/components/ui/QuantitySelector"
 import { checkAndClearPurchasePending } from "@/hooks/usePaymentRedirect"
 import { queryKeys } from "@/lib/query-keys"
 import type {

@@ -31,7 +31,8 @@ export const resolveMaxQuantity = (
   opts?: { dayPassFallbackToDateRange?: boolean },
 ): number => {
   const perOrder = product.max_per_order ?? Number.POSITIVE_INFINITY
-  const stockRemaining = product.total_stock_remaining ?? Number.POSITIVE_INFINITY
+  const stockRemaining =
+    product.total_stock_remaining ?? Number.POSITIVE_INFINITY
   let cap = Math.min(perOrder, stockRemaining)
 
   if (

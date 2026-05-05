@@ -33,7 +33,10 @@ export function ProductPicker({
       <div className="space-y-4">
         {products.map((product) => {
           const quantity = quantities[product.id] ?? 0
-          const maxQuantity = resolveMaxQuantity(product)
+          const maxQuantity = resolveMaxQuantity({
+            max_per_order: product.max_per_order,
+            total_stock_remaining: product.total_stock_remaining,
+          })
 
           return (
             <div
