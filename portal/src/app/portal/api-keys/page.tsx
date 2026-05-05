@@ -5,6 +5,10 @@ import { Check, Copy, Key, Loader2, Plus, Trash2 } from "lucide-react"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
+import {
+  EventsApiAccessUnavailable,
+  useEventsApiAccess,
+} from "@/components/EventsApiAccessGate"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -26,6 +30,9 @@ import type {
 } from "@/lib/apiKeysService"
 
 const DEFAULT_SCOPES: ApiKeyScope[] = ["events:read"]
+const WRITE_SCOPE_LIFETIME_DAYS = 30
+
+const scopeKey = (scope: ApiKeyScope) => scope.replace(":", "_")
 
 const SCOPE_OPTIONS: Array<{
   value: ApiKeyScope
@@ -39,6 +46,11 @@ const SCOPE_OPTIONS: Array<{
       "List events and read the context needed for event automation.",
   },
   {
+    value: "events:write",
+    label: "Create events",
+    description: "Create and edit events on your behalf.",
+  },
+  {
     value: "rsvp:write",
     label: "RSVP to events",
     description: "Register or cancel attendance for events.",
@@ -47,6 +59,7 @@ const SCOPE_OPTIONS: Array<{
 
 export default function ApiKeysPage() {
   const { t } = useTranslation()
+  const { allowed } = useEventsApiAccess()
   const {
     keys,
     isLoading,
@@ -80,11 +93,17 @@ export default function ApiKeysPage() {
   const onCreate = async () => {
     const name = newKeyName.trim()
     if (!name) return
+    const requiresExpiry = selectedScopes.includes("events:write")
+    const expiresAt = requiresExpiry
+      ? new Date(
+          Date.now() + WRITE_SCOPE_LIFETIME_DAYS * 24 * 60 * 60 * 1000,
+        ).toISOString()
+      : null
     try {
       const created = await createKey({
         name,
         scopes: selectedScopes,
-        expires_at: null,
+        expires_at: expiresAt,
       })
       setCreatedKey(created)
       setNewKeyName("")
@@ -124,6 +143,10 @@ export default function ApiKeysPage() {
 
   const isActive = (k: ApiKeyPublic) =>
     !k.revoked_at && (!k.expires_at || new Date(k.expires_at) > new Date())
+
+  if (!allowed) {
+    return <EventsApiAccessUnavailable />
+  }
 
   return (
     <div className="flex-1 p-6 bg-background">
@@ -307,14 +330,17 @@ export default function ApiKeysPage() {
                         htmlFor={checkboxId}
                         className="text-sm font-medium cursor-pointer"
                       >
-                        {t(`api_keys.scope.${scope.value}.label`, {
+                        {t(`api_keys.scope.${scopeKey(scope.value)}.label`, {
                           defaultValue: scope.label,
                         })}
                       </Label>
                       <p className="text-xs text-muted-foreground">
-                        {t(`api_keys.scope.${scope.value}.description`, {
-                          defaultValue: scope.description,
-                        })}
+                        {t(
+                          `api_keys.scope.${scopeKey(scope.value)}.description`,
+                          {
+                            defaultValue: scope.description,
+                          },
+                        )}
                       </p>
                     </div>
                   </div>

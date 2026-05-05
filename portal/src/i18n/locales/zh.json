@@ -397,7 +397,23 @@
     "revoke_title": "撤销 API 密钥",
     "revoke_description": "此操作无法撤销。任何使用此令牌的内容将立即停止工作。",
     "revoked": "API 密钥已撤销",
-    "revoke_failed": "撤销 API 密钥失败"
+    "revoke_failed": "撤销 API 密钥失败",
+    "scopes_label": "权限",
+    "scopes_description": "新密钥默认仅有只读权限。仅在确有需要时才开启更多权限。",
+    "scope": {
+      "events_read": {
+        "label": "读取活动",
+        "description": "列出活动并读取活动自动化所需的上下文。"
+      },
+      "events_write": {
+        "label": "创建活动",
+        "description": "代表你创建和编辑活动。"
+      },
+      "rsvp_write": {
+        "label": "报名活动",
+        "description": "为活动报名或取消报名。"
+      }
+    }
   },
   "breadcrumbs": {
     "application": "申请",
@@ -423,6 +439,10 @@
       "back_to_events": "返回活动列表",
       "no_open_hours": "无营业时间",
       "in_timezone_time": "{{timezone}} 时间"
+    },
+    "api_access": {
+      "unavailable_heading": "此 popup 不可用",
+      "unavailable_message": "API 密钥和活动 API 文档属于活动模块，此 popup 未启用该模块。"
     },
     "list": {
       "heading": "活动",

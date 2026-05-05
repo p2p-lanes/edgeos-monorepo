@@ -31,7 +31,8 @@ const useResources = () => {
 
   // Direct-sale popups have no application and no reviewer-controlled
   // attendees — just an event overview that links to checkout, plus a
-  // passes view for managing existing purchases.
+  // passes view for managing existing purchases. The events module
+  // (and its API Keys/Docs subsections) is not exposed in this flow.
   if (city?.sale_type === "direct" && user) {
     const resources: Resource[] = [
       {
@@ -39,22 +40,6 @@ const useResources = () => {
         icon: Ticket,
         status: "active",
         path: `/portal/${city?.slug}`,
-        children: eventsEnabled
-          ? [
-              {
-                name: t("sidebar.api_keys", { defaultValue: "API Keys" }),
-                icon: Key,
-                status: "active",
-                path: "/portal/api-keys",
-              },
-              {
-                name: t("sidebar.api_docs", { defaultValue: "API Docs" }),
-                icon: BookOpen,
-                status: "active",
-                path: "/portal/docs",
-              },
-            ]
-          : undefined,
       },
       {
         name: t("sidebar.passes"),

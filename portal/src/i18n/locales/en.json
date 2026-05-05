@@ -397,7 +397,23 @@
     "revoke_title": "Revoke API key",
     "revoke_description": "This action cannot be undone. Anything using this token will immediately stop working.",
     "revoked": "API key revoked",
-    "revoke_failed": "Failed to revoke API key"
+    "revoke_failed": "Failed to revoke API key",
+    "scopes_label": "Permissions",
+    "scopes_description": "New keys start with read-only access. Only enable broader permissions when you really need them.",
+    "scope": {
+      "events_read": {
+        "label": "Read events",
+        "description": "List events and read the context needed for event automation."
+      },
+      "events_write": {
+        "label": "Create events",
+        "description": "Create and edit events on your behalf."
+      },
+      "rsvp_write": {
+        "label": "RSVP to events",
+        "description": "Register or cancel attendance for events."
+      }
+    }
   },
   "breadcrumbs": {
     "application": "Application",
@@ -423,6 +439,10 @@
       "back_to_events": "Back to events",
       "no_open_hours": "No open hours",
       "in_timezone_time": "in {{timezone}} time"
+    },
+    "api_access": {
+      "unavailable_heading": "Not available for this popup",
+      "unavailable_message": "API keys and the events API docs are part of the events module, which isn't enabled for this popup."
     },
     "list": {
       "heading": "Events",
