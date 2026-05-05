@@ -397,7 +397,23 @@
     "revoke_title": "Revocar API key",
     "revoke_description": "Esta acción no se puede deshacer. Todo lo que use este token va a dejar de funcionar al instante.",
     "revoked": "API key revocada",
-    "revoke_failed": "Error al revocar la API key"
+    "revoke_failed": "Error al revocar la API key",
+    "scopes_label": "Permisos",
+    "scopes_description": "Las keys nuevas arrancan solo con acceso de lectura. Activá permisos más amplios solo cuando realmente los necesites.",
+    "scope": {
+      "events_read": {
+        "label": "Leer eventos",
+        "description": "Listar eventos y leer el contexto que necesita la automatización."
+      },
+      "events_write": {
+        "label": "Crear eventos",
+        "description": "Crear y editar eventos en tu nombre."
+      },
+      "rsvp_write": {
+        "label": "Registrarse a eventos",
+        "description": "Registrar o cancelar la asistencia a eventos."
+      }
+    }
   },
   "breadcrumbs": {
     "application": "Aplicación",
@@ -423,6 +439,10 @@
       "back_to_events": "Volver a eventos",
       "no_open_hours": "Sin horarios de apertura",
       "in_timezone_time": "en horario de {{timezone}}"
+    },
+    "api_access": {
+      "unavailable_heading": "No disponible para este popup",
+      "unavailable_message": "Las API keys y la documentación de la API de eventos forman parte del módulo de eventos, que no está habilitado para este popup."
     },
     "list": {
       "heading": "Eventos",

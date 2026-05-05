@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import Link from "next/link"
+import { EventsApiAccessGate } from "@/components/EventsApiAccessGate"
 
 export const metadata: Metadata = {
   title: "Events API",
@@ -112,6 +113,14 @@ const ERRORS: { code: string; meaning: string }[] = [
 ]
 
 export default function ApiDocsPage() {
+  return (
+    <EventsApiAccessGate>
+      <ApiDocsBody />
+    </EventsApiAccessGate>
+  )
+}
+
+function ApiDocsBody() {
   return (
     <div className="flex-1 p-6 bg-background">
       <div className="max-w-4xl mx-auto space-y-8">
