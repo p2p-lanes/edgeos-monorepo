@@ -876,7 +876,7 @@ async def _handle_regular_payment(
             await _send_payment_confirmed_email(payment, db_session=db)
         logger.info("Payment {} approved via SimpleFI webhook", payment.id)
     else:
-        payments_crud.update(db, payment, PaymentUpdate(status=PaymentStatus.EXPIRED))
+        payments_crud.update_status(db, payment.id, PaymentStatus.EXPIRED)
         logger.info(
             "Payment %s marked as expired (status: %s)",
             payment.id,
