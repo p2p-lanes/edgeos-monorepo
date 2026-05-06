@@ -27,7 +27,11 @@ export default function DynamicProductStep({
 
   // Explicit error state for non-ticket product steps missing a template.
   // This replaces the silent legacy-component fallback with a debuggable error.
-  if (!stepConfig.template && stepConfig.step_type !== "tickets" && !isContentOnly) {
+  if (
+    !stepConfig.template &&
+    stepConfig.step_type !== "tickets" &&
+    !isContentOnly
+  ) {
     // Only show error when there are products to display but no template.
     // When filtered is empty, show the standard empty state below.
     if (filtered.length > 0) {

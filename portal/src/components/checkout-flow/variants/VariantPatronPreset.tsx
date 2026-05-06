@@ -5,8 +5,8 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import {
-  resolvePatronPriceMode,
   type PatronPriceMode,
+  resolvePatronPriceMode,
 } from "@/hooks/checkout/resolvePatronPriceMode"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"

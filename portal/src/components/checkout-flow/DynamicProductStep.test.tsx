@@ -20,23 +20,31 @@ import DynamicProductStep from "./DynamicProductStep"
 function makeStep(
   overrides: Partial<TicketingStepPublic> & { step_type: string },
 ): TicketingStepPublic {
+  const {
+    id,
+    step_type,
+    product_category,
+    template,
+    template_config,
+    ...rest
+  } = overrides
   return {
-    id: overrides.id ?? overrides.step_type,
+    id: id ?? step_type,
     popup_id: "popup-id",
     tenant_id: "tenant-id",
-    step_type: overrides.step_type,
-    title: overrides.step_type,
+    step_type,
+    title: step_type,
     description: null,
     order: 0,
     is_enabled: true,
     protected: false,
-    product_category: overrides.product_category ?? null,
-    template: overrides.template ?? null,
-    template_config: overrides.template_config ?? null,
+    product_category: product_category ?? null,
+    template: template ?? null,
+    template_config: template_config ?? null,
     watermark: null,
     show_title: true,
     show_watermark: true,
-    ...overrides,
+    ...rest,
   } as TicketingStepPublic
 }
 

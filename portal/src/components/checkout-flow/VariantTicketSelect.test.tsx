@@ -161,7 +161,11 @@ describe("VariantTicketSelect — empty-attendee suppression", () => {
         products={[purchasedProduct]}
         stepType="tickets"
         onSkip={vi.fn()}
-        templateConfig={{ sections: [{ key: "s1", label: "Section 1", order: 0, product_ids: [] }] }}
+        templateConfig={{
+          sections: [
+            { key: "s1", label: "Section 1", order: 0, product_ids: [] },
+          ],
+        }}
       />,
     )
 

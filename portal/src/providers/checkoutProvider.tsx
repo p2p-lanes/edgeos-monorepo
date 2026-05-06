@@ -58,10 +58,6 @@ interface CheckoutContextValue {
   stepConfigs: TicketingStepPublic[]
   cart: CheckoutCartState
   summary: CheckoutCartSummary
-  passProducts: ProductsPass[]
-  housingProducts: ProductsPass[]
-  merchProducts: ProductsPass[]
-  patronProducts: ProductsPass[]
   allProducts: ProductsPass[]
   productsByStepId: Map<string, ProductsPass[]>
   getProductsForStep: StepProductResolution["getProductsForStep"]
@@ -254,28 +250,6 @@ export function CheckoutProvider({
   const allActiveProducts = useMemo(
     () => products.filter((p) => p.is_active),
     [products],
-  )
-
-  // Legacy category arrays kept for backward compatibility with context consumers
-  // (e.g. cart summary, confirm step). These will be removed in Slice 2.
-  const passProducts = useMemo(
-    () =>
-      allActiveProducts.filter((p) => p.category.toLowerCase() === "ticket"),
-    [allActiveProducts],
-  )
-  const housingProducts = useMemo(
-    () =>
-      allActiveProducts.filter((p) => p.category.toLowerCase() === "housing"),
-    [allActiveProducts],
-  )
-  const merchProducts = useMemo(
-    () => allActiveProducts.filter((p) => p.category.toLowerCase() === "merch"),
-    [allActiveProducts],
-  )
-  const patronProducts = useMemo(
-    () =>
-      allActiveProducts.filter((p) => p.category.toLowerCase() === "patreon"),
-    [allActiveProducts],
   )
 
   // Item selection hooks
@@ -766,10 +740,6 @@ export function CheckoutProvider({
     stepConfigs: effectiveConfiguredSteps,
     cart,
     summary: finalSummary,
-    passProducts,
-    housingProducts,
-    merchProducts,
-    patronProducts,
     allProducts: products,
     productsByStepId,
     getProductsForStep,
