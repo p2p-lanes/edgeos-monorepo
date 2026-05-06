@@ -44,6 +44,7 @@ from sqlmodel import Session
 
 from app.api.application.models import Applications
 from app.api.application.schemas import ApplicationStatus
+from app.api.attendee.crud import generate_check_in_code
 from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.human.models import Humans
 from app.api.popup.models import Popups
@@ -191,10 +192,11 @@ def _add_product_to_attendee(
     """Give an attendee a purchased product (triggers has_products guard)."""
     product = _make_product(db, tenant, popup, suffix="purchased")
     ap = AttendeeProducts(
+        id=uuid.uuid4(),
         tenant_id=tenant.id,
         attendee_id=attendee.id,
         product_id=product.id,
-        quantity=1,
+        check_in_code=generate_check_in_code(),
     )
     db.add(ap)
     db.commit()
@@ -672,3 +674,106 @@ class TestDeleteMyAttendeeForPopupHttp:
         )
 
         assert response.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# W3 fix: requires_check_in propagated in attendee_products response
+# ---------------------------------------------------------------------------
+
+
+class TestAttendeeProductsRequiresCheckIn:
+    """GET /attendees/my/popup/{popup_id} must expose requires_check_in per product.
+
+    W3 from verify-report: AttendeeProductPublic was missing requires_check_in,
+    so TicketQRList couldn't distinguish scannable vs. non-scannable products.
+    """
+
+    def _make_product_with_flag(
+        self,
+        db: Session,
+        tenant: Tenants,
+        popup: Popups,
+        *,
+        suffix: str,
+        requires_check_in: bool,
+    ):
+        from app.api.product.models import Products
+
+        product = Products(
+            id=uuid.uuid4(),
+            tenant_id=tenant.id,
+            popup_id=popup.id,
+            name=f"Product {suffix}",
+            slug=f"test-rci-{suffix}-{uuid.uuid4().hex[:6]}",
+            price=Decimal("50"),
+            category="ticket" if requires_check_in else "merch",
+            requires_check_in=requires_check_in,
+        )
+        db.add(product)
+        db.flush()
+        return product
+
+    def test_attendee_product_includes_requires_check_in_true(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        """products[].requires_check_in === true for a scannable product."""
+        popup = _make_popup(db, tenant_a, suffix="rci-true")
+        human = _make_human(db, tenant_a, suffix="rci-true")
+        app = _make_application(db, tenant_a, popup, human)
+        attendee = _make_app_attendee(db, tenant_a, popup, human, app)
+
+        product = self._make_product_with_flag(
+            db, tenant_a, popup, suffix="scannable", requires_check_in=True
+        )
+        ap = AttendeeProducts(
+            id=uuid.uuid4(),
+            tenant_id=tenant_a.id,
+            attendee_id=attendee.id,
+            product_id=product.id,
+            check_in_code=generate_check_in_code("RCI"),
+        )
+        db.add(ap)
+        db.commit()
+
+        response = client.get(
+            f"/api/v1/attendees/my/popup/{popup.id}", headers=_auth(human)
+        )
+
+        assert response.status_code == 200
+        body = response.json()
+        assert len(body["results"]) == 1
+        products = body["results"][0]["products"]
+        assert len(products) == 1
+        assert products[0]["requires_check_in"] is True
+
+    def test_attendee_product_includes_requires_check_in_false(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        """products[].requires_check_in === false for a non-scannable product."""
+        popup = _make_popup(db, tenant_a, suffix="rci-false")
+        human = _make_human(db, tenant_a, suffix="rci-false")
+        app = _make_application(db, tenant_a, popup, human)
+        attendee = _make_app_attendee(db, tenant_a, popup, human, app)
+
+        product = self._make_product_with_flag(
+            db, tenant_a, popup, suffix="merch", requires_check_in=False
+        )
+        ap = AttendeeProducts(
+            id=uuid.uuid4(),
+            tenant_id=tenant_a.id,
+            attendee_id=attendee.id,
+            product_id=product.id,
+            check_in_code=generate_check_in_code("RCI"),
+        )
+        db.add(ap)
+        db.commit()
+
+        response = client.get(
+            f"/api/v1/attendees/my/popup/{popup.id}", headers=_auth(human)
+        )
+
+        assert response.status_code == 200
+        body = response.json()
+        products = body["results"][0]["products"]
+        assert len(products) == 1
+        assert products[0]["requires_check_in"] is False

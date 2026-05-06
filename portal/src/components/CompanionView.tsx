@@ -77,6 +77,7 @@ export function CompanionView({ participation }: CompanionViewProps) {
   const isAccepted = application_status === "accepted"
   const hasTickets = tickets.length > 0
   // QR code is only safe to show when application is accepted AND companion has passes
+  // check_in_code is nullable post-migration (direct-sale attendees may have null)
   const canShowCheckIn = isAccepted && hasTickets && !!attendee.check_in_code
 
   const status = statusConfig[application_status]
@@ -193,9 +194,9 @@ export function CompanionView({ participation }: CompanionViewProps) {
         )}
       </CardContent>
 
-      {canShowCheckIn && (
+      {canShowCheckIn && attendee.check_in_code && (
         <QRcode
-          check_in_code={attendee.check_in_code!}
+          check_in_code={attendee.check_in_code}
           isOpen={isQrModalOpen}
           onOpenChange={setIsQrModalOpen}
         />

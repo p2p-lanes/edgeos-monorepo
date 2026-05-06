@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from app.api.popup.models import Popups
     from app.api.tenant.models import Tenants
 from app.api.application.schemas import ApplicationStatus, ScholarshipStatus
-from app.api.attendee.crud import generate_check_in_code
+from app.api.attendee.crud import attendees_crud, generate_check_in_code
 from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.coupon.crud import coupons_crud
 from app.api.form_section.models import FormSections
@@ -89,7 +89,11 @@ def _get_discounted_price(price: Decimal, discount_value: Decimal) -> Decimal:
 
 
 def _get_credit(application: Applications, discount_value: Decimal) -> Decimal:
-    """Calculate credit from previously paid products."""
+    """Calculate credit from previously paid products.
+
+    Each AttendeeProducts row represents one ticket (quantity=1).
+    Credit is sum of ap.product.price per row (not price * quantity).
+    """
     total = Decimal("0")
     for attendee in application.attendees:
         patreon = False
@@ -99,7 +103,7 @@ def _get_credit(application: Applications, discount_value: Decimal) -> Decimal:
                 patreon = True
                 subtotal = Decimal("0")
             elif not patreon:
-                subtotal += ap.product.price * ap.quantity
+                subtotal += ap.product.price  # each row = 1 ticket = 1× price
         if not patreon:
             total += subtotal
 
@@ -378,48 +382,33 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         session.add(payment)
         session.flush()
 
-        created_attendees: list[Attendees] = []
-        first_slot = True
         try:
+            # One attendee per (human, popup) for direct sales — Design §2.1
+            attendee = attendees_crud.find_or_create_direct_attendee(
+                session,
+                human_id=buyer.id,
+                popup_id=popup.id,
+                tenant_id=tenant.id,
+                name=buyer_name,
+                email=obj.buyer.email,
+            )
+
             for line in obj.products:
                 product = products_map[line.product_id]
                 amount += product.price * line.quantity
 
                 for _ in range(line.quantity):
-                    attendee_name = buyer_name if first_slot else ""
-                    attendee_email = obj.buyer.email if first_slot else None
-                    attendee_category = (
-                        "main"
-                        if first_slot
-                        else (
-                            product.attendee_category.value
-                            if product.attendee_category
-                            else "main"
-                        )
-                    )
-
-                    attendee = Attendees(
-                        tenant_id=tenant.id,
-                        application_id=None,
-                        popup_id=popup.id,
-                        human_id=buyer.id,
-                        name=attendee_name,
-                        category=attendee_category,
-                        email=attendee_email,
-                        check_in_code=generate_check_in_code(
-                            (popup.slug or "")[:3].upper()
-                        ),
-                    )
-                    session.add(attendee)
-                    session.flush()
-                    created_attendees.append(attendee)
-
+                    # One AttendeeProducts row per ticket — Design §2.2
                     session.add(
                         AttendeeProducts(
+                            id=uuid.uuid4(),
                             tenant_id=tenant.id,
                             attendee_id=attendee.id,
                             product_id=product.id,
-                            quantity=1,
+                            check_in_code=generate_check_in_code(
+                                (popup.slug or "")[:3].upper()
+                            ),
+                            payment_id=payment.id,
                         )
                     )
                     session.add(
@@ -436,8 +425,6 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                             product_currency=popup.currency,
                         )
                     )
-
-                    first_slot = False
 
             amount = amount.quantize(MONEY_PRECISION, rounding=ROUND_HALF_UP)
 
@@ -1795,19 +1782,18 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         session: Session,
         payment: Payments,
     ) -> None:
-        """Remove products from attendees that were added by this payment."""
-        if not payment.products_snapshot:
-            return
+        """Remove all AttendeeProducts rows linked to this payment.
 
+        Uses payment_id FK for precise removal — avoids deleting tickets that
+        belong to a different payment but share the same (attendee, product) pair.
+        """
         logger.info("Removing products from attendees for payment {}", payment.id)
-        for product_snapshot in payment.products_snapshot:
-            statement = select(AttendeeProducts).where(
-                AttendeeProducts.attendee_id == product_snapshot.attendee_id,
-                AttendeeProducts.product_id == product_snapshot.product_id,
-            )
-            attendee_product = session.exec(statement).first()
-            if attendee_product:
-                session.delete(attendee_product)
+        statement = select(AttendeeProducts).where(
+            AttendeeProducts.payment_id == payment.id,
+        )
+        tickets = list(session.exec(statement).all())
+        for ticket in tickets:
+            session.delete(ticket)
 
         session.flush()
 
@@ -1815,9 +1801,14 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         self,
         session: Session,
         products: list[PaymentProductRequest],
+        payment_id: uuid.UUID | None = None,
     ) -> None:
-        """Add products to attendees after payment approval."""
-        # Get tenant_id from first attendee (all should be same tenant)
+        """Add products to attendees after payment approval.
+
+        Each PaymentProductRequest.quantity creates N new AttendeeProducts rows.
+        Always-INSERT — no upsert. Each row is an independent ticket with its own
+        UUID and check_in_code.
+        """
         if not products:
             return
 
@@ -1829,24 +1820,14 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         tenant_id = first_attendee.tenant_id
 
         for req_prod in products:
-            # Check if attendee already has this product
-            statement = select(AttendeeProducts).where(
-                AttendeeProducts.attendee_id == req_prod.attendee_id,
-                AttendeeProducts.product_id == req_prod.product_id,
-            )
-            existing = session.exec(statement).first()
-
-            if existing:
-                # Update quantity
-                existing.quantity += req_prod.quantity
-                session.add(existing)
-            else:
-                # Create new link
+            for _ in range(req_prod.quantity):
                 attendee_product = AttendeeProducts(
+                    id=uuid.uuid4(),
                     tenant_id=tenant_id,
                     attendee_id=req_prod.attendee_id,
                     product_id=req_prod.product_id,
-                    quantity=req_prod.quantity,
+                    check_in_code=generate_check_in_code(""),
+                    payment_id=payment_id,
                 )
                 session.add(attendee_product)
 

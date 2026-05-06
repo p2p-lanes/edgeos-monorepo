@@ -13,6 +13,7 @@ import {
   MapPin,
   Package,
   Palette,
+  QrCode,
   Settings,
   ShoppingCart,
   Sparkles,
@@ -125,6 +126,7 @@ export function AppSidebar() {
         badge: pendingReviewCount,
       },
       { icon: Users, title: "Attendees", path: "/attendees" },
+      { icon: QrCode, title: "Scan Ticket", path: "/scan" },
       { icon: User, title: "Humans", path: "/humans" },
       {
         icon: CreditCard,

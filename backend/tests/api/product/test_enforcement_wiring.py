@@ -151,7 +151,7 @@ class TestAddProductEnforcement:
         attendee = _make_attendee(db, app)
 
         with pytest.raises(HTTPException) as exc_info:
-            attendees_crud.add_product(db, attendee.id, product.id, quantity=1)
+            attendees_crud.add_product(db, attendee.id, product.id)
         assert exc_info.value.status_code == 409
 
     def test_add_product_within_stock_decrements_counter(
@@ -160,7 +160,7 @@ class TestAddProductEnforcement:
         tenant_a: Tenants,
         popup_tenant_a: Popups,
     ) -> None:
-        """add_product with stock available → counter decremented."""
+        """add_product call decrements 1 unit of total_stock_remaining."""
         product = _make_product(
             db, tenant_a, popup_tenant_a,
             total_stock_cap=5,
@@ -169,7 +169,9 @@ class TestAddProductEnforcement:
         app = _get_or_create_application(db, tenant_a, popup_tenant_a)
         attendee = _make_attendee(db, app)
 
-        attendees_crud.add_product(db, attendee.id, product.id, quantity=2)
+        # Always-insert: each call creates 1 ticket and decrements 1.
+        attendees_crud.add_product(db, attendee.id, product.id)
+        attendees_crud.add_product(db, attendee.id, product.id)
 
         db.expire_all()
         refreshed = db.get(Products, product.id)
@@ -192,31 +194,38 @@ class TestAddProductEnforcement:
         app = _get_or_create_application(db, tenant_a, popup_tenant_a)
         attendee = _make_attendee(db, app)
 
-        result = attendees_crud.add_product(db, attendee.id, product.id, quantity=99)
-        assert result is not None
+        # Many calls on an unlimited product all succeed.
+        for _ in range(5):
+            result = attendees_crud.add_product(db, attendee.id, product.id)
+            assert result is not None
 
         db.expire_all()
         refreshed = db.get(Products, product.id)
         assert refreshed.total_stock_remaining is None
 
-    def test_add_product_exceeds_max_per_order_raises_422(
+    def test_add_product_invalid_max_per_order_raises_422(
         self,
         db: Session,
         tenant_a: Tenants,
         popup_tenant_a: Popups,
     ) -> None:
-        """add_product with qty > max_per_order → 422."""
+        """add_product on a product mis-configured with max_per_order < 1 → 422.
+
+        Note: under always-insert semantics, max_per_order is enforced per cart
+        in the calling layer; this guard only catches the degenerate case where
+        max_per_order is 0 (config error that would reject all tickets).
+        """
         product = _make_product(
             db, tenant_a, popup_tenant_a,
             total_stock_cap=10,
             total_stock_remaining=10,
-            max_per_order=2,
+            max_per_order=0,
         )
         app = _get_or_create_application(db, tenant_a, popup_tenant_a)
         attendee = _make_attendee(db, app)
 
         with pytest.raises(HTTPException) as exc_info:
-            attendees_crud.add_product(db, attendee.id, product.id, quantity=3)
+            attendees_crud.add_product(db, attendee.id, product.id)
         assert exc_info.value.status_code == 422
 
     def test_add_product_concurrent_decrements_exactly_one_wins(
@@ -244,7 +253,7 @@ class TestAddProductEnforcement:
             with SyncSession(test_engine) as session:
                 attendee = _make_attendee(session, app)
                 try:
-                    attendees_crud.add_product(session, attendee.id, product.id, 1)
+                    attendees_crud.add_product(session, attendee.id, product.id)
                     with lock:
                         successes.append(True)
                 except HTTPException as exc:

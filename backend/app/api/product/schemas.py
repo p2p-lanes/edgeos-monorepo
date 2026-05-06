@@ -78,6 +78,10 @@ class ProductBase(SQLModel):
         default=False,
         sa_column=Column(Boolean, nullable=False, server_default="false"),
     )
+    requires_check_in: bool = Field(
+        default=False,
+        sa_column=Column(Boolean, nullable=False, server_default="false"),
+    )
 
 
 class ProductPublic(ProductBase):
@@ -109,6 +113,7 @@ class ProductCreate(BaseModel):
     total_stock_remaining: int | None = Field(default=None, ge=0)
     max_per_order: int | None = Field(default=None, ge=1)
     insurance_eligible: bool = False
+    requires_check_in: bool = False
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -145,6 +150,7 @@ class ProductUpdate(BaseModel):
     total_stock_remaining: int | None = Field(default=None, ge=0)
     max_per_order: int | None = Field(default=None, ge=1)
     insurance_eligible: bool | None = None
+    requires_check_in: bool | None = None
 
 
 class ProductBatchItem(BaseModel):
@@ -167,6 +173,7 @@ class ProductBatchItem(BaseModel):
     total_stock_remaining: int | None = Field(default=None, ge=0)
     max_per_order: int | None = Field(default=None, ge=1)
     insurance_eligible: bool = False
+    requires_check_in: bool = False
 
     model_config = ConfigDict(str_strip_whitespace=True)
 

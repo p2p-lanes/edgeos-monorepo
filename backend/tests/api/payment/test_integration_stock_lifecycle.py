@@ -548,9 +548,7 @@ class TestApplicationFlowEnforcement:
         db.refresh(attendee)
 
         with pytest.raises(HTTPException) as exc_info:
-            attendees_crud.add_product(
-                db, attendee.id, product.id, quantity=1
-            )
+            attendees_crud.add_product(db, attendee.id, product.id)
 
         assert exc_info.value.status_code == 409
 

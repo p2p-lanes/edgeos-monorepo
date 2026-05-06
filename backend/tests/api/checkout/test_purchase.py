@@ -138,7 +138,8 @@ def test_purchase_happy_path_creates_payment_and_attendees(
     attendees = list(
         db.exec(select(Attendees).where(Attendees.popup_id == popup.id)).all()
     )
-    assert len(attendees) == 2
+    # New design: 1 attendee per (human, popup), 2 AttendeeProducts rows for qty=2
+    assert len(attendees) == 1
 
 
 def test_purchase_unknown_slug_returns_404(client: TestClient, tenant_a: Tenants) -> None:

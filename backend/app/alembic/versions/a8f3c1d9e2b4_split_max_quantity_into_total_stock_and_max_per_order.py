@@ -21,7 +21,7 @@ steps (add_column, backfill UPDATE, drop_column) are not wrapped in IF NOT EXIST
 guards — the version table is the idempotency boundary.
 
 Revision ID: a8f3c1d9e2b4
-Revises: 0043_tenant_scoped_popup_slug
+Revises: 0044_event_custom_location
 Create Date: 2026-05-05
 """
 
@@ -31,7 +31,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "a8f3c1d9e2b4"
-down_revision: str = "0043_tenant_scoped_popup_slug"
+down_revision: str = "0044_event_custom_location"
 branch_labels: Sequence[str] | None = None
 depends_on: Sequence[str] | None = None
 

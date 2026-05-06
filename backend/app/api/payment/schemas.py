@@ -5,6 +5,7 @@ from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 from sqlalchemy import Integer, Numeric, String, Text
+from sqlalchemy.dialects import postgresql as pg
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Column, Field, SQLModel
 
@@ -35,16 +36,24 @@ class PaymentStatus(str, Enum):
 
 
 class PaymentProductBase(SQLModel):
-    """Base schema for payment product snapshot."""
+    """Base schema for payment product snapshot.
 
+    UUID PK 'id' replaces the old composite PK (payment_id, product_id, attendee_id),
+    allowing multiple rows with the same triple (needed when a buyer purchases N tickets
+    of the same product in one payment — each gets its own PaymentProducts row).
+    """
+
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        sa_column=Column(
+            pg.UUID(as_uuid=True),
+            primary_key=True,
+        ),
+    )
     tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
-    payment_id: uuid.UUID = Field(foreign_key="payments.id", primary_key=True)
-    product_id: uuid.UUID = Field(
-        foreign_key="products.id", primary_key=True, index=True
-    )
-    attendee_id: uuid.UUID = Field(
-        foreign_key="attendees.id", primary_key=True, index=True
-    )
+    payment_id: uuid.UUID = Field(foreign_key="payments.id", index=True)
+    product_id: uuid.UUID = Field(foreign_key="products.id", index=True)
+    attendee_id: uuid.UUID = Field(foreign_key="attendees.id", index=True)
     quantity: int = Field(default=1)
 
     # Snapshot of product at time of purchase

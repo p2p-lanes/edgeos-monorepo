@@ -12,7 +12,11 @@ import {
 } from "lucide-react"
 import { Suspense, useState } from "react"
 
-import { type AttendeePublic, AttendeesService } from "@/client"
+import {
+  type AttendeeProductPublic,
+  type AttendeePublic,
+  AttendeesService,
+} from "@/client"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
@@ -43,6 +47,50 @@ import {
 } from "@/hooks/useTableSearchParams"
 import { exportToCsv, fetchAllPages } from "@/lib/export"
 
+// ── CSV flattening helper ─────────────────────────────────────────────────────
+
+type FlatAttendeeRow = {
+  name: string
+  email: string | null | undefined
+  category: string
+  gender: string | null | undefined
+  ticket_check_in_code: string
+  product_id: string
+}
+
+/**
+ * Expand each attendee into one row per purchased ticket.
+ * Attendees with no products emit a single row with empty ticket fields
+ * so they still appear in the CSV.
+ */
+export function flattenAttendeesForCsv(
+  attendees: AttendeePublic[],
+): FlatAttendeeRow[] {
+  return attendees.flatMap((att) => {
+    const products = (att.products ?? []) as unknown as AttendeeProductPublic[]
+    if (products.length === 0) {
+      return [
+        {
+          name: att.name,
+          email: att.email,
+          category: att.category,
+          gender: att.gender,
+          ticket_check_in_code: "",
+          product_id: "",
+        },
+      ]
+    }
+    return products.map((p) => ({
+      name: att.name,
+      email: att.email,
+      category: att.category,
+      gender: att.gender,
+      ticket_check_in_code: p.check_in_code ?? "",
+      product_id: String(p.product_id),
+    }))
+  })
+}
+
 function getAttendeesQueryOptions(
   popupId: string | null,
   page: number,
@@ -69,6 +117,104 @@ export const Route = createFileRoute("/_layout/attendees")({
   }),
 })
 
+/**
+ * Renders the inner content of the attendee details dialog.
+ * Exported for unit-test isolation — rendered without Dialog wrapper so callers
+ * can assert on the content without needing modal open/close machinery.
+ */
+export function AttendeeDetailsContent({
+  attendee,
+}: {
+  attendee: AttendeePublic
+}) {
+  const products = (attendee.products ??
+    []) as unknown as AttendeeProductPublic[]
+
+  return (
+    <>
+      {/* Hero */}
+      <div className="space-y-1 px-6 pt-6 pb-4">
+        <p className="text-2xl font-semibold">{attendee.name}</p>
+        <Badge variant="secondary" className="capitalize">
+          {attendee.category}
+        </Badge>
+      </div>
+
+      <Separator />
+
+      {/* Contact */}
+      <InlineSection title="Contact" className="px-6 py-4">
+        <InlineRow
+          icon={<Mail className="h-4 w-4 text-muted-foreground" />}
+          label="Email"
+        >
+          <span className="text-sm text-muted-foreground">
+            {attendee.email || "N/A"}
+          </span>
+        </InlineRow>
+        {attendee.gender && (
+          <InlineRow
+            icon={<User className="h-4 w-4 text-muted-foreground" />}
+            label="Gender"
+          >
+            <span className="text-sm text-muted-foreground">
+              {attendee.gender}
+            </span>
+          </InlineRow>
+        )}
+      </InlineSection>
+
+      <Separator />
+
+      {/* Check-in — show per-ticket codes when products have them */}
+      <InlineSection title="Check-in" className="px-6 py-4">
+        {products.length > 0 ? (
+          products.map((p) => (
+            <InlineRow
+              key={p.id}
+              icon={<QrCode className="h-4 w-4 text-muted-foreground" />}
+              label="Ticket code"
+            >
+              <span className="font-mono text-sm font-medium">
+                {p.check_in_code}
+              </span>
+            </InlineRow>
+          ))
+        ) : (
+          <InlineRow
+            icon={<QrCode className="h-4 w-4 text-muted-foreground" />}
+            label="Code"
+          >
+            <span className="font-mono text-sm font-medium">
+              {attendee.check_in_code ?? "N/A"}
+            </span>
+          </InlineRow>
+        )}
+      </InlineSection>
+
+      {/* Footer */}
+      <Separator />
+      <div className="flex items-center justify-between px-6 py-4">
+        <div className="flex gap-4 text-xs text-muted-foreground">
+          {attendee.created_at && (
+            <span>{new Date(attendee.created_at).toLocaleDateString()}</span>
+          )}
+          {attendee.updated_at && (
+            <span>
+              Updated {new Date(attendee.updated_at).toLocaleDateString()}
+            </span>
+          )}
+        </div>
+        <DialogClose asChild>
+          <Button variant="outline" size="sm">
+            Close
+          </Button>
+        </DialogClose>
+      </div>
+    </>
+  )
+}
+
 function ViewAttendee({ attendee }: { attendee: AttendeePublic }) {
   const [isOpen, setIsOpen] = useState(false)
 
@@ -86,94 +232,7 @@ function ViewAttendee({ attendee }: { attendee: AttendeePublic }) {
           <DialogTitle>Attendee Details</DialogTitle>
           <DialogDescription>{attendee.name}</DialogDescription>
         </DialogHeader>
-
-        {/* Hero */}
-        <div className="space-y-1 px-6 pt-6 pb-4">
-          <p className="text-2xl font-semibold">{attendee.name}</p>
-          <Badge variant="secondary" className="capitalize">
-            {attendee.category}
-          </Badge>
-        </div>
-
-        <Separator />
-
-        {/* Contact */}
-        <InlineSection title="Contact" className="px-6 py-4">
-          <InlineRow
-            icon={<Mail className="h-4 w-4 text-muted-foreground" />}
-            label="Email"
-          >
-            <span className="text-sm text-muted-foreground">
-              {attendee.email || "N/A"}
-            </span>
-          </InlineRow>
-          {attendee.gender && (
-            <InlineRow
-              icon={<User className="h-4 w-4 text-muted-foreground" />}
-              label="Gender"
-            >
-              <span className="text-sm text-muted-foreground">
-                {attendee.gender}
-              </span>
-            </InlineRow>
-          )}
-        </InlineSection>
-
-        <Separator />
-
-        {/* Check-in */}
-        <InlineSection title="Check-in" className="px-6 py-4">
-          <InlineRow
-            icon={<QrCode className="h-4 w-4 text-muted-foreground" />}
-            label="Code"
-          >
-            <span className="font-mono text-sm font-medium">
-              {attendee.check_in_code}
-            </span>
-          </InlineRow>
-        </InlineSection>
-
-        {/* Products */}
-        {attendee.products && attendee.products.length > 0 && (
-          <>
-            <Separator />
-            <div className="px-6 py-4">
-              <p className="mb-2 px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Products
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {attendee.products.map((product) => {
-                  const p = product as { id?: string; name?: string }
-                  return (
-                    <Badge key={p.id ?? String(product)} variant="secondary">
-                      {p.name ?? "Unknown"}
-                    </Badge>
-                  )
-                })}
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* Footer */}
-        <Separator />
-        <div className="flex items-center justify-between px-6 py-4">
-          <div className="flex gap-4 text-xs text-muted-foreground">
-            {attendee.created_at && (
-              <span>{new Date(attendee.created_at).toLocaleDateString()}</span>
-            )}
-            {attendee.updated_at && (
-              <span>
-                Updated {new Date(attendee.updated_at).toLocaleDateString()}
-              </span>
-            )}
-          </div>
-          <DialogClose asChild>
-            <Button variant="outline" size="sm">
-              Close
-            </Button>
-          </DialogClose>
-        </div>
+        <AttendeeDetailsContent attendee={attendee} />
       </DialogContent>
     </Dialog>
   )
@@ -298,17 +357,15 @@ function Attendees() {
           popupId: selectedPopupId,
         }),
       )
-      exportToCsv(
-        "attendees",
-        results as unknown as Record<string, unknown>[],
-        [
-          { key: "name", label: "Name" },
-          { key: "email", label: "Email" },
-          { key: "category", label: "Category" },
-          { key: "check_in_code", label: "Check-in Code" },
-          { key: "gender", label: "Gender" },
-        ],
-      )
+      const rows = flattenAttendeesForCsv(results)
+      exportToCsv("attendees", rows as unknown as Record<string, unknown>[], [
+        { key: "name", label: "Name" },
+        { key: "email", label: "Email" },
+        { key: "category", label: "Category" },
+        { key: "gender", label: "Gender" },
+        { key: "ticket_check_in_code", label: "Ticket Check-in Code" },
+        { key: "product_id", label: "Product ID" },
+      ])
     } finally {
       setIsExporting(false)
     }
