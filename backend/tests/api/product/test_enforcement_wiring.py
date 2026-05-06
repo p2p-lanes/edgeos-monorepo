@@ -214,18 +214,30 @@ class TestAddProductEnforcement:
         Note: under always-insert semantics, max_per_order is enforced per cart
         in the calling layer; this guard only catches the degenerate case where
         max_per_order is 0 (config error that would reject all tickets).
+
+        The DB check constraint ck_products_max_per_order_positive prevents
+        inserting max_per_order=0 directly, so we mock session.get to return a
+        Product object with max_per_order=0 — simulating legacy/corrupted data
+        without poisoning the shared session.
         """
-        product = _make_product(
-            db, tenant_a, popup_tenant_a,
-            total_stock_cap=10,
-            total_stock_remaining=10,
-            max_per_order=0,
-        )
+        from unittest.mock import MagicMock, patch
+
+        from app.api.product.models import Products
+
+        # Build a mock product with max_per_order=0 (uncreatable via normal ORM)
+        mock_product = MagicMock(spec=Products)
+        mock_product.id = uuid.uuid4()
+        mock_product.name = "invalid-max-per-order-product"
+        mock_product.max_per_order = 0
+        mock_product.total_stock_cap = 10
+        mock_product.total_stock_remaining = 10
+
         app = _get_or_create_application(db, tenant_a, popup_tenant_a)
         attendee = _make_attendee(db, app)
 
-        with pytest.raises(HTTPException) as exc_info:
-            attendees_crud.add_product(db, attendee.id, product.id)
+        with patch.object(db, "get", return_value=mock_product):
+            with pytest.raises(HTTPException) as exc_info:
+                attendees_crud.add_product(db, attendee.id, mock_product.id)
         assert exc_info.value.status_code == 422
 
     def test_add_product_concurrent_decrements_exactly_one_wins(

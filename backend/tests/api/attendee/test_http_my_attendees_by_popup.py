@@ -386,7 +386,10 @@ class TestListMyAttendeesByPopupHttp:
         ap = result["products"][0]
         assert ap["attendee_id"] == str(attendee.id)
         assert "product_id" in ap
-        assert ap["quantity"] == 1
+        # Under always-insert semantics each AttendeeProducts row is one ticket;
+        # AttendeeProductPublic has no 'quantity' field — presence of the row IS
+        # the quantity (1 row = 1 ticket).
+        assert "id" in ap
 
 
 # ---------------------------------------------------------------------------
