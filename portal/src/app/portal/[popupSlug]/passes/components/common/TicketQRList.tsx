@@ -17,14 +17,15 @@ interface TicketQRListProps {
 
 /**
  * Renders a vertical list of QR codes — one per ticket that has
- * `requires_check_in === true`. Tickets with `requires_check_in === false`
- * (merch, non-scannable products) are silently skipped.
+ * `requires_check_in === true`. Tickets with `requires_check_in` falsy/undefined
+ * (merch, non-scannable products) are silently skipped — the safer default,
+ * since a missing flag must not surface a QR for an unscannable product.
  *
  * Layout: each entry shows the product name and a compact QR code +
  * the raw check_in_code string beneath it.
  */
 const TicketQRList = ({ tickets }: TicketQRListProps) => {
-  const scannable = tickets.filter((t) => t.requires_check_in !== false)
+  const scannable = tickets.filter((t) => t.requires_check_in === true)
 
   if (scannable.length === 0) return null
 

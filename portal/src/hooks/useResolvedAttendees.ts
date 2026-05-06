@@ -88,9 +88,7 @@ export function useResolvedAttendees(): AttendeePassState[] {
         product_id: ap.product_id,
         check_in_code: ap.check_in_code,
         payment_id: ap.payment_id ?? null,
-        // product_name and requires_check_in are not in AttendeeProductPublic;
-        // they will be undefined here and TicketQRList defaults requires_check_in to true.
-        // A future enrichment can pass them via a separate ticket-detail endpoint.
+        requires_check_in: ap.requires_check_in ?? false,
       })),
     }),
   )
