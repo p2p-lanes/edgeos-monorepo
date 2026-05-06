@@ -71,6 +71,7 @@ const baseTicket: TicketPublic = {
   },
   product: {
     id: "prod-uuid-1",
+    tenant_id: "tenant-1",
     name: "Weekend Pass",
     slug: "weekend-pass",
     price: "100.00",

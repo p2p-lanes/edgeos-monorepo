@@ -11,7 +11,7 @@ import {
 } from "lucide-react"
 import { useRef, useState } from "react"
 
-import { AttendeesService, type CheckInPayload, type TicketPublic } from "@/client"
+import { AttendeesService, type TicketPublic } from "@/client"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -174,10 +174,10 @@ function Scan() {
   const { showErrorToast } = useCustomToast()
 
   const scanMutation = useMutation({
-    mutationFn: ({ code, payload }: { code: string; payload: CheckInPayload }) =>
+    mutationFn: ({ code }: { code: string }) =>
       AttendeesService.getByCheckInCode({
         code: code.toUpperCase().trim(),
-        requestBody: payload,
+        requestBody: { source: "manual" },
       }),
     onSuccess: (ticket) => {
       setScannedTicket(ticket)
@@ -191,7 +191,8 @@ function Scan() {
         setNotFound(true)
         setScannedTicket(null)
       } else {
-        createErrorHandler(showErrorToast)(err as Error)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        createErrorHandler(showErrorToast)(err as any)
       }
       setCode("")
       setTimeout(() => inputRef.current?.focus(), 50)
@@ -202,7 +203,7 @@ function Scan() {
     const target = (overrideCode ?? code).toUpperCase().trim()
     if (!target) return
     setNotFound(false)
-    scanMutation.mutate({ code: target, payload: {} })
+    scanMutation.mutate({ code: target })
   }
 
   return (
