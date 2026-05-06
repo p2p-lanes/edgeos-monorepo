@@ -72,6 +72,10 @@ class ProductBase(SQLModel):
         default=False,
         sa_column=Column(Boolean, nullable=False, server_default="false"),
     )
+    requires_check_in: bool = Field(
+        default=False,
+        sa_column=Column(Boolean, nullable=False, server_default="false"),
+    )
 
 
 class ProductPublic(ProductBase):
@@ -101,6 +105,7 @@ class ProductCreate(BaseModel):
     exclusive: bool = False
     max_quantity: int | None = None
     insurance_eligible: bool = False
+    requires_check_in: bool = False
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -135,6 +140,7 @@ class ProductUpdate(BaseModel):
     exclusive: bool | None = None
     max_quantity: int | None = None
     insurance_eligible: bool | None = None
+    requires_check_in: bool | None = None
 
 
 class ProductBatchItem(BaseModel):
@@ -155,6 +161,7 @@ class ProductBatchItem(BaseModel):
     exclusive: bool = False
     max_quantity: int | None = None
     insurance_eligible: bool = False
+    requires_check_in: bool = False
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
