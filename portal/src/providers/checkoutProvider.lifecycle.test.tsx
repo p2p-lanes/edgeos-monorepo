@@ -144,7 +144,9 @@ describe("CheckoutProvider — cart lifecycle integration", () => {
         template: "merch-image",
       }),
     ]
-    const products = [makeProduct({ id: "swag-1", category: "other", price: 30 })]
+    const products = [
+      makeProduct({ id: "swag-1", category: "other", price: 30 }),
+    ]
 
     const { result } = renderHook(() => useCheckout(), {
       wrapper: makeWrapper(steps, products),
@@ -171,7 +173,9 @@ describe("CheckoutProvider — cart lifecycle integration", () => {
         template: "merch-image",
       }),
     ]
-    const products = [makeProduct({ id: "tshirt", category: "merch", price: 20 })]
+    const products = [
+      makeProduct({ id: "tshirt", category: "merch", price: 20 }),
+    ]
 
     const { result } = renderHook(() => useCheckout(), {
       wrapper: makeWrapper(steps, products),
@@ -221,8 +225,12 @@ describe("CheckoutProvider — cart lifecycle integration", () => {
     })
 
     expect(result.current.cart.merch).toHaveLength(2)
-    const merchItem = result.current.cart.merch.find((m) => m.productId === "p-merch")
-    const otherItem = result.current.cart.merch.find((m) => m.productId === "p-other")
+    const merchItem = result.current.cart.merch.find(
+      (m) => m.productId === "p-merch",
+    )
+    const otherItem = result.current.cart.merch.find(
+      (m) => m.productId === "p-other",
+    )
     expect(merchItem?.quantity).toBe(1)
     expect(otherItem?.quantity).toBe(2)
   })

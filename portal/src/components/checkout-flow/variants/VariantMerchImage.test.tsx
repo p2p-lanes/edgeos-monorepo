@@ -24,10 +24,16 @@
  * Requirement: REQ: step-product-resolution — SCN: exact reproducer bug is fixed
  * Design: §2 (cart hooks id-lookup), §8 (VariantMerchImage.test.tsx)
  */
-import { act, fireEvent, render, renderHook, screen } from "@testing-library/react"
+import {
+  act,
+  fireEvent,
+  render,
+  renderHook,
+  screen,
+} from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import type { ProductsPass } from "@/types/Products"
 import { useMerchSelection } from "@/hooks/checkout/useMerchSelection"
+import type { ProductsPass } from "@/types/Products"
 import VariantMerchImage from "./VariantMerchImage"
 
 // ---------------------------------------------------------------------------
@@ -74,11 +80,8 @@ vi.mock("@/providers/checkoutProvider", () => ({
 
 // Mock next/image
 vi.mock("next/image", () => ({
-  default: ({
-    src,
-    alt,
-  }: { src: string; alt: string }) => (
-    // biome-ignore lint/a11y/useAltText: test stub
+  default: ({ src, alt }: { src: string; alt: string }) => (
+    // biome-ignore lint/performance/noImgElement: test stub
     <img src={src} alt={alt} />
   ),
 }))
@@ -160,7 +163,9 @@ describe("VariantMerchImage — category='other' bug reproducer (unit-level)", (
     )
 
     // Compact layout: when quantity=0, the outer card is a <button> with aria-label
-    const addButton = screen.getByRole("button", { name: /add custom swag to cart/i })
+    const addButton = screen.getByRole("button", {
+      name: /add custom swag to cart/i,
+    })
     fireEvent.click(addButton)
 
     expect(mockUpdateMerchQuantity).toHaveBeenCalledWith("p1", 1)

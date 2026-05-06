@@ -27,8 +27,8 @@ import { fireEvent, render, screen } from "@testing-library/react"
 import type { ReactNode } from "react"
 import { describe, expect, it, vi } from "vitest"
 import type { TicketingStepPublic } from "@/client"
-import type { ProductsPass } from "@/types/Products"
 import { CheckoutProvider } from "@/providers/checkoutProvider"
+import type { ProductsPass } from "@/types/Products"
 import DynamicProductStep from "./DynamicProductStep"
 
 // ---------------------------------------------------------------------------
@@ -81,11 +81,8 @@ vi.mock("react-i18next", () => ({
 
 // Mock next/image (used by VariantMerchImage)
 vi.mock("next/image", () => ({
-  default: ({
-    src,
-    alt,
-  }: { src: string; alt: string }) => (
-    // biome-ignore lint/a11y/useAltText: test stub
+  default: ({ src, alt }: { src: string; alt: string }) => (
+    // biome-ignore lint/performance/noImgElement: test stub
     <img src={src} alt={alt} />
   ),
 }))
@@ -207,7 +204,9 @@ describe("checkout flow — category='other' end-to-end smoke", () => {
     renderWithProvider(step, [product])
 
     // Resolver returns [] → DynamicProductStep shows empty state
-    expect(screen.queryByText(/no products available for this step/i)).not.toBeNull()
+    expect(
+      screen.queryByText(/no products available for this step/i),
+    ).not.toBeNull()
   })
 
   it("DynamicProductStep renders product for arbitrary custom category string", () => {
