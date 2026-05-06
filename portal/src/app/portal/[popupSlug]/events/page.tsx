@@ -492,10 +492,11 @@ export default function EventsPage() {
   return (
     // Natural flow so the outer <main> from portal/layout drives scrolling:
     // heading + toolbar scroll out of view with the list/calendar body
-    // instead of being sticky at the top. `overflow-x-hidden` is a safety
-    // net: any wide content inside the list/calendar body is clipped here
-    // instead of letting the whole viewport scroll sideways.
-    <div className="max-w-4xl mx-auto p-4 sm:p-6 overflow-x-hidden">
+    // instead of being sticky at the top. `overflow-x-clip` (not -hidden)
+    // is a safety net for wide content while preserving position:sticky
+    // for descendants — `overflow: hidden` would establish a scroll
+    // container and break sticky behavior on the calendar column.
+    <div className="max-w-4xl mx-auto p-4 sm:p-6 overflow-x-clip">
       <div className="mb-6">
         <div className="flex items-start justify-between gap-2">
           <h1 className="text-2xl font-bold tracking-tight">

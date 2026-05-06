@@ -206,8 +206,11 @@ export function CalendarBody({
     // forcing the column wider than its track — otherwise a long event
     // title/kind/venue string in the selected-day panel pushes the whole
     // grid (including the calendar) past the viewport on mobile.
-    <div className="grid lg:grid-cols-7 gap-5">
-      <div className="min-w-0 lg:col-span-3 rounded-xl border bg-card p-3">
+    // `items-start` keeps the calendar column at its natural height
+    // instead of stretching to match the events list, so it can be
+    // sticky without growing as more events render alongside it.
+    <div className="grid lg:grid-cols-7 gap-5 items-start">
+      <div className="min-w-0 lg:col-span-3 rounded-xl border bg-card p-3 lg:sticky lg:top-4 lg:self-start">
         <div className="flex items-center justify-between mb-2">
           <Button
             variant="ghost"
