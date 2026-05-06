@@ -6,15 +6,16 @@ import { usePatronSelection } from "./usePatronSelection"
 function makeProduct(
   overrides: Partial<ProductsPass> & { id: string; category: string },
 ): ProductsPass {
+  const { id, category, ...rest } = overrides
   return {
-    id: overrides.id,
-    name: overrides.name ?? overrides.id,
-    category: overrides.category,
-    is_active: overrides.is_active ?? true,
-    price: overrides.price ?? 10,
+    name: id,
+    is_active: true,
+    price: 10,
     compare_price: null,
-    max_quantity: overrides.max_quantity ?? null,
-    ...overrides,
+    max_quantity: null,
+    ...rest,
+    id,
+    category,
   } as unknown as ProductsPass
 }
 

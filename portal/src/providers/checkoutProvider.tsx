@@ -30,9 +30,9 @@ import {
   useMerchSelection,
   usePatronSelection,
   usePaymentSubmit,
-  useProductCategories,
   usePromoCode,
 } from "@/hooks/checkout"
+import { useStepProductResolver } from "@/hooks/checkout/useStepProductResolver"
 import useGetPassesData from "@/hooks/useGetPassesData"
 import { useIsAuthenticated } from "@/hooks/useIsAuthenticated"
 import { buildFormZodSchema } from "@/lib/form-schema-builder"
@@ -46,6 +46,7 @@ import type {
 } from "@/types/checkout"
 import type { ApplicationFormSchema } from "@/types/form-schema"
 import type { ProductsPass } from "@/types/Products"
+import type { StepProductResolution } from "@/hooks/checkout"
 import { useApplication } from "./applicationProvider"
 import { useCityProvider } from "./cityProvider"
 import { useDiscount } from "./discountProvider"
@@ -62,6 +63,8 @@ interface CheckoutContextValue {
   merchProducts: ProductsPass[]
   patronProducts: ProductsPass[]
   allProducts: ProductsPass[]
+  productsByStepId: Map<string, ProductsPass[]>
+  getProductsForStep: StepProductResolution["getProductsForStep"]
   attendees: AttendeePassState[]
   isLoading: boolean
   isInitialLoading: boolean
@@ -240,9 +243,37 @@ export function CheckoutProvider({
   const isInitialLoading =
     !!cityId && isAuthenticated && (isLoadingSteps || isLoadingProducts)
 
-  // Product categories
-  const { passProducts, housingProducts, merchProducts, patronProducts } =
-    useProductCategories(products)
+  // Step-aware product resolution (replaces useProductCategories)
+  const { productsByStepId, getProductsForStep } = useStepProductResolver(
+    effectiveConfiguredSteps,
+    products,
+  )
+
+  // Full active product list — passed to cart selection hooks so id-lookup works
+  // regardless of the product's category string.
+  const allActiveProducts = useMemo(
+    () => products.filter((p) => p.is_active),
+    [products],
+  )
+
+  // Legacy category arrays kept for backward compatibility with context consumers
+  // (e.g. cart summary, confirm step). These will be removed in Slice 2.
+  const passProducts = useMemo(
+    () => allActiveProducts.filter((p) => p.category.toLowerCase() === "ticket"),
+    [allActiveProducts],
+  )
+  const housingProducts = useMemo(
+    () => allActiveProducts.filter((p) => p.category.toLowerCase() === "housing"),
+    [allActiveProducts],
+  )
+  const merchProducts = useMemo(
+    () => allActiveProducts.filter((p) => p.category.toLowerCase() === "merch"),
+    [allActiveProducts],
+  )
+  const patronProducts = useMemo(
+    () => allActiveProducts.filter((p) => p.category.toLowerCase() === "patreon"),
+    [allActiveProducts],
+  )
 
   // Item selection hooks
   const housingPricePerDay = useMemo(() => {
@@ -261,13 +292,13 @@ export function CheckoutProvider({
     selectHousing,
     updateHousingQuantity,
     clearHousing,
-  } = useHousingSelection(housingProducts, housingPricePerDay)
+  } = useHousingSelection(allActiveProducts, housingPricePerDay)
 
   const { merch, setMerch, updateMerchQuantity } =
-    useMerchSelection(merchProducts)
+    useMerchSelection(allActiveProducts)
 
   const { patron, setPatron, setPatronAmount, clearPatron } =
-    usePatronSelection(patronProducts)
+    usePatronSelection(allActiveProducts)
 
   const [insurance, setInsurance] = useState(false)
   const [termsAccepted, setTermsAccepted] = useState(false)
@@ -740,6 +771,8 @@ export function CheckoutProvider({
     merchProducts,
     patronProducts,
     allProducts: products,
+    productsByStepId,
+    getProductsForStep,
     attendees: attendeePasses,
     isLoading,
     isInitialLoading,
