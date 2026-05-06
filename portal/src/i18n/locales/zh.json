@@ -500,7 +500,8 @@
       "event_count_one": "{{count}} 个活动",
       "event_count_other": "{{count}} 个活动",
       "no_venues": "此 pop-up 暂未配置场地。",
-      "no_venue_column": "无场地",
+      "no_venue_column": "会议",
+      "offsite_column": "外部地点",
       "untitled_venue": "未命名场地"
     },
     "add_to_calendar": {
@@ -549,7 +550,8 @@
       "remove_invitation_aria": "移除 {{email}} 的邀请",
       "edit_event_button": "编辑活动",
       "pending_approval_banner_title": "等待审批",
-      "pending_approval_banner_message": "你的活动正在等待审批,其他人暂时无法查看。"
+      "pending_approval_banner_message": "你的活动正在等待审批,其他人暂时无法查看。",
+      "open_in_maps": "在 Google 地图中打开"
     },
     "form": {
       "create_heading": "创建活动",
@@ -603,8 +605,9 @@
       "no_tags_configured": "此 pop-up 尚未配置标签。请让管理员在 Event Settings 中设置。",
       "track_label": "Track(可选)",
       "track_placeholder": "无 track",
-      "meeting_url_label": "会议链接(可选)",
+      "meeting_url_label": "会议链接",
       "meeting_url_placeholder": "https://…",
+      "meeting_url_required": "未选择场地时必须填写会议链接。",
       "cancel_button": "取消",
       "create_button": "创建活动",
       "save_button": "保存更改",
@@ -619,7 +622,14 @@
       "creation_restricted_heading": "创建活动受限",
       "creation_restricted_message": "仅管理员可为此 pop-up 创建活动。",
       "no_popup_error": "无 popup",
-      "no_venue_option": "无场地",
+      "no_venue_option": "会议",
+      "custom_location_option": "自定义地点",
+      "venues_group_label": "场地",
+      "custom_location_name_label": "地点名称",
+      "custom_location_name_placeholder": "我家",
+      "custom_location_url_label": "Google 地图链接",
+      "custom_location_url_placeholder": "https://maps.google.com/...",
+      "custom_location_validation_both_required": "请同时填写名称与 Google 地图链接。",
       "no_track_option": "无 track",
       "venue_capacity_suffix": "(容量 {{capacity}})",
       "event_cover_alt": "活动封面",

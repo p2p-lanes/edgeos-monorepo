@@ -158,9 +158,7 @@ async def send_event_itip(
         from app.api.tenant.utils import get_portal_url
 
         portal_base = get_portal_url(popup.tenant)
-        event_url = (
-            f"{portal_base.rstrip('/')}/portal/{popup_slug}/events/{event.id}"
-        )
+        event_url = f"{portal_base.rstrip('/')}/portal/{popup_slug}/events/{event.id}"
 
     service = get_email_service()
     from_address = popup.tenant.sender_email if popup and popup.tenant else None
@@ -385,7 +383,14 @@ def calendar_fields_changed(before: dict, after) -> bool:
     ``before`` is a snapshot dict captured before the update; ``after`` is
     the refreshed Events row. We bump SEQUENCE when any of these differ.
     """
-    fields = ("title", "start_time", "end_time", "venue_id")
+    fields = (
+        "title",
+        "start_time",
+        "end_time",
+        "venue_id",
+        "custom_location_name",
+        "custom_location_url",
+    )
     for f in fields:
         if before.get(f) != getattr(after, f, None):
             return True

@@ -1253,6 +1253,7 @@ export class CheckoutService {
      * Rate-limited 120/min/IP.
      * @param data The data for the request.
      * @param data.slug
+     * @param data.xTenantId
      * @returns CheckoutRuntimeResponse Successful Response
      * @throws ApiError
      */
@@ -1262,6 +1263,9 @@ export class CheckoutService {
             url: '/api/v1/checkout/{slug}/runtime',
             path: {
                 slug: data.slug
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
             },
             errors: {
                 422: 'Validation Error'
@@ -1275,6 +1279,7 @@ export class CheckoutService {
      * @param data The data for the request.
      * @param data.slug
      * @param data.requestBody
+     * @param data.xTenantId
      * @returns OpenTicketingPurchaseResponse Successful Response
      * @throws ApiError
      */
@@ -1284,6 +1289,9 @@ export class CheckoutService {
             url: '/api/v1/checkout/{slug}/purchase',
             path: {
                 slug: data.slug
+            },
+            headers: {
+                'X-Tenant-Id': data.xTenantId
             },
             body: data.requestBody,
             mediaType: 'application/json',
@@ -1304,6 +1312,7 @@ export class CouponsService {
      * Rate-limited 30/min/IP.
      * @param data The data for the request.
      * @param data.requestBody
+     * @param data.xTenantId
      * @returns CouponValidatePublicResponse Successful Response
      * @throws ApiError
      */
@@ -1311,6 +1320,9 @@ export class CouponsService {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/api/v1/coupons/validate-public',
+            headers: {
+                'X-Tenant-Id': data.xTenantId
+            },
             body: data.requestBody,
             mediaType: 'application/json',
             errors: {

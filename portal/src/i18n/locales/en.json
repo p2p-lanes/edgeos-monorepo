@@ -500,7 +500,8 @@
       "event_count_one": "{{count}} event",
       "event_count_other": "{{count}} events",
       "no_venues": "No venues configured for this pop-up yet.",
-      "no_venue_column": "No venue",
+      "no_venue_column": "Meeting",
+      "offsite_column": "Off-site",
       "untitled_venue": "Untitled venue"
     },
     "add_to_calendar": {
@@ -549,7 +550,8 @@
       "remove_invitation_aria": "Remove invitation for {{email}}",
       "edit_event_button": "Edit event",
       "pending_approval_banner_title": "Pending approval",
-      "pending_approval_banner_message": "Your event is pending approval and not yet visible to others."
+      "pending_approval_banner_message": "Your event is pending approval and not yet visible to others.",
+      "open_in_maps": "Open in Google Maps"
     },
     "form": {
       "create_heading": "Create event",
@@ -603,8 +605,9 @@
       "no_tags_configured": "Tags for this pop-up are not configured. Ask an admin to set them in Event Settings.",
       "track_label": "Track (optional)",
       "track_placeholder": "No track",
-      "meeting_url_label": "Meeting URL (optional)",
+      "meeting_url_label": "Meeting URL",
       "meeting_url_placeholder": "https://…",
+      "meeting_url_required": "Meeting URL is required when no venue is selected.",
       "cancel_button": "Cancel",
       "create_button": "Create event",
       "save_button": "Save changes",
@@ -619,7 +622,14 @@
       "creation_restricted_heading": "Event creation is restricted",
       "creation_restricted_message": "Only admins can create events for this pop-up.",
       "no_popup_error": "No popup",
-      "no_venue_option": "No venue",
+      "no_venue_option": "Meeting",
+      "custom_location_option": "Custom location",
+      "venues_group_label": "Venues",
+      "custom_location_name_label": "Place name",
+      "custom_location_name_placeholder": "My apartment",
+      "custom_location_url_label": "Google Maps link",
+      "custom_location_url_placeholder": "https://maps.google.com/...",
+      "custom_location_validation_both_required": "Provide both a name and a Google Maps link.",
       "no_track_option": "No track",
       "venue_capacity_suffix": " (cap. {{capacity}})",
       "event_cover_alt": "Event cover",

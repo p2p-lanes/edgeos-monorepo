@@ -4147,6 +4147,28 @@ export const EventCreateSchema = {
             ],
             title: 'Venue Id'
         },
+        custom_location_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Custom Location Name'
+        },
+        custom_location_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Custom Location Url'
+        },
         track_id: {
             anyOf: [
                 {
@@ -4600,6 +4622,29 @@ export const EventPublicSchema = {
                 }
             ],
             title: 'Venue Id'
+        },
+        custom_location_name: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Custom Location Name'
+        },
+        custom_location_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Custom Location Url'
         },
         track_id: {
             anyOf: [
@@ -5167,6 +5212,28 @@ export const EventUpdateSchema = {
                 }
             ],
             title: 'Venue Id'
+        },
+        custom_location_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Custom Location Name'
+        },
+        custom_location_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Custom Location Url'
         },
         track_id: {
             anyOf: [
@@ -9316,6 +9383,11 @@ export const PopupAdminSchema = {
             title: 'Tier Progression Enabled',
             default: false
         },
+        events_enabled: {
+            type: 'boolean',
+            title: 'Events Enabled',
+            default: true
+        },
         id: {
             type: 'string',
             format: 'uuid',
@@ -9676,6 +9748,11 @@ export const PopupCreateSchema = {
             type: 'boolean',
             title: 'Tier Progression Enabled',
             default: false
+        },
+        events_enabled: {
+            type: 'boolean',
+            title: 'Events Enabled',
+            default: true
         }
     },
     type: 'object',
@@ -9957,6 +10034,11 @@ export const PopupPublicSchema = {
             type: 'boolean',
             title: 'Tier Progression Enabled',
             default: false
+        },
+        events_enabled: {
+            type: 'boolean',
+            title: 'Events Enabled',
+            default: true
         }
     },
     type: 'object',
@@ -10493,6 +10575,17 @@ export const PopupUpdateSchema = {
                 }
             ],
             title: 'Tier Progression Enabled'
+        },
+        events_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Events Enabled'
         }
     },
     type: 'object',

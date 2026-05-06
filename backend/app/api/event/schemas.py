@@ -77,6 +77,11 @@ class EventBase(SQLModel):
         sa_column=Column(JSONB, nullable=False, server_default="[]"),
     )
     venue_id: uuid.UUID | None = Field(default=None, foreign_key="event_venues.id")
+    # Custom location (used when no venue is selected). The pair is XOR with
+    # ``venue_id`` and is validated as all-or-nothing on the create/update
+    # schemas; either both fields are set or both must be null.
+    custom_location_name: str | None = Field(default=None, max_length=255)
+    custom_location_url: str | None = Field(default=None, sa_type=Text())
     track_id: uuid.UUID | None = Field(
         default=None, foreign_key="tracks.id", index=True
     )
@@ -113,6 +118,30 @@ class EventBase(SQLModel):
         default_factory=datetime.utcnow,
         sa_type=DateTime(timezone=True),
     )
+
+
+def _enforce_custom_location_xor(
+    *,
+    venue_id: uuid.UUID | None,
+    name: str | None,
+    url: str | None,
+) -> None:
+    """Validator helper for ``EventCreate``/``EventUpdate``.
+
+    Rules (all-or-nothing pairing, mutually exclusive with ``venue_id``):
+      - If either custom field is set, both must be set.
+      - If a venue is set, neither custom field may be set.
+    A venue-less, location-less event is allowed (online-only).
+    """
+    has_name = bool(name and name.strip())
+    has_url = bool(url and url.strip())
+    if has_name != has_url:
+        raise ValueError(
+            "custom_location_name and custom_location_url must both be "
+            "provided together, or both omitted."
+        )
+    if venue_id is not None and (has_name or has_url):
+        raise ValueError("venue_id and custom_location_* are mutually exclusive.")
 
 
 class EventPublic(EventBase):
@@ -159,6 +188,8 @@ class EventCreate(BaseModel):
     max_participant: int | None = None
     tags: list[str] = []
     venue_id: uuid.UUID | None = None
+    custom_location_name: str | None = None
+    custom_location_url: str | None = None
     track_id: uuid.UUID | None = None
     visibility: EventVisibility = EventVisibility.PUBLIC
     require_approval: bool = False
@@ -168,6 +199,15 @@ class EventCreate(BaseModel):
     recurrence: RecurrenceRule | None = None
 
     model_config = ConfigDict(str_strip_whitespace=True)
+
+    @model_validator(mode="after")
+    def _validate_custom_location(self) -> "EventCreate":
+        _enforce_custom_location_xor(
+            venue_id=self.venue_id,
+            name=self.custom_location_name,
+            url=self.custom_location_url,
+        )
+        return self
 
 
 class EventUpdate(BaseModel):
@@ -183,12 +223,32 @@ class EventUpdate(BaseModel):
     max_participant: int | None = None
     tags: list[str] | None = None
     venue_id: uuid.UUID | None = None
+    custom_location_name: str | None = None
+    custom_location_url: str | None = None
     track_id: uuid.UUID | None = None
     visibility: EventVisibility | None = None
     require_approval: bool | None = None
     kind: str | None = None
     status: EventStatus | None = None
     highlighted: bool | None = None
+
+    @model_validator(mode="after")
+    def _validate_custom_location(self) -> "EventUpdate":
+        # Only validate when at least one of the relevant fields is being
+        # touched in this patch — otherwise an unrelated PATCH (e.g.
+        # ``{"title": "..."}``) would reject the update.
+        if (
+            self.venue_id is None
+            and self.custom_location_name is None
+            and self.custom_location_url is None
+        ):
+            return self
+        _enforce_custom_location_xor(
+            venue_id=self.venue_id,
+            name=self.custom_location_name,
+            url=self.custom_location_url,
+        )
+        return self
 
 
 class RecurrenceUpdate(BaseModel):
