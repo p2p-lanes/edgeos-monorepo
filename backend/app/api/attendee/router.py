@@ -11,7 +11,10 @@ from app.api.attendee.schemas import (
     AttendeeUpdate,
     AttendeeWithOriginPublic,
     AttendeeWithTickets,
+    TicketAttendeeSnapshot,
     TicketProduct,
+    TicketProductSnapshot,
+    TicketPublic,
 )
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
@@ -34,9 +37,11 @@ def _build_attendee_with_origin(attendee) -> AttendeeWithOriginPublic:
     """Build an AttendeeWithOriginPublic from an Attendees ORM row."""
     products = [
         AttendeeProductPublic(
+            id=ap.id,
             attendee_id=ap.attendee_id,
             product_id=ap.product_id,
-            quantity=ap.quantity,
+            check_in_code=ap.check_in_code,
+            payment_id=ap.payment_id,
         )
         for ap in attendee.attendee_products
     ]
@@ -281,13 +286,13 @@ async def list_attendees(
 
     results = []
     for a in attendees:
-        # Build product list with quantities
+        # Build product list — one row per ticket, quantity=1 per ticket
         products = []
         for ap in a.attendee_products:
             from app.api.product.schemas import ProductWithQuantity
 
             product = ProductWithQuantity.model_validate(ap.product)
-            product.quantity = ap.quantity
+            product.quantity = 1  # each ticket row = 1 unit
             products.append(product)
 
         attendee_data = AttendeePublic.model_validate(a)
@@ -315,13 +320,13 @@ async def get_attendee(
             detail="Attendee not found",
         )
 
-    # Build product list with quantities
+    # Build product list — one row per ticket
     products = []
     for ap in attendee.attendee_products:
         from app.api.product.schemas import ProductWithQuantity
 
         product_data = ap.product.model_dump()
-        product_data["quantity"] = ap.quantity
+        product_data["quantity"] = 1  # each ticket row = 1 unit
         products.append(ProductWithQuantity(**product_data))
 
     result = AttendeePublic.model_validate(attendee)
@@ -347,13 +352,13 @@ async def update_attendee(
 
     updated = crud.attendees_crud.update_attendee(db, attendee, attendee_in)
 
-    # Build product list
+    # Build product list — one row per ticket
     products = []
     for ap in updated.attendee_products:
         from app.api.product.schemas import ProductWithQuantity
 
         product_data = ap.product.model_dump()
-        product_data["quantity"] = ap.quantity
+        product_data["quantity"] = 1  # each ticket row = 1 unit
         products.append(ProductWithQuantity(**product_data))
 
     result = AttendeePublic.model_validate(updated)
@@ -386,33 +391,45 @@ async def delete_attendee(
     crud.attendees_crud.delete_attendee(db, attendee)
 
 
-@router.get("/check-in/{code}", response_model=AttendeePublic)
+@router.get("/check-in/{code}", response_model=TicketPublic)
 async def get_by_check_in_code(
     code: str,
     db: TenantSession,
     _: CurrentUser,
-) -> AttendeePublic:
-    """Get attendee by check-in code (BO - for check-in process)."""
-    attendee = crud.attendees_crud.get_by_check_in_code(db, code.upper())
+) -> TicketPublic:
+    """Get ticket by check-in code (BO - for check-in process).
 
-    if not attendee:
+    Returns TicketPublic with embedded attendee + product snapshots.
+    Code is matched case-insensitively (uppercased before lookup).
+    """
+    result = crud.attendees_crud.get_by_check_in_code(db, code.upper())
+
+    if not result:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Attendee not found",
+            detail="Ticket not found",
         )
 
-    # Build product list with quantities
-    products = []
-    for ap in attendee.attendee_products:
-        from app.api.product.schemas import ProductWithQuantity
-
-        product_data = ap.product.model_dump()
-        product_data["quantity"] = ap.quantity
-        products.append(ProductWithQuantity(**product_data))
-
-    result = AttendeePublic.model_validate(attendee)
-    result.products = products
-    return result
+    ticket, attendee, product = result
+    return TicketPublic(
+        id=ticket.id,
+        check_in_code=ticket.check_in_code,
+        payment_id=ticket.payment_id,
+        attendee=TicketAttendeeSnapshot(
+            id=attendee.id,
+            name=attendee.name,
+            email=attendee.email,
+            category=attendee.category,
+        ),
+        product=TicketProductSnapshot(
+            id=product.id,
+            name=product.name,
+            price=float(product.price),
+            category=product.category,
+            start_date=product.start_date,
+            end_date=product.end_date,
+        ),
+    )
 
 
 @router.get("/tickets/{email}", response_model=list[AttendeeWithTickets])
@@ -421,7 +438,12 @@ async def get_tickets_by_email(
     db: TenantSession,
     _: CurrentUser,
 ) -> list[AttendeeWithTickets]:
-    """Get all tickets/products for an email across all events (BO)."""
+    """Get all tickets/products for an email across all events (BO).
+
+    Returns one AttendeeWithTickets per attendee row. Each AttendeeProducts row
+    (ticket) is flattened into a TicketProduct entry with quantity=1.
+    Handles both application-linked and direct-sale attendees.
+    """
     attendees, _ = crud.attendees_crud.find_by_email(db, email=email, limit=1000)  # type: ignore[assignment]
 
     results = []
@@ -429,10 +451,18 @@ async def get_tickets_by_email(
         if not attendee.attendee_products:
             continue
 
-        # Get popup through application
-        popup = attendee.application.popup
+        # Resolve popup — direct-sale attendees have attendee.popup directly
+        # Application-linked attendees may have attendee.application.popup
+        popup = None
+        if attendee.popup_id:
+            from app.api.popup.models import Popups
+
+            popup = db.get(Popups, attendee.popup_id)
+        if popup is None and attendee.application:
+            popup = attendee.application.popup
         popup_name = popup.name if popup else "Unknown"
 
+        # Per-ticket entries — one TicketProduct per AttendeeProducts row
         ticket_products = []
         for ap in attendee.attendee_products:
             ticket_products.append(
@@ -441,7 +471,7 @@ async def get_tickets_by_email(
                     category=ap.product.category,
                     start_date=ap.product.start_date,
                     end_date=ap.product.end_date,
-                    quantity=ap.quantity,
+                    quantity=1,  # each row = 1 ticket
                 )
             )
 
@@ -452,7 +482,7 @@ async def get_tickets_by_email(
                 email=attendee.email,
                 category=attendee.category,
                 check_in_code=attendee.check_in_code,
-                popup_id=popup.id if popup else attendee.application.popup_id,
+                popup_id=popup.id if popup else attendee.popup_id,
                 popup_name=popup_name,
                 popup_slug=popup.slug if popup else None,
                 products=ticket_products,
