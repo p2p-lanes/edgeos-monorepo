@@ -358,6 +358,34 @@ class TestListMyAttendeesByPopupHttp:
         assert str(att_a.id) in ids
         assert body["paging"]["total"] == 1
 
+    def test_attendee_with_purchased_products_serializes(
+        self, client: TestClient, db: Session, tenant_a: Tenants
+    ) -> None:
+        # Regression: Attendees.products is a property returning Products
+        # ORM rows. If model_validate reads from `attendee.products`, it tries
+        # to coerce Products into AttendeeProductPublic (link-table shape) and
+        # fails with 422. The builder must read attendee_products instead.
+        popup = _make_popup(db, tenant_a, suffix="b-prods")
+        human = _make_human(db, tenant_a, suffix="b-prods")
+        app = _make_application(db, tenant_a, popup, human)
+        attendee = _make_app_attendee(db, tenant_a, popup, human, app)
+        _add_product_to_attendee(db, attendee, tenant_a, popup)
+
+        response = client.get(
+            f"/api/v1/attendees/my/popup/{popup.id}", headers=_auth(human)
+        )
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["paging"]["total"] == 1
+        result = body["results"][0]
+        assert result["id"] == str(attendee.id)
+        assert len(result["products"]) == 1
+        ap = result["products"][0]
+        assert ap["attendee_id"] == str(attendee.id)
+        assert "product_id" in ap
+        assert ap["quantity"] == 1
+
 
 # ---------------------------------------------------------------------------
 # CAP-C: POST /attendees/my/popup/{popup_id}
