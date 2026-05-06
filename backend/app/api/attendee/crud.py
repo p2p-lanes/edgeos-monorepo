@@ -548,20 +548,21 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         session.refresh(ticket)
         return ticket
 
-    def remove_product(
+    def remove_ticket(
         self,
         session: Session,
-        attendee_id: uuid.UUID,
-        product_id: uuid.UUID,
+        ticket_id: uuid.UUID,
     ) -> None:
-        """Remove a product from an attendee."""
-        statement = select(AttendeeProducts).where(
-            AttendeeProducts.attendee_id == attendee_id,
-            AttendeeProducts.product_id == product_id,
-        )
-        ap = session.exec(statement).first()
-        if ap:
-            session.delete(ap)
+        """Delete a single AttendeeProducts row by its UUID PK.
+
+        Design §2.4: under always-insert semantics every row is an independent
+        ticket. Callers must identify *which* ticket to remove by its id.
+        Deleting by (attendee_id, product_id) would arbitrarily pick one row
+        when multiple tickets of the same product exist for an attendee.
+        """
+        ticket = session.get(AttendeeProducts, ticket_id)
+        if ticket:
+            session.delete(ticket)
             session.commit()
 
     def clear_products(

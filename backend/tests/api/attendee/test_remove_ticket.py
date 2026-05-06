@@ -10,6 +10,7 @@ arbitrary row when multiple tickets of the same product exist for one attendee.
 """
 
 import uuid
+from decimal import Decimal
 
 import pytest
 from sqlmodel import Session, select
@@ -25,6 +26,22 @@ from app.api.tenant.models import Tenants
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def _make_product(db: Session, tenant: Tenants, popup: Popups) -> Products:
+    product = Products(
+        id=uuid.uuid4(),
+        tenant_id=tenant.id,
+        popup_id=popup.id,
+        name=f"Remove Ticket Product {uuid.uuid4().hex[:6]}",
+        slug=f"remove-ticket-prod-{uuid.uuid4().hex[:6]}",
+        price=Decimal("10"),
+        category="ticket",
+    )
+    db.add(product)
+    db.commit()
+    db.refresh(product)
+    return product
 
 
 def _make_attendee(db: Session, tenant: Tenants, popup: Popups) -> Attendees:
@@ -86,14 +103,14 @@ class TestRemoveTicket:
         db: Session,
         tenant_a: Tenants,
         popup_tenant_a: Popups,
-        product_tenant_a: Products,
     ) -> None:
         """Calling remove_ticket with a specific ticket_id removes only that row."""
+        product = _make_product(db, tenant_a, popup_tenant_a)
         attendee = _make_attendee(db, tenant_a, popup_tenant_a)
 
         # Create two tickets for the same attendee + product
-        ticket_1 = _make_ticket(db, tenant_a, attendee, product_tenant_a)
-        ticket_2 = _make_ticket(db, tenant_a, attendee, product_tenant_a)
+        ticket_1 = _make_ticket(db, tenant_a, attendee, product)
+        ticket_2 = _make_ticket(db, tenant_a, attendee, product)
 
         # Remove only ticket_1
         attendee_crud.attendees_crud.remove_ticket(db, ticket_1.id)
