@@ -94,7 +94,11 @@ describe("mergeAvailableAndPurchasedProducts — attendee_category filter remova
     })
 
     // Attendee is "main" — without the filter, BOTH products should appear
-    const result = mergeAvailableAndPurchasedProducts("main", [kidProduct, mainProduct], [])
+    const result = mergeAvailableAndPurchasedProducts(
+      "main",
+      [kidProduct, mainProduct],
+      [],
+    )
 
     expect(result.map((p) => p.id)).toContain("kid-ticket")
     expect(result.map((p) => p.id)).toContain("main-ticket")
@@ -102,8 +106,16 @@ describe("mergeAvailableAndPurchasedProducts — attendee_category filter remova
 
   it("includes active products for all attendee categories when filter is removed", () => {
     const products = [
-      createProduct({ id: "p-main", attendee_category: "main", is_active: true }),
-      createProduct({ id: "p-spouse", attendee_category: "spouse", is_active: true }),
+      createProduct({
+        id: "p-main",
+        attendee_category: "main",
+        is_active: true,
+      }),
+      createProduct({
+        id: "p-spouse",
+        attendee_category: "spouse",
+        is_active: true,
+      }),
       createProduct({ id: "p-kid", attendee_category: "kid", is_active: true }),
     ]
 
@@ -126,7 +138,11 @@ describe("mergeAvailableAndPurchasedProducts — attendee_category filter remova
       is_active: true,
     })
 
-    const result = mergeAvailableAndPurchasedProducts("main", [inactiveProduct, activeProduct], [])
+    const result = mergeAvailableAndPurchasedProducts(
+      "main",
+      [inactiveProduct, activeProduct],
+      [],
+    )
 
     expect(result.map((p) => p.id)).not.toContain("inactive-kid")
     expect(result.map((p) => p.id)).toContain("active-main")

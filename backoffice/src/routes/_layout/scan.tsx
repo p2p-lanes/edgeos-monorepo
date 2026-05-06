@@ -14,11 +14,11 @@ import { useRef, useState } from "react"
 import { AttendeesService, type TicketPublic } from "@/client"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { InlineRow, InlineSection } from "@/components/ui/inline-form"
+import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
-import { createErrorHandler } from "@/utils"
 import useCustomToast from "@/hooks/useCustomToast"
+import { createErrorHandler } from "@/utils"
 
 export const Route = createFileRoute("/_layout/scan")({
   component: Scan,
@@ -52,7 +52,9 @@ export function TicketScanResult({ ticket }: { ticket: TicketPublic }) {
           <CheckCircle className="h-5 w-5 flex-shrink-0" />
           <div>
             <p className="font-semibold text-sm">First check-in!</p>
-            <p className="text-xs opacity-80">This ticket has not been scanned before.</p>
+            <p className="text-xs opacity-80">
+              This ticket has not been scanned before.
+            </p>
           </div>
         </div>
       ) : (
@@ -61,7 +63,8 @@ export function TicketScanResult({ ticket }: { ticket: TicketPublic }) {
           <div>
             <p className="font-semibold text-sm">Re-scan #{scanCount}</p>
             <p className="text-xs opacity-80">
-              This ticket has already been scanned {scanCount - 1} time{scanCount - 1 !== 1 ? "s" : ""}.
+              This ticket has already been scanned {scanCount - 1} time
+              {scanCount - 1 !== 1 ? "s" : ""}.
             </p>
           </div>
         </div>
@@ -75,8 +78,12 @@ export function TicketScanResult({ ticket }: { ticket: TicketPublic }) {
             <QrCode className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <p className="font-mono text-lg font-semibold">{ticket.check_in_code}</p>
-            <p className="text-xs text-muted-foreground">Ticket ID: {ticket.id.slice(0, 8)}…</p>
+            <p className="font-mono text-lg font-semibold">
+              {ticket.check_in_code}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Ticket ID: {ticket.id.slice(0, 8)}…
+            </p>
           </div>
         </div>
 
@@ -102,9 +109,15 @@ export function TicketScanResult({ ticket }: { ticket: TicketPublic }) {
               label="Valid"
             >
               <span className="text-sm text-muted-foreground">
-                {new Date(ticket.product.start_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                {new Date(ticket.product.start_date).toLocaleDateString(
+                  "en-US",
+                  { month: "short", day: "numeric" },
+                )}
                 {" to "}
-                {new Date(ticket.product.end_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                {new Date(ticket.product.end_date).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                })}
               </span>
             </InlineRow>
           )}
@@ -125,14 +138,18 @@ export function TicketScanResult({ ticket }: { ticket: TicketPublic }) {
               icon={<User className="h-4 w-4 text-muted-foreground" />}
               label="Email"
             >
-              <span className="text-sm text-muted-foreground">{ticket.attendee.email}</span>
+              <span className="text-sm text-muted-foreground">
+                {ticket.attendee.email}
+              </span>
             </InlineRow>
           )}
           <InlineRow
             icon={<User className="h-4 w-4 text-muted-foreground" />}
             label="Category"
           >
-            <Badge variant="outline" className="capitalize">{ticket.attendee.category}</Badge>
+            <Badge variant="outline" className="capitalize">
+              {ticket.attendee.category}
+            </Badge>
           </InlineRow>
         </InlineSection>
 
@@ -150,14 +167,18 @@ export function TicketScanResult({ ticket }: { ticket: TicketPublic }) {
             icon={<Clock className="h-4 w-4 text-muted-foreground" />}
             label="First scan"
           >
-            <span className="text-sm text-muted-foreground">{formatDateTime(ticket.first_scan_at)}</span>
+            <span className="text-sm text-muted-foreground">
+              {formatDateTime(ticket.first_scan_at)}
+            </span>
           </InlineRow>
           {(ticket.total_scans ?? 0) > 1 && (
             <InlineRow
               icon={<Clock className="h-4 w-4 text-muted-foreground" />}
               label="Latest scan"
             >
-              <span className="text-sm text-muted-foreground">{formatDateTime(ticket.last_scan_at)}</span>
+              <span className="text-sm text-muted-foreground">
+                {formatDateTime(ticket.last_scan_at)}
+              </span>
             </InlineRow>
           )}
         </InlineSection>
@@ -243,7 +264,9 @@ function Scan() {
           <AlertCircle className="h-5 w-5 flex-shrink-0" />
           <div>
             <p className="font-semibold text-sm">Ticket not found</p>
-            <p className="text-xs opacity-80">No ticket matches that check-in code.</p>
+            <p className="text-xs opacity-80">
+              No ticket matches that check-in code.
+            </p>
           </div>
         </div>
       )}

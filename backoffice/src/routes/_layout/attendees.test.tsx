@@ -7,7 +7,7 @@
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { render, screen } from "@testing-library/react"
-import React from "react"
+import type React from "react"
 import type { ReactNode } from "react"
 import { describe, expect, it, vi } from "vitest"
 
@@ -88,14 +88,32 @@ describe("flattenAttendeesForCsv", () => {
       gender: null,
       check_in_code: null,
       products: [
-        { id: "ap-1", attendee_id: "att-1", product_id: "prod-1", check_in_code: "CODE1" },
-        { id: "ap-2", attendee_id: "att-1", product_id: "prod-2", check_in_code: "CODE2" },
+        {
+          id: "ap-1",
+          attendee_id: "att-1",
+          product_id: "prod-1",
+          check_in_code: "CODE1",
+        },
+        {
+          id: "ap-2",
+          attendee_id: "att-1",
+          product_id: "prod-2",
+          check_in_code: "CODE2",
+        },
       ],
     }
     const rows = flattenAttendeesForCsv([attendee as never])
     expect(rows).toHaveLength(2)
-    expect(rows[0]).toMatchObject({ name: "Alice", ticket_check_in_code: "CODE1", product_id: "prod-1" })
-    expect(rows[1]).toMatchObject({ name: "Alice", ticket_check_in_code: "CODE2", product_id: "prod-2" })
+    expect(rows[0]).toMatchObject({
+      name: "Alice",
+      ticket_check_in_code: "CODE1",
+      product_id: "prod-1",
+    })
+    expect(rows[1]).toMatchObject({
+      name: "Alice",
+      ticket_check_in_code: "CODE2",
+      product_id: "prod-2",
+    })
   })
 
   it("returns one row with empty ticket fields when attendee has no products", () => {
@@ -110,7 +128,11 @@ describe("flattenAttendeesForCsv", () => {
     }
     const rows = flattenAttendeesForCsv([attendee as never])
     expect(rows).toHaveLength(1)
-    expect(rows[0]).toMatchObject({ name: "Bob", ticket_check_in_code: "", product_id: "" })
+    expect(rows[0]).toMatchObject({
+      name: "Bob",
+      ticket_check_in_code: "",
+      product_id: "",
+    })
   })
 
   it("handles mixed attendees — preserves attendee-level data in each row", () => {
@@ -123,7 +145,12 @@ describe("flattenAttendeesForCsv", () => {
         gender: "female",
         check_in_code: null,
         products: [
-          { id: "ap-1", attendee_id: "att-1", product_id: "prod-1", check_in_code: "CODE1" },
+          {
+            id: "ap-1",
+            attendee_id: "att-1",
+            product_id: "prod-1",
+            check_in_code: "CODE1",
+          },
         ],
       },
       {
@@ -156,8 +183,18 @@ describe("AttendeeDetailsContent", () => {
       gender: null,
       check_in_code: null,
       products: [
-        { id: "ap-1", attendee_id: "att-1", product_id: "prod-1", check_in_code: "TICKET-CODE-A" },
-        { id: "ap-2", attendee_id: "att-1", product_id: "prod-2", check_in_code: "TICKET-CODE-B" },
+        {
+          id: "ap-1",
+          attendee_id: "att-1",
+          product_id: "prod-1",
+          check_in_code: "TICKET-CODE-A",
+        },
+        {
+          id: "ap-2",
+          attendee_id: "att-1",
+          product_id: "prod-2",
+          check_in_code: "TICKET-CODE-B",
+        },
       ],
     }
 

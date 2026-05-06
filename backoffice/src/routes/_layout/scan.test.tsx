@@ -34,8 +34,8 @@ vi.mock("@/hooks/useCustomToast", () => ({
   }),
 }))
 
-import { TicketScanResult } from "@/routes/_layout/scan"
 import type { TicketPublic } from "@/client"
+import { TicketScanResult } from "@/routes/_layout/scan"
 
 function makeWrapper() {
   const queryClient = new QueryClient({

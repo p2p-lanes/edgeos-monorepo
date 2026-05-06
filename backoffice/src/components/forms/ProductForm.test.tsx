@@ -418,7 +418,9 @@ describe("ProductForm — ticket-as-first-class-entity (Phase 8.2)", () => {
   it("does NOT render an Attendee Type / attendee_category input for ticket products", async () => {
     render(<ProductForm onSuccess={vi.fn()} />, { wrapper: makeWrapper() })
 
-    await waitFor(() => screen.getByPlaceholderText(/product name/i), { timeout: 3000 })
+    await waitFor(() => screen.getByPlaceholderText(/product name/i), {
+      timeout: 3000,
+    })
 
     // The form must not expose an "Attendee Type" select or label
     expect(screen.queryByText(/attendee type/i)).toBeNull()
@@ -428,21 +430,30 @@ describe("ProductForm — ticket-as-first-class-entity (Phase 8.2)", () => {
   it("renders a requires_check_in toggle switch", async () => {
     render(<ProductForm onSuccess={vi.fn()} />, { wrapper: makeWrapper() })
 
-    await waitFor(() => screen.getByPlaceholderText(/product name/i), { timeout: 3000 })
+    await waitFor(() => screen.getByPlaceholderText(/product name/i), {
+      timeout: 3000,
+    })
 
     // A switch/checkbox for requires_check_in should be present
-    const toggle = document.querySelector('[id="requires_check_in"]') ??
-      screen.queryByRole("switch", { name: /requires check.in|check.in|scanning/i })
+    const toggle =
+      document.querySelector('[id="requires_check_in"]') ??
+      screen.queryByRole("switch", {
+        name: /requires check.in|check.in|scanning/i,
+      })
     expect(toggle).not.toBeNull()
   })
 
   it("requires_check_in defaults to true when category is ticket", async () => {
     render(<ProductForm onSuccess={vi.fn()} />, { wrapper: makeWrapper() })
 
-    await waitFor(() => screen.getByPlaceholderText(/product name/i), { timeout: 3000 })
+    await waitFor(() => screen.getByPlaceholderText(/product name/i), {
+      timeout: 3000,
+    })
 
     // Default category is ticket — requires_check_in should default to checked
-    const toggle = document.querySelector<HTMLButtonElement>('[id="requires_check_in"]')
+    const toggle = document.querySelector<HTMLButtonElement>(
+      '[id="requires_check_in"]',
+    )
     if (toggle) {
       // Switch component uses data-state=checked/unchecked
       expect(toggle.getAttribute("data-state")).toBe("checked")

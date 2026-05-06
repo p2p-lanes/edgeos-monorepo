@@ -272,7 +272,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
       duration_type: (defaultValues?.duration_type ?? "full") as TicketDuration,
       requires_check_in:
         defaultValues?.requires_check_in ??
-        ((defaultValues?.category ?? "ticket") === "ticket"),
+        (defaultValues?.category ?? "ticket") === "ticket",
       is_active: defaultValues?.is_active ?? true,
       exclusive: defaultValues?.exclusive ?? false,
       max_quantity: defaultValues?.max_quantity?.toString() ?? "",
