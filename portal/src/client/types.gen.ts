@@ -345,12 +345,14 @@ export type AttendeeInfo = {
 };
 
 /**
- * Schema for attendee product with quantity.
+ * Schema for attendee product (per-ticket identity).
  */
 export type AttendeeProductPublic = {
+    id: string;
     attendee_id: string;
     product_id: string;
-    quantity: number;
+    check_in_code: string;
+    payment_id?: (string | null);
 };
 
 /**
@@ -365,7 +367,7 @@ export type AttendeePublic = {
     category: string;
     email?: (string | null);
     gender?: (string | null);
-    check_in_code: string;
+    check_in_code?: (string | null);
     poap_url?: (string | null);
     id: string;
     created_at?: (string | null);
@@ -443,7 +445,7 @@ export type AttendeeWithOriginPublic = {
     category: string;
     email?: (string | null);
     gender?: (string | null);
-    check_in_code: string;
+    check_in_code?: (string | null);
     poap_url?: (string | null);
     id: string;
     created_at?: (string | null);
@@ -460,7 +462,7 @@ export type AttendeeWithTickets = {
     name: string;
     email: (string | null);
     category: string;
-    check_in_code: string;
+    check_in_code?: (string | null);
     popup_id: string;
     popup_name: string;
     popup_slug?: (string | null);
@@ -2182,6 +2184,7 @@ export type ProductCreate = {
     exclusive?: boolean;
     max_quantity?: (number | null);
     insurance_eligible?: boolean;
+    requires_check_in?: boolean;
 };
 
 /**
@@ -2213,6 +2216,7 @@ export type ProductPublic = {
     exclusive?: boolean;
     max_quantity?: (number | null);
     insurance_eligible?: boolean;
+    requires_check_in?: boolean;
     id: string;
 };
 
@@ -2240,6 +2244,7 @@ export type ProductPublicWithTier = {
     exclusive?: boolean;
     max_quantity?: (number | null);
     insurance_eligible?: boolean;
+    requires_check_in?: boolean;
     id: string;
     tier_group?: (TierGroupPublic | null);
     phase?: (TierPhasePublic | null);
@@ -2264,6 +2269,7 @@ export type ProductUpdate = {
     exclusive?: (boolean | null);
     max_quantity?: (number | null);
     insurance_eligible?: (boolean | null);
+    requires_check_in?: (boolean | null);
 };
 
 /**
@@ -2532,6 +2538,47 @@ export type TicketProduct = {
     start_date?: (string | null);
     end_date?: (string | null);
     quantity?: number;
+};
+
+/**
+ * Request payload for POST /attendees/check-in/{code}.
+ */
+export type CheckInPayload = {
+    source: 'qr' | 'manual' | 'virtual' | 'admin_override';
+    gate?: (string | null);
+    device_id?: (string | null);
+    notes?: (string | null);
+};
+
+/**
+ * Per-ticket public schema returned by check-in and ticket lookup endpoints.
+ */
+export type TicketPublic = {
+    id: string;
+    check_in_code: string;
+    payment_id?: (string | null);
+    attendee_id: string;
+    product_id: string;
+    attendee: AttendeePublic;
+    product: ProductPublic;
+    created_at?: (string | null);
+    total_scans?: number;
+    first_scan_at?: (string | null);
+    last_scan_at?: (string | null);
+};
+
+/**
+ * Public schema for a ticket event log entry.
+ */
+export type TicketEventPublic = {
+    id: string;
+    tenant_id: string;
+    attendee_product_id: string;
+    event_type: string;
+    occurred_at: string;
+    actor_user_id?: (string | null);
+    payload?: (unknown | null);
+    created_at?: (string | null);
 };
 
 /**
@@ -3170,10 +3217,11 @@ export type AttendeesDeleteAttendeeResponse = (void);
 
 export type AttendeesGetByCheckInCodeData = {
     code: string;
+    requestBody: CheckInPayload;
     xTenantId?: (string | null);
 };
 
-export type AttendeesGetByCheckInCodeResponse = (AttendeePublic);
+export type AttendeesGetByCheckInCodeResponse = (TicketPublic);
 
 export type AttendeesGetTicketsByEmailData = {
     email: string;

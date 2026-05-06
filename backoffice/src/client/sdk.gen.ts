@@ -961,17 +961,18 @@ export class AttendeesService {
     }
     
     /**
-     * Get By Check In Code
-     * Get attendee by check-in code (BO - for check-in process).
+     * Check In By Code
+     * Scan a ticket by check-in code. Records a check_in event and returns enriched TicketPublic.
      * @param data The data for the request.
      * @param data.code
+     * @param data.requestBody
      * @param data.xTenantId
-     * @returns AttendeePublic Successful Response
+     * @returns TicketPublic Successful Response
      * @throws ApiError
      */
     public static getByCheckInCode(data: AttendeesGetByCheckInCodeData): CancelablePromise<AttendeesGetByCheckInCodeResponse> {
         return __request(OpenAPI, {
-            method: 'GET',
+            method: 'POST',
             url: '/api/v1/attendees/check-in/{code}',
             path: {
                 code: data.code
@@ -979,6 +980,8 @@ export class AttendeesService {
             headers: {
                 'X-Tenant-Id': data.xTenantId
             },
+            body: data.requestBody,
+            mediaType: 'application/json',
             errors: {
                 422: 'Validation Error'
             }
