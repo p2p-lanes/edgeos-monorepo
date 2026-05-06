@@ -1323,9 +1323,10 @@ function LegacySectionLayout({
   const renderItem = (p: ProductsPass) => {
     const quantity = getQuantity(p.id)
     const isAdded = quantity > 0
-    const showStepper = supportsQuantitySelector(p.max_quantity)
+    const showStepper = supportsQuantitySelector(p.max_per_order)
     const max = resolveMaxQuantity({
-      max_quantity: p.max_quantity,
+      max_per_order: p.max_per_order,
+      total_stock_remaining: p.total_stock_remaining,
       start_date: p.start_date,
       end_date: p.end_date,
     })
