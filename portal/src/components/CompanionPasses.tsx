@@ -34,6 +34,7 @@ export function CompanionPasses({ participation }: CompanionPassesProps) {
 
   const isAccepted = application_status === "accepted"
   const hasTickets = tickets.length > 0
+  // check_in_code is nullable post-migration (direct-sale attendees may have null)
   const canShowCheckIn = isAccepted && hasTickets && !!attendee.check_in_code
 
   return (
@@ -133,9 +134,9 @@ export function CompanionPasses({ participation }: CompanionPassesProps) {
         </div>
       )}
 
-      {canShowCheckIn && (
+      {canShowCheckIn && attendee.check_in_code && (
         <QRcode
-          check_in_code={attendee.check_in_code!}
+          check_in_code={attendee.check_in_code}
           isOpen={isQrModalOpen}
           onOpenChange={setIsQrModalOpen}
         />

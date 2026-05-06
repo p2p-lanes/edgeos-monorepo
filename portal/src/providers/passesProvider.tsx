@@ -148,6 +148,8 @@ export function buildBaseAttendeePasses(
         attendeeProducts,
         purchased,
       ),
+      // Preserve per-ticket entries for QR rendering (ticket-as-first-class-entity)
+      ticket_entries: attendee.ticket_entries,
     }
   })
 }

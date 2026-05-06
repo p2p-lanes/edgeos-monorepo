@@ -40,8 +40,9 @@ describe("TicketQRList", () => {
 
     const qrs = screen.getAllByTestId("qr-code")
     expect(qrs).toHaveLength(2)
-    expect(screen.getByText("AAAA1111")).toBeInTheDocument()
-    expect(screen.getByText("BBBB2222")).toBeInTheDocument()
+    // getByText throws if not found — inherently asserts presence
+    expect(screen.getByText("AAAA1111")).toBeTruthy()
+    expect(screen.getByText("BBBB2222")).toBeTruthy()
   })
 
   it("skips tickets where requires_check_in is false", () => {
@@ -54,7 +55,7 @@ describe("TicketQRList", () => {
 
     const qrs = screen.getAllByTestId("qr-code")
     expect(qrs).toHaveLength(1)
-    expect(screen.queryByText("BBBB2222")).not.toBeInTheDocument()
+    expect(screen.queryByText("BBBB2222")).toBeNull()
   })
 
   it("renders nothing when all tickets have requires_check_in false", () => {
@@ -65,8 +66,8 @@ describe("TicketQRList", () => {
 
     const { container } = render(<TicketQRList tickets={tickets} />)
 
-    expect(screen.queryByTestId("qr-code")).not.toBeInTheDocument()
-    // Container should be empty or show a placeholder
+    expect(screen.queryByTestId("qr-code")).toBeNull()
+    // Component returns null — container's first child should be null
     expect(container.firstChild).toBeNull()
   })
 
@@ -77,6 +78,6 @@ describe("TicketQRList", () => {
 
     render(<TicketQRList tickets={tickets} />)
 
-    expect(screen.getByText("VIP Pass")).toBeInTheDocument()
+    expect(screen.getByText("VIP Pass")).toBeTruthy()
   })
 })
