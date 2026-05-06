@@ -240,9 +240,19 @@ export function CheckoutProvider({
   const isInitialLoading =
     !!cityId && isAuthenticated && (isLoadingSteps || isLoadingProducts)
 
-  // Product categories
+  // Product categories (kept for downstream UI counts/legacy consumers).
   const { passProducts, housingProducts, merchProducts, patronProducts } =
     useProductCategories(products)
+
+  // Selection hooks need the FULL active product list so that products
+  // assigned to a step via `step.product_category` (any category — not only
+  // hardcoded "merch"/"housing"/"patreon") resolve in id-lookup. The hooks do
+  // their own `find(p => p.id === productId)` after the click; the array must
+  // not be pre-filtered by category here.
+  const allActiveProducts = useMemo(
+    () => products.filter((p) => p.is_active),
+    [products],
+  )
 
   // Item selection hooks
   const housingPricePerDay = useMemo(() => {
@@ -261,13 +271,13 @@ export function CheckoutProvider({
     selectHousing,
     updateHousingQuantity,
     clearHousing,
-  } = useHousingSelection(housingProducts, housingPricePerDay)
+  } = useHousingSelection(allActiveProducts, housingPricePerDay)
 
   const { merch, setMerch, updateMerchQuantity } =
-    useMerchSelection(merchProducts)
+    useMerchSelection(allActiveProducts)
 
   const { patron, setPatron, setPatronAmount, clearPatron } =
-    usePatronSelection(patronProducts)
+    usePatronSelection(allActiveProducts)
 
   const [insurance, setInsurance] = useState(false)
   const [termsAccepted, setTermsAccepted] = useState(false)
