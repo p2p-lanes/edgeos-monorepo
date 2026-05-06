@@ -27,14 +27,14 @@ function clampQuantity(product: ProductsPass, quantity: number): number {
 }
 
 export function useHousingSelection(
-  housingProducts: ProductsPass[],
+  allActiveProducts: ProductsPass[],
   pricePerDay = true,
 ) {
   const [housing, setHousing] = useState<SelectedHousingItem | null>(null)
 
   const selectHousing = useCallback(
     (productId: string, checkIn: string, checkOut: string) => {
-      const product = housingProducts.find((p) => p.id === productId)
+      const product = allActiveProducts.find((p) => p.id === productId)
       if (!product) return
 
       const nights = computeNights(checkIn, checkOut)
@@ -59,7 +59,7 @@ export function useHousingSelection(
         }
       })
     },
-    [housingProducts, pricePerDay],
+    [allActiveProducts, pricePerDay],
   )
 
   const updateHousingQuantity = useCallback((quantity: number) => {

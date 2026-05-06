@@ -2,12 +2,12 @@ import { useCallback, useState } from "react"
 import type { SelectedPatronItem } from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
 
-export function usePatronSelection(patronProducts: ProductsPass[]) {
+export function usePatronSelection(allActiveProducts: ProductsPass[]) {
   const [patron, setPatron] = useState<SelectedPatronItem | null>(null)
 
   const setPatronAmount = useCallback(
     (productId: string, amount: number, isCustom = false) => {
-      const product = patronProducts.find((p) => p.id === productId)
+      const product = allActiveProducts.find((p) => p.id === productId)
       if (!product) return
 
       setPatron({
@@ -17,7 +17,7 @@ export function usePatronSelection(patronProducts: ProductsPass[]) {
         isCustomAmount: isCustom,
       })
     },
-    [patronProducts],
+    [allActiveProducts],
   )
 
   const clearPatron = useCallback(() => {

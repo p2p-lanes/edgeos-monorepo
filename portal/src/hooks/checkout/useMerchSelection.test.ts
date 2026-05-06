@@ -1,13 +1,9 @@
 /**
- * Tests for useMerchSelection — client-side max_per_order enforcement (task 6.4).
- *
- * TDD phase: includes RED (before implementation) and GREEN validation.
- *
- * Covers:
- *   - updateMerchQuantity clamps to max_per_order when set
- *   - updateMerchQuantity allows unlimited when max_per_order is null
- *   - updateMerchQuantity clamps to total_stock_remaining when max_per_order is null
- *   - updateMerchQuantity clamps to min(max_per_order, total_stock_remaining)
+ * Tests for useMerchSelection — combines:
+ *  - Client-side max_per_order / total_stock_remaining clamping (from product-inventory-redesign).
+ *  - Id-lookup against the full active product list, irrespective of `category`,
+ *    so step.product_category gating decides what is shown rather than a
+ *    hardcoded merch filter (from ticketing-steps-product-resolution).
  */
 
 import { act, renderHook } from "@testing-library/react"
@@ -104,5 +100,51 @@ describe("useMerchSelection — client-side max_per_order cap", () => {
       result.current.updateMerchQuantity("merch-5", 0)
     })
     expect(result.current.merch).toHaveLength(0)
+  })
+})
+
+describe("useMerchSelection — id-lookup against full active product list", () => {
+  it("resolves product with arbitrary category via id from full list", () => {
+    const allActiveProducts = [
+      makeMerchProduct({ id: "p1", category: "other" }),
+      makeMerchProduct({ id: "p2", category: "merch" }),
+    ]
+    const { result } = renderHook(() => useMerchSelection(allActiveProducts))
+
+    act(() => {
+      result.current.updateMerchQuantity("p1", 1)
+    })
+
+    expect(result.current.merch).toHaveLength(1)
+    expect(result.current.merch[0].productId).toBe("p1")
+    expect(result.current.merch[0].quantity).toBe(1)
+  })
+
+  it("returns without updating cart when productId is unknown (graceful)", () => {
+    const allActiveProducts = [makeMerchProduct({ id: "p1" })]
+    const { result } = renderHook(() => useMerchSelection(allActiveProducts))
+
+    act(() => {
+      result.current.updateMerchQuantity("nonexistent-id", 1)
+    })
+
+    expect(result.current.merch).toHaveLength(0)
+  })
+
+  it("updates quantity and totalPrice for an existing cart item", () => {
+    const allActiveProducts = [
+      makeMerchProduct({ id: "p1", price: 5 }),
+    ]
+    const { result } = renderHook(() => useMerchSelection(allActiveProducts))
+
+    act(() => {
+      result.current.updateMerchQuantity("p1", 1)
+    })
+    act(() => {
+      result.current.updateMerchQuantity("p1", 3)
+    })
+
+    expect(result.current.merch[0].quantity).toBe(3)
+    expect(result.current.merch[0].totalPrice).toBe(15)
   })
 })

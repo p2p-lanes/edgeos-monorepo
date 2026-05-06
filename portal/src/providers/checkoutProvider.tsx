@@ -19,6 +19,7 @@ import {
 import type { TicketingStepPublic } from "@/client"
 import { TicketingStepsService } from "@/client"
 import { supportsQuantitySelector } from "@/components/ui/QuantitySelector"
+import type { StepProductResolution } from "@/hooks/checkout"
 import {
   type CartSelectionState,
   useCartPersistence,
@@ -30,9 +31,9 @@ import {
   useMerchSelection,
   usePatronSelection,
   usePaymentSubmit,
-  useProductCategories,
   usePromoCode,
 } from "@/hooks/checkout"
+import { useStepProductResolver } from "@/hooks/checkout/useStepProductResolver"
 import useGetPassesData from "@/hooks/useGetPassesData"
 import { useIsAuthenticated } from "@/hooks/useIsAuthenticated"
 import { buildFormZodSchema } from "@/lib/form-schema-builder"
@@ -57,11 +58,9 @@ interface CheckoutContextValue {
   stepConfigs: TicketingStepPublic[]
   cart: CheckoutCartState
   summary: CheckoutCartSummary
-  passProducts: ProductsPass[]
-  housingProducts: ProductsPass[]
-  merchProducts: ProductsPass[]
-  patronProducts: ProductsPass[]
   allProducts: ProductsPass[]
+  productsByStepId: Map<string, ProductsPass[]>
+  getProductsForStep: StepProductResolution["getProductsForStep"]
   attendees: AttendeePassState[]
   isLoading: boolean
   isInitialLoading: boolean
@@ -240,15 +239,18 @@ export function CheckoutProvider({
   const isInitialLoading =
     !!cityId && isAuthenticated && (isLoadingSteps || isLoadingProducts)
 
-  // Product categories (kept for downstream UI counts/legacy consumers).
-  const { passProducts, housingProducts, merchProducts, patronProducts } =
-    useProductCategories(products)
+  // Step-aware product resolution (replaces hardcoded useProductCategories).
+  // Each step's product list is derived from step.product_category at runtime,
+  // not from a hardcoded "merch"/"housing"/"patreon" filter on the full list.
+  const { productsByStepId, getProductsForStep } = useStepProductResolver(
+    effectiveConfiguredSteps,
+    products,
+  )
 
-  // Selection hooks need the FULL active product list so that products
-  // assigned to a step via `step.product_category` (any category — not only
-  // hardcoded "merch"/"housing"/"patreon") resolve in id-lookup. The hooks do
-  // their own `find(p => p.id === productId)` after the click; the array must
-  // not be pre-filtered by category here.
+  // Full active product list — passed to cart selection hooks so id-lookup works
+  // regardless of the product's category string. The hooks do their own
+  // `find(p => p.id === productId)` after the click; the array must not be
+  // pre-filtered by category here.
   const allActiveProducts = useMemo(
     () => products.filter((p) => p.is_active),
     [products],
@@ -396,13 +398,10 @@ export function CheckoutProvider({
   } = useCheckoutSteps({
     initialStep,
     configuredSteps: effectiveConfiguredSteps,
-    patronCount: patronProducts.length,
-    housingCount: housingProducts.length,
-    merchCount: merchProducts.length,
+    productsByStepId,
     selectedPassesCount: selectedPasses.length,
     dynamicItemsCount: Object.values(dynamicItems).flat().length,
     isEditing,
-    allProducts: products,
     buyerInfoComplete: isBuyerInfoComplete,
   })
 
@@ -745,11 +744,9 @@ export function CheckoutProvider({
     stepConfigs: effectiveConfiguredSteps,
     cart,
     summary: finalSummary,
-    passProducts,
-    housingProducts,
-    merchProducts,
-    patronProducts,
     allProducts: products,
+    productsByStepId,
+    getProductsForStep,
     attendees: attendeePasses,
     isLoading,
     isInitialLoading,
