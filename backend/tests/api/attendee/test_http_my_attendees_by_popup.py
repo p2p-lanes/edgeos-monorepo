@@ -44,6 +44,7 @@ from sqlmodel import Session
 
 from app.api.application.models import Applications
 from app.api.application.schemas import ApplicationStatus
+from app.api.attendee.crud import generate_check_in_code
 from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.human.models import Humans
 from app.api.popup.models import Popups
@@ -191,10 +192,11 @@ def _add_product_to_attendee(
     """Give an attendee a purchased product (triggers has_products guard)."""
     product = _make_product(db, tenant, popup, suffix="purchased")
     ap = AttendeeProducts(
+        id=uuid.uuid4(),
         tenant_id=tenant.id,
         attendee_id=attendee.id,
         product_id=product.id,
-        quantity=1,
+        check_in_code=generate_check_in_code(),
     )
     db.add(ap)
     db.commit()

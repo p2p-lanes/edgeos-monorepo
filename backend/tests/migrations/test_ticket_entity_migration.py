@@ -7,10 +7,7 @@ Spec: C7/migration-explosion, C5/payment-products-uuid-pk
 Design: §1 Steps A-G + requires_check_in backfill
 """
 
-import uuid
-
-import pytest
-from sqlmodel import Session, text
+from sqlmodel import Session
 
 
 class TestTicketEntityMigration:

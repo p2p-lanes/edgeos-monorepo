@@ -12,7 +12,6 @@ Design: §2.5, §3.1, §3.4
 import uuid
 
 import pytest
-from pydantic import ValidationError
 from sqlmodel import Session
 
 from app.api.attendee.models import AttendeeProducts, Attendees
@@ -150,9 +149,6 @@ class TestPaymentProductsModel:
 
     def test_id_is_pk(self) -> None:
         """PaymentProducts.id should be UUID typed."""
-        # Check the field type annotation
-        from app.api.payment.schemas import PaymentProductBase
-        fields = PaymentProductBase.model_fields
         # payment_id, product_id, attendee_id must NOT be primary keys
         # id IS the primary key — verified by migration test
         assert "id" in PaymentProducts.model_fields or hasattr(PaymentProducts, "id"), (
