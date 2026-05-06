@@ -40,6 +40,7 @@ def _set_event_settings(
     *,
     event_enabled: bool = True,
     can_publish_event: PublishPermission = PublishPermission.EVERYONE,
+    events_require_approval: bool = True,
 ) -> EventSettings:
     existing = db.exec(
         select(EventSettings).where(EventSettings.popup_id == popup.id)
@@ -53,6 +54,7 @@ def _set_event_settings(
         popup_id=popup.id,
         event_enabled=event_enabled,
         can_publish_event=can_publish_event,
+        events_require_approval=events_require_approval,
     )
     db.add(row)
     db.commit()
@@ -139,14 +141,14 @@ class TestApiKeyPolicy:
         assert resp.status_code == 403, resp.text
         assert "restricted to approved event automation routes" in resp.json()["detail"]
 
-    def test_pat_created_event_forces_manual_approval(
+    def test_pat_event_respects_event_settings_approval(
         self,
         client: TestClient,
         db: Session,
         tenant_a: Tenants,
     ) -> None:
         popup = _make_popup(db, tenant_a)
-        _set_event_settings(db, tenant_a, popup)
+        _set_event_settings(db, tenant_a, popup, events_require_approval=True)
         human = _make_human(db, tenant_a)
         raw_key = _make_pat(
             db,
@@ -171,6 +173,39 @@ class TestApiKeyPolicy:
         assert row is not None
         assert row.status == EventStatus.PENDING_APPROVAL
         assert row.visibility == EventVisibility.UNLISTED
+
+    def test_pat_event_does_not_require_approval_when_settings_disabled(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        _set_event_settings(db, tenant_a, popup, events_require_approval=False)
+        human = _make_human(db, tenant_a)
+        raw_key = _make_pat(
+            db,
+            tenant_a,
+            human,
+            scopes=["events:read", "events:write"],
+        )
+
+        resp = client.post(
+            "/api/v1/events/portal/events",
+            headers=_pat_auth(raw_key),
+            json=_event_payload(popup),
+        )
+
+        assert resp.status_code == 201, resp.text
+        body = resp.json()
+        assert body["status"] == EventStatus.PUBLISHED.value
+        assert body["visibility"] == EventVisibility.PUBLIC.value
+
+        db.expire_all()
+        row = db.get(Events, uuid.UUID(body["id"]))
+        assert row is not None
+        assert row.status == EventStatus.PUBLISHED
+        assert row.visibility == EventVisibility.PUBLIC
 
     def test_pat_without_write_scope_cannot_create_event(
         self,

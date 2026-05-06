@@ -19,10 +19,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  Crown,
   Layers,
   MapPin,
   Repeat,
-  Star,
   Tag,
   Users,
 } from "lucide-react"
@@ -34,10 +34,12 @@ import {
   EventParticipantsService,
   type EventPublic,
   EventsService,
+  HumansService,
 } from "@/client"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { CoverImage } from "./CoverImage"
+import type { EventsScrollSnapshot } from "./eventsViewState"
 import { summarizeRrule } from "./summarizeRrule"
 import { useEventTimezone } from "./useEventTimezone"
 
@@ -50,6 +52,16 @@ interface CalendarBodyProps {
   trackIds?: string[]
   /** Initial month + selected day. Defaults to today before the popup loads. */
   defaultDate?: Date | null
+  /**
+   * Called right before the user follows an event link into the detail
+   * page. The body owns the calendar's selected day; the parent owns
+   * filter state and writes the snapshot to sessionStorage.
+   */
+  onEventLinkClick?: (
+    view: "calendar",
+    dayKey: string,
+    scroll: EventsScrollSnapshot,
+  ) => void
 }
 
 /**
@@ -65,6 +77,7 @@ export function CalendarBody({
   tags,
   trackIds,
   defaultDate,
+  onEventLinkClick,
 }: CalendarBodyProps) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
@@ -87,6 +100,12 @@ export function CalendarBody({
   }, [defaultDate])
   const { formatTime, formatDayKey, formatGridDayKey } =
     useEventTimezone(popupId)
+
+  const { data: currentHuman } = useQuery({
+    queryKey: ["current-human"],
+    queryFn: () => HumansService.getCurrentHumanInfo(),
+    staleTime: 5 * 60 * 1000,
+  })
 
   const { data } = useQuery({
     queryKey: [
@@ -159,13 +178,39 @@ export function CalendarBody({
   const selectedEvents = selectedDate ? getEventsForDate(selectedDate) : []
   const dayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
+  // `from` rebuilds the events-page URL state (view + selected day) so
+  // the detail page's "Back to events" link returns the user here.
+  const selectedDayKey = selectedDate ? formatGridDayKey(selectedDate) : null
+  const fromParam = selectedDayKey
+    ? encodeURIComponent(`view=calendar&date=${selectedDayKey}`)
+    : null
+  const eventHref = (event: EventPublic) => {
+    const base = fromParam
+      ? `/portal/${slug}/events/${event.id}?from=${fromParam}`
+      : `/portal/${slug}/events/${event.id}`
+    return event.occurrence_id
+      ? `${base}${fromParam ? "&" : "?"}occ=${encodeURIComponent(event.start_time)}`
+      : base
+  }
+  const handleEventClick = () => {
+    if (!onEventLinkClick || !selectedDayKey) return
+    const main =
+      typeof document !== "undefined" ? document.querySelector("main") : null
+    onEventLinkClick("calendar", selectedDayKey, {
+      outer: main?.scrollTop ?? 0,
+    })
+  }
+
   return (
     // `min-w-0` on each grid child prevents intrinsic content width from
     // forcing the column wider than its track — otherwise a long event
     // title/kind/venue string in the selected-day panel pushes the whole
     // grid (including the calendar) past the viewport on mobile.
-    <div className="grid lg:grid-cols-7 gap-5">
-      <div className="min-w-0 lg:col-span-3 rounded-xl border bg-card p-3">
+    // `items-start` keeps the calendar column at its natural height
+    // instead of stretching to match the events list, so it can be
+    // sticky without growing as more events render alongside it.
+    <div className="grid lg:grid-cols-7 gap-5 items-start">
+      <div className="min-w-0 lg:col-span-3 rounded-xl border bg-card p-3 lg:sticky lg:top-4 lg:self-start">
         <div className="flex items-center justify-between mb-2">
           <Button
             variant="ghost"
@@ -265,6 +310,8 @@ export function CalendarBody({
                       ? t("events.list.part_of_recurring_series")
                       : null)
                   const isHighlighted = event.highlighted === true
+                  const isOwner =
+                    currentHuman != null && event.owner_id === currentHuman.id
                   return (
                     <div
                       key={event.id}
@@ -275,11 +322,8 @@ export function CalendarBody({
                       )}
                     >
                       <Link
-                        href={
-                          event.occurrence_id
-                            ? `/portal/${slug}/events/${event.id}?occ=${encodeURIComponent(event.start_time)}`
-                            : `/portal/${slug}/events/${event.id}`
-                        }
+                        href={eventHref(event)}
+                        onClick={handleEventClick}
                         className="block p-3"
                       >
                         <div className="flex items-start gap-3">
@@ -297,12 +341,10 @@ export function CalendarBody({
                           )}
                           <div className="min-w-0 flex-1">
                             <h4 className="text-sm font-medium truncate flex items-center gap-1.5">
-                              {isHighlighted && (
-                                <Star
-                                  className="h-3.5 w-3.5 shrink-0 fill-amber-400 text-amber-500"
-                                  aria-label={t(
-                                    "events.list.highlighted_title",
-                                  )}
+                              {isOwner && (
+                                <Crown
+                                  className="h-3.5 w-3.5 shrink-0 text-amber-500"
+                                  aria-label={t("events.list.owned_title")}
                                 />
                               )}
                               <span className="truncate">{event.title}</span>

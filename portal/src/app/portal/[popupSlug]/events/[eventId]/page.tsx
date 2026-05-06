@@ -20,6 +20,7 @@ import {
   UserPlus,
   Users,
   Video,
+  X,
 } from "lucide-react"
 import Link from "next/link"
 import { useParams, useSearchParams } from "next/navigation"
@@ -351,19 +352,29 @@ export default function EventDetailPage() {
 
       <div>
         <div className="flex items-center gap-2 mb-1 flex-wrap">
-          {event.status !== "pending_approval" && (
-            <Badge
-              variant="secondary"
-              className={cn(
-                "px-3 py-1 text-xs shadow-sm capitalize cursor-default",
-                event.status === "published"
-                  ? "bg-primary/10 text-primary hover:bg-primary/10"
-                  : "hover:bg-secondary",
+          {event.status === "published"
+            ? event.visibility &&
+              event.visibility !== "public" && (
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "px-3 py-1 text-xs shadow-sm capitalize cursor-default",
+                    event.visibility === "private"
+                      ? "bg-amber-100 text-amber-800 border-transparent hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-300"
+                      : "bg-card",
+                  )}
+                >
+                  {event.visibility}
+                </Badge>
+              )
+            : event.status !== "pending_approval" && (
+                <Badge
+                  variant="secondary"
+                  className="px-3 py-1 text-xs shadow-sm capitalize cursor-default hover:bg-secondary"
+                >
+                  {event.status}
+                </Badge>
               )}
-            >
-              {event.status}
-            </Badge>
-          )}
           {event.kind && (
             <Badge
               variant="outline"
@@ -372,39 +383,44 @@ export default function EventDetailPage() {
               {event.kind}
             </Badge>
           )}
-          {event.visibility && event.visibility !== "public" && (
-            <Badge
-              variant="outline"
-              className="px-3 py-1 text-xs shadow-sm bg-card capitalize cursor-default"
-            >
-              {event.visibility}
-            </Badge>
-          )}
         </div>
         <h1 className="text-xl sm:text-2xl font-bold">{event.title}</h1>
       </div>
 
       {/* Details card */}
       <div className="relative rounded-xl border bg-card p-4 space-y-3">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setAddToCalOpen(true)}
-          className={cn(
-            "absolute top-3 right-3",
-            calendarAdded &&
-              "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800",
-          )}
-        >
-          {calendarAdded ? (
-            <CalendarCheck className="mr-2 h-4 w-4" />
-          ) : (
-            <CalendarPlus className="mr-2 h-4 w-4" />
-          )}
-          {calendarAdded
-            ? t("events.detail.added_to_calendar_button")
-            : t("events.detail.add_to_calendar_button")}
-        </Button>
+        {event.status === "published" && (
+          <div className="absolute top-3 right-3 flex flex-col items-end gap-1.5">
+            {myParticipationActive ? (
+              <>
+                <div className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-950/40 dark:text-emerald-300">
+                  <CheckCircle className="h-4 w-4" />
+                  {myParticipation?.status === "checked_in"
+                    ? t("events.rsvp.checked_in")
+                    : t("events.rsvp.registered")}
+                </div>
+                {myParticipation?.status === "registered" && eventStarted && (
+                  <Button
+                    size="sm"
+                    onClick={() => checkInMutation.mutate()}
+                    disabled={isPending}
+                  >
+                    {t("events.rsvp.check_in")}
+                  </Button>
+                )}
+              </>
+            ) : (
+              <Button
+                onClick={() => registerMutation.mutate()}
+                disabled={isPending}
+                className="inline-flex items-center gap-2"
+              >
+                <UserPlus className="h-4 w-4" />
+                {t("events.rsvp.rsvp")}
+              </Button>
+            )}
+          </div>
+        )}
         <div className="flex items-center gap-2.5 pr-36">
           <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
             <Clock className="h-4 w-4 text-primary" />
@@ -424,7 +440,7 @@ export default function EventDetailPage() {
           </div>
         </div>
         {event.rrule && (
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 pr-36">
             <div className="h-8 w-8 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">
               <Repeat className="h-4 w-4 text-blue-600" />
             </div>
@@ -433,23 +449,45 @@ export default function EventDetailPage() {
             </p>
           </div>
         )}
-        {event.venue_title && (
-          <div className="flex items-center gap-2.5">
-            <div className="h-8 w-8 rounded-lg bg-green-500/10 flex items-center justify-center shrink-0">
-              <MapPin className="h-4 w-4 text-green-600" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-medium truncate">
-                {event.venue_title}
-              </p>
-              {event.venue_location && (
-                <p className="text-xs text-muted-foreground truncate">
-                  {event.venue_location}
-                </p>
-              )}
-            </div>
-          </div>
-        )}
+        {event.venue_title &&
+          (() => {
+            const venueHref =
+              event.venue_id && city?.slug
+                ? `/portal/${city.slug}/events/venues/${event.venue_id}`
+                : null
+            const inner = (
+              <>
+                <div className="h-8 w-8 rounded-lg bg-green-500/10 flex items-center justify-center shrink-0">
+                  <MapPin className="h-4 w-4 text-green-600" />
+                </div>
+                <div className="min-w-0">
+                  <p
+                    className={cn(
+                      "text-sm font-medium truncate",
+                      venueHref && "group-hover:underline",
+                    )}
+                  >
+                    {event.venue_title}
+                  </p>
+                  {event.venue_location && (
+                    <p className="text-xs text-muted-foreground truncate">
+                      {event.venue_location}
+                    </p>
+                  )}
+                </div>
+              </>
+            )
+            return venueHref ? (
+              <Link
+                href={venueHref}
+                className="group flex items-center gap-2.5 pr-36 -mx-2 px-2 py-1.5 rounded-md hover:bg-muted/50 transition-colors"
+              >
+                {inner}
+              </Link>
+            ) : (
+              <div className="flex items-center gap-2.5 pr-36">{inner}</div>
+            )
+          })()}
         {event.meeting_url && (
           <div className="flex items-center gap-2.5">
             <div className="h-8 w-8 rounded-lg bg-purple-500/10 flex items-center justify-center shrink-0">
@@ -465,6 +503,27 @@ export default function EventDetailPage() {
             </a>
           </div>
         )}
+        {/* Bottom-right: Manual add to calendar — secondary action, low-key */}
+        <div className="flex justify-end pt-1">
+          <button
+            type="button"
+            onClick={() => setAddToCalOpen(true)}
+            className={cn(
+              "inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground",
+              calendarAdded &&
+                "text-emerald-600 hover:text-emerald-700 dark:text-emerald-400",
+            )}
+          >
+            {calendarAdded ? (
+              <CalendarCheck className="h-3.5 w-3.5" />
+            ) : (
+              <CalendarPlus className="h-3.5 w-3.5" />
+            )}
+            {calendarAdded
+              ? t("events.detail.added_to_calendar_button")
+              : t("events.detail.manual_add_to_calendar_button")}
+          </button>
+        </div>
       </div>
 
       <AddToCalendarModal
@@ -512,57 +571,31 @@ export default function EventDetailPage() {
         </div>
       )}
 
-      {/* RSVP */}
-      {event.status === "published" && (
-        <div className="rounded-xl border bg-card p-4">
-          {myParticipationActive ? (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 text-green-600">
-                <CheckCircle className="h-4 w-4" />
-                <span className="text-sm font-medium">
-                  {myParticipation?.status === "checked_in"
-                    ? t("events.rsvp.checked_in")
-                    : t("events.rsvp.registered")}
-                </span>
-              </div>
-              {myParticipation?.status === "registered" && (
-                <div className="flex gap-2">
-                  {eventStarted ? (
-                    <Button
-                      size="sm"
-                      onClick={() => checkInMutation.mutate()}
-                      disabled={isPending}
-                    >
-                      {t("events.rsvp.check_in")}
-                    </Button>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">
-                      {t("events.rsvp.check_in_opens_at_start")}
-                    </p>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => cancelMutation.mutate()}
-                    disabled={isPending}
-                  >
-                    {t("events.rsvp.cancel")}
-                  </Button>
-                </div>
-              )}
-            </div>
-          ) : (
+      {/* Below-card RSVP utilities: hint on the left, Cancel RSVP on the right.
+          Separated by justify-between so they don't visually crowd each other. */}
+      {event.status === "published" &&
+        myParticipationActive &&
+        myParticipation?.status === "registered" && (
+          <div className="flex items-center justify-between gap-4">
+            {!eventStarted ? (
+              <span className="text-xs text-muted-foreground">
+                {t("events.rsvp.check_in_opens_at_start")}
+              </span>
+            ) : (
+              <span />
+            )}
             <Button
-              onClick={() => registerMutation.mutate()}
+              size="sm"
+              variant="outline"
+              onClick={() => cancelMutation.mutate()}
               disabled={isPending}
-              className="inline-flex items-center gap-2"
+              className="border-destructive/30 bg-destructive/10 text-destructive shadow-none hover:border-destructive/50 hover:bg-destructive/20 hover:text-destructive dark:border-destructive/40 dark:bg-destructive/20 dark:hover:bg-destructive/30"
             >
-              <UserPlus className="h-4 w-4" />
-              {t("events.rsvp.rsvp")}
+              <X className="h-3.5 w-3.5" />
+              {t("events.rsvp.cancel")}
             </Button>
-          )}
-        </div>
-      )}
+          </div>
+        )}
 
       {/* Owner-only: Paste attendees to invite */}
       {isOwner && (

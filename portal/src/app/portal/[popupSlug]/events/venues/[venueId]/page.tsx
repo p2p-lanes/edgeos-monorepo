@@ -76,10 +76,17 @@ export default function PortalVenueDetailPage() {
     )
   }
 
-  const mapsUrl =
-    venue.geo_lat != null && venue.geo_lng != null
-      ? `https://www.google.com/maps/@${venue.geo_lat},${venue.geo_lng},17z`
+  const mapsUrl = (() => {
+    if (venue.geo_lat != null && venue.geo_lng != null) {
+      return `https://www.google.com/maps/@${venue.geo_lat},${venue.geo_lng},17z`
+    }
+    const query = [venue.title, venue.formatted_address || venue.location]
+      .filter(Boolean)
+      .join(", ")
+    return query
+      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
       : null
+  })()
 
   const gallery = [...(venue.photos ?? [])].sort(
     (a, b) => a.position - b.position,
@@ -118,26 +125,35 @@ export default function PortalVenueDetailPage() {
         </div>
       )}
 
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">
-          {venue.title || t("events.venues.detail.untitled_venue")}
-        </h1>
-        {venue.location && (
-          <p className="text-sm text-muted-foreground mt-1 inline-flex items-center gap-1">
-            <MapPin className="h-4 w-4" />
-            {venue.location}
-            {mapsUrl && (
-              <a
-                href={mapsUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="ml-1 inline-flex items-center gap-0.5 underline"
-              >
-                {t("events.venues.detail.map_link")}{" "}
-                <ArrowUpRight className="h-3 w-3" />
-              </a>
-            )}
-          </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold tracking-tight">
+            {venue.title || t("events.venues.detail.untitled_venue")}
+          </h1>
+          {venue.location && (
+            <p className="text-sm text-muted-foreground mt-1 inline-flex items-center gap-1">
+              <MapPin className="h-4 w-4" />
+              {venue.location}
+            </p>
+          )}
+        </div>
+        {mapsUrl && (
+          <a
+            href={mapsUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="group inline-flex items-center gap-2 self-start rounded-lg border bg-card px-3.5 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-muted whitespace-nowrap"
+          >
+            <span className="flex h-7 w-7 items-center justify-center rounded-md bg-green-500/10">
+              <MapPin className="h-4 w-4 text-green-600" />
+            </span>
+            <span>
+              {t("events.venues.detail.open_in_google_maps", {
+                defaultValue: "Open in Google Maps",
+              })}
+            </span>
+            <ArrowUpRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+          </a>
         )}
       </div>
 

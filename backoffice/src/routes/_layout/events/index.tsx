@@ -85,8 +85,10 @@ function formatDateTime(
   }
 }
 
-const statusVariant: Record<string, "default" | "secondary" | "destructive"> = {
-  published: "default",
+const statusVariant: Record<
+  string,
+  "default" | "secondary" | "destructive" | "outline"
+> = {
   draft: "secondary",
   cancelled: "destructive",
   pending_approval: "secondary",
@@ -96,6 +98,21 @@ const statusVariant: Record<string, "default" | "secondary" | "destructive"> = {
 const statusLabel: Record<string, string> = {
   pending_approval: "Pending approval",
   rejected: "Rejected",
+}
+
+const visibilityVariant: Record<
+  string,
+  "default" | "secondary" | "destructive" | "outline"
+> = {
+  public: "outline",
+  unlisted: "secondary",
+  private: "outline",
+}
+
+const visibilityLabel: Record<string, string> = {
+  public: "Public",
+  unlisted: "Unlisted",
+  private: "Private",
 }
 
 function parseOccurrenceId(
@@ -427,6 +444,21 @@ function buildEventColumns(
       header: "Status",
       cell: ({ row }) => {
         const status = row.original.status as string
+        if (status === "published") {
+          const visibility = (row.original.visibility as string) ?? "public"
+          return (
+            <Badge
+              variant={visibilityVariant[visibility] ?? "outline"}
+              className={
+                visibility === "private"
+                  ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 border-transparent"
+                  : undefined
+              }
+            >
+              {visibilityLabel[visibility] ?? visibility}
+            </Badge>
+          )
+        }
         return (
           <Badge
             variant={statusVariant[status] ?? "secondary"}

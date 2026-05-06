@@ -154,9 +154,12 @@ async def send_event_itip(
     venue_title = getattr(getattr(event, "venue", None), "title", "") or ""
 
     event_url = ""
-    if popup_slug:
+    if popup_slug and popup and popup.tenant:
+        from app.api.tenant.utils import get_portal_url
+
+        portal_base = get_portal_url(popup.tenant)
         event_url = (
-            f"{settings.PORTAL_URL.rstrip('/')}/portal/{popup_slug}/events/{event.id}"
+            f"{portal_base.rstrip('/')}/portal/{popup_slug}/events/{event.id}"
         )
 
     service = get_email_service()

@@ -458,7 +458,8 @@
       "hide_title": "Ocultar de mi lista",
       "unhide_title": "Mostrar",
       "highlighted_badge": "Destacado",
-      "highlighted_title": "Evento destacado"
+      "highlighted_title": "Evento destacado",
+      "owned_title": "Creado por ti"
     },
     "toolbar": {
       "search_placeholder": "Buscar eventos...",
@@ -492,6 +493,7 @@
     "day": {
       "prev_day": "Día anterior",
       "next_day": "Día siguiente",
+      "pick_date": "Elegir fecha",
       "today": "Hoy",
       "first_day": "Primer día",
       "empty_state": "No hay eventos este día",
@@ -533,6 +535,7 @@
       "join_meeting": "Unirse a la reunión",
       "add_to_calendar_button": "Agregar al calendario",
       "added_to_calendar_button": "Agregado al calendario",
+      "manual_add_to_calendar_button": "Agregar manualmente al calendario",
       "invitations_heading": "Invitaciones ({{count}})",
       "invitations_empty": "Aún no hay invitaciones",
       "participants_heading": "Participantes",

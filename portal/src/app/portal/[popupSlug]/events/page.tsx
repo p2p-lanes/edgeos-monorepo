@@ -5,6 +5,7 @@ import {
   CalendarDays,
   CheckCircle,
   Clock,
+  Crown,
   Eye,
   EyeOff,
   Filter,
@@ -13,7 +14,6 @@ import {
   Pencil,
   Plus,
   Repeat,
-  Star,
   Tag,
 } from "lucide-react"
 import Link from "next/link"
@@ -34,6 +34,12 @@ import { useCityProvider } from "@/providers/cityProvider"
 import { CalendarBody } from "./lib/CalendarBody"
 import { DayBody } from "./lib/DayBody"
 import { EventsToolbar, type EventsView } from "./lib/EventsToolbar"
+import {
+  consumeEventsViewState,
+  type EventsScrollSnapshot,
+  type EventsViewSnapshot,
+  saveEventsViewState,
+} from "./lib/eventsViewState"
 import { summarizeRrule } from "./lib/summarizeRrule"
 import {
   useEventTimezone,
@@ -63,21 +69,55 @@ export default function EventsPage() {
   const { t } = useTranslation()
   const { getCity } = useCityProvider()
   const city = getCity()
-  const [search, setSearch] = useState("")
-  const [rsvpedOnly, setRsvpedOnly] = useState(false)
-  const [mineOnly, setMineOnly] = useState(false)
-  const [showHidden, setShowHidden] = useState(false)
-  const [selectedTags, setSelectedTags] = useState<string[]>([])
-  const [selectedTrackIds, setSelectedTrackIds] = useState<string[]>([])
+
+  // One-shot restore of UI state from sessionStorage when the user comes
+  // back from an event detail page. The detail page's "Back to events"
+  // link round-trips `?view=...&date=...`; we use those to look up the
+  // matching snapshot (saved by the body components on link click) and
+  // seed filters + scroll. `consume*` deletes the entry so a later
+  // refresh doesn't restore stale state. Stored once in a ref so all
+  // useState lazy initializers see the same snapshot, and StrictMode's
+  // double-render doesn't consume twice.
+  const restoreSnapshotRef = useRef<{
+    value: EventsViewSnapshot | null
+  } | null>(null)
+  if (restoreSnapshotRef.current === null) {
+    let value: EventsViewSnapshot | null = null
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search)
+      const v = (params.get("view") as EventsView | null) ?? "list"
+      const d = params.get("date")
+      value = consumeEventsViewState(v, d)
+    }
+    restoreSnapshotRef.current = { value }
+  }
+  const restoredFilters = restoreSnapshotRef.current.value?.listFilters
+  const restoredScroll = restoreSnapshotRef.current.value?.scroll
+
+  const [search, setSearch] = useState(() => restoredFilters?.search ?? "")
+  const [rsvpedOnly, setRsvpedOnly] = useState(
+    () => restoredFilters?.rsvpedOnly ?? false,
+  )
+  const [mineOnly, setMineOnly] = useState(
+    () => restoredFilters?.mineOnly ?? false,
+  )
+  const [showHidden, setShowHidden] = useState(
+    () => restoredFilters?.showHidden ?? false,
+  )
+  const [selectedTags, setSelectedTags] = useState<string[]>(
+    () => restoredFilters?.selectedTags ?? [],
+  )
+  const [selectedTrackIds, setSelectedTrackIds] = useState<string[]>(
+    () => restoredFilters?.selectedTrackIds ?? [],
+  )
   const queryClient = useQueryClient()
 
-  // The view tab is persisted in the URL so a refresh keeps the user on
-  // their current tab. The day-view date, on the other hand, is owned
-  // locally — we only seed it from `?date=` once on mount (so the
-  // back-from-event-detail link still lands on the right day) and then
-  // strip the param. That way a plain refresh always falls back to the
-  // popup's first booking day, while session navigation (today/first-day/
-  // prev/next) still works in-page.
+  // The view tab and the day-view/calendar-view selected day are both
+  // persisted in the URL. `view` and `selectedDate` are derived from
+  // `?view=` and `?date=` respectively, so a refresh, browser back, or
+  // the "Back to events" link all land on the same view+day with no
+  // hydration race. The setters update the URL via `router.replace`
+  // (no history entries) and React re-derives on the next render.
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -86,36 +126,81 @@ export default function EventsPage() {
   const setView = useCallback(
     (next: EventsView) => {
       const params = new URLSearchParams(searchParams.toString())
-      if (next === "list") params.delete("view")
-      else params.set("view", next)
+      if (next === "list") {
+        params.delete("view")
+        // Date doesn't apply in list view; drop it so the URL is clean.
+        params.delete("date")
+      } else {
+        params.set("view", next)
+      }
       const qs = params.toString()
       router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
     },
     [router, pathname, searchParams],
   )
 
-  const [selectedDate, setSelectedDate] = useState<Date | null>(() => {
-    if (typeof window === "undefined") return null
-    const dateParam = new URLSearchParams(window.location.search).get("date")
+  // `selectedDate` is derived directly from the `?date=YYYY-MM-DD` URL
+  // param (no separate React state) so the URL is the single source of
+  // truth — refreshes, browser back, and the "Back to events" link all
+  // round-trip the same way without hydration races. Day/calendar views
+  // call `setSelectedDate` to navigate; it just updates the URL via
+  // `router.replace` (no history entries) and React re-derives.
+  //
+  // `useSearchParams()` can occasionally lag the actual URL by one
+  // render (the live URL is what `window.location.search` reflects), so
+  // we fall back to reading it directly when the hook hasn't seen a
+  // `date` yet. The `searchParams` dep ensures the memo recomputes once
+  // the hook catches up.
+  const selectedDate = useMemo<Date | null>(() => {
+    let dateParam = searchParams.get("date")
+    if (!dateParam && typeof window !== "undefined") {
+      dateParam = new URLSearchParams(window.location.search).get("date")
+    }
     if (!dateParam) return null
     const m = dateParam.match(/^(\d{4})-(\d{2})-(\d{2})$/)
     if (!m) return null
     const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 0, 0, 0, 0)
     return Number.isNaN(d.getTime()) ? null : d
-  })
-  // One-shot URL cleanup: drop `?date=` after seeding local state so a
-  // refresh no longer carries it. Runs once per mount; back-from-detail
-  // re-mounts the page so its `?date=` is honored on the new mount.
-  const didCleanDateUrlRef = useRef(false)
-  useEffect(() => {
-    if (didCleanDateUrlRef.current) return
-    didCleanDateUrlRef.current = true
-    const params = new URLSearchParams(searchParams.toString())
-    if (!params.has("date")) return
-    params.delete("date")
-    const qs = params.toString()
-    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
-  }, [router, pathname, searchParams])
+  }, [searchParams])
+
+  const setSelectedDate = useCallback(
+    (next: Date) => {
+      const params = new URLSearchParams(searchParams.toString())
+      const ymd = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(
+        2,
+        "0",
+      )}-${String(next.getDate()).padStart(2, "0")}`
+      params.set("date", ymd)
+      const qs = params.toString()
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+    },
+    [searchParams, router, pathname],
+  )
+
+  // Saves the current UI state right before the user follows an event
+  // link into the detail page. Bodies pass their own dayKey + scroll
+  // positions; filters live here and are stamped onto every snapshot so
+  // the page restores them on return regardless of which view exited.
+  const handleEventLinkClick = useCallback(
+    (
+      fromView: EventsView,
+      dayKey: string | null,
+      scroll: EventsScrollSnapshot,
+    ) => {
+      saveEventsViewState(fromView, dayKey, {
+        scroll,
+        listFilters: {
+          search,
+          rsvpedOnly,
+          mineOnly,
+          showHidden,
+          selectedTags,
+          selectedTrackIds,
+        },
+      })
+    },
+    [search, rsvpedOnly, mineOnly, showHidden, selectedTags, selectedTrackIds],
+  )
 
   const { data: currentHuman } = useQuery({
     queryKey: ["current-human"],
@@ -140,16 +225,6 @@ export default function EventsPage() {
     staleTime: 5 * 60 * 1000,
   })
   const allowedTracks = tracksData?.results ?? []
-
-  // Default landing date for the day/calendar views: the popup's first
-  // booking day, parsed as a local Date. Falls back to "today" until the
-  // popup data has loaded.
-  const popupStartDate = useMemo(() => {
-    if (!city?.start_date) return null
-    const m = city.start_date.slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/)
-    if (!m) return null
-    return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 0, 0, 0, 0)
-  }, [city?.start_date])
 
   // Expansion window for recurring events. Passing start_after triggers the
   // backend to expand RRULEs into concrete occurrences; without it, recurring
@@ -380,6 +455,22 @@ export default function EventsPage() {
   ])
   const grouped = groupByDate(events, formatDayKey)
 
+  // Restore outer scroll position once after returning from event
+  // detail. List view waits for events to load (so the page has the
+  // scroll height to apply the restore); calendar/day view render their
+  // body synchronously so we can scroll immediately. Day view's inner
+  // grid scroll is handled separately inside DayBody.
+  const didRestoreOuterScrollRef = useRef(false)
+  useEffect(() => {
+    if (didRestoreOuterScrollRef.current) return
+    if (!restoredScroll || restoredScroll.outer == null) return
+    if (view === "list" && (isLoading || events.length === 0)) return
+    didRestoreOuterScrollRef.current = true
+    const main =
+      typeof document !== "undefined" ? document.querySelector("main") : null
+    if (main) main.scrollTop = restoredScroll.outer
+  }, [view, restoredScroll, isLoading, events.length])
+
   if (!moduleEnabled) {
     return (
       <div className="flex flex-col h-full max-w-4xl mx-auto p-4 sm:p-6">
@@ -401,10 +492,11 @@ export default function EventsPage() {
   return (
     // Natural flow so the outer <main> from portal/layout drives scrolling:
     // heading + toolbar scroll out of view with the list/calendar body
-    // instead of being sticky at the top. `overflow-x-hidden` is a safety
-    // net: any wide content inside the list/calendar body is clipped here
-    // instead of letting the whole viewport scroll sideways.
-    <div className="max-w-4xl mx-auto p-4 sm:p-6 overflow-x-hidden">
+    // instead of being sticky at the top. `overflow-x-clip` (not -hidden)
+    // is a safety net for wide content while preserving position:sticky
+    // for descendants — `overflow: hidden` would establish a scroll
+    // container and break sticky behavior on the calendar column.
+    <div className="max-w-4xl mx-auto p-4 sm:p-6 overflow-x-clip">
       <div className="mb-6">
         <div className="flex items-start justify-between gap-2">
           <h1 className="text-2xl font-bold tracking-tight">
@@ -467,7 +559,8 @@ export default function EventsPage() {
             rsvpedOnly={rsvpedOnly}
             tags={selectedTags}
             trackIds={selectedTrackIds}
-            defaultDate={popupStartDate}
+            defaultDate={selectedDate}
+            onEventLinkClick={handleEventLinkClick}
           />
         ) : view === "day" ? (
           <DayBody
@@ -479,7 +572,8 @@ export default function EventsPage() {
             trackIds={selectedTrackIds}
             selectedDate={selectedDate}
             onSelectedDateChange={setSelectedDate}
-            defaultDate={popupStartDate}
+            restoredScroll={restoredScroll}
+            onEventLinkClick={handleEventLinkClick}
           />
         ) : isLoading ? (
           <div className="flex items-center justify-center py-20">
@@ -522,16 +616,23 @@ export default function EventsPage() {
                               ? `/portal/${city?.slug}/events/${event.id}?occ=${encodeURIComponent(event.start_time)}`
                               : `/portal/${city?.slug}/events/${event.id}`
                           }
+                          onClick={() => {
+                            const main =
+                              typeof document !== "undefined"
+                                ? document.querySelector("main")
+                                : null
+                            handleEventLinkClick("list", null, {
+                              outer: main?.scrollTop ?? 0,
+                            })
+                          }}
                           className="block p-3 sm:p-4 pb-11"
                         >
                           <div className="flex items-start justify-between gap-2 mb-1 pr-8">
                             <h3 className="font-medium text-sm sm:text-base flex items-center gap-1.5">
-                              {isHighlighted && (
-                                <Star
-                                  className="h-3.5 w-3.5 shrink-0 fill-amber-400 text-amber-500"
-                                  aria-label={t(
-                                    "events.list.highlighted_title",
-                                  )}
+                              {isOwner && (
+                                <Crown
+                                  className="h-3.5 w-3.5 shrink-0 text-amber-500"
+                                  aria-label={t("events.list.owned_title")}
                                 />
                               )}
                               <span>{event.title}</span>

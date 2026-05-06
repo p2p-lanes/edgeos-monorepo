@@ -2742,6 +2742,7 @@ export type VenueBusySlot = {
     event_id?: (string | null);
     event_start?: (string | null);
     event_end?: (string | null);
+    highlighted?: boolean;
 };
 
 export type VenueExceptionCreate = {

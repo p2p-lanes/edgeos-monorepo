@@ -559,6 +559,7 @@ def _compute_availability(
                 event_id=e.id,
                 event_start=e.start_time,
                 event_end=e.end_time,
+                highlighted=bool(e.highlighted),
             )
         )
     for exc in closed_exceptions:
