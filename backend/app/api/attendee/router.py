@@ -36,21 +36,41 @@ _AttendeeLimit = Annotated[
 
 
 def _build_attendee_with_origin(attendee) -> AttendeeWithOriginPublic:
-    """Build an AttendeeWithOriginPublic from an Attendees ORM row."""
-    products = [
+    """Build an AttendeeWithOriginPublic from an Attendees ORM row.
+
+    Constructs the response manually to avoid the Pydantic from_attributes
+    traversal of attendee.products (a property returning Products ORM objects)
+    colliding with the AttendeeProductPublic schema expected by the response model.
+    """
+    ticket_products = [
         AttendeeProductPublic(
             id=ap.id,
             attendee_id=ap.attendee_id,
             product_id=ap.product_id,
             check_in_code=ap.check_in_code,
             payment_id=ap.payment_id,
+            requires_check_in=ap.product.requires_check_in if ap.product else False,
         )
         for ap in attendee.attendee_products
     ]
     origin = "application" if attendee.application_id is not None else "direct_sale"
-    result = AttendeeWithOriginPublic.model_validate(attendee)
-    result.products = products  # type: ignore[assignment]
-    result.origin = origin
+    result = AttendeeWithOriginPublic(
+        id=attendee.id,
+        tenant_id=attendee.tenant_id,
+        application_id=attendee.application_id,
+        popup_id=attendee.popup_id,
+        human_id=attendee.human_id,
+        name=attendee.name,
+        category=attendee.category,
+        email=attendee.email,
+        gender=attendee.gender,
+        check_in_code=attendee.check_in_code,
+        poap_url=attendee.poap_url,
+        created_at=attendee.created_at,
+        updated_at=attendee.updated_at,
+        products=ticket_products,
+        origin=origin,
+    )
     return result
 
 

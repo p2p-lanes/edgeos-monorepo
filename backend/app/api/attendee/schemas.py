@@ -155,13 +155,18 @@ class AttendeeProductsBase(SQLModel):
 
 
 class AttendeeProductPublic(BaseModel):
-    """Schema for an individual ticket (one row per ticket, no quantity)."""
+    """Schema for an individual ticket (one row per ticket, no quantity).
+
+    requires_check_in is denormalized from the related Product so the frontend
+    can decide whether to render a QR code without an extra round-trip.
+    """
 
     id: uuid.UUID
     attendee_id: uuid.UUID
     product_id: uuid.UUID
     check_in_code: str
     payment_id: uuid.UUID | None = None
+    requires_check_in: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 
