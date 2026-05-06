@@ -144,8 +144,6 @@ class TestTicketEventModel:
         import uuid
         from decimal import Decimal
 
-        from sqlmodel import Session
-
         from app.api.attendee.models import AttendeeProducts, Attendees
         from app.api.human.models import Humans
         from app.api.product.models import Products

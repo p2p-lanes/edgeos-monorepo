@@ -12,8 +12,7 @@ arbitrary row when multiple tickets of the same product exist for one attendee.
 import uuid
 from decimal import Decimal
 
-import pytest
-from sqlmodel import Session, select
+from sqlmodel import Session
 
 from app.api.attendee import crud as attendee_crud
 from app.api.attendee.models import AttendeeProducts, Attendees
@@ -21,7 +20,6 @@ from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
-
 
 # ---------------------------------------------------------------------------
 # Helpers

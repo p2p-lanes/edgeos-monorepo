@@ -193,8 +193,10 @@ class TicketProductSnapshot(BaseModel):
 class TicketPublic(BaseModel):
     """Full public representation of a single ticket (AttendeeProducts row).
 
-    Returned by GET /attendees/check-in/{code}.
+    Returned by POST /attendees/check-in/{code}.
     Embeds attendee + product snapshots for scanner UIs without extra round-trips.
+    Enriched with scan summary fields from ticket_events so frontend/staff can
+    apply check-in policy at runtime (single-scan, scan-every-time, etc.).
     """
 
     id: uuid.UUID
@@ -202,6 +204,10 @@ class TicketPublic(BaseModel):
     payment_id: uuid.UUID | None = None
     attendee: TicketAttendeeSnapshot
     product: TicketProductSnapshot
+    # Scan summary — populated by POST /attendees/check-in/{code} from ticket_events
+    total_scans: int = 0
+    first_scan_at: datetime | None = None
+    last_scan_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
