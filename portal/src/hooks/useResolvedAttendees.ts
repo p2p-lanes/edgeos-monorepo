@@ -1,11 +1,11 @@
 "use client"
 
 import { resolvePopupCheckoutPolicy } from "@/checkout/popupCheckoutPolicy"
+import type { AttendeeWithOriginPublic } from "@/client"
 import { sortAttendees } from "@/helpers/filters"
 import useAuth from "@/hooks/useAuth"
 import useHumanAttendeesQuery from "@/hooks/useHumanAttendeesQuery"
 import { useCityProvider } from "@/providers/cityProvider"
-import type { AttendeeWithOriginPublic } from "@/client"
 import type { AttendeePassState } from "@/types/Attendee"
 
 /**
@@ -78,20 +78,22 @@ export function useResolvedAttendees(): AttendeePassState[] {
   // PassesProvider replaces products via buildBaseAttendeePasses anyway,
   // so the product field is overwritten. We extract per-ticket entries into
   // ticket_entries so QR display in AttendeeTicket can use them.
-  const withTicketEntries = humanAttendees.map((attendee: AttendeeWithOriginPublic): AttendeePassState => ({
-    ...(attendee as unknown as AttendeePassState),
-    products: [],
-    ticket_entries: (attendee.products ?? []).map((ap) => ({
-      id: ap.id,
-      attendee_id: ap.attendee_id,
-      product_id: ap.product_id,
-      check_in_code: ap.check_in_code,
-      payment_id: ap.payment_id ?? null,
-      // product_name and requires_check_in are not in AttendeeProductPublic;
-      // they will be undefined here and TicketQRList defaults requires_check_in to true.
-      // A future enrichment can pass them via a separate ticket-detail endpoint.
-    })),
-  }))
+  const withTicketEntries = humanAttendees.map(
+    (attendee: AttendeeWithOriginPublic): AttendeePassState => ({
+      ...(attendee as unknown as AttendeePassState),
+      products: [],
+      ticket_entries: (attendee.products ?? []).map((ap) => ({
+        id: ap.id,
+        attendee_id: ap.attendee_id,
+        product_id: ap.product_id,
+        check_in_code: ap.check_in_code,
+        payment_id: ap.payment_id ?? null,
+        // product_name and requires_check_in are not in AttendeeProductPublic;
+        // they will be undefined here and TicketQRList defaults requires_check_in to true.
+        // A future enrichment can pass them via a separate ticket-detail endpoint.
+      })),
+    }),
+  )
   return sortAttendees(withTicketEntries)
 }
 

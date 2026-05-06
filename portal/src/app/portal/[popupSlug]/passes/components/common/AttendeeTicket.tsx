@@ -253,7 +253,8 @@ const AttendeeTicket = ({
                   ))}
                 </div>
                 {/* Per-ticket QR codes — one per ticket where product.requires_check_in === true */}
-                {attendee.ticket_entries && attendee.ticket_entries.length > 0 ? (
+                {attendee.ticket_entries &&
+                attendee.ticket_entries.length > 0 ? (
                   <TicketQRList tickets={attendee.ticket_entries} />
                 ) : (
                   /* Fallback: legacy attendee-level QR (pre-migration attendees) */

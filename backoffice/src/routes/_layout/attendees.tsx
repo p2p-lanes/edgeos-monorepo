@@ -17,6 +17,35 @@ import {
   type AttendeePublic,
   AttendeesService,
 } from "@/client"
+import { DataTable, SortableHeader } from "@/components/Common/DataTable"
+import { EmptyState } from "@/components/Common/EmptyState"
+import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
+import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { InlineRow, InlineSection } from "@/components/ui/inline-form"
+import { Separator } from "@/components/ui/separator"
+import { Skeleton } from "@/components/ui/skeleton"
+import { useWorkspace } from "@/contexts/WorkspaceContext"
+import {
+  useTableSearchParams,
+  validateTableSearch,
+} from "@/hooks/useTableSearchParams"
+import { exportToCsv, fetchAllPages } from "@/lib/export"
 
 // ── CSV flattening helper ─────────────────────────────────────────────────────
 
@@ -61,35 +90,6 @@ export function flattenAttendeesForCsv(
     }))
   })
 }
-import { DataTable, SortableHeader } from "@/components/Common/DataTable"
-import { EmptyState } from "@/components/Common/EmptyState"
-import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
-import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { InlineRow, InlineSection } from "@/components/ui/inline-form"
-import { Separator } from "@/components/ui/separator"
-import { Skeleton } from "@/components/ui/skeleton"
-import { useWorkspace } from "@/contexts/WorkspaceContext"
-import {
-  useTableSearchParams,
-  validateTableSearch,
-} from "@/hooks/useTableSearchParams"
-import { exportToCsv, fetchAllPages } from "@/lib/export"
 
 function getAttendeesQueryOptions(
   popupId: string | null,
@@ -124,7 +124,9 @@ export const Route = createFileRoute("/_layout/attendees")({
  */
 export function AttendeeDetailsContent({
   attendee,
-}: { attendee: AttendeePublic }) {
+}: {
+  attendee: AttendeePublic
+}) {
   const products = (attendee.products ??
     []) as unknown as AttendeeProductPublic[]
 

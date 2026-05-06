@@ -1,5 +1,5 @@
-import type { AttendeeProductPublic, AttendeePublic } from "@/client"
 import type { TicketEntry } from "@/app/portal/[popupSlug]/passes/components/common/TicketQRList"
+import type { AttendeeProductPublic, AttendeePublic } from "@/client"
 import type { ProductsPass } from "./Products"
 
 export type AttendeeCategory = "main" | "spouse" | "kid" | "baby" | "teen"
