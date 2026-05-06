@@ -167,12 +167,20 @@ export function EditEventForm({
 
   const venueMaxCapacity = selectedVenue?.capacity ?? null
   const venueDisabled = selectedVenue?.booking_mode === "unbookable"
+  const isCustomLocation = form.venueId === "__custom__"
+  const isMeeting = !form.venueId && !isCustomLocation
+  const customLocationMissing =
+    isCustomLocation &&
+    (!form.customLocationName.trim() || !form.customLocationUrl.trim())
+  const meetingUrlMissing = isMeeting && !form.meetingUrl.trim()
 
   const canSubmit =
     !!form.title.trim() &&
     !!startIso &&
     !!endIso &&
-    (!form.venueId || withinOpenHours) &&
+    (!form.venueId || isCustomLocation || withinOpenHours) &&
+    !customLocationMissing &&
+    !meetingUrlMissing &&
     availability !== "conflict" &&
     availability !== "checking" &&
     !updateMutation.isPending
@@ -203,7 +211,16 @@ export function EditEventForm({
           selectedVenue={selectedVenue}
           selectedDateIsClosed={selectedDateIsClosed}
           selectedVenueLabel={event.venue_title ?? undefined}
+          customLocationName={form.customLocationName}
+          onCustomLocationNameChange={form.setCustomLocationName}
+          customLocationUrl={form.customLocationUrl}
+          onCustomLocationUrlChange={form.setCustomLocationUrl}
         />
+        {customLocationMissing && (
+          <p className="text-xs text-destructive">
+            {t("events.form.custom_location_validation_both_required")}
+          </p>
+        )}
 
         <div className="space-y-2">
           <Label htmlFor="title">{t("events.form.title_label")}</Label>
@@ -268,16 +285,27 @@ export function EditEventForm({
           onChange={form.setTags}
         />
 
-        <div className="space-y-2">
-          <Label htmlFor="meeting">{t("events.form.meeting_url_label")}</Label>
-          <Input
-            id="meeting"
-            type="url"
-            value={form.meetingUrl}
-            onChange={(e) => form.setMeetingUrl(e.target.value)}
-            placeholder={t("events.form.meeting_url_placeholder")}
-          />
-        </div>
+        {isMeeting && (
+          <div className="space-y-2">
+            <Label htmlFor="meeting">
+              {t("events.form.meeting_url_label")}
+              <span className="text-destructive ml-0.5">*</span>
+            </Label>
+            <Input
+              id="meeting"
+              type="url"
+              required
+              value={form.meetingUrl}
+              onChange={(e) => form.setMeetingUrl(e.target.value)}
+              placeholder={t("events.form.meeting_url_placeholder")}
+            />
+            {meetingUrlMissing && (
+              <p className="text-xs text-destructive">
+                {t("events.form.meeting_url_required")}
+              </p>
+            )}
+          </div>
+        )}
 
         <TrackField
           tracks={tracks}

@@ -9,7 +9,7 @@ import {
 import { useForm, useStore } from "@tanstack/react-form"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link, useNavigate } from "@tanstack/react-router"
-import { Trash2 } from "lucide-react"
+import { Home, Trash2, Video } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import {
   type EventCreate,
@@ -36,7 +36,10 @@ import { LoadingButton } from "@/components/ui/loading-button"
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
@@ -220,6 +223,12 @@ export function EventForm({
   const [durationValue, setDurationValue] =
     useState<number>(initialDurationValue)
   const [venueDialogOpen, setVenueDialogOpen] = useState(false)
+  // True when the user picked the "Custom location" sentinel in the venue
+  // dropdown — the event has no Venue row, but stores an ad-hoc place name
+  // and Maps URL on the event itself.
+  const [customSelected, setCustomSelected] = useState<boolean>(
+    Boolean(defaultValues?.custom_location_name),
+  )
   const durationMinutes = Math.max(
     1,
     Math.round(durationUnit === "hours" ? durationValue * 60 : durationValue),
@@ -239,6 +248,8 @@ export function EventForm({
       meeting_url: defaultValues?.meeting_url ?? "",
       max_participant: defaultValues?.max_participant?.toString() ?? "",
       venue_id: defaultValues?.venue_id ?? initialVenueId ?? "",
+      custom_location_name: defaultValues?.custom_location_name ?? "",
+      custom_location_url: defaultValues?.custom_location_url ?? "",
       track_id: defaultValues?.track_id ?? "",
       visibility: (defaultValues?.visibility ?? "public") as
         | "public"
@@ -272,8 +283,29 @@ export function EventForm({
       const startDate = localTzNaiveToUtc(value.start_time, value.timezone)
       const endDate = new Date(startDate.getTime() + durationMinutes * 60_000)
 
-      // meeting_url only applies when there's no physical venue.
-      const meetingUrl = value.venue_id ? null : value.meeting_url || null
+      // meeting_url only applies for online-only Meeting events (no venue,
+      // no custom physical location). When the Meeting option is selected
+      // it is required — there's nowhere else for attendees to go.
+      const isMeeting = !value.venue_id && !customSelected
+      const meetingUrl = isMeeting ? value.meeting_url.trim() || null : null
+      if (isMeeting && !meetingUrl) {
+        showErrorToast("Meeting URL is required for Meeting events.")
+        return
+      }
+
+      const customName = customSelected
+        ? value.custom_location_name.trim() || null
+        : null
+      const customUrl = customSelected
+        ? value.custom_location_url.trim() || null
+        : null
+      if (customSelected && (!customName || !customUrl)) {
+        showErrorToast(
+          "Provide both a name and a Google Maps link for the custom location.",
+        )
+        return
+      }
+      const venueId = customSelected ? null : value.venue_id || null
 
       if (isEdit) {
         const payload: EventUpdate = {
@@ -288,7 +320,9 @@ export function EventForm({
           max_participant: value.max_participant
             ? parseInt(value.max_participant, 10)
             : null,
-          venue_id: value.venue_id || null,
+          venue_id: venueId,
+          custom_location_name: customName,
+          custom_location_url: customUrl,
           track_id: value.track_id || null,
           visibility: value.visibility,
           require_approval: value.require_approval,
@@ -311,7 +345,9 @@ export function EventForm({
           max_participant: value.max_participant
             ? parseInt(value.max_participant, 10)
             : null,
-          venue_id: value.venue_id || null,
+          venue_id: venueId,
+          custom_location_name: customName,
+          custom_location_url: customUrl,
           track_id: value.track_id || null,
           visibility: value.visibility,
           require_approval: value.require_approval,
@@ -904,28 +940,106 @@ export function EventForm({
           <form.Field name="venue_id">
             {(field) => (
               <Select
-                value={field.state.value || "__none__"}
-                onValueChange={(v) =>
-                  field.handleChange(v === "__none__" ? "" : v)
+                value={
+                  customSelected
+                    ? "__custom__"
+                    : field.state.value || "__none__"
                 }
+                onValueChange={(v) => {
+                  if (v === "__custom__") {
+                    setCustomSelected(true)
+                    field.handleChange("")
+                  } else if (v === "__none__") {
+                    setCustomSelected(false)
+                    field.handleChange("")
+                  } else {
+                    setCustomSelected(false)
+                    field.handleChange(v)
+                  }
+                }}
                 disabled={readOnly}
               >
                 <SelectTrigger className="w-[240px]">
-                  <SelectValue placeholder="No venue" />
+                  <SelectValue placeholder="Meeting" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__none__">No venue</SelectItem>
-                  {venues?.results.map((v) => (
-                    <SelectItem key={v.id} value={v.id}>
-                      {v.title || "Untitled venue"}
-                      {v.capacity ? ` (cap. ${v.capacity})` : ""}
-                    </SelectItem>
-                  ))}
+                  <SelectItem
+                    value="__none__"
+                    className="bg-muted/40 text-foreground data-[highlighted]:bg-muted"
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <Video className="h-3.5 w-3.5 text-muted-foreground" />
+                      Meeting
+                    </span>
+                  </SelectItem>
+                  <SelectItem
+                    value="__custom__"
+                    className="bg-muted/40 text-foreground data-[highlighted]:bg-muted"
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <Home className="h-3.5 w-3.5 text-muted-foreground" />
+                      Custom location
+                    </span>
+                  </SelectItem>
+                  {venues?.results && venues.results.length > 0 && (
+                    <>
+                      <SelectSeparator />
+                      <SelectGroup>
+                        <SelectLabel className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                          Venues
+                        </SelectLabel>
+                        {venues.results.map((v) => (
+                          <SelectItem key={v.id} value={v.id}>
+                            {v.title || "Untitled venue"}
+                            {v.capacity ? ` (cap. ${v.capacity})` : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </>
+                  )}
                 </SelectContent>
               </Select>
             )}
           </form.Field>
         </InlineRow>
+
+        {customSelected && (
+          <>
+            <InlineRow
+              label="Place name"
+              description="Shown to attendees in place of a venue card."
+            >
+              <form.Field name="custom_location_name">
+                {(field) => (
+                  <Input
+                    value={field.state.value}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    placeholder="My apartment"
+                    disabled={readOnly}
+                    className="w-[280px]"
+                  />
+                )}
+              </form.Field>
+            </InlineRow>
+            <InlineRow
+              label="Google Maps link"
+              description="Any well-formed http(s) URL — Google Maps, Apple Maps, OSM…"
+            >
+              <form.Field name="custom_location_url">
+                {(field) => (
+                  <Input
+                    type="url"
+                    value={field.state.value}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    placeholder="https://maps.google.com/..."
+                    disabled={readOnly}
+                    className="w-[280px]"
+                  />
+                )}
+              </form.Field>
+            </InlineRow>
+          </>
+        )}
 
         {selectedVenue && (
           <InlineRow
@@ -951,14 +1065,16 @@ export function EventForm({
           </div>
         )}
 
-        {!venueIdValue && (
+        {!venueIdValue && !customSelected && (
           <InlineRow
             label="Meeting URL"
-            description="Virtual meeting link for this event"
+            description="Virtual meeting link — required for Meeting events."
           >
             <form.Field name="meeting_url">
               {(field) => (
                 <Input
+                  type="url"
+                  required
                   value={field.state.value}
                   onChange={(e) => field.handleChange(e.target.value)}
                   placeholder="https://meet.google.com/..."

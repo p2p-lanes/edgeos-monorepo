@@ -497,11 +497,22 @@ function buildEventColumns(
       cell: ({ row }) => {
         const venueId = row.original.venue_id
         const label = venueId ? venueNameById.get(venueId) : null
-        return (
-          <span className="text-muted-foreground truncate max-w-[200px] block">
-            {label ?? "—"}
-          </span>
-        )
+        const customName = row.original.custom_location_name
+        if (label) {
+          return (
+            <span className="text-muted-foreground truncate max-w-[200px] block">
+              {label}
+            </span>
+          )
+        }
+        if (!venueId && customName) {
+          return (
+            <span className="text-muted-foreground/80 truncate max-w-[200px] block">
+              ⌂ {customName}
+            </span>
+          )
+        }
+        return <span className="text-muted-foreground">—</span>
       },
     },
     {

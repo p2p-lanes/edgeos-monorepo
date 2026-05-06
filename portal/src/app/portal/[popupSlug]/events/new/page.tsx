@@ -79,6 +79,8 @@ export default function NewPortalEventPage() {
   const [title, setTitle] = useState("")
   const [content, setContent] = useState("")
   const [venueId, setVenueId] = useState<string>("")
+  const [customLocationName, setCustomLocationName] = useState("")
+  const [customLocationUrl, setCustomLocationUrl] = useState("")
 
   const {
     dateStr,
@@ -155,6 +157,13 @@ export default function NewPortalEventPage() {
   })
   const tracks: TrackPublic[] = tracksData?.results ?? []
 
+  const isCustomLocation = venueId === "__custom__"
+  const isMeeting = !venueId && !isCustomLocation
+  const customLocationMissing =
+    isCustomLocation &&
+    (!customLocationName.trim() || !customLocationUrl.trim())
+  const meetingUrlMissing = isMeeting && !meetingUrl.trim()
+
   // ---- mutation -------------------------------------------------------
   const createMutation = useMutation({
     mutationFn: () => {
@@ -167,13 +176,19 @@ export default function NewPortalEventPage() {
           start_time: startIso,
           end_time: endIso,
           timezone: timezone || "UTC",
-          venue_id: venueId || null,
+          venue_id: !isCustomLocation && venueId ? venueId : null,
+          custom_location_name: isCustomLocation
+            ? customLocationName.trim() || null
+            : null,
+          custom_location_url: isCustomLocation
+            ? customLocationUrl.trim() || null
+            : null,
           track_id: trackId || null,
           visibility,
           max_participant: maxParticipants
             ? Math.max(0, parseInt(maxParticipants, 10))
             : null,
-          meeting_url: meetingUrl || null,
+          meeting_url: isMeeting ? meetingUrl.trim() || null : null,
           cover_url: coverUrl || null,
           tags,
           status: "published",
@@ -276,7 +291,9 @@ export default function NewPortalEventPage() {
     !!title.trim() &&
     !!startIso &&
     !!endIso &&
-    (!venueId || withinOpenHours) &&
+    (!venueId || isCustomLocation || withinOpenHours) &&
+    !customLocationMissing &&
+    !meetingUrlMissing &&
     availability !== "conflict" &&
     availability !== "checking" &&
     !createMutation.isPending
@@ -321,7 +338,16 @@ export default function NewPortalEventPage() {
           venues={venues}
           selectedVenue={selectedVenue}
           selectedDateIsClosed={selectedDateIsClosed}
+          customLocationName={customLocationName}
+          onCustomLocationNameChange={setCustomLocationName}
+          customLocationUrl={customLocationUrl}
+          onCustomLocationUrlChange={setCustomLocationUrl}
         />
+        {customLocationMissing && (
+          <p className="text-xs text-destructive">
+            {t("events.form.custom_location_validation_both_required")}
+          </p>
+        )}
 
         {/* Title */}
         <div className="space-y-2">
@@ -548,17 +574,28 @@ export default function NewPortalEventPage() {
           </div>
         )}
 
-        {/* Meeting URL */}
-        <div className="space-y-2">
-          <Label htmlFor="meeting">{t("events.form.meeting_url_label")}</Label>
-          <Input
-            id="meeting"
-            type="url"
-            value={meetingUrl}
-            onChange={(e) => setMeetingUrl(e.target.value)}
-            placeholder={t("events.form.meeting_url_placeholder")}
-          />
-        </div>
+        {/* Meeting URL — required when the Meeting option is selected. */}
+        {isMeeting && (
+          <div className="space-y-2">
+            <Label htmlFor="meeting">
+              {t("events.form.meeting_url_label")}
+              <span className="text-destructive ml-0.5">*</span>
+            </Label>
+            <Input
+              id="meeting"
+              type="url"
+              required
+              value={meetingUrl}
+              onChange={(e) => setMeetingUrl(e.target.value)}
+              placeholder={t("events.form.meeting_url_placeholder")}
+            />
+            {meetingUrlMissing && (
+              <p className="text-xs text-destructive">
+                {t("events.form.meeting_url_required")}
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="flex justify-end gap-2 pt-2">
           <Button

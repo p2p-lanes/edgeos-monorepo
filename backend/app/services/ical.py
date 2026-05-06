@@ -113,6 +113,14 @@ def build_event_ics(
             location_bits.append(venue.title)
         if getattr(venue, "location", None):
             location_bits.append(venue.location)
+    elif getattr(event, "custom_location_name", None):
+        # No venue but the event has an ad-hoc custom location — use the
+        # name (and the maps URL when present, which the schema XOR
+        # guarantees) so calendar clients show something useful.
+        location_bits.append(event.custom_location_name)
+        custom_url = getattr(event, "custom_location_url", None)
+        if custom_url:
+            location_bits.append(custom_url)
     location = _escape(" — ".join(location_bits)) if location_bits else ""
 
     if occurrence_start is not None:

@@ -11,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { VenueHoursSummary } from "@/components/VenueHoursSummary"
 import { VenueSelect } from "./VenueSelect"
@@ -27,6 +28,10 @@ interface EventVenueFieldProps {
    * no SelectItem to read the trigger label from and shows the placeholder.
    */
   selectedVenueLabel?: string
+  customLocationName: string
+  onCustomLocationNameChange: (next: string) => void
+  customLocationUrl: string
+  onCustomLocationUrlChange: (next: string) => void
 }
 
 export function EventVenueField({
@@ -36,9 +41,14 @@ export function EventVenueField({
   selectedVenue,
   selectedDateIsClosed,
   selectedVenueLabel,
+  customLocationName,
+  onCustomLocationNameChange,
+  customLocationUrl,
+  onCustomLocationUrlChange,
 }: EventVenueFieldProps) {
   const { t } = useTranslation()
   const [picturesOpen, setPicturesOpen] = useState(false)
+  const isCustom = venueId === "__custom__"
 
   // Combine the venue's cover and gallery into a single ordered list. The
   // cover comes first (when present), followed by gallery photos sorted by
@@ -63,6 +73,33 @@ export function EventVenueField({
         venues={venues}
         selectedVenueLabel={selectedVenueLabel}
       />
+      {isCustom && (
+        <div className="space-y-2 pt-1">
+          <div className="space-y-1">
+            <Label htmlFor="custom_location_name" className="text-xs">
+              {t("events.form.custom_location_name_label")}
+            </Label>
+            <Input
+              id="custom_location_name"
+              value={customLocationName}
+              onChange={(e) => onCustomLocationNameChange(e.target.value)}
+              placeholder={t("events.form.custom_location_name_placeholder")}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="custom_location_url" className="text-xs">
+              {t("events.form.custom_location_url_label")}
+            </Label>
+            <Input
+              id="custom_location_url"
+              type="url"
+              value={customLocationUrl}
+              onChange={(e) => onCustomLocationUrlChange(e.target.value)}
+              placeholder={t("events.form.custom_location_url_placeholder")}
+            />
+          </div>
+        </div>
+      )}
       {selectedVenue?.booking_mode === "approval_required" && (
         <div className="flex items-start gap-2.5 rounded-md border border-amber-300 bg-amber-50 p-2.5 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-100">
           <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />

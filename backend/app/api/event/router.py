@@ -225,6 +225,8 @@ def _to_public(
     ``venue_map``/``track_map`` let callers pre-fetch venues/tracks in a
     single query and avoid N+1 when serializing a list.
     """
+    # ``custom_location_name``/``custom_location_url`` live on EventBase and
+    # are picked up automatically by ``model_validate`` — no extra plumbing.
     data = EventPublic.model_validate(event)
     occ = event.__dict__.get("_occurrence_id") if hasattr(event, "__dict__") else None
     updates: dict = {}
@@ -525,6 +527,14 @@ async def create_event(
 
     event_data = event_in.model_dump()
     event_data.pop("recurrence", None)
+    # Defense-in-depth: the schema validator already rejects venue+custom
+    # collisions, but if either side is set we still null out the other so
+    # downstream code never sees both populated.
+    if event_data.get("custom_location_name"):
+        event_data["venue_id"] = None
+    elif event_data.get("venue_id") is not None:
+        event_data["custom_location_name"] = None
+        event_data["custom_location_url"] = None
     event_data["rrule"] = rrule_str
     event_data["tenant_id"] = tenant_id
     event_data["owner_id"] = current_user.id
@@ -533,6 +543,9 @@ async def create_event(
     # but if the venue requires approval OR the requested capacity exceeds
     # the venue's, we force the event into pending_approval and notify so
     # the decision stays auditable even for admin-created events.
+    # Custom-location events skip this venue-based gate entirely (no venue,
+    # no booking_mode rule); the popup-level events_require_approval flag
+    # still applies further below for portal events.
     requires_approval = False
     approval_reason = ""
     if event_in.venue_id is not None:
@@ -610,12 +623,26 @@ async def update_event(
             exclude_event_id=event.id,
         )
 
+    # Transition: switching to a venue clears any prior custom location, and
+    # switching to a custom location clears the prior venue. Rebuild via the
+    # dump dict so the cleared fields are tracked as set (CRUD.update relies
+    # on ``exclude_unset=True``).
+    patch_dict = event_in.model_dump(exclude_unset=True)
+    if patch_dict.get("venue_id") is not None:
+        patch_dict["custom_location_name"] = None
+        patch_dict["custom_location_url"] = None
+    elif patch_dict.get("custom_location_name") is not None:
+        patch_dict["venue_id"] = None
+    event_in = EventUpdate(**patch_dict)
+
     before = {
         "title": event.title,
         "start_time": event.start_time,
         "end_time": event.end_time,
         "venue_id": event.venue_id,
         "content": event.content,
+        "custom_location_name": event.custom_location_name,
+        "custom_location_url": event.custom_location_url,
     }
     updated = crud.events_crud.update(db, event, event_in)
 
@@ -1149,9 +1176,7 @@ async def _send_event_approval_email(
         from app.api.tenant.utils import get_portal_url
 
         portal_base = get_portal_url(popup.tenant)
-        event_url = (
-            f"{portal_base.rstrip('/')}/portal/{popup_slug}/events/{event.id}"
-        )
+        event_url = f"{portal_base.rstrip('/')}/portal/{popup_slug}/events/{event.id}"
 
     when = event.start_time.strftime("%b %d, %Y at %H:%M") if event.start_time else ""
 
@@ -1701,6 +1726,14 @@ async def create_portal_event(
 
     event_data = event_in.model_dump()
     event_data.pop("recurrence", None)
+    # Defense-in-depth: the schema validator already rejects venue+custom
+    # collisions, but if either side is set we still null out the other so
+    # downstream code never sees both populated.
+    if event_data.get("custom_location_name"):
+        event_data["venue_id"] = None
+    elif event_data.get("venue_id") is not None:
+        event_data["custom_location_name"] = None
+        event_data["custom_location_url"] = None
     event_data["rrule"] = rrule_str
     event_data["tenant_id"] = current_human.tenant_id
     event_data["owner_id"] = current_human.id
@@ -1709,6 +1742,8 @@ async def create_portal_event(
     #  1. Popup-level setting requires admin approval for human-created events.
     #  2. Venue is bookable only with admin approval (booking_mode).
     #  3. User requested ``max_participant`` larger than the venue capacity.
+    # Custom-location events skip (2) and (3) (no venue), but (1) still
+    # applies so admins keep moderation control over off-site portal events.
     requires_approval = False
     approval_reason = ""
     if settings and settings.events_require_approval:
@@ -1800,12 +1835,25 @@ async def update_portal_event(
             exclude_event_id=event.id,
         )
 
+    # Transition: switching to a venue clears any prior custom location, and
+    # switching to a custom location clears the prior venue. Rebuild via the
+    # dump dict so the cleared fields are tracked as set.
+    patch_dict = event_in.model_dump(exclude_unset=True)
+    if patch_dict.get("venue_id") is not None:
+        patch_dict["custom_location_name"] = None
+        patch_dict["custom_location_url"] = None
+    elif patch_dict.get("custom_location_name") is not None:
+        patch_dict["venue_id"] = None
+    event_in = EventUpdate(**patch_dict)
+
     before = {
         "title": event.title,
         "start_time": event.start_time,
         "end_time": event.end_time,
         "venue_id": event.venue_id,
         "content": event.content,
+        "custom_location_name": event.custom_location_name,
+        "custom_location_url": event.custom_location_url,
     }
     updated = crud.events_crud.update(db, event, event_in)
     if _event_calendar_fields_changed(before, updated):
