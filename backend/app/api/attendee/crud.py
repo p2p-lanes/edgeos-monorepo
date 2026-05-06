@@ -1,8 +1,10 @@
 import random
 import string
 import uuid
+from typing import Any
 
 from fastapi import HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, func, select
 
@@ -28,10 +30,30 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
     def __init__(self) -> None:
         super().__init__(Attendees)
 
-    def get_by_check_in_code(self, session: Session, code: str) -> Attendees | None:
-        """Get an attendee by check-in code."""
-        statement = select(Attendees).where(Attendees.check_in_code == code)
-        return session.exec(statement).first()
+    def get_by_check_in_code(
+        self,
+        session: Session,
+        code: str,
+    ) -> "tuple[AttendeeProducts, Attendees, Any] | None":
+        """Return (ticket, attendee, product) for a given check_in_code.
+
+        Looks up AttendeeProducts.check_in_code (Design §2.3). Returns None when
+        the code is not found. Uses selectinload so product and attendee are
+        available without additional queries.
+        """
+        statement = (
+            select(AttendeeProducts)
+            .where(AttendeeProducts.check_in_code == code)
+            .options(
+                selectinload(AttendeeProducts.attendee),  # type: ignore[arg-type]
+                selectinload(AttendeeProducts.product),  # type: ignore[arg-type]
+            )
+            .limit(1)
+        )
+        ticket = session.exec(statement).first()
+        if ticket is None:
+            return None
+        return ticket, ticket.attendee, ticket.product
 
     def find_by_application(
         self,
@@ -200,6 +222,51 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         session.add(attendee)
         session.commit()
         session.refresh(attendee)
+        return attendee
+
+    def find_or_create_direct_attendee(
+        self,
+        session: Session,
+        human_id: uuid.UUID,
+        popup_id: uuid.UUID,
+        tenant_id: uuid.UUID,
+        name: str,
+        email: str | None = None,
+    ) -> Attendees:
+        """Find or create the single direct-sale attendee for a (human, popup) pair.
+
+        Implements SELECT → INSERT → IntegrityError → re-SELECT so concurrent
+        purchases by the same human for the same popup converge on one row.
+        Does NOT call session.commit() — callers control the transaction boundary.
+
+        One attendee is shared across all direct purchases by the same human for
+        the same popup. Tickets are tracked via AttendeeProducts rows.
+        """
+        existing = self.find_direct_attendee(session, human_id, popup_id)
+        if existing:
+            return existing
+
+        # Attendees.check_in_code is now nullable — tickets carry their own codes
+        attendee = Attendees(
+            tenant_id=tenant_id,
+            application_id=None,
+            popup_id=popup_id,
+            human_id=human_id,
+            name=name,
+            category="main",
+            check_in_code=None,
+            email=email.lower() if email else None,
+        )
+        session.add(attendee)
+        try:
+            session.flush()
+        except IntegrityError:
+            session.rollback()
+            # Concurrent INSERT — re-SELECT the winner
+            existing = self.find_direct_attendee(session, human_id, popup_id)
+            if existing is None:
+                raise  # unexpected — re-raise original error
+            return existing
         return attendee
 
     def _find_human_id_by_email(
@@ -449,30 +516,37 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         session: Session,
         attendee_id: uuid.UUID,
         product_id: uuid.UUID,
-        quantity: int = 1,
+        tenant_id: uuid.UUID | None = None,
+        payment_id: uuid.UUID | None = None,
+        check_in_code_prefix: str = "",
     ) -> AttendeeProducts:
-        """Add a product to an attendee."""
-        # Check if already exists
-        statement = select(AttendeeProducts).where(
-            AttendeeProducts.attendee_id == attendee_id,
-            AttendeeProducts.product_id == product_id,
+        """Add one ticket (AttendeeProducts row) for an attendee.
+
+        Always inserts a new row — callers that want N tickets must call N times.
+        Each row gets its own UUID PK and unique check_in_code.
+        The old quantity / upsert behavior is removed (Design §2.2).
+        """
+        if tenant_id is None:
+            attendee = session.get(Attendees, attendee_id)
+            if attendee is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Attendee not found",
+                )
+            tenant_id = attendee.tenant_id
+
+        ticket = AttendeeProducts(
+            id=uuid.uuid4(),
+            tenant_id=tenant_id,
+            attendee_id=attendee_id,
+            product_id=product_id,
+            check_in_code=generate_check_in_code(check_in_code_prefix),
+            payment_id=payment_id,
         )
-        existing = session.exec(statement).first()
-
-        if existing:
-            existing.quantity += quantity
-            session.add(existing)
-        else:
-            existing = AttendeeProducts(
-                attendee_id=attendee_id,
-                product_id=product_id,
-                quantity=quantity,
-            )
-            session.add(existing)
-
+        session.add(ticket)
         session.commit()
-        session.refresh(existing)
-        return existing
+        session.refresh(ticket)
+        return ticket
 
     def remove_product(
         self,
