@@ -12,8 +12,13 @@ from app.api.shared.crud import BaseCRUD
 
 
 def generate_check_in_code(prefix: str = "") -> str:
-    """Generate a unique check-in code with optional prefix."""
-    code = "".join(random.choices(string.ascii_uppercase, k=4))
+    """Generate a unique check-in code with optional prefix.
+
+    Produces a prefix + 8 random uppercase letters. The 8-letter random part
+    gives ~208 billion combinations (26^8), reducing collision probability
+    during bulk migration explosion of quantity>1 rows.
+    """
+    code = "".join(random.choices(string.ascii_uppercase, k=8))
     return f"{prefix}{code}"
 
 
