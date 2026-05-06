@@ -8,7 +8,7 @@
  * 4. Render "other" category products correctly (bug reproducer).
  */
 import { render, screen } from "@testing-library/react"
-import { describe, expect, it, vi } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 import type { TicketingStepPublic } from "@/client"
 import type { ProductsPass } from "@/types/Products"
 import DynamicProductStep from "./DynamicProductStep"
@@ -69,6 +69,16 @@ function makeProduct(overrides: Partial<ProductsPass>): ProductsPass {
 // Mocks
 // ---------------------------------------------------------------------------
 
+// Single top-level mock for checkoutProvider — override getProductsForStep per test.
+const mockGetProductsForStep = vi.fn(() => [] as ProductsPass[])
+
+vi.mock("@/providers/checkoutProvider", () => ({
+  useCheckout: () => ({
+    getProductsForStep: mockGetProductsForStep,
+    allProducts: [],
+  }),
+}))
+
 // Mock the variant components so tests don't need to render full UI trees.
 vi.mock("./variants/VariantMerchImage", () => ({
   default: ({ products }: { products: ProductsPass[] }) => (
@@ -123,24 +133,21 @@ vi.mock("./variants/VariantTicketSelect", () => ({
 // ---------------------------------------------------------------------------
 
 describe("DynamicProductStep", () => {
+  beforeEach(() => {
+    mockGetProductsForStep.mockReset()
+    mockGetProductsForStep.mockReturnValue([])
+  })
+
   describe("uses getProductsForStep from context (resolver integration)", () => {
     it("renders the variant with products returned by getProductsForStep", () => {
       const product = makeProduct({ id: "p1", category: "other", name: "Swag" })
+      mockGetProductsForStep.mockReturnValue([product])
+
       const step = makeStep({
         step_type: "merch",
         template: "merch-image",
         product_category: "other",
       })
-
-      vi.mock("@/providers/checkoutProvider", () => ({
-        useCheckout: () => ({
-          getProductsForStep: (s: TicketingStepPublic) => {
-            if (s.id === step.id) return [product]
-            return []
-          },
-          allProducts: [],
-        }),
-      }))
 
       render(<DynamicProductStep stepConfig={step} onSkip={vi.fn()} />)
 
@@ -151,59 +158,40 @@ describe("DynamicProductStep", () => {
 
   describe("null product_category (non-content, non-confirm step)", () => {
     it("renders empty state silently when product_category is null", () => {
+      // resolver returns [] for null category steps
+      mockGetProductsForStep.mockReturnValue([])
+
       const step = makeStep({
         step_type: "merch",
         template: "merch-image",
         product_category: null,
       })
 
-      // With null category, resolver returns []
-      vi.mock("@/providers/checkoutProvider", () => ({
-        useCheckout: () => ({
-          getProductsForStep: () => [],
-          allProducts: [],
-        }),
-      }))
-
       render(<DynamicProductStep stepConfig={step} onSkip={vi.fn()} />)
 
       // Should render empty / continue state, NOT a configuration error
-      expect(
-        screen.queryByText(/no products available/i),
-      ).not.toBeNull()
+      expect(screen.queryByText(/no products available/i)).not.toBeNull()
       // Must NOT show "Step configuration error"
-      expect(
-        screen.queryByText(/step configuration error/i),
-      ).toBeNull()
+      expect(screen.queryByText(/step configuration error/i)).toBeNull()
     })
   })
 
   describe("null template on non-ticket step (misconfiguration error state)", () => {
     it("renders explicit error state when template is null for a product step", () => {
+      const product = makeProduct({ id: "p1", category: "merch" })
+      mockGetProductsForStep.mockReturnValue([product])
+
       const step = makeStep({
         step_type: "merch",
         template: null, // misconfigured — no template assigned
         product_category: "merch",
       })
 
-      vi.mock("@/providers/checkoutProvider", () => ({
-        useCheckout: () => ({
-          getProductsForStep: () => [
-            makeProduct({ id: "p1", category: "merch" }),
-          ],
-          allProducts: [],
-        }),
-      }))
-
       render(<DynamicProductStep stepConfig={step} onSkip={vi.fn()} />)
 
       // Should show "Step configuration error." (design §6)
-      expect(
-        screen.queryByText(/step configuration error/i),
-      ).not.toBeNull()
-      expect(
-        screen.queryByText(/no template assigned/i),
-      ).not.toBeNull()
+      expect(screen.queryByText(/step configuration error/i)).not.toBeNull()
+      expect(screen.queryByText(/no template assigned/i)).not.toBeNull()
     })
   })
 
@@ -214,18 +202,13 @@ describe("DynamicProductStep", () => {
         category: "other",
         name: "Custom Item",
       })
+      mockGetProductsForStep.mockReturnValue([product])
+
       const step = makeStep({
         step_type: "merch",
         template: "merch-image",
         product_category: "other",
       })
-
-      vi.mock("@/providers/checkoutProvider", () => ({
-        useCheckout: () => ({
-          getProductsForStep: () => [product],
-          allProducts: [],
-        }),
-      }))
 
       render(<DynamicProductStep stepConfig={step} onSkip={vi.fn()} />)
 
@@ -236,18 +219,14 @@ describe("DynamicProductStep", () => {
 
   describe("content-only templates", () => {
     it("renders youtube-video variant regardless of product count", () => {
+      // resolver returns [] for content-only steps
+      mockGetProductsForStep.mockReturnValue([])
+
       const step = makeStep({
         step_type: "youtube",
         template: "youtube-video",
         product_category: null,
       })
-
-      vi.mock("@/providers/checkoutProvider", () => ({
-        useCheckout: () => ({
-          getProductsForStep: () => [],
-          allProducts: [],
-        }),
-      }))
 
       render(<DynamicProductStep stepConfig={step} onSkip={vi.fn()} />)
 
