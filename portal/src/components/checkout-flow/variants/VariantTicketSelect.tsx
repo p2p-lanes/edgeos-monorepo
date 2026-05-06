@@ -122,6 +122,22 @@ function countSelected(attendee: AttendeePassState): number {
 }
 
 // ---------------------------------------------------------------------------
+// Empty-attendee suppression helper
+// ---------------------------------------------------------------------------
+
+/** True when an attendee has at least one renderable product:
+ *  either purchased (must show Owned row in editing mode), or
+ *  present in at least one section group (configurable product). */
+function attendeeHasRenderableContent(
+  attendee: AttendeePassState,
+  sections: TemplateSection[],
+): boolean {
+  // Always show attendees who have purchased products.
+  if (attendee.products.some((p) => p.purchased)) return true
+  return buildSectionGroups(attendee, sections).length > 0
+}
+
+// ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 
@@ -138,8 +154,16 @@ export default function VariantTicketSelect({
     null,
   )
 
-  // If no attendee data, fall back to legacy section-based layout
-  if (attendeePasses.length === 0) {
+  const sections = parseSections(templateConfig)
+
+  // Filter attendees with no renderable content before dispatching to layouts.
+  // This covers all four layout variants in one place (DRY per design §4 ADR-6).
+  const visibleAttendees = sortedAttendees(attendeePasses).filter((a) =>
+    attendeeHasRenderableContent(a, sections),
+  )
+
+  // If no renderable attendees, fall back to legacy section-based layout.
+  if (visibleAttendees.length === 0) {
     return (
       <LegacySectionLayout
         products={products}
@@ -150,11 +174,8 @@ export default function VariantTicketSelect({
     )
   }
 
-  const attendees = sortedAttendees(attendeePasses)
-
-  const sections = parseSections(templateConfig)
   const sharedProps = {
-    attendees,
+    attendees: visibleAttendees,
     toggleProduct,
     isEditing,
     sections,
