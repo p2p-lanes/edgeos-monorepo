@@ -353,6 +353,7 @@ export type AttendeeProductPublic = {
     product_id: string;
     check_in_code: string;
     payment_id?: (string | null);
+    requires_check_in?: boolean;
 };
 
 /**
