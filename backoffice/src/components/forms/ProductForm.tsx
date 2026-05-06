@@ -9,9 +9,9 @@ import {
   Layers,
   Plus,
   Power,
+  QrCode,
   Shield,
   ShieldCheck,
-  Users,
 } from "lucide-react"
 import { useMemo, useState } from "react"
 import {
@@ -20,7 +20,6 @@ import {
   type ProductPublicWithTier,
   ProductsService,
   type ProductUpdate,
-  type TicketAttendeeCategory,
   type TicketDuration,
   TicketTierGroupsService,
 } from "@/client"
@@ -93,13 +92,6 @@ const TICKET_DURATIONS: { value: TicketDuration; label: string }[] = [
   { value: "month", label: "Month Pass" },
   { value: "full", label: "Full Event" },
 ]
-
-const ATTENDEE_CATEGORIES: { value: TicketAttendeeCategory; label: string }[] =
-  [
-    { value: "main", label: "Main Attendee" },
-    { value: "spouse", label: "Spouse" },
-    { value: "kid", label: "Kid" },
-  ]
 
 /** Extract YYYY-MM-DD from an ISO date string like "2026-05-10T00:00:00Z" */
 const toDateInputValue = (iso?: string | null): string => {
@@ -277,9 +269,10 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
       description: defaultValues?.description ?? "",
       image_url: defaultValues?.image_url ?? "",
       category: (defaultValues?.category ?? "ticket") as ProductCategory,
-      attendee_category: (defaultValues?.attendee_category ??
-        "main") as TicketAttendeeCategory,
       duration_type: (defaultValues?.duration_type ?? "full") as TicketDuration,
+      requires_check_in:
+        defaultValues?.requires_check_in ??
+        ((defaultValues?.category ?? "ticket") === "ticket"),
       is_active: defaultValues?.is_active ?? true,
       exclusive: defaultValues?.exclusive ?? false,
       max_quantity: defaultValues?.max_quantity?.toString() ?? "",
@@ -318,10 +311,10 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
             description: value.description || null,
             image_url: value.image_url || null,
             category: value.category,
-            attendee_category: isTicket ? value.attendee_category : null,
             duration_type: isTicket ? value.duration_type : null,
             start_date: isTicket && value.start_date ? value.start_date : null,
             end_date: isTicket && value.end_date ? value.end_date : null,
+            requires_check_in: value.requires_check_in,
             is_active: value.is_active,
             exclusive: value.exclusive,
             max_quantity: maxQty,
@@ -351,11 +344,11 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
             description: value.description || undefined,
             image_url: value.image_url || undefined,
             category: value.category,
-            attendee_category: isTicket ? value.attendee_category : undefined,
             duration_type: isTicket ? value.duration_type : undefined,
             start_date:
               isTicket && value.start_date ? value.start_date : undefined,
             end_date: isTicket && value.end_date ? value.end_date : undefined,
+            requires_check_in: value.requires_check_in,
             is_active: value.is_active,
             exclusive: value.exclusive,
             max_quantity: maxQty ?? undefined,
@@ -673,33 +666,23 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
                     )}
                   </form.Field>
 
-                  <form.Field name="attendee_category">
+                  <form.Field name="requires_check_in">
                     {(field) => (
                       <InlineRow
                         icon={
-                          <Users className="h-4 w-4 text-muted-foreground" />
+                          <QrCode className="h-4 w-4 text-muted-foreground" />
                         }
-                        label="Attendee Type"
-                        description="Who can purchase this ticket"
+                        label="Requires Check-in"
+                        description="Enable for products that need scanning at the venue (tickets, parking, VIP access)"
                       >
-                        <Select
-                          value={field.state.value}
-                          onValueChange={(val) =>
-                            field.handleChange(val as TicketAttendeeCategory)
+                        <Switch
+                          id="requires_check_in"
+                          checked={field.state.value}
+                          onCheckedChange={(checked) =>
+                            field.handleChange(checked)
                           }
                           disabled={readOnly}
-                        >
-                          <SelectTrigger className="w-auto text-sm">
-                            <SelectValue placeholder="Select type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {ATTENDEE_CATEGORIES.map((cat) => (
-                              <SelectItem key={cat.value} value={cat.value}>
-                                {cat.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        />
                       </InlineRow>
                     )}
                   </form.Field>
