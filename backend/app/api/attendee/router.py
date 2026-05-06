@@ -41,10 +41,11 @@ def _build_attendee_with_origin(attendee) -> AttendeeWithOriginPublic:
         for ap in attendee.attendee_products
     ]
     origin = "application" if attendee.application_id is not None else "direct_sale"
-    result = AttendeeWithOriginPublic.model_validate(attendee)
-    result.products = products  # type: ignore[assignment]
-    result.origin = origin
-    return result
+    # Exclude `products` from the base validation: Attendees.products is a
+    # property returning Products ORM rows, which would fail to coerce into
+    # AttendeeProductPublic (link-table shape). Override afterwards.
+    base = AttendeePublic.model_validate(attendee).model_dump(exclude={"products"})
+    return AttendeeWithOriginPublic(**base, products=products, origin=origin)
 
 
 # ---------------------------------------------------------------------------

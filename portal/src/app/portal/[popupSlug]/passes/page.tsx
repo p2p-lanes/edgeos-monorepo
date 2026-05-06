@@ -1,14 +1,15 @@
 "use client"
 
-import { Ticket } from "lucide-react"
+import { AlertCircle, RefreshCw, Ticket } from "lucide-react"
 import { useParams, useRouter } from "next/navigation"
 import { useEffect } from "react"
 import { useTranslation } from "react-i18next"
 import { resolvePopupCheckoutPolicy } from "@/checkout/popupCheckoutPolicy"
 import type { CompanionParticipation } from "@/client"
 import { CompanionPasses } from "@/components/CompanionPasses"
-import { ButtonAnimated } from "@/components/ui/button"
+import { Button, ButtonAnimated } from "@/components/ui/button"
 import { Loader } from "@/components/ui/Loader"
+import useHumanAttendeesQuery from "@/hooks/useHumanAttendeesQuery"
 import { useHumanPopupAccess } from "@/hooks/useHumanPopupAccess"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
@@ -31,6 +32,12 @@ export default function HomePasses() {
   const access = useHumanPopupAccess(city?.id ? String(city.id) : null)
   const isDirectSale = policy.saleType === "direct"
 
+  // Subscribe to the same attendees query that PassesProvider drives off so
+  // a backend failure shows an inline error UI instead of an infinite loader.
+  // Disabled for direct-sale popups (matches useResolvedAttendees behavior).
+  const popupId = city?.id ? String(city.id) : null
+  const attendeesQuery = useHumanAttendeesQuery(isDirectSale ? null : popupId)
+
   useEffect(() => {
     // For direct-sale popups we keep /passes accessible even when the human
     // hasn't bought yet — the page renders an empty state with a CTA back to
@@ -47,6 +54,39 @@ export default function HomePasses() {
   }
   if (!isDirectSale && access.state === "denied") {
     return <Loader />
+  }
+
+  // Surface attendees-query failures so the page does not get stuck in a
+  // loader. Direct-sale popups skip this branch (their query is disabled).
+  if (!isDirectSale && attendeesQuery.isError) {
+    return (
+      <div className="w-full md:mt-0 mx-auto items-center max-w-3xl p-6 bg-transparent">
+        <div className="flex flex-col items-center justify-center rounded-2xl border bg-card p-10 text-center shadow-sm">
+          <div className="size-12 rounded-full bg-destructive/15 flex items-center justify-center mb-4">
+            <AlertCircle className="size-6 text-destructive" />
+          </div>
+          <h2 className="text-xl font-semibold">
+            {t("passes.error_title", {
+              defaultValue: "Couldn't load your tickets",
+            })}
+          </h2>
+          <p className="mt-2 text-sm text-muted-foreground max-w-sm">
+            {t("passes.error_description", {
+              defaultValue:
+                "Something went wrong while fetching your tickets. Please try again.",
+            })}
+          </p>
+          <Button
+            className="mt-6"
+            onClick={() => attendeesQuery.refetch()}
+            disabled={attendeesQuery.isFetching}
+          >
+            <RefreshCw className="size-4" />
+            {t("passes.error_retry", { defaultValue: "Try again" })}
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   // Companions don't have an Application, so PassesProvider data will be empty.
