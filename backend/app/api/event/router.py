@@ -2,7 +2,7 @@ import uuid
 from collections.abc import Iterable
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, HTTPException, Query, Response, status
 from loguru import logger
 from pydantic import BaseModel
 from sqlmodel import Session
@@ -36,7 +36,6 @@ from app.core.dependencies.users import (
     HumanTenantSession,
     TenantSession,
 )
-from app.core.security import TokenPayload, get_token_payload
 from app.services.event_itip import (
     bump_and_dispatch_cancel as _bump_and_dispatch_itip_cancel,
 )
@@ -1665,7 +1664,6 @@ async def create_portal_event(
     event_in: EventCreate,
     db: HumanTenantSession,
     current_human: CurrentHuman,
-    token_payload: TokenPayload = Depends(get_token_payload),
 ) -> EventPublic:
     from app.api.event.models import Events
     from app.api.event_settings.crud import event_settings_crud
@@ -1737,12 +1735,6 @@ async def create_portal_event(
             )
 
     if requires_approval:
-        event_data["status"] = EventStatus.PENDING_APPROVAL
-        event_data["visibility"] = EventVisibility.UNLISTED
-
-    if token_payload.via_api_key:
-        requires_approval = True
-        approval_reason = "Event created via API key requires manual approval."
         event_data["status"] = EventStatus.PENDING_APPROVAL
         event_data["visibility"] = EventVisibility.UNLISTED
 
