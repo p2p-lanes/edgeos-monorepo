@@ -114,7 +114,7 @@ export function buildBaseAttendeePasses(
     ).map((product: ProductsPass) => {
       const isMultiUnit =
         product.duration_type !== "day" &&
-        supportsQuantitySelector(product.max_quantity)
+        supportsQuantitySelector(product.max_per_order)
       const originalQuantity =
         product.duration_type === "day"
           ? (purchased.find((p) => p.id === product.id)?.quantity ?? 0)
@@ -183,7 +183,7 @@ function applyCartSelections(
       }
       // Non-day: multi-unit products restore the persisted quantity;
       // single-unit products stay at the legacy quantity of 1.
-      const isMultiUnit = supportsQuantitySelector(product.max_quantity)
+      const isMultiUnit = supportsQuantitySelector(product.max_per_order)
       return {
         ...product,
         selected: true,

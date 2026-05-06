@@ -446,8 +446,51 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         product_id: uuid.UUID,
         quantity: int = 1,
     ) -> AttendeeProducts:
-        """Add a product to an attendee."""
-        # Check if already exists
+        """Add a product to an attendee.
+
+        Enforces total_stock and max_per_order uniformly with the portal/admin
+        payment paths. No admin bypass — caps are absolute per locked decision §4.
+
+        Enforcement sequence:
+          1. Fetch product (404 if missing)
+          2. Validate max_per_order (422 if qty exceeds cap)
+          3. Atomic total-stock decrement (409 if sold out; no-op for unlimited)
+          4. Atomic tier-group shared-stock decrement if applicable (409 if sold out)
+          5. Upsert into attendee_products
+        """
+        from app.api.product.crud import (
+            _resolve_tier_group,
+            products_crud,
+            tier_groups_crud,
+        )
+        from app.api.product.models import Products
+
+        product = session.get(Products, product_id)
+        if product is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Product not found",
+            )
+
+        # 1. max_per_order — per-line cap
+        if product.max_per_order is not None and quantity > product.max_per_order:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    f"Quantity {quantity} exceeds max_per_order "
+                    f"({product.max_per_order}) for '{product.name}'"
+                ),
+            )
+
+        # 2. Atomic total-stock decrement (no-op for unlimited)
+        products_crud.decrement_total_stock(session, product_id, quantity)
+
+        # 3. Atomic tier-group shared-stock decrement if applicable
+        group_id = _resolve_tier_group(session, product_id)
+        if group_id is not None:
+            tier_groups_crud.decrement_shared_stock(session, group_id, quantity)
+
+        # 4. Upsert into attendee_products
         statement = select(AttendeeProducts).where(
             AttendeeProducts.attendee_id == attendee_id,
             AttendeeProducts.product_id == product_id,
@@ -459,6 +502,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
             session.add(existing)
         else:
             existing = AttendeeProducts(
+                tenant_id=product.tenant_id,
                 attendee_id=attendee_id,
                 product_id=product_id,
                 quantity=quantity,

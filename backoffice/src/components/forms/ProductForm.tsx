@@ -282,7 +282,8 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
       duration_type: (defaultValues?.duration_type ?? "full") as TicketDuration,
       is_active: defaultValues?.is_active ?? true,
       exclusive: defaultValues?.exclusive ?? false,
-      max_quantity: defaultValues?.max_quantity?.toString() ?? "",
+      total_stock_cap: defaultValues?.total_stock_cap?.toString() ?? "",
+      max_per_order: defaultValues?.max_per_order?.toString() ?? "",
       start_date: toDateInputValue(defaultValues?.start_date),
       end_date: toDateInputValue(defaultValues?.end_date),
       insurance_eligible: defaultValues?.insurance_eligible ?? false,
@@ -306,8 +307,11 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
       }
       setTierOverlapError(null)
 
-      const maxQty = value.max_quantity
-        ? Number.parseInt(value.max_quantity, 10)
+      const totalStockCap = value.total_stock_cap
+        ? Number.parseInt(value.total_stock_cap, 10)
+        : null
+      const maxPerOrder = value.max_per_order
+        ? Number.parseInt(value.max_per_order, 10)
         : null
 
       if (isEdit) {
@@ -324,7 +328,8 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
             end_date: isTicket && value.end_date ? value.end_date : null,
             is_active: value.is_active,
             exclusive: value.exclusive,
-            max_quantity: maxQty,
+            total_stock_cap: totalStockCap,
+            max_per_order: maxPerOrder,
             insurance_eligible: value.insurance_eligible,
           },
           {
@@ -358,7 +363,8 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
             end_date: isTicket && value.end_date ? value.end_date : undefined,
             is_active: value.is_active,
             exclusive: value.exclusive,
-            max_quantity: maxQty ?? undefined,
+            total_stock_cap: totalStockCap ?? undefined,
+            max_per_order: maxPerOrder ?? undefined,
             insurance_eligible: value.insurance_eligible,
           },
           {
@@ -543,13 +549,13 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
           </form.Field>
 
           <form.Field
-            name="max_quantity"
+            name="total_stock_cap"
             validators={{
               onBlur: ({ value }) => {
                 if (readOnly || !value) return undefined
                 const num = Number.parseInt(value, 10)
                 if (Number.isNaN(num) || num < 1) {
-                  return "Max quantity must be a positive number"
+                  return "Total stock must be a positive number. Leave empty for unlimited."
                 }
                 return undefined
               },
@@ -559,10 +565,50 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
               <div>
                 <InlineRow
                   icon={<Hash className="h-4 w-4 text-muted-foreground" />}
-                  label="Max Quantity"
-                  description="Leave empty for unlimited"
+                  label="Total stock"
+                  description="Maximum units available. Leave empty for unlimited."
                 >
                   <Input
+                    id="total_stock_cap"
+                    aria-label="Total stock"
+                    placeholder="Unlimited"
+                    type="number"
+                    min="1"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    disabled={readOnly}
+                    className="max-w-32 text-sm"
+                  />
+                </InlineRow>
+                <FieldError errors={field.state.meta.errors} />
+              </div>
+            )}
+          </form.Field>
+
+          <form.Field
+            name="max_per_order"
+            validators={{
+              onBlur: ({ value }) => {
+                if (readOnly || !value) return undefined
+                const num = Number.parseInt(value, 10)
+                if (Number.isNaN(num) || num < 1) {
+                  return "Max per order must be a positive number. Leave empty for unlimited."
+                }
+                return undefined
+              },
+            }}
+          >
+            {(field) => (
+              <div>
+                <InlineRow
+                  icon={<Hash className="h-4 w-4 text-muted-foreground" />}
+                  label="Max per order"
+                  description="Per-cart cap. Leave empty for unlimited."
+                >
+                  <Input
+                    id="max_per_order"
+                    aria-label="Max per order"
                     placeholder="Unlimited"
                     type="number"
                     min="1"

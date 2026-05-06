@@ -263,7 +263,7 @@ function SimpleQuantityVariant({
               {ungrouped.map((product) => {
                 const usesQuantity =
                   product.duration_type === "day" ||
-                  supportsQuantitySelector(product.max_quantity)
+                  supportsQuantitySelector(product.max_per_order)
 
                 if (usesQuantity) {
                   return (

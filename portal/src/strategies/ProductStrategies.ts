@@ -64,7 +64,7 @@ class MonthProductStrategy implements ProductStrategy {
     attendeeId: string,
     product: ProductsPass,
   ): AttendeePassState[] {
-    const isMultiUnit = supportsQuantitySelector(product.max_quantity)
+    const isMultiUnit = supportsQuantitySelector(product.max_per_order)
     // For multi-unit products, the caller passes the NEW desired quantity in
     // `product.quantity`. The selection is active when quantity > 0.
     const willSelectMonth = isMultiUnit
@@ -132,7 +132,7 @@ class WeekProductStrategy implements ProductStrategy {
     attendeeId: string,
     product: ProductsPass,
   ): AttendeePassState[] {
-    const isMultiUnit = supportsQuantitySelector(product.max_quantity)
+    const isMultiUnit = supportsQuantitySelector(product.max_per_order)
 
     return attendees.map((attendee) => {
       if (attendee.id !== attendeeId) return attendee
@@ -196,7 +196,7 @@ class FullProductStrategy implements ProductStrategy {
     attendeeId: string,
     product: ProductsPass,
   ): AttendeePassState[] {
-    const isMultiUnit = supportsQuantitySelector(product.max_quantity)
+    const isMultiUnit = supportsQuantitySelector(product.max_per_order)
 
     return attendees.map((attendee) => {
       if (attendee.id !== attendeeId) return attendee
@@ -255,7 +255,7 @@ class ExclusivityGuard implements ProductStrategy {
     if (product.selected) return true
     if (
       product.duration_type === "day" ||
-      supportsQuantitySelector(product.max_quantity)
+      supportsQuantitySelector(product.max_per_order)
     ) {
       return (product.quantity ?? 0) > 0
     }
@@ -265,7 +265,7 @@ class ExclusivityGuard implements ProductStrategy {
   private clearSelection(product: ProductsPass): ProductsPass {
     const usesQuantity =
       product.duration_type === "day" ||
-      supportsQuantitySelector(product.max_quantity)
+      supportsQuantitySelector(product.max_per_order)
 
     return {
       ...product,
@@ -348,7 +348,7 @@ class SimpleQuantityProductStrategy implements ProductStrategy {
   ): AttendeePassState[] {
     const usesQuantity =
       product.duration_type === "day" ||
-      supportsQuantitySelector(product.max_quantity)
+      supportsQuantitySelector(product.max_per_order)
 
     return attendees.map((attendee) => {
       if (attendee.id !== attendeeId) return attendee

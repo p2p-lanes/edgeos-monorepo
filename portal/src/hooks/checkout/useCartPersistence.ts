@@ -1,5 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query"
 import { type MutableRefObject, useCallback, useEffect } from "react"
+import { resolveMaxQuantity } from "@/components/ui/QuantitySelector"
 import {
   type CartState,
   useCart,
@@ -204,7 +205,7 @@ export function useCartPersistence({
           Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)),
         )
         const savedQuantity = savedCart.housing.quantity ?? 1
-        const maxQty = product.max_quantity ?? Number.POSITIVE_INFINITY
+        const maxQty = resolveMaxQuantity(product)
         const quantity = Math.max(1, Math.min(savedQuantity, maxQty))
         const basePrice = housingPricePerDay
           ? product.price * nights

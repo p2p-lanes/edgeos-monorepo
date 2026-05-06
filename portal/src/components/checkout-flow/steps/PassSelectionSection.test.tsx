@@ -65,6 +65,12 @@ vi.mock("framer-motion", () => ({
 // ---------------------------------------------------------------------------
 const mockToggleProduct = vi.fn()
 
+vi.mock("@/providers/applicationProvider", () => ({
+  useApplication: () => ({
+    getRelevantApplication: () => null,
+  }),
+}))
+
 vi.mock("@/providers/passesProvider", () => ({
   usePassesProvider: () => mockPassesProvider(),
 }))

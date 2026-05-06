@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react"
+import { resolveMaxQuantity } from "@/components/ui/QuantitySelector"
 import type { SelectedHousingItem } from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
 
@@ -20,8 +21,8 @@ function computeBasePrice(
 }
 
 function clampQuantity(product: ProductsPass, quantity: number): number {
-  const max = product.max_quantity
-  if (max == null) return Math.max(0, quantity)
+  const max = resolveMaxQuantity(product)
+  if (max === Number.POSITIVE_INFINITY) return Math.max(0, quantity)
   return Math.max(0, Math.min(quantity, max))
 }
 

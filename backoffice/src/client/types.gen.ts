@@ -681,7 +681,9 @@ export type CheckoutRuntimeProduct = {
     duration_type?: (string | null);
     start_date?: (unknown | null);
     end_date?: (unknown | null);
-    max_quantity?: (number | null);
+    total_stock_cap?: (number | null);
+    total_stock_remaining?: (number | null);
+    max_per_order?: (number | null);
     is_active?: boolean;
     exclusive?: boolean;
     insurance_eligible?: boolean;
@@ -2126,7 +2128,9 @@ export type ProductBatchItem = {
     end_date?: (string | null);
     is_active?: boolean;
     exclusive?: boolean;
-    max_quantity?: (number | null);
+    total_stock_cap?: (number | null);
+    total_stock_remaining?: (number | null);
+    max_per_order?: (number | null);
     insurance_eligible?: boolean;
 };
 
@@ -2149,7 +2153,9 @@ export type ProductBatchResult = {
     end_date?: (string | null);
     is_active?: boolean;
     exclusive?: boolean;
-    max_quantity?: (number | null);
+    total_stock_cap?: (number | null);
+    total_stock_remaining?: (number | null);
+    max_per_order?: (number | null);
     insurance_eligible?: boolean;
     id: string;
     success: boolean;
@@ -2186,7 +2192,9 @@ export type ProductCreate = {
     end_date?: (string | null);
     is_active?: boolean;
     exclusive?: boolean;
-    max_quantity?: (number | null);
+    total_stock_cap?: (number | null);
+    total_stock_remaining?: (number | null);
+    max_per_order?: (number | null);
     insurance_eligible?: boolean;
 };
 
@@ -2217,7 +2225,9 @@ export type ProductPublic = {
     end_date?: (string | null);
     is_active?: boolean;
     exclusive?: boolean;
-    max_quantity?: (number | null);
+    total_stock_cap?: (number | null);
+    total_stock_remaining?: (number | null);
+    max_per_order?: (number | null);
     insurance_eligible?: boolean;
     id: string;
 };
@@ -2244,7 +2254,9 @@ export type ProductPublicWithTier = {
     end_date?: (string | null);
     is_active?: boolean;
     exclusive?: boolean;
-    max_quantity?: (number | null);
+    total_stock_cap?: (number | null);
+    total_stock_remaining?: (number | null);
+    max_per_order?: (number | null);
     insurance_eligible?: boolean;
     id: string;
     tier_group?: (TierGroupPublic | null);
@@ -2268,7 +2280,9 @@ export type ProductUpdate = {
     end_date?: (string | null);
     is_active?: (boolean | null);
     exclusive?: (boolean | null);
-    max_quantity?: (number | null);
+    total_stock_cap?: (number | null);
+    total_stock_remaining?: (number | null);
+    max_per_order?: (number | null);
     insurance_eligible?: (boolean | null);
 };
 
@@ -2291,7 +2305,9 @@ export type ProductWithQuantity = {
     end_date?: (string | null);
     is_active?: boolean;
     exclusive?: boolean;
-    max_quantity?: (number | null);
+    total_stock_cap?: (number | null);
+    total_stock_remaining?: (number | null);
+    max_per_order?: (number | null);
     insurance_eligible?: boolean;
     id: string;
     quantity?: number;

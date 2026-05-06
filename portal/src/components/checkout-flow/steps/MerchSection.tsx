@@ -5,6 +5,7 @@ import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import ExpandableDescription from "@/components/ui/ExpandableDescription"
 import QuantitySelector, {
+  resolveMaxQuantity,
   supportsQuantitySelector,
 } from "@/components/ui/QuantitySelector"
 import { cn } from "@/lib/utils"
@@ -201,8 +202,8 @@ function MerchQtyControl({
   quantity,
   onQuantityChange,
 }: MerchQtyControlProps) {
-  const showStepper = supportsQuantitySelector(product.max_quantity)
-  const max = product.max_quantity ?? Number.POSITIVE_INFINITY
+  const showStepper = supportsQuantitySelector(product.max_per_order)
+  const max = resolveMaxQuantity(product)
 
   if (showStepper) {
     return (

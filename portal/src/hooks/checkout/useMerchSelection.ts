@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react"
+import { resolveMaxQuantity } from "@/components/ui/QuantitySelector"
 import type { SelectedMerchItem } from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
 
@@ -10,10 +11,11 @@ export function useMerchSelection(merchProducts: ProductsPass[]) {
       const product = merchProducts.find((p) => p.id === productId)
       if (!product) return
 
+      const maxQty = resolveMaxQuantity(product)
       const clamped =
-        product.max_quantity == null
+        maxQty === Number.POSITIVE_INFINITY
           ? Math.max(0, quantity)
-          : Math.max(0, Math.min(quantity, product.max_quantity))
+          : Math.max(0, Math.min(quantity, maxQty))
 
       if (clamped <= 0) {
         setMerch((prev) => prev.filter((m) => m.productId !== productId))

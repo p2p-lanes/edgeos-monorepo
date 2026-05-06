@@ -3131,7 +3131,7 @@ export const CheckoutRuntimeProductSchema = {
             ],
             title: 'End Date'
         },
-        max_quantity: {
+        total_stock_cap: {
             anyOf: [
                 {
                     type: 'integer'
@@ -3140,7 +3140,29 @@ export const CheckoutRuntimeProductSchema = {
                     type: 'null'
                 }
             ],
-            title: 'Max Quantity'
+            title: 'Total Stock Cap'
+        },
+        total_stock_remaining: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Total Stock Remaining'
+        },
+        max_per_order: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Per Order'
         },
         is_active: {
             type: 'boolean',
@@ -10857,16 +10879,41 @@ export const ProductBatchItemSchema = {
             title: 'Exclusive',
             default: false
         },
-        max_quantity: {
+        total_stock_cap: {
             anyOf: [
                 {
-                    type: 'integer'
+                    type: 'integer',
+                    minimum: 1
                 },
                 {
                     type: 'null'
                 }
             ],
-            title: 'Max Quantity'
+            title: 'Total Stock Cap'
+        },
+        total_stock_remaining: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    minimum: 0
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Total Stock Remaining'
+        },
+        max_per_order: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    minimum: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Per Order'
         },
         insurance_eligible: {
             type: 'boolean',
@@ -10998,7 +11045,7 @@ export const ProductBatchResultSchema = {
             title: 'Exclusive',
             default: false
         },
-        max_quantity: {
+        total_stock_cap: {
             anyOf: [
                 {
                     type: 'integer'
@@ -11007,7 +11054,29 @@ export const ProductBatchResultSchema = {
                     type: 'null'
                 }
             ],
-            title: 'Max Quantity'
+            title: 'Total Stock Cap'
+        },
+        total_stock_remaining: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Total Stock Remaining'
+        },
+        max_per_order: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Per Order'
         },
         insurance_eligible: {
             type: 'boolean',
@@ -11209,16 +11278,41 @@ export const ProductCreateSchema = {
             title: 'Exclusive',
             default: false
         },
-        max_quantity: {
+        total_stock_cap: {
             anyOf: [
                 {
-                    type: 'integer'
+                    type: 'integer',
+                    minimum: 1
                 },
                 {
                     type: 'null'
                 }
             ],
-            title: 'Max Quantity'
+            title: 'Total Stock Cap'
+        },
+        total_stock_remaining: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    minimum: 0
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Total Stock Remaining'
+        },
+        max_per_order: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    minimum: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Per Order'
         },
         insurance_eligible: {
             type: 'boolean',
@@ -11370,7 +11464,7 @@ export const ProductPublicSchema = {
             title: 'Exclusive',
             default: false
         },
-        max_quantity: {
+        total_stock_cap: {
             anyOf: [
                 {
                     type: 'integer'
@@ -11379,7 +11473,29 @@ export const ProductPublicSchema = {
                     type: 'null'
                 }
             ],
-            title: 'Max Quantity'
+            title: 'Total Stock Cap'
+        },
+        total_stock_remaining: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Total Stock Remaining'
+        },
+        max_per_order: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Per Order'
         },
         insurance_eligible: {
             type: 'boolean',
@@ -11516,7 +11632,7 @@ export const ProductPublicWithTierSchema = {
             title: 'Exclusive',
             default: false
         },
-        max_quantity: {
+        total_stock_cap: {
             anyOf: [
                 {
                     type: 'integer'
@@ -11525,7 +11641,29 @@ export const ProductPublicWithTierSchema = {
                     type: 'null'
                 }
             ],
-            title: 'Max Quantity'
+            title: 'Total Stock Cap'
+        },
+        total_stock_remaining: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Total Stock Remaining'
+        },
+        max_per_order: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Per Order'
         },
         insurance_eligible: {
             type: 'boolean',
@@ -11722,16 +11860,41 @@ export const ProductUpdateSchema = {
             ],
             title: 'Exclusive'
         },
-        max_quantity: {
+        total_stock_cap: {
             anyOf: [
                 {
-                    type: 'integer'
+                    type: 'integer',
+                    minimum: 1
                 },
                 {
                     type: 'null'
                 }
             ],
-            title: 'Max Quantity'
+            title: 'Total Stock Cap'
+        },
+        total_stock_remaining: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    minimum: 0
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Total Stock Remaining'
+        },
+        max_per_order: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    minimum: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Per Order'
         },
         insurance_eligible: {
             anyOf: [
@@ -11868,7 +12031,7 @@ export const ProductWithQuantitySchema = {
             title: 'Exclusive',
             default: false
         },
-        max_quantity: {
+        total_stock_cap: {
             anyOf: [
                 {
                     type: 'integer'
@@ -11877,7 +12040,29 @@ export const ProductWithQuantitySchema = {
                     type: 'null'
                 }
             ],
-            title: 'Max Quantity'
+            title: 'Total Stock Cap'
+        },
+        total_stock_remaining: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Total Stock Remaining'
+        },
+        max_per_order: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Per Order'
         },
         insurance_eligible: {
             type: 'boolean',
