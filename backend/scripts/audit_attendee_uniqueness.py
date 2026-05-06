@@ -48,11 +48,15 @@ def main(engine: Engine | None = None) -> int:
     with Session(_engine) as session:
         rows = session.exec(DUPLICATE_QUERY).all()
         if rows:
-            print(f"FAIL: {len(rows)} duplicate (human_id, popup_id) pairs found")
+            sys.stdout.write(
+                f"FAIL: {len(rows)} duplicate (human_id, popup_id) pairs found\n"
+            )
             for row in rows:
-                print(f"  human={row.human_id} popup={row.popup_id} count={row.dup_count}")
+                sys.stdout.write(
+                    f"  human={row.human_id} popup={row.popup_id} count={row.dup_count}\n"
+                )
             return 1
-        print("OK: no direct-sale attendee duplicates")
+        sys.stdout.write("OK: no direct-sale attendee duplicates\n")
         return 0
 
 
