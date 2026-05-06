@@ -17,6 +17,8 @@ from app.api.attendee.schemas import (
     TicketPublic,
 )
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
+from app.api.ticket_event.crud import get_check_in_summary, record_check_in
+from app.api.ticket_event.schemas import CheckInPayload
 from app.core.dependencies.users import (
     CurrentHuman,
     CurrentUser,
@@ -391,15 +393,24 @@ async def delete_attendee(
     crud.attendees_crud.delete_attendee(db, attendee)
 
 
-@router.get("/check-in/{code}", response_model=TicketPublic)
-async def get_by_check_in_code(
+@router.post("/check-in/{code}", response_model=TicketPublic)
+async def post_check_in(
     code: str,
+    payload: CheckInPayload,
     db: TenantSession,
-    _: CurrentUser,
+    current_user: CurrentUser,
 ) -> TicketPublic:
-    """Get ticket by check-in code (BO - for check-in process).
+    """Record a check-in event and return enriched TicketPublic (BO - scanner endpoint).
 
-    Returns TicketPublic with embedded attendee + product snapshots.
+    POST replaces the former GET — the endpoint now mutates state by inserting a
+    ticket_events row on every scan. This enables full scan history so frontend/staff
+    can apply the right policy at runtime (single-scan, scan-every-time, etc.).
+
+    Returns:
+      - 200 with TicketPublic + scan summary (total_scans, first_scan_at, last_scan_at)
+      - 404 if check_in_code not found
+      Backend does NOT block re-scans (total_scans > 1 is allowed — policy is frontend).
+
     Code is matched case-insensitively (uppercased before lookup).
     """
     result = crud.attendees_crud.get_by_check_in_code(db, code.upper())
@@ -411,6 +422,18 @@ async def get_by_check_in_code(
         )
 
     ticket, attendee, product = result
+
+    # Record the check-in event; actor is the current user
+    record_check_in(
+        db,
+        attendee_product_id=ticket.id,
+        payload=payload,
+        actor_user_id=current_user.id,
+    )
+
+    # Build scan summary from ticket_events (single aggregation query)
+    summary = get_check_in_summary(db, ticket.id)
+
     return TicketPublic(
         id=ticket.id,
         check_in_code=ticket.check_in_code,
@@ -429,6 +452,9 @@ async def get_by_check_in_code(
             start_date=product.start_date,
             end_date=product.end_date,
         ),
+        total_scans=summary["total_scans"],
+        first_scan_at=summary["first_scan_at"],
+        last_scan_at=summary["last_scan_at"],
     )
 
 

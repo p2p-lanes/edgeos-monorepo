@@ -115,6 +115,12 @@ def upgrade() -> None:
         ["event_type", "occurred_at"],
     )
 
+    # Grant permissions to tenant roles (mirrors pattern from all other tables)
+    op.execute(
+        "GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE ticket_events TO tenant_role"
+    )
+    op.execute("GRANT SELECT ON TABLE ticket_events TO tenant_viewer_role")
+
 
 def downgrade() -> None:
     raise RuntimeError(
