@@ -48,7 +48,12 @@ describe("useHousingSelection — id-lookup against full active product list", (
 
   it("clamps quantity to max_quantity when updating housing quantity", () => {
     const allActiveProducts = [
-      makeProduct({ id: "h1", category: "housing", price: 50, max_quantity: 2 }),
+      makeProduct({
+        id: "h1",
+        category: "housing",
+        price: 50,
+        max_quantity: 2,
+      }),
     ]
     const { result } = renderHook(() => useHousingSelection(allActiveProducts))
 

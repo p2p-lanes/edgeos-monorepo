@@ -19,6 +19,7 @@ import {
 import type { TicketingStepPublic } from "@/client"
 import { TicketingStepsService } from "@/client"
 import { supportsQuantitySelector } from "@/components/ui/QuantitySelector"
+import type { StepProductResolution } from "@/hooks/checkout"
 import {
   type CartSelectionState,
   useCartPersistence,
@@ -46,7 +47,6 @@ import type {
 } from "@/types/checkout"
 import type { ApplicationFormSchema } from "@/types/form-schema"
 import type { ProductsPass } from "@/types/Products"
-import type { StepProductResolution } from "@/hooks/checkout"
 import { useApplication } from "./applicationProvider"
 import { useCityProvider } from "./cityProvider"
 import { useDiscount } from "./discountProvider"
@@ -259,11 +259,13 @@ export function CheckoutProvider({
   // Legacy category arrays kept for backward compatibility with context consumers
   // (e.g. cart summary, confirm step). These will be removed in Slice 2.
   const passProducts = useMemo(
-    () => allActiveProducts.filter((p) => p.category.toLowerCase() === "ticket"),
+    () =>
+      allActiveProducts.filter((p) => p.category.toLowerCase() === "ticket"),
     [allActiveProducts],
   )
   const housingProducts = useMemo(
-    () => allActiveProducts.filter((p) => p.category.toLowerCase() === "housing"),
+    () =>
+      allActiveProducts.filter((p) => p.category.toLowerCase() === "housing"),
     [allActiveProducts],
   )
   const merchProducts = useMemo(
@@ -271,7 +273,8 @@ export function CheckoutProvider({
     [allActiveProducts],
   )
   const patronProducts = useMemo(
-    () => allActiveProducts.filter((p) => p.category.toLowerCase() === "patreon"),
+    () =>
+      allActiveProducts.filter((p) => p.category.toLowerCase() === "patreon"),
     [allActiveProducts],
   )
 
@@ -417,13 +420,10 @@ export function CheckoutProvider({
   } = useCheckoutSteps({
     initialStep,
     configuredSteps: effectiveConfiguredSteps,
-    patronCount: patronProducts.length,
-    housingCount: housingProducts.length,
-    merchCount: merchProducts.length,
+    productsByStepId,
     selectedPassesCount: selectedPasses.length,
     dynamicItemsCount: Object.values(dynamicItems).flat().length,
     isEditing,
-    allProducts: products,
     buyerInfoComplete: isBuyerInfoComplete,
   })
 

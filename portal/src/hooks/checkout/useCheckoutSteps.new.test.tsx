@@ -55,7 +55,12 @@ function makeProductsByStepId(
 describe("useCheckoutSteps — resolver-map-based visibility (new signature)", () => {
   it("hides a product step when its resolver entry is empty", () => {
     const steps = [
-      makeStep({ id: "step-merch", step_type: "merch", product_category: "merch", template: "merch-image" }),
+      makeStep({
+        id: "step-merch",
+        step_type: "merch",
+        product_category: "merch",
+        template: "merch-image",
+      }),
       makeStep({ id: "step-confirm", step_type: "confirm" }),
     ]
     const productsByStepId = makeProductsByStepId([
@@ -80,7 +85,12 @@ describe("useCheckoutSteps — resolver-map-based visibility (new signature)", (
 
   it("shows a product step when its resolver entry has at least one product", () => {
     const steps = [
-      makeStep({ id: "step-merch", step_type: "merch", product_category: "merch", template: "merch-image" }),
+      makeStep({
+        id: "step-merch",
+        step_type: "merch",
+        product_category: "merch",
+        template: "merch-image",
+      }),
       makeStep({ id: "step-confirm", step_type: "confirm" }),
     ]
     const productsByStepId = makeProductsByStepId([
@@ -105,7 +115,12 @@ describe("useCheckoutSteps — resolver-map-based visibility (new signature)", (
 
   it("shows a content-only template step (faqs) even when resolver entry is empty", () => {
     const steps = [
-      makeStep({ id: "step-faq", step_type: "content", template: "faqs", product_category: null }),
+      makeStep({
+        id: "step-faq",
+        step_type: "content",
+        template: "faqs",
+        product_category: null,
+      }),
       makeStep({ id: "step-confirm", step_type: "confirm" }),
     ]
     const productsByStepId = makeProductsByStepId([
@@ -130,7 +145,12 @@ describe("useCheckoutSteps — resolver-map-based visibility (new signature)", (
 
   it("shows a youtube-video step even when resolver entry is empty", () => {
     const steps = [
-      makeStep({ id: "step-yt", step_type: "media", template: "youtube-video", product_category: null }),
+      makeStep({
+        id: "step-yt",
+        step_type: "media",
+        template: "youtube-video",
+        product_category: null,
+      }),
       makeStep({ id: "step-confirm", step_type: "confirm" }),
     ]
     const productsByStepId = makeProductsByStepId([
@@ -153,9 +173,7 @@ describe("useCheckoutSteps — resolver-map-based visibility (new signature)", (
   })
 
   it("always shows confirm step when is_enabled=true, regardless of resolver", () => {
-    const steps = [
-      makeStep({ id: "step-confirm", step_type: "confirm" }),
-    ]
+    const steps = [makeStep({ id: "step-confirm", step_type: "confirm" })]
     const productsByStepId = makeProductsByStepId([["step-confirm", []]])
 
     const { result } = renderHook(() =>
@@ -174,7 +192,13 @@ describe("useCheckoutSteps — resolver-map-based visibility (new signature)", (
 
   it("hides a step when is_enabled=false", () => {
     const steps = [
-      makeStep({ id: "step-merch", step_type: "merch", product_category: "merch", template: "merch-image", is_enabled: false }),
+      makeStep({
+        id: "step-merch",
+        step_type: "merch",
+        product_category: "merch",
+        template: "merch-image",
+        is_enabled: false,
+      }),
       makeStep({ id: "step-confirm", step_type: "confirm" }),
     ]
     const productsByStepId = makeProductsByStepId([
@@ -198,7 +222,12 @@ describe("useCheckoutSteps — resolver-map-based visibility (new signature)", (
 
   it("shows a custom step (step_type='villa') when its resolver entry has products", () => {
     const steps = [
-      makeStep({ id: "step-villa", step_type: "villa", product_category: "villa", template: "merch-image" }),
+      makeStep({
+        id: "step-villa",
+        step_type: "villa",
+        product_category: "villa",
+        template: "merch-image",
+      }),
       makeStep({ id: "step-confirm", step_type: "confirm" }),
     ]
     const productsByStepId = makeProductsByStepId([
@@ -222,7 +251,12 @@ describe("useCheckoutSteps — resolver-map-based visibility (new signature)", (
 
   it("shows the tickets step regardless of resolver output (structural step)", () => {
     const steps = [
-      makeStep({ id: "step-tickets", step_type: "tickets", product_category: "ticket", template: "ticket-select" }),
+      makeStep({
+        id: "step-tickets",
+        step_type: "tickets",
+        product_category: "ticket",
+        template: "ticket-select",
+      }),
       makeStep({ id: "step-confirm", step_type: "confirm" }),
     ]
     // Resolver returns empty (no ticket products)

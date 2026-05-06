@@ -7,7 +7,9 @@ export interface StepProductResolution {
   /** Map<stepId, ProductsPass[]> — product list per configured step. */
   productsByStepId: Map<string, ProductsPass[]>
   /** Convenience accessor; returns [] when step is unknown or has no resolved products. */
-  getProductsForStep: (step: TicketingStepPublic | null | undefined) => ProductsPass[]
+  getProductsForStep: (
+    step: TicketingStepPublic | null | undefined,
+  ) => ProductsPass[]
 }
 
 function resolveProductsForStep(

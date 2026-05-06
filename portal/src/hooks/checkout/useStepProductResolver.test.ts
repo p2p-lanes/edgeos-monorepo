@@ -45,7 +45,10 @@ function makeProduct(
 describe("useStepProductResolver", () => {
   it("returns an empty map when configuredSteps is empty", () => {
     const { result } = renderHook(() =>
-      useStepProductResolver([], [makeProduct({ id: "p1", category: "merch" })]),
+      useStepProductResolver(
+        [],
+        [makeProduct({ id: "p1", category: "merch" })],
+      ),
     )
     expect(result.current.productsByStepId.size).toBe(0)
   })
@@ -60,9 +63,7 @@ describe("useStepProductResolver", () => {
       }),
     ]
     const products = [makeProduct({ id: "p1", category: "merch" })]
-    const { result } = renderHook(() =>
-      useStepProductResolver(steps, products),
-    )
+    const { result } = renderHook(() => useStepProductResolver(steps, products))
     expect(result.current.productsByStepId.get("step-null")).toEqual([])
   })
 
@@ -76,9 +77,7 @@ describe("useStepProductResolver", () => {
       }),
     ]
     const products = [makeProduct({ id: "p1", category: "merch" })]
-    const { result } = renderHook(() =>
-      useStepProductResolver(steps, products),
-    )
+    const { result } = renderHook(() => useStepProductResolver(steps, products))
     expect(result.current.productsByStepId.get("step-yt")).toEqual([])
   })
 
@@ -110,12 +109,14 @@ describe("useStepProductResolver", () => {
 
   it("maps step.id to empty array for confirm step regardless of products", () => {
     const steps = [
-      makeStep({ id: "step-confirm", step_type: "confirm", product_category: null }),
+      makeStep({
+        id: "step-confirm",
+        step_type: "confirm",
+        product_category: null,
+      }),
     ]
     const products = [makeProduct({ id: "p1", category: "merch" })]
-    const { result } = renderHook(() =>
-      useStepProductResolver(steps, products),
-    )
+    const { result } = renderHook(() => useStepProductResolver(steps, products))
     expect(result.current.productsByStepId.get("step-confirm")).toEqual([])
   })
 
@@ -132,9 +133,7 @@ describe("useStepProductResolver", () => {
       makeProduct({ id: "p1", category: "other" }),
       makeProduct({ id: "p2", category: "merch" }),
     ]
-    const { result } = renderHook(() =>
-      useStepProductResolver(steps, products),
-    )
+    const { result } = renderHook(() => useStepProductResolver(steps, products))
     const resolved = result.current.productsByStepId.get("step-other")
     expect(resolved).toHaveLength(1)
     expect(resolved![0].id).toBe("p1")
@@ -154,12 +153,12 @@ describe("useStepProductResolver", () => {
       makeProduct({ id: "p2", category: "Merch" }),
       makeProduct({ id: "p3", category: "housing" }),
     ]
-    const { result } = renderHook(() =>
-      useStepProductResolver(steps, products),
-    )
+    const { result } = renderHook(() => useStepProductResolver(steps, products))
     const resolved = result.current.productsByStepId.get("step-merch")
     expect(resolved).toHaveLength(2)
-    expect(resolved!.map((p) => p.id)).toEqual(expect.arrayContaining(["p1", "p2"]))
+    expect(resolved!.map((p) => p.id)).toEqual(
+      expect.arrayContaining(["p1", "p2"]),
+    )
   })
 
   it("two steps with the same product_category both resolve the same products (no de-dup)", () => {
@@ -178,9 +177,7 @@ describe("useStepProductResolver", () => {
       }),
     ]
     const products = [makeProduct({ id: "p1", category: "merch" })]
-    const { result } = renderHook(() =>
-      useStepProductResolver(steps, products),
-    )
+    const { result } = renderHook(() => useStepProductResolver(steps, products))
     const resolved1 = result.current.productsByStepId.get("step-merch-1")
     const resolved2 = result.current.productsByStepId.get("step-merch-2")
     expect(resolved1).toHaveLength(1)
@@ -202,9 +199,7 @@ describe("useStepProductResolver", () => {
       makeProduct({ id: "p1", category: "merch", is_active: true }),
       makeProduct({ id: "p2", category: "merch", is_active: false }),
     ]
-    const { result } = renderHook(() =>
-      useStepProductResolver(steps, products),
-    )
+    const { result } = renderHook(() => useStepProductResolver(steps, products))
     const resolved = result.current.productsByStepId.get("step-merch")
     expect(resolved).toHaveLength(1)
     expect(resolved![0].id).toBe("p1")

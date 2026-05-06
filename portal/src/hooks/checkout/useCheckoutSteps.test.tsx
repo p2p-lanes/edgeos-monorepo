@@ -1,6 +1,7 @@
 import { renderHook } from "@testing-library/react"
 import { describe, expect, it } from "vitest"
 import type { TicketingStepPublic } from "@/client"
+import type { ProductsPass } from "@/types/Products"
 import { useCheckoutSteps } from "./useCheckoutSteps"
 
 function makeStep(
@@ -25,20 +26,38 @@ function makeStep(
   } as TicketingStepPublic
 }
 
+function makeProduct(
+  overrides: Partial<ProductsPass> & { id: string; category: string },
+): ProductsPass {
+  const { id, category, ...rest } = overrides
+  return {
+    name: id,
+    is_active: true,
+    price: 10,
+    compare_price: null,
+    max_quantity: null,
+    ...rest,
+    id,
+    category,
+  } as unknown as ProductsPass
+}
+
 describe("useCheckoutSteps", () => {
   it("includes all configured known steps in availableSteps", () => {
     const configuredSteps = [
       makeStep({ step_type: "tickets", order: 0 }),
       makeStep({ step_type: "confirm", order: 1 }),
     ]
+    const productsByStepId = new Map<string, ProductsPass[]>([
+      ["tickets", []],
+      ["confirm", []],
+    ])
 
     const { result } = renderHook(() =>
       useCheckoutSteps({
         initialStep: "passes",
         configuredSteps,
-        patronCount: 0,
-        housingCount: 0,
-        merchCount: 0,
+        productsByStepId,
         selectedPassesCount: 1,
         dynamicItemsCount: 0,
         isEditing: false,
@@ -48,20 +67,35 @@ describe("useCheckoutSteps", () => {
     expect(result.current.availableSteps).toEqual(["passes", "confirm"])
   })
 
-  it("keeps other known steps when present", () => {
+  it("keeps housing step when resolver entry has products", () => {
     const configuredSteps = [
       makeStep({ step_type: "tickets", order: 0 }),
-      makeStep({ step_type: "housing", order: 1 }),
+      makeStep({
+        id: "housing",
+        step_type: "housing",
+        order: 1,
+        product_category: "housing",
+        template: "housing-date",
+      }),
       makeStep({ step_type: "confirm", order: 2 }),
     ]
+    const productsByStepId = new Map<string, ProductsPass[]>([
+      ["tickets", []],
+      [
+        "housing",
+        [
+          makeProduct({ id: "h1", category: "housing" }),
+          makeProduct({ id: "h2", category: "housing" }),
+        ],
+      ],
+      ["confirm", []],
+    ])
 
     const { result } = renderHook(() =>
       useCheckoutSteps({
         initialStep: "passes",
         configuredSteps,
-        patronCount: 0,
-        housingCount: 2,
-        merchCount: 0,
+        productsByStepId,
         selectedPassesCount: 1,
         dynamicItemsCount: 0,
         isEditing: false,
@@ -75,28 +109,44 @@ describe("useCheckoutSteps", () => {
     ])
   })
 
-  it("excludes housing and merch when no products available", () => {
+  it("excludes housing and merch when resolver entries are empty", () => {
     const configuredSteps = [
       makeStep({ step_type: "tickets", order: 0 }),
-      makeStep({ step_type: "housing", order: 1 }),
-      makeStep({ step_type: "merch", order: 2 }),
+      makeStep({
+        id: "housing",
+        step_type: "housing",
+        order: 1,
+        product_category: "housing",
+        template: "housing-date",
+      }),
+      makeStep({
+        id: "merch",
+        step_type: "merch",
+        order: 2,
+        product_category: "merch",
+        template: "merch-image",
+      }),
       makeStep({ step_type: "confirm", order: 3 }),
     ]
+    const productsByStepId = new Map<string, ProductsPass[]>([
+      ["tickets", []],
+      ["housing", []],
+      ["merch", []],
+      ["confirm", []],
+    ])
 
     const { result } = renderHook(() =>
       useCheckoutSteps({
         initialStep: "passes",
         configuredSteps,
-        patronCount: 0,
-        housingCount: 0,
-        merchCount: 0,
+        productsByStepId,
         selectedPassesCount: 1,
         dynamicItemsCount: 0,
         isEditing: false,
       }),
     )
 
-    // housing and merch filtered because counts = 0
+    // housing and merch filtered because resolver entries are empty
     expect(result.current.availableSteps).toEqual(["passes", "confirm"])
   })
 })
