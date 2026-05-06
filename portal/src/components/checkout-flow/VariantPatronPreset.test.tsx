@@ -110,7 +110,7 @@ describe("VariantPatronPreset — price mode", () => {
     expect(presetButtons.length).toBeGreaterThan(0)
   })
 
-  it("renders fixed-price Add button when price_mode=fixed", () => {
+  it("renders fixed-price toggle (Switch) when price_mode=fixed", () => {
     const product = makeProduct({ price: 50 })
 
     render(
@@ -122,10 +122,9 @@ describe("VariantPatronPreset — price mode", () => {
       />,
     )
 
-    // Fixed mode shows a single "Add" button (or "Remove" if already in cart)
-    // at the configured product price — no preset amount buttons
-    const addButton = screen.queryByRole("button", { name: /add/i })
-    expect(addButton).not.toBeNull()
+    // Fixed mode shows a Switch toggle at the configured product price
+    const toggle = screen.queryByRole("switch")
+    expect(toggle).not.toBeNull()
 
     // Should NOT show preset buttons (those are for variable mode)
     const buttons = screen.queryAllByRole("button")
@@ -133,6 +132,9 @@ describe("VariantPatronPreset — price mode", () => {
       /^\$\d+$/.test((b.textContent ?? "").trim()),
     )
     expect(presetButtons.length).toBe(0)
+
+    // Price should be displayed (format: $50 with minimumFractionDigits:0)
+    expect(screen.queryByText(/\$50/)).not.toBeNull()
   })
 
   it("variable mode behavior is identical before and after price_mode changes (parity)", () => {
