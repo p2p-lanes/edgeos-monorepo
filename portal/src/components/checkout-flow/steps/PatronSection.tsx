@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
+import { resolvePatronPriceMode } from "@/hooks/checkout/resolvePatronPriceMode"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
 import { useCityProvider } from "@/providers/cityProvider"
@@ -17,12 +18,20 @@ interface PatronSectionProps {
 }
 
 export default function PatronSection({ onSkip }: PatronSectionProps) {
-  const { patronProducts, cart, setPatronAmount, clearPatron } = useCheckout()
+  const { patronProducts, stepConfigs, cart, setPatronAmount, clearPatron } =
+    useCheckout()
   const { getCity } = useCityProvider()
   const city = getCity()
 
   const patronProduct = patronProducts[0]
-  const isVariablePrice = patronProduct?.category === "patreon"
+
+  // Resolve price mode from template_config instead of hardcoded category string.
+  // ADR-4: defaults to "variable" when unset for backward compatibility.
+  const stepConfig = stepConfigs.find((s) => s.step_type === "patron")
+  const isVariablePrice =
+    resolvePatronPriceMode(
+      stepConfig?.template_config as Record<string, unknown> | null,
+    ) === "variable"
   const isPatronEnabled = cart.patron !== null
 
   const currentAmount = cart.patron?.amount || 0
