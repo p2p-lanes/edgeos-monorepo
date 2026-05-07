@@ -19,12 +19,12 @@ interface TicketQRListProps {
 }
 
 /**
- * Renders a list of scannable tickets — one entry per ticket where
+ * Renders a row of QR-icon buttons — one per ticket where
  * `requires_check_in === true`. Tickets with `requires_check_in` falsy/undefined
  * (merch, non-scannable products) are silently skipped.
  *
- * Each entry shows the product name and the raw check_in_code, plus a button
- * that opens a shared modal with the QR enlarged.
+ * Visually minimal (matches the pre-refactor UX): each scannable ticket is
+ * just a QR icon that opens the shared modal with the enlarged QR.
  */
 const TicketQRList = ({ tickets }: TicketQRListProps) => {
   const { t } = useTranslation()
@@ -35,31 +35,17 @@ const TicketQRList = ({ tickets }: TicketQRListProps) => {
   if (scannable.length === 0) return null
 
   return (
-    <div className="flex flex-col gap-2 mt-3">
+    <div className="flex items-center gap-2 mt-3 justify-end lg:absolute lg:bottom-6 lg:right-6 lg:mt-0">
       {scannable.map((ticket) => (
-        <div
+        <button
           key={ticket.id}
-          className="flex items-center justify-between gap-3 p-3 rounded-xl border border-border bg-card"
+          type="button"
+          onClick={() => setActiveCode(ticket.check_in_code)}
+          aria-label={t("passes.check_in_code")}
+          className="text-pass-text hover:text-pass-title transition-colors cursor-pointer"
         >
-          <div className="flex flex-col min-w-0">
-            {ticket.product_name && (
-              <p className="text-xs font-medium text-pass-text uppercase tracking-wider truncate">
-                {ticket.product_name}
-              </p>
-            )}
-            <p className="text-sm font-mono text-pass-title truncate">
-              {ticket.check_in_code}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setActiveCode(ticket.check_in_code)}
-            className="flex items-center gap-1.5 text-xs font-medium text-pass-text uppercase tracking-wider hover:text-pass-title transition-colors cursor-pointer flex-shrink-0"
-          >
-            <span>{t("passes.check_in_code")}</span>
-            <QrCode className="w-4 h-4" />
-          </button>
-        </div>
+          <QrCode className="w-5 h-5" />
+        </button>
       ))}
 
       <QRcode
