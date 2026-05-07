@@ -4,7 +4,7 @@ import type { ColumnDef, Row } from "@tanstack/react-table"
 import { ChevronDown, ChevronRight, ClipboardCheck } from "lucide-react"
 import { Suspense } from "react"
 
-import { type TicketEventListItem, TicketEventsService } from "@/client"
+import { type TicketEventListItem, TicketEventService } from "@/client"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
@@ -57,7 +57,7 @@ function getTicketEventsQueryOptions(
 ) {
   return {
     queryFn: () =>
-      TicketEventsService.listTicketEvents({
+      TicketEventService.listTicketEvents({
         popupId: popupId || undefined,
         skip: page * pageSize,
         limit: pageSize,
