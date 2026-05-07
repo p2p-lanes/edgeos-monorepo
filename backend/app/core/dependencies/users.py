@@ -151,10 +151,10 @@ def get_admin(
 def require_write_permission(
     current_user: Annotated["UserPublic", Depends(get_current_user)],
 ) -> "UserPublic":
-    if current_user.role == UserRole.VIEWER:
+    if current_user.role not in [UserRole.SUPERADMIN, UserRole.ADMIN]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Viewer role does not have write access",
+            detail="Write access requires admin role",
         )
     return current_user
 
