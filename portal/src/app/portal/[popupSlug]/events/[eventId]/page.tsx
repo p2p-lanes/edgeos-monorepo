@@ -9,6 +9,7 @@ import {
   CalendarPlus,
   CheckCircle,
   Clock,
+  Home,
   Layers,
   Mail,
   MapPin,
@@ -488,6 +489,24 @@ export default function EventDetailPage() {
               <div className="flex items-center gap-2.5 pr-36">{inner}</div>
             )
           })()}
+        {!event.venue_title && event.custom_location_name && (
+          <a
+            href={event.custom_location_url ?? undefined}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={t("events.detail.open_in_maps")}
+            className="group flex items-center gap-2.5 pr-36 -mx-2 px-2 py-1.5 rounded-md hover:bg-muted/50 transition-colors"
+          >
+            <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+              <Home className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-medium truncate group-hover:underline">
+                {event.custom_location_name}
+              </p>
+            </div>
+          </a>
+        )}
         {event.meeting_url && (
           <div className="flex items-center gap-2.5">
             <div className="h-8 w-8 rounded-lg bg-purple-500/10 flex items-center justify-center shrink-0">

@@ -13,6 +13,10 @@ export interface UseEditEventFormResult {
   setContent: (next: string) => void
   venueId: string
   setVenueId: (next: string) => void
+  customLocationName: string
+  setCustomLocationName: (next: string) => void
+  customLocationUrl: string
+  setCustomLocationUrl: (next: string) => void
   trackId: string
   setTrackId: (next: string) => void
   visibility: Visibility
@@ -35,7 +39,17 @@ export interface UseEditEventFormResult {
 export function useEditEventForm(event: EventPublic): UseEditEventFormResult {
   const [title, setTitle] = useState(() => event.title ?? "")
   const [content, setContent] = useState(() => event.content ?? "")
-  const [venueId, setVenueId] = useState(() => event.venue_id ?? "")
+  // Seed the dropdown with the custom-location sentinel when the event was
+  // created with one — keeps the inputs visible and editable on first paint.
+  const [venueId, setVenueId] = useState(() =>
+    event.custom_location_name ? "__custom__" : (event.venue_id ?? ""),
+  )
+  const [customLocationName, setCustomLocationName] = useState(
+    () => event.custom_location_name ?? "",
+  )
+  const [customLocationUrl, setCustomLocationUrl] = useState(
+    () => event.custom_location_url ?? "",
+  )
   const [trackId, setTrackId] = useState(() => event.track_id ?? "")
   const [visibility, setVisibility] = useState<Visibility>(
     () => (event.visibility as Visibility) ?? "public",
@@ -51,22 +65,27 @@ export function useEditEventForm(event: EventPublic): UseEditEventFormResult {
     timezone: string,
     startIso: string,
     endIso: string,
-  ): EventUpdate => ({
-    title: title.trim(),
-    content: content.trim() || null,
-    start_time: startIso,
-    end_time: endIso,
-    timezone: timezone || "UTC",
-    venue_id: venueId || null,
-    track_id: trackId || null,
-    visibility,
-    max_participant: maxParticipants
-      ? Math.max(0, Number.parseInt(maxParticipants, 10))
-      : null,
-    meeting_url: meetingUrl || null,
-    cover_url: coverUrl || null,
-    tags,
-  })
+  ): EventUpdate => {
+    const isCustom = venueId === "__custom__"
+    return {
+      title: title.trim(),
+      content: content.trim() || null,
+      start_time: startIso,
+      end_time: endIso,
+      timezone: timezone || "UTC",
+      venue_id: !isCustom && venueId ? venueId : null,
+      custom_location_name: isCustom ? customLocationName.trim() || null : null,
+      custom_location_url: isCustom ? customLocationUrl.trim() || null : null,
+      track_id: trackId || null,
+      visibility,
+      max_participant: maxParticipants
+        ? Math.max(0, Number.parseInt(maxParticipants, 10))
+        : null,
+      meeting_url: !isCustom && !venueId ? meetingUrl || null : null,
+      cover_url: coverUrl || null,
+      tags,
+    }
+  }
 
   return {
     title,
@@ -75,6 +94,10 @@ export function useEditEventForm(event: EventPublic): UseEditEventFormResult {
     setContent,
     venueId,
     setVenueId,
+    customLocationName,
+    setCustomLocationName,
+    customLocationUrl,
+    setCustomLocationUrl,
     trackId,
     setTrackId,
     visibility,

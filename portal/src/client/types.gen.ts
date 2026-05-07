@@ -923,6 +923,8 @@ export type EventCreate = {
     max_participant?: (number | null);
     tags?: Array<(string)>;
     venue_id?: (string | null);
+    custom_location_name?: (string | null);
+    custom_location_url?: (string | null);
     track_id?: (string | null);
     visibility?: EventVisibility;
     require_approval?: boolean;
@@ -1012,6 +1014,8 @@ export type EventPublic = {
     max_participant?: (number | null);
     tags?: Array<(string)>;
     venue_id?: (string | null);
+    custom_location_name?: (string | null);
+    custom_location_url?: (string | null);
     track_id?: (string | null);
     visibility?: EventVisibility;
     require_approval?: boolean;
@@ -1101,6 +1105,8 @@ export type EventUpdate = {
     max_participant?: (number | null);
     tags?: (Array<(string)> | null);
     venue_id?: (string | null);
+    custom_location_name?: (string | null);
+    custom_location_url?: (string | null);
     track_id?: (string | null);
     visibility?: (EventVisibility | null);
     require_approval?: (boolean | null);
@@ -3261,6 +3267,7 @@ export type CartsDeleteMyCartResponse = (void);
 
 export type CheckoutGetRuntimeData = {
     slug: string;
+    xTenantId?: (string | null);
 };
 
 export type CheckoutGetRuntimeResponse = (CheckoutRuntimeResponse);
@@ -3268,12 +3275,14 @@ export type CheckoutGetRuntimeResponse = (CheckoutRuntimeResponse);
 export type CheckoutPurchaseOpenTicketingData = {
     requestBody: OpenTicketingPurchaseCreate;
     slug: string;
+    xTenantId?: (string | null);
 };
 
 export type CheckoutPurchaseOpenTicketingResponse = (OpenTicketingPurchaseResponse);
 
 export type CouponsValidateCouponPublicData = {
     requestBody: CouponValidatePublicRequest;
+    xTenantId?: (string | null);
 };
 
 export type CouponsValidateCouponPublicResponse = (CouponValidatePublicResponse);

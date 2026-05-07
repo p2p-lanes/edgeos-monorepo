@@ -500,7 +500,8 @@
       "event_count_one": "{{count}} evento",
       "event_count_other": "{{count}} eventos",
       "no_venues": "Este pop-up todavía no tiene venues configurados.",
-      "no_venue_column": "Sin venue",
+      "no_venue_column": "Reunión",
+      "offsite_column": "Fuera de sede",
       "untitled_venue": "Venue sin título"
     },
     "add_to_calendar": {
@@ -549,7 +550,8 @@
       "remove_invitation_aria": "Quitar invitación para {{email}}",
       "edit_event_button": "Editar evento",
       "pending_approval_banner_title": "Pendiente de aprobación",
-      "pending_approval_banner_message": "Tu evento está pendiente de aprobación y aún no es visible para otros."
+      "pending_approval_banner_message": "Tu evento está pendiente de aprobación y aún no es visible para otros.",
+      "open_in_maps": "Abrir en Google Maps"
     },
     "form": {
       "create_heading": "Crear evento",
@@ -603,8 +605,9 @@
       "no_tags_configured": "Las etiquetas para este pop-up no están configuradas. Pedile a un admin que las defina en Event Settings.",
       "track_label": "Track (opcional)",
       "track_placeholder": "Sin track",
-      "meeting_url_label": "URL de la reunión (opcional)",
+      "meeting_url_label": "URL de la reunión",
       "meeting_url_placeholder": "https://…",
+      "meeting_url_required": "La URL de la reunión es obligatoria si no elegís un venue.",
       "cancel_button": "Cancelar",
       "create_button": "Crear evento",
       "save_button": "Guardar cambios",
@@ -619,7 +622,14 @@
       "creation_restricted_heading": "La creación de eventos está restringida",
       "creation_restricted_message": "Solo los admins pueden crear eventos para este pop-up.",
       "no_popup_error": "Sin popup",
-      "no_venue_option": "Sin lugar",
+      "no_venue_option": "Reunión",
+      "custom_location_option": "Ubicación personalizada",
+      "venues_group_label": "Venues",
+      "custom_location_name_label": "Nombre del lugar",
+      "custom_location_name_placeholder": "Mi casa",
+      "custom_location_url_label": "Link de Google Maps",
+      "custom_location_url_placeholder": "https://maps.google.com/...",
+      "custom_location_validation_both_required": "Indicá un nombre y un link de Google Maps.",
       "no_track_option": "Sin track",
       "venue_capacity_suffix": " (cap. {{capacity}})",
       "event_cover_alt": "Portada del evento",

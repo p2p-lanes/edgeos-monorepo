@@ -1,14 +1,19 @@
 "use client"
 
+import { Home, Video } from "lucide-react"
 import { memo, useMemo } from "react"
 import { useTranslation } from "react-i18next"
 import type { EventVenuePublic } from "@/client"
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
 } from "@/components/ui/select"
+import { cn } from "@/lib/utils"
 
 interface VenueSelectProps {
   venueId: string
@@ -23,6 +28,7 @@ interface VenueSelectProps {
 }
 
 const NONE_VALUE = "__none__"
+const CUSTOM_VALUE = "__custom__"
 
 function VenueSelectImpl({
   venueId,
@@ -32,15 +38,15 @@ function VenueSelectImpl({
 }: VenueSelectProps) {
   const { t } = useTranslation()
 
-  // Build the dropdown item list with one entry per unique value. The
-  // currently selected venue is included exactly once: from `venues` when
-  // present, or as a stub using `selectedVenueLabel` while the list query
-  // is still resolving.
-  const items = useMemo(() => {
-    const out: { value: string; label: string }[] = [
-      { value: NONE_VALUE, label: t("events.form.no_venue_option") },
-    ]
-    const seen = new Set<string>([NONE_VALUE])
+  // Build venue dropdown items separately from the two synthetic options
+  // (Meeting + Custom location), which always sit at the top of the list
+  // with a visual separator and an icon to distinguish them from real
+  // venues. The currently selected venue is included exactly once: from
+  // `venues` when present, or as a stub using `selectedVenueLabel` while
+  // the list query is still resolving.
+  const venueItems = useMemo(() => {
+    const out: { value: string; label: string }[] = []
+    const seen = new Set<string>([NONE_VALUE, CUSTOM_VALUE])
 
     const formatVenueLabel = (v: EventVenuePublic) => {
       const title = v.title || t("events.venues.list.untitled_venue")
@@ -51,7 +57,11 @@ function VenueSelectImpl({
         : title
     }
 
-    if (venueId && !venues.some((v) => v.id === venueId)) {
+    if (
+      venueId &&
+      venueId !== CUSTOM_VALUE &&
+      !venues.some((v) => v.id === venueId)
+    ) {
       out.push({
         value: venueId,
         label: selectedVenueLabel || t("events.venues.list.untitled_venue"),
@@ -77,8 +87,12 @@ function VenueSelectImpl({
   // ourselves and dropping it straight into the trigger sidesteps that
   // entire mechanism.
   const triggerLabel =
-    items.find((i) => i.value === (venueId || NONE_VALUE))?.label ??
-    t("events.form.venue_placeholder")
+    venueId === CUSTOM_VALUE
+      ? t("events.form.custom_location_option")
+      : !venueId
+        ? t("events.form.no_venue_option")
+        : (venueItems.find((i) => i.value === venueId)?.label ??
+          t("events.form.venue_placeholder"))
 
   return (
     <Select
@@ -89,11 +103,45 @@ function VenueSelectImpl({
         <span className="truncate text-left">{triggerLabel}</span>
       </SelectTrigger>
       <SelectContent>
-        {items.map((item) => (
-          <SelectItem key={item.value} value={item.value}>
-            {item.label}
-          </SelectItem>
-        ))}
+        <SelectItem
+          value={NONE_VALUE}
+          className={cn(
+            "data-[highlighted]:bg-muted",
+            "bg-muted/40 text-foreground",
+          )}
+        >
+          <span className="inline-flex items-center gap-2">
+            <Video className="h-3.5 w-3.5 text-muted-foreground" />
+            {t("events.form.no_venue_option")}
+          </span>
+        </SelectItem>
+        <SelectItem
+          value={CUSTOM_VALUE}
+          className={cn(
+            "data-[highlighted]:bg-muted",
+            "bg-muted/40 text-foreground",
+          )}
+        >
+          <span className="inline-flex items-center gap-2">
+            <Home className="h-3.5 w-3.5 text-muted-foreground" />
+            {t("events.form.custom_location_option")}
+          </span>
+        </SelectItem>
+        {venueItems.length > 0 && (
+          <>
+            <SelectSeparator />
+            <SelectGroup>
+              <SelectLabel className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                {t("events.form.venues_group_label")}
+              </SelectLabel>
+              {venueItems.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </>
+        )}
       </SelectContent>
     </Select>
   )

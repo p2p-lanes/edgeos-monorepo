@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Clock,
   Crown,
+  Home,
   Layers,
   Repeat,
   Tag,
@@ -258,15 +259,22 @@ export function DayBody({
   // Build the column list. Always show every venue we know about, even
   // those without events on this day, so the calendar layout is stable
   // as the user pages through days. Append a synthetic "no venue" column
-  // only when at least one event lacks a venue.
+  // only when at least one event lacks a venue, and a separate "off-site"
+  // column at the very end for events that have a custom location.
   const columns: VenueColumn[] = useMemo(() => {
     const venues = venuesData?.results ?? []
     const cols: VenueColumn[] = venues.map((v) => ({
       id: v.id,
       title: v.title,
     }))
-    if (dayEvents.some((e) => !e.venue_id)) {
+    if (dayEvents.some((e) => !e.venue_id && !e.custom_location_name)) {
       cols.push({ id: "__no_venue__", title: t("events.day.no_venue_column") })
+    }
+    if (dayEvents.some((e) => !e.venue_id && !!e.custom_location_name)) {
+      cols.push({
+        id: "__custom_location__",
+        title: t("events.day.offsite_column"),
+      })
     }
     return cols
   }, [venuesData, dayEvents, t])
@@ -279,7 +287,9 @@ export function DayBody({
     for (const col of columns) map.set(col.id, [])
 
     for (const event of dayEvents) {
-      const colId = event.venue_id ?? "__no_venue__"
+      const colId =
+        event.venue_id ??
+        (event.custom_location_name ? "__custom_location__" : "__no_venue__")
       if (!map.has(colId)) continue
       const startMin = minutesInTz(event.start_time)
       const endsOnDay = formatDayKey(event.end_time) === dayKey
@@ -597,6 +607,13 @@ export function DayBody({
                                   aria-label={t("events.list.owned_title")}
                                 />
                               )}
+                              {!event.venue_id &&
+                                event.custom_location_name && (
+                                  <Home
+                                    className="h-3 w-3 shrink-0 text-muted-foreground"
+                                    aria-hidden="true"
+                                  />
+                                )}
                               <span
                                 className={cn(
                                   isShort ? "truncate" : "line-clamp-2",
@@ -605,6 +622,13 @@ export function DayBody({
                                 {event.title}
                               </span>
                             </div>
+                            {!isShort &&
+                              !event.venue_id &&
+                              event.custom_location_name && (
+                                <div className="text-[10px] text-muted-foreground/80 truncate">
+                                  {event.custom_location_name}
+                                </div>
+                              )}
                             <div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-0.5">
                               <Clock className="h-2.5 w-2.5" />
                               <span className="truncate">
@@ -808,6 +832,13 @@ export function DayBody({
                                   aria-hidden="true"
                                 />
                               )}
+                              {!event.venue_id &&
+                                event.custom_location_name && (
+                                  <Home
+                                    className="h-2.5 w-2.5 shrink-0 text-muted-foreground"
+                                    aria-hidden="true"
+                                  />
+                                )}
                               <span className="truncate">{event.title}</span>
                             </div>
                             <div className="flex items-center gap-1 text-[9px] text-muted-foreground mt-0.5">
