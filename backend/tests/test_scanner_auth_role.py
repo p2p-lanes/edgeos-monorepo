@@ -210,6 +210,41 @@ class TestAuthRoleRejection:
         )
         assert "access_token" in response.json()
 
+    def test_user_login_rejects_check_in_controller_pre_otp(
+        self,
+        client: TestClient,
+        check_in_controller_user_tenant_a: Users,
+    ) -> None:
+        """CHECK_IN_CONTROLLER gets 403 from POST /auth/user/login BEFORE OTP is generated.
+
+        Pre-OTP gating: the scanner role must not even receive the email — we
+        reject at the login step, not at authenticate. UX requirement: users
+        must not have to wait for an OTP they can never use.
+        """
+        response = client.post(
+            "/api/v1/auth/user/login",
+            json={"email": check_in_controller_user_tenant_a.email},
+        )
+        assert response.status_code == 403, (
+            f"CHECK_IN_CONTROLLER must be rejected at /auth/user/login PRE-OTP, "
+            f"got {response.status_code}: {response.text}"
+        )
+
+    def test_scanner_login_rejects_viewer_pre_otp(
+        self,
+        client: TestClient,
+        viewer_user_tenant_a: Users,
+    ) -> None:
+        """VIEWER gets 403 from POST /auth/scanner/login BEFORE OTP is generated."""
+        response = client.post(
+            "/api/v1/auth/scanner/login",
+            json={"email": viewer_user_tenant_a.email},
+        )
+        assert response.status_code == 403, (
+            f"VIEWER must be rejected at /auth/scanner/login PRE-OTP, "
+            f"got {response.status_code}: {response.text}"
+        )
+
 
 # ---------------------------------------------------------------------------
 # T9.RED — scanner route re-gating tests
