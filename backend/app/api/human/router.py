@@ -1,5 +1,5 @@
 import uuid
-from typing import TYPE_CHECKING, Annotated
+from typing import Annotated
 
 from fastapi import APIRouter, Header, HTTPException, status
 
@@ -12,35 +12,24 @@ from app.api.human.schemas import (
     HumanPublic,
     HumanUpdate,
 )
-from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
+    CurrentAdmin,
     CurrentHuman,
-    CurrentUser,
+    CurrentSuperadmin,
     CurrentWriter,
     HumanTenantSession,
     TenantSession,
 )
 from app.services.email_helpers import send_application_status_email
 
-if TYPE_CHECKING:
-    from app.api.user.schemas import UserPublic
-
 router = APIRouter(prefix="/humans", tags=["humans"])
-
-
-def _check_superadmin(current_user: "UserPublic") -> None:
-    if current_user.role != UserRole.SUPERADMIN:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only superadmins can perform this action",
-        )
 
 
 @router.get("", response_model=ListModel[HumanPublic])
 async def list_humans(
     db: TenantSession,
-    _: CurrentUser,
+    _: CurrentAdmin,
     search: str | None = None,
     popup_id: uuid.UUID | None = None,
     incomplete_application: bool = False,
@@ -83,11 +72,14 @@ async def list_humans(
 async def create_human(
     human_in: HumanCreate,
     db: TenantSession,
-    current_user: CurrentUser,
+    current_user: CurrentSuperadmin,
     x_tenant_id: Annotated[str | None, Header(alias="X-Tenant-Id")] = None,
 ) -> HumanPublic:
-    """Create a human (superadmin only, for testing purposes)."""
-    _check_superadmin(current_user)
+    """Create a human (superadmin only, for testing purposes).
+
+    The CurrentSuperadmin dep enforces the superadmin gate; the former inline
+    _check_superadmin() call is removed as redundant.
+    """
 
     # Check if human with this email already exists
     existing = crud.get_by_email(db, human_in.email)
@@ -145,7 +137,7 @@ async def update_current_human(
 async def get_human(
     human_id: uuid.UUID,
     db: TenantSession,
-    _: CurrentUser,
+    _: CurrentAdmin,
 ) -> HumanPublic:
     human = crud.get(db, human_id)
 

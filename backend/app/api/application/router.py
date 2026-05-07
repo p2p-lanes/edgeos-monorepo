@@ -37,7 +37,6 @@ from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, 
 from app.core.dependencies.users import (
     CurrentAdmin,
     CurrentHuman,
-    CurrentUser,
     CurrentWriter,
     HumanTenantSession,
     TenantSession,
@@ -79,7 +78,7 @@ def _build_application_public(
 @router.get("", response_model=ListModel[ApplicationPublic])
 async def list_applications(
     db: TenantSession,
-    _: CurrentUser,
+    _: CurrentAdmin,
     popup_id: uuid.UUID | None = None,
     human_id: uuid.UUID | None = None,
     reviewed_by: uuid.UUID | None = None,
@@ -180,7 +179,7 @@ async def create_application_admin(
 async def get_application(
     application_id: uuid.UUID,
     db: TenantSession,
-    _: CurrentUser,
+    _: CurrentAdmin,
 ) -> ApplicationPublic:
     """Get a single application (BO only)."""
     application = crud.applications_crud.get(db, application_id)
