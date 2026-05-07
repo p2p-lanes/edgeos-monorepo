@@ -12,6 +12,7 @@ from app.api.auth.utils import (
     is_code_valid,
 )
 from app.api.human.models import Humans
+from app.api.shared.enums import UserRole
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
 from app.core.config import settings
@@ -46,6 +47,7 @@ def check_rate_limit(identifier: str) -> None:
 async def login_user(
     session: Session,
     email: str,
+    allowed_roles: set[UserRole] | None = None,  # reserved for future symmetry; unused at login step (ADR-3)
 ) -> tuple[str, int]:
     # Rate limit by email
     check_rate_limit(f"user:{email.lower()}")
@@ -125,6 +127,7 @@ async def authenticate_user(
     session: Session,
     email: str,
     code: str,
+    allowed_roles: set[UserRole] | None = None,  # if set, role must be in this set after OTP success
 ) -> Users:
     statement = select(Users).where(
         Users.email == email,
@@ -187,6 +190,14 @@ async def authenticate_user(
         user.auth_attempts = 0
         session.add(user)
         session.commit()
+
+    # Role allow-list check AFTER OTP success — OTP is already consumed at this point.
+    # This is a business-rule gate, not a credential gate (ADR-3).
+    if allowed_roles is not None and user.role not in allowed_roles:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Role not allowed for this login surface",
+        )
 
     logger.info(f"User authenticated successfully: {email}")
     return user
