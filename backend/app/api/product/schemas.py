@@ -129,6 +129,17 @@ class ProductCreate(BaseModel):
                 raise ValueError("duration_type can only be set for ticket products")
         return self
 
+    @model_validator(mode="after")
+    def validate_max_per_order_vs_stock_cap(self) -> "ProductCreate":
+        """max_per_order must not exceed total_stock_cap when both are set."""
+        if self.max_per_order is not None and self.total_stock_cap is not None:
+            if self.max_per_order > self.total_stock_cap:
+                raise ValueError(
+                    "max_per_order cannot exceed total_stock_cap "
+                    f"({self.max_per_order} > {self.total_stock_cap})"
+                )
+        return self
+
 
 class ProductUpdate(BaseModel):
     """Product schema for updates."""
@@ -151,6 +162,17 @@ class ProductUpdate(BaseModel):
     max_per_order: int | None = Field(default=None, ge=1)
     insurance_eligible: bool | None = None
     requires_check_in: bool | None = None
+
+    @model_validator(mode="after")
+    def validate_max_per_order_vs_stock_cap(self) -> "ProductUpdate":
+        """max_per_order must not exceed total_stock_cap when both are set."""
+        if self.max_per_order is not None and self.total_stock_cap is not None:
+            if self.max_per_order > self.total_stock_cap:
+                raise ValueError(
+                    "max_per_order cannot exceed total_stock_cap "
+                    f"({self.max_per_order} > {self.total_stock_cap})"
+                )
+        return self
 
 
 class ProductBatchItem(BaseModel):
@@ -187,6 +209,17 @@ class ProductBatchItem(BaseModel):
                 )
             if self.duration_type is not None:
                 raise ValueError("duration_type can only be set for ticket products")
+        return self
+
+    @model_validator(mode="after")
+    def validate_max_per_order_vs_stock_cap(self) -> "ProductBatchItem":
+        """max_per_order must not exceed total_stock_cap when both are set."""
+        if self.max_per_order is not None and self.total_stock_cap is not None:
+            if self.max_per_order > self.total_stock_cap:
+                raise ValueError(
+                    "max_per_order cannot exceed total_stock_cap "
+                    f"({self.max_per_order} > {self.total_stock_cap})"
+                )
         return self
 
 
