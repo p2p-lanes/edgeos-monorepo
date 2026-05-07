@@ -129,7 +129,7 @@ class TestPostCheckIn:
         _make_ticket(db, tenant_a, attendee, product, code=code)
 
         response = client.post(
-            f"/api/v1/attendees/check-in/{code}",
+            f"/api/v1/attendees/check-in/{code}?popup_id={popup_tenant_a.id}",
             json={"source": "qr"},
             headers=_auth(admin_user_tenant_a),
         )
@@ -162,7 +162,7 @@ class TestPostCheckIn:
 
         # First scan
         r1 = client.post(
-            f"/api/v1/attendees/check-in/{code}",
+            f"/api/v1/attendees/check-in/{code}?popup_id={popup_tenant_a.id}",
             json={"source": "qr"},
             headers=headers,
         )
@@ -172,7 +172,7 @@ class TestPostCheckIn:
 
         # Second scan
         r2 = client.post(
-            f"/api/v1/attendees/check-in/{code}",
+            f"/api/v1/attendees/check-in/{code}?popup_id={popup_tenant_a.id}",
             json={"source": "manual"},
             headers=headers,
         )
@@ -218,7 +218,7 @@ class TestPostCheckIn:
         _make_ticket(db, tenant_a, attendee, product, code=code)
 
         response = client.post(
-            f"/api/v1/attendees/check-in/{code}",
+            f"/api/v1/attendees/check-in/{code}?popup_id={popup_tenant_a.id}",
             json={"source": "qr"},
             headers=_auth(admin_user_tenant_a),
         )
@@ -229,14 +229,41 @@ class TestPostCheckIn:
             f"Expected detail to mention non-scannable; got {response.json()['detail']!r}"
         )
 
+    def test_cross_popup_returns_404(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        popup_tenant_a: Popups,
+        popup_tenant_a_summer_fest: Popups,
+        admin_user_tenant_a: Users,
+    ) -> None:
+        """A code from popup A scanned with popup_id=B returns 404 (cross-popup)."""
+        product = _make_product(db, tenant_a, popup_tenant_a)
+        human = _make_human(db, tenant_a)
+        attendee = _make_attendee(db, tenant_a, popup_tenant_a, human)
+        code = f"XPOPUP{uuid.uuid4().hex[:2].upper()}"
+        _make_ticket(db, tenant_a, attendee, product, code=code)
+
+        # Scan from the wrong popup
+        response = client.post(
+            f"/api/v1/attendees/check-in/{code}?popup_id={popup_tenant_a_summer_fest.id}",
+            json={"source": "qr"},
+            headers=_auth(admin_user_tenant_a),
+        )
+        assert response.status_code == 404, (
+            f"Expected 404 for cross-popup scan, got {response.status_code}: {response.text}"
+        )
+
     def test_unknown_code_returns_404(
         self,
         client: TestClient,
+        popup_tenant_a: Popups,
         admin_user_tenant_a: Users,
     ) -> None:
         """POST with unknown check_in_code returns 404."""
         response = client.post(
-            "/api/v1/attendees/check-in/UNKNOWN99",
+            f"/api/v1/attendees/check-in/UNKNOWN99?popup_id={popup_tenant_a.id}",
             json={"source": "qr"},
             headers=_auth(admin_user_tenant_a),
         )
@@ -264,7 +291,7 @@ class TestPostCheckIn:
         ticket = _make_ticket(db, tenant_a, attendee, product, code=code)
 
         response = client.post(
-            f"/api/v1/attendees/check-in/{code}",
+            f"/api/v1/attendees/check-in/{code}?popup_id={popup_tenant_a.id}",
             json={"source": "manual", "notes": "Staff override"},
             headers=_auth(admin_user_tenant_a),
         )
@@ -302,12 +329,12 @@ class TestPostCheckIn:
 
         # Scan ticket_a twice
         client.post(
-            f"/api/v1/attendees/check-in/{code_a}",
+            f"/api/v1/attendees/check-in/{code_a}?popup_id={popup_tenant_a.id}",
             json={"source": "qr"},
             headers=headers,
         )
         r2 = client.post(
-            f"/api/v1/attendees/check-in/{code_a}",
+            f"/api/v1/attendees/check-in/{code_a}?popup_id={popup_tenant_a.id}",
             json={"source": "qr"},
             headers=headers,
         )
@@ -315,7 +342,7 @@ class TestPostCheckIn:
 
         # Scan ticket_b once
         rb = client.post(
-            f"/api/v1/attendees/check-in/{code_b}",
+            f"/api/v1/attendees/check-in/{code_b}?popup_id={popup_tenant_a.id}",
             json={"source": "qr"},
             headers=headers,
         )

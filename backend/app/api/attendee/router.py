@@ -411,6 +411,10 @@ async def post_check_in(
     payload: CheckInPayload,
     db: TenantSession,
     current_user: CurrentCheckInOperator,
+    popup_id: Annotated[
+        uuid.UUID,
+        Query(description="Popup the scanner is operating in"),
+    ],
 ) -> TicketPublic:
     """Record a check-in event and return enriched TicketPublic (BO - scanner endpoint).
 
@@ -418,12 +422,16 @@ async def post_check_in(
     ticket_events row on every scan. This enables full scan history so frontend/staff
     can apply the right policy at runtime (single-scan, scan-every-time, etc.).
 
+    The scanner MUST send `popup_id` (the popup it is operating in). The endpoint
+    rejects codes that belong to a different popup, mirroring how every other
+    popup-scoped route is non-cross.
+
     Returns:
       - 200 with TicketPublic + scan summary. Backend always records the new
         event; the frontend can detect a re-scan via `total_scans > 1` and
         surface a warning (policy is frontend's responsibility).
       - 400 if the product does not require check-in (`requires_check_in=false`)
-      - 404 if check_in_code not found
+      - 404 if check_in_code not found OR the ticket belongs to a different popup
 
     Code is matched case-insensitively (uppercased before lookup).
     """
@@ -436,6 +444,15 @@ async def post_check_in(
         )
 
     ticket, attendee, product = result
+
+    # Reject codes from a different popup. We treat cross-popup access as
+    # "not found" rather than a distinct error to keep the response uniform
+    # with the way every other popup-scoped route handles non-matching rows.
+    if attendee.popup_id != popup_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ticket not found",
+        )
 
     # Reject codes belonging to non-scannable products (e.g. merch, lodging).
     # The migration generates a check_in_code for every attendee_products row to
@@ -451,6 +468,7 @@ async def post_check_in(
     record_check_in(
         db,
         attendee_product_id=ticket.id,
+        popup_id=popup_id,
         payload=payload,
         actor_user_id=current_user.id,
     )

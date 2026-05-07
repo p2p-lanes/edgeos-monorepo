@@ -70,18 +70,7 @@ async def list_ticket_events(
         )
 
     if popup_id is not None:
-        # Join through attendee_product → attendee to filter by popup_id
-        statement = (
-            statement.join(
-                AttendeeProducts,
-                TicketEvent.attendee_product_id == AttendeeProducts.id,
-            )
-            .join(
-                Attendees,
-                AttendeeProducts.attendee_id == Attendees.id,
-            )
-            .where(Attendees.popup_id == popup_id)
-        )
+        statement = statement.where(TicketEvent.popup_id == popup_id)
 
     if event_type is not None:
         statement = statement.where(TicketEvent.event_type == event_type)
@@ -97,17 +86,7 @@ async def list_ticket_events(
             TicketEvent.attendee_product_id == attendee_product_id
         )
     if popup_id is not None:
-        count_statement = (
-            count_statement.join(
-                AttendeeProducts,
-                TicketEvent.attendee_product_id == AttendeeProducts.id,
-            )
-            .join(
-                Attendees,
-                AttendeeProducts.attendee_id == Attendees.id,
-            )
-            .where(Attendees.popup_id == popup_id)
-        )
+        count_statement = count_statement.where(TicketEvent.popup_id == popup_id)
     if event_type is not None:
         count_statement = count_statement.where(TicketEvent.event_type == event_type)
 

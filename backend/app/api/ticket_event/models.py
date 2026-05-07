@@ -36,6 +36,8 @@ class TicketEvent(SQLModel, table=True):
 
     tenant_id: uuid.UUID = Field(foreign_key="tenants.id")
 
+    popup_id: uuid.UUID = Field(foreign_key="popups.id", index=True)
+
     attendee_product_id: uuid.UUID = Field(foreign_key="attendee_products.id")
 
     event_type: str = Field(max_length=32)

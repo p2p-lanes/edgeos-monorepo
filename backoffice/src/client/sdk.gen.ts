@@ -977,16 +977,21 @@ export class AttendeesService {
      * ticket_events row on every scan. This enables full scan history so frontend/staff
      * can apply the right policy at runtime (single-scan, scan-every-time, etc.).
      *
+     * The scanner MUST send `popup_id` (the popup it is operating in). The endpoint
+     * rejects codes that belong to a different popup, mirroring how every other
+     * popup-scoped route is non-cross.
+     *
      * Returns:
      * - 200 with TicketPublic + scan summary. Backend always records the new
      * event; the frontend can detect a re-scan via `total_scans > 1` and
      * surface a warning (policy is frontend's responsibility).
      * - 400 if the product does not require check-in (`requires_check_in=false`)
-     * - 404 if check_in_code not found
+     * - 404 if check_in_code not found OR the ticket belongs to a different popup
      *
      * Code is matched case-insensitively (uppercased before lookup).
      * @param data The data for the request.
      * @param data.code
+     * @param data.popupId Popup the scanner is operating in
      * @param data.requestBody
      * @param data.xTenantId
      * @returns TicketPublic Successful Response
@@ -1001,6 +1006,9 @@ export class AttendeesService {
             },
             headers: {
                 'X-Tenant-Id': data.xTenantId
+            },
+            query: {
+                popup_id: data.popupId
             },
             body: data.requestBody,
             mediaType: 'application/json',

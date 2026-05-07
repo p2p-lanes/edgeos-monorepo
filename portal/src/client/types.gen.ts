@@ -3317,6 +3317,10 @@ export type AttendeesDeleteAttendeeResponse = (void);
 
 export type AttendeesPostCheckInData = {
     code: string;
+    /**
+     * Popup the scanner is operating in
+     */
+    popupId: string;
     requestBody: CheckInPayload;
     xTenantId?: (string | null);
 };

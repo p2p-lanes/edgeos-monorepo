@@ -16,6 +16,7 @@ from app.api.ticket_event.schemas import CheckInPayload
 def record_check_in(
     session: Session,
     attendee_product_id: uuid.UUID,
+    popup_id: uuid.UUID,
     payload: CheckInPayload,
     actor_user_id: uuid.UUID | None,
 ) -> TicketEvent:
@@ -24,6 +25,8 @@ def record_check_in(
     Args:
         session: active SQLModel session (caller owns the transaction).
         attendee_product_id: UUID PK of the AttendeeProducts (ticket) row.
+        popup_id: popup the scan happened in (required — caller has already
+            validated it matches `attendee.popup_id`).
         payload: CheckInPayload with source and optional notes.
         actor_user_id: user who performed the scan; None for system events.
 
@@ -40,6 +43,7 @@ def record_check_in(
     event = TicketEvent(
         id=uuid.uuid4(),
         tenant_id=ticket.tenant_id,
+        popup_id=popup_id,
         attendee_product_id=attendee_product_id,
         event_type="check_in",
         actor_user_id=actor_user_id,

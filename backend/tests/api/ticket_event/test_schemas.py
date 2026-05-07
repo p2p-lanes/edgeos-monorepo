@@ -196,6 +196,7 @@ class TestTicketEventModel:
         event = TicketEvent(
             id=uuid.uuid4(),
             tenant_id=tenant_a.id,
+            popup_id=popup_tenant_a.id,
             attendee_product_id=ticket.id,
             event_type="check_in",
             actor_user_id=None,

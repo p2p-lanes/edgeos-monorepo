@@ -98,7 +98,13 @@ class TestRecordCheckIn:
         ticket = _make_ticket_chain(db, tenant_a, popup_tenant_a)
         payload = CheckInPayload(source="qr")
 
-        event = record_check_in(db, ticket.id, payload, actor_user_id=None)
+        event = record_check_in(
+            db,
+            ticket.id,
+            popup_id=popup_tenant_a.id,
+            payload=payload,
+            actor_user_id=None,
+        )
 
         assert isinstance(event, TicketEvent)
         assert event.id is not None
@@ -122,7 +128,13 @@ class TestRecordCheckIn:
         payload = CheckInPayload(source="manual", notes="Staff override")
 
         # actor_user_id=None (system event) — FK constraint won't fire without a real user row
-        event = record_check_in(db, ticket.id, payload, actor_user_id=None)
+        event = record_check_in(
+            db,
+            ticket.id,
+            popup_id=popup_tenant_a.id,
+            payload=payload,
+            actor_user_id=None,
+        )
         assert event.payload["notes"] == "Staff override"
         assert event.payload["source"] == "manual"
 
@@ -142,7 +154,13 @@ class TestRecordCheckIn:
             notes="Test note",
         )
 
-        event = record_check_in(db, ticket.id, payload, actor_user_id=None)
+        event = record_check_in(
+            db,
+            ticket.id,
+            popup_id=popup_tenant_a.id,
+            payload=payload,
+            actor_user_id=None,
+        )
 
         assert event.payload["source"] == "qr"
         assert event.payload["notes"] == "Test note"
@@ -164,8 +182,20 @@ class TestListEventsForTicket:
         ticket = _make_ticket_chain(db, tenant_a, popup_tenant_a)
         payload = CheckInPayload(source="qr")
 
-        record_check_in(db, ticket.id, payload, actor_user_id=None)
-        record_check_in(db, ticket.id, payload, actor_user_id=None)
+        record_check_in(
+            db,
+            ticket.id,
+            popup_id=popup_tenant_a.id,
+            payload=payload,
+            actor_user_id=None,
+        )
+        record_check_in(
+            db,
+            ticket.id,
+            popup_id=popup_tenant_a.id,
+            payload=payload,
+            actor_user_id=None,
+        )
 
         events = list_events_for_ticket(db, ticket.id)
         assert len(events) >= 2, f"Expected >= 2 events, got {len(events)}"
@@ -183,12 +213,26 @@ class TestListEventsForTicket:
         ticket = _make_ticket_chain(db, tenant_a, popup_tenant_a)
         payload = CheckInPayload(source="qr")
 
-        record_check_in(db, ticket.id, payload, actor_user_id=None)
-        record_check_in(db, ticket.id, payload, actor_user_id=None)
+        record_check_in(
+            db,
+            ticket.id,
+            popup_id=popup_tenant_a.id,
+            payload=payload,
+            actor_user_id=None,
+        )
+        record_check_in(
+            db,
+            ticket.id,
+            popup_id=popup_tenant_a.id,
+            payload=payload,
+            actor_user_id=None,
+        )
 
         events = list_events_for_ticket(db, ticket.id)
         # Should be DESC — e2 was inserted later so it comes first
-        occurred_times = [e.occurred_at for e in events if e.attendee_product_id == ticket.id]
+        occurred_times = [
+            e.occurred_at for e in events if e.attendee_product_id == ticket.id
+        ]
         if len(occurred_times) >= 2:
             assert occurred_times[0] >= occurred_times[-1], (
                 "Events must be ordered DESC by occurred_at"
@@ -218,7 +262,13 @@ class TestListEventsForTicket:
         from app.api.ticket_event.schemas import CheckInPayload
 
         ticket = _make_ticket_chain(db, tenant_a, popup_tenant_a)
-        record_check_in(db, ticket.id, CheckInPayload(source="qr"), actor_user_id=None)
+        record_check_in(
+            db,
+            ticket.id,
+            popup_id=popup_tenant_a.id,
+            payload=CheckInPayload(source="qr"),
+            actor_user_id=None,
+        )
 
         check_ins = list_events_for_ticket(db, ticket.id, event_type="check_in")
         assert all(e.event_type == "check_in" for e in check_ins)
@@ -257,7 +307,13 @@ class TestGetCheckInSummary:
         from app.api.ticket_event.schemas import CheckInPayload
 
         ticket = _make_ticket_chain(db, tenant_a, popup_tenant_a)
-        record_check_in(db, ticket.id, CheckInPayload(source="qr"), actor_user_id=None)
+        record_check_in(
+            db,
+            ticket.id,
+            popup_id=popup_tenant_a.id,
+            payload=CheckInPayload(source="qr"),
+            actor_user_id=None,
+        )
 
         summary = get_check_in_summary(db, ticket.id)
 
@@ -277,9 +333,19 @@ class TestGetCheckInSummary:
         from app.api.ticket_event.schemas import CheckInPayload
 
         ticket = _make_ticket_chain(db, tenant_a, popup_tenant_a)
-        record_check_in(db, ticket.id, CheckInPayload(source="qr"), actor_user_id=None)
         record_check_in(
-            db, ticket.id, CheckInPayload(source="manual"), actor_user_id=None
+            db,
+            ticket.id,
+            popup_id=popup_tenant_a.id,
+            payload=CheckInPayload(source="qr"),
+            actor_user_id=None,
+        )
+        record_check_in(
+            db,
+            ticket.id,
+            popup_id=popup_tenant_a.id,
+            payload=CheckInPayload(source="manual"),
+            actor_user_id=None,
         )
 
         summary = get_check_in_summary(db, ticket.id)
@@ -303,9 +369,27 @@ class TestGetCheckInSummary:
         ticket_b = _make_ticket_chain(db, tenant_a, popup_tenant_a)
 
         # Scan ticket_a twice, ticket_b once
-        record_check_in(db, ticket_a.id, CheckInPayload(source="qr"), actor_user_id=None)
-        record_check_in(db, ticket_a.id, CheckInPayload(source="qr"), actor_user_id=None)
-        record_check_in(db, ticket_b.id, CheckInPayload(source="manual"), actor_user_id=None)
+        record_check_in(
+            db,
+            ticket_a.id,
+            popup_id=popup_tenant_a.id,
+            payload=CheckInPayload(source="qr"),
+            actor_user_id=None,
+        )
+        record_check_in(
+            db,
+            ticket_a.id,
+            popup_id=popup_tenant_a.id,
+            payload=CheckInPayload(source="qr"),
+            actor_user_id=None,
+        )
+        record_check_in(
+            db,
+            ticket_b.id,
+            popup_id=popup_tenant_a.id,
+            payload=CheckInPayload(source="manual"),
+            actor_user_id=None,
+        )
 
         summary_a = get_check_in_summary(db, ticket_a.id)
         summary_b = get_check_in_summary(db, ticket_b.id)

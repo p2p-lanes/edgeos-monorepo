@@ -106,8 +106,16 @@ def _make_ticket(
 def _record_check_in(db: Session, ticket: AttendeeProducts) -> None:
     from app.api.ticket_event.crud import record_check_in
 
+    # Derive popup_id from the ticket's attendee so callers don't have to
+    # plumb it through. Mirrors what the real endpoint does post-validation.
+    attendee = db.get(Attendees, ticket.attendee_id)
+    assert attendee is not None
     record_check_in(
-        db, ticket.id, CheckInPayload(source="qr"), actor_user_id=None
+        db,
+        ticket.id,
+        popup_id=attendee.popup_id,
+        payload=CheckInPayload(source="qr"),
+        actor_user_id=None,
     )
 
 
