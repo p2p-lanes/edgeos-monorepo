@@ -95,6 +95,14 @@ def upgrade() -> None:
     )
 
     # ------------------------------------------------------------------
+    # Drop legacy composite PK BEFORE the explosion in Step B.1.
+    # Otherwise inserting a second ticket row for the same
+    # (attendee_id, product_id) violates the old attendee_products_pkey.
+    # The new PK on `id` is created in Step D after data mutations finish.
+    # ------------------------------------------------------------------
+    op.drop_constraint("attendee_products_pkey", "attendee_products", type_="primary")
+
+    # ------------------------------------------------------------------
     # Step B — Backfill
     # ------------------------------------------------------------------
     conn = op.get_bind()
@@ -188,9 +196,10 @@ def upgrade() -> None:
 
     # ------------------------------------------------------------------
     # Step D — Restructure attendee_products
-    #          Drop old composite PK → new UUID PK → unique index on code
+    #          New UUID PK → unique index on code
+    #          (old composite PK was dropped before Step B.1 to allow the
+    #           quantity explosion to insert duplicate (attendee_id, product_id))
     # ------------------------------------------------------------------
-    op.drop_constraint("attendee_products_pkey", "attendee_products", type_="primary")
     op.create_primary_key("pk_attendee_products", "attendee_products", ["id"])
 
     # Now that PK is id, enforce check_in_code NOT NULL
