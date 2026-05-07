@@ -55,27 +55,83 @@ def _build_application_public(
     review_decision=None,
 ) -> ApplicationPublic:
     """Build ApplicationPublic with attendees and products."""
-    from app.api.product.schemas import ProductWithQuantity
+    from app.api.attendee.schemas import AttendeeProductPublic
 
     attendees = []
     for a in application.attendees:
-        # Each AttendeeProducts row is one ticket — group by product_id and count.
-        counts = Counter(ap.product_id for ap in a.attendee_products)
-        seen = {ap.product_id: ap.product for ap in a.attendee_products}
-        products = []
-        for pid, qty in counts.items():
-            product = ProductWithQuantity.model_validate(seen[pid])
-            product.quantity = qty
-            products.append(product)
-
-        attendee_data = AttendeePublic.model_validate(a)
-        attendee_data.products = products
+        # AttendeePublic.products is list[AttendeeProductPublic] — one entry per
+        # ticket (per AttendeeProducts row), each carrying its own check_in_code,
+        # payment_id, and requires_check_in.
+        ticket_products = [
+            AttendeeProductPublic(
+                id=ap.id,
+                attendee_id=ap.attendee_id,
+                product_id=ap.product_id,
+                check_in_code=ap.check_in_code,
+                payment_id=ap.payment_id,
+                requires_check_in=ap.product.requires_check_in if ap.product else False,
+            )
+            for ap in a.attendee_products
+        ]
+        # Build the base dict from scalar ORM columns only — do NOT call
+        # AttendeePublic.model_validate(a) because it triggers ORM property
+        # traversal of attendee.products (a @property returning Products rows),
+        # which fails Pydantic coercion into AttendeeProductPublic[].
+        attendee_data = AttendeePublic(
+            id=a.id,
+            tenant_id=a.tenant_id,
+            application_id=a.application_id,
+            popup_id=a.popup_id,
+            human_id=a.human_id,
+            name=a.name,
+            category=a.category,
+            email=a.email,
+            gender=a.gender,
+            check_in_code=a.check_in_code,
+            poap_url=a.poap_url,
+            created_at=getattr(a, "created_at", None),
+            updated_at=getattr(a, "updated_at", None),
+            products=ticket_products,
+        )
         attendees.append(attendee_data)
 
-    app_public = ApplicationPublic.model_validate(application)
-    app_public.attendees = attendees
-    app_public.red_flag = application.red_flag
-    app_public.review_decision = review_decision
+    # Build ApplicationPublic explicitly. Calling model_validate(application)
+    # would trigger recursive coercion of `attendees` → AttendeePublic, which
+    # in turn reads the Attendees.products @property (returning Products rows)
+    # and fails Pydantic validation into AttendeeProductPublic[].
+    from app.api.human.schemas import HumanPublic
+
+    app_public = ApplicationPublic(
+        id=application.id,
+        tenant_id=application.tenant_id,
+        popup_id=application.popup_id,
+        human_id=application.human_id,
+        group_id=application.group_id,
+        referral=application.referral,
+        info_not_shared=application.info_not_shared or [],
+        status=application.status,
+        custom_fields=application.custom_fields or {},
+        custom_fields_schema=application.custom_fields_schema,
+        credit=application.credit,
+        submitted_at=application.submitted_at,
+        accepted_at=application.accepted_at,
+        created_at=getattr(application, "created_at", None),
+        updated_at=getattr(application, "updated_at", None),
+        scholarship_request=application.scholarship_request,
+        scholarship_details=application.scholarship_details,
+        scholarship_video_url=application.scholarship_video_url,
+        scholarship_status=application.scholarship_status,
+        discount_percentage=application.discount_percentage,
+        incentive_amount=application.incentive_amount,
+        incentive_currency=application.incentive_currency,
+        human=HumanPublic.model_validate(application.human) if application.human else None,
+        attendees=attendees,
+        red_flag=application.red_flag,
+        brings_spouse=application.brings_spouse,
+        brings_kids=application.brings_kids,
+        kid_count=application.kid_count,
+        review_decision=review_decision,
+    )
     return app_public
 
 
