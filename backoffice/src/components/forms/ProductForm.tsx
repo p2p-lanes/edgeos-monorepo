@@ -582,11 +582,18 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
           <form.Field
             name="max_per_order"
             validators={{
-              onBlur: ({ value }) => {
+              onBlur: ({ value, fieldApi }) => {
                 if (readOnly || !value) return undefined
                 const num = Number.parseInt(value, 10)
                 if (Number.isNaN(num) || num < 1) {
                   return "Max per order must be a positive number. Leave empty for unlimited."
+                }
+                const rawCap = fieldApi.form.getFieldValue("total_stock_cap")
+                if (rawCap) {
+                  const cap = Number.parseInt(rawCap, 10)
+                  if (!Number.isNaN(cap) && num > cap) {
+                    return `Cannot exceed total stock cap (${cap})`
+                  }
                 }
                 return undefined
               },
