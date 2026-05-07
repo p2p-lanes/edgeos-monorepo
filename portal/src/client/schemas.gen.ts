@@ -1629,8 +1629,149 @@ export const AttendeeInfoSchema = {
     description: 'Minimal attendee information for participation responses.'
 } as const;
 
+export const AttendeeListItemSchema = {
+    properties: {
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        application_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Application Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        human_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Human Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        category: {
+            type: 'string',
+            title: 'Category'
+        },
+        email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Email'
+        },
+        gender: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Gender'
+        },
+        check_in_code: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Check In Code'
+        },
+        poap_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Poap Url'
+        },
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        created_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created At'
+        },
+        updated_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Updated At'
+        },
+        products: {
+            items: {
+                '$ref': '#/components/schemas/ProductWithQuantity'
+            },
+            type: 'array',
+            title: 'Products',
+            default: []
+        }
+    },
+    type: 'object',
+    required: ['tenant_id', 'popup_id', 'name', 'category', 'id'],
+    title: 'AttendeeListItem',
+    description: `Attendee schema for the list endpoint (GET /attendees).
+
+Uses ProductWithQuantity for the products field to preserve the legacy
+shape returned by the list endpoint. Use AttendeePublic for detail views
+where AttendeeProductPublic (with check_in_code) is needed.`
+} as const;
+
 export const AttendeeProductPublicSchema = {
     properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
         attendee_id: {
             type: 'string',
             format: 'uuid',
@@ -1641,15 +1782,35 @@ export const AttendeeProductPublicSchema = {
             format: 'uuid',
             title: 'Product Id'
         },
-        quantity: {
-            type: 'integer',
-            title: 'Quantity'
+        check_in_code: {
+            type: 'string',
+            title: 'Check In Code'
+        },
+        payment_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Payment Id'
+        },
+        requires_check_in: {
+            type: 'boolean',
+            title: 'Requires Check In',
+            default: false
         }
     },
     type: 'object',
-    required: ['attendee_id', 'product_id', 'quantity'],
+    required: ['id', 'attendee_id', 'product_id', 'check_in_code'],
     title: 'AttendeeProductPublic',
-    description: 'Schema for attendee product with quantity.'
+    description: `Schema for an individual ticket (one row per ticket, no quantity).
+
+requires_check_in is denormalized from the related Product so the frontend
+can decide whether to render a QR code without an extra round-trip.`
 } as const;
 
 export const AttendeePublicSchema = {
@@ -1719,7 +1880,14 @@ export const AttendeePublicSchema = {
             title: 'Gender'
         },
         check_in_code: {
-            type: 'string',
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
             title: 'Check In Code'
         },
         poap_url: {
@@ -1763,16 +1931,23 @@ export const AttendeePublicSchema = {
             title: 'Updated At'
         },
         products: {
-            items: {},
+            items: {
+                '$ref': '#/components/schemas/AttendeeProductPublic'
+            },
             type: 'array',
             title: 'Products',
             default: []
         }
     },
     type: 'object',
-    required: ['tenant_id', 'popup_id', 'name', 'category', 'check_in_code', 'id'],
+    required: ['tenant_id', 'popup_id', 'name', 'category', 'id'],
     title: 'AttendeePublic',
-    description: 'Attendee schema for API responses.'
+    description: `Attendee schema for API responses (detail view).
+
+products is typed as list[AttendeeProductPublic] so each entry carries
+check_in_code, payment_id, and requires_check_in. The list endpoint
+(GET /attendees) uses the separate AttendeeListItem schema which keeps
+the legacy ProductWithQuantity shape for backwards compatibility.`
 } as const;
 
 export const AttendeePurchasesSchema = {
@@ -1941,7 +2116,14 @@ export const AttendeeWithOriginPublicSchema = {
             title: 'Gender'
         },
         check_in_code: {
-            type: 'string',
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
             title: 'Check In Code'
         },
         poap_url: {
@@ -1999,7 +2181,7 @@ export const AttendeeWithOriginPublicSchema = {
         }
     },
     type: 'object',
-    required: ['tenant_id', 'popup_id', 'name', 'category', 'check_in_code', 'id'],
+    required: ['tenant_id', 'popup_id', 'name', 'category', 'id'],
     title: 'AttendeeWithOriginPublic',
     description: `Attendee response with an origin discriminator field.
 
@@ -2038,7 +2220,14 @@ export const AttendeeWithTicketsSchema = {
             title: 'Category'
         },
         check_in_code: {
-            type: 'string',
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
             title: 'Check In Code'
         },
         popup_id: {
@@ -2070,7 +2259,7 @@ export const AttendeeWithTicketsSchema = {
         }
     },
     type: 'object',
-    required: ['id', 'name', 'email', 'category', 'check_in_code', 'popup_id', 'popup_name', 'products'],
+    required: ['id', 'name', 'email', 'category', 'popup_id', 'popup_name', 'products'],
     title: 'AttendeeWithTickets',
     description: 'Attendee with ticket/product information.'
 } as const;
@@ -2868,6 +3057,56 @@ export const CategoryBreakdownSchema = {
     required: ['category', 'label'],
     title: 'CategoryBreakdown',
     description: 'Aggregated breakdown by product category.'
+} as const;
+
+export const CheckInPayloadSchema = {
+    properties: {
+        source: {
+            type: 'string',
+            enum: ['qr', 'manual', 'virtual', 'admin_override'],
+            title: 'Source'
+        },
+        gate: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Gate'
+        },
+        device_id: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Device Id'
+        },
+        notes: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Notes'
+        }
+    },
+    type: 'object',
+    required: ['source'],
+    title: 'CheckInPayload',
+    description: `Typed payload for event_type='check_in' rows in ticket_events.
+
+source is required (discriminates how the scan occurred).
+gate, device_id, notes are optional scanner metadata.`
 } as const;
 
 export const CheckoutBuyerFieldSchema = {
@@ -7828,11 +8067,11 @@ export const ListModel_ApplicationReviewPublic_Schema = {
     title: 'ListModel[ApplicationReviewPublic]'
 } as const;
 
-export const ListModel_AttendeePublic_Schema = {
+export const ListModel_AttendeeListItem_Schema = {
     properties: {
         results: {
             items: {
-                '$ref': '#/components/schemas/AttendeePublic'
+                '$ref': '#/components/schemas/AttendeeListItem'
             },
             type: 'array',
             title: 'Results'
@@ -7843,7 +8082,7 @@ export const ListModel_AttendeePublic_Schema = {
     },
     type: 'object',
     required: ['results', 'paging'],
-    title: 'ListModel[AttendeePublic]'
+    title: 'ListModel[AttendeeListItem]'
 } as const;
 
 export const ListModel_AttendeeWithOriginPublic_Schema = {
@@ -8132,6 +8371,24 @@ export const ListModel_TenantPublic_Schema = {
     type: 'object',
     required: ['results', 'paging'],
     title: 'ListModel[TenantPublic]'
+} as const;
+
+export const ListModel_TicketEventListItem_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/TicketEventListItem'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[TicketEventListItem]'
 } as const;
 
 export const ListModel_TicketingStepPublic_Schema = {
@@ -10919,6 +11176,11 @@ export const ProductBatchItemSchema = {
             type: 'boolean',
             title: 'Insurance Eligible',
             default: false
+        },
+        requires_check_in: {
+            type: 'boolean',
+            title: 'Requires Check In',
+            default: false
         }
     },
     type: 'object',
@@ -11081,6 +11343,11 @@ export const ProductBatchResultSchema = {
         insurance_eligible: {
             type: 'boolean',
             title: 'Insurance Eligible',
+            default: false
+        },
+        requires_check_in: {
+            type: 'boolean',
+            title: 'Requires Check In',
             default: false
         },
         id: {
@@ -11318,6 +11585,11 @@ export const ProductCreateSchema = {
             type: 'boolean',
             title: 'Insurance Eligible',
             default: false
+        },
+        requires_check_in: {
+            type: 'boolean',
+            title: 'Requires Check In',
+            default: false
         }
     },
     type: 'object',
@@ -11502,6 +11774,11 @@ export const ProductPublicSchema = {
             title: 'Insurance Eligible',
             default: false
         },
+        requires_check_in: {
+            type: 'boolean',
+            title: 'Requires Check In',
+            default: false
+        },
         id: {
             type: 'string',
             format: 'uuid',
@@ -11668,6 +11945,11 @@ export const ProductPublicWithTierSchema = {
         insurance_eligible: {
             type: 'boolean',
             title: 'Insurance Eligible',
+            default: false
+        },
+        requires_check_in: {
+            type: 'boolean',
+            title: 'Requires Check In',
             default: false
         },
         id: {
@@ -11906,6 +12188,17 @@ export const ProductUpdateSchema = {
                 }
             ],
             title: 'Insurance Eligible'
+        },
+        requires_check_in: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Requires Check In'
         }
     },
     type: 'object',
@@ -12067,6 +12360,11 @@ export const ProductWithQuantitySchema = {
         insurance_eligible: {
             type: 'boolean',
             title: 'Insurance Eligible',
+            default: false
+        },
+        requires_check_in: {
+            type: 'boolean',
+            title: 'Requires Check In',
             default: false
         },
         id: {
@@ -12849,11 +13147,143 @@ export const TicketAttendeeCategorySchema = {
     description: 'Attendee categories for ticket products.'
 } as const;
 
+export const TicketAttendeeSnapshotSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Email'
+        },
+        category: {
+            type: 'string',
+            title: 'Category'
+        }
+    },
+    type: 'object',
+    required: ['id', 'name', 'category'],
+    title: 'TicketAttendeeSnapshot',
+    description: 'Minimal attendee data embedded in a TicketPublic response.'
+} as const;
+
 export const TicketDurationSchema = {
     type: 'string',
     enum: ['day', 'week', 'month', 'full'],
     title: 'TicketDuration',
     description: 'Duration types for ticket products.'
+} as const;
+
+export const TicketEventListItemSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        attendee_product_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Attendee Product Id'
+        },
+        event_type: {
+            type: 'string',
+            title: 'Event Type'
+        },
+        occurred_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Occurred At'
+        },
+        source: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Source'
+        },
+        attendee_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Attendee Name'
+        },
+        attendee_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Attendee Email'
+        },
+        product_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Product Name'
+        },
+        actor_user_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Actor User Id'
+        },
+        payload: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Payload'
+        }
+    },
+    type: 'object',
+    required: ['id', 'attendee_product_id', 'event_type', 'occurred_at'],
+    title: 'TicketEventListItem',
+    description: `Enriched ticket event row for the backoffice scan-history table.
+
+Eager-loads attendee + product data so the table renders without N+1
+fetches. source is extracted from payload["source"] for check_in events.`
 } as const;
 
 export const TicketProductSchema = {
@@ -12907,6 +13337,133 @@ export const TicketProductSchema = {
     required: ['name'],
     title: 'TicketProduct',
     description: 'Minimal product data for tickets.'
+} as const;
+
+export const TicketProductSnapshotSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        price: {
+            type: 'number',
+            title: 'Price'
+        },
+        category: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Category'
+        },
+        start_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Start Date'
+        },
+        end_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'End Date'
+        }
+    },
+    type: 'object',
+    required: ['id', 'name', 'price'],
+    title: 'TicketProductSnapshot',
+    description: 'Minimal product data embedded in a TicketPublic response.'
+} as const;
+
+export const TicketPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        check_in_code: {
+            type: 'string',
+            title: 'Check In Code'
+        },
+        payment_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Payment Id'
+        },
+        attendee: {
+            '$ref': '#/components/schemas/TicketAttendeeSnapshot'
+        },
+        product: {
+            '$ref': '#/components/schemas/TicketProductSnapshot'
+        },
+        total_scans: {
+            type: 'integer',
+            title: 'Total Scans',
+            default: 0
+        },
+        first_scan_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'First Scan At'
+        },
+        last_scan_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Scan At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'check_in_code', 'attendee', 'product'],
+    title: 'TicketPublic',
+    description: `Full public representation of a single ticket (AttendeeProducts row).
+
+Returned by POST /attendees/check-in/{code}.
+Embeds attendee + product snapshots for scanner UIs without extra round-trips.
+Enriched with scan summary fields from ticket_events so frontend/staff can
+apply check-in policy at runtime (single-scan, scan-every-time, etc.).`
 } as const;
 
 export const TicketingStepCreateSchema = {
@@ -13977,7 +14534,7 @@ export const UserPublicSchema = {
 
 export const UserRoleSchema = {
     type: 'string',
-    enum: ['superadmin', 'admin', 'viewer'],
+    enum: ['superadmin', 'admin', 'viewer', 'check_in_controller'],
     title: 'UserRole'
 } as const;
 

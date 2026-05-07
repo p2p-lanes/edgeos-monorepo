@@ -132,9 +132,7 @@ describe("useMerchSelection — id-lookup against full active product list", () 
   })
 
   it("updates quantity and totalPrice for an existing cart item", () => {
-    const allActiveProducts = [
-      makeMerchProduct({ id: "p1", price: 5 }),
-    ]
+    const allActiveProducts = [makeMerchProduct({ id: "p1", price: 5 })]
     const { result } = renderHook(() => useMerchSelection(allActiveProducts))
 
     act(() => {

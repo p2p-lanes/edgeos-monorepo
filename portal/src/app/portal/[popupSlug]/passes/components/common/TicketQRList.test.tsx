@@ -107,7 +107,10 @@ describe("TicketQRList", () => {
         payment_id: null,
         product_name: "Mystery",
         // requires_check_in intentionally omitted
-      } as AttendeeProductPublic & { product_name?: string; requires_check_in?: boolean },
+      } as AttendeeProductPublic & {
+        product_name?: string
+        requires_check_in?: boolean
+      },
     ]
 
     const { container } = render(<TicketQRList tickets={tickets} />)
