@@ -17,6 +17,14 @@ vi.mock("@/components/checkout-flow/OpenCheckoutRuntime", () => ({
   ),
 }))
 
+vi.mock("@/hooks/useAuth", () => ({
+  default: () => ({ user: null }),
+}))
+
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({ t: (key: string) => key }),
+}))
+
 const runtimeData = {
   popup: {
     id: "popup-1",
@@ -46,7 +54,7 @@ describe("OpenTicketingCheckoutPage", () => {
 
     render(<OpenTicketingCheckoutPage />)
 
-    expect(screen.getByText("Cargando checkout...")).toBeTruthy()
+    expect(screen.getByText("openCheckout.loading")).toBeTruthy()
   })
 
   it("renders unavailable state when runtime loading fails", () => {
@@ -58,7 +66,8 @@ describe("OpenTicketingCheckoutPage", () => {
 
     render(<OpenTicketingCheckoutPage />)
 
-    expect(screen.getByText("Checkout no disponible")).toBeTruthy()
+    expect(screen.getByText("openCheckout.unavailable_title")).toBeTruthy()
+    expect(screen.getByText("openCheckout.unavailable_description")).toBeTruthy()
   })
 
   it("renders the shared runtime for the popup slug", () => {

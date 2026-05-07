@@ -78,7 +78,7 @@ describe("InsuranceCard", () => {
     it("renders default INSURANCE_BENEFITS when benefits prop is omitted", () => {
       render(<InsuranceCard {...defaultProps} />)
       expect(
-        screen.queryByText("Full refund up to 14 days before the event"),
+        screen.queryByText("Full refund up to 14 days before the pop-up"),
       ).not.toBeNull()
       expect(
         screen.queryByText("50% refund up to 7 days before"),
