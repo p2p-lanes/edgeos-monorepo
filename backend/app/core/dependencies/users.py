@@ -270,7 +270,7 @@ def get_tenant_session(
     credential_type = (
         CredentialType.READONLY
         if current_user.role == UserRole.VIEWER
-        else CredentialType.CRUD
+        else CredentialType.CRUD  # CHECK_IN_CONTROLLER falls through to CRUD — required for ticket_events writes
     )
 
     cached_cred = tenant_connection_manager.get_credential(
