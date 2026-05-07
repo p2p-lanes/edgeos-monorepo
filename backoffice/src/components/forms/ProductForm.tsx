@@ -746,8 +746,8 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
                         icon={
                           <Calendar className="h-4 w-4 text-muted-foreground" />
                         }
-                        label="Available from"
-                        description="When the product becomes available for purchase"
+                        label="Start Date"
+                        description="When the ticket validity begins"
                       >
                         <DatePicker
                           value={field.state.value}
@@ -766,8 +766,8 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
                         icon={
                           <Calendar className="h-4 w-4 text-muted-foreground" />
                         }
-                        label="Available until"
-                        description="When the product is no longer available for purchase"
+                        label="End Date"
+                        description="When the ticket validity ends"
                       >
                         <DatePicker
                           value={field.state.value}
