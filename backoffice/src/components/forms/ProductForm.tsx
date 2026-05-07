@@ -641,6 +641,27 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
             )}
           </form.Field>
 
+          <form.Field name="requires_check_in">
+            {(field) => (
+              <InlineRow
+                icon={
+                  <QrCode className="h-4 w-4 text-muted-foreground" />
+                }
+                label="Requires Check-in"
+                description="Enable for products that need scanning at the venue (tickets, parking, VIP access)"
+              >
+                <Switch
+                  id="requires_check_in"
+                  checked={field.state.value}
+                  onCheckedChange={(checked) =>
+                    field.handleChange(checked)
+                  }
+                  disabled={readOnly}
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+
           <form.Field name="is_active">
             {(field) => (
               <InlineRow
@@ -708,27 +729,6 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
                             ))}
                           </SelectContent>
                         </Select>
-                      </InlineRow>
-                    )}
-                  </form.Field>
-
-                  <form.Field name="requires_check_in">
-                    {(field) => (
-                      <InlineRow
-                        icon={
-                          <QrCode className="h-4 w-4 text-muted-foreground" />
-                        }
-                        label="Requires Check-in"
-                        description="Enable for products that need scanning at the venue (tickets, parking, VIP access)"
-                      >
-                        <Switch
-                          id="requires_check_in"
-                          checked={field.state.value}
-                          onCheckedChange={(checked) =>
-                            field.handleChange(checked)
-                          }
-                          disabled={readOnly}
-                        />
                       </InlineRow>
                     )}
                   </form.Field>
