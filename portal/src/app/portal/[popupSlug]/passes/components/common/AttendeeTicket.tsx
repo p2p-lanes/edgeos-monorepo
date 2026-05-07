@@ -1,4 +1,4 @@
-import { ChevronRight, QrCode, Ticket, User } from "lucide-react"
+import { ChevronRight, Ticket, User } from "lucide-react"
 import React, { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { TICKET_CATEGORY } from "@/checkout/popupCheckoutPolicy"
@@ -18,7 +18,6 @@ import useModal from "../../hooks/useModal"
 import { AttendeeModal } from "../AttendeeModal"
 import OptionsMenu from "./Buttons/OptionsMenu"
 import Product from "./Products/ProductTicket"
-import QRcode from "./QRcode"
 import TicketQRList from "./TicketQRList"
 
 const getDurationPriority = (p: ProductsPass): number => {
@@ -60,7 +59,6 @@ const AttendeeTicket = ({
   const { removeAttendee, editAttendee } = useAttendee()
   const hasPurchased = attendee.products.some((product) => product.purchased)
   const isMainAttendee = attendee.category === "main"
-  const [isQrModalOpen, setIsQrModalOpen] = useState(false)
 
   const hasMonthPurchased = attendee.products.some(
     (product) =>
@@ -121,10 +119,6 @@ const AttendeeTicket = ({
 
   const handleRemoveAttendee = () => {
     handleDelete(attendee)
-  }
-
-  const handleOpenQrModal = () => {
-    setIsQrModalOpen(true)
   }
 
   return (
@@ -254,21 +248,9 @@ const AttendeeTicket = ({
                 </div>
                 {/* Per-ticket QR codes — one per ticket where product.requires_check_in === true */}
                 {attendee.ticket_entries &&
-                attendee.ticket_entries.length > 0 ? (
-                  <TicketQRList tickets={attendee.ticket_entries} />
-                ) : (
-                  /* Fallback: legacy attendee-level QR (pre-migration attendees) */
-                  attendee.check_in_code && (
-                    <button
-                      type="button"
-                      onClick={handleOpenQrModal}
-                      className="flex items-center gap-1.5 mt-3 justify-end lg:absolute lg:bottom-6 lg:right-6 lg:mt-0 text-xs font-medium text-pass-text uppercase tracking-wider hover:text-pass-title transition-colors cursor-pointer"
-                    >
-                      <span>{t("passes.check_in_code")}</span>
-                      <QrCode className="w-4 h-4" />
-                    </button>
-                  )
-                )}
+                  attendee.ticket_entries.length > 0 && (
+                    <TicketQRList tickets={attendee.ticket_entries} />
+                  )}
               </>
             ) : (
               /* Buy mode - collapsible sections */
@@ -418,15 +400,6 @@ const AttendeeTicket = ({
         editingAttendee={modal.editingAttendee}
         isDelete={modal.isDelete}
       />
-
-      {/* Legacy attendee-level QR modal — only shown for pre-migration attendees */}
-      {!attendee.ticket_entries?.length && attendee.check_in_code && (
-        <QRcode
-          check_in_code={attendee.check_in_code}
-          isOpen={isQrModalOpen}
-          onOpenChange={setIsQrModalOpen}
-        />
-      )}
     </div>
   )
 }

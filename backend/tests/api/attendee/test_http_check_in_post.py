@@ -224,7 +224,7 @@ class TestPostCheckIn:
 
         response = client.post(
             f"/api/v1/attendees/check-in/{code}",
-            json={"source": "manual", "gate": "gate-b", "notes": "Staff override"},
+            json={"source": "manual", "notes": "Staff override"},
             headers=_auth(admin_user_tenant_a),
         )
         assert response.status_code == 200
@@ -238,7 +238,6 @@ class TestPostCheckIn:
         assert event is not None, "TicketEvent must be created after POST check-in"
         assert event.payload is not None
         assert event.payload["source"] == "manual"
-        assert event.payload["gate"] == "gate-b"
         assert event.payload["notes"] == "Staff override"
 
     def test_two_tickets_independent_counters(

@@ -2,8 +2,9 @@
  * Tests for check-in route — Phase 8.4 (ticket-as-first-class-entity)
  *
  * Covers:
- * (a) TicketEventSubRow: renders expanded payload and ticket UUID
- * (b) column cells: event_type badge, attendee name+email, product name, date
+ * (a) TicketEventSubRow: renders actor display (name → email → id fallback)
+ *     and payload JSON; UUID + timestamp removed from sub-row.
+ * (b) column cells: attendee name+email, product name, date
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { render, screen } from "@testing-library/react"
@@ -67,7 +68,7 @@ describe("TicketEventSubRow", () => {
     } as never
   }
 
-  it("renders the ticket UUID in expanded sub-row", () => {
+  it("does not render ticket UUID or timestamp (removed from sub-row)", () => {
     const event = {
       id: "evt-1",
       attendee_product_id: "00000000-0000-0000-0000-000000000042",
@@ -78,6 +79,8 @@ describe("TicketEventSubRow", () => {
       attendee_email: "alice@example.com",
       product_name: "Day Pass",
       actor_user_id: null,
+      actor_user_name: null,
+      actor_user_email: null,
       payload: null,
     }
 
@@ -86,8 +89,9 @@ describe("TicketEventSubRow", () => {
     })
 
     expect(
-      screen.getByText("00000000-0000-0000-0000-000000000042"),
-    ).toBeInTheDocument()
+      screen.queryByText("00000000-0000-0000-0000-000000000042"),
+    ).not.toBeInTheDocument()
+    expect(screen.queryByText("Timestamp")).not.toBeInTheDocument()
   })
 
   it("renders payload JSON when present", () => {
@@ -113,17 +117,67 @@ describe("TicketEventSubRow", () => {
     expect(screen.getByText(/scanner-01/)).toBeInTheDocument()
   })
 
-  it("renders actor_user_id when present", () => {
+  it("prefers actor_user_name over email and id", () => {
     const event = {
       id: "evt-3",
       attendee_product_id: "ap-uuid",
-      event_type: "void",
+      event_type: "check_in",
       occurred_at: "2024-01-15T10:00:00Z",
       source: null,
       attendee_name: "Carol",
       attendee_email: null,
       product_name: null,
       actor_user_id: "user-uuid-123",
+      actor_user_name: "Boreal Reviewer",
+      actor_user_email: "reviewer@example.com",
+      payload: null,
+    }
+
+    render(<TicketEventSubRow row={makeRow(event)} />, {
+      wrapper: makeWrapper(),
+    })
+
+    expect(screen.getByText("Boreal Reviewer")).toBeInTheDocument()
+    expect(screen.queryByText("reviewer@example.com")).not.toBeInTheDocument()
+    expect(screen.queryByText("user-uuid-123")).not.toBeInTheDocument()
+  })
+
+  it("falls back to actor_user_email when name is null", () => {
+    const event = {
+      id: "evt-3b",
+      attendee_product_id: "ap-uuid",
+      event_type: "check_in",
+      occurred_at: "2024-01-15T10:00:00Z",
+      source: null,
+      attendee_name: null,
+      attendee_email: null,
+      product_name: null,
+      actor_user_id: "user-uuid-123",
+      actor_user_name: null,
+      actor_user_email: "reviewer@example.com",
+      payload: null,
+    }
+
+    render(<TicketEventSubRow row={makeRow(event)} />, {
+      wrapper: makeWrapper(),
+    })
+
+    expect(screen.getByText("reviewer@example.com")).toBeInTheDocument()
+  })
+
+  it("falls back to actor_user_id when name and email are null", () => {
+    const event = {
+      id: "evt-3c",
+      attendee_product_id: "ap-uuid",
+      event_type: "check_in",
+      occurred_at: "2024-01-15T10:00:00Z",
+      source: null,
+      attendee_name: null,
+      attendee_email: null,
+      product_name: null,
+      actor_user_id: "user-uuid-123",
+      actor_user_name: null,
+      actor_user_email: null,
       payload: null,
     }
 

@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
-import { createFileRoute, useNavigate } from "@tanstack/react-router"
+import { createFileRoute } from "@tanstack/react-router"
 import type { ColumnDef, Row } from "@tanstack/react-table"
 import { ChevronDown, ChevronRight, ClipboardCheck } from "lucide-react"
 import { Suspense } from "react"
@@ -9,39 +9,18 @@ import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
-import { Badge } from "@/components/ui/badge"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import {
-  type TableSearchParams,
   useTableSearchParams,
   validateTableSearch,
 } from "@/hooks/useTableSearchParams"
 
 // ── Search params ─────────────────────────────────────────────────────────────
 
-const VALID_EVENT_TYPES = new Set(["check_in", "check_out", "void"])
-
-type CheckInSearchParams = TableSearchParams & {
-  event_type?: string
-}
-
 export const Route = createFileRoute("/_layout/check-in")({
   component: CheckIn,
-  validateSearch: (raw: Record<string, unknown>): CheckInSearchParams => ({
-    ...validateTableSearch(raw),
-    ...(typeof raw.event_type === "string" &&
-    VALID_EVENT_TYPES.has(raw.event_type)
-      ? { event_type: raw.event_type }
-      : {}),
-  }),
+  validateSearch: validateTableSearch,
   head: () => ({
     meta: [{ title: "Check In - EdgeOS" }],
   }),
@@ -53,7 +32,6 @@ function getTicketEventsQueryOptions(
   popupId: string | null,
   page: number,
   pageSize: number,
-  eventType?: string,
 ) {
   return {
     queryFn: () =>
@@ -61,76 +39,27 @@ function getTicketEventsQueryOptions(
         popupId: popupId || undefined,
         skip: page * pageSize,
         limit: pageSize,
-        eventType: eventType || undefined,
       }),
-    queryKey: ["ticket-events", popupId, { page, pageSize, eventType }],
+    queryKey: ["ticket-events", popupId, { page, pageSize }],
   }
-}
-
-// ── Event type filter ─────────────────────────────────────────────────────────
-
-const EVENT_TYPE_OPTIONS: { value: string; label: string }[] = [
-  { value: "check_in", label: "Check In" },
-  { value: "check_out", label: "Check Out" },
-  { value: "void", label: "Void" },
-]
-
-function EventTypeFilter({
-  selected,
-  onSelect,
-}: {
-  selected: string | undefined
-  onSelect: (value: string | undefined) => void
-}) {
-  const selectedOption = selected
-    ? EVENT_TYPE_OPTIONS.find((o) => o.value === selected)
-    : undefined
-
-  return (
-    <Select
-      value={selectedOption?.value ?? "all"}
-      onValueChange={(value) => onSelect(value === "all" ? undefined : value)}
-    >
-      <SelectTrigger className="h-9 w-[160px]">
-        <SelectValue>{selectedOption?.label ?? "All types"}</SelectValue>
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="all">All types</SelectItem>
-        {EVENT_TYPE_OPTIONS.map((option) => (
-          <SelectItem key={option.value} value={option.value}>
-            {option.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  )
 }
 
 // ── Expanded sub-row ──────────────────────────────────────────────────────────
 
 export function TicketEventSubRow({ row }: { row: Row<TicketEventListItem> }) {
   const event = row.original
+  const actorLabel =
+    event.actor_user_name || event.actor_user_email || event.actor_user_id
 
   return (
     <div className="border-l-2 border-primary/20 bg-muted/20 py-3 pl-6 pr-4 space-y-1">
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-        <dt className="text-muted-foreground font-medium">Ticket UUID</dt>
-        <dd className="font-mono text-xs">{event.attendee_product_id}</dd>
-
-        {event.actor_user_id && (
+        {actorLabel && (
           <>
             <dt className="text-muted-foreground font-medium">Actor user</dt>
-            <dd className="font-mono text-xs">{event.actor_user_id}</dd>
+            <dd className="text-sm">{actorLabel}</dd>
           </>
         )}
-
-        <dt className="text-muted-foreground font-medium">Timestamp</dt>
-        <dd className="text-xs">
-          {new Intl.DateTimeFormat("en-US", {
-            dateStyle: "long",
-            timeStyle: "medium",
-          }).format(new Date(event.occurred_at))}
-        </dd>
 
         {event.payload && Object.keys(event.payload).length > 0 && (
           <>
@@ -189,15 +118,6 @@ const columns: ColumnDef<TicketEventListItem>[] = [
     ),
   },
   {
-    accessorKey: "event_type",
-    header: "Event Type",
-    cell: ({ row }) => (
-      <Badge variant="outline" className="capitalize">
-        {row.original.event_type.replace(/_/g, " ")}
-      </Badge>
-    ),
-  },
-  {
     accessorKey: "source",
     header: "Source",
     cell: ({ row }) => (
@@ -236,20 +156,17 @@ const columns: ColumnDef<TicketEventListItem>[] = [
 
 function CheckInTableContent() {
   const { selectedPopupId } = useWorkspace()
-  const navigate = useNavigate()
   const searchParams = Route.useSearch()
   const { pagination, setPagination } = useTableSearchParams(
     searchParams,
     "/check-in",
   )
-  const eventType = searchParams.event_type
 
   const { data: events } = useQuery({
     ...getTicketEventsQueryOptions(
       selectedPopupId,
       pagination.pageIndex,
       pagination.pageSize,
-      eventType,
     ),
     placeholderData: keepPreviousData,
   })
@@ -266,18 +183,6 @@ function CheckInTableContent() {
         pagination,
         onPaginationChange: setPagination,
       }}
-      filterBar={
-        <EventTypeFilter
-          selected={eventType}
-          onSelect={(value) => {
-            navigate({
-              to: "/check-in",
-              search: (prev) => ({ ...prev, event_type: value, page: 0 }),
-              replace: true,
-            })
-          }}
-        />
-      }
       renderSubComponent={TicketEventSubRow}
       emptyState={
         <EmptyState
@@ -300,7 +205,7 @@ function CheckIn() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Check In</h1>
         <p className="text-muted-foreground">
-          Scan history — ticket check-in and check-out events
+          Scan history — ticket check-in events
         </p>
       </div>
       {!isContextReady ? (

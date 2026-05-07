@@ -119,11 +119,11 @@ class TestRecordCheckIn:
         from app.api.ticket_event.schemas import CheckInPayload
 
         ticket = _make_ticket_chain(db, tenant_a, popup_tenant_a)
-        payload = CheckInPayload(source="manual", gate="main-gate")
+        payload = CheckInPayload(source="manual", notes="Staff override")
 
         # actor_user_id=None (system event) — FK constraint won't fire without a real user row
         event = record_check_in(db, ticket.id, payload, actor_user_id=None)
-        assert event.payload["gate"] == "main-gate"
+        assert event.payload["notes"] == "Staff override"
         assert event.payload["source"] == "manual"
 
     def test_record_check_in_payload_serialized(
@@ -138,15 +138,13 @@ class TestRecordCheckIn:
 
         ticket = _make_ticket_chain(db, tenant_a, popup_tenant_a)
         payload = CheckInPayload(
-            source="virtual",
-            device_id="device-abc",
+            source="qr",
             notes="Test note",
         )
 
         event = record_check_in(db, ticket.id, payload, actor_user_id=None)
 
-        assert event.payload["source"] == "virtual"
-        assert event.payload["device_id"] == "device-abc"
+        assert event.payload["source"] == "qr"
         assert event.payload["notes"] == "Test note"
 
 

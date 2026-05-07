@@ -670,16 +670,14 @@ export type CategoryBreakdown = {
  * Typed payload for event_type='check_in' rows in ticket_events.
  *
  * source is required (discriminates how the scan occurred).
- * gate, device_id, notes are optional scanner metadata.
+ * notes is optional freeform operator annotation.
  */
 export type CheckInPayload = {
-    source: 'qr' | 'manual' | 'virtual' | 'admin_override';
-    gate?: (string | null);
-    device_id?: (string | null);
+    source: 'qr' | 'manual';
     notes?: (string | null);
 };
 
-export type source = 'qr' | 'manual' | 'virtual' | 'admin_override';
+export type source = 'qr' | 'manual';
 
 /**
  * Public buyer-form field for the checkout runtime.
@@ -2581,6 +2579,8 @@ export type TicketEventListItem = {
     attendee_email?: (string | null);
     product_name?: (string | null);
     actor_user_id?: (string | null);
+    actor_user_name?: (string | null);
+    actor_user_email?: (string | null);
     payload?: ({
     [key: string]: unknown;
 } | null);

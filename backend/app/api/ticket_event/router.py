@@ -9,7 +9,7 @@ import uuid
 
 from fastapi import APIRouter
 from sqlalchemy.orm import selectinload
-from sqlmodel import func, select
+from sqlmodel import Session, func, select
 from sqlmodel import select as sa_select
 
 from app.api.attendee.models import AttendeeProducts, Attendees
@@ -17,6 +17,8 @@ from app.api.product.models import Products
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.api.ticket_event.models import TicketEvent
 from app.api.ticket_event.schemas import TicketEventListItem
+from app.api.user.models import Users
+from app.core.db import engine
 from app.core.dependencies.users import CurrentCheckInOperator, TenantSession
 
 router = APIRouter(prefix="/ticket-events", tags=["ticket_event"])
@@ -120,11 +122,25 @@ async def list_ticket_events(
 
     events = list(db.exec(statement).all())
 
+    # Resolve actor user details via the main engine — tenant_role lacks SELECT
+    # on the users table by design. Mirrors the pattern used in
+    # application_review/router._get_reviewer_details.
+    actor_ids = {e.actor_user_id for e in events if e.actor_user_id is not None}
+    actors_by_id: dict[uuid.UUID, Users] = {}
+    if actor_ids:
+        with Session(engine) as main_session:
+            actor_id_col = Users.id  # ty:ignore[invalid-assignment]
+            actor_rows = main_session.exec(
+                select(Users).where(actor_id_col.in_(actor_ids))  # type: ignore[attr-defined]
+            ).all()
+            actors_by_id = {u.id: u for u in actor_rows}
+
     results = []
     for event in events:
         ap: AttendeeProducts | None = event.attendee_product  # type: ignore[attr-defined]
         attendee: Attendees | None = ap.attendee if ap else None  # type: ignore[union-attr]
         product: Products | None = ap.product if ap else None  # type: ignore[union-attr]
+        actor = actors_by_id.get(event.actor_user_id) if event.actor_user_id else None
 
         source: str | None = None
         if event.payload and isinstance(event.payload, dict):
@@ -141,6 +157,8 @@ async def list_ticket_events(
                 attendee_email=attendee.email if attendee else None,
                 product_name=product.name if product else None,
                 actor_user_id=event.actor_user_id,
+                actor_user_name=actor.full_name if actor else None,
+                actor_user_email=actor.email if actor else None,
                 payload=event.payload,
             )
         )

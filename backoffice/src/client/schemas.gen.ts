@@ -3063,30 +3063,8 @@ export const CheckInPayloadSchema = {
     properties: {
         source: {
             type: 'string',
-            enum: ['qr', 'manual', 'virtual', 'admin_override'],
+            enum: ['qr', 'manual'],
             title: 'Source'
-        },
-        gate: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Gate'
-        },
-        device_id: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Device Id'
         },
         notes: {
             anyOf: [
@@ -3106,7 +3084,7 @@ export const CheckInPayloadSchema = {
     description: `Typed payload for event_type='check_in' rows in ticket_events.
 
 source is required (discriminates how the scan occurred).
-gate, device_id, notes are optional scanner metadata.`
+notes is optional freeform operator annotation.`
 } as const;
 
 export const CheckoutBuyerFieldSchema = {
@@ -13263,6 +13241,28 @@ export const TicketEventListItemSchema = {
                 }
             ],
             title: 'Actor User Id'
+        },
+        actor_user_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Actor User Name'
+        },
+        actor_user_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Actor User Email'
         },
         payload: {
             anyOf: [

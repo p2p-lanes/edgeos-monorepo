@@ -16,12 +16,10 @@ class CheckInPayload(BaseModel):
     """Typed payload for event_type='check_in' rows in ticket_events.
 
     source is required (discriminates how the scan occurred).
-    gate, device_id, notes are optional scanner metadata.
+    notes is optional freeform operator annotation.
     """
 
-    source: Literal["qr", "manual", "virtual", "admin_override"]
-    gate: str | None = None
-    device_id: str | None = None
+    source: Literal["qr", "manual"]
     notes: str | None = None
 
 
@@ -60,6 +58,8 @@ class TicketEventListItem(BaseModel):
     attendee_email: str | None = None
     product_name: str | None = None
     actor_user_id: uuid.UUID | None = None
+    actor_user_name: str | None = None
+    actor_user_email: str | None = None
     payload: dict | None = None  # full payload for expandable detail view
 
     model_config = ConfigDict(from_attributes=True)

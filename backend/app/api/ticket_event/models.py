@@ -19,7 +19,7 @@ class TicketEvent(SQLModel, table=True):
     """Event log entry for a single ticket (AttendeeProducts row).
 
     event_type discriminates the payload shape:
-      - 'check_in': CheckInPayload (source, gate, device_id, notes)
+      - 'check_in': CheckInPayload (source, notes)
       - future: 'transfer', 'refund', 'edit'
 
     actor_user_id is NULL for system-generated events.
@@ -70,4 +70,8 @@ class TicketEvent(SQLModel, table=True):
     )
 
     # Relationship — used by router for eager loading; not in DB schema.
+    # NOTE: no relationship to Users — tenant_role lacks SELECT on users.
+    # The router resolves actor_user_id → name/email via a batch query on the
+    # main engine (see application_review/router._get_reviewer_details for the
+    # established pattern).
     attendee_product: "AttendeeProducts" = Relationship()  # type: ignore[assignment]

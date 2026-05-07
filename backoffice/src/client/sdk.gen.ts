@@ -1042,6 +1042,7 @@ export class AuthService {
     /**
      * User Login
      * Login a user and send a 6-digit code to their email.
+     * CHECK_IN_CONTROLLER is rejected pre-OTP — use /auth/scanner/login instead.
      * @param data The data for the request.
      * @param data.requestBody
      * @returns AuthCodeSentResponse Successful Response
@@ -1083,7 +1084,7 @@ export class AuthService {
     /**
      * Scanner Login
      * Initiate scanner login. Accepts CHECK_IN_CONTROLLER, ADMIN, and SUPERADMIN.
-     * No role check at login step — role is gated at /auth/scanner/authenticate (ADR-3).
+     * VIEWER is rejected pre-OTP — must not receive a code they can't redeem.
      * @param data The data for the request.
      * @param data.requestBody
      * @returns AuthCodeSentResponse Successful Response

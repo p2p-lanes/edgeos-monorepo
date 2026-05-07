@@ -27,20 +27,6 @@ class TestCheckInPayload:
         payload = CheckInPayload(source="manual")
         assert payload.source == "manual"
 
-    def test_valid_virtual_source(self) -> None:
-        """CheckInPayload with source='virtual' is valid."""
-        from app.api.ticket_event.schemas import CheckInPayload
-
-        payload = CheckInPayload(source="virtual")
-        assert payload.source == "virtual"
-
-    def test_valid_admin_override_source(self) -> None:
-        """CheckInPayload with source='admin_override' is valid."""
-        from app.api.ticket_event.schemas import CheckInPayload
-
-        payload = CheckInPayload(source="admin_override")
-        assert payload.source == "admin_override"
-
     def test_invalid_source_raises(self) -> None:
         """CheckInPayload with unknown source raises ValidationError."""
         from pydantic import ValidationError
@@ -50,27 +36,39 @@ class TestCheckInPayload:
         with pytest.raises(ValidationError):
             CheckInPayload(source="invalid_source")
 
-    def test_optional_fields_default_none(self) -> None:
-        """gate, device_id, notes default to None."""
+    def test_virtual_source_rejected(self) -> None:
+        """'virtual' is no longer a valid source value."""
+        from pydantic import ValidationError
+
+        from app.api.ticket_event.schemas import CheckInPayload
+
+        with pytest.raises(ValidationError):
+            CheckInPayload(source="virtual")
+
+    def test_admin_override_source_rejected(self) -> None:
+        """'admin_override' is no longer a valid source value."""
+        from pydantic import ValidationError
+
+        from app.api.ticket_event.schemas import CheckInPayload
+
+        with pytest.raises(ValidationError):
+            CheckInPayload(source="admin_override")
+
+    def test_notes_defaults_to_none(self) -> None:
+        """notes defaults to None when not provided."""
         from app.api.ticket_event.schemas import CheckInPayload
 
         payload = CheckInPayload(source="qr")
-        assert payload.gate is None
-        assert payload.device_id is None
         assert payload.notes is None
 
-    def test_optional_fields_accepted(self) -> None:
-        """gate, device_id, notes are accepted when provided."""
+    def test_notes_accepted(self) -> None:
+        """notes is accepted when provided."""
         from app.api.ticket_event.schemas import CheckInPayload
 
         payload = CheckInPayload(
             source="manual",
-            gate="gate-a",
-            device_id="device-123",
             notes="Manual override — bracelet lost",
         )
-        assert payload.gate == "gate-a"
-        assert payload.device_id == "device-123"
         assert payload.notes == "Manual override — bracelet lost"
 
 
@@ -201,7 +199,7 @@ class TestTicketEventModel:
             attendee_product_id=ticket.id,
             event_type="check_in",
             actor_user_id=None,
-            payload={"source": "qr", "gate": None, "device_id": None, "notes": None},
+            payload={"source": "qr", "notes": None},
         )
         db.add(event)
         db.commit()
