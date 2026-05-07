@@ -26,16 +26,13 @@ import pytest
 from fastapi import HTTPException
 from sqlmodel import Session, select
 
-from app.api.attendee.crud import attendees_crud
-from app.api.attendee.models import AttendeeProducts, Attendees
-from app.api.attendee.schemas import AttendeeCreate
-from app.api.payment.crud import payments_crud
-from app.api.product.crud import products_crud
-from app.api.product.models import Products
-from app.api.popup.models import Popups
-from app.api.tenant.models import Tenants
 from app.api.application.models import Applications
-
+from app.api.attendee.crud import attendees_crud
+from app.api.attendee.models import Attendees
+from app.api.payment.crud import payments_crud
+from app.api.popup.models import Popups
+from app.api.product.models import Products
+from app.api.tenant.models import Tenants
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -309,6 +306,7 @@ class TestValidateProductAvailabilityRemoved:
     def test_no_call_sites_in_payment_crud(self) -> None:
         """No remaining call to _validate_product_availability in payment/crud.py."""
         import inspect
+
         import app.api.payment.crud as payment_crud_module
 
         source = inspect.getsource(payment_crud_module)
@@ -350,7 +348,6 @@ def _make_ot_product(
     max_per_order: int | None = None,
     price: str = "100.00",
 ) -> Products:
-    from decimal import Decimal
 
     product = Products(
         tenant_id=popup.tenant_id,
@@ -370,8 +367,12 @@ def _make_ot_product(
     return product
 
 
-def _ot_purchase(popup: Popups, product: Products, qty: int = 1):
-    from app.api.checkout.schemas import BuyerInfo, OpenTicketingPurchaseCreate, ProductLine
+def _ot_purchase(product: Products, qty: int = 1):
+    from app.api.checkout.schemas import (
+        BuyerInfo,
+        OpenTicketingPurchaseCreate,
+        ProductLine,
+    )
 
     return OpenTicketingPurchaseCreate(
         products=[ProductLine(product_id=product.id, quantity=qty)],
@@ -401,7 +402,7 @@ class TestOpenTicketingPaymentEnforcement:
             total_stock_cap=1,
             total_stock_remaining=0,
         )
-        obj = _ot_purchase(popup, product, qty=1)
+        obj = _ot_purchase(product, qty=1)
 
         with patch("app.services.simplefi.get_simplefi_client") as mock_sf:
             with pytest.raises(HTTPException) as exc_info:
@@ -427,7 +428,7 @@ class TestOpenTicketingPaymentEnforcement:
             total_stock_cap=10,
             total_stock_remaining=10,
         )
-        obj = _ot_purchase(popup, product, qty=2)
+        obj = _ot_purchase(product, qty=2)
 
         simplefi_response = SimpleNamespace(
             id=f"sf-{uuid.uuid4().hex[:8]}",
@@ -462,7 +463,7 @@ class TestOpenTicketingPaymentEnforcement:
             total_stock_cap=None,
             total_stock_remaining=None,
         )
-        obj = _ot_purchase(popup, product, qty=5)
+        obj = _ot_purchase(product, qty=5)
 
         simplefi_response = SimpleNamespace(
             id=f"sf-{uuid.uuid4().hex[:8]}",
@@ -496,7 +497,7 @@ class TestOpenTicketingPaymentEnforcement:
             total_stock_remaining=100,
             max_per_order=2,
         )
-        obj = _ot_purchase(popup, product, qty=3)
+        obj = _ot_purchase(product, qty=3)
 
         with patch("app.services.simplefi.get_simplefi_client"):
             with pytest.raises(HTTPException) as exc_info:
@@ -512,9 +513,10 @@ class TestOpenTicketingPaymentEnforcement:
         test_engine,
     ) -> None:
         """Concurrent calls on remaining=1: exactly one succeeds, one 409."""
-        from sqlmodel import Session as SyncSession
         from types import SimpleNamespace
         from unittest.mock import patch
+
+        from sqlmodel import Session as SyncSession
 
         popup = _make_ot_popup(db, tenant_a)
         product = _make_ot_product(
@@ -528,7 +530,7 @@ class TestOpenTicketingPaymentEnforcement:
         lock = threading.Lock()
 
         def one_purchase() -> None:
-            obj = _ot_purchase(popup, product, qty=1)
+            obj = _ot_purchase(product, qty=1)
             simplefi_response = SimpleNamespace(
                 id=f"sf-{uuid.uuid4().hex[:8]}",
                 status="pending",
@@ -580,7 +582,6 @@ class TestCreatePaymentEnforcement:
         popup_tenant_a: Popups,
     ) -> None:
         """total_stock_remaining=0 via create_payment → 409, no payment row."""
-        from unittest.mock import patch
         from app.api.payment.schemas import PaymentCreate, PaymentProductRequest
 
         product = _make_product(

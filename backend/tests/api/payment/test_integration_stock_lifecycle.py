@@ -22,24 +22,20 @@ Spec references:
 import threading
 import uuid
 from decimal import Decimal
-from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
-from app.api.payment.crud import payments_crud
 from app.api.payment.models import PaymentProducts, Payments
 from app.api.payment.schemas import PaymentStatus
-from app.api.product.crud import products_crud, tier_groups_crud
-from app.api.product.models import Products, TicketTierGroup, TicketTierPhase
 from app.api.popup.models import Popups
+from app.api.product.crud import products_crud
+from app.api.product.models import Products, TicketTierGroup, TicketTierPhase
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
-from app.core.security import create_access_token
 from app.api.user.models import Users
-
+from app.core.security import create_access_token
 
 # ---------------------------------------------------------------------------
 # Fixtures / Helpers
@@ -106,10 +102,10 @@ def _make_payment_with_product(
     Creates a minimal Human → Application → Attendee chain required by
     PaymentProducts FK (attendee_id is part of the primary key).
     """
-    from app.api.attendee.models import Attendees
-    from app.api.human.models import Humans
     from app.api.application.models import Applications
     from app.api.application.schemas import ApplicationStatus
+    from app.api.attendee.models import Attendees
+    from app.api.human.models import Humans
 
     ext_id = external_id or f"simplefi-integ-{uuid.uuid4().hex[:8]}"
     suffix = uuid.uuid4().hex[:8]
@@ -500,10 +496,11 @@ class TestApplicationFlowEnforcement:
         tenant_a: Tenants,
     ) -> None:
         from fastapi import HTTPException
-        from app.api.attendee.crud import attendees_crud
-        from app.api.attendee.models import Attendees
+
         from app.api.application.models import Applications
         from app.api.application.schemas import ApplicationStatus
+        from app.api.attendee.crud import attendees_crud
+        from app.api.attendee.models import Attendees
         from app.api.human.models import Humans
 
         popup = _make_direct_popup(db, tenant_a)

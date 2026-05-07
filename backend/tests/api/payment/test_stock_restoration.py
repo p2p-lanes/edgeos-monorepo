@@ -24,20 +24,16 @@ Spec references:
 
 import uuid
 from decimal import Decimal
-from unittest.mock import MagicMock
 
-import pytest
-from fastapi import HTTPException
 from sqlmodel import Session
 
 from app.api.payment.crud import payments_crud
 from app.api.payment.models import PaymentProducts, Payments
 from app.api.payment.schemas import PaymentStatus
-from app.api.product.crud import _resolve_tier_group, products_crud, tier_groups_crud
-from app.api.product.models import Products, TicketTierGroup, TicketTierPhase
 from app.api.popup.models import Popups
+from app.api.product.crud import products_crud, tier_groups_crud
+from app.api.product.models import Products, TicketTierGroup, TicketTierPhase
 from app.api.tenant.models import Tenants
-
 
 # ---------------------------------------------------------------------------
 # Fixtures / Helpers
@@ -487,10 +483,10 @@ class TestUpdateStatusCancelledRejectedRestoration:
         _decrement(db, product, 2)  # remaining=8
 
         # Build an APPROVED payment directly (skip SimpleFI).
-        from app.api.attendee.models import Attendees
-        from app.api.human.models import Humans
         from app.api.application.models import Applications
         from app.api.application.schemas import ApplicationStatus
+        from app.api.attendee.models import Attendees
+        from app.api.human.models import Humans
 
         human = Humans(
             tenant_id=tenant_a.id,

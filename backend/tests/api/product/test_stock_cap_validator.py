@@ -21,13 +21,12 @@ import uuid
 import pytest
 from fastapi import HTTPException
 from pydantic import ValidationError
-from sqlmodel import Session, select
+from sqlmodel import Session
 
+from app.api.popup.models import Popups
 from app.api.product.models import Products, TicketTierGroup, TicketTierPhase
 from app.api.product.schemas import ProductCreate, ProductUpdate
-from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
-
 
 # ---------------------------------------------------------------------------
 # Helpers

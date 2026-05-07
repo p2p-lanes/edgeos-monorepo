@@ -24,7 +24,6 @@ from app.api.ticket_event.schemas import CheckInPayload
 from app.api.user.models import Users
 from app.core.security import create_access_token
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

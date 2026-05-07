@@ -12,13 +12,11 @@ Spec references:
 
 import uuid
 
-import pytest
 from sqlmodel import Session
 
-from app.api.product.models import Products, TicketTierGroup, TicketTierPhase
 from app.api.popup.models import Popups
+from app.api.product.models import Products, TicketTierGroup, TicketTierPhase
 from app.api.tenant.models import Tenants
-
 
 # ---------------------------------------------------------------------------
 # Helpers

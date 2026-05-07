@@ -1857,7 +1857,11 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         separate refund-stock decision and is intentionally not wired here.
         See design §4.2 and proposal locked decisions.
         """
-        from app.api.product.crud import _resolve_tier_group, products_crud, tier_groups_crud
+        from app.api.product.crud import (
+            _resolve_tier_group,
+            products_crud,
+            tier_groups_crud,
+        )
 
         if not payment.products_snapshot:
             return

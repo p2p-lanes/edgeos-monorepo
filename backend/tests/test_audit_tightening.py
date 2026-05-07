@@ -18,11 +18,9 @@ Roles used:
 
 import uuid
 
-import pytest
 from fastapi.testclient import TestClient
 
 from tests._role_assertions import assert_authorized, assert_forbidden
-
 
 # ---------------------------------------------------------------------------
 # application/router.py

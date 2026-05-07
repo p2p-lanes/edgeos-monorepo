@@ -520,7 +520,6 @@ class TierPhasesCRUD(BaseCRUD[TicketTierPhase, TierPhaseCreate, TierPhaseUpdate]
         total_stock_cap set and the destination group has a shared_stock_cap,
         raises HTTP 422.
         """
-        from app.api.product.validators import assert_no_total_vs_shared_stock_conflict
 
         assert obj_in.group_id is not None, "group_id must be injected by the router"
 

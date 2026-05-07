@@ -92,7 +92,6 @@ class TestRecordCheckIn:
     ) -> None:
         """record_check_in returns a persisted TicketEvent with event_type='check_in'."""
         from app.api.ticket_event.crud import record_check_in
-
         from app.api.ticket_event.models import TicketEvent
         from app.api.ticket_event.schemas import CheckInPayload
 
@@ -117,7 +116,6 @@ class TestRecordCheckIn:
     ) -> None:
         """record_check_in captures actor_user_id when provided."""
         from app.api.ticket_event.crud import record_check_in
-
         from app.api.ticket_event.schemas import CheckInPayload
 
         ticket = _make_ticket_chain(db, tenant_a, popup_tenant_a)
@@ -136,7 +134,6 @@ class TestRecordCheckIn:
     ) -> None:
         """Full CheckInPayload dict is stored in payload column."""
         from app.api.ticket_event.crud import record_check_in
-
         from app.api.ticket_event.schemas import CheckInPayload
 
         ticket = _make_ticket_chain(db, tenant_a, popup_tenant_a)
@@ -164,7 +161,6 @@ class TestListEventsForTicket:
     ) -> None:
         """All events for a ticket are returned."""
         from app.api.ticket_event.crud import list_events_for_ticket, record_check_in
-
         from app.api.ticket_event.schemas import CheckInPayload
 
         ticket = _make_ticket_chain(db, tenant_a, popup_tenant_a)
@@ -184,7 +180,6 @@ class TestListEventsForTicket:
     ) -> None:
         """Events are ordered by occurred_at DESC (latest first)."""
         from app.api.ticket_event.crud import list_events_for_ticket, record_check_in
-
         from app.api.ticket_event.schemas import CheckInPayload
 
         ticket = _make_ticket_chain(db, tenant_a, popup_tenant_a)
@@ -222,7 +217,6 @@ class TestListEventsForTicket:
     ) -> None:
         """list_events_for_ticket with event_type filter returns only matching events."""
         from app.api.ticket_event.crud import list_events_for_ticket, record_check_in
-
         from app.api.ticket_event.schemas import CheckInPayload
 
         ticket = _make_ticket_chain(db, tenant_a, popup_tenant_a)
@@ -262,7 +256,6 @@ class TestGetCheckInSummary:
     ) -> None:
         """After one scan, total_scans=1, first_scan_at == last_scan_at."""
         from app.api.ticket_event.crud import get_check_in_summary, record_check_in
-
         from app.api.ticket_event.schemas import CheckInPayload
 
         ticket = _make_ticket_chain(db, tenant_a, popup_tenant_a)
@@ -283,7 +276,6 @@ class TestGetCheckInSummary:
     ) -> None:
         """After two scans, total_scans=2, first_scan_at != last_scan_at."""
         from app.api.ticket_event.crud import get_check_in_summary, record_check_in
-
         from app.api.ticket_event.schemas import CheckInPayload
 
         ticket = _make_ticket_chain(db, tenant_a, popup_tenant_a)
@@ -307,7 +299,6 @@ class TestGetCheckInSummary:
     ) -> None:
         """Two tickets have independent scan counters."""
         from app.api.ticket_event.crud import get_check_in_summary, record_check_in
-
         from app.api.ticket_event.schemas import CheckInPayload
 
         ticket_a = _make_ticket_chain(db, tenant_a, popup_tenant_a)

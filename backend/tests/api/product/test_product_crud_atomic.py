@@ -16,13 +16,12 @@ import uuid
 
 import pytest
 from fastapi import HTTPException
-from sqlmodel import Session, select
+from sqlmodel import Session
 
+from app.api.popup.models import Popups
 from app.api.product.crud import products_crud, tier_groups_crud
 from app.api.product.models import Products, TicketTierGroup
-from app.api.popup.models import Popups
 from app.api.tenant.models import Tenants
-
 
 # ---------------------------------------------------------------------------
 # Helpers

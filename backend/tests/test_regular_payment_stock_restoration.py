@@ -20,10 +20,8 @@ non-approved path must also run through the same restoration codepath.
 """
 
 import asyncio
-from types import SimpleNamespace
-
 import importlib
-import pytest
+from types import SimpleNamespace
 
 from app.api.payment.router import _handle_regular_payment
 from app.api.payment.schemas import PaymentStatus, SimpleFIWebhookPayload
