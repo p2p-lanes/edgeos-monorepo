@@ -39,7 +39,12 @@ import {
 import { createErrorHandler } from "@/utils"
 
 const emailSchema = z.string().email({ message: "Invalid email address" })
-const roleSchema = z.enum(["superadmin", "admin", "viewer", "check_in_controller"] as const)
+const roleSchema = z.enum([
+  "superadmin",
+  "admin",
+  "viewer",
+  "check_in_controller",
+] as const)
 
 const ROLE_OPTIONS: {
   value: UserRole
