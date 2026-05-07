@@ -228,9 +228,6 @@ const YourPasses = ({ access, onSwitchToBuy }: YourPassesProps) => {
                 <p className="text-pass-title font-medium">
                   {t("passes.need_more_passes")}
                 </p>
-                <p className="text-pass-text text-xs mt-0.5">
-                  {t("passes.add_family_or_weeks")}
-                </p>
               </div>
               <Button
                 onClick={onSwitchToBuy}
@@ -277,9 +274,6 @@ const YourPasses = ({ access, onSwitchToBuy }: YourPassesProps) => {
               <div className="flex-1 min-w-0">
                 <p className="text-pass-title font-semibold text-sm">
                   {t("passes.need_more_passes")}
-                </p>
-                <p className="text-pass-text text-xs mt-0.5">
-                  {t("passes.add_family_or_weeks")}
                 </p>
               </div>
               <Button

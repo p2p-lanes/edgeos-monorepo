@@ -249,7 +249,7 @@
   "passes": {
     "your_passes": "Tus Pases",
     "buy_passes": "Comprar Pases",
-    "your_passes_description": "Mirá y administrá tus pases acá. ¿Necesitás hacer cambios? ¡Podés cambiar tu semana más cerca del evento para ajustarte a tus planes!",
+    "your_passes_description": "Mirá y administrá tu orden acá.",
     "loading_passes": "Cargando información de pases...",
     "add_spouse": "Agregar pareja",
     "add_children": "Agregar hijos",
@@ -293,8 +293,7 @@
     "people_registered": "Las inscripciones ya están abiertas",
     "builders_registered": "Sumate a esta experiencia",
     "buy": "Comprar",
-    "need_more_passes": "¿Necesitás más pases?",
-    "add_family_or_weeks": "Agregá familiares o más semanas",
+    "need_more_passes": "¿Querés agregar algo más?",
     "waiver_acknowledge": "Reconozco los riesgos involucrados y acepto el Descargo de Responsabilidad.",
     "waiver_info": "Información del descargo",
     "waiver_detail": "Entiendo que participar en este evento conlleva riesgos inherentes, incluyendo la posibilidad de lesiones o pérdidas. Al marcar esta casilla, confirmo que he leído y acepto el Descargo de Responsabilidad, y voluntariamente acepto estos riesgos y libero a los organizadores de cualquier reclamo relacionado con mi participación.",
