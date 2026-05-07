@@ -71,7 +71,7 @@ const ApplicationProvider = ({ children }: { children: ReactNode }) => {
     if (!application) return []
     return (application.attendees ?? []).map((att) => ({
       ...att,
-      products: (att.products ?? []) as ProductsPass[],
+      products: (att.products ?? []) as unknown as ProductsPass[],
     }))
   }, [getRelevantApplication])
 
