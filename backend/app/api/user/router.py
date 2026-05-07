@@ -12,9 +12,19 @@ from app.core.dependencies.users import CurrentAdmin, CurrentUser, SessionDep
 router = APIRouter(prefix="/users", tags=["users"])
 
 ROLE_HIERARCHY = {
-    UserRole.SUPERADMIN: [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.VIEWER],
-    UserRole.ADMIN: [UserRole.ADMIN, UserRole.VIEWER],
+    UserRole.SUPERADMIN: [
+        UserRole.SUPERADMIN,
+        UserRole.ADMIN,
+        UserRole.VIEWER,
+        UserRole.CHECK_IN_CONTROLLER,
+    ],
+    UserRole.ADMIN: [
+        UserRole.ADMIN,
+        UserRole.VIEWER,
+        UserRole.CHECK_IN_CONTROLLER,
+    ],
     UserRole.VIEWER: [],
+    UserRole.CHECK_IN_CONTROLLER: [],  # controllers create no one
 }
 
 
@@ -81,7 +91,7 @@ async def get_user(
 async def create_user(
     user_in: UserCreate,
     db: SessionDep,
-    current_user: CurrentUser,
+    current_user: CurrentAdmin,
 ) -> UserPublic:
     allowed_roles = ROLE_HIERARCHY.get(current_user.role, [])
     if user_in.role not in allowed_roles:
