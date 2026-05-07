@@ -58,11 +58,17 @@ vi.mock("@/hooks/useUnsavedChanges", () => ({
   UnsavedChangesDialog: () => null,
 }))
 
-import { PopupsService, ProductsService, TicketTierGroupsService } from "@/client"
+import {
+  PopupsService,
+  ProductsService,
+  TicketTierGroupsService,
+} from "@/client"
 import { ProductForm } from "./ProductForm"
 
 const mockGetPopup = vi.mocked(PopupsService.getPopup)
-const mockListProductCategories = vi.mocked(ProductsService.listProductCategories)
+const mockListProductCategories = vi.mocked(
+  ProductsService.listProductCategories,
+)
 const mockListTierGroups = vi.mocked(TicketTierGroupsService.listTierGroups)
 
 const POPUP_NO_TIER = {
@@ -92,10 +98,9 @@ describe("ProductForm — cross-field max_per_order vs total_stock_cap", () => {
     mockGetPopup.mockResolvedValue(
       POPUP_NO_TIER as Awaited<ReturnType<typeof PopupsService.getPopup>>,
     )
-    mockListProductCategories.mockResolvedValue([
-      "ticket",
-      "merch",
-    ] as Awaited<ReturnType<typeof ProductsService.listProductCategories>>)
+    mockListProductCategories.mockResolvedValue(["ticket", "merch"] as Awaited<
+      ReturnType<typeof ProductsService.listProductCategories>
+    >)
     mockListTierGroups.mockResolvedValue({
       results: [],
       paging: { offset: 0, limit: 100, total: 0 },

@@ -58,11 +58,17 @@ vi.mock("@/hooks/useUnsavedChanges", () => ({
   UnsavedChangesDialog: () => null,
 }))
 
-import { PopupsService, ProductsService, TicketTierGroupsService } from "@/client"
+import {
+  PopupsService,
+  ProductsService,
+  TicketTierGroupsService,
+} from "@/client"
 import { ProductForm } from "./ProductForm"
 
 const mockGetPopup = vi.mocked(PopupsService.getPopup)
-const mockListProductCategories = vi.mocked(ProductsService.listProductCategories)
+const mockListProductCategories = vi.mocked(
+  ProductsService.listProductCategories,
+)
 const mockListTierGroups = vi.mocked(TicketTierGroupsService.listTierGroups)
 
 const POPUP_NO_TIER = {
