@@ -62,7 +62,9 @@ def _make_human(db: Session, tenant: Tenants) -> Humans:
     return human
 
 
-def _make_attendee(db: Session, tenant: Tenants, popup: Popups, human: Humans) -> Attendees:
+def _make_attendee(
+    db: Session, tenant: Tenants, popup: Popups, human: Humans
+) -> Attendees:
     attendee = Attendees(
         id=uuid.uuid4(),
         tenant_id=tenant.id,
@@ -103,7 +105,9 @@ def _seed_otp(user: Users, code: str = "123456") -> None:
     if is_redis_available():
         auth_code_store.store_user_code(user.id, code)
     else:
-        pytest.skip("OTP seeding requires Redis; Redis not available in this environment")
+        pytest.skip(
+            "OTP seeding requires Redis; Redis not available in this environment"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -300,7 +304,7 @@ class TestScannerRouteReGating:
         assert_authorized(
             client,
             "POST",
-            f"/api/v1/attendees/check-in/{code}",
+            f"/api/v1/attendees/check-in/{code}?popup_id={popup_tenant_a.id}",
             admin_token_tenant_a,
             json={"source": "qr"},
         )
@@ -340,7 +344,7 @@ class TestScannerRouteReGating:
     ) -> None:
         """CHECK_IN_CONTROLLER can GET /ticket-events (response is not 403)."""
         response = client.get(
-            "/api/v1/ticket-events",
+            "/api/v1/check-ins",
             headers={"Authorization": f"Bearer {check_in_controller_token_tenant_a}"},
         )
         assert response.status_code != 403, (
@@ -357,7 +361,7 @@ class TestScannerRouteReGating:
         assert_forbidden(
             client,
             "GET",
-            "/api/v1/ticket-events",
+            "/api/v1/check-ins",
             viewer_token_tenant_a,
         )
 

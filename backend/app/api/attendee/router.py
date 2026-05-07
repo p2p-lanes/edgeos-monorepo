@@ -16,9 +16,9 @@ from app.api.attendee.schemas import (
     TicketProductSnapshot,
     TicketPublic,
 )
+from app.api.check_in.crud import get_check_in_summary, record_check_in
+from app.api.check_in.schemas import CheckInPayload
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
-from app.api.ticket_event.crud import get_check_in_summary, record_check_in
-from app.api.ticket_event.schemas import CheckInPayload
 from app.core.dependencies.users import (
     CurrentCheckInOperator,
     CurrentHuman,

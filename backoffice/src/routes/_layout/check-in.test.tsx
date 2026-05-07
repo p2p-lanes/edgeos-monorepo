@@ -1,9 +1,9 @@
 /**
- * Tests for check-in route — Phase 8.4 (ticket-as-first-class-entity)
+ * Tests for check-in route.
  *
  * Covers:
- * (a) TicketEventSubRow: renders actor display (name → email → id fallback)
- *     and payload JSON; UUID + timestamp removed from sub-row.
+ * (a) CheckInSubRow: renders "Scanned by" (name and/or email; row is hidden
+ *     when neither is set) and payload JSON; UUID + timestamp not shown.
  * (b) column cells: attendee name+email, product name, date
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
@@ -12,8 +12,8 @@ import type { ReactNode } from "react"
 import { describe, expect, it, vi } from "vitest"
 
 vi.mock("@/client", () => ({
-  TicketEventsService: {
-    listTicketEvents: vi.fn(),
+  CheckInService: {
+    listCheckIns: vi.fn(),
   },
 }))
 
@@ -45,7 +45,7 @@ vi.mock("@/hooks/useTableSearchParams", () => ({
   validateTableSearch: vi.fn(),
 }))
 
-import { TicketEventSubRow } from "@/routes/_layout/check-in"
+import { CheckInSubRow } from "@/routes/_layout/check-in"
 
 function makeWrapper() {
   const queryClient = new QueryClient({
@@ -59,9 +59,9 @@ function makeWrapper() {
   )
 }
 
-// ── (a) TicketEventSubRow ─────────────────────────────────────────────────────
+// ── (a) CheckInSubRow ─────────────────────────────────────────────────────
 
-describe("TicketEventSubRow", () => {
+describe("CheckInSubRow", () => {
   function makeRow(event: object) {
     return {
       original: event,
@@ -84,7 +84,7 @@ describe("TicketEventSubRow", () => {
       payload: null,
     }
 
-    render(<TicketEventSubRow row={makeRow(event)} />, {
+    render(<CheckInSubRow row={makeRow(event)} />, {
       wrapper: makeWrapper(),
     })
 
@@ -108,7 +108,7 @@ describe("TicketEventSubRow", () => {
       payload: { source: "qr_scan", device: "scanner-01" },
     }
 
-    render(<TicketEventSubRow row={makeRow(event)} />, {
+    render(<CheckInSubRow row={makeRow(event)} />, {
       wrapper: makeWrapper(),
     })
 
@@ -117,11 +117,10 @@ describe("TicketEventSubRow", () => {
     expect(screen.getByText(/scanner-01/)).toBeInTheDocument()
   })
 
-  it("prefers actor_user_name over email and id", () => {
+  it("renders 'Scanned by' as 'name - email' when both are set", () => {
     const event = {
       id: "evt-3",
       attendee_product_id: "ap-uuid",
-      event_type: "check_in",
       occurred_at: "2024-01-15T10:00:00Z",
       source: null,
       attendee_name: "Carol",
@@ -133,20 +132,21 @@ describe("TicketEventSubRow", () => {
       payload: null,
     }
 
-    render(<TicketEventSubRow row={makeRow(event)} />, {
+    render(<CheckInSubRow row={makeRow(event)} />, {
       wrapper: makeWrapper(),
     })
 
-    expect(screen.getByText("Boreal Reviewer")).toBeInTheDocument()
-    expect(screen.queryByText("reviewer@example.com")).not.toBeInTheDocument()
+    expect(
+      screen.getByText("Boreal Reviewer - reviewer@example.com"),
+    ).toBeInTheDocument()
+    expect(screen.getByText("Scanned by")).toBeInTheDocument()
     expect(screen.queryByText("user-uuid-123")).not.toBeInTheDocument()
   })
 
-  it("falls back to actor_user_email when name is null", () => {
+  it("falls back to email only when name is null", () => {
     const event = {
       id: "evt-3b",
       attendee_product_id: "ap-uuid",
-      event_type: "check_in",
       occurred_at: "2024-01-15T10:00:00Z",
       source: null,
       attendee_name: null,
@@ -158,18 +158,18 @@ describe("TicketEventSubRow", () => {
       payload: null,
     }
 
-    render(<TicketEventSubRow row={makeRow(event)} />, {
+    render(<CheckInSubRow row={makeRow(event)} />, {
       wrapper: makeWrapper(),
     })
 
     expect(screen.getByText("reviewer@example.com")).toBeInTheDocument()
+    expect(screen.queryByText("user-uuid-123")).not.toBeInTheDocument()
   })
 
-  it("falls back to actor_user_id when name and email are null", () => {
+  it("hides 'Scanned by' when neither name nor email is set", () => {
     const event = {
       id: "evt-3c",
       attendee_product_id: "ap-uuid",
-      event_type: "check_in",
       occurred_at: "2024-01-15T10:00:00Z",
       source: null,
       attendee_name: null,
@@ -181,11 +181,12 @@ describe("TicketEventSubRow", () => {
       payload: null,
     }
 
-    render(<TicketEventSubRow row={makeRow(event)} />, {
+    render(<CheckInSubRow row={makeRow(event)} />, {
       wrapper: makeWrapper(),
     })
 
-    expect(screen.getByText("user-uuid-123")).toBeInTheDocument()
+    expect(screen.queryByText("Scanned by")).not.toBeInTheDocument()
+    expect(screen.queryByText("user-uuid-123")).not.toBeInTheDocument()
   })
 
   it("does not render payload section when payload is null", () => {
@@ -202,7 +203,7 @@ describe("TicketEventSubRow", () => {
       payload: null,
     }
 
-    render(<TicketEventSubRow row={makeRow(event)} />, {
+    render(<CheckInSubRow row={makeRow(event)} />, {
       wrapper: makeWrapper(),
     })
 

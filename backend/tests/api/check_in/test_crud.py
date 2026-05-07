@@ -2,8 +2,8 @@
 
 TDD phase: RED — written before crud implementation.
 Addendum #12 design:
-  - record_check_in: inserts ticket_events row, returns TicketEvent
-  - list_events_for_ticket: ordered DESC by occurred_at
+  - record_check_in: inserts ticket_events row, returns CheckIn
+  - list_check_ins_for_ticket: ordered DESC by occurred_at
   - get_check_in_summary: count + min + max in single SQL query
 """
 
@@ -82,7 +82,7 @@ def _make_ticket_chain(
 
 
 class TestRecordCheckIn:
-    """record_check_in must insert a check_in TicketEvent row."""
+    """record_check_in must insert a check_in CheckIn row."""
 
     def test_record_check_in_creates_event(
         self,
@@ -90,10 +90,10 @@ class TestRecordCheckIn:
         tenant_a: Tenants,
         popup_tenant_a: Popups,
     ) -> None:
-        """record_check_in returns a persisted TicketEvent with event_type='check_in'."""
-        from app.api.ticket_event.crud import record_check_in
-        from app.api.ticket_event.models import TicketEvent
-        from app.api.ticket_event.schemas import CheckInPayload
+        """record_check_in returns a persisted CheckIn with event_type='check_in'."""
+        from app.api.check_in.crud import record_check_in
+        from app.api.check_in.models import CheckIn
+        from app.api.check_in.schemas import CheckInPayload
 
         ticket = _make_ticket_chain(db, tenant_a, popup_tenant_a)
         payload = CheckInPayload(source="qr")
@@ -106,10 +106,9 @@ class TestRecordCheckIn:
             actor_user_id=None,
         )
 
-        assert isinstance(event, TicketEvent)
+        assert isinstance(event, CheckIn)
         assert event.id is not None
         assert event.attendee_product_id == ticket.id
-        assert event.event_type == "check_in"
         assert event.payload is not None
         assert event.payload["source"] == "qr"
         assert event.actor_user_id is None
@@ -121,8 +120,8 @@ class TestRecordCheckIn:
         popup_tenant_a: Popups,
     ) -> None:
         """record_check_in captures actor_user_id when provided."""
-        from app.api.ticket_event.crud import record_check_in
-        from app.api.ticket_event.schemas import CheckInPayload
+        from app.api.check_in.crud import record_check_in
+        from app.api.check_in.schemas import CheckInPayload
 
         ticket = _make_ticket_chain(db, tenant_a, popup_tenant_a)
         payload = CheckInPayload(source="manual", notes="Staff override")
@@ -145,8 +144,8 @@ class TestRecordCheckIn:
         popup_tenant_a: Popups,
     ) -> None:
         """Full CheckInPayload dict is stored in payload column."""
-        from app.api.ticket_event.crud import record_check_in
-        from app.api.ticket_event.schemas import CheckInPayload
+        from app.api.check_in.crud import record_check_in
+        from app.api.check_in.schemas import CheckInPayload
 
         ticket = _make_ticket_chain(db, tenant_a, popup_tenant_a)
         payload = CheckInPayload(
@@ -167,7 +166,7 @@ class TestRecordCheckIn:
 
 
 class TestListEventsForTicket:
-    """list_events_for_ticket returns events ordered by occurred_at DESC."""
+    """list_check_ins_for_ticket returns events ordered by occurred_at DESC."""
 
     def test_list_events_returns_all_events(
         self,
@@ -176,8 +175,8 @@ class TestListEventsForTicket:
         popup_tenant_a: Popups,
     ) -> None:
         """All events for a ticket are returned."""
-        from app.api.ticket_event.crud import list_events_for_ticket, record_check_in
-        from app.api.ticket_event.schemas import CheckInPayload
+        from app.api.check_in.crud import list_check_ins_for_ticket, record_check_in
+        from app.api.check_in.schemas import CheckInPayload
 
         ticket = _make_ticket_chain(db, tenant_a, popup_tenant_a)
         payload = CheckInPayload(source="qr")
@@ -197,7 +196,7 @@ class TestListEventsForTicket:
             actor_user_id=None,
         )
 
-        events = list_events_for_ticket(db, ticket.id)
+        events = list_check_ins_for_ticket(db, ticket.id)
         assert len(events) >= 2, f"Expected >= 2 events, got {len(events)}"
 
     def test_list_events_ordered_desc(
@@ -207,8 +206,8 @@ class TestListEventsForTicket:
         popup_tenant_a: Popups,
     ) -> None:
         """Events are ordered by occurred_at DESC (latest first)."""
-        from app.api.ticket_event.crud import list_events_for_ticket, record_check_in
-        from app.api.ticket_event.schemas import CheckInPayload
+        from app.api.check_in.crud import list_check_ins_for_ticket, record_check_in
+        from app.api.check_in.schemas import CheckInPayload
 
         ticket = _make_ticket_chain(db, tenant_a, popup_tenant_a)
         payload = CheckInPayload(source="qr")
@@ -228,7 +227,7 @@ class TestListEventsForTicket:
             actor_user_id=None,
         )
 
-        events = list_events_for_ticket(db, ticket.id)
+        events = list_check_ins_for_ticket(db, ticket.id)
         # Should be DESC — e2 was inserted later so it comes first
         occurred_times = [
             e.occurred_at for e in events if e.attendee_product_id == ticket.id
@@ -245,37 +244,11 @@ class TestListEventsForTicket:
         popup_tenant_a: Popups,
     ) -> None:
         """New ticket with no events returns empty list."""
-        from app.api.ticket_event.crud import list_events_for_ticket
+        from app.api.check_in.crud import list_check_ins_for_ticket
 
         ticket = _make_ticket_chain(db, tenant_a, popup_tenant_a)
-        events = list_events_for_ticket(db, ticket.id)
+        events = list_check_ins_for_ticket(db, ticket.id)
         assert events == [], f"Expected empty list for new ticket, got: {events}"
-
-    def test_list_events_filter_by_type(
-        self,
-        db: Session,
-        tenant_a: Tenants,
-        popup_tenant_a: Popups,
-    ) -> None:
-        """list_events_for_ticket with event_type filter returns only matching events."""
-        from app.api.ticket_event.crud import list_events_for_ticket, record_check_in
-        from app.api.ticket_event.schemas import CheckInPayload
-
-        ticket = _make_ticket_chain(db, tenant_a, popup_tenant_a)
-        record_check_in(
-            db,
-            ticket.id,
-            popup_id=popup_tenant_a.id,
-            payload=CheckInPayload(source="qr"),
-            actor_user_id=None,
-        )
-
-        check_ins = list_events_for_ticket(db, ticket.id, event_type="check_in")
-        assert all(e.event_type == "check_in" for e in check_ins)
-
-        no_matches = list_events_for_ticket(db, ticket.id, event_type="transfer")
-        assert no_matches == []
-
 
 class TestGetCheckInSummary:
     """get_check_in_summary returns total_scans + first_scan_at + last_scan_at."""
@@ -287,7 +260,7 @@ class TestGetCheckInSummary:
         popup_tenant_a: Popups,
     ) -> None:
         """New ticket has total_scans=0, first_scan_at=None, last_scan_at=None."""
-        from app.api.ticket_event.crud import get_check_in_summary
+        from app.api.check_in.crud import get_check_in_summary
 
         ticket = _make_ticket_chain(db, tenant_a, popup_tenant_a)
         summary = get_check_in_summary(db, ticket.id)
@@ -303,8 +276,8 @@ class TestGetCheckInSummary:
         popup_tenant_a: Popups,
     ) -> None:
         """After one scan, total_scans=1, first_scan_at == last_scan_at."""
-        from app.api.ticket_event.crud import get_check_in_summary, record_check_in
-        from app.api.ticket_event.schemas import CheckInPayload
+        from app.api.check_in.crud import get_check_in_summary, record_check_in
+        from app.api.check_in.schemas import CheckInPayload
 
         ticket = _make_ticket_chain(db, tenant_a, popup_tenant_a)
         record_check_in(
@@ -329,8 +302,8 @@ class TestGetCheckInSummary:
         popup_tenant_a: Popups,
     ) -> None:
         """After two scans, total_scans=2, first_scan_at != last_scan_at."""
-        from app.api.ticket_event.crud import get_check_in_summary, record_check_in
-        from app.api.ticket_event.schemas import CheckInPayload
+        from app.api.check_in.crud import get_check_in_summary, record_check_in
+        from app.api.check_in.schemas import CheckInPayload
 
         ticket = _make_ticket_chain(db, tenant_a, popup_tenant_a)
         record_check_in(
@@ -362,8 +335,8 @@ class TestGetCheckInSummary:
         popup_tenant_a: Popups,
     ) -> None:
         """Two tickets have independent scan counters."""
-        from app.api.ticket_event.crud import get_check_in_summary, record_check_in
-        from app.api.ticket_event.schemas import CheckInPayload
+        from app.api.check_in.crud import get_check_in_summary, record_check_in
+        from app.api.check_in.schemas import CheckInPayload
 
         ticket_a = _make_ticket_chain(db, tenant_a, popup_tenant_a)
         ticket_b = _make_ticket_chain(db, tenant_a, popup_tenant_a)

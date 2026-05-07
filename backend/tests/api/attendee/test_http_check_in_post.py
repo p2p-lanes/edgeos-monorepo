@@ -68,7 +68,9 @@ def _make_human(db: Session, tenant: Tenants) -> Humans:
     return human
 
 
-def _make_attendee(db: Session, tenant: Tenants, popup: Popups, human: Humans) -> Attendees:
+def _make_attendee(
+    db: Session, tenant: Tenants, popup: Popups, human: Humans
+) -> Attendees:
     attendee = Attendees(
         id=uuid.uuid4(),
         tenant_id=tenant.id,
@@ -139,9 +141,15 @@ class TestPostCheckIn:
         )
         data = response.json()
         assert data["check_in_code"] == code
-        assert data["total_scans"] == 1, f"Expected total_scans=1, got {data['total_scans']}"
-        assert data["first_scan_at"] is not None, "first_scan_at must be set after first scan"
-        assert data["last_scan_at"] is not None, "last_scan_at must be set after first scan"
+        assert data["total_scans"] == 1, (
+            f"Expected total_scans=1, got {data['total_scans']}"
+        )
+        assert data["first_scan_at"] is not None, (
+            "first_scan_at must be set after first scan"
+        )
+        assert data["last_scan_at"] is not None, (
+            "last_scan_at must be set after first scan"
+        )
 
     def test_rescan_returns_200_with_incremented_total(
         self,
@@ -176,7 +184,9 @@ class TestPostCheckIn:
             json={"source": "manual"},
             headers=headers,
         )
-        assert r2.status_code == 200, f"Re-scan must return 200, got {r2.status_code}: {r2.text}"
+        assert r2.status_code == 200, (
+            f"Re-scan must return 200, got {r2.status_code}: {r2.text}"
+        )
         data2 = r2.json()
 
         assert data2["total_scans"] == 2, (
@@ -282,7 +292,7 @@ class TestPostCheckIn:
         """POST with source='manual' stores that source in ticket_events.payload."""
         from sqlmodel import select
 
-        from app.api.ticket_event.models import TicketEvent
+        from app.api.check_in.models import CheckIn
 
         product = _make_product(db, tenant_a, popup_tenant_a)
         human = _make_human(db, tenant_a)
@@ -299,11 +309,11 @@ class TestPostCheckIn:
 
         # Verify the event was stored with correct payload
         event = db.exec(
-            select(TicketEvent)
-            .where(TicketEvent.attendee_product_id == ticket.id)
-            .order_by(TicketEvent.occurred_at.desc())  # type: ignore[union-attr]
+            select(CheckIn)
+            .where(CheckIn.attendee_product_id == ticket.id)
+            .order_by(CheckIn.occurred_at.desc())  # type: ignore[union-attr]
         ).first()
-        assert event is not None, "TicketEvent must be created after POST check-in"
+        assert event is not None, "CheckIn must be created after POST check-in"
         assert event.payload is not None
         assert event.payload["source"] == "manual"
         assert event.payload["notes"] == "Staff override"
@@ -347,7 +357,9 @@ class TestPostCheckIn:
             headers=headers,
         )
         assert rb.status_code == 200
-        assert rb.json()["total_scans"] == 1, "ticket_b counter must be independent (1 scan)"
+        assert rb.json()["total_scans"] == 1, (
+            "ticket_b counter must be independent (1 scan)"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -396,4 +408,6 @@ class TestGetTicketsByEmail:
             f"Expected 2 per-ticket entries (no aggregation), got {len(products)}"
         )
         for p in products:
-            assert p["quantity"] == 1, f"Each ticket must have quantity=1, got {p['quantity']}"
+            assert p["quantity"] == 1, (
+                f"Each ticket must have quantity=1, got {p['quantity']}"
+            )

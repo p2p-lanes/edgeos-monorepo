@@ -1,10 +1,9 @@
-"""HTTP API tests for GET /ticket-events endpoint.
+"""HTTP API tests for GET /check-ins endpoint.
 
 Covers:
 - list returns rows (basic smoke test)
 - filter by attendee_product_id works
 - filter by popup_id works
-- filter by event_type works
 - order is descended by occurred_at
 - tenant scoping: tenant_b cannot see tenant_a events
 """
@@ -16,11 +15,11 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session
 
 from app.api.attendee.models import AttendeeProducts, Attendees
+from app.api.check_in.schemas import CheckInPayload
 from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.tenant.models import Tenants
-from app.api.ticket_event.schemas import CheckInPayload
 from app.api.user.models import Users
 from app.core.security import create_access_token
 
@@ -104,7 +103,7 @@ def _make_ticket(
 
 
 def _record_check_in(db: Session, ticket: AttendeeProducts) -> None:
-    from app.api.ticket_event.crud import record_check_in
+    from app.api.check_in.crud import record_check_in
 
     # Derive popup_id from the ticket's attendee so callers don't have to
     # plumb it through. Mirrors what the real endpoint does post-validation.
@@ -124,7 +123,7 @@ def _record_check_in(db: Session, ticket: AttendeeProducts) -> None:
 # ---------------------------------------------------------------------------
 
 
-class TestListTicketEvents:
+class TestListCheckIns:
     """GET /ticket-events — basic listing and pagination."""
 
     def test_list_returns_rows(
@@ -143,7 +142,7 @@ class TestListTicketEvents:
         _record_check_in(db, ticket)
 
         response = client.get(
-            "/api/v1/ticket-events",
+            "/api/v1/check-ins",
             headers=_auth(admin_user_tenant_a),
         )
         assert response.status_code == 200, (
@@ -162,7 +161,7 @@ class TestListTicketEvents:
         popup_tenant_a: Popups,
         admin_user_tenant_a: Users,
     ) -> None:
-        """Each result row must have id, attendee_product_id, event_type, occurred_at."""
+        """Each result row must have id, attendee_product_id, occurred_at, plus enriched fields."""
         product = _make_product(db, tenant_a, popup_tenant_a)
         human = _make_human(db, tenant_a)
         attendee = _make_attendee(db, tenant_a, popup_tenant_a, human)
@@ -170,7 +169,7 @@ class TestListTicketEvents:
         _record_check_in(db, ticket)
 
         response = client.get(
-            f"/api/v1/ticket-events?attendee_product_id={ticket.id}",
+            f"/api/v1/check-ins?attendee_product_id={ticket.id}",
             headers=_auth(admin_user_tenant_a),
         )
         assert response.status_code == 200
@@ -179,7 +178,6 @@ class TestListTicketEvents:
         row = rows[0]
         assert "id" in row
         assert "attendee_product_id" in row
-        assert "event_type" in row
         assert "occurred_at" in row
         assert "attendee_name" in row
         assert "product_name" in row
@@ -203,14 +201,14 @@ class TestListTicketEvents:
         _record_check_in(db, ticket_b)
 
         response = client.get(
-            f"/api/v1/ticket-events?attendee_product_id={ticket_a.id}",
+            f"/api/v1/check-ins?attendee_product_id={ticket_a.id}",
             headers=_auth(admin_user_tenant_a),
         )
         assert response.status_code == 200
         rows = response.json()["results"]
-        assert all(
-            r["attendee_product_id"] == str(ticket_a.id) for r in rows
-        ), "All returned events must be for ticket_a only"
+        assert all(r["attendee_product_id"] == str(ticket_a.id) for r in rows), (
+            "All returned events must be for ticket_a only"
+        )
 
     def test_filter_by_popup_id(
         self,
@@ -236,7 +234,7 @@ class TestListTicketEvents:
         _record_check_in(db, ticket_sf)
 
         response = client.get(
-            f"/api/v1/ticket-events?popup_id={popup_tenant_a.id}",
+            f"/api/v1/check-ins?popup_id={popup_tenant_a.id}",
             headers=_auth(admin_user_tenant_a),
         )
         assert response.status_code == 200
@@ -269,7 +267,7 @@ class TestListTicketEvents:
         _record_check_in(db, ticket)
 
         response = client.get(
-            f"/api/v1/ticket-events?attendee_product_id={ticket.id}",
+            f"/api/v1/check-ins?attendee_product_id={ticket.id}",
             headers=_auth(admin_user_tenant_a),
         )
         assert response.status_code == 200
@@ -297,11 +295,9 @@ class TestListTicketEvents:
 
         # Tenant B user queries for all events — must not see tenant A events
         response = client.get(
-            f"/api/v1/ticket-events?attendee_product_id={ticket.id}",
+            f"/api/v1/check-ins?attendee_product_id={ticket.id}",
             headers=_auth(admin_user_tenant_b),
         )
         assert response.status_code == 200
         rows = response.json()["results"]
-        assert len(rows) == 0, (
-            "Tenant B must not see events for tenant A tickets"
-        )
+        assert len(rows) == 0, "Tenant B must not see events for tenant A tickets"

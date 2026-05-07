@@ -3059,6 +3059,123 @@ export const CategoryBreakdownSchema = {
     description: 'Aggregated breakdown by product category.'
 } as const;
 
+export const CheckInListItemSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        attendee_product_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Attendee Product Id'
+        },
+        occurred_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Occurred At'
+        },
+        source: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Source'
+        },
+        attendee_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Attendee Name'
+        },
+        attendee_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Attendee Email'
+        },
+        product_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Product Name'
+        },
+        actor_user_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Actor User Id'
+        },
+        actor_user_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Actor User Name'
+        },
+        actor_user_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Actor User Email'
+        },
+        payload: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Payload'
+        }
+    },
+    type: 'object',
+    required: ['id', 'attendee_product_id', 'occurred_at'],
+    title: 'CheckInListItem',
+    description: `Enriched check-in row for the backoffice scan-history table.
+
+Eager-loads attendee + product data so the table renders without N+1
+fetches. \`source\` is extracted from payload["source"].`
+} as const;
+
 export const CheckInPayloadSchema = {
     properties: {
         source: {
@@ -3081,10 +3198,10 @@ export const CheckInPayloadSchema = {
     type: 'object',
     required: ['source'],
     title: 'CheckInPayload',
-    description: `Typed payload for event_type='check_in' rows in ticket_events.
+    description: `Typed payload stored in the check_ins.payload JSONB column.
 
-source is required (discriminates how the scan occurred).
-notes is optional freeform operator annotation.`
+\`source\` discriminates how the scan occurred. \`notes\` is an optional
+free-form operator annotation.`
 } as const;
 
 export const CheckoutBuyerFieldSchema = {
@@ -8099,6 +8216,24 @@ export const ListModel_AttendeesDirectoryEntry_Schema = {
     title: 'ListModel[AttendeesDirectoryEntry]'
 } as const;
 
+export const ListModel_CheckInListItem_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/CheckInListItem'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[CheckInListItem]'
+} as const;
+
 export const ListModel_CouponPublic_Schema = {
     properties: {
         results: {
@@ -8349,24 +8484,6 @@ export const ListModel_TenantPublic_Schema = {
     type: 'object',
     required: ['results', 'paging'],
     title: 'ListModel[TenantPublic]'
-} as const;
-
-export const ListModel_TicketEventListItem_Schema = {
-    properties: {
-        results: {
-            items: {
-                '$ref': '#/components/schemas/TicketEventListItem'
-            },
-            type: 'array',
-            title: 'Results'
-        },
-        paging: {
-            '$ref': '#/components/schemas/Paging'
-        }
-    },
-    type: 'object',
-    required: ['results', 'paging'],
-    title: 'ListModel[TicketEventListItem]'
 } as const;
 
 export const ListModel_TicketingStepPublic_Schema = {
@@ -13163,127 +13280,6 @@ export const TicketDurationSchema = {
     enum: ['day', 'week', 'month', 'full'],
     title: 'TicketDuration',
     description: 'Duration types for ticket products.'
-} as const;
-
-export const TicketEventListItemSchema = {
-    properties: {
-        id: {
-            type: 'string',
-            format: 'uuid',
-            title: 'Id'
-        },
-        attendee_product_id: {
-            type: 'string',
-            format: 'uuid',
-            title: 'Attendee Product Id'
-        },
-        event_type: {
-            type: 'string',
-            title: 'Event Type'
-        },
-        occurred_at: {
-            type: 'string',
-            format: 'date-time',
-            title: 'Occurred At'
-        },
-        source: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Source'
-        },
-        attendee_name: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Attendee Name'
-        },
-        attendee_email: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Attendee Email'
-        },
-        product_name: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Product Name'
-        },
-        actor_user_id: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'uuid'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Actor User Id'
-        },
-        actor_user_name: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Actor User Name'
-        },
-        actor_user_email: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Actor User Email'
-        },
-        payload: {
-            anyOf: [
-                {
-                    additionalProperties: true,
-                    type: 'object'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Payload'
-        }
-    },
-    type: 'object',
-    required: ['id', 'attendee_product_id', 'event_type', 'occurred_at'],
-    title: 'TicketEventListItem',
-    description: `Enriched ticket event row for the backoffice scan-history table.
-
-Eager-loads attendee + product data so the table renders without N+1
-fetches. source is extracted from payload["source"] for check_in events.`
 } as const;
 
 export const TicketProductSchema = {

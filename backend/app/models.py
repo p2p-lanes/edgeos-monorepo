@@ -29,8 +29,8 @@ from app.api.attendee.schemas import AttendeeCreate, AttendeePublic, AttendeeUpd
 
 # Auth
 from app.api.auth.pending_human_models import PendingHumans
-from app.api.check_in.models import CheckIns
-from app.api.check_in.schemas import CheckInCreate, CheckInPublic, CheckInUpdate
+from app.api.check_in.models import CheckIn
+from app.api.check_in.schemas import CheckInPayload, CheckInPublic
 from app.api.coupon.models import Coupons
 from app.api.coupon.schemas import CouponCreate, CouponPublic, CouponUpdate
 
@@ -206,10 +206,9 @@ __all__ = [
     "AttendeePublic",
     "AttendeeUpdate",
     # Check-ins
-    "CheckIns",
-    "CheckInCreate",
+    "CheckIn",
+    "CheckInPayload",
     "CheckInPublic",
-    "CheckInUpdate",
     # Payments
     "Payments",
     "PaymentProducts",

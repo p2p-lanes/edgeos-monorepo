@@ -4,7 +4,7 @@ import type { ColumnDef, Row } from "@tanstack/react-table"
 import { ChevronDown, ChevronRight, ClipboardCheck } from "lucide-react"
 import { Suspense } from "react"
 
-import { type TicketEventListItem, TicketEventService } from "@/client"
+import { type CheckInListItem, CheckInService } from "@/client"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
@@ -28,36 +28,46 @@ export const Route = createFileRoute("/_layout/check-in")({
 
 // ── Query helpers ─────────────────────────────────────────────────────────────
 
-function getTicketEventsQueryOptions(
+function getCheckInsQueryOptions(
   popupId: string | null,
   page: number,
   pageSize: number,
 ) {
   return {
     queryFn: () =>
-      TicketEventService.listTicketEvents({
+      CheckInService.listCheckIns({
         popupId: popupId || undefined,
         skip: page * pageSize,
         limit: pageSize,
       }),
-    queryKey: ["ticket-events", popupId, { page, pageSize }],
+    queryKey: ["check-ins", popupId, { page, pageSize }],
   }
 }
 
 // ── Expanded sub-row ──────────────────────────────────────────────────────────
 
-export function TicketEventSubRow({ row }: { row: Row<TicketEventListItem> }) {
+export function CheckInSubRow({ row }: { row: Row<CheckInListItem> }) {
   const event = row.original
-  const actorLabel =
-    event.actor_user_name || event.actor_user_email || event.actor_user_id
+  const scannedByName = event.actor_user_name?.trim() || null
+  const scannedByEmail = event.actor_user_email || null
+  // Format: "name - email" when both, just email when only email,
+  // hide the row entirely when neither (the bare UUID fallback was noise).
+  let scannedBy: string | null = null
+  if (scannedByName && scannedByEmail) {
+    scannedBy = `${scannedByName} - ${scannedByEmail}`
+  } else if (scannedByName) {
+    scannedBy = scannedByName
+  } else if (scannedByEmail) {
+    scannedBy = scannedByEmail
+  }
 
   return (
     <div className="border-l-2 border-primary/20 bg-muted/20 py-3 pl-6 pr-4 space-y-1">
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-        {actorLabel && (
+        {scannedBy && (
           <>
-            <dt className="text-muted-foreground font-medium">Actor user</dt>
-            <dd className="text-sm">{actorLabel}</dd>
+            <dt className="text-muted-foreground font-medium">Scanned by</dt>
+            <dd className="text-sm">{scannedBy}</dd>
           </>
         )}
 
@@ -78,7 +88,7 @@ export function TicketEventSubRow({ row }: { row: Row<TicketEventListItem> }) {
 
 // ── Columns ───────────────────────────────────────────────────────────────────
 
-const columns: ColumnDef<TicketEventListItem>[] = [
+const columns: ColumnDef<CheckInListItem>[] = [
   {
     accessorKey: "occurred_at",
     header: ({ column }) => <SortableHeader label="Date" column={column} />,
@@ -163,7 +173,7 @@ function CheckInTableContent() {
   )
 
   const { data: events } = useQuery({
-    ...getTicketEventsQueryOptions(
+    ...getCheckInsQueryOptions(
       selectedPopupId,
       pagination.pageIndex,
       pagination.pageSize,
@@ -183,7 +193,7 @@ function CheckInTableContent() {
         pagination,
         onPaginationChange: setPagination,
       }}
-      renderSubComponent={TicketEventSubRow}
+      renderSubComponent={CheckInSubRow}
       emptyState={
         <EmptyState
           icon={ClipboardCheck}

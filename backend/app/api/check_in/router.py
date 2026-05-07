@@ -1,8 +1,7 @@
-"""Router for ticket_events — backoffice scan-history endpoint.
+"""Router for the backoffice scan-history endpoint.
 
-Provides GET /ticket-events with optional filtering by attendee_product_id,
-popup_id, and event_type. Eager-loads attendee + product data per row to
-avoid N+1 queries. Tenant-scoped via TenantSession / RLS.
+Provides GET /check-ins with optional filtering by attendee_product_id and
+popup_id. One row per scan event with full history.
 """
 
 import uuid
@@ -13,37 +12,35 @@ from sqlmodel import Session, func, select
 from sqlmodel import select as sa_select
 
 from app.api.attendee.models import AttendeeProducts, Attendees
+from app.api.check_in.models import CheckIn
+from app.api.check_in.schemas import CheckInListItem
 from app.api.product.models import Products
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
-from app.api.ticket_event.models import TicketEvent
-from app.api.ticket_event.schemas import TicketEventListItem
 from app.api.user.models import Users
 from app.core.db import engine
 from app.core.dependencies.users import CurrentCheckInOperator, TenantSession
 
-router = APIRouter(prefix="/ticket-events", tags=["ticket_event"])
+router = APIRouter(prefix="/check-ins", tags=["check_in"])
 
 
-@router.get("", response_model=ListModel[TicketEventListItem])
-async def list_ticket_events(
+@router.get("", response_model=ListModel[CheckInListItem])
+async def list_check_ins(
     db: TenantSession,
     current_user: CurrentCheckInOperator,
     attendee_product_id: uuid.UUID | None = None,
     popup_id: uuid.UUID | None = None,
-    event_type: str | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 50,
-) -> ListModel[TicketEventListItem]:
-    """List ticket events with attendee + product names (BO only).
+) -> ListModel[CheckInListItem]:
+    """List check-ins with attendee + product names (BO only).
 
     Filters:
     - attendee_product_id: exact match on the ticket UUID
-    - popup_id: joined through attendee_product → attendee → popup_id
-    - event_type: exact match on event type string (e.g. 'check_in')
+    - popup_id: exact match on the popup the scan happened in
 
     Ordered by occurred_at DESC. Tenant isolation is enforced both via the
     TenantSession (separate DB connection per tenant) and by an explicit
-    tenant_id filter (defence-in-depth, covers tables without RLS policies).
+    tenant_id filter (defence-in-depth).
     """
     # Tenant filter — explicit defence-in-depth on top of TenantSession/RLS.
     # current_user.tenant_id is None only for superadmins, who get their own
@@ -51,50 +48,36 @@ async def list_ticket_events(
     tenant_id_filter = current_user.tenant_id
 
     # Build base statement with eager loads to avoid N+1
-    statement = (
-        select(TicketEvent)
-        .options(
-            selectinload(TicketEvent.attendee_product)  # type: ignore[arg-type]
-            .selectinload(AttendeeProducts.attendee),  # type: ignore[arg-type]
-            selectinload(TicketEvent.attendee_product)  # type: ignore[arg-type]
-            .selectinload(AttendeeProducts.product),  # type: ignore[arg-type]
-        )
+    statement = select(CheckIn).options(
+        selectinload(CheckIn.attendee_product).selectinload(AttendeeProducts.attendee),  # type: ignore[arg-type]  # type: ignore[arg-type]
+        selectinload(CheckIn.attendee_product).selectinload(AttendeeProducts.product),  # type: ignore[arg-type]  # type: ignore[arg-type]
     )
 
     if tenant_id_filter is not None:
-        statement = statement.where(TicketEvent.tenant_id == tenant_id_filter)
+        statement = statement.where(CheckIn.tenant_id == tenant_id_filter)
 
     if attendee_product_id is not None:
-        statement = statement.where(
-            TicketEvent.attendee_product_id == attendee_product_id
-        )
+        statement = statement.where(CheckIn.attendee_product_id == attendee_product_id)
 
     if popup_id is not None:
-        statement = statement.where(TicketEvent.popup_id == popup_id)
-
-    if event_type is not None:
-        statement = statement.where(TicketEvent.event_type == event_type)
+        statement = statement.where(CheckIn.popup_id == popup_id)
 
     # Count total rows for pagination
-    count_statement = sa_select(func.count(TicketEvent.id))
+    count_statement = sa_select(func.count(CheckIn.id))
     if tenant_id_filter is not None:
-        count_statement = count_statement.where(
-            TicketEvent.tenant_id == tenant_id_filter
-        )
+        count_statement = count_statement.where(CheckIn.tenant_id == tenant_id_filter)
     if attendee_product_id is not None:
         count_statement = count_statement.where(
-            TicketEvent.attendee_product_id == attendee_product_id
+            CheckIn.attendee_product_id == attendee_product_id
         )
     if popup_id is not None:
-        count_statement = count_statement.where(TicketEvent.popup_id == popup_id)
-    if event_type is not None:
-        count_statement = count_statement.where(TicketEvent.event_type == event_type)
+        count_statement = count_statement.where(CheckIn.popup_id == popup_id)
 
     total = db.exec(count_statement).one()
 
     # Apply ordering and pagination to main statement
     statement = (
-        statement.order_by(TicketEvent.occurred_at.desc())  # type: ignore[union-attr]
+        statement.order_by(CheckIn.occurred_at.desc())  # type: ignore[union-attr]
         .offset(skip)
         .limit(limit)
     )
@@ -126,10 +109,9 @@ async def list_ticket_events(
             source = event.payload.get("source")
 
         results.append(
-            TicketEventListItem(
+            CheckInListItem(
                 id=event.id,
                 attendee_product_id=event.attendee_product_id,
-                event_type=event.event_type,
                 occurred_at=event.occurred_at,
                 source=source,
                 attendee_name=attendee.name if attendee else None,
@@ -142,7 +124,7 @@ async def list_ticket_events(
             )
         )
 
-    return ListModel[TicketEventListItem](
+    return ListModel[CheckInListItem](
         results=results,
         paging=Paging(offset=skip, limit=limit, total=total),
     )

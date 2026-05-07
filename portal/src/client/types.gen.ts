@@ -667,10 +667,32 @@ export type CategoryBreakdown = {
 };
 
 /**
- * Typed payload for event_type='check_in' rows in ticket_events.
+ * Enriched check-in row for the backoffice scan-history table.
  *
- * source is required (discriminates how the scan occurred).
- * notes is optional freeform operator annotation.
+ * Eager-loads attendee + product data so the table renders without N+1
+ * fetches. `source` is extracted from payload["source"].
+ */
+export type CheckInListItem = {
+    id: string;
+    attendee_product_id: string;
+    occurred_at: string;
+    source?: (string | null);
+    attendee_name?: (string | null);
+    attendee_email?: (string | null);
+    product_name?: (string | null);
+    actor_user_id?: (string | null);
+    actor_user_name?: (string | null);
+    actor_user_email?: (string | null);
+    payload?: ({
+    [key: string]: unknown;
+} | null);
+};
+
+/**
+ * Typed payload stored in the check_ins.payload JSONB column.
+ *
+ * `source` discriminates how the scan occurred. `notes` is an optional
+ * free-form operator annotation.
  */
 export type CheckInPayload = {
     source: 'qr' | 'manual';
@@ -1602,6 +1624,11 @@ export type ListModel_AttendeeWithOriginPublic_ = {
     paging: Paging;
 };
 
+export type ListModel_CheckInListItem_ = {
+    results: Array<CheckInListItem>;
+    paging: Paging;
+};
+
 export type ListModel_CouponPublic_ = {
     results: Array<CouponPublic>;
     paging: Paging;
@@ -1669,11 +1696,6 @@ export type ListModel_ProductPublicWithTier_ = {
 
 export type ListModel_TenantPublic_ = {
     results: Array<TenantPublic>;
-    paging: Paging;
-};
-
-export type ListModel_TicketEventListItem_ = {
-    results: Array<TicketEventListItem>;
     paging: Paging;
 };
 
@@ -2563,29 +2585,6 @@ export type TicketAttendeeSnapshot = {
  */
 export type TicketDuration = 'day' | 'week' | 'month' | 'full';
 
-/**
- * Enriched ticket event row for the backoffice scan-history table.
- *
- * Eager-loads attendee + product data so the table renders without N+1
- * fetches. source is extracted from payload["source"] for check_in events.
- */
-export type TicketEventListItem = {
-    id: string;
-    attendee_product_id: string;
-    event_type: string;
-    occurred_at: string;
-    source?: (string | null);
-    attendee_name?: (string | null);
-    attendee_email?: (string | null);
-    product_name?: (string | null);
-    actor_user_id?: (string | null);
-    actor_user_name?: (string | null);
-    actor_user_email?: (string | null);
-    payload?: ({
-    [key: string]: unknown;
-} | null);
-};
-
 export type TicketingStepCreate = {
     popup_id: string;
     step_type: string;
@@ -3421,6 +3420,22 @@ export type CartsDeleteMyCartData = {
 };
 
 export type CartsDeleteMyCartResponse = (void);
+
+export type CheckInListCheckInsData = {
+    attendeeProductId?: (string | null);
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    popupId?: (string | null);
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+    xTenantId?: (string | null);
+};
+
+export type CheckInListCheckInsResponse = (ListModel_CheckInListItem_);
 
 export type CheckoutGetRuntimeData = {
     slug: string;
@@ -4735,23 +4750,6 @@ export type TenantsDeleteCredentialsData = {
 };
 
 export type TenantsDeleteCredentialsResponse = (void);
-
-export type TicketEventListTicketEventsData = {
-    attendeeProductId?: (string | null);
-    eventType?: (string | null);
-    /**
-     * Maximum number of items to return
-     */
-    limit?: number;
-    popupId?: (string | null);
-    /**
-     * Number of items to skip
-     */
-    skip?: number;
-    xTenantId?: (string | null);
-};
-
-export type TicketEventListTicketEventsResponse = (ListModel_TicketEventListItem_);
 
 export type TicketingStepsListPortalTicketingStepsData = {
     popupId: string;

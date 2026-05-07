@@ -1,4 +1,4 @@
-"""Tests for TicketEvent model, CheckInPayload, and TicketEventPublic schemas.
+"""Tests for CheckIn model, CheckInPayload, and CheckInPublic schemas.
 
 TDD phase: RED — written before model/schema implementations.
 Addendum #12 design spec.
@@ -15,14 +15,14 @@ class TestCheckInPayload:
 
     def test_valid_qr_source(self) -> None:
         """CheckInPayload with source='qr' is valid."""
-        from app.api.ticket_event.schemas import CheckInPayload
+        from app.api.check_in.schemas import CheckInPayload
 
         payload = CheckInPayload(source="qr")
         assert payload.source == "qr"
 
     def test_valid_manual_source(self) -> None:
         """CheckInPayload with source='manual' is valid."""
-        from app.api.ticket_event.schemas import CheckInPayload
+        from app.api.check_in.schemas import CheckInPayload
 
         payload = CheckInPayload(source="manual")
         assert payload.source == "manual"
@@ -31,7 +31,7 @@ class TestCheckInPayload:
         """CheckInPayload with unknown source raises ValidationError."""
         from pydantic import ValidationError
 
-        from app.api.ticket_event.schemas import CheckInPayload
+        from app.api.check_in.schemas import CheckInPayload
 
         with pytest.raises(ValidationError):
             CheckInPayload(source="invalid_source")
@@ -40,7 +40,7 @@ class TestCheckInPayload:
         """'virtual' is no longer a valid source value."""
         from pydantic import ValidationError
 
-        from app.api.ticket_event.schemas import CheckInPayload
+        from app.api.check_in.schemas import CheckInPayload
 
         with pytest.raises(ValidationError):
             CheckInPayload(source="virtual")
@@ -49,21 +49,21 @@ class TestCheckInPayload:
         """'admin_override' is no longer a valid source value."""
         from pydantic import ValidationError
 
-        from app.api.ticket_event.schemas import CheckInPayload
+        from app.api.check_in.schemas import CheckInPayload
 
         with pytest.raises(ValidationError):
             CheckInPayload(source="admin_override")
 
     def test_notes_defaults_to_none(self) -> None:
         """notes defaults to None when not provided."""
-        from app.api.ticket_event.schemas import CheckInPayload
+        from app.api.check_in.schemas import CheckInPayload
 
         payload = CheckInPayload(source="qr")
         assert payload.notes is None
 
     def test_notes_accepted(self) -> None:
         """notes is accepted when provided."""
-        from app.api.ticket_event.schemas import CheckInPayload
+        from app.api.check_in.schemas import CheckInPayload
 
         payload = CheckInPayload(
             source="manual",
@@ -72,80 +72,79 @@ class TestCheckInPayload:
         assert payload.notes == "Manual override — bracelet lost"
 
 
-class TestTicketEventPublic:
-    """TicketEventPublic must expose all event log fields."""
+class TestCheckInPublic:
+    """CheckInPublic must expose all event log fields."""
 
-    def test_ticket_event_public_fields(self) -> None:
-        """TicketEventPublic must have id, event_type, occurred_at, payload."""
-        from app.api.ticket_event.schemas import TicketEventPublic
+    def test_check_in_public_fields(self) -> None:
+        """CheckInPublic must have id, occurred_at, payload, popup_id."""
+        from app.api.check_in.schemas import CheckInPublic
 
-        event = TicketEventPublic(
+        event = CheckInPublic(
             id=uuid.uuid4(),
             tenant_id=uuid.uuid4(),
+            popup_id=uuid.uuid4(),
             attendee_product_id=uuid.uuid4(),
-            event_type="check_in",
             occurred_at=datetime.now(),
             actor_user_id=None,
             payload={"source": "qr"},
             created_at=datetime.now(),
         )
-        assert event.event_type == "check_in"
         assert event.payload == {"source": "qr"}
         assert event.actor_user_id is None
 
-    def test_ticket_event_public_from_attributes(self) -> None:
-        """TicketEventPublic must support from_attributes (ORM→schema)."""
-        from app.api.ticket_event.schemas import TicketEventPublic
+    def test_check_in_public_from_attributes(self) -> None:
+        """CheckInPublic must support from_attributes (ORM→schema)."""
+        from app.api.check_in.schemas import CheckInPublic
 
-        config = TicketEventPublic.model_config
+        config = CheckInPublic.model_config
         assert config.get("from_attributes") is True, (
-            "TicketEventPublic must have model_config with from_attributes=True"
+            "CheckInPublic must have model_config with from_attributes=True"
         )
 
 
-class TestTicketEventModel:
-    """TicketEvent SQLModel must map to ticket_events table."""
+class TestCheckInModel:
+    """CheckIn SQLModel must map to check_ins table."""
 
-    def test_ticket_event_table_name(self) -> None:
-        """TicketEvent model must map to 'ticket_events' table."""
-        from app.api.ticket_event.models import TicketEvent
+    def test_check_in_table_name(self) -> None:
+        """CheckIn model must map to 'check_ins' table."""
+        from app.api.check_in.models import CheckIn
 
-        assert TicketEvent.__tablename__ == "ticket_events", (
-            f"Expected table 'ticket_events', got '{TicketEvent.__tablename__}'"
+        assert CheckIn.__tablename__ == "check_ins", (
+            f"Expected table 'check_ins', got '{CheckIn.__tablename__}'"
         )
 
-    def test_ticket_event_model_fields(self) -> None:
-        """TicketEvent model must have all required fields."""
-        from app.api.ticket_event.models import TicketEvent
+    def test_check_in_model_fields(self) -> None:
+        """CheckIn model must have all required fields."""
+        from app.api.check_in.models import CheckIn
 
         required_fields = {
             "id",
             "tenant_id",
+            "popup_id",
             "attendee_product_id",
-            "event_type",
             "occurred_at",
             "actor_user_id",
             "payload",
             "created_at",
         }
-        model_fields = set(TicketEvent.model_fields.keys())
+        model_fields = set(CheckIn.model_fields.keys())
         missing = required_fields - model_fields
-        assert not missing, f"TicketEvent missing fields: {missing}"
+        assert not missing, f"CheckIn missing fields: {missing}"
 
-    def test_ticket_event_orm_create(
+    def test_check_in_orm_create(
         self,
         db,
         tenant_a,
         popup_tenant_a,
     ) -> None:
-        """TicketEvent can be created and persisted to DB."""
+        """CheckIn can be created and persisted to DB."""
         import uuid
         from decimal import Decimal
 
         from app.api.attendee.models import AttendeeProducts, Attendees
+        from app.api.check_in.models import CheckIn
         from app.api.human.models import Humans
         from app.api.product.models import Products
-        from app.api.ticket_event.models import TicketEvent
 
         # Create minimal product + attendee + ticket
         product = Products(
@@ -192,13 +191,12 @@ class TestTicketEventModel:
         db.add(ticket)
         db.commit()
 
-        # Create a TicketEvent
-        event = TicketEvent(
+        # Create a CheckIn
+        event = CheckIn(
             id=uuid.uuid4(),
             tenant_id=tenant_a.id,
             popup_id=popup_tenant_a.id,
             attendee_product_id=ticket.id,
-            event_type="check_in",
             actor_user_id=None,
             payload={"source": "qr", "notes": None},
         )
@@ -207,5 +205,4 @@ class TestTicketEventModel:
         db.refresh(event)
 
         assert event.id is not None
-        assert event.event_type == "check_in"
         assert event.payload["source"] == "qr"

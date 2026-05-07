@@ -80,10 +80,10 @@ def client(
         # engine in app.core.security; patch that bind to the testcontainer
         # so test_api_key_policy.py doesn't hit a real localhost Postgres.
         patch("app.core.security.engine", test_engine),
-        # ticket_event router resolves actor user details via the main engine
+        # check_in router resolves actor user details via the main engine
         # (tenant_role lacks SELECT on users); same testcontainer redirection
         # needed so the list endpoint works without a real localhost Postgres.
-        patch("app.api.ticket_event.router.engine", test_engine),
+        patch("app.api.check_in.router.engine", test_engine),
     ):
         with TestClient(application) as c:
             yield c
