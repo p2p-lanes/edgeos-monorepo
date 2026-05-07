@@ -62,13 +62,13 @@ def test_payment_request_expired_webhook_marks_pending_payment_expired(
             assert requested_external_id == external_id
             return payment
 
-        def update(self, _db, db_obj, obj_in):
-            update_data = obj_in.model_dump(exclude_unset=True)
-            for field, value in update_data.items():
-                setattr(
-                    db_obj, field, value.value if hasattr(value, "value") else value
-                )
-            return db_obj
+        def update_status(self, _db, payment_id, new_status):
+            # Slice 3: handler now delegates to update_status (which runs
+            # _restore_payment_stock before marking EXPIRED).
+            assert payment_id == payment.id
+            assert new_status == PaymentStatus.EXPIRED
+            payment.status = new_status.value
+            return payment
 
     monkeypatch.setattr(payment_router_module, "payments_crud", FakePaymentsCRUD())
 

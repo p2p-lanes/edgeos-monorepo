@@ -20,7 +20,7 @@ function createProduct(overrides: Partial<ProductsPass>): ProductsPass {
     quantity: overrides.quantity,
     selected: overrides.selected,
     purchased: overrides.purchased,
-    max_quantity: overrides.max_quantity ?? 1,
+    max_per_order: overrides.max_per_order ?? 1,
     compare_price: overrides.compare_price ?? null,
   } as ProductsPass
 }
@@ -60,7 +60,7 @@ describe("TotalCalculator", () => {
         quantity: 2,
         price: 100,
         original_price: 100,
-        max_quantity: 5,
+        max_per_order: 5,
       }),
       createProduct({
         id: "patreon",

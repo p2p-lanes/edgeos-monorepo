@@ -1,5 +1,6 @@
 import json
 import secrets
+import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -268,7 +269,8 @@ def _seed_products(
                 ),
                 is_active=product_data.get("is_active", True),
                 exclusive=product_data.get("exclusive", False),
-                max_quantity=product_data.get("max_quantity"),
+                total_stock_cap=product_data.get("total_stock_cap"),
+                total_stock_remaining=product_data.get("total_stock_cap"),  # init remaining = cap
             )
             session.add(product)
             session.commit()
@@ -648,13 +650,18 @@ def _seed_applications(
                 product_map_key = f"{popup_key}:{product_slug}"
                 product = product_map.get(product_map_key)
                 if product:
-                    attendee_product = AttendeeProducts(
-                        tenant_id=tenant_id,
-                        attendee_id=attendee.id,
-                        product_id=product.id,
-                        quantity=prod_data.get("quantity", 1),
-                    )
-                    session.add(attendee_product)
+                    from app.api.attendee.crud import generate_check_in_code
+
+                    quantity = prod_data.get("quantity", 1)
+                    for _ in range(quantity):
+                        attendee_product = AttendeeProducts(
+                            id=uuid.uuid4(),
+                            tenant_id=tenant_id,
+                            attendee_id=attendee.id,
+                            product_id=product.id,
+                            check_in_code=generate_check_in_code(""),
+                        )
+                        session.add(attendee_product)
                     session.commit()
                 else:
                     logger.warning(

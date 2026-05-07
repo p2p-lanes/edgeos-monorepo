@@ -20,7 +20,7 @@ function createProduct(overrides: Partial<ProductsPass>): ProductsPass {
     quantity: overrides.quantity ?? 1,
     selected: overrides.selected,
     purchased: overrides.purchased,
-    max_quantity: overrides.max_quantity ?? 1,
+    max_per_order: overrides.max_per_order ?? 1,
     compare_price: overrides.compare_price ?? null,
   } as ProductsPass
 }

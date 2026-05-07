@@ -8,16 +8,15 @@ import { readAndClearPendingPaymentRedirectState } from "@/hooks/usePaymentRedir
 import { useApplication } from "@/providers/applicationProvider"
 import { useCheckout } from "@/providers/checkoutProvider"
 import DynamicProductStep from "./DynamicProductStep"
-import {
-  STEP_COMPONENT_REGISTRY,
-  shouldUseDynamicStep,
-} from "./registries/stepRegistry"
+import { shouldUseDynamicStep } from "./registries/stepRegistry"
 import type { WatermarkStyle } from "./ScrollySectionNav"
 import ScrollySectionNav from "./ScrollySectionNav"
 import SectionHeader from "./SectionHeader"
 import SnapDotNav from "./SnapDotNav"
 import SnapFooter from "./SnapFooter"
 import SnapSection from "./SnapSection"
+import ConfirmStep from "./steps/ConfirmStep"
+import OpenCheckoutBuyerStep from "./steps/OpenCheckoutBuyerStep"
 import PassSelectionSection from "./steps/PassSelectionSection"
 import SuccessStep from "./steps/SuccessStep"
 
@@ -256,6 +255,11 @@ function ScrollyCheckoutFlowInner({
   }, [allSections, isInitialLoading])
 
   const renderSectionContent = (stepId: string) => {
+    // Buyer and confirm are structural steps — wired explicitly, not via DynamicProductStep.
+    if (stepId === "buyer") return <OpenCheckoutBuyerStep />
+    if (stepId === "confirm") return <ConfirmStep />
+
+    // Passes/tickets: dynamic step or legacy PassSelectionSection fallback.
     if (stepId === "passes" || stepId === "tickets") {
       const ticketConfig = getStepConfig("tickets") ?? getStepConfig("passes")
       if (shouldUseDynamicStep(ticketConfig)) {
@@ -266,17 +270,10 @@ function ScrollyCheckoutFlowInner({
       return <PassSelectionSection />
     }
 
+    // All other product steps route through DynamicProductStep.
+    // If no config found or no template, DynamicProductStep shows the appropriate
+    // empty/error state rather than a phantom legacy card.
     const config = getStepConfig(stepId)
-
-    if (shouldUseDynamicStep(config)) {
-      return <DynamicProductStep stepConfig={config!} onSkip={() => {}} />
-    }
-
-    const FallbackComponent = STEP_COMPONENT_REGISTRY[stepId]
-    if (FallbackComponent) {
-      return <FallbackComponent onSkip={() => {}} />
-    }
-
     if (config) {
       return <DynamicProductStep stepConfig={config} onSkip={() => {}} />
     }

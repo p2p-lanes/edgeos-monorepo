@@ -44,9 +44,7 @@ vi.mock("@/providers/checkoutProvider", () => ({
     goToNextStep: vi.fn(),
     goToPreviousStep: vi.fn(),
     goToStep: vi.fn(),
-    housingProducts: [],
-    merchProducts: [],
-    patronProducts: [],
+    getProductsForStep: vi.fn(() => []),
     submitPayment: vi.fn().mockResolvedValue({ success: true }),
     cart: {
       passes: [],
@@ -77,7 +75,6 @@ vi.mock("@/components/checkout-flow/steps/SuccessStep", () => ({
 }))
 
 vi.mock("@/components/checkout-flow/registries/stepRegistry", () => ({
-  STEP_COMPONENT_REGISTRY: {},
   shouldUseDynamicStep: () => false,
 }))
 

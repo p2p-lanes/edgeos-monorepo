@@ -9,9 +9,9 @@ import {
   Layers,
   Plus,
   Power,
+  QrCode,
   Shield,
   ShieldCheck,
-  Users,
 } from "lucide-react"
 import { useMemo, useState } from "react"
 import {
@@ -20,7 +20,6 @@ import {
   type ProductPublicWithTier,
   ProductsService,
   type ProductUpdate,
-  type TicketAttendeeCategory,
   type TicketDuration,
   TicketTierGroupsService,
 } from "@/client"
@@ -93,13 +92,6 @@ const TICKET_DURATIONS: { value: TicketDuration; label: string }[] = [
   { value: "month", label: "Month Pass" },
   { value: "full", label: "Full Event" },
 ]
-
-const ATTENDEE_CATEGORIES: { value: TicketAttendeeCategory; label: string }[] =
-  [
-    { value: "main", label: "Main Attendee" },
-    { value: "spouse", label: "Spouse" },
-    { value: "kid", label: "Kid" },
-  ]
 
 /** Extract YYYY-MM-DD from an ISO date string like "2026-05-10T00:00:00Z" */
 const toDateInputValue = (iso?: string | null): string => {
@@ -277,12 +269,14 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
       description: defaultValues?.description ?? "",
       image_url: defaultValues?.image_url ?? "",
       category: (defaultValues?.category ?? "ticket") as ProductCategory,
-      attendee_category: (defaultValues?.attendee_category ??
-        "main") as TicketAttendeeCategory,
       duration_type: (defaultValues?.duration_type ?? "full") as TicketDuration,
+      requires_check_in:
+        defaultValues?.requires_check_in ??
+        (defaultValues?.category ?? "ticket") === "ticket",
       is_active: defaultValues?.is_active ?? true,
       exclusive: defaultValues?.exclusive ?? false,
-      max_quantity: defaultValues?.max_quantity?.toString() ?? "",
+      total_stock_cap: defaultValues?.total_stock_cap?.toString() ?? "",
+      max_per_order: defaultValues?.max_per_order?.toString() ?? "",
       start_date: toDateInputValue(defaultValues?.start_date),
       end_date: toDateInputValue(defaultValues?.end_date),
       insurance_eligible: defaultValues?.insurance_eligible ?? false,
@@ -306,8 +300,11 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
       }
       setTierOverlapError(null)
 
-      const maxQty = value.max_quantity
-        ? Number.parseInt(value.max_quantity, 10)
+      const totalStockCap = value.total_stock_cap
+        ? Number.parseInt(value.total_stock_cap, 10)
+        : null
+      const maxPerOrder = value.max_per_order
+        ? Number.parseInt(value.max_per_order, 10)
         : null
 
       if (isEdit) {
@@ -318,13 +315,14 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
             description: value.description || null,
             image_url: value.image_url || null,
             category: value.category,
-            attendee_category: isTicket ? value.attendee_category : null,
             duration_type: isTicket ? value.duration_type : null,
             start_date: isTicket && value.start_date ? value.start_date : null,
             end_date: isTicket && value.end_date ? value.end_date : null,
+            requires_check_in: value.requires_check_in,
             is_active: value.is_active,
             exclusive: value.exclusive,
-            max_quantity: maxQty,
+            total_stock_cap: totalStockCap,
+            max_per_order: maxPerOrder,
             insurance_eligible: value.insurance_eligible,
           },
           {
@@ -351,14 +349,15 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
             description: value.description || undefined,
             image_url: value.image_url || undefined,
             category: value.category,
-            attendee_category: isTicket ? value.attendee_category : undefined,
             duration_type: isTicket ? value.duration_type : undefined,
             start_date:
               isTicket && value.start_date ? value.start_date : undefined,
             end_date: isTicket && value.end_date ? value.end_date : undefined,
+            requires_check_in: value.requires_check_in,
             is_active: value.is_active,
             exclusive: value.exclusive,
-            max_quantity: maxQty ?? undefined,
+            total_stock_cap: totalStockCap ?? undefined,
+            max_per_order: maxPerOrder ?? undefined,
             insurance_eligible: value.insurance_eligible,
           },
           {
@@ -543,13 +542,13 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
           </form.Field>
 
           <form.Field
-            name="max_quantity"
+            name="total_stock_cap"
             validators={{
               onBlur: ({ value }) => {
                 if (readOnly || !value) return undefined
                 const num = Number.parseInt(value, 10)
                 if (Number.isNaN(num) || num < 1) {
-                  return "Max quantity must be a positive number"
+                  return "Total stock must be a positive number. Leave empty for unlimited."
                 }
                 return undefined
               },
@@ -559,10 +558,57 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
               <div>
                 <InlineRow
                   icon={<Hash className="h-4 w-4 text-muted-foreground" />}
-                  label="Max Quantity"
-                  description="Leave empty for unlimited"
+                  label="Total stock"
+                  description="Maximum units available. Leave empty for unlimited."
                 >
                   <Input
+                    id="total_stock_cap"
+                    aria-label="Total stock"
+                    placeholder="Unlimited"
+                    type="number"
+                    min="1"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    disabled={readOnly}
+                    className="max-w-32 text-sm"
+                  />
+                </InlineRow>
+                <FieldError errors={field.state.meta.errors} />
+              </div>
+            )}
+          </form.Field>
+
+          <form.Field
+            name="max_per_order"
+            validators={{
+              onBlur: ({ value, fieldApi }) => {
+                if (readOnly || !value) return undefined
+                const num = Number.parseInt(value, 10)
+                if (Number.isNaN(num) || num < 1) {
+                  return "Max per order must be a positive number. Leave empty for unlimited."
+                }
+                const rawCap = fieldApi.form.getFieldValue("total_stock_cap")
+                if (rawCap) {
+                  const cap = Number.parseInt(rawCap, 10)
+                  if (!Number.isNaN(cap) && num > cap) {
+                    return `Cannot exceed total stock cap (${cap})`
+                  }
+                }
+                return undefined
+              },
+            }}
+          >
+            {(field) => (
+              <div>
+                <InlineRow
+                  icon={<Hash className="h-4 w-4 text-muted-foreground" />}
+                  label="Max per order"
+                  description="Per-cart cap. Leave empty for unlimited."
+                >
+                  <Input
+                    id="max_per_order"
+                    aria-label="Max per order"
                     placeholder="Unlimited"
                     type="number"
                     min="1"
@@ -598,6 +644,23 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
                     Eligible
                   </Label>
                 </div>
+              </InlineRow>
+            )}
+          </form.Field>
+
+          <form.Field name="requires_check_in">
+            {(field) => (
+              <InlineRow
+                icon={<QrCode className="h-4 w-4 text-muted-foreground" />}
+                label="Requires Check-in"
+                description="Enable for products that need scanning at the venue (tickets, parking, VIP access)"
+              >
+                <Switch
+                  id="requires_check_in"
+                  checked={field.state.value}
+                  onCheckedChange={(checked) => field.handleChange(checked)}
+                  disabled={readOnly}
+                />
               </InlineRow>
             )}
           </form.Field>
@@ -665,37 +728,6 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
                             {TICKET_DURATIONS.map((dur) => (
                               <SelectItem key={dur.value} value={dur.value}>
                                 {dur.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </InlineRow>
-                    )}
-                  </form.Field>
-
-                  <form.Field name="attendee_category">
-                    {(field) => (
-                      <InlineRow
-                        icon={
-                          <Users className="h-4 w-4 text-muted-foreground" />
-                        }
-                        label="Attendee Type"
-                        description="Who can purchase this ticket"
-                      >
-                        <Select
-                          value={field.state.value}
-                          onValueChange={(val) =>
-                            field.handleChange(val as TicketAttendeeCategory)
-                          }
-                          disabled={readOnly}
-                        >
-                          <SelectTrigger className="w-auto text-sm">
-                            <SelectValue placeholder="Select type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {ATTENDEE_CATEGORIES.map((cat) => (
-                              <SelectItem key={cat.value} value={cat.value}>
-                                {cat.label}
                               </SelectItem>
                             ))}
                           </SelectContent>

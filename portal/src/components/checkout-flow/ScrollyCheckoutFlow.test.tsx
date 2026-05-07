@@ -71,7 +71,6 @@ vi.mock("./steps/PassSelectionSection", () => ({
 }))
 
 vi.mock("./registries/stepRegistry", () => ({
-  STEP_COMPONENT_REGISTRY: {},
   shouldUseDynamicStep: () => false,
 }))
 

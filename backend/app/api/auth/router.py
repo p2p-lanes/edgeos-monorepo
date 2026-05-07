@@ -14,6 +14,7 @@ from app.api.auth.schemas import (
     UserAuth,
     UserVerify,
 )
+from app.api.shared.enums import UserRole
 from app.core.dependencies.users import SessionDep
 from app.core.security import Token, create_access_token
 
@@ -27,10 +28,12 @@ async def user_login(
 ) -> AuthCodeSentResponse:
     """
     Login a user and send a 6-digit code to their email.
+    CHECK_IN_CONTROLLER is rejected pre-OTP — use /auth/scanner/login instead.
     """
     email, expiration_minutes = await login_user(
         session=session,
         email=request.email,
+        allowed_roles={UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.VIEWER},
     )
 
     return AuthCodeSentResponse(
@@ -47,15 +50,66 @@ async def user_authenticate(
 ) -> Token:
     """
     Authenticate a user and return a JWT token.
+    CHECK_IN_CONTROLLER is rejected — use /auth/scanner/authenticate instead.
     """
     user = await authenticate_user(
         session=session,
         email=request.email,
         code=request.code,
+        allowed_roles={UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.VIEWER},
     )
 
     access_token = create_access_token(subject=user.id, token_type="user")
     logger.info(f"User authenticated: {user.email}")
+
+    return Token(access_token=access_token)
+
+
+@router.post("/scanner/login", response_model=AuthCodeSentResponse)
+async def scanner_login(
+    request: UserAuth,
+    session: SessionDep,
+) -> AuthCodeSentResponse:
+    """
+    Initiate scanner login. Accepts CHECK_IN_CONTROLLER, ADMIN, and SUPERADMIN.
+    VIEWER is rejected pre-OTP — must not receive a code they can't redeem.
+    """
+    email, expiration_minutes = await login_user(
+        session=session,
+        email=request.email,
+        allowed_roles={
+            UserRole.SUPERADMIN,
+            UserRole.ADMIN,
+            UserRole.CHECK_IN_CONTROLLER,
+        },
+    )
+
+    return AuthCodeSentResponse(
+        message="Authentication code sent to your email",
+        email=email,
+        expires_in_minutes=expiration_minutes,
+    )
+
+
+@router.post("/scanner/authenticate", response_model=Token)
+async def scanner_authenticate(
+    request: UserVerify,
+    session: SessionDep,
+) -> Token:
+    """
+    Authenticate a scanner operator and return a JWT token.
+    Only SUPERADMIN, ADMIN, and CHECK_IN_CONTROLLER are accepted.
+    VIEWER is rejected with 403.
+    """
+    user = await authenticate_user(
+        session=session,
+        email=request.email,
+        code=request.code,
+        allowed_roles={UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.CHECK_IN_CONTROLLER},
+    )
+
+    access_token = create_access_token(subject=user.id, token_type="user")
+    logger.info(f"Scanner operator authenticated: {user.email}")
 
     return Token(access_token=access_token)
 

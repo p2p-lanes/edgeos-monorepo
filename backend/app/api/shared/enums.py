@@ -5,6 +5,7 @@ class UserRole(str, Enum):
     SUPERADMIN = "superadmin"
     ADMIN = "admin"
     VIEWER = "viewer"
+    CHECK_IN_CONTROLLER = "check_in_controller"
 
 
 class CredentialType(str, Enum):

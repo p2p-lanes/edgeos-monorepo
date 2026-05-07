@@ -67,8 +67,18 @@ class ProductBase(SQLModel):
     )
     is_active: bool = Field(default=True)
     exclusive: bool = Field(default=False)
-    max_quantity: int | None = Field(default=None, nullable=True)
+    # Inventory fields — replaces the ambiguous max_quantity column.
+    # total_stock_cap:       Admin-set inventory ceiling. NULL = unlimited.
+    # total_stock_remaining: Live atomic counter. NULL = unlimited (no tracking).
+    # max_per_order:         Per-cart cap. NULL = unlimited. Pure validator; no counter.
+    total_stock_cap: int | None = Field(default=None, nullable=True)
+    total_stock_remaining: int | None = Field(default=None, nullable=True)
+    max_per_order: int | None = Field(default=None, nullable=True)
     insurance_eligible: bool = Field(
+        default=False,
+        sa_column=Column(Boolean, nullable=False, server_default="false"),
+    )
+    requires_check_in: bool = Field(
         default=False,
         sa_column=Column(Boolean, nullable=False, server_default="false"),
     )
@@ -99,8 +109,11 @@ class ProductCreate(BaseModel):
     end_date: datetime | None = None
     is_active: bool = True
     exclusive: bool = False
-    max_quantity: int | None = None
+    total_stock_cap: int | None = Field(default=None, ge=1)
+    total_stock_remaining: int | None = Field(default=None, ge=0)
+    max_per_order: int | None = Field(default=None, ge=1)
     insurance_eligible: bool = False
+    requires_check_in: bool = False
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -114,6 +127,17 @@ class ProductCreate(BaseModel):
                 )
             if self.duration_type is not None:
                 raise ValueError("duration_type can only be set for ticket products")
+        return self
+
+    @model_validator(mode="after")
+    def validate_max_per_order_vs_stock_cap(self) -> "ProductCreate":
+        """max_per_order must not exceed total_stock_cap when both are set."""
+        if self.max_per_order is not None and self.total_stock_cap is not None:
+            if self.max_per_order > self.total_stock_cap:
+                raise ValueError(
+                    "max_per_order cannot exceed total_stock_cap "
+                    f"({self.max_per_order} > {self.total_stock_cap})"
+                )
         return self
 
 
@@ -133,8 +157,22 @@ class ProductUpdate(BaseModel):
     end_date: datetime | None = None
     is_active: bool | None = None
     exclusive: bool | None = None
-    max_quantity: int | None = None
+    total_stock_cap: int | None = Field(default=None, ge=1)
+    total_stock_remaining: int | None = Field(default=None, ge=0)
+    max_per_order: int | None = Field(default=None, ge=1)
     insurance_eligible: bool | None = None
+    requires_check_in: bool | None = None
+
+    @model_validator(mode="after")
+    def validate_max_per_order_vs_stock_cap(self) -> "ProductUpdate":
+        """max_per_order must not exceed total_stock_cap when both are set."""
+        if self.max_per_order is not None and self.total_stock_cap is not None:
+            if self.max_per_order > self.total_stock_cap:
+                raise ValueError(
+                    "max_per_order cannot exceed total_stock_cap "
+                    f"({self.max_per_order} > {self.total_stock_cap})"
+                )
+        return self
 
 
 class ProductBatchItem(BaseModel):
@@ -153,8 +191,11 @@ class ProductBatchItem(BaseModel):
     end_date: datetime | None = None
     is_active: bool = True
     exclusive: bool = False
-    max_quantity: int | None = None
+    total_stock_cap: int | None = Field(default=None, ge=1)
+    total_stock_remaining: int | None = Field(default=None, ge=0)
+    max_per_order: int | None = Field(default=None, ge=1)
     insurance_eligible: bool = False
+    requires_check_in: bool = False
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -168,6 +209,17 @@ class ProductBatchItem(BaseModel):
                 )
             if self.duration_type is not None:
                 raise ValueError("duration_type can only be set for ticket products")
+        return self
+
+    @model_validator(mode="after")
+    def validate_max_per_order_vs_stock_cap(self) -> "ProductBatchItem":
+        """max_per_order must not exceed total_stock_cap when both are set."""
+        if self.max_per_order is not None and self.total_stock_cap is not None:
+            if self.max_per_order > self.total_stock_cap:
+                raise ValueError(
+                    "max_per_order cannot exceed total_stock_cap "
+                    f"({self.max_per_order} > {self.total_stock_cap})"
+                )
         return self
 
 

@@ -345,16 +345,51 @@ export type AttendeeInfo = {
 };
 
 /**
- * Schema for attendee product with quantity.
+ * Attendee schema for the list endpoint (GET /attendees).
+ *
+ * Uses ProductWithQuantity for the products field to preserve the legacy
+ * shape returned by the list endpoint. Use AttendeePublic for detail views
+ * where AttendeeProductPublic (with check_in_code) is needed.
  */
-export type AttendeeProductPublic = {
-    attendee_id: string;
-    product_id: string;
-    quantity: number;
+export type AttendeeListItem = {
+    tenant_id: string;
+    application_id?: (string | null);
+    popup_id: string;
+    human_id?: (string | null);
+    name: string;
+    category: string;
+    email?: (string | null);
+    gender?: (string | null);
+    check_in_code?: (string | null);
+    poap_url?: (string | null);
+    id: string;
+    created_at?: (string | null);
+    updated_at?: (string | null);
+    products?: Array<ProductWithQuantity>;
 };
 
 /**
- * Attendee schema for API responses.
+ * Schema for an individual ticket (one row per ticket, no quantity).
+ *
+ * requires_check_in is denormalized from the related Product so the frontend
+ * can decide whether to render a QR code without an extra round-trip.
+ */
+export type AttendeeProductPublic = {
+    id: string;
+    attendee_id: string;
+    product_id: string;
+    check_in_code: string;
+    payment_id?: (string | null);
+    requires_check_in?: boolean;
+};
+
+/**
+ * Attendee schema for API responses (detail view).
+ *
+ * products is typed as list[AttendeeProductPublic] so each entry carries
+ * check_in_code, payment_id, and requires_check_in. The list endpoint
+ * (GET /attendees) uses the separate AttendeeListItem schema which keeps
+ * the legacy ProductWithQuantity shape for backwards compatibility.
  */
 export type AttendeePublic = {
     tenant_id: string;
@@ -365,12 +400,12 @@ export type AttendeePublic = {
     category: string;
     email?: (string | null);
     gender?: (string | null);
-    check_in_code: string;
+    check_in_code?: (string | null);
     poap_url?: (string | null);
     id: string;
     created_at?: (string | null);
     updated_at?: (string | null);
-    products?: Array<unknown>;
+    products?: Array<AttendeeProductPublic>;
 };
 
 /**
@@ -443,7 +478,7 @@ export type AttendeeWithOriginPublic = {
     category: string;
     email?: (string | null);
     gender?: (string | null);
-    check_in_code: string;
+    check_in_code?: (string | null);
     poap_url?: (string | null);
     id: string;
     created_at?: (string | null);
@@ -460,7 +495,7 @@ export type AttendeeWithTickets = {
     name: string;
     email: (string | null);
     category: string;
-    check_in_code: string;
+    check_in_code?: (string | null);
     popup_id: string;
     popup_name: string;
     popup_slug?: (string | null);
@@ -632,6 +667,21 @@ export type CategoryBreakdown = {
 };
 
 /**
+ * Typed payload for event_type='check_in' rows in ticket_events.
+ *
+ * source is required (discriminates how the scan occurred).
+ * gate, device_id, notes are optional scanner metadata.
+ */
+export type CheckInPayload = {
+    source: 'qr' | 'manual' | 'virtual' | 'admin_override';
+    gate?: (string | null);
+    device_id?: (string | null);
+    notes?: (string | null);
+};
+
+export type source = 'qr' | 'manual' | 'virtual' | 'admin_override';
+
+/**
  * Public buyer-form field for the checkout runtime.
  */
 export type CheckoutBuyerField = {
@@ -681,7 +731,9 @@ export type CheckoutRuntimeProduct = {
     duration_type?: (string | null);
     start_date?: (unknown | null);
     end_date?: (unknown | null);
-    max_quantity?: (number | null);
+    total_stock_cap?: (number | null);
+    total_stock_remaining?: (number | null);
+    max_per_order?: (number | null);
     is_active?: boolean;
     exclusive?: boolean;
     insurance_eligible?: boolean;
@@ -1537,8 +1589,8 @@ export type ListModel_ApplicationReviewPublic_ = {
     paging: Paging;
 };
 
-export type ListModel_AttendeePublic_ = {
-    results: Array<AttendeePublic>;
+export type ListModel_AttendeeListItem_ = {
+    results: Array<AttendeeListItem>;
     paging: Paging;
 };
 
@@ -1619,6 +1671,11 @@ export type ListModel_ProductPublicWithTier_ = {
 
 export type ListModel_TenantPublic_ = {
     results: Array<TenantPublic>;
+    paging: Paging;
+};
+
+export type ListModel_TicketEventListItem_ = {
+    results: Array<TicketEventListItem>;
     paging: Paging;
 };
 
@@ -2126,8 +2183,11 @@ export type ProductBatchItem = {
     end_date?: (string | null);
     is_active?: boolean;
     exclusive?: boolean;
-    max_quantity?: (number | null);
+    total_stock_cap?: (number | null);
+    total_stock_remaining?: (number | null);
+    max_per_order?: (number | null);
     insurance_eligible?: boolean;
+    requires_check_in?: boolean;
 };
 
 /**
@@ -2149,8 +2209,11 @@ export type ProductBatchResult = {
     end_date?: (string | null);
     is_active?: boolean;
     exclusive?: boolean;
-    max_quantity?: (number | null);
+    total_stock_cap?: (number | null);
+    total_stock_remaining?: (number | null);
+    max_per_order?: (number | null);
     insurance_eligible?: boolean;
+    requires_check_in?: boolean;
     id: string;
     success: boolean;
     err_msg?: (string | null);
@@ -2186,8 +2249,11 @@ export type ProductCreate = {
     end_date?: (string | null);
     is_active?: boolean;
     exclusive?: boolean;
-    max_quantity?: (number | null);
+    total_stock_cap?: (number | null);
+    total_stock_remaining?: (number | null);
+    max_per_order?: (number | null);
     insurance_eligible?: boolean;
+    requires_check_in?: boolean;
 };
 
 /**
@@ -2217,8 +2283,11 @@ export type ProductPublic = {
     end_date?: (string | null);
     is_active?: boolean;
     exclusive?: boolean;
-    max_quantity?: (number | null);
+    total_stock_cap?: (number | null);
+    total_stock_remaining?: (number | null);
+    max_per_order?: (number | null);
     insurance_eligible?: boolean;
+    requires_check_in?: boolean;
     id: string;
 };
 
@@ -2244,8 +2313,11 @@ export type ProductPublicWithTier = {
     end_date?: (string | null);
     is_active?: boolean;
     exclusive?: boolean;
-    max_quantity?: (number | null);
+    total_stock_cap?: (number | null);
+    total_stock_remaining?: (number | null);
+    max_per_order?: (number | null);
     insurance_eligible?: boolean;
+    requires_check_in?: boolean;
     id: string;
     tier_group?: (TierGroupPublic | null);
     phase?: (TierPhasePublic | null);
@@ -2268,8 +2340,11 @@ export type ProductUpdate = {
     end_date?: (string | null);
     is_active?: (boolean | null);
     exclusive?: (boolean | null);
-    max_quantity?: (number | null);
+    total_stock_cap?: (number | null);
+    total_stock_remaining?: (number | null);
+    max_per_order?: (number | null);
     insurance_eligible?: (boolean | null);
+    requires_check_in?: (boolean | null);
 };
 
 /**
@@ -2291,8 +2366,11 @@ export type ProductWithQuantity = {
     end_date?: (string | null);
     is_active?: boolean;
     exclusive?: boolean;
-    max_quantity?: (number | null);
+    total_stock_cap?: (number | null);
+    total_stock_remaining?: (number | null);
+    max_per_order?: (number | null);
     insurance_eligible?: boolean;
+    requires_check_in?: boolean;
     id: string;
     quantity?: number;
 };
@@ -2473,9 +2551,40 @@ export type TenantUpdate = {
 export type TicketAttendeeCategory = 'main' | 'spouse' | 'kid';
 
 /**
+ * Minimal attendee data embedded in a TicketPublic response.
+ */
+export type TicketAttendeeSnapshot = {
+    id: string;
+    name: string;
+    email?: (string | null);
+    category: string;
+};
+
+/**
  * Duration types for ticket products.
  */
 export type TicketDuration = 'day' | 'week' | 'month' | 'full';
+
+/**
+ * Enriched ticket event row for the backoffice scan-history table.
+ *
+ * Eager-loads attendee + product data so the table renders without N+1
+ * fetches. source is extracted from payload["source"] for check_in events.
+ */
+export type TicketEventListItem = {
+    id: string;
+    attendee_product_id: string;
+    event_type: string;
+    occurred_at: string;
+    source?: (string | null);
+    attendee_name?: (string | null);
+    attendee_email?: (string | null);
+    product_name?: (string | null);
+    actor_user_id?: (string | null);
+    payload?: ({
+    [key: string]: unknown;
+} | null);
+};
 
 export type TicketingStepCreate = {
     popup_id: string;
@@ -2538,6 +2647,37 @@ export type TicketProduct = {
     start_date?: (string | null);
     end_date?: (string | null);
     quantity?: number;
+};
+
+/**
+ * Minimal product data embedded in a TicketPublic response.
+ */
+export type TicketProductSnapshot = {
+    id: string;
+    name: string;
+    price: number;
+    category?: (string | null);
+    start_date?: (string | null);
+    end_date?: (string | null);
+};
+
+/**
+ * Full public representation of a single ticket (AttendeeProducts row).
+ *
+ * Returned by POST /attendees/check-in/{code}.
+ * Embeds attendee + product snapshots for scanner UIs without extra round-trips.
+ * Enriched with scan summary fields from ticket_events so frontend/staff can
+ * apply check-in policy at runtime (single-scan, scan-every-time, etc.).
+ */
+export type TicketPublic = {
+    id: string;
+    check_in_code: string;
+    payment_id?: (string | null);
+    attendee: TicketAttendeeSnapshot;
+    product: TicketProductSnapshot;
+    total_scans?: number;
+    first_scan_at?: (string | null);
+    last_scan_at?: (string | null);
 };
 
 /**
@@ -2704,7 +2844,7 @@ export type UserPublic = {
     id: string;
 };
 
-export type UserRole = 'superadmin' | 'admin' | 'viewer';
+export type UserRole = 'superadmin' | 'admin' | 'viewer' | 'check_in_controller';
 
 /**
  * Statuses that users can set (subset of ApplicationStatus).
@@ -3151,14 +3291,14 @@ export type AttendeesListAttendeesData = {
     xTenantId?: (string | null);
 };
 
-export type AttendeesListAttendeesResponse = (ListModel_AttendeePublic_);
+export type AttendeesListAttendeesResponse = (ListModel_AttendeeListItem_);
 
 export type AttendeesGetAttendeeData = {
     attendeeId: string;
     xTenantId?: (string | null);
 };
 
-export type AttendeesGetAttendeeResponse = (AttendeePublic);
+export type AttendeesGetAttendeeResponse = (AttendeeWithOriginPublic);
 
 export type AttendeesUpdateAttendeeData = {
     attendeeId: string;
@@ -3166,7 +3306,7 @@ export type AttendeesUpdateAttendeeData = {
     xTenantId?: (string | null);
 };
 
-export type AttendeesUpdateAttendeeResponse = (AttendeePublic);
+export type AttendeesUpdateAttendeeResponse = (AttendeeWithOriginPublic);
 
 export type AttendeesDeleteAttendeeData = {
     attendeeId: string;
@@ -3175,12 +3315,13 @@ export type AttendeesDeleteAttendeeData = {
 
 export type AttendeesDeleteAttendeeResponse = (void);
 
-export type AttendeesGetByCheckInCodeData = {
+export type AttendeesPostCheckInData = {
     code: string;
+    requestBody: CheckInPayload;
     xTenantId?: (string | null);
 };
 
-export type AttendeesGetByCheckInCodeResponse = (AttendeePublic);
+export type AttendeesPostCheckInResponse = (TicketPublic);
 
 export type AttendeesGetTicketsByEmailData = {
     email: string;
@@ -3200,6 +3341,18 @@ export type AuthUserAuthenticateData = {
 };
 
 export type AuthUserAuthenticateResponse = (Token);
+
+export type AuthScannerLoginData = {
+    requestBody: UserAuth;
+};
+
+export type AuthScannerLoginResponse = (AuthCodeSentResponse);
+
+export type AuthScannerAuthenticateData = {
+    requestBody: UserVerify;
+};
+
+export type AuthScannerAuthenticateResponse = (Token);
 
 export type AuthHumanLoginData = {
     requestBody: HumanAuth;
@@ -4578,6 +4731,23 @@ export type TenantsDeleteCredentialsData = {
 };
 
 export type TenantsDeleteCredentialsResponse = (void);
+
+export type TicketEventListTicketEventsData = {
+    attendeeProductId?: (string | null);
+    eventType?: (string | null);
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    popupId?: (string | null);
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+    xTenantId?: (string | null);
+};
+
+export type TicketEventListTicketEventsResponse = (ListModel_TicketEventListItem_);
 
 export type TicketingStepsListPortalTicketingStepsData = {
     popupId: string;

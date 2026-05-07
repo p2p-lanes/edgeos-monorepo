@@ -48,7 +48,6 @@ function stripMotionProps<T extends Record<string, unknown>>(props: T) {
 }
 vi.mock("framer-motion", () => ({
   motion: {
-    // biome-ignore lint/suspicious/noExplicitAny: test mock
     div: ({ children, className, ...rest }: any) => (
       <div className={className} {...stripMotionProps(rest)}>
         {children}
@@ -64,6 +63,12 @@ vi.mock("framer-motion", () => ({
 // Provider / hook mocks
 // ---------------------------------------------------------------------------
 const mockToggleProduct = vi.fn()
+
+vi.mock("@/providers/applicationProvider", () => ({
+  useApplication: () => ({
+    getRelevantApplication: () => null,
+  }),
+}))
 
 vi.mock("@/providers/passesProvider", () => ({
   usePassesProvider: () => mockPassesProvider(),

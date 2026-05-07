@@ -345,11 +345,13 @@ def _group_to_public(db: Any, group: Any) -> TierGroupPublic:
     sold_counts: dict = {
         p.id: crud.tier_phases_crud.get_sold_count(db, p.id) for p in all_phases
     }
-    # Resolve max_quantity per phase via the linked product
+    # Resolve total_stock_cap per phase via the linked product.
+    # For tier-grouped products the migration sets total_stock_cap = NULL,
+    # so phase-level cap defers to the group's shared_stock_remaining.
     product_ids_for_phases = [p.product_id for p in all_phases]
     products_map = crud.products_crud.get_by_ids(db, product_ids_for_phases)
     max_quantities: dict = {
-        p.id: products_map[p.product_id].max_quantity
+        p.id: products_map[p.product_id].total_stock_cap
         if p.product_id in products_map
         else None
         for p in all_phases

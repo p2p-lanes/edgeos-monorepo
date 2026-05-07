@@ -3,6 +3,7 @@ import {
   Building2,
   Calendar,
   CalendarDays,
+  ClipboardCheck,
   CreditCard,
   FileText,
   FormInput,
@@ -125,6 +126,7 @@ export function AppSidebar() {
         badge: pendingReviewCount,
       },
       { icon: Users, title: "Attendees", path: "/attendees" },
+      { icon: ClipboardCheck, title: "Check In", path: "/check-in" },
       { icon: User, title: "Humans", path: "/humans" },
       {
         icon: CreditCard,

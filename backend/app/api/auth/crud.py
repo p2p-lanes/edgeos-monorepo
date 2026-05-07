@@ -12,6 +12,7 @@ from app.api.auth.utils import (
     is_code_valid,
 )
 from app.api.human.models import Humans
+from app.api.shared.enums import UserRole
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
 from app.core.config import settings
@@ -46,6 +47,7 @@ def check_rate_limit(identifier: str) -> None:
 async def login_user(
     session: Session,
     email: str,
+    allowed_roles: set[UserRole] | None = None,
 ) -> tuple[str, int]:
     # Rate limit by email
     check_rate_limit(f"user:{email.lower()}")
@@ -58,6 +60,16 @@ async def login_user(
     user = session.exec(statement).first()
 
     if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    # Role allow-list is enforced PRE-OTP so disallowed users never receive a
+    # code they could not redeem. The 404 mirrors the unknown-email branch above
+    # to keep responses indistinguishable and prevent role enumeration via this
+    # surface. authenticate_user() re-checks as defense-in-depth.
+    if allowed_roles is not None and user.role not in allowed_roles:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
@@ -125,6 +137,7 @@ async def authenticate_user(
     session: Session,
     email: str,
     code: str,
+    allowed_roles: set[UserRole] | None = None,  # if set, role must be in this set after OTP success
 ) -> Users:
     statement = select(Users).where(
         Users.email == email,
@@ -187,6 +200,15 @@ async def authenticate_user(
         user.auth_attempts = 0
         session.add(user)
         session.commit()
+
+    # Defense-in-depth: re-check role allow-list after OTP success. Returns 404
+    # (mirroring the unknown-email branch) so role enumeration is not possible
+    # even if a caller bypasses login_user. OTP is already consumed at this point.
+    if allowed_roles is not None and user.role not in allowed_roles:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
 
     logger.info(f"User authenticated successfully: {email}")
     return user

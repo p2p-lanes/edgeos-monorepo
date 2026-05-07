@@ -68,7 +68,7 @@ const Product = ({
   // multi-unit passes is intentionally out of scope (see plan) — fall back to
   // the toggle path which drives the existing "give up for credit" flow.
   const showStepper =
-    supportsQuantitySelector(product.max_quantity) && !purchased && !isEditing
+    supportsQuantitySelector(product.max_per_order) && !purchased && !isEditing
   const maxQuantity = resolveMaxQuantity(product)
   const currentQuantity = product.quantity ?? 0
 

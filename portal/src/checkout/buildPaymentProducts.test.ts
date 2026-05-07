@@ -20,7 +20,7 @@ function createProduct(overrides: Partial<ProductsPass>): ProductsPass {
     original_quantity: overrides.original_quantity,
     selected: overrides.selected,
     purchased: overrides.purchased,
-    max_quantity: overrides.max_quantity ?? 1,
+    max_per_order: overrides.max_per_order ?? 1,
     compare_price: overrides.compare_price ?? null,
   } as ProductsPass
 }
@@ -57,7 +57,7 @@ describe("buildPaymentProducts", () => {
       duration_type: "month",
       selected: true,
       quantity: 2,
-      max_quantity: 5,
+      max_per_order: 5,
     })
     const attendeePasses = [createAttendee([purchasedWeek, selectedMonth])]
 

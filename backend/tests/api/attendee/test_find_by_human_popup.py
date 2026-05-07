@@ -198,21 +198,24 @@ class TestFindByHumanPopup:
         assert direct_attendee.id in ids
 
     def test_pagination_skip_limit(self, db: Session, tenant_a: Tenants) -> None:
-        """Pagination: skip=1, limit=1 returns the right slice and total=3."""
+        """Pagination: skip=1, limit=1 returns the right slice and total=2.
+
+        Under the new design a human can have at most 1 app-linked + 1 direct
+        attendee per popup. Total = 2; skip=1, limit=1 returns exactly 1 row.
+        """
         popup = _make_popup(db, tenant_a, suffix="paged")
         human = _make_human(
             db, tenant_a, email=f"paged-{uuid.uuid4().hex[:8]}@test.com"
         )
         _make_app_attendee(db, tenant_a, popup, human, name="Paged One")
         _make_direct_attendee(db, tenant_a, popup, human, name="Paged Two")
-        _make_direct_attendee(db, tenant_a, popup, human, name="Paged Three")
         db.commit()
 
         results, total = attendees_crud.find_by_human_popup(
             db, human.id, popup.id, skip=1, limit=1
         )
 
-        assert total == 3
+        assert total == 2
         assert len(results) == 1
 
     def test_cross_popup_isolation(self, db: Session, tenant_a: Tenants) -> None:

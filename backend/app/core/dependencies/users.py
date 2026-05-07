@@ -151,10 +151,25 @@ def get_admin(
 def require_write_permission(
     current_user: Annotated["UserPublic", Depends(get_current_user)],
 ) -> "UserPublic":
-    if current_user.role == UserRole.VIEWER:
+    if current_user.role not in [UserRole.SUPERADMIN, UserRole.ADMIN]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Viewer role does not have write access",
+            detail="Write access requires admin role",
+        )
+    return current_user
+
+
+def get_check_in_operator(
+    current_user: Annotated["UserPublic", Depends(get_current_user)],
+) -> "UserPublic":
+    if current_user.role not in [
+        UserRole.SUPERADMIN,
+        UserRole.ADMIN,
+        UserRole.CHECK_IN_CONTROLLER,
+    ]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Check-in operator access required",
         )
     return current_user
 
@@ -164,6 +179,7 @@ CurrentHuman = Annotated["HumanPublic", Depends(get_current_human)]
 CurrentSuperadmin = Annotated["UserPublic", Depends(get_superadmin)]
 CurrentAdmin = Annotated["UserPublic", Depends(get_admin)]
 CurrentWriter = Annotated["UserPublic", Depends(require_write_permission)]
+CurrentCheckInOperator = Annotated["UserPublic", Depends(get_check_in_operator)]
 
 
 def get_current_tenant(
@@ -254,7 +270,7 @@ def get_tenant_session(
     credential_type = (
         CredentialType.READONLY
         if current_user.role == UserRole.VIEWER
-        else CredentialType.CRUD
+        else CredentialType.CRUD  # CHECK_IN_CONTROLLER falls through to CRUD — required for ticket_events writes
     )
 
     cached_cred = tenant_connection_manager.get_credential(

@@ -30,8 +30,8 @@ from app.api.event.schemas import (
 )
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
+    CurrentAdmin,
     CurrentHuman,
-    CurrentUser,
     CurrentWriter,
     HumanTenantSession,
     TenantSession,
@@ -433,7 +433,7 @@ def _invitation_visible_to_human(
 @router.get("", response_model=ListModel[EventPublic])
 async def list_events(
     db: TenantSession,
-    _: CurrentUser,
+    _: CurrentAdmin,
     popup_id: uuid.UUID | None = None,
     event_status: EventStatus | None = None,
     kind: str | None = None,
@@ -481,7 +481,7 @@ async def list_events(
 async def get_event(
     event_id: uuid.UUID,
     db: TenantSession,
-    _: CurrentUser,
+    _: CurrentAdmin,
 ) -> EventPublic:
     event = crud.events_crud.get(db, event_id)
     if not event:
@@ -940,7 +940,7 @@ def _run_availability_check(
 async def check_availability(
     payload: EventAvailabilityCheck,
     db: TenantSession,
-    _: CurrentUser,
+    _: CurrentAdmin,
 ) -> EventAvailabilityResult:
     """Check whether a venue is free for a candidate time window."""
     return _run_availability_check(db, payload)
@@ -969,7 +969,7 @@ async def check_availability_portal(
 async def list_invitations(
     event_id: uuid.UUID,
     db: TenantSession,
-    _: CurrentUser,
+    _: CurrentAdmin,
 ) -> list[EventInvitationPublic]:
     from sqlmodel import select
 
@@ -1063,7 +1063,7 @@ async def bulk_invite(
     event_id: uuid.UUID,
     payload: EventInvitationBulkCreate,
     db: TenantSession,
-    current_user: CurrentUser,
+    current_user: CurrentWriter,
 ) -> EventInvitationBulkResult:
     event = crud.events_crud.get(db, event_id)
     if not event:
@@ -1330,7 +1330,7 @@ async def delete_portal_invitation(
 async def export_event_ics(
     event_id: uuid.UUID,
     db: TenantSession,
-    _: CurrentUser,
+    _: CurrentAdmin,
 ) -> Response:
     event = crud.events_crud.get(db, event_id)
     if not event:

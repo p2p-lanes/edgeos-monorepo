@@ -13,7 +13,7 @@ from app.api.popup_reviewer.schemas import (
 from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
-    CurrentUser,
+    CurrentAdmin,
     CurrentWriter,
     SessionDep,
     TenantSession,
@@ -49,7 +49,7 @@ async def list_reviewers(
     popup_id: uuid.UUID,
     db: TenantSession,
     session: SessionDep,
-    _: CurrentUser,
+    _: CurrentAdmin,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[PopupReviewerPublic]:

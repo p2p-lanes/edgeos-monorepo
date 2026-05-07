@@ -64,7 +64,9 @@ class CheckoutRuntimeProduct(BaseModel):
     duration_type: str | None = None
     start_date: Any | None = None
     end_date: Any | None = None
-    max_quantity: int | None = None
+    total_stock_cap: int | None = None
+    total_stock_remaining: int | None = None
+    max_per_order: int | None = None
     is_active: bool = True
     exclusive: bool = False
     insurance_eligible: bool = False

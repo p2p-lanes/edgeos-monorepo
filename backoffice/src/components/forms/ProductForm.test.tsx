@@ -394,3 +394,97 @@ describe("ProductForm — tier group integration", () => {
     })
   })
 })
+
+// RED tests — Phase 8.2: attendee_category removal + requires_check_in toggle
+describe("ProductForm — ticket-as-first-class-entity (Phase 8.2)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+
+    mockListProductCategories.mockResolvedValue([
+      "ticket",
+      "housing",
+      "merch",
+    ] as Awaited<ReturnType<typeof ProductsService.listProductCategories>>)
+
+    mockListTierGroups.mockResolvedValue({
+      results: [],
+    } as Awaited<ReturnType<typeof TicketTierGroupsService.listTierGroups>>)
+
+    mockGetPopup.mockResolvedValue(
+      POPUP_WITHOUT_TIER as Awaited<ReturnType<typeof PopupsService.getPopup>>,
+    )
+  })
+
+  it("does NOT render an Attendee Type / attendee_category input for ticket products", async () => {
+    render(<ProductForm onSuccess={vi.fn()} />, { wrapper: makeWrapper() })
+
+    await waitFor(() => screen.getByPlaceholderText(/product name/i), {
+      timeout: 3000,
+    })
+
+    // The form must not expose an "Attendee Type" select or label
+    expect(screen.queryByText(/attendee type/i)).toBeNull()
+    expect(screen.queryByText(/who can purchase this ticket/i)).toBeNull()
+  })
+
+  it("renders a requires_check_in toggle switch", async () => {
+    render(<ProductForm onSuccess={vi.fn()} />, { wrapper: makeWrapper() })
+
+    await waitFor(() => screen.getByPlaceholderText(/product name/i), {
+      timeout: 3000,
+    })
+
+    // A switch/checkbox for requires_check_in should be present
+    const toggle =
+      document.querySelector('[id="requires_check_in"]') ??
+      screen.queryByRole("switch", {
+        name: /requires check.in|check.in|scanning/i,
+      })
+    expect(toggle).not.toBeNull()
+  })
+
+  it("requires_check_in defaults to true when category is ticket", async () => {
+    render(<ProductForm onSuccess={vi.fn()} />, { wrapper: makeWrapper() })
+
+    await waitFor(() => screen.getByPlaceholderText(/product name/i), {
+      timeout: 3000,
+    })
+
+    // Default category is ticket — requires_check_in should default to checked
+    const toggle = document.querySelector<HTMLButtonElement>(
+      '[id="requires_check_in"]',
+    )
+    if (toggle) {
+      // Switch component uses data-state=checked/unchecked
+      expect(toggle.getAttribute("data-state")).toBe("checked")
+    } else {
+      // Fallback: find by aria-checked
+      const checkbox = screen.queryByRole("switch")
+      expect(checkbox?.getAttribute("aria-checked")).toBe("true")
+    }
+  })
+
+  it("create payload includes requires_check_in field", async () => {
+    const user = userEvent.setup()
+
+    render(<ProductForm onSuccess={vi.fn()} />, { wrapper: makeWrapper() })
+
+    await waitFor(() => screen.getByPlaceholderText(/product name/i))
+    await user.type(screen.getByPlaceholderText(/product name/i), "My Ticket")
+
+    const priceInput = screen.getByPlaceholderText("100.00")
+    await user.type(priceInput, "50")
+
+    await user.click(screen.getByRole("button", { name: /create product/i }))
+
+    await waitFor(() => {
+      expect(mockCreateProduct).toHaveBeenCalledWith(
+        expect.objectContaining({
+          requestBody: expect.objectContaining({
+            requires_check_in: expect.any(Boolean),
+          }),
+        }),
+      )
+    })
+  })
+})
