@@ -52,6 +52,11 @@ def _build_attendee_with_origin(attendee) -> AttendeeWithOriginPublic:
             check_in_code=ap.check_in_code,
             payment_id=ap.payment_id,
             requires_check_in=ap.product.requires_check_in if ap.product else False,
+            product_name=(ap.product.name if ap.product else None),
+            product_category=(ap.product.category if ap.product else None),
+            start_date=(ap.product.start_date if ap.product else None),
+            end_date=(ap.product.end_date if ap.product else None),
+            duration_type=(ap.product.duration_type if ap.product else None),
         )
         for ap in attendee.attendee_products
     ]

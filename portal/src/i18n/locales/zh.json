@@ -298,6 +298,12 @@
     "waiver_acknowledge": "我确认了解相关风险，并同意免责声明。",
     "waiver_info": "免责声明信息",
     "waiver_detail": "我了解参加此活动存在固有风险，包括受伤或损失的可能性。勾选此框即表示我已阅读并同意免责声明，我自愿承担这些风险并免除组织者与我参与相关的任何索赔。",
+    "categories": {
+      "ticket": "票",
+      "housing": "住宿",
+      "merch": "周边",
+      "other": "其他"
+    },
     "discounts": {
       "patron_free": "赞助人免费票",
       "week_credit": "周票抵扣",

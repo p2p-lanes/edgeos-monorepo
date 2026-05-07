@@ -373,6 +373,11 @@ export type AttendeeListItem = {
  *
  * requires_check_in is denormalized from the related Product so the frontend
  * can decide whether to render a QR code without an extra round-trip.
+ *
+ * product_name, product_category, start_date, end_date, and duration_type are
+ * denormalized from the related Product at response-build time (current product
+ * state, not snapshot-at-purchase). All are optional with None defaults for
+ * backward compatibility with old clients that do not read them.
  */
 export type AttendeeProductPublic = {
     id: string;
@@ -381,6 +386,11 @@ export type AttendeeProductPublic = {
     check_in_code: string;
     payment_id?: (string | null);
     requires_check_in?: boolean;
+    product_name?: (string | null);
+    product_category?: (string | null);
+    start_date?: (string | null);
+    end_date?: (string | null);
+    duration_type?: (string | null);
 };
 
 /**

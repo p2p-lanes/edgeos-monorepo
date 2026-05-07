@@ -298,6 +298,12 @@
     "waiver_acknowledge": "Reconozco los riesgos involucrados y acepto el Descargo de Responsabilidad.",
     "waiver_info": "Información del descargo",
     "waiver_detail": "Entiendo que participar en este evento conlleva riesgos inherentes, incluyendo la posibilidad de lesiones o pérdidas. Al marcar esta casilla, confirmo que he leído y acepto el Descargo de Responsabilidad, y voluntariamente acepto estos riesgos y libero a los organizadores de cualquier reclamo relacionado con mi participación.",
+    "categories": {
+      "ticket": "Entrada",
+      "housing": "Alojamiento",
+      "merch": "Merchandise",
+      "other": "Otro"
+    },
     "discounts": {
       "patron_free": "Tickets gratis de Patrono",
       "week_credit": "Crédito de pase semanal",

@@ -76,20 +76,15 @@ export function useResolvedAttendees(): AttendeePassState[] {
 
   // Map AttendeeWithOriginPublic[] to AttendeePassState[].
   // PassesProvider replaces products via buildBaseAttendeePasses anyway,
-  // so the product field is overwritten. We extract per-ticket entries into
-  // ticket_entries so QR display in AttendeeTicket can use them.
+  // so the product field is overwritten. ticket_entries carries the raw
+  // per-ticket AttendeeProductPublic rows — all denormalized product fields
+  // (product_name, product_category, start_date, end_date, duration_type)
+  // are populated by the backend, so no client-side join is needed.
   const withTicketEntries = humanAttendees.map(
     (attendee: AttendeeWithOriginPublic): AttendeePassState => ({
       ...(attendee as unknown as AttendeePassState),
       products: [],
-      ticket_entries: (attendee.products ?? []).map((ap) => ({
-        id: ap.id,
-        attendee_id: ap.attendee_id,
-        product_id: ap.product_id,
-        check_in_code: ap.check_in_code,
-        payment_id: ap.payment_id ?? null,
-        requires_check_in: ap.requires_check_in ?? false,
-      })),
+      ticket_entries: attendee.products ?? [],
     }),
   )
   return sortAttendees(withTicketEntries)

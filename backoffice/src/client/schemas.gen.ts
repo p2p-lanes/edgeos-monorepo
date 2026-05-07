@@ -1802,6 +1802,63 @@ export const AttendeeProductPublicSchema = {
             type: 'boolean',
             title: 'Requires Check In',
             default: false
+        },
+        product_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Product Name'
+        },
+        product_category: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Product Category'
+        },
+        start_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Start Date'
+        },
+        end_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'End Date'
+        },
+        duration_type: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Duration Type'
         }
     },
     type: 'object',
@@ -1810,7 +1867,12 @@ export const AttendeeProductPublicSchema = {
     description: `Schema for an individual ticket (one row per ticket, no quantity).
 
 requires_check_in is denormalized from the related Product so the frontend
-can decide whether to render a QR code without an extra round-trip.`
+can decide whether to render a QR code without an extra round-trip.
+
+product_name, product_category, start_date, end_date, and duration_type are
+denormalized from the related Product at response-build time (current product
+state, not snapshot-at-purchase). All are optional with None defaults for
+backward compatibility with old clients that do not read them.`
 } as const;
 
 export const AttendeePublicSchema = {

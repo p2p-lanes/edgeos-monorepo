@@ -1,8 +1,14 @@
-import type { TicketEntry } from "@/app/portal/[popupSlug]/passes/components/common/TicketQRList"
 import type { AttendeeProductPublic, AttendeePublic } from "@/client"
 import type { ProductsPass } from "./Products"
 
 export type AttendeeCategory = "main" | "spouse" | "kid" | "baby" | "teen"
+
+/**
+ * A single ticket entry as returned by the API's AttendeeProductPublic.
+ * All denormalized product fields (product_name, product_category, start_date,
+ * end_date, duration_type) are available directly — no client-side join needed.
+ */
+export type TicketEntry = AttendeeProductPublic
 
 // Portal-specific: extends AttendeePublic with typed products for the passes UI state.
 // ticket_entries carries the raw per-ticket AttendeeProductPublic rows from the API

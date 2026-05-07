@@ -165,6 +165,11 @@ class AttendeeProductPublic(BaseModel):
 
     requires_check_in is denormalized from the related Product so the frontend
     can decide whether to render a QR code without an extra round-trip.
+
+    product_name, product_category, start_date, end_date, and duration_type are
+    denormalized from the related Product at response-build time (current product
+    state, not snapshot-at-purchase). All are optional with None defaults for
+    backward compatibility with old clients that do not read them.
     """
 
     id: uuid.UUID
@@ -173,6 +178,11 @@ class AttendeeProductPublic(BaseModel):
     check_in_code: str
     payment_id: uuid.UUID | None = None
     requires_check_in: bool = False
+    product_name: str | None = None
+    product_category: str | None = None
+    start_date: datetime | None = None
+    end_date: datetime | None = None
+    duration_type: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -298,6 +298,12 @@
     "waiver_acknowledge": "I acknowledge the risks involved and agree to the Waiver and Release of Liability.",
     "waiver_info": "Waiver information",
     "waiver_detail": "I understand that participating in this event involves inherent risks, including the possibility of injury or loss. By checking this box, I confirm that I have read and agree to the Waiver and Release of Liability, and I voluntarily accept these risks and release the organizers from any claims related to my participation.",
+    "categories": {
+      "ticket": "Ticket",
+      "housing": "Housing",
+      "merch": "Merch",
+      "other": "Other"
+    },
     "discounts": {
       "patron_free": "Patron Free Tickets",
       "week_credit": "Week Pass Credit",
