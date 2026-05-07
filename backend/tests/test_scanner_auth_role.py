@@ -145,15 +145,15 @@ class TestAuthRoleRejection:
         client: TestClient,
         check_in_controller_user_tenant_a: Users,
     ) -> None:
-        """CHECK_IN_CONTROLLER user gets 403 from POST /auth/user/authenticate even with valid OTP."""
+        """CHECK_IN_CONTROLLER gets 404 from /auth/user/authenticate (parity with unknown email — no leak)."""
         _seed_otp(check_in_controller_user_tenant_a, "111111")
         # auth/user/authenticate is unauthenticated — no Bearer token needed
         response = client.post(
             "/api/v1/auth/user/authenticate",
             json={"email": check_in_controller_user_tenant_a.email, "code": "111111"},
         )
-        assert response.status_code == 403, (
-            f"CHECK_IN_CONTROLLER must get 403 at /auth/user/authenticate, "
+        assert response.status_code == 404, (
+            f"CHECK_IN_CONTROLLER must get 404 at /auth/user/authenticate (no role leak), "
             f"got {response.status_code}: {response.text}"
         )
 
@@ -179,14 +179,14 @@ class TestAuthRoleRejection:
         client: TestClient,
         viewer_user_tenant_a: Users,
     ) -> None:
-        """VIEWER gets 403 from POST /auth/scanner/authenticate even with valid OTP."""
+        """VIEWER gets 404 from /auth/scanner/authenticate (parity with unknown email — no leak)."""
         _seed_otp(viewer_user_tenant_a, "333333")
         response = client.post(
             "/api/v1/auth/scanner/authenticate",
             json={"email": viewer_user_tenant_a.email, "code": "333333"},
         )
-        assert response.status_code == 403, (
-            f"VIEWER must get 403 at /auth/scanner/authenticate, "
+        assert response.status_code == 404, (
+            f"VIEWER must get 404 at /auth/scanner/authenticate (no role leak), "
             f"got {response.status_code}: {response.text}"
         )
 
@@ -215,18 +215,18 @@ class TestAuthRoleRejection:
         client: TestClient,
         check_in_controller_user_tenant_a: Users,
     ) -> None:
-        """CHECK_IN_CONTROLLER gets 403 from POST /auth/user/login BEFORE OTP is generated.
+        """CHECK_IN_CONTROLLER gets 404 from POST /auth/user/login BEFORE OTP is generated.
 
-        Pre-OTP gating: the scanner role must not even receive the email — we
-        reject at the login step, not at authenticate. UX requirement: users
-        must not have to wait for an OTP they can never use.
+        Pre-OTP gating: the scanner role must not even receive the email. The
+        response is indistinguishable from an unknown-email 404 to prevent
+        role enumeration via the login surface.
         """
         response = client.post(
             "/api/v1/auth/user/login",
             json={"email": check_in_controller_user_tenant_a.email},
         )
-        assert response.status_code == 403, (
-            f"CHECK_IN_CONTROLLER must be rejected at /auth/user/login PRE-OTP, "
+        assert response.status_code == 404, (
+            f"CHECK_IN_CONTROLLER must get 404 at /auth/user/login (no role leak), "
             f"got {response.status_code}: {response.text}"
         )
 
@@ -235,13 +235,13 @@ class TestAuthRoleRejection:
         client: TestClient,
         viewer_user_tenant_a: Users,
     ) -> None:
-        """VIEWER gets 403 from POST /auth/scanner/login BEFORE OTP is generated."""
+        """VIEWER gets 404 from POST /auth/scanner/login BEFORE OTP is generated (no leak)."""
         response = client.post(
             "/api/v1/auth/scanner/login",
             json={"email": viewer_user_tenant_a.email},
         )
-        assert response.status_code == 403, (
-            f"VIEWER must be rejected at /auth/scanner/login PRE-OTP, "
+        assert response.status_code == 404, (
+            f"VIEWER must get 404 at /auth/scanner/login (no role leak), "
             f"got {response.status_code}: {response.text}"
         )
 
