@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from app.api.attendee import crud
 from app.api.attendee.schemas import (
     AttendeeCreate,
+    AttendeeListItem,
     AttendeeProductPublic,
     AttendeePublic,
     AttendeeUpdate,
@@ -39,8 +40,10 @@ def _build_attendee_with_origin(attendee) -> AttendeeWithOriginPublic:
     """Build an AttendeeWithOriginPublic from an Attendees ORM row.
 
     Constructs the response manually to avoid the Pydantic from_attributes
-    traversal of attendee.products (a property returning Products ORM objects)
-    colliding with the AttendeeProductPublic schema expected by the response model.
+    traversal of attendee.products (a SQLAlchemy property returning Products
+    ORM objects) colliding with the AttendeeProductPublic schema expected by
+    the typed products field. We extract scalar fields directly from the ORM
+    object to sidestep ORM property access.
     """
     ticket_products = [
         AttendeeProductPublic(
@@ -54,11 +57,25 @@ def _build_attendee_with_origin(attendee) -> AttendeeWithOriginPublic:
         for ap in attendee.attendee_products
     ]
     origin = "application" if attendee.application_id is not None else "direct_sale"
-    # Exclude `products` from the base validation: Attendees.products is a
-    # property returning Products ORM rows, which would fail to coerce into
-    # AttendeeProductPublic (link-table shape). Override with the ticket list
-    # built above (which carries requires_check_in denormalized from product).
-    base = AttendeePublic.model_validate(attendee).model_dump(exclude={"products"})
+    # Build the base dict from scalar ORM columns only — do NOT call
+    # model_validate(attendee) because it triggers ORM property traversal of
+    # attendee.products (a @property returning Products rows), which now fails
+    # Pydantic coercion into AttendeeProductPublic[].
+    base: dict = {
+        "id": attendee.id,
+        "tenant_id": attendee.tenant_id,
+        "application_id": attendee.application_id,
+        "popup_id": attendee.popup_id,
+        "human_id": attendee.human_id,
+        "name": attendee.name,
+        "category": attendee.category,
+        "email": attendee.email,
+        "gender": attendee.gender,
+        "check_in_code": attendee.check_in_code,
+        "poap_url": attendee.poap_url,
+        "created_at": getattr(attendee, "created_at", None),
+        "updated_at": getattr(attendee, "updated_at", None),
+    }
     return AttendeeWithOriginPublic(**base, products=ticket_products, origin=origin)
 
 
@@ -261,7 +278,7 @@ async def delete_my_attendee_for_popup(
 # These routes are for direct BO access
 
 
-@router.get("", response_model=ListModel[AttendeePublic])
+@router.get("", response_model=ListModel[AttendeeListItem])
 async def list_attendees(
     db: TenantSession,
     _: CurrentUser,
@@ -271,8 +288,13 @@ async def list_attendees(
     search: str | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
-) -> ListModel[AttendeePublic]:
-    """List attendees with optional filters (BO only)."""
+) -> ListModel[AttendeeListItem]:
+    """List attendees with optional filters (BO only).
+
+    Returns AttendeeListItem (ProductWithQuantity shape) for compatibility with
+    the existing BO list view. Use GET /attendees/{id} for the full
+    AttendeePublic shape with typed AttendeeProductPublic tickets.
+    """
     if application_id:
         attendees = crud.attendees_crud.find_by_application(db, application_id)
         total = len(attendees)
@@ -305,23 +327,29 @@ async def list_attendees(
             product.quantity = 1  # each ticket row = 1 unit
             products.append(product)
 
-        attendee_data = AttendeePublic.model_validate(a)
+        attendee_data = AttendeeListItem.model_validate(a)
         attendee_data.products = products
         results.append(attendee_data)
 
-    return ListModel[AttendeePublic](
+    return ListModel[AttendeeListItem](
         results=results,
         paging=Paging(offset=skip, limit=limit, total=total),
     )
 
 
-@router.get("/{attendee_id}", response_model=AttendeePublic)
+@router.get("/{attendee_id}", response_model=AttendeeWithOriginPublic)
 async def get_attendee(
     attendee_id: uuid.UUID,
     db: TenantSession,
     _: CurrentUser,
-) -> AttendeePublic:
-    """Get a single attendee (BO only)."""
+) -> AttendeeWithOriginPublic:
+    """Get a single attendee with full ticket details (BO only).
+
+    Returns AttendeeWithOriginPublic so each products entry is an
+    AttendeeProductPublic with check_in_code, payment_id, and
+    requires_check_in populated. The origin discriminator is also
+    included ('application' | 'direct_sale').
+    """
     attendee = crud.attendees_crud.get(db, attendee_id)
 
     if not attendee:
@@ -330,27 +358,16 @@ async def get_attendee(
             detail="Attendee not found",
         )
 
-    # Build product list — one row per ticket
-    products = []
-    for ap in attendee.attendee_products:
-        from app.api.product.schemas import ProductWithQuantity
-
-        product_data = ap.product.model_dump()
-        product_data["quantity"] = 1  # each ticket row = 1 unit
-        products.append(ProductWithQuantity(**product_data))
-
-    result = AttendeePublic.model_validate(attendee)
-    result.products = products
-    return result
+    return _build_attendee_with_origin(attendee)
 
 
-@router.patch("/{attendee_id}", response_model=AttendeePublic)
+@router.patch("/{attendee_id}", response_model=AttendeeWithOriginPublic)
 async def update_attendee(
     attendee_id: uuid.UUID,
     attendee_in: AttendeeUpdate,
     db: TenantSession,
     _current_user: CurrentWriter,
-) -> AttendeePublic:
+) -> AttendeeWithOriginPublic:
     """Update an attendee (BO only)."""
 
     attendee = crud.attendees_crud.get(db, attendee_id)
@@ -361,19 +378,7 @@ async def update_attendee(
         )
 
     updated = crud.attendees_crud.update_attendee(db, attendee, attendee_in)
-
-    # Build product list — one row per ticket
-    products = []
-    for ap in updated.attendee_products:
-        from app.api.product.schemas import ProductWithQuantity
-
-        product_data = ap.product.model_dump()
-        product_data["quantity"] = 1  # each ticket row = 1 unit
-        products.append(ProductWithQuantity(**product_data))
-
-    result = AttendeePublic.model_validate(updated)
-    result.products = products
-    return result
+    return _build_attendee_with_origin(updated)
 
 
 @router.delete("/{attendee_id}", status_code=status.HTTP_204_NO_CONTENT)

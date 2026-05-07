@@ -37,12 +37,18 @@ class AttendeeBase(SQLModel):
 
 
 class AttendeePublic(AttendeeBase):
-    """Attendee schema for API responses."""
+    """Attendee schema for API responses (detail view).
+
+    products is typed as list[AttendeeProductPublic] so each entry carries
+    check_in_code, payment_id, and requires_check_in. The list endpoint
+    (GET /attendees) uses the separate AttendeeListItem schema which keeps
+    the legacy ProductWithQuantity shape for backwards compatibility.
+    """
 
     id: uuid.UUID
     created_at: datetime | None = None
     updated_at: datetime | None = None
-    products: list = []  # List of ProductWithQuantity
+    products: list["AttendeeProductPublic"] = []
     human_id: uuid.UUID | None = None
 
     model_config = ConfigDict(from_attributes=True)
@@ -256,6 +262,23 @@ class AttendeeWithOriginPublic(AttendeePublic):
     origin: str = (
         ""  # "application" | "direct_sale" — set by router after model_validate
     )
+
+
+class AttendeeListItem(AttendeeBase):
+    """Attendee schema for the list endpoint (GET /attendees).
+
+    Uses ProductWithQuantity for the products field to preserve the legacy
+    shape returned by the list endpoint. Use AttendeePublic for detail views
+    where AttendeeProductPublic (with check_in_code) is needed.
+    """
+
+    id: uuid.UUID
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+    products: list[ProductWithQuantity] = []
+    human_id: uuid.UUID | None = None
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AttendeePurchases(BaseModel):
