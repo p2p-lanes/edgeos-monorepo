@@ -28,10 +28,12 @@ async def user_login(
 ) -> AuthCodeSentResponse:
     """
     Login a user and send a 6-digit code to their email.
+    CHECK_IN_CONTROLLER is rejected pre-OTP — use /auth/scanner/login instead.
     """
     email, expiration_minutes = await login_user(
         session=session,
         email=request.email,
+        allowed_roles={UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.VIEWER},
     )
 
     return AuthCodeSentResponse(
@@ -70,11 +72,16 @@ async def scanner_login(
 ) -> AuthCodeSentResponse:
     """
     Initiate scanner login. Accepts CHECK_IN_CONTROLLER, ADMIN, and SUPERADMIN.
-    No role check at login step — role is gated at /auth/scanner/authenticate (ADR-3).
+    VIEWER is rejected pre-OTP — must not receive a code they can't redeem.
     """
     email, expiration_minutes = await login_user(
         session=session,
         email=request.email,
+        allowed_roles={
+            UserRole.SUPERADMIN,
+            UserRole.ADMIN,
+            UserRole.CHECK_IN_CONTROLLER,
+        },
     )
 
     return AuthCodeSentResponse(

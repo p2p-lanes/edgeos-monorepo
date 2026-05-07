@@ -47,7 +47,7 @@ def check_rate_limit(identifier: str) -> None:
 async def login_user(
     session: Session,
     email: str,
-    allowed_roles: set[UserRole] | None = None,  # noqa: ARG001 — reserved for future symmetry; unused at login step (ADR-3)
+    allowed_roles: set[UserRole] | None = None,
 ) -> tuple[str, int]:
     # Rate limit by email
     check_rate_limit(f"user:{email.lower()}")
@@ -63,6 +63,14 @@ async def login_user(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
+        )
+
+    # Role allow-list is enforced PRE-OTP so disallowed users never receive a
+    # code they could not redeem. authenticate_user() re-checks as defense-in-depth.
+    if allowed_roles is not None and user.role not in allowed_roles:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Role not allowed for this login surface",
         )
 
     auth_code = generate_auth_code()
