@@ -66,11 +66,13 @@ async def login_user(
         )
 
     # Role allow-list is enforced PRE-OTP so disallowed users never receive a
-    # code they could not redeem. authenticate_user() re-checks as defense-in-depth.
+    # code they could not redeem. The 404 mirrors the unknown-email branch above
+    # to keep responses indistinguishable and prevent role enumeration via this
+    # surface. authenticate_user() re-checks as defense-in-depth.
     if allowed_roles is not None and user.role not in allowed_roles:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Role not allowed for this login surface",
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
         )
 
     auth_code = generate_auth_code()
@@ -199,12 +201,13 @@ async def authenticate_user(
         session.add(user)
         session.commit()
 
-    # Role allow-list check AFTER OTP success — OTP is already consumed at this point.
-    # This is a business-rule gate, not a credential gate (ADR-3).
+    # Defense-in-depth: re-check role allow-list after OTP success. Returns 404
+    # (mirroring the unknown-email branch) so role enumeration is not possible
+    # even if a caller bypasses login_user. OTP is already consumed at this point.
     if allowed_roles is not None and user.role not in allowed_roles:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Role not allowed for this login surface",
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
         )
 
     logger.info(f"User authenticated successfully: {email}")
