@@ -8,7 +8,6 @@ from app.api.attendee.schemas import (
     AttendeeCreate,
     AttendeeListItem,
     AttendeeProductPublic,
-    AttendeePublic,
     AttendeeUpdate,
     AttendeeWithOriginPublic,
     AttendeeWithTickets,

@@ -47,7 +47,7 @@ def check_rate_limit(identifier: str) -> None:
 async def login_user(
     session: Session,
     email: str,
-    allowed_roles: set[UserRole] | None = None,  # reserved for future symmetry; unused at login step (ADR-3)
+    allowed_roles: set[UserRole] | None = None,  # noqa: ARG001 — reserved for future symmetry; unused at login step (ADR-3)
 ) -> tuple[str, int]:
     # Rate limit by email
     check_rate_limit(f"user:{email.lower()}")
