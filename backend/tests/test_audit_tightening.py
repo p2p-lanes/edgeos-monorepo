@@ -489,25 +489,18 @@ class TestEventRoutesTightening:
             json={"emails": ["test@test.com"]},
         )
 
-    def test_check_in_controller_can_bulk_invite(
+    def test_check_in_controller_cannot_bulk_invite(
         self,
         client: TestClient,
         check_in_controller_token_tenant_a: str,
     ) -> None:
-        """CHECK_IN_CONTROLLER is NOT blocked by CurrentWriter (which only blocks VIEWER).
-
-        CurrentWriter = require_write_permission() = blocks role==VIEWER only.
-        CHECK_IN_CONTROLLER is not VIEWER, so it passes the dep check.
-        The route returns 404 (event not found) because no event exists — NOT 403.
-        """
-        response = client.post(
+        """CHECK_IN_CONTROLLER gets 403 on POST /events/{id}/invitations (not in CurrentWriter)."""
+        assert_forbidden(
+            client,
+            "POST",
             f"/api/v1/events/{uuid.uuid4()}/invitations",
-            headers={"Authorization": f"Bearer {check_in_controller_token_tenant_a}"},
+            check_in_controller_token_tenant_a,
             json={"emails": ["test@test.com"]},
-        )
-        assert response.status_code != 403, (
-            f"CHECK_IN_CONTROLLER must not get 403 on POST /events/{{id}}/invitations "
-            f"(CurrentWriter only blocks VIEWER), got {response.status_code}: {response.text}"
         )
 
     def test_viewer_cannot_export_ics(
