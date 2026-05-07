@@ -159,11 +159,27 @@ def require_write_permission(
     return current_user
 
 
+def get_check_in_operator(
+    current_user: Annotated["UserPublic", Depends(get_current_user)],
+) -> "UserPublic":
+    if current_user.role not in [
+        UserRole.SUPERADMIN,
+        UserRole.ADMIN,
+        UserRole.CHECK_IN_CONTROLLER,
+    ]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Check-in operator access required",
+        )
+    return current_user
+
+
 CurrentUser = Annotated["UserPublic", Depends(get_current_user)]
 CurrentHuman = Annotated["HumanPublic", Depends(get_current_human)]
 CurrentSuperadmin = Annotated["UserPublic", Depends(get_superadmin)]
 CurrentAdmin = Annotated["UserPublic", Depends(get_admin)]
 CurrentWriter = Annotated["UserPublic", Depends(require_write_permission)]
+CurrentCheckInOperator = Annotated["UserPublic", Depends(get_check_in_operator)]
 
 
 def get_current_tenant(
