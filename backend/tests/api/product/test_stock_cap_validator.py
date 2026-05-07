@@ -405,3 +405,81 @@ class TestProductsCRUDUpdateWiring:
             ProductUpdate(total_stock_cap=200, total_stock_remaining=200),
         )
         assert updated.total_stock_cap == 200
+
+
+# ---------------------------------------------------------------------------
+# Cross-field: max_per_order <= total_stock_cap
+# TDD: RED — written before the implementation.
+# ---------------------------------------------------------------------------
+
+
+class TestMaxPerOrderVsTotalStockCap:
+    """max_per_order must not exceed total_stock_cap when both are set."""
+
+    def test_product_create_max_per_order_exceeds_stock_cap_rejected(self) -> None:
+        """ProductCreate with max_per_order > total_stock_cap → ValidationError."""
+        with pytest.raises(ValidationError) as exc_info:
+            ProductCreate(
+                popup_id=uuid.uuid4(),
+                name="Test",
+                slug="test",
+                price=10,
+                max_per_order=10,
+                total_stock_cap=5,
+            )
+        errors = exc_info.value.errors()
+        assert any("max_per_order" in str(e) or "total_stock_cap" in str(e) for e in errors), (
+            f"expected cross-field error in errors, got: {errors}"
+        )
+
+    def test_product_create_max_per_order_equals_stock_cap_accepted(self) -> None:
+        """ProductCreate with max_per_order == total_stock_cap → allowed."""
+        pc = ProductCreate(
+            popup_id=uuid.uuid4(),
+            name="Equal",
+            slug="equal",
+            price=10,
+            max_per_order=5,
+            total_stock_cap=5,
+        )
+        assert pc.max_per_order == 5
+        assert pc.total_stock_cap == 5
+
+    def test_product_create_max_per_order_less_than_stock_cap_accepted(self) -> None:
+        """ProductCreate with max_per_order < total_stock_cap → allowed."""
+        pc = ProductCreate(
+            popup_id=uuid.uuid4(),
+            name="Valid",
+            slug="valid",
+            price=10,
+            max_per_order=5,
+            total_stock_cap=10,
+        )
+        assert pc.max_per_order == 5
+
+    def test_product_create_max_per_order_set_stock_cap_null_accepted(self) -> None:
+        """ProductCreate with max_per_order set but total_stock_cap=None → allowed (unlimited)."""
+        pc = ProductCreate(
+            popup_id=uuid.uuid4(),
+            name="NullCap",
+            slug="null-cap",
+            price=10,
+            max_per_order=10,
+            total_stock_cap=None,
+        )
+        assert pc.max_per_order == 10
+        assert pc.total_stock_cap is None
+
+    def test_product_update_max_per_order_exceeds_stock_cap_rejected(self) -> None:
+        """ProductUpdate with max_per_order > total_stock_cap → ValidationError."""
+        with pytest.raises(ValidationError) as exc_info:
+            ProductUpdate(max_per_order=10, total_stock_cap=5)
+        errors = exc_info.value.errors()
+        assert any("max_per_order" in str(e) or "total_stock_cap" in str(e) for e in errors), (
+            f"expected cross-field error in errors, got: {errors}"
+        )
+
+    def test_product_update_max_per_order_valid_combination_accepted(self) -> None:
+        """ProductUpdate with max_per_order <= total_stock_cap → allowed."""
+        pu = ProductUpdate(max_per_order=3, total_stock_cap=10)
+        assert pu.max_per_order == 3
