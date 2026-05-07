@@ -33,6 +33,7 @@ from app.api import (
     user,
 )
 from app.api.application.router import portal_router
+from app.api.ticket_event import router as ticket_event_router
 
 api_router = APIRouter()
 
@@ -88,3 +89,6 @@ api_router.include_router(track.router)
 
 # Dashboard
 api_router.include_router(dashboard.router)
+
+# Ticket events (scan history)
+api_router.include_router(ticket_event_router.router)
