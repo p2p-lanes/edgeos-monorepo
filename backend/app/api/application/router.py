@@ -1,6 +1,7 @@
 import csv
 import io
 import uuid
+from collections import Counter
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, status
@@ -54,14 +55,17 @@ def _build_application_public(
     review_decision=None,
 ) -> ApplicationPublic:
     """Build ApplicationPublic with attendees and products."""
+    from app.api.product.schemas import ProductWithQuantity
+
     attendees = []
     for a in application.attendees:
+        # Each AttendeeProducts row is one ticket — group by product_id and count.
+        counts = Counter(ap.product_id for ap in a.attendee_products)
+        seen = {ap.product_id: ap.product for ap in a.attendee_products}
         products = []
-        for ap in a.attendee_products:
-            from app.api.product.schemas import ProductWithQuantity
-
-            product = ProductWithQuantity.model_validate(ap.product)
-            product.quantity = ap.quantity
+        for pid, qty in counts.items():
+            product = ProductWithQuantity.model_validate(seen[pid])
+            product.quantity = qty
             products.append(product)
 
         attendee_data = AttendeePublic.model_validate(a)
@@ -241,18 +245,19 @@ async def list_my_tickets(
         # raise AttributeError for direct-sale attendees.
         popup = attendee.popup
 
-        # Build product list
-        products = []
-        for ap in attendee.attendee_products:
-            products.append(
-                TicketProduct(
-                    name=ap.product.name,
-                    category=ap.product.category,
-                    start_date=ap.product.start_date,
-                    end_date=ap.product.end_date,
-                    quantity=ap.quantity,
-                )
+        # Build product list — group ticket rows by product_id and count.
+        counts = Counter(ap.product_id for ap in attendee.attendee_products)
+        seen = {ap.product_id: ap.product for ap in attendee.attendee_products}
+        products = [
+            TicketProduct(
+                name=seen[pid].name,
+                category=seen[pid].category,
+                start_date=seen[pid].start_date,
+                end_date=seen[pid].end_date,
+                quantity=qty,
             )
+            for pid, qty in counts.items()
+        ]
 
         results.append(
             AttendeeWithTickets(
@@ -331,10 +336,13 @@ async def get_my_purchases(
 
     results = []
     for attendee in attendees:
+        # Each AttendeeProducts row is one ticket — group by product_id and count.
+        counts = Counter(ap.product_id for ap in attendee.attendee_products)
+        seen = {ap.product_id: ap.product for ap in attendee.attendee_products}
         products = []
-        for ap in attendee.attendee_products:
-            product = ProductWithQuantity.model_validate(ap.product)
-            product.quantity = ap.quantity
+        for pid, qty in counts.items():
+            product = ProductWithQuantity.model_validate(seen[pid])
+            product.quantity = qty
             products.append(product)
 
         results.append(
@@ -556,7 +564,14 @@ def _build_directory_entry(application) -> AttendeesDirectoryEntry:
     check_out = None
 
     if main_attendee:
+        # Each AttendeeProducts row is one ticket — dedupe by product_id so
+        # the directory shows each product once even if the attendee bought
+        # multiple tickets of it.
+        seen_pids: set[uuid.UUID] = set()
         for ap in main_attendee.attendee_products:
+            if ap.product_id in seen_pids:
+                continue
+            seen_pids.add(ap.product_id)
             p = ap.product
             products.append(
                 DirectoryProduct(

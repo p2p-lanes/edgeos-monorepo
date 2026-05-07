@@ -83,9 +83,15 @@ async def get_group(
     # Build members list from applications (relationships already eager loaded)
     members = []
     for application in group.applications:
+        # Each AttendeeProducts row is one ticket — dedupe by product_id so
+        # the member's product list shows each product once.
         products = []
+        seen_pids: set[uuid.UUID] = set()
         for attendee in application.attendees:
             for ap in attendee.attendee_products:
+                if ap.product_id in seen_pids:
+                    continue
+                seen_pids.add(ap.product_id)
                 products.append(ap.product)
 
         human = application.human
@@ -246,9 +252,15 @@ async def get_my_group(
     # Build members list (relationships already eager loaded)
     members = []
     for application in group.applications:
+        # Each AttendeeProducts row is one ticket — dedupe by product_id so
+        # the member's product list shows each product once.
         products = []
+        seen_pids: set[uuid.UUID] = set()
         for attendee in application.attendees:
             for ap in attendee.attendee_products:
+                if ap.product_id in seen_pids:
+                    continue
+                seen_pids.add(ap.product_id)
                 products.append(ap.product)
 
         human = application.human
