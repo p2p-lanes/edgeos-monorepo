@@ -17,7 +17,7 @@ from app.api.product.models import Products
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.api.ticket_event.models import TicketEvent
 from app.api.ticket_event.schemas import TicketEventListItem
-from app.core.dependencies.users import CurrentUser, TenantSession
+from app.core.dependencies.users import CurrentCheckInOperator, TenantSession
 
 router = APIRouter(prefix="/ticket-events", tags=["ticket_event"])
 
@@ -25,7 +25,7 @@ router = APIRouter(prefix="/ticket-events", tags=["ticket_event"])
 @router.get("", response_model=ListModel[TicketEventListItem])
 async def list_ticket_events(
     db: TenantSession,
-    current_user: CurrentUser,
+    current_user: CurrentCheckInOperator,
     attendee_product_id: uuid.UUID | None = None,
     popup_id: uuid.UUID | None = None,
     event_type: str | None = None,

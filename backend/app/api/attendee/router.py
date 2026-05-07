@@ -21,6 +21,7 @@ from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, 
 from app.api.ticket_event.crud import get_check_in_summary, record_check_in
 from app.api.ticket_event.schemas import CheckInPayload
 from app.core.dependencies.users import (
+    CurrentCheckInOperator,
     CurrentHuman,
     CurrentUser,
     CurrentWriter,
@@ -281,7 +282,7 @@ async def delete_my_attendee_for_popup(
 @router.get("", response_model=ListModel[AttendeeListItem])
 async def list_attendees(
     db: TenantSession,
-    _: CurrentUser,
+    _: CurrentCheckInOperator,
     application_id: uuid.UUID | None = None,
     popup_id: uuid.UUID | None = None,
     email: str | None = None,
@@ -341,7 +342,7 @@ async def list_attendees(
 async def get_attendee(
     attendee_id: uuid.UUID,
     db: TenantSession,
-    _: CurrentUser,
+    _: CurrentCheckInOperator,
 ) -> AttendeeWithOriginPublic:
     """Get a single attendee with full ticket details (BO only).
 
@@ -411,7 +412,7 @@ async def post_check_in(
     code: str,
     payload: CheckInPayload,
     db: TenantSession,
-    current_user: CurrentUser,
+    current_user: CurrentCheckInOperator,
 ) -> TicketPublic:
     """Record a check-in event and return enriched TicketPublic (BO - scanner endpoint).
 
@@ -475,7 +476,7 @@ async def post_check_in(
 async def get_tickets_by_email(
     email: str,
     db: TenantSession,
-    _: CurrentUser,
+    _: CurrentCheckInOperator,
 ) -> list[AttendeeWithTickets]:
     """Get all tickets/products for an email across all events (BO).
 
