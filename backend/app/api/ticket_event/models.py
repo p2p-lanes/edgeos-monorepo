@@ -6,10 +6,13 @@ Stores per-ticket lifecycle events (check_in, future: transfer, refund, edit).
 
 import uuid
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy.dialects.postgresql import JSONB, UUID
-from sqlmodel import Column, DateTime, Field, SQLModel, func
+from sqlmodel import Column, DateTime, Field, Relationship, SQLModel, func
+
+if TYPE_CHECKING:
+    from app.api.attendee.models import AttendeeProducts
 
 
 class TicketEvent(SQLModel, table=True):
@@ -65,3 +68,6 @@ class TicketEvent(SQLModel, table=True):
             nullable=False,
         ),
     )
+
+    # Relationship — used by router for eager loading; not in DB schema.
+    attendee_product: "AttendeeProducts" = Relationship()  # type: ignore[assignment]

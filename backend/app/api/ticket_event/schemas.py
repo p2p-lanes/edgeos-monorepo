@@ -42,3 +42,24 @@ class TicketEventPublic(TicketEventBase):
     """Full public representation of a ticket_events row for API responses."""
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class TicketEventListItem(BaseModel):
+    """Enriched ticket event row for the backoffice scan-history table.
+
+    Eager-loads attendee + product data so the table renders without N+1
+    fetches. source is extracted from payload["source"] for check_in events.
+    """
+
+    id: uuid.UUID
+    attendee_product_id: uuid.UUID
+    event_type: str
+    occurred_at: datetime
+    source: str | None = None  # extracted from payload["source"] for check_in events
+    attendee_name: str | None = None
+    attendee_email: str | None = None
+    product_name: str | None = None
+    actor_user_id: uuid.UUID | None = None
+    payload: dict | None = None  # full payload for expandable detail view
+
+    model_config = ConfigDict(from_attributes=True)
