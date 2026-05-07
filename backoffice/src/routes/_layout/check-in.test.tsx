@@ -2,8 +2,8 @@
  * Tests for check-in route.
  *
  * Covers:
- * (a) CheckInSubRow: renders "Scanned by" (name and/or email; row is hidden
- *     when neither is set) and payload JSON; UUID + timestamp not shown.
+ * (a) CheckInSubRow: renders "Scanned by" (name and/or email; row hidden when
+ *     neither is set). UUID, timestamp, and raw payload JSON are never shown.
  * (b) column cells: attendee name+email, product name, date
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
@@ -94,27 +94,27 @@ describe("CheckInSubRow", () => {
     expect(screen.queryByText("Timestamp")).not.toBeInTheDocument()
   })
 
-  it("renders payload JSON when present", () => {
+  it("does not render the raw payload JSON even when it has content", () => {
     const event = {
       id: "evt-2",
       attendee_product_id: "ap-uuid",
-      event_type: "check_in",
       occurred_at: "2024-01-15T10:00:00Z",
-      source: "qr_scan",
+      source: "qr",
       attendee_name: "Bob",
       attendee_email: null,
       product_name: null,
       actor_user_id: null,
-      payload: { source: "qr_scan", device: "scanner-01" },
+      actor_user_name: null,
+      actor_user_email: null,
+      payload: { source: "qr", notes: "Some operator note" },
     }
 
     render(<CheckInSubRow row={makeRow(event)} />, {
       wrapper: makeWrapper(),
     })
 
-    // JSON payload should be rendered as preformatted text
-    expect(screen.getByText(/qr_scan/)).toBeInTheDocument()
-    expect(screen.getByText(/scanner-01/)).toBeInTheDocument()
+    expect(screen.queryByText("Payload")).not.toBeInTheDocument()
+    expect(screen.queryByText(/Some operator note/)).not.toBeInTheDocument()
   })
 
   it("renders 'Scanned by' as 'name - email' when both are set", () => {
@@ -187,26 +187,5 @@ describe("CheckInSubRow", () => {
 
     expect(screen.queryByText("Scanned by")).not.toBeInTheDocument()
     expect(screen.queryByText("user-uuid-123")).not.toBeInTheDocument()
-  })
-
-  it("does not render payload section when payload is null", () => {
-    const event = {
-      id: "evt-4",
-      attendee_product_id: "ap-uuid",
-      event_type: "check_in",
-      occurred_at: "2024-01-15T10:00:00Z",
-      source: null,
-      attendee_name: "Dave",
-      attendee_email: null,
-      product_name: null,
-      actor_user_id: null,
-      payload: null,
-    }
-
-    render(<CheckInSubRow row={makeRow(event)} />, {
-      wrapper: makeWrapper(),
-    })
-
-    expect(screen.queryByText("Payload")).not.toBeInTheDocument()
   })
 })

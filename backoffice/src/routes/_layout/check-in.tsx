@@ -70,17 +70,6 @@ export function CheckInSubRow({ row }: { row: Row<CheckInListItem> }) {
             <dd className="text-sm">{scannedBy}</dd>
           </>
         )}
-
-        {event.payload && Object.keys(event.payload).length > 0 && (
-          <>
-            <dt className="text-muted-foreground font-medium">Payload</dt>
-            <dd>
-              <pre className="text-xs bg-muted rounded p-2 overflow-x-auto">
-                {JSON.stringify(event.payload, null, 2)}
-              </pre>
-            </dd>
-          </>
-        )}
       </dl>
     </div>
   )
