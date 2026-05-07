@@ -57,7 +57,7 @@ const routeLabels: Record<string, string> = {
   "form-builder": "Form Builder",
   applications: "Applications",
   attendees: "Attendees",
-  scan: "Scan Ticket",
+  "check-in": "Check In",
   humans: "Humans",
   payments: "Payments",
   organizations: "Organizations",
