@@ -142,7 +142,6 @@ class TestPostCheckIn:
         assert data["total_scans"] == 1, f"Expected total_scans=1, got {data['total_scans']}"
         assert data["first_scan_at"] is not None, "first_scan_at must be set after first scan"
         assert data["last_scan_at"] is not None, "last_scan_at must be set after first scan"
-        assert data["is_rescan"] is False, "First scan must not be flagged as a re-scan"
 
     def test_rescan_returns_200_with_incremented_total(
         self,
@@ -169,7 +168,7 @@ class TestPostCheckIn:
         )
         assert r1.status_code == 200
         data1 = r1.json()
-        assert data1["is_rescan"] is False, "First scan must not be flagged as a re-scan"
+        assert data1["total_scans"] == 1
 
         # Second scan
         r2 = client.post(
@@ -183,7 +182,6 @@ class TestPostCheckIn:
         assert data2["total_scans"] == 2, (
             f"Expected total_scans=2 after re-scan, got {data2['total_scans']}"
         )
-        assert data2["is_rescan"] is True, "Re-scan must be flagged via is_rescan=true"
         assert data2["first_scan_at"] is not None
         assert data2["last_scan_at"] is not None
         # first_scan_at must equal the first scan (or be earlier)

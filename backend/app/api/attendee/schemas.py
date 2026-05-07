@@ -215,14 +215,11 @@ class TicketPublic(BaseModel):
     payment_id: uuid.UUID | None = None
     attendee: TicketAttendeeSnapshot
     product: TicketProductSnapshot
-    # Scan summary — populated by POST /attendees/check-in/{code} from ticket_events
+    # Scan summary — populated by POST /attendees/check-in/{code} from ticket_events.
+    # Re-scan can be derived by the frontend as `total_scans > 1`.
     total_scans: int = 0
     first_scan_at: datetime | None = None
     last_scan_at: datetime | None = None
-    # True when the ticket had at least one prior scan before this request.
-    # The endpoint records the new event regardless; frontend uses this to
-    # surface a "re-scan" warning (not an error).
-    is_rescan: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 
