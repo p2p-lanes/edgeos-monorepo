@@ -357,7 +357,9 @@ export type AttendeeProductPublic = {
 };
 
 /**
- * Attendee schema for API responses.
+ * Attendee schema for API responses (detail view).
+ * products is typed as AttendeeProductPublic[] so each entry carries
+ * check_in_code, payment_id, and requires_check_in.
  */
 export type AttendeePublic = {
     tenant_id: string;
@@ -373,7 +375,28 @@ export type AttendeePublic = {
     id: string;
     created_at?: (string | null);
     updated_at?: (string | null);
-    products?: Array<unknown>;
+    products?: Array<AttendeeProductPublic>;
+};
+
+/**
+ * Attendee schema for the list endpoint (GET /attendees).
+ * Uses ProductWithQuantity for products field (legacy shape).
+ */
+export type AttendeeListItem = {
+    tenant_id: string;
+    application_id?: (string | null);
+    popup_id: string;
+    human_id?: (string | null);
+    name: string;
+    category: string;
+    email?: (string | null);
+    gender?: (string | null);
+    check_in_code?: (string | null);
+    poap_url?: (string | null);
+    id: string;
+    created_at?: (string | null);
+    updated_at?: (string | null);
+    products?: Array<ProductWithQuantity>;
 };
 
 /**
@@ -1547,6 +1570,11 @@ export type ListModel_AttendeePublic_ = {
     paging: Paging;
 };
 
+export type ListModel_AttendeeListItem_ = {
+    results: Array<AttendeeListItem>;
+    paging: Paging;
+};
+
 export type ListModel_AttendeesDirectoryEntry_ = {
     results: Array<AttendeesDirectoryEntry>;
     paging: Paging;
@@ -1629,6 +1657,11 @@ export type ListModel_TenantPublic_ = {
 
 export type ListModel_TicketingStepPublic_ = {
     results: Array<TicketingStepPublic>;
+    paging: Paging;
+};
+
+export type ListModel_TicketEventListItem_ = {
+    results: Array<TicketEventListItem>;
     paging: Paging;
 };
 
@@ -2605,6 +2638,23 @@ export type TicketEventPublic = {
 };
 
 /**
+ * Enriched ticket event row for the backoffice scan-history table.
+ * Eager-loads attendee + product data to avoid N+1 fetches.
+ */
+export type TicketEventListItem = {
+    id: string;
+    attendee_product_id: string;
+    event_type: string;
+    occurred_at: string;
+    source?: (string | null);
+    attendee_name?: (string | null);
+    attendee_email?: (string | null);
+    product_name?: (string | null);
+    actor_user_id?: (string | null);
+    payload?: (Record<string, unknown> | null);
+};
+
+/**
  * Schema for creating a new ticket tier group.
  */
 export type TierGroupCreate = {
@@ -3215,14 +3265,14 @@ export type AttendeesListAttendeesData = {
     xTenantId?: (string | null);
 };
 
-export type AttendeesListAttendeesResponse = (ListModel_AttendeePublic_);
+export type AttendeesListAttendeesResponse = (ListModel_AttendeeListItem_);
 
 export type AttendeesGetAttendeeData = {
     attendeeId: string;
     xTenantId?: (string | null);
 };
 
-export type AttendeesGetAttendeeResponse = (AttendeePublic);
+export type AttendeesGetAttendeeResponse = (AttendeeWithOriginPublic);
 
 export type AttendeesUpdateAttendeeData = {
     attendeeId: string;
@@ -3230,7 +3280,7 @@ export type AttendeesUpdateAttendeeData = {
     xTenantId?: (string | null);
 };
 
-export type AttendeesUpdateAttendeeResponse = (AttendeePublic);
+export type AttendeesUpdateAttendeeResponse = (AttendeeWithOriginPublic);
 
 export type AttendeesDeleteAttendeeData = {
     attendeeId: string;
@@ -4980,3 +5030,14 @@ export type VenuePropertyTypesDeletePropertyTypeData = {
 export type VenuePropertyTypesDeletePropertyTypeResponse = (void);
 
 export type VenuePropertyTypesListPropertyTypesPortalResponse = (Array<VenuePropertyTypePublic>);
+
+export type TicketEventsListTicketEventsData = {
+    attendeeProductId?: (string | null);
+    popupId?: (string | null);
+    eventType?: (string | null);
+    skip?: number;
+    limit?: number;
+    xTenantId?: (string | null);
+};
+
+export type TicketEventsListTicketEventsResponse = (ListModel_TicketEventListItem_);

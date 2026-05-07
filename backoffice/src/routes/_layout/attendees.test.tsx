@@ -14,6 +14,7 @@ import { describe, expect, it, vi } from "vitest"
 vi.mock("@/client", () => ({
   AttendeesService: {
     listAttendees: vi.fn(),
+    getAttendee: vi.fn(),
   },
 }))
 
@@ -77,41 +78,55 @@ function makeWrapper() {
 }
 
 // ── (a) CSV flattening ────────────────────────────────────────────────────────
+// NOTE: flattenAttendeesForCsv accepts AttendeeListItem[] whose products field
+// is ProductWithQuantity[] (list endpoint shape). ProductWithQuantity carries
+// only the product id (p.id) — no check_in_code. So ticket_check_in_code is
+// always "" in the CSV; per-ticket codes are only available in the detail view.
 
 describe("flattenAttendeesForCsv", () => {
   it("returns one row per ticket when attendee has multiple products", () => {
     const attendee = {
       id: "att-1",
+      tenant_id: "tenant-1",
+      popup_id: "popup-1",
       name: "Alice",
       email: "alice@example.com",
       category: "main",
       gender: null,
       check_in_code: null,
+      // ProductWithQuantity shape — only id and name are required for the test
       products: [
         {
-          id: "ap-1",
-          attendee_id: "att-1",
-          product_id: "prod-1",
-          check_in_code: "CODE1",
+          id: "prod-1",
+          name: "Day Pass",
+          tenant_id: "t",
+          popup_id: "p",
+          slug: "day",
+          price: "0",
+          quantity: 1,
         },
         {
-          id: "ap-2",
-          attendee_id: "att-1",
-          product_id: "prod-2",
-          check_in_code: "CODE2",
+          id: "prod-2",
+          name: "Night Pass",
+          tenant_id: "t",
+          popup_id: "p",
+          slug: "night",
+          price: "0",
+          quantity: 1,
         },
       ],
     }
     const rows = flattenAttendeesForCsv([attendee as never])
     expect(rows).toHaveLength(2)
+    // ticket_check_in_code is always "" — list endpoint does not carry per-ticket codes
     expect(rows[0]).toMatchObject({
       name: "Alice",
-      ticket_check_in_code: "CODE1",
+      ticket_check_in_code: "",
       product_id: "prod-1",
     })
     expect(rows[1]).toMatchObject({
       name: "Alice",
-      ticket_check_in_code: "CODE2",
+      ticket_check_in_code: "",
       product_id: "prod-2",
     })
   })
@@ -119,6 +134,8 @@ describe("flattenAttendeesForCsv", () => {
   it("returns one row with empty ticket fields when attendee has no products", () => {
     const attendee = {
       id: "att-1",
+      tenant_id: "tenant-1",
+      popup_id: "popup-1",
       name: "Bob",
       email: "bob@example.com",
       category: "main",
@@ -139,6 +156,8 @@ describe("flattenAttendeesForCsv", () => {
     const attendees = [
       {
         id: "att-1",
+        tenant_id: "tenant-1",
+        popup_id: "popup-1",
         name: "Alice",
         email: "alice@example.com",
         category: "main",
@@ -146,15 +165,20 @@ describe("flattenAttendeesForCsv", () => {
         check_in_code: null,
         products: [
           {
-            id: "ap-1",
-            attendee_id: "att-1",
-            product_id: "prod-1",
-            check_in_code: "CODE1",
+            id: "prod-1",
+            name: "Day Pass",
+            tenant_id: "t",
+            popup_id: "p",
+            slug: "day",
+            price: "0",
+            quantity: 1,
           },
         ],
       },
       {
         id: "att-2",
+        tenant_id: "tenant-1",
+        popup_id: "popup-1",
         name: "Bob",
         email: null,
         category: "spouse",
@@ -172,16 +196,21 @@ describe("flattenAttendeesForCsv", () => {
 })
 
 // ── (b) AttendeeDetailsContent — per-ticket check_in_codes ──────────────────────
+// AttendeeDetailsContent accepts AttendeeWithOriginPublic (detail endpoint shape).
+// products[] is AttendeeProductPublic[] so each entry has check_in_code.
 
 describe("AttendeeDetailsContent", () => {
   it("renders per-ticket check_in_codes from products array", async () => {
     const attendee = {
       id: "att-1",
+      tenant_id: "tenant-1",
+      popup_id: "popup-1",
       name: "Alice",
       email: "alice@example.com",
       category: "main",
       gender: null,
       check_in_code: null,
+      origin: "direct_sale",
       products: [
         {
           id: "ap-1",
@@ -209,11 +238,14 @@ describe("AttendeeDetailsContent", () => {
   it("shows fallback attendee-level check_in_code when no products", async () => {
     const attendee = {
       id: "att-1",
+      tenant_id: "tenant-1",
+      popup_id: "popup-1",
       name: "Alice",
       email: "alice@example.com",
       category: "main",
       gender: null,
       check_in_code: "ATT-LEGACY-CODE",
+      origin: "direct_sale",
       products: [],
     }
 

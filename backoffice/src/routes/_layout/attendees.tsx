@@ -13,9 +13,9 @@ import {
 import { Suspense, useState } from "react"
 
 import {
-  type AttendeeProductPublic,
-  type AttendeePublic,
+  type AttendeeListItem,
   AttendeesService,
+  type AttendeeWithOriginPublic,
 } from "@/client"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
@@ -62,12 +62,15 @@ type FlatAttendeeRow = {
  * Expand each attendee into one row per purchased ticket.
  * Attendees with no products emit a single row with empty ticket fields
  * so they still appear in the CSV.
+ *
+ * Accepts AttendeeListItem (list endpoint shape) where products are
+ * ProductWithQuantity rows — we only need the product_id for the CSV.
  */
 export function flattenAttendeesForCsv(
-  attendees: AttendeePublic[],
+  attendees: AttendeeListItem[],
 ): FlatAttendeeRow[] {
   return attendees.flatMap((att) => {
-    const products = (att.products ?? []) as unknown as AttendeeProductPublic[]
+    const products = att.products ?? []
     if (products.length === 0) {
       return [
         {
@@ -85,8 +88,10 @@ export function flattenAttendeesForCsv(
       email: att.email,
       category: att.category,
       gender: att.gender,
-      ticket_check_in_code: p.check_in_code ?? "",
-      product_id: String(p.product_id),
+      // ProductWithQuantity from list endpoint does not carry check_in_code;
+      // use empty string for CSV — full codes are in the detail view.
+      ticket_check_in_code: "",
+      product_id: String(p.id),
     }))
   })
 }
@@ -121,14 +126,16 @@ export const Route = createFileRoute("/_layout/attendees")({
  * Renders the inner content of the attendee details dialog.
  * Exported for unit-test isolation — rendered without Dialog wrapper so callers
  * can assert on the content without needing modal open/close machinery.
+ *
+ * Accepts AttendeeWithOriginPublic so products[] is typed as
+ * AttendeeProductPublic[] and check_in_code is always populated.
  */
 export function AttendeeDetailsContent({
   attendee,
 }: {
-  attendee: AttendeePublic
+  attendee: AttendeeWithOriginPublic
 }) {
-  const products = (attendee.products ??
-    []) as unknown as AttendeeProductPublic[]
+  const products = attendee.products ?? []
 
   return (
     <>
@@ -215,8 +222,17 @@ export function AttendeeDetailsContent({
   )
 }
 
-function ViewAttendee({ attendee }: { attendee: AttendeePublic }) {
+function ViewAttendee({ attendee }: { attendee: AttendeeListItem }) {
   const [isOpen, setIsOpen] = useState(false)
+
+  // Fetch full detail (AttendeeWithOriginPublic with typed products[]) only
+  // when the dialog is open so check_in_code is populated per ticket.
+  const { data: detail } = useQuery({
+    queryKey: ["attendees", attendee.id],
+    queryFn: () => AttendeesService.getAttendee({ attendeeId: attendee.id }),
+    enabled: isOpen,
+    staleTime: 30_000,
+  })
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -232,13 +248,19 @@ function ViewAttendee({ attendee }: { attendee: AttendeePublic }) {
           <DialogTitle>Attendee Details</DialogTitle>
           <DialogDescription>{attendee.name}</DialogDescription>
         </DialogHeader>
-        <AttendeeDetailsContent attendee={attendee} />
+        {detail ? (
+          <AttendeeDetailsContent attendee={detail} />
+        ) : (
+          <div className="px-6 py-8">
+            <Skeleton className="h-32 w-full" />
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   )
 }
 
-function AttendeeActionsMenu({ attendee }: { attendee: AttendeePublic }) {
+function AttendeeActionsMenu({ attendee }: { attendee: AttendeeListItem }) {
   const [open, setOpen] = useState(false)
 
   return (
@@ -255,7 +277,7 @@ function AttendeeActionsMenu({ attendee }: { attendee: AttendeePublic }) {
   )
 }
 
-const columns: ColumnDef<AttendeePublic>[] = [
+const columns: ColumnDef<AttendeeListItem>[] = [
   {
     accessorKey: "name",
     header: ({ column }) => <SortableHeader label="Name" column={column} />,
@@ -357,7 +379,7 @@ function Attendees() {
           popupId: selectedPopupId,
         }),
       )
-      const rows = flattenAttendeesForCsv(results)
+      const rows = flattenAttendeesForCsv(results as AttendeeListItem[])
       exportToCsv("attendees", rows as unknown as Record<string, unknown>[], [
         { key: "name", label: "Name" },
         { key: "email", label: "Email" },
