@@ -23,7 +23,6 @@ from app.api.ticket_event.schemas import CheckInPayload
 from app.core.dependencies.users import (
     CurrentCheckInOperator,
     CurrentHuman,
-    CurrentUser,
     CurrentWriter,
     HumanTenantSession,
     TenantSession,

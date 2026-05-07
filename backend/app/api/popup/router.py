@@ -37,7 +37,6 @@ from app.api.translation.service import (
 from app.core.dependencies.users import (
     CurrentCheckInOperator,
     CurrentHuman,
-    CurrentUser,
     CurrentWriter,
     HumanTenantSession,
     SessionDep,
