@@ -13453,6 +13453,11 @@ export const TicketPublicSchema = {
                 }
             ],
             title: 'Last Scan At'
+        },
+        is_rescan: {
+            type: 'boolean',
+            title: 'Is Rescan',
+            default: false
         }
     },
     type: 'object',

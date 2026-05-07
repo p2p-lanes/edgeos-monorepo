@@ -419,9 +419,10 @@ async def post_check_in(
     can apply the right policy at runtime (single-scan, scan-every-time, etc.).
 
     Returns:
-      - 200 with TicketPublic + scan summary (total_scans, first_scan_at, last_scan_at)
+      - 200 with TicketPublic + scan summary; `is_rescan=true` when the ticket had
+        a prior scan (warning, not an error — backend always records the new event)
+      - 400 if the product does not require check-in (`requires_check_in=false`)
       - 404 if check_in_code not found
-      Backend does NOT block re-scans (total_scans > 1 is allowed — policy is frontend).
 
     Code is matched case-insensitively (uppercased before lookup).
     """
@@ -435,6 +436,16 @@ async def post_check_in(
 
     ticket, attendee, product = result
 
+    # Reject codes belonging to non-scannable products (e.g. merch, lodging).
+    # The migration generates a check_in_code for every attendee_products row to
+    # keep the column NOT NULL, but only `requires_check_in=true` products are
+    # legitimate scan targets.
+    if not product.requires_check_in:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Product does not require check-in",
+        )
+
     # Record the check-in event; actor is the current user
     record_check_in(
         db,
@@ -443,8 +454,10 @@ async def post_check_in(
         actor_user_id=current_user.id,
     )
 
-    # Build scan summary from ticket_events (single aggregation query)
+    # Build scan summary from ticket_events (single aggregation query).
+    # is_rescan is true when there was at least one prior scan before this one.
     summary = get_check_in_summary(db, ticket.id)
+    is_rescan = summary["total_scans"] > 1
 
     return TicketPublic(
         id=ticket.id,
@@ -467,6 +480,7 @@ async def post_check_in(
         total_scans=summary["total_scans"],
         first_scan_at=summary["first_scan_at"],
         last_scan_at=summary["last_scan_at"],
+        is_rescan=is_rescan,
     )
 
 

@@ -2678,6 +2678,7 @@ export type TicketPublic = {
     total_scans?: number;
     first_scan_at?: (string | null);
     last_scan_at?: (string | null);
+    is_rescan?: boolean;
 };
 
 /**

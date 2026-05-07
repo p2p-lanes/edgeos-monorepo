@@ -219,6 +219,10 @@ class TicketPublic(BaseModel):
     total_scans: int = 0
     first_scan_at: datetime | None = None
     last_scan_at: datetime | None = None
+    # True when the ticket had at least one prior scan before this request.
+    # The endpoint records the new event regardless; frontend uses this to
+    # surface a "re-scan" warning (not an error).
+    is_rescan: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 

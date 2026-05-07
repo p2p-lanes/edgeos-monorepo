@@ -24,7 +24,7 @@ def record_check_in(
     Args:
         session: active SQLModel session (caller owns the transaction).
         attendee_product_id: UUID PK of the AttendeeProducts (ticket) row.
-        payload: CheckInPayload with source, gate, device_id, notes.
+        payload: CheckInPayload with source and optional notes.
         actor_user_id: user who performed the scan; None for system events.
 
     Returns:

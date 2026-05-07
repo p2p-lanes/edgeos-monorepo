@@ -978,9 +978,10 @@ export class AttendeesService {
      * can apply the right policy at runtime (single-scan, scan-every-time, etc.).
      *
      * Returns:
-     * - 200 with TicketPublic + scan summary (total_scans, first_scan_at, last_scan_at)
+     * - 200 with TicketPublic + scan summary; `is_rescan=true` when the ticket had
+     * a prior scan (warning, not an error — backend always records the new event)
+     * - 400 if the product does not require check-in (`requires_check_in=false`)
      * - 404 if check_in_code not found
-     * Backend does NOT block re-scans (total_scans > 1 is allowed — policy is frontend).
      *
      * Code is matched case-insensitively (uppercased before lookup).
      * @param data The data for the request.

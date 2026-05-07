@@ -142,6 +142,7 @@ class TestPostCheckIn:
         assert data["total_scans"] == 1, f"Expected total_scans=1, got {data['total_scans']}"
         assert data["first_scan_at"] is not None, "first_scan_at must be set after first scan"
         assert data["last_scan_at"] is not None, "last_scan_at must be set after first scan"
+        assert data["is_rescan"] is False, "First scan must not be flagged as a re-scan"
 
     def test_rescan_returns_200_with_incremented_total(
         self,
@@ -168,6 +169,7 @@ class TestPostCheckIn:
         )
         assert r1.status_code == 200
         data1 = r1.json()
+        assert data1["is_rescan"] is False, "First scan must not be flagged as a re-scan"
 
         # Second scan
         r2 = client.post(
@@ -181,11 +183,52 @@ class TestPostCheckIn:
         assert data2["total_scans"] == 2, (
             f"Expected total_scans=2 after re-scan, got {data2['total_scans']}"
         )
+        assert data2["is_rescan"] is True, "Re-scan must be flagged via is_rescan=true"
         assert data2["first_scan_at"] is not None
         assert data2["last_scan_at"] is not None
         # first_scan_at must equal the first scan (or be earlier)
         assert data1["first_scan_at"] == data2["first_scan_at"], (
             "first_scan_at must not change on re-scan"
+        )
+
+    def test_non_scannable_product_returns_400(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        popup_tenant_a: Popups,
+        admin_user_tenant_a: Users,
+    ) -> None:
+        """POST with a code from a `requires_check_in=False` product returns 400."""
+        product = Products(
+            id=uuid.uuid4(),
+            tenant_id=tenant_a.id,
+            popup_id=popup_tenant_a.id,
+            name=f"Non-Scannable {uuid.uuid4().hex[:6]}",
+            slug=f"ns-{uuid.uuid4().hex[:6]}",
+            price=Decimal("10"),
+            category="merch",
+            requires_check_in=False,
+        )
+        db.add(product)
+        db.commit()
+        db.refresh(product)
+
+        human = _make_human(db, tenant_a)
+        attendee = _make_attendee(db, tenant_a, popup_tenant_a, human)
+        code = f"NOSCAN{uuid.uuid4().hex[:2].upper()}"
+        _make_ticket(db, tenant_a, attendee, product, code=code)
+
+        response = client.post(
+            f"/api/v1/attendees/check-in/{code}",
+            json={"source": "qr"},
+            headers=_auth(admin_user_tenant_a),
+        )
+        assert response.status_code == 400, (
+            f"Expected 400 for non-scannable product, got {response.status_code}: {response.text}"
+        )
+        assert "does not require check-in" in response.json()["detail"].lower(), (
+            f"Expected detail to mention non-scannable; got {response.json()['detail']!r}"
         )
 
     def test_unknown_code_returns_404(
