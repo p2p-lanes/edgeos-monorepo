@@ -210,7 +210,6 @@ function PatronDefault({
   handlePreset,
   handleCustomChange,
   onRemove,
-  onSkip,
 }: PatronLayoutProps) {
   return (
     <div className="space-y-4">
@@ -299,7 +298,6 @@ function PatronCompact({
   handlePreset,
   handleCustomChange,
   onRemove,
-  onSkip,
 }: PatronLayoutProps) {
   return (
     <div className="space-y-3">
@@ -384,7 +382,6 @@ function PatronGrid({
   handlePreset,
   handleCustomChange,
   onRemove,
-  onSkip,
 }: PatronLayoutProps) {
   return (
     <div className="space-y-4">

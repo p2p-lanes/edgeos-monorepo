@@ -31,13 +31,11 @@ function stripMotionProps<T extends Record<string, unknown>>(props: T) {
 
 vi.mock("framer-motion", () => ({
   motion: {
-    // biome-ignore lint/suspicious/noExplicitAny: test mock
     div: ({ children, className, ...rest }: any) => (
       <div className={className} {...stripMotionProps(rest)}>
         {children}
       </div>
     ),
-    // biome-ignore lint/suspicious/noExplicitAny: test mock
     span: ({ children, className, ...rest }: any) => (
       <span className={className} {...stripMotionProps(rest)}>
         {children}

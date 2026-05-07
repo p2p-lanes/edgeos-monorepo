@@ -43,7 +43,6 @@ function SectionTitle({ title }: { title?: string }) {
 function AccordionFaqs({
   items,
   title,
-  onSkip,
 }: {
   items: FaqItem[]
   title?: string
@@ -106,7 +105,6 @@ function AccordionFaqs({
 function ListFaqs({
   items,
   title,
-  onSkip,
 }: {
   items: FaqItem[]
   title?: string
@@ -138,7 +136,6 @@ function ListFaqs({
 function TwoColumnFaqs({
   items,
   title,
-  onSkip,
 }: {
   items: FaqItem[]
   title?: string
@@ -173,7 +170,6 @@ function TwoColumnFaqs({
 function CardsFaqs({
   items,
   title,
-  onSkip,
 }: {
   items: FaqItem[]
   title?: string

@@ -247,7 +247,6 @@ function MerchDefault({
   products,
   getQuantity,
   onQuantityChange,
-  onSkip,
 }: CardListProps) {
   return (
     <div className="space-y-4">
@@ -267,12 +266,7 @@ function MerchDefault({
 
 /* ── Variant: Grid (2-column image cards with quantity) ───── */
 
-function MerchGrid({
-  products,
-  getQuantity,
-  onQuantityChange,
-  onSkip,
-}: CardListProps) {
+function MerchGrid({ products, getQuantity, onQuantityChange }: CardListProps) {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -359,7 +353,6 @@ function MerchCompact({
   products,
   getQuantity,
   onQuantityChange,
-  onSkip,
 }: CardListProps) {
   return (
     <div className="space-y-2">

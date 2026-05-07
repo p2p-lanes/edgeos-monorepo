@@ -125,7 +125,6 @@ function SnapSectionHeader({
             >
               {watermarkText.split("").map((char, i) => (
                 <span
-                  // biome-ignore lint/suspicious/noArrayIndexKey: static decorative chars
                   key={i}
                   data-watermark-char
                   style={{ display: "inline-block" }}

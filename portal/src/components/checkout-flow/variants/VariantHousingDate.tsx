@@ -615,7 +615,6 @@ function HousingDefault({
   getQuantity,
   onIncrement,
   onDecrement,
-  onSkip,
 }: CardListProps) {
   return (
     <div className="space-y-5">
@@ -831,7 +830,6 @@ function HousingShowcase({
   getQuantity,
   onIncrement,
   onDecrement,
-  onSkip,
 }: CardListProps) {
   return (
     <div className="space-y-6">
@@ -864,7 +862,6 @@ function HousingCompact({
   getQuantity,
   onIncrement,
   onDecrement,
-  onSkip,
 }: CardListProps) {
   return (
     <div className="space-y-4">
@@ -903,7 +900,6 @@ function HousingGrid({
   getQuantity,
   onIncrement,
   onDecrement,
-  onSkip,
 }: CardListProps) {
   return (
     <div className="space-y-6">

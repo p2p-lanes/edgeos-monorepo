@@ -67,7 +67,9 @@ describe("OpenTicketingCheckoutPage", () => {
     render(<OpenTicketingCheckoutPage />)
 
     expect(screen.getByText("openCheckout.unavailable_title")).toBeTruthy()
-    expect(screen.getByText("openCheckout.unavailable_description")).toBeTruthy()
+    expect(
+      screen.getByText("openCheckout.unavailable_description"),
+    ).toBeTruthy()
   })
 
   it("renders the shared runtime for the popup slug", () => {
