@@ -9,6 +9,7 @@ import QuantitySelector, {
   resolveMaxQuantity,
   supportsQuantitySelector,
 } from "@/components/ui/QuantitySelector"
+import { deriveProductState, type ProductSaleState } from "@/lib/product-state"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
 import { usePassesProvider } from "@/providers/passesProvider"
@@ -79,6 +80,38 @@ const getCategoryMeta = (cat: string) =>
     badge: "bg-gray-100 text-gray-700",
     tab: "text-gray-700 border-gray-700",
   }
+
+function SaleStateBadge({ state }: { state: ProductSaleState }) {
+  if (state === "on_sale") return null
+  const config: Record<
+    Exclude<ProductSaleState, "on_sale">,
+    { label: string; classes: string }
+  > = {
+    upcoming: {
+      label: "UPCOMING",
+      classes: "bg-blue-100 text-blue-700 border-blue-200",
+    },
+    ended: {
+      label: "ENDED",
+      classes: "bg-slate-100 text-slate-500 border-slate-200",
+    },
+    sold_out: {
+      label: "SOLD OUT",
+      classes: "bg-rose-100 text-rose-700 border-rose-200",
+    },
+  }
+  const { label, classes } = config[state]
+  return (
+    <span
+      className={cn(
+        "px-2 py-0.5 text-[10px] font-semibold uppercase rounded tracking-wide border shrink-0",
+        classes,
+      )}
+    >
+      {label}
+    </span>
+  )
+}
 
 const sortProductsByPriority = (a: ProductsPass, b: ProductsPass): number => {
   const rank = (p: ProductsPass) => {
@@ -427,7 +460,9 @@ function PassRow({
   const comparePrice = product.compare_price ?? product.original_price
   const hasDiscount = comparePrice && comparePrice > product.price
   const isSelected = selected && !purchased
-  const effectiveDisabled = disabled
+  const saleState = deriveProductState(product)
+  const stateBlocked = saleState !== "on_sale"
+  const effectiveDisabled = disabled || stateBlocked
   const isClickable = !effectiveDisabled && (!purchased || isEditing)
   const [summaryOpen, setSummaryOpen] = useState(false)
   // Multi-unit stepper mode — editing of purchased multi-unit passes is out
@@ -593,6 +628,7 @@ function PassRow({
             <span className="font-medium text-foreground break-words">
               {product.name}
             </span>
+            <SaleStateBadge state={saleState} />
           </div>
         </div>
       </div>
@@ -678,7 +714,9 @@ function DayPassRow({
   const comparePrice = product.compare_price ?? product.price
   const hasDiscount = comparePrice != null && comparePrice > product.price
   const hasQuantity = quantity > 0
-  const effectiveDisabled = disabled
+  const saleState = deriveProductState(product)
+  const stateBlocked = saleState !== "on_sale"
+  const effectiveDisabled = disabled || stateBlocked
 
   const maxQuantity = resolveMaxQuantity(product)
 
@@ -764,6 +802,7 @@ function DayPassRow({
             <span className="font-medium text-foreground break-words">
               {product.name}
             </span>
+            <SaleStateBadge state={saleState} />
           </div>
           <p className="text-sm text-muted-foreground">per day</p>
           {product.description && (
@@ -849,6 +888,8 @@ function CompactAttendeeCard({
             const isDayPass = p.duration_type === "day"
             const hasStepper =
               isDayPass || supportsQuantitySelector(p.max_per_order)
+            const pillSaleState = deriveProductState(p)
+            const pillStateBlocked = pillSaleState !== "on_sale"
 
             if (hasStepper) {
               const qty = p.quantity ?? 0
@@ -864,6 +905,7 @@ function CompactAttendeeCard({
                 attendee.category === "baby"
               const tileDisabled =
                 !!p.disabled ||
+                pillStateBlocked ||
                 (!isDayPass &&
                   isChild &&
                   (p.duration_type === "full" ||
@@ -912,6 +954,7 @@ function CompactAttendeeCard({
                   >
                     {p.name}
                   </span>
+                  <SaleStateBadge state={pillSaleState} />
                   <span
                     className={cn(
                       "font-semibold ml-0.5",
@@ -930,6 +973,7 @@ function CompactAttendeeCard({
               attendee.category === "baby"
             const isDisabled =
               p.disabled ||
+              pillStateBlocked ||
               (isChild &&
                 (p.duration_type === "full" || p.duration_type === "month")) ||
               (p.duration_type === "week" && hasFullOrMonthSelected) ||
@@ -959,6 +1003,7 @@ function CompactAttendeeCard({
                 {isSelected && <Check className="w-3 h-3" />}
                 {p.purchased && !isEditing && <Ticket className="w-3 h-3" />}
                 <span>{p.name}</span>
+                <SaleStateBadge state={pillSaleState} />
                 <span
                   className={cn(
                     "font-semibold",
