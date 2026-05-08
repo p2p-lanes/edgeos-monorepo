@@ -14,7 +14,6 @@ Scenarios:
 """
 
 import uuid
-from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy.orm import selectinload
@@ -42,8 +41,6 @@ def _make_product(
     name: str,
     category: str = "ticket",
     requires_check_in: bool = True,
-    start_date: datetime | None = None,
-    end_date: datetime | None = None,
 ) -> Products:
     product = Products(
         id=uuid.uuid4(),
@@ -56,8 +53,6 @@ def _make_product(
         requires_check_in=requires_check_in,
         is_active=True,
         duration_type="week",
-        start_date=start_date,
-        end_date=end_date,
     )
     db.add(product)
     db.commit()

@@ -132,10 +132,6 @@ class PopupBase(SQLModel):
         default=ApplicationLayout.single_page,
         sa_column=Column(String, nullable=False, server_default="single_page"),
     )
-    tier_progression_enabled: bool = Field(
-        default=False,
-        sa_column=Column(Boolean, nullable=False, server_default="false"),
-    )
     events_enabled: bool = Field(
         default=True,
         sa_column=Column(Boolean, nullable=False, server_default="true"),

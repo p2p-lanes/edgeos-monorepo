@@ -1,12 +1,12 @@
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
-from sqlalchemy import Index, UniqueConstraint, text
+from sqlalchemy import Index, text
 from sqlalchemy import Numeric as SaNumerical
 from sqlalchemy.dialects.postgresql import UUID
-from sqlmodel import Column, DateTime, Field, Relationship, SQLModel
+from sqlmodel import Column, DateTime, Field, Relationship
 
 from app.api.product.schemas import ProductBase
 
@@ -15,68 +15,6 @@ if TYPE_CHECKING:
     from app.api.payment.models import PaymentProducts
     from app.api.popup.models import Popups
     from app.api.tenant.models import Tenants
-
-
-# ---------------------------------------------------------------------------
-# Legacy tier-group models — kept in PR 1 to avoid breaking existing tier tests.
-# These classes reference DB tables (ticket_tier_group, ticket_tier_phase) that
-# are dropped by migration 0045. After that migration runs the classes become
-# dead code; they will be deleted in PR 2 alongside test_tier_groups_api.py and
-# test_tier_progression.py.
-# ---------------------------------------------------------------------------
-
-
-class TicketTierGroup(SQLModel, table=True):
-    """Tier group that pools multiple ticket-phase products under a shared inventory cap.
-
-    DEPRECATED — table dropped by migration a1b9c3d7e5f2. Will be removed in PR 2.
-    """
-
-    __tablename__ = "ticket_tier_group"
-
-    id: uuid.UUID = Field(
-        default_factory=uuid.uuid4,
-        sa_column=Column(UUID(as_uuid=True), primary_key=True),
-    )
-    tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
-    name: str = Field(nullable=False)
-    shared_stock_cap: int | None = Field(default=None, nullable=True)
-    shared_stock_remaining: int | None = Field(default=None, nullable=True)
-
-    # Relationships
-    phases: list["TicketTierPhase"] = Relationship(
-        back_populates="group",
-        sa_relationship_kwargs={"order_by": "TicketTierPhase.order"},
-    )
-
-
-class TicketTierPhase(SQLModel, table=True):
-    """A single phase (e.g. Early Bird) within a TicketTierGroup, linked to one product.
-
-    DEPRECATED — table dropped by migration a1b9c3d7e5f2. Will be removed in PR 2.
-    """
-
-    __tablename__ = "ticket_tier_phase"
-    __table_args__ = (
-        UniqueConstraint("group_id", "order", name="uq_ticket_tier_phase_group_order"),
-    )
-
-    id: uuid.UUID = Field(
-        default_factory=uuid.uuid4,
-        sa_column=Column(UUID(as_uuid=True), primary_key=True),
-    )
-    group_id: uuid.UUID = Field(foreign_key="ticket_tier_group.id", index=True)
-    product_id: uuid.UUID = Field(
-        foreign_key="products.id",
-        unique=True,  # mapped to uq_ticket_tier_phase_product_id in migration
-    )
-    order: int = Field(nullable=False)
-    label: str = Field(nullable=False)
-    sale_starts_at: datetime | None = Field(default=None, nullable=True)
-    sale_ends_at: datetime | None = Field(default=None, nullable=True)
-
-    # Relationships
-    group: Optional["TicketTierGroup"] = Relationship(back_populates="phases")
 
 
 # ---------------------------------------------------------------------------

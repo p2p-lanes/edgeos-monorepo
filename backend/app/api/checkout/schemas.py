@@ -7,7 +7,6 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.api.popup.schemas import PopupPublic
-from app.api.product.schemas import TierGroupPublic, TierPhasePublic
 from app.api.ticketing_step.schemas import TicketingStepPublic
 
 # ---------------------------------------------------------------------------
@@ -70,8 +69,6 @@ class CheckoutRuntimeProduct(BaseModel):
     is_active: bool = True
     exclusive: bool = False
     insurance_eligible: bool = False
-    tier_group: TierGroupPublic | None = None
-    phase: TierPhasePublic | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

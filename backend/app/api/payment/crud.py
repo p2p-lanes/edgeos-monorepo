@@ -360,8 +360,6 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         self._validate_max_per_order(fabricated_requests, valid_products)
         # Atomically decrement total-stock counters (409 if sold out).
         self._decrement_total_stocks(session, fabricated_requests, valid_products)
-        # Atomically decrement shared tier-group counters (409 if group sold out).
-        self._decrement_shared_tier_stocks(session, fabricated_requests)
 
         buyer_snapshot = self._build_buyer_snapshot(popup, obj.buyer.form_data)
         buyer_name = (
@@ -977,62 +975,6 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         return valid_products
 
-    def _decrement_shared_tier_stocks(
-        self,
-        session: Session,
-        requested_products: list[PaymentProductRequest],
-    ) -> None:
-        """Atomically decrement shared_stock_remaining for any tier groups
-        that own the requested products.
-
-        Aggregates quantities per tier group, then issues one atomic UPDATE
-        per group via `tier_groups_crud.decrement_shared_stock`. If any group
-        has exhausted its shared cap, the method raises HTTP 409 and the
-        caller's transaction must roll back.
-
-        No-op for requests that touch no tier-managed products or only groups
-        without a shared cap.
-        """
-        from app.api.product.crud import tier_groups_crud
-        from app.api.product.models import TicketTierGroup, TicketTierPhase
-
-        product_ids = {p.product_id for p in requested_products}
-        if not product_ids:
-            return
-
-        phases_statement = select(TicketTierPhase).where(
-            TicketTierPhase.product_id.in_(product_ids)  # type: ignore[attr-defined]
-        )
-        phases = list(session.exec(phases_statement).all())
-        if not phases:
-            return
-
-        product_to_group: dict[uuid.UUID, uuid.UUID] = {
-            ph.product_id: ph.group_id for ph in phases
-        }
-
-        group_quantities: dict[uuid.UUID, int] = {}
-        for rp in requested_products:
-            group_id = product_to_group.get(rp.product_id)
-            if group_id is not None:
-                group_quantities[group_id] = (
-                    group_quantities.get(group_id, 0) + rp.quantity
-                )
-
-        if not group_quantities:
-            return
-
-        group_ids = list(group_quantities.keys())
-        groups_statement = select(TicketTierGroup).where(
-            TicketTierGroup.id.in_(group_ids),  # type: ignore[attr-defined]
-            TicketTierGroup.shared_stock_remaining.is_not(None),  # type: ignore[union-attr]
-        )
-        groups_with_cap = list(session.exec(groups_statement).all())
-
-        for group in groups_with_cap:
-            qty = group_quantities[group.id]
-            tier_groups_crud.decrement_shared_stock(session, group.id, qty)
-
     def _validate_max_per_order(
         self,
         requested_products: list[PaymentProductRequest],
@@ -1339,16 +1281,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         # Validate per-order caps (in-memory, fail fast, 422 on violation).
         self._validate_max_per_order(obj.products, valid_products)
 
-        # Reserve shared tier-group stock atomically before taking any
-        # irreversible action (creating payment rows, calling SimpleFI). If a
-        # linked group is sold out the 409 propagates and the transaction
-        # rolls back cleanly.
-        self._decrement_shared_tier_stocks(session, obj.products)
-
-        # Atomically decrement total-stock counters. Must run inside the same
-        # transaction as _decrement_shared_tier_stocks so a failure rolls both
-        # back via MVCC abort. Order: tier-group first (existing behavior
-        # preserved), then per-product.
+        # Atomically decrement total-stock counters.
         self._decrement_total_stocks(session, obj.products, valid_products)
 
         # Use eager loading to avoid N+1 when accessing application relationships
@@ -1857,11 +1790,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         separate refund-stock decision and is intentionally not wired here.
         See design §4.2 and proposal locked decisions.
         """
-        from app.api.product.crud import (
-            _resolve_tier_group,
-            products_crud,
-            tier_groups_crud,
-        )
+        from app.api.product.crud import products_crud
 
         if not payment.products_snapshot:
             return
@@ -1869,11 +1798,6 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         for pp in payment.products_snapshot:
             # Restore per-product total stock counter (no-op for unlimited products).
             products_crud.restore_total_stock(session, pp.product_id, pp.quantity)
-
-            # Restore shared tier-group counter if this product belongs to a group.
-            group_id = _resolve_tier_group(session, pp.product_id)
-            if group_id is not None:
-                tier_groups_crud.restore_shared_stock(session, group_id, pp.quantity)
 
     def update_status(
         self,

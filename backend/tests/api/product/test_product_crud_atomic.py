@@ -4,7 +4,6 @@ TDD phase: RED — written BEFORE the implementation exists.
 Tests cover:
   - decrement_total_stock: success, sold-out, unlimited (NULL), not-found
   - restore_total_stock: success, LEAST clamp, unlimited no-op
-  - TierGroupsCRUD.restore_shared_stock: success, LEAST clamp, unlimited no-op
 
 Spec references:
   §Domain 1 "Atomic Stock Decrement", §Domain 1 "Stock Restoration",
@@ -19,8 +18,8 @@ from fastapi import HTTPException
 from sqlmodel import Session
 
 from app.api.popup.models import Popups
-from app.api.product.crud import products_crud, tier_groups_crud
-from app.api.product.models import Products, TicketTierGroup
+from app.api.product.crud import products_crud
+from app.api.product.models import Products
 from app.api.tenant.models import Tenants
 
 # ---------------------------------------------------------------------------
@@ -51,26 +50,6 @@ def _make_product(
     db.commit()
     db.refresh(product)
     return product
-
-
-def _make_tier_group(
-    db: Session,
-    tenant: Tenants,
-    *,
-    shared_stock_cap: int | None,
-    shared_stock_remaining: int | None,
-) -> TicketTierGroup:
-    """Insert a minimal tier group with the given stock columns."""
-    group = TicketTierGroup(
-        tenant_id=tenant.id,
-        name=f"atomic-group-{uuid.uuid4().hex[:8]}",
-        shared_stock_cap=shared_stock_cap,
-        shared_stock_remaining=shared_stock_remaining,
-    )
-    db.add(group)
-    db.commit()
-    db.refresh(group)
-    return group
 
 
 # ---------------------------------------------------------------------------
@@ -270,63 +249,3 @@ class TestRestoreTotalStock:
         assert refreshed.total_stock_remaining is None
 
 
-# ---------------------------------------------------------------------------
-# TierGroupsCRUD.restore_shared_stock
-# ---------------------------------------------------------------------------
-
-
-class TestRestoreSharedStock:
-    """Spec §Domain 3 — restore_shared_stock on TicketTierGroup."""
-
-    def test_success_restores_shared_counter(
-        self,
-        db: Session,
-        tenant_a: Tenants,
-    ) -> None:
-        """Restores shared_stock_remaining by qty."""
-        group = _make_tier_group(
-            db, tenant_a,
-            shared_stock_cap=20,
-            shared_stock_remaining=17,  # 3 were held
-        )
-        tier_groups_crud.restore_shared_stock(db, group.id, 3)
-        db.commit()
-        db.expire_all()
-        refreshed = db.get(TicketTierGroup, group.id)
-        assert refreshed.shared_stock_remaining == 20
-
-    def test_least_clamp_cannot_exceed_shared_cap(
-        self,
-        db: Session,
-        tenant_a: Tenants,
-    ) -> None:
-        """LEAST clamp prevents drift past shared_stock_cap."""
-        group = _make_tier_group(
-            db, tenant_a,
-            shared_stock_cap=10,
-            shared_stock_remaining=10,  # already at cap
-        )
-        tier_groups_crud.restore_shared_stock(db, group.id, 5)
-        db.commit()
-        db.expire_all()
-        refreshed = db.get(TicketTierGroup, group.id)
-        assert refreshed.shared_stock_remaining == 10, (
-            f"LEAST clamp must cap at 10, got {refreshed.shared_stock_remaining}"
-        )
-
-    def test_unlimited_group_is_noop(
-        self,
-        db: Session,
-        tenant_a: Tenants,
-    ) -> None:
-        """NULL shared_stock_remaining / cap: restore is a silent no-op."""
-        group = _make_tier_group(
-            db, tenant_a,
-            shared_stock_cap=None,
-            shared_stock_remaining=None,
-        )
-        tier_groups_crud.restore_shared_stock(db, group.id, 5)
-        db.commit()
-        db.expire_all()
-        refreshed = db.get(TicketTierGroup, group.id)
-        assert refreshed.shared_stock_remaining is None
