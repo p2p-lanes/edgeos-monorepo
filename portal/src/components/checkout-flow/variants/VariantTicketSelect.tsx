@@ -9,13 +9,11 @@ import QuantitySelector, {
   resolveMaxQuantity,
   supportsQuantitySelector,
 } from "@/components/ui/QuantitySelector"
-import { formatDate } from "@/helpers/dates"
-import { resolveTierPhaseState } from "@/helpers/tierPhaseState"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
 import { usePassesProvider } from "@/providers/passesProvider"
 import type { AttendeePassState } from "@/types/Attendee"
-import { formatCheckoutDate, formatCurrency } from "@/types/checkout"
+import { formatCurrency } from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
 import type { VariantProps } from "../registries/variantRegistry"
 
@@ -429,8 +427,7 @@ function PassRow({
   const comparePrice = product.compare_price ?? product.original_price
   const hasDiscount = comparePrice && comparePrice > product.price
   const isSelected = selected && !purchased
-  const tierState = resolveTierPhaseState(product)
-  const effectiveDisabled = disabled || tierState.blocked
+  const effectiveDisabled = disabled
   const isClickable = !effectiveDisabled && (!purchased || isEditing)
   const [summaryOpen, setSummaryOpen] = useState(false)
   // Multi-unit stepper mode — editing of purchased multi-unit passes is out
@@ -596,22 +593,7 @@ function PassRow({
             <span className="font-medium text-foreground break-words">
               {product.name}
             </span>
-            {tierState.badge && (
-              <span className="text-[10px] uppercase tracking-wide text-muted-foreground border border-border rounded px-1 py-0.5 shrink-0 mt-0.5">
-                {tierState.badge}
-              </span>
-            )}
           </div>
-          {product.start_date && product.end_date && (
-            <p className="text-sm text-muted-foreground">
-              {formatDate(product.start_date, {
-                day: "numeric",
-                month: "short",
-              })}
-              {" – "}
-              {formatDate(product.end_date, { day: "numeric", month: "short" })}
-            </p>
-          )}
         </div>
       </div>
       <div className="text-right shrink-0">
@@ -696,12 +678,9 @@ function DayPassRow({
   const comparePrice = product.compare_price ?? product.price
   const hasDiscount = comparePrice != null && comparePrice > product.price
   const hasQuantity = quantity > 0
-  const tierState = resolveTierPhaseState(product)
-  const effectiveDisabled = disabled || tierState.blocked
+  const effectiveDisabled = disabled
 
-  const maxQuantity = resolveMaxQuantity(product, {
-    dayPassFallbackToDateRange: true,
-  })
+  const maxQuantity = resolveMaxQuantity(product)
 
   const minQuantity = purchased && !isEditing ? originalQuantity : 0
 
@@ -785,11 +764,6 @@ function DayPassRow({
             <span className="font-medium text-foreground break-words">
               {product.name}
             </span>
-            {tierState.badge && (
-              <span className="text-[10px] uppercase tracking-wide text-muted-foreground border border-border rounded px-1 py-0.5 shrink-0 mt-0.5">
-                {tierState.badge}
-              </span>
-            )}
           </div>
           <p className="text-sm text-muted-foreground">per day</p>
           {product.description && (
@@ -878,9 +852,7 @@ function CompactAttendeeCard({
 
             if (hasStepper) {
               const qty = p.quantity ?? 0
-              const max = resolveMaxQuantity(p, {
-                dayPassFallbackToDateRange: isDayPass,
-              })
+              const max = resolveMaxQuantity(p)
               const minQty =
                 isDayPass && p.purchased && !isEditing
                   ? (p.original_quantity ?? 0)
@@ -890,10 +862,8 @@ function CompactAttendeeCard({
                 attendee.category === "kid" ||
                 attendee.category === "teen" ||
                 attendee.category === "baby"
-              const tierState = resolveTierPhaseState(p)
               const tileDisabled =
                 !!p.disabled ||
-                tierState.blocked ||
                 (!isDayPass &&
                   isChild &&
                   (p.duration_type === "full" ||
@@ -950,11 +920,6 @@ function CompactAttendeeCard({
                   >
                     {formatCurrency(p.price)}
                   </span>
-                  {tierState.badge && (
-                    <span className="ml-1 text-[10px] uppercase tracking-wide text-muted-foreground border border-border rounded px-1 py-0.5">
-                      {tierState.badge}
-                    </span>
-                  )}
                 </div>
               )
             }
@@ -963,10 +928,8 @@ function CompactAttendeeCard({
               attendee.category === "kid" ||
               attendee.category === "teen" ||
               attendee.category === "baby"
-            const tierState = resolveTierPhaseState(p)
             const isDisabled =
               p.disabled ||
-              tierState.blocked ||
               (isChild &&
                 (p.duration_type === "full" || p.duration_type === "month")) ||
               (p.duration_type === "week" && hasFullOrMonthSelected) ||
@@ -1007,11 +970,6 @@ function CompactAttendeeCard({
                 {p.purchased && !isEditing && (
                   <span className="text-[10px] uppercase tracking-wide opacity-60">
                     owned
-                  </span>
-                )}
-                {tierState.badge && (
-                  <span className="text-[10px] uppercase tracking-wide opacity-70 border border-current rounded px-1 py-0.5">
-                    {tierState.badge}
                   </span>
                 )}
               </button>
@@ -1348,22 +1306,14 @@ function LegacySectionLayout({
     const max = resolveMaxQuantity({
       max_per_order: p.max_per_order,
       total_stock_remaining: p.total_stock_remaining,
-      start_date: p.start_date,
-      end_date: p.end_date,
     })
-    const tierState = resolveTierPhaseState(p)
-    const rowDisabled = tierState.blocked && !isAdded
     const total = isAdded ? p.price * quantity : p.price
     const hasDiscount = p.compare_price != null && p.compare_price > p.price
 
     return (
       <div
         key={p.id}
-        className={cn(
-          "p-4 transition-colors",
-          isAdded ? "bg-primary/10" : "",
-          rowDisabled && "opacity-40",
-        )}
+        className={cn("p-4 transition-colors", isAdded ? "bg-primary/10" : "")}
       >
         <div className="flex items-center gap-3">
           <div className="relative w-14 h-14 shrink-0 rounded-xl overflow-hidden bg-muted flex items-center justify-center">
@@ -1381,11 +1331,6 @@ function LegacySectionLayout({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <h3 className="font-medium text-foreground text-sm">{p.name}</h3>
-              {tierState.badge && (
-                <span className="text-[10px] uppercase tracking-wide text-muted-foreground border border-border rounded px-1 py-0.5">
-                  {tierState.badge}
-                </span>
-              )}
             </div>
             {p.description && (
               <ExpandableDescription
@@ -1393,13 +1338,6 @@ function LegacySectionLayout({
                 clamp={2}
                 className="text-xs text-muted-foreground mt-0.5"
               />
-            )}
-            {(p.start_date || p.end_date) && (
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {p.start_date && formatCheckoutDate(p.start_date)}
-                {p.start_date && p.end_date && " – "}
-                {p.end_date && formatCheckoutDate(p.end_date)}
-              </p>
             )}
           </div>
           {showStepper ? (
@@ -1417,15 +1355,9 @@ function LegacySectionLayout({
           ) : (
             <button
               type="button"
-              onClick={
-                rowDisabled
-                  ? undefined
-                  : () =>
-                      isAdded
-                        ? removeDynamicItem(stepType, p.id)
-                        : handleAdd(p, 1)
+              onClick={() =>
+                isAdded ? removeDynamicItem(stepType, p.id) : handleAdd(p, 1)
               }
-              disabled={rowDisabled}
               aria-label={isAdded ? "Remove from cart" : "Add to cart"}
               className={cn(
                 "h-8 px-3 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 shrink-0",

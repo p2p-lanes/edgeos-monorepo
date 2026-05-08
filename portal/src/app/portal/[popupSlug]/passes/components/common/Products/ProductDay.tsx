@@ -48,9 +48,7 @@ const Product = ({
   const { purchased, selected } = product
 
   const showStepper = supportsQuantitySelector(product.max_per_order)
-  const maxQuantity = resolveMaxQuantity(product, {
-    dayPassFallbackToDateRange: true,
-  })
+  const maxQuantity = resolveMaxQuantity(product)
 
   const currentQuantity = product.quantity ?? 0
   const minQuantity = purchased ? (product.original_quantity ?? 1) : 0

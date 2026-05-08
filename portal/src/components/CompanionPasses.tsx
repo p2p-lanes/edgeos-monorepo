@@ -86,19 +86,6 @@ export function CompanionPasses({ participation }: CompanionPassesProps) {
                   <Ticket className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                   <div className="flex items-baseline gap-2 flex-1 min-w-0">
                     <span className="font-medium text-sm">{ticket.name}</span>
-                    {ticket.start_date && ticket.end_date && (
-                      <span className="text-xs text-muted-foreground truncate">
-                        {new Date(ticket.start_date).toLocaleDateString(
-                          "en-US",
-                          { month: "short", day: "numeric" },
-                        )}{" "}
-                        to{" "}
-                        {new Date(ticket.end_date).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                        })}
-                      </span>
-                    )}
                   </div>
                   {ticket.quantity && ticket.quantity > 1 && (
                     <span className="text-xs text-muted-foreground">

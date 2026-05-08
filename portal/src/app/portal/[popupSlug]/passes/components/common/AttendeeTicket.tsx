@@ -229,19 +229,6 @@ const AttendeeTicket = ({
                         <span className="font-bold text-pass-title text-sm lg:text-base whitespace-nowrap">
                           {entry.product_name}
                         </span>
-                        {entry.start_date && entry.end_date && (
-                          <span className="text-pass-text text-xs lg:text-sm truncate">
-                            {new Date(entry.start_date).toLocaleDateString(
-                              "en-US",
-                              { month: "short", day: "numeric" },
-                            )}{" "}
-                            to{" "}
-                            {new Date(entry.end_date).toLocaleDateString(
-                              "en-US",
-                              { month: "short", day: "numeric" },
-                            )}
-                          </span>
-                        )}
                       </div>
                       {entry.requires_check_in === true && (
                         <button

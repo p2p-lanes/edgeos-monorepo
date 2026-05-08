@@ -46,11 +46,6 @@ function toProductsPass(product: CheckoutRuntimeProduct): ProductsPass {
       (product.attendee_category as ProductPublic["attendee_category"]) ?? null,
     duration_type:
       (product.duration_type as ProductPublic["duration_type"]) ?? null,
-    start_date:
-      typeof product.start_date === "string" ? product.start_date : null,
-    end_date: typeof product.end_date === "string" ? product.end_date : null,
-    tier_group: product.tier_group ?? null,
-    phase: product.phase ?? null,
   }
 }
 

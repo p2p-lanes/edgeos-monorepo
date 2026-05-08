@@ -21,32 +21,14 @@ export const supportsQuantitySelector = (
  *   is true and the product has a date range, in which case the date-range cap applies.
  * - Backend remains source of truth; this is a UX cap only.
  */
-export const resolveMaxQuantity = (
-  product: {
-    max_per_order?: number | null
-    total_stock_remaining?: number | null
-    start_date?: string | null
-    end_date?: string | null
-  },
-  opts?: { dayPassFallbackToDateRange?: boolean },
-): number => {
+export const resolveMaxQuantity = (product: {
+  max_per_order?: number | null
+  total_stock_remaining?: number | null
+}): number => {
   const perOrder = product.max_per_order ?? Number.POSITIVE_INFINITY
   const stockRemaining =
     product.total_stock_remaining ?? Number.POSITIVE_INFINITY
-  let cap = Math.min(perOrder, stockRemaining)
-
-  if (
-    cap === Number.POSITIVE_INFINITY &&
-    opts?.dayPassFallbackToDateRange &&
-    product.start_date &&
-    product.end_date
-  ) {
-    const start = new Date(product.start_date)
-    const end = new Date(product.end_date)
-    const diff = Math.abs(end.getTime() - start.getTime())
-    cap = Math.ceil(diff / (1000 * 60 * 60 * 24)) + 1
-  }
-
+  const cap = Math.min(perOrder, stockRemaining)
   return cap
 }
 
