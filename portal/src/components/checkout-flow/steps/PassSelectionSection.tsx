@@ -26,6 +26,7 @@ import {
   resolveMaxQuantity,
   supportsQuantitySelector,
 } from "@/components/ui/QuantitySelector"
+import { deriveProductState, type ProductSaleState } from "@/lib/product-state"
 import { cn } from "@/lib/utils"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCheckout } from "@/providers/checkoutProvider"
@@ -87,6 +88,38 @@ const getCategoryColors = (category: string) => {
     badge: "bg-amber-50 text-amber-700",
     icon: "text-white",
   }
+}
+
+function SaleStateBadge({ state }: { state: ProductSaleState }) {
+  if (state === "on_sale") return null
+  const config: Record<
+    Exclude<ProductSaleState, "on_sale">,
+    { label: string; classes: string }
+  > = {
+    upcoming: {
+      label: "UPCOMING",
+      classes: "bg-blue-100 text-blue-700 border-blue-200",
+    },
+    ended: {
+      label: "ENDED",
+      classes: "bg-slate-100 text-slate-500 border-slate-200",
+    },
+    sold_out: {
+      label: "SOLD OUT",
+      classes: "bg-rose-100 text-rose-700 border-rose-200",
+    },
+  }
+  const { label, classes } = config[state]
+  return (
+    <span
+      className={cn(
+        "px-2 py-0.5 text-[10px] font-semibold uppercase rounded tracking-wide border",
+        classes,
+      )}
+    >
+      {label}
+    </span>
+  )
 }
 
 const sortProductsByPriority = (a: ProductsPass, b: ProductsPass): number => {
@@ -602,7 +635,11 @@ function PassOption({
   const comparePrice = product.compare_price ?? product.original_price
   const hasDiscount = comparePrice && comparePrice > product.price
 
-  const isClickable = !disabled && (!purchased || isEditing)
+  const saleState = deriveProductState(product)
+  const stateBlocked = saleState !== "on_sale"
+  const effectiveDisabled = disabled || stateBlocked
+
+  const isClickable = !effectiveDisabled && (!purchased || isEditing)
   const isSelected = selected && !purchased
 
   if (purchased && !isEditing) {
@@ -712,7 +749,7 @@ function PassOption({
       disabled={!isClickable}
       className={cn(
         "w-full px-5 py-3 flex items-center justify-between gap-4 transition-all",
-        disabled
+        effectiveDisabled
           ? "opacity-40 cursor-not-allowed bg-muted"
           : isSelected
             ? "bg-primary/10"
@@ -725,7 +762,7 @@ function PassOption({
             "w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all",
             isSelected
               ? "bg-primary border-primary"
-              : disabled
+              : effectiveDisabled
                 ? "border-border"
                 : "border-border",
           )}
@@ -736,6 +773,7 @@ function PassOption({
           <div className="flex items-center gap-2">
             <Ticket className="w-4 h-4 text-muted-foreground" />
             <span className="font-medium text-foreground">{product.name}</span>
+            <SaleStateBadge state={saleState} />
           </div>
           {disabledReason && (
             <p className="text-xs text-amber-600 mt-1">{disabledReason}</p>
@@ -791,14 +829,18 @@ function QuantityPassOption({
   const isMinReached = purchased && quantity <= originalQuantity && !isEditing
   const hasQuantity = quantity > 0
 
+  const saleState = deriveProductState(product)
+  const stateBlocked = saleState !== "on_sale"
+  const effectiveDisabled = disabled || stateBlocked
+
   const handleIncrement = (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (!isMaxReached && !disabled) onQuantityChange(quantity + 1)
+    if (!isMaxReached && !effectiveDisabled) onQuantityChange(quantity + 1)
   }
 
   const handleDecrement = (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (!isMinReached && quantity > 0 && !disabled) {
+    if (!isMinReached && quantity > 0 && !effectiveDisabled) {
       onQuantityChange(quantity - 1)
     }
   }
@@ -884,7 +926,7 @@ function QuantityPassOption({
     <div
       className={cn(
         "px-5 py-3 flex items-center justify-between gap-4",
-        disabled ? "opacity-40" : hasQuantity ? "bg-primary/10" : "",
+        effectiveDisabled ? "opacity-40" : hasQuantity ? "bg-primary/10" : "",
       )}
     >
       <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -892,11 +934,11 @@ function QuantityPassOption({
           <button
             type="button"
             onClick={handleDecrement}
-            disabled={disabled || quantity === 0 || isMinReached}
+            disabled={effectiveDisabled || quantity === 0 || isMinReached}
             aria-label={`Decrease ${product.name} quantity`}
             className={cn(
               "w-5 h-5 rounded flex items-center justify-center transition-all",
-              disabled || quantity === 0 || isMinReached
+              effectiveDisabled || quantity === 0 || isMinReached
                 ? "text-muted-foreground cursor-not-allowed"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted",
             )}
@@ -914,11 +956,11 @@ function QuantityPassOption({
           <button
             type="button"
             onClick={handleIncrement}
-            disabled={disabled || isMaxReached}
+            disabled={effectiveDisabled || isMaxReached}
             aria-label={`Increase ${product.name} quantity`}
             className={cn(
               "w-5 h-5 rounded flex items-center justify-center transition-all",
-              disabled || isMaxReached
+              effectiveDisabled || isMaxReached
                 ? "text-muted-foreground cursor-not-allowed"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted",
             )}
@@ -930,6 +972,7 @@ function QuantityPassOption({
           <div className="flex items-center gap-2">
             <Ticket className="w-4 h-4 text-muted-foreground" />
             <span className="font-medium text-foreground">{product.name}</span>
+            <SaleStateBadge state={saleState} />
           </div>
           <p className="text-sm text-muted-foreground">
             quantity-based checkout
@@ -977,14 +1020,18 @@ function DayPassOption({
   const isMinReached = purchased && quantity <= originalQuantity && !isEditing
   const hasQuantity = quantity > 0
 
+  const saleState = deriveProductState(product)
+  const stateBlocked = saleState !== "on_sale"
+  const effectiveDisabled = disabled || stateBlocked
+
   const handleIncrement = (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (!isMaxReached && !disabled) onQuantityChange(quantity + 1)
+    if (!isMaxReached && !effectiveDisabled) onQuantityChange(quantity + 1)
   }
 
   const handleDecrement = (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (!isMinReached && quantity > 0 && !disabled)
+    if (!isMinReached && quantity > 0 && !effectiveDisabled)
       onQuantityChange(quantity - 1)
   }
 
@@ -1073,7 +1120,7 @@ function DayPassOption({
     <div
       className={cn(
         "px-5 py-3 flex items-center justify-between gap-4",
-        disabled ? "opacity-40" : hasQuantity ? "bg-primary/10" : "",
+        effectiveDisabled ? "opacity-40" : hasQuantity ? "bg-primary/10" : "",
       )}
     >
       <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -1081,11 +1128,11 @@ function DayPassOption({
           <button
             type="button"
             onClick={handleDecrement}
-            disabled={disabled || quantity === 0 || isMinReached}
+            disabled={effectiveDisabled || quantity === 0 || isMinReached}
             aria-label="Decrease day pass quantity"
             className={cn(
               "w-5 h-5 rounded flex items-center justify-center transition-all",
-              disabled || quantity === 0 || isMinReached
+              effectiveDisabled || quantity === 0 || isMinReached
                 ? "text-muted-foreground cursor-not-allowed"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted",
             )}
@@ -1103,7 +1150,7 @@ function DayPassOption({
           <button
             type="button"
             onClick={handleIncrement}
-            disabled={disabled || isMaxReached}
+            disabled={effectiveDisabled || isMaxReached}
             aria-label="Increase day pass quantity"
             className={cn(
               "w-5 h-5 rounded flex items-center justify-center transition-all",
@@ -1119,6 +1166,7 @@ function DayPassOption({
           <div className="flex items-center gap-2">
             <Ticket className="w-4 h-4 text-muted-foreground" />
             <span className="font-medium text-foreground">{product.name}</span>
+            <SaleStateBadge state={saleState} />
           </div>
           <p className="text-sm text-muted-foreground">per day</p>
           {disabledReason && (
