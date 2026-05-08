@@ -452,10 +452,12 @@ export default function EventDetailPage() {
         )}
         {event.venue_title &&
           (() => {
-            const venueHref =
-              event.venue_id && city?.slug
-                ? `/portal/${city.slug}/events/venues/${event.venue_id}`
-                : null
+            const mapsQuery = [event.venue_title, event.venue_location]
+              .filter(Boolean)
+              .join(", ")
+            const mapsUrl = mapsQuery
+              ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapsQuery)}`
+              : null
             const inner = (
               <>
                 <div className="h-8 w-8 rounded-lg bg-green-500/10 flex items-center justify-center shrink-0">
@@ -465,7 +467,7 @@ export default function EventDetailPage() {
                   <p
                     className={cn(
                       "text-sm font-medium truncate",
-                      venueHref && "group-hover:underline",
+                      mapsUrl && "group-hover:underline",
                     )}
                   >
                     {event.venue_title}
@@ -478,15 +480,23 @@ export default function EventDetailPage() {
                 </div>
               </>
             )
-            return venueHref ? (
-              <Link
-                href={venueHref}
-                className="group flex items-center gap-2.5 pr-36 -mx-2 px-2 py-1.5 rounded-md hover:bg-muted/50 transition-colors"
-              >
-                {inner}
-              </Link>
-            ) : (
-              <div className="flex items-center gap-2.5 pr-36">{inner}</div>
+            return (
+              <div className="pr-36">
+                {mapsUrl ? (
+                  <a
+                    href={mapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group flex min-w-0 items-center gap-2.5 -mx-2 px-2 py-1.5 rounded-md transition-colors hover:bg-muted/50"
+                  >
+                    {inner}
+                  </a>
+                ) : (
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    {inner}
+                  </div>
+                )}
+              </div>
             )
           })()}
         {!event.venue_title && event.custom_location_name && (

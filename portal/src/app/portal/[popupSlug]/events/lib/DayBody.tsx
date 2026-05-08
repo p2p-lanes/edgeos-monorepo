@@ -12,6 +12,8 @@ import {
   Crown,
   Home,
   Layers,
+  Maximize2,
+  Minimize2,
   Repeat,
   Tag,
 } from "lucide-react"
@@ -65,6 +67,14 @@ interface DayBodyProps {
     dayKey: string,
     scroll: EventsScrollSnapshot,
   ) => void
+  /**
+   * When true, the body assumes its parent has rendered it inside a
+   * fullscreen overlay and the inner scroll area should grow to fill the
+   * viewport instead of capping at 70vh. The button itself only renders
+   * when `onToggleFullscreen` is also provided.
+   */
+  isFullscreen?: boolean
+  onToggleFullscreen?: () => void
 }
 
 const HOUR_PX = 56
@@ -113,6 +123,8 @@ export function DayBody({
   defaultDate,
   restoredScroll,
   onEventLinkClick,
+  isFullscreen = false,
+  onToggleFullscreen,
 }: DayBodyProps) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
@@ -355,7 +367,9 @@ export function DayBody({
   const handleEventClick = () => {
     if (!onEventLinkClick) return
     const main =
-      typeof document !== "undefined" ? document.querySelector("main") : null
+      typeof document !== "undefined"
+        ? document.getElementById("portal-scroll")
+        : null
     onEventLinkClick("day", dayKey, {
       outer: main?.scrollTop ?? 0,
       innerVertical: scrollRef.current?.scrollTop ?? 0,
@@ -367,21 +381,26 @@ export function DayBody({
   // the venue grid vertically; on mobile (transposed) we scroll the venue
   // rows horizontally. On empty days settle near 8:00 instead of 00:00.
   //
-  // When returning from event detail with a sessionStorage snapshot, we
-  // instead restore the previous inner scroll positions and consume the
-  // snapshot. Subsequent columnEvents updates (e.g., user navigates to
-  // another day) resume the normal auto-scroll behavior. Restore is
-  // gated on at least one scroll container being mounted, so a render
-  // while `isLoading` is true (grid replaced by a spinner) defers the
-  // restore until the grid is actually in the DOM.
+  // Auto-scroll fires once per day (keyed by `dayKey`) so background
+  // refetches and RSVP mutations — both of which produce a fresh
+  // `columnEvents` Map — don't yank the user back to the earliest event
+  // every time the data updates. When returning from event detail with a
+  // sessionStorage snapshot we instead restore the previous inner scroll
+  // positions and mark the day as already-handled so the auto-scroll
+  // branch doesn't immediately overwrite the restore. Restore is gated on
+  // at least one scroll container being mounted, so a render while
+  // `isLoading` is true (grid replaced by a spinner) defers the restore
+  // until the grid is actually in the DOM.
   const restorePendingRef = useRef<EventsScrollSnapshot | null>(
     restoredScroll ?? null,
   )
+  const autoScrolledDayKeyRef = useRef<string | null>(null)
   useEffect(() => {
     if (restorePendingRef.current) {
       if (!scrollRef.current && !mobileScrollRef.current) return
       const snap = restorePendingRef.current
       restorePendingRef.current = null
+      autoScrolledDayKeyRef.current = dayKey
       if (snap.innerVertical != null && scrollRef.current) {
         scrollRef.current.scrollTop = snap.innerVertical
       }
@@ -390,6 +409,9 @@ export function DayBody({
       }
       return
     }
+    if (autoScrolledDayKeyRef.current === dayKey) return
+    if (!scrollRef.current && !mobileScrollRef.current) return
+    autoScrolledDayKeyRef.current = dayKey
     let earliest = Number.POSITIVE_INFINITY
     for (const items of columnEvents.values()) {
       if (items.length > 0 && items[0].startMin < earliest) {
@@ -405,7 +427,7 @@ export function DayBody({
       const target = Math.max(0, anchor * M_MIN_W - M_HOUR_W)
       mobileScrollRef.current.scrollTo({ left: target, behavior: "smooth" })
     }
-  }, [columnEvents])
+  }, [columnEvents, dayKey])
 
   const goPrev = () => setSelectedDate((d) => subDays(d, 1))
   const goNext = () => setSelectedDate((d) => addDays(d, 1))
@@ -439,40 +461,66 @@ export function DayBody({
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
-        <div className="flex flex-col items-end min-w-0">
-          <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                className="inline-flex items-center gap-1 text-sm font-semibold capitalize truncate hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
-                aria-label={t("events.day.pick_date")}
-                title={t("events.day.pick_date")}
-              >
-                <span className="truncate">
-                  {format(selectedDate, "EEEE, MMMM d, yyyy")}
-                </span>
-                <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
-              <Calendar
-                mode="single"
-                selected={selectedDate}
-                defaultMonth={selectedDate}
-                onSelect={(d) => {
-                  if (d) {
-                    setSelectedDate(startOfDay(d))
-                    setDatePickerOpen(false)
-                  }
-                }}
-                autoFocus
-              />
-            </PopoverContent>
-          </Popover>
-          <span className="text-[11px] text-muted-foreground">
-            {t("events.day.event_count", { count: totalEvents })}
-            {timezone ? ` · ${timezone}` : ""}
-          </span>
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="flex flex-col items-end min-w-0">
+            <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1 text-sm font-semibold capitalize truncate hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                  aria-label={t("events.day.pick_date")}
+                  title={t("events.day.pick_date")}
+                >
+                  <span className="truncate">
+                    {format(selectedDate, "EEEE, MMMM d, yyyy")}
+                  </span>
+                  <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  defaultMonth={selectedDate}
+                  onSelect={(d) => {
+                    if (d) {
+                      setSelectedDate(startOfDay(d))
+                      setDatePickerOpen(false)
+                    }
+                  }}
+                  autoFocus
+                />
+              </PopoverContent>
+            </Popover>
+            <span className="text-[11px] text-muted-foreground">
+              {t("events.day.event_count", { count: totalEvents })}
+              {timezone ? ` · ${timezone}` : ""}
+            </span>
+          </div>
+          {onToggleFullscreen && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 shrink-0"
+              onClick={onToggleFullscreen}
+              aria-label={t(
+                isFullscreen
+                  ? "events.day.exit_fullscreen"
+                  : "events.day.enter_fullscreen",
+              )}
+              title={t(
+                isFullscreen
+                  ? "events.day.exit_fullscreen"
+                  : "events.day.enter_fullscreen",
+              )}
+            >
+              {isFullscreen ? (
+                <Minimize2 className="h-4 w-4" />
+              ) : (
+                <Maximize2 className="h-4 w-4" />
+              )}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -491,7 +539,10 @@ export function DayBody({
         <>
           <div
             ref={scrollRef}
-            className="hidden md:block max-h-[70vh] overflow-auto"
+            className={cn(
+              "hidden md:block overflow-auto",
+              isFullscreen ? "max-h-[calc(100vh-9rem)]" : "max-h-[70vh]",
+            )}
           >
             <div
               className="grid"
@@ -717,7 +768,10 @@ export function DayBody({
             the desktop grid above. */}
           <div
             ref={mobileScrollRef}
-            className="md:hidden max-h-[70vh] overflow-auto"
+            className={cn(
+              "md:hidden overflow-auto",
+              isFullscreen ? "max-h-[calc(100vh-9rem)]" : "max-h-[70vh]",
+            )}
           >
             <div style={{ width: 24 * M_HOUR_W }}>
               {/* Sticky hour-labels row spans the full timeline width */}

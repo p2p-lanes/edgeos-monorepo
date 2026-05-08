@@ -5227,16 +5227,13 @@ export const EventSettingsCreateSchema = {
             title: 'Allowed Kinds',
             default: []
         },
-        approval_notification_email: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Approval Notification Email'
+        approval_notification_emails: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Approval Notification Emails',
+            default: []
         }
     },
     type: 'object',
@@ -5301,16 +5298,12 @@ export const EventSettingsPublicSchema = {
             type: 'array',
             title: 'Allowed Kinds'
         },
-        approval_notification_email: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Approval Notification Email'
+        approval_notification_emails: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Approval Notification Emails'
         },
         created_at: {
             type: 'string',
@@ -5429,16 +5422,19 @@ export const EventSettingsUpdateSchema = {
             ],
             title: 'Allowed Kinds'
         },
-        approval_notification_email: {
+        approval_notification_emails: {
             anyOf: [
                 {
-                    type: 'string'
+                    items: {
+                        type: 'string'
+                    },
+                    type: 'array'
                 },
                 {
                     type: 'null'
                 }
             ],
-            title: 'Approval Notification Email'
+            title: 'Approval Notification Emails'
         }
     },
     type: 'object',

@@ -507,7 +507,9 @@
       "no_venues": "此 pop-up 暂未配置场地。",
       "no_venue_column": "会议",
       "offsite_column": "外部地点",
-      "untitled_venue": "未命名场地"
+      "untitled_venue": "未命名场地",
+      "enter_fullscreen": "全屏",
+      "exit_fullscreen": "退出全屏"
     },
     "add_to_calendar": {
       "title": "添加到日历",
@@ -654,7 +656,8 @@
       "new": {
         "heading": "新建场地",
         "subheading": "在 {{cityName}} 提议一个可供活动预订的场地。",
-        "requires_approval_note": "需要管理员审核后才会出现在场地列表中。",
+        "requires_approval_banner_title": "需要管理员审核",
+        "requires_approval_note": "该场地需经审核,在管理员批准前不会出现在场地列表中。",
         "title_label": "标题",
         "title_placeholder": "例如:主礼堂",
         "location_label": "位置",
@@ -711,6 +714,8 @@
         "booking_free": "可自由预订",
         "booking_approval": "需要审核",
         "booking_unbookable": "不可预订",
+        "approval_required_banner_title": "活动需要管理员审核",
+        "approval_required_banner_message": "在此场地举办的活动需要管理员审核。预订此场地后,你的活动将处于待审核状态,在获得批准前其他人无法查看。",
         "edit_button": "编辑场地"
       }
     }

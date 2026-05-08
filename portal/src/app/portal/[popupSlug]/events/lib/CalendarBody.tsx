@@ -195,7 +195,9 @@ export function CalendarBody({
   const handleEventClick = () => {
     if (!onEventLinkClick || !selectedDayKey) return
     const main =
-      typeof document !== "undefined" ? document.querySelector("main") : null
+      typeof document !== "undefined"
+        ? document.getElementById("portal-scroll")
+        : null
     onEventLinkClick("calendar", selectedDayKey, {
       outer: main?.scrollTop ?? 0,
     })

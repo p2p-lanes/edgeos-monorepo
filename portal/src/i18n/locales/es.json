@@ -507,7 +507,9 @@
       "no_venues": "Este pop-up todavía no tiene venues configurados.",
       "no_venue_column": "Reunión",
       "offsite_column": "Fuera de sede",
-      "untitled_venue": "Venue sin título"
+      "untitled_venue": "Venue sin título",
+      "enter_fullscreen": "Pantalla completa",
+      "exit_fullscreen": "Salir de pantalla completa"
     },
     "add_to_calendar": {
       "title": "Agregar al calendario",
@@ -654,7 +656,8 @@
       "new": {
         "heading": "Nuevo lugar",
         "subheading": "Proponé un espacio donde realizar eventos en {{cityName}}.",
-        "requires_approval_note": "Requiere aprobación del admin antes de aparecer en la lista.",
+        "requires_approval_banner_title": "Requiere aprobación del admin",
+        "requires_approval_note": "Este lugar quedará pendiente de revisión y no aparecerá en la lista hasta que un admin lo apruebe.",
         "title_label": "Título",
         "title_placeholder": "Ej. Auditorio Principal",
         "location_label": "Ubicación",
@@ -711,6 +714,8 @@
         "booking_free": "Libre",
         "booking_approval": "Requiere aprobación",
         "booking_unbookable": "No reservable",
+        "approval_required_banner_title": "Aprobación requerida para eventos",
+        "approval_required_banner_message": "Los eventos en este lugar necesitan aprobación del admin. Cuando reserves este lugar, tu evento quedará pendiente de revisión y no será visible para otros hasta que sea aprobado.",
         "edit_button": "Editar lugar"
       }
     }

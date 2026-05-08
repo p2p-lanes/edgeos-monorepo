@@ -507,7 +507,9 @@
       "no_venues": "No venues configured for this pop-up yet.",
       "no_venue_column": "Meeting",
       "offsite_column": "Off-site",
-      "untitled_venue": "Untitled venue"
+      "untitled_venue": "Untitled venue",
+      "enter_fullscreen": "Fullscreen",
+      "exit_fullscreen": "Exit fullscreen"
     },
     "add_to_calendar": {
       "title": "Add to calendar",
@@ -654,7 +656,8 @@
       "new": {
         "heading": "New venue",
         "subheading": "Propose a space that events at {{cityName}} can be booked against.",
-        "requires_approval_note": "Requires admin approval before it appears in the venue list.",
+        "requires_approval_banner_title": "Requires admin approval",
+        "requires_approval_note": "This venue will be pending review and won't appear in the venue list until an admin approves it.",
         "title_label": "Title",
         "title_placeholder": "e.g. Main Auditorium",
         "location_label": "Location",
@@ -711,6 +714,8 @@
         "booking_free": "Permissionless",
         "booking_approval": "Approval required",
         "booking_unbookable": "Not bookable",
+        "approval_required_banner_title": "Approval required for events",
+        "approval_required_banner_message": "Events at this venue need admin approval. When you book this venue, your event will be pending review and won't be visible to others until it's approved.",
         "edit_button": "Edit venue"
       }
     }

@@ -23,18 +23,26 @@ if TYPE_CHECKING:
 
 def _resolve_admin_recipient(
     settings, popup: Popups | None
-) -> tuple[str | None, str | None, str | None]:
-    """Return ``(email, from_address, from_name)`` for the approval email.
+) -> tuple[list[str], str | None, str | None]:
+    """Return ``(emails, from_address, from_name)`` for the approval email.
 
-    Prefers ``EventSettings.approval_notification_email``; falls back to
-    the tenant's ``contact_email``. Returns ``(None, _, _)`` if nothing is
-    configured — caller should skip the send.
+    Prefers ``EventSettings.approval_notification_emails``; falls back to
+    the tenant's ``contact_email``/``sender_email`` wrapped in a single
+    element list. Returns ``([], _, _)`` if nothing is configured — caller
+    should skip the send.
     """
-    to = settings.approval_notification_email if settings else None
+    raw = (
+        getattr(settings, "approval_notification_emails", None) or []
+        if settings
+        else []
+    )
+    to = [e.strip() for e in raw if isinstance(e, str) and e.strip()]
     if not to and popup and popup.tenant:
-        to = getattr(popup.tenant, "contact_email", None) or getattr(
+        fallback = getattr(popup.tenant, "contact_email", None) or getattr(
             popup.tenant, "sender_email", None
         )
+        if fallback:
+            to = [fallback]
     from_address = popup.tenant.sender_email if popup and popup.tenant else None
     from_name = popup.tenant.sender_name if popup and popup.tenant else None
     return to, from_address, from_name
@@ -50,7 +58,7 @@ async def notify_event_pending_approval(
     to, from_address, from_name = _resolve_admin_recipient(settings, popup)
     if not to:
         logger.info(
-            "No approval_notification_email for popup {}, skipping event "
+            "No approval_notification_emails for popup {}, skipping event "
             "approval notice",
             event.popup_id,
         )
@@ -69,6 +77,7 @@ async def notify_event_pending_approval(
         f"</ul>"
         f'<p><a href="{review_url}">Review in backoffice →</a></p>'
     )
+    recipients_log = ", ".join(to)
     try:
         await get_email_service().send_email(
             to=to,
@@ -79,14 +88,14 @@ async def notify_event_pending_approval(
         )
         logger.info(
             "Sent event approval notice to {} for event {} ({})",
-            to,
+            recipients_log,
             event.id,
             reason,
         )
     except Exception as exc:  # pragma: no cover - best-effort
         logger.warning(
             "Failed to send event approval notice to {} for event {}: {}",
-            to,
+            recipients_log,
             event.id,
             exc,
         )
@@ -114,6 +123,7 @@ async def notify_venue_pending_approval(
         f"</ul>"
         f'<p><a href="{review_url}">Review in backoffice →</a></p>'
     )
+    recipients_log = ", ".join(to)
     try:
         await get_email_service().send_email(
             to=to,
@@ -122,11 +132,13 @@ async def notify_venue_pending_approval(
             from_address=from_address,
             from_name=from_name,
         )
-        logger.info("Sent venue approval notice to {} for venue {}", to, venue.id)
+        logger.info(
+            "Sent venue approval notice to {} for venue {}", recipients_log, venue.id
+        )
     except Exception as exc:  # pragma: no cover
         logger.warning(
             "Failed to send venue approval notice to {} for venue {}: {}",
-            to,
+            recipients_log,
             venue.id,
             exc,
         )

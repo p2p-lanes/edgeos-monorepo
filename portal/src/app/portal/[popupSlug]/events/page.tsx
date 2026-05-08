@@ -18,7 +18,15 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
+import { createPortal } from "react-dom"
 import { useTranslation } from "react-i18next"
 
 import {
@@ -45,6 +53,12 @@ import {
   useEventTimezone,
   usePortalEventSettings,
 } from "./lib/useEventTimezone"
+
+// useLayoutEffect on the client, useEffect on the server. Lets us restore
+// scroll synchronously before the browser paints (no flash of "first event"
+// while we wait for a regular useEffect tick) without React's SSR warning.
+const useIsomorphicLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect
 
 function groupByDate(
   events: EventPublic[],
@@ -176,6 +190,44 @@ export default function EventsPage() {
     },
     [searchParams, router, pathname],
   )
+
+  // Day-view fullscreen overlay. Local state only — refreshes drop the
+  // overlay (the user is back at the toolbar+grid like any other view).
+  // Switching away from day view auto-collapses it so we never leave a
+  // hidden overlay floating over list/calendar.
+  const [isDayFullscreen, setIsDayFullscreen] = useState(false)
+  useEffect(() => {
+    if (view !== "day" && isDayFullscreen) setIsDayFullscreen(false)
+  }, [view, isDayFullscreen])
+  // Lock body scroll while fullscreen so the overlay's inner scroll
+  // owns vertical movement; restore prior value on cleanup.
+  useEffect(() => {
+    if (!isDayFullscreen) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [isDayFullscreen])
+  // Esc closes the overlay.
+  useEffect(() => {
+    if (!isDayFullscreen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsDayFullscreen(false)
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [isDayFullscreen])
+  const toggleDayFullscreen = useCallback(
+    () => setIsDayFullscreen((v) => !v),
+    [],
+  )
+  // Track mount so createPortal target (`document.body`) is available
+  // (Next.js renders this page on the server first).
+  const [isMounted, setIsMounted] = useState(false)
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
 
   // Saves the current UI state right before the user follows an event
   // link into the detail page. Bodies pass their own dayKey + scroll
@@ -460,15 +512,44 @@ export default function EventsPage() {
   // scroll height to apply the restore); calendar/day view render their
   // body synchronously so we can scroll immediately. Day view's inner
   // grid scroll is handled separately inside DayBody.
+  //
+  // Runs as a layout effect so the scroll is applied before paint —
+  // otherwise the user briefly sees the page at scrollTop=0 (the layout
+  // <main> still has whatever Next.js's scroll-to-top left it at) and
+  // then jumps. We also re-apply across a few frames because event-card
+  // heights can settle late (fonts, images, recurrence summary line),
+  // which would otherwise leave the browser-clamped scrollTop at the
+  // wrong row. Aborts the retry loop if the user starts scrolling.
   const didRestoreOuterScrollRef = useRef(false)
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     if (didRestoreOuterScrollRef.current) return
     if (!restoredScroll || restoredScroll.outer == null) return
     if (view === "list" && (isLoading || events.length === 0)) return
     didRestoreOuterScrollRef.current = true
     const main =
-      typeof document !== "undefined" ? document.querySelector("main") : null
-    if (main) main.scrollTop = restoredScroll.outer
+      typeof document !== "undefined"
+        ? document.getElementById("portal-scroll")
+        : null
+    if (!main) return
+    const target = restoredScroll.outer
+    main.scrollTop = target
+    let lastApplied = main.scrollTop
+    let frames = 0
+    let cancelled = false
+    const tick = () => {
+      if (cancelled || !main) return
+      // User scrolled away from where we last set it — stop fighting.
+      if (main.scrollTop !== lastApplied) return
+      if (main.scrollTop !== target) {
+        main.scrollTop = target
+        lastApplied = main.scrollTop
+      }
+      if (++frames < 6) requestAnimationFrame(tick)
+    }
+    requestAnimationFrame(tick)
+    return () => {
+      cancelled = true
+    }
   }, [view, restoredScroll, isLoading, events.length])
 
   if (!moduleEnabled) {
@@ -528,27 +609,29 @@ export default function EventsPage() {
         </p>
       </div>
 
-      <div className="mb-4">
-        <EventsToolbar
-          view={view}
-          onViewChange={setView}
-          search={search}
-          onSearchChange={setSearch}
-          rsvpedOnly={rsvpedOnly}
-          onRsvpedOnlyChange={setRsvpedOnly}
-          mineOnly={mineOnly}
-          onMineOnlyChange={setMineOnly}
-          showHidden={showHidden}
-          onShowHiddenChange={setShowHidden}
-          hiddenCount={hiddenCountData?.count}
-          allowedTags={eventSettings?.allowed_tags ?? []}
-          selectedTags={selectedTags}
-          onSelectedTagsChange={setSelectedTags}
-          allowedTracks={allowedTracks}
-          selectedTrackIds={selectedTrackIds}
-          onSelectedTrackIdsChange={setSelectedTrackIds}
-        />
-      </div>
+      {!isDayFullscreen && (
+        <div className="mb-4">
+          <EventsToolbar
+            view={view}
+            onViewChange={setView}
+            search={search}
+            onSearchChange={setSearch}
+            rsvpedOnly={rsvpedOnly}
+            onRsvpedOnlyChange={setRsvpedOnly}
+            mineOnly={mineOnly}
+            onMineOnlyChange={setMineOnly}
+            showHidden={showHidden}
+            onShowHiddenChange={setShowHidden}
+            hiddenCount={hiddenCountData?.count}
+            allowedTags={eventSettings?.allowed_tags ?? []}
+            selectedTags={selectedTags}
+            onSelectedTagsChange={setSelectedTags}
+            allowedTracks={allowedTracks}
+            selectedTrackIds={selectedTrackIds}
+            onSelectedTrackIdsChange={setSelectedTrackIds}
+          />
+        </div>
+      )}
 
       <div>
         {view === "calendar" ? (
@@ -563,18 +646,22 @@ export default function EventsPage() {
             onEventLinkClick={handleEventLinkClick}
           />
         ) : view === "day" ? (
-          <DayBody
-            popupId={city?.id}
-            slug={city?.slug}
-            search={search}
-            rsvpedOnly={rsvpedOnly}
-            tags={selectedTags}
-            trackIds={selectedTrackIds}
-            selectedDate={selectedDate}
-            onSelectedDateChange={setSelectedDate}
-            restoredScroll={restoredScroll}
-            onEventLinkClick={handleEventLinkClick}
-          />
+          isDayFullscreen ? null : (
+            <DayBody
+              popupId={city?.id}
+              slug={city?.slug}
+              search={search}
+              rsvpedOnly={rsvpedOnly}
+              tags={selectedTags}
+              trackIds={selectedTrackIds}
+              selectedDate={selectedDate}
+              onSelectedDateChange={setSelectedDate}
+              restoredScroll={restoredScroll}
+              onEventLinkClick={handleEventLinkClick}
+              isFullscreen={false}
+              onToggleFullscreen={toggleDayFullscreen}
+            />
+          )
         ) : isLoading ? (
           <div className="flex items-center justify-center py-20">
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
@@ -776,6 +863,52 @@ export default function EventsPage() {
           </div>
         )}
       </div>
+
+      {isMounted &&
+        isDayFullscreen &&
+        view === "day" &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-50 flex flex-col gap-3 bg-background p-3 sm:p-4 overflow-y-auto"
+            role="dialog"
+            aria-modal="true"
+          >
+            <EventsToolbar
+              view={view}
+              onViewChange={setView}
+              search={search}
+              onSearchChange={setSearch}
+              rsvpedOnly={rsvpedOnly}
+              onRsvpedOnlyChange={setRsvpedOnly}
+              mineOnly={mineOnly}
+              onMineOnlyChange={setMineOnly}
+              showHidden={showHidden}
+              onShowHiddenChange={setShowHidden}
+              hiddenCount={hiddenCountData?.count}
+              allowedTags={eventSettings?.allowed_tags ?? []}
+              selectedTags={selectedTags}
+              onSelectedTagsChange={setSelectedTags}
+              allowedTracks={allowedTracks}
+              selectedTrackIds={selectedTrackIds}
+              onSelectedTrackIdsChange={setSelectedTrackIds}
+            />
+            <DayBody
+              popupId={city?.id}
+              slug={city?.slug}
+              search={search}
+              rsvpedOnly={rsvpedOnly}
+              tags={selectedTags}
+              trackIds={selectedTrackIds}
+              selectedDate={selectedDate}
+              onSelectedDateChange={setSelectedDate}
+              restoredScroll={restoredScroll}
+              onEventLinkClick={handleEventLinkClick}
+              isFullscreen={true}
+              onToggleFullscreen={toggleDayFullscreen}
+            />
+          </div>,
+          document.body,
+        )}
     </div>
   )
 }

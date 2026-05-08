@@ -1138,7 +1138,7 @@ export type EventSettingsCreate = {
     timezone?: string;
     allowed_tags?: Array<(string)>;
     allowed_kinds?: Array<(string)>;
-    approval_notification_email?: (string | null);
+    approval_notification_emails?: Array<(string)>;
 };
 
 /**
@@ -1155,7 +1155,7 @@ export type EventSettingsPublic = {
     timezone?: string;
     allowed_tags?: Array<(string)>;
     allowed_kinds?: Array<(string)>;
-    approval_notification_email?: (string | null);
+    approval_notification_emails?: Array<(string)>;
     created_at?: string;
     updated_at?: string;
     id: string;
@@ -1173,7 +1173,7 @@ export type EventSettingsUpdate = {
     timezone?: (string | null);
     allowed_tags?: (Array<(string)> | null);
     allowed_kinds?: (Array<(string)> | null);
-    approval_notification_email?: (string | null);
+    approval_notification_emails?: (Array<(string)> | null);
 };
 
 export type EventStatus = 'draft' | 'published' | 'cancelled' | 'pending_approval' | 'rejected';
