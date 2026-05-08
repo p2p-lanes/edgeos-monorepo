@@ -240,7 +240,8 @@ async def list_pending_reviews(
     applications they haven't reviewed yet.
     """
     from app.api.application.crud import applications_crud
-    from app.api.application.schemas import ApplicationPublic, ApplicationStatus
+    from app.api.application.router import _build_application_public
+    from app.api.application.schemas import ApplicationStatus
     from app.api.popup_reviewer.crud import popup_reviewers_crud
 
     reviewer_assignments = popup_reviewers_crud.find_by_user(db, current_user.id)
@@ -281,7 +282,7 @@ async def list_pending_reviews(
     paginated = pending_apps[skip : skip + limit]
 
     return ListModel(
-        results=[ApplicationPublic.model_validate(a) for a in paginated],
+        results=[_build_application_public(a) for a in paginated],
         paging=Paging(offset=skip, limit=limit, total=total),
     )
 
