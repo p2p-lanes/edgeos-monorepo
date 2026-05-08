@@ -28,7 +28,7 @@ from sqlalchemy.dialects.postgresql import TIMESTAMP
 
 # revision identifiers, used by Alembic.
 revision: str = "a1b9c3d7e5f2"
-down_revision: str = "3f8a1c9e4b2d"
+down_revision: str = "c5e9d3b2f8a0"
 branch_labels: Sequence[str] | None = None
 depends_on: Sequence[str] | None = None
 
