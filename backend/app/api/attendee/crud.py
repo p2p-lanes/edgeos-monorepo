@@ -441,6 +441,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
                 selectinload(Attendees.attendee_products).selectinload(  # type: ignore[arg-type]
                     AttendeeProducts.product  # ty: ignore[invalid-argument-type]
                 ),
+                selectinload(Attendees.payment_products),  # type: ignore[arg-type]
             )
             .offset(skip)
             .limit(limit)
