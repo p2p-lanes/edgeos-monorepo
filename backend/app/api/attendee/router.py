@@ -43,23 +43,50 @@ def _build_attendee_with_origin(attendee) -> AttendeeWithOriginPublic:
     ORM objects) colliding with the AttendeeProductPublic schema expected by
     the typed products field. We extract scalar fields directly from the ORM
     object to sidestep ORM property access.
+
+    product_name and product_category prefer the at-purchase snapshot stored in
+    payment_products (matched on (payment_id, product_id)) so renames or
+    recategorizations after the purchase do not retroactively rewrite a buyer's
+    pass. Falls back to live ap.product when the attendee has no payment_id
+    (free / application grant) or no snapshot row exists (e.g., cancelled
+    payment whose snapshot rows were deleted). start_date, end_date, and
+    duration_type are not snapshotted and always read from the live product.
     """
-    ticket_products = [
-        AttendeeProductPublic(
-            id=ap.id,
-            attendee_id=ap.attendee_id,
-            product_id=ap.product_id,
-            check_in_code=ap.check_in_code,
-            payment_id=ap.payment_id,
-            requires_check_in=ap.product.requires_check_in if ap.product else False,
-            product_name=(ap.product.name if ap.product else None),
-            product_category=(ap.product.category if ap.product else None),
-            start_date=(ap.product.start_date if ap.product else None),
-            end_date=(ap.product.end_date if ap.product else None),
-            duration_type=(ap.product.duration_type if ap.product else None),
+    snapshot_by_pair = {
+        (pp.payment_id, pp.product_id): pp for pp in attendee.payment_products
+    }
+
+    ticket_products = []
+    for ap in attendee.attendee_products:
+        snapshot = (
+            snapshot_by_pair.get((ap.payment_id, ap.product_id))
+            if ap.payment_id is not None
+            else None
         )
-        for ap in attendee.attendee_products
-    ]
+        if snapshot is not None:
+            product_name = snapshot.product_name
+            product_category = snapshot.product_category
+        else:
+            product_name = ap.product.name if ap.product else None
+            product_category = ap.product.category if ap.product else None
+
+        ticket_products.append(
+            AttendeeProductPublic(
+                id=ap.id,
+                attendee_id=ap.attendee_id,
+                product_id=ap.product_id,
+                check_in_code=ap.check_in_code,
+                payment_id=ap.payment_id,
+                requires_check_in=(
+                    ap.product.requires_check_in if ap.product else False
+                ),
+                product_name=product_name,
+                product_category=product_category,
+                start_date=(ap.product.start_date if ap.product else None),
+                end_date=(ap.product.end_date if ap.product else None),
+                duration_type=(ap.product.duration_type if ap.product else None),
+            )
+        )
     origin = "application" if attendee.application_id is not None else "direct_sale"
     # Build the base dict from scalar ORM columns only — do NOT call
     # model_validate(attendee) because it triggers ORM property traversal of
