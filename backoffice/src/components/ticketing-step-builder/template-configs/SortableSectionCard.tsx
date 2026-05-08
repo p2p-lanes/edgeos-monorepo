@@ -3,9 +3,12 @@ import { CSS } from "@dnd-kit/utilities"
 import { GripVertical, Package, Plus, Trash2, X } from "lucide-react"
 import { useState } from "react"
 
+import type { TicketAttendeeCategory } from "@/client"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { ImageUpload } from "@/components/ui/image-upload"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
 
@@ -16,6 +19,7 @@ export interface ProductSection {
   product_ids: string[]
   description?: string
   image_url?: string
+  attendee_categories?: TicketAttendeeCategory[] | null
 }
 
 export function parseConfigSections(config: Record<string, unknown> | null): {
@@ -34,6 +38,15 @@ export function toKey(label: string): string {
     .replace(/^-+|-+$/g, "")
 }
 
+const ATTENDEE_CATEGORY_OPTIONS: Array<{
+  value: TicketAttendeeCategory
+  label: string
+}> = [
+  { value: "main", label: "Main" },
+  { value: "spouse", label: "Spouse" },
+  { value: "kid", label: "Kid" },
+]
+
 interface SortableSectionCardProps {
   section: ProductSection
   onUpdate: (key: string, updates: Partial<ProductSection>) => void
@@ -41,6 +54,7 @@ interface SortableSectionCardProps {
   products: Array<{ id: string; name: string }>
   assignLabel?: string
   showMediaFields?: boolean
+  showAttendeeCategories?: boolean
 }
 
 export function SortableSectionCard({
@@ -50,6 +64,7 @@ export function SortableSectionCard({
   products,
   assignLabel = "Assign product",
   showMediaFields = true,
+  showAttendeeCategories = false,
 }: SortableSectionCardProps) {
   const {
     attributes,
@@ -75,6 +90,20 @@ export function SortableSectionCard({
   )
 
   const [showProductPicker, setShowProductPicker] = useState(false)
+
+  const handleCategoryToggle = (
+    cat: TicketAttendeeCategory,
+    checked: boolean,
+  ) => {
+    const current = section.attendee_categories ?? []
+    const next = checked ? [...current, cat] : current.filter((c) => c !== cat)
+    // Collapse rule: empty OR all-3-checked → null (visible to all)
+    const resolved =
+      next.length === 0 || next.length === ATTENDEE_CATEGORY_OPTIONS.length
+        ? null
+        : next
+    onUpdate(section.key, { attendee_categories: resolved })
+  }
 
   return (
     <div
@@ -143,6 +172,42 @@ export function SortableSectionCard({
               placeholder="Short description shown on the property card"
               className="min-h-[60px] text-sm"
             />
+          </div>
+        </div>
+      )}
+
+      {showAttendeeCategories && (
+        <div className="px-3 pb-3">
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs font-medium text-muted-foreground">
+              Visible to
+            </Label>
+            <div className="flex items-center gap-4">
+              {ATTENDEE_CATEGORY_OPTIONS.map(({ value, label }) => (
+                <div key={value} className="flex items-center gap-1.5">
+                  <Checkbox
+                    id={`${section.key}-cat-${value}`}
+                    checked={(section.attendee_categories ?? []).includes(
+                      value,
+                    )}
+                    onCheckedChange={(checked) =>
+                      handleCategoryToggle(value, checked === true)
+                    }
+                  />
+                  <label
+                    htmlFor={`${section.key}-cat-${value}`}
+                    className="text-xs cursor-pointer"
+                  >
+                    {label}
+                  </label>
+                </div>
+              ))}
+            </div>
+            {section.attendee_categories == null && (
+              <span className="text-xs text-muted-foreground">
+                Visible to all attendees
+              </span>
+            )}
           </div>
         </div>
       )}
