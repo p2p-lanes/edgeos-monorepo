@@ -82,8 +82,6 @@ def _build_attendee_with_origin(attendee) -> AttendeeWithOriginPublic:
                 ),
                 product_name=product_name,
                 product_category=product_category,
-                start_date=(ap.product.start_date if ap.product else None),
-                end_date=(ap.product.end_date if ap.product else None),
                 duration_type=(ap.product.duration_type if ap.product else None),
             )
         )
@@ -518,8 +516,6 @@ async def post_check_in(
             name=product.name,
             price=float(product.price),
             category=product.category,
-            start_date=product.start_date,
-            end_date=product.end_date,
         ),
         total_scans=summary["total_scans"],
         first_scan_at=summary["first_scan_at"],
@@ -564,8 +560,6 @@ async def get_tickets_by_email(
                 TicketProduct(
                     name=ap.product.name,
                     category=ap.product.category,
-                    start_date=ap.product.start_date,
-                    end_date=ap.product.end_date,
                     quantity=1,  # each row = 1 ticket
                 )
             )

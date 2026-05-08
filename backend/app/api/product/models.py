@@ -17,8 +17,20 @@ if TYPE_CHECKING:
     from app.api.tenant.models import Tenants
 
 
+# ---------------------------------------------------------------------------
+# Legacy tier-group models — kept in PR 1 to avoid breaking existing tier tests.
+# These classes reference DB tables (ticket_tier_group, ticket_tier_phase) that
+# are dropped by migration 0045. After that migration runs the classes become
+# dead code; they will be deleted in PR 2 alongside test_tier_groups_api.py and
+# test_tier_progression.py.
+# ---------------------------------------------------------------------------
+
+
 class TicketTierGroup(SQLModel, table=True):
-    """Tier group that pools multiple ticket-phase products under a shared inventory cap."""
+    """Tier group that pools multiple ticket-phase products under a shared inventory cap.
+
+    DEPRECATED — table dropped by migration a1b9c3d7e5f2. Will be removed in PR 2.
+    """
 
     __tablename__ = "ticket_tier_group"
 
@@ -39,7 +51,10 @@ class TicketTierGroup(SQLModel, table=True):
 
 
 class TicketTierPhase(SQLModel, table=True):
-    """A single phase (e.g. Early Bird) within a TicketTierGroup, linked to one product."""
+    """A single phase (e.g. Early Bird) within a TicketTierGroup, linked to one product.
+
+    DEPRECATED — table dropped by migration a1b9c3d7e5f2. Will be removed in PR 2.
+    """
 
     __tablename__ = "ticket_tier_phase"
     __table_args__ = (
@@ -62,6 +77,11 @@ class TicketTierPhase(SQLModel, table=True):
 
     # Relationships
     group: Optional["TicketTierGroup"] = Relationship(back_populates="phases")
+
+
+# ---------------------------------------------------------------------------
+# Products model
+# ---------------------------------------------------------------------------
 
 
 class Products(ProductBase, table=True):

@@ -4,7 +4,7 @@ from decimal import Decimal
 from enum import StrEnum
 from typing import Self
 
-from pydantic import field_validator, model_validator
+from pydantic import ConfigDict, field_validator, model_validator
 from sqlalchemy import Boolean, Column, Numeric
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlmodel import Field, SQLModel, String
@@ -183,7 +183,6 @@ class PopupCreate(SQLModel):
     insurance_enabled: bool = False
     insurance_percentage: Decimal | None = None
     application_layout: ApplicationLayout = ApplicationLayout.single_page
-    tier_progression_enabled: bool = False
     events_enabled: bool = True
 
     @field_validator("currency")
@@ -208,6 +207,10 @@ class PopupCreate(SQLModel):
 
 
 class PopupUpdate(SQLModel):
+    # Reject unknown fields so deprecated ones (e.g., the removed
+    # tier_progression_enabled) are surfaced as 422 instead of silently ignored.
+    model_config = ConfigDict(extra="forbid")
+
     name: str | None = None
     tagline: str | None = None
     location: str | None = None
@@ -242,7 +245,6 @@ class PopupUpdate(SQLModel):
     insurance_enabled: bool | None = None
     insurance_percentage: Decimal | None = None
     application_layout: ApplicationLayout | None = None
-    tier_progression_enabled: bool | None = None
     events_enabled: bool | None = None
 
     @field_validator("currency")
@@ -307,7 +309,6 @@ class PopupPublic(SQLModel):
     insurance_enabled: bool = False
     insurance_percentage: Decimal | None = None
     application_layout: ApplicationLayout = ApplicationLayout.single_page
-    tier_progression_enabled: bool = False
     events_enabled: bool = True
 
 

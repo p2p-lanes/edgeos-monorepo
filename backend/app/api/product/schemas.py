@@ -59,10 +59,10 @@ class ProductBase(SQLModel):
         default=None, nullable=True
     )
     duration_type: TicketDuration | None = Field(default=None, nullable=True)
-    start_date: datetime | None = Field(
+    sale_starts_at: datetime | None = Field(
         default=None, nullable=True, sa_type=DateTime(timezone=True)
     )
-    end_date: datetime | None = Field(
+    sale_ends_at: datetime | None = Field(
         default=None, nullable=True, sa_type=DateTime(timezone=True)
     )
     is_active: bool = Field(default=True)
@@ -105,8 +105,8 @@ class ProductCreate(BaseModel):
     category: str = "ticket"
     attendee_category: TicketAttendeeCategory | None = None
     duration_type: TicketDuration | None = None
-    start_date: datetime | None = None
-    end_date: datetime | None = None
+    sale_starts_at: datetime | None = None
+    sale_ends_at: datetime | None = None
     is_active: bool = True
     exclusive: bool = False
     total_stock_cap: int | None = Field(default=None, ge=1)
@@ -140,6 +140,16 @@ class ProductCreate(BaseModel):
                 )
         return self
 
+    @model_validator(mode="after")
+    def validate_sale_window(self) -> "ProductCreate":
+        """sale_starts_at must be before sale_ends_at when both are set."""
+        if self.sale_starts_at is not None and self.sale_ends_at is not None:
+            if self.sale_starts_at > self.sale_ends_at:
+                raise ValueError(
+                    "sale_starts_at must be before sale_ends_at"
+                )
+        return self
+
 
 class ProductUpdate(BaseModel):
     """Product schema for updates."""
@@ -153,8 +163,8 @@ class ProductUpdate(BaseModel):
     category: str | None = None
     attendee_category: TicketAttendeeCategory | None = None
     duration_type: TicketDuration | None = None
-    start_date: datetime | None = None
-    end_date: datetime | None = None
+    sale_starts_at: datetime | None = None
+    sale_ends_at: datetime | None = None
     is_active: bool | None = None
     exclusive: bool | None = None
     total_stock_cap: int | None = Field(default=None, ge=1)
@@ -174,6 +184,16 @@ class ProductUpdate(BaseModel):
                 )
         return self
 
+    @model_validator(mode="after")
+    def validate_sale_window(self) -> "ProductUpdate":
+        """sale_starts_at must be before sale_ends_at when both are set."""
+        if self.sale_starts_at is not None and self.sale_ends_at is not None:
+            if self.sale_starts_at > self.sale_ends_at:
+                raise ValueError(
+                    "sale_starts_at must be before sale_ends_at"
+                )
+        return self
+
 
 class ProductBatchItem(BaseModel):
     """Single product in a batch import (popup_id is top-level)."""
@@ -187,8 +207,8 @@ class ProductBatchItem(BaseModel):
     category: str = "ticket"
     attendee_category: TicketAttendeeCategory | None = None
     duration_type: TicketDuration | None = None
-    start_date: datetime | None = None
-    end_date: datetime | None = None
+    sale_starts_at: datetime | None = None
+    sale_ends_at: datetime | None = None
     is_active: bool = True
     exclusive: bool = False
     total_stock_cap: int | None = Field(default=None, ge=1)

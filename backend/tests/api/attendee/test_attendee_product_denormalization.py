@@ -7,7 +7,6 @@ T3.1 — Three scenarios:
 """
 
 import uuid
-from datetime import datetime
 from decimal import Decimal
 
 from sqlmodel import Session
@@ -34,8 +33,6 @@ def _make_product(
     category: str = "ticket",
     requires_check_in: bool = True,
     duration_type: str | None = "week",
-    start_date: datetime | None = None,
-    end_date: datetime | None = None,
 ) -> Products:
     product = Products(
         id=uuid.uuid4(),
@@ -48,8 +45,6 @@ def _make_product(
         requires_check_in=requires_check_in,
         is_active=is_active,
         duration_type=duration_type,
-        start_date=start_date,
-        end_date=end_date,
     )
     db.add(product)
     db.commit()
@@ -119,10 +114,7 @@ def test_denorm_active_product_populates_all_fields(
     tenant_a: Tenants,
     popup_tenant_a: Popups,
 ) -> None:
-    """Active product → all 5 denormalized fields are non-null in the response."""
-    start = datetime(2025, 6, 1)
-    end = datetime(2025, 6, 7)
-
+    """Active product → denormalized fields are populated in the response."""
     product = _make_product(
         db,
         tenant_a,
@@ -131,8 +123,6 @@ def test_denorm_active_product_populates_all_fields(
         category="ticket",
         requires_check_in=True,
         duration_type="week",
-        start_date=start,
-        end_date=end,
     )
     human = _make_human(db, tenant_a, suffix="active")
     attendee = _make_attendee(db, tenant_a, popup_tenant_a, human, suffix="active")
@@ -160,11 +150,6 @@ def test_denorm_active_product_populates_all_fields(
     assert ap.product_name == "Denorm Product active"
     assert ap.product_category == "ticket"
     assert ap.duration_type == "week"
-    # DB returns timezone-aware datetimes; compare by stripping tzinfo for portability
-    assert ap.start_date is not None
-    assert ap.end_date is not None
-    assert ap.start_date.year == start.year and ap.start_date.month == start.month and ap.start_date.day == start.day
-    assert ap.end_date.year == end.year and ap.end_date.month == end.month and ap.end_date.day == end.day
     assert ap.requires_check_in is True
 
 

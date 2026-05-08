@@ -431,8 +431,6 @@ class DirectoryProduct(BaseModel):
     slug: str
     category: str | None = None
     duration_type: str | None = None
-    start_date: datetime | None = None
-    end_date: datetime | None = None
 
 
 class AssociatedAttendee(BaseModel):
@@ -486,8 +484,6 @@ class AttendeesDirectoryEntry(BaseModel):
 
     # Participation
     participation: list[DirectoryProduct] = []
-    check_in: datetime | None = None
-    check_out: datetime | None = None
 
     # Associated attendees (spouse/kids)
     associated_attendees: list[AssociatedAttendee] = []

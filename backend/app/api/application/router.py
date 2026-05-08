@@ -308,8 +308,6 @@ async def list_my_tickets(
             TicketProduct(
                 name=seen[pid].name,
                 category=seen[pid].category,
-                start_date=seen[pid].start_date,
-                end_date=seen[pid].end_date,
                 quantity=qty,
             )
             for pid, qty in counts.items()
@@ -622,8 +620,6 @@ def _build_directory_entry(application) -> AttendeesDirectoryEntry:
     # Find main attendee and their products
     main_attendee = application.get_main_attendee()
     products: list[DirectoryProduct] = []
-    check_in = None
-    check_out = None
 
     if main_attendee:
         # Each AttendeeProducts row is one ticket — dedupe by product_id so
@@ -642,16 +638,8 @@ def _build_directory_entry(application) -> AttendeesDirectoryEntry:
                     slug=p.slug,
                     category=p.category,
                     duration_type=p.duration_type,
-                    start_date=p.start_date,
-                    end_date=p.end_date,
                 )
             )
-            if p.start_date:
-                if check_in is None or p.start_date < check_in:
-                    check_in = p.start_date
-            if p.end_date:
-                if check_out is None or p.end_date > check_out:
-                    check_out = p.end_date
 
     has_kids = any(a.category == "kid" for a in application.attendees)
     brings_kids: bool | str = "*" if "brings_kids" in info_hidden else has_kids
@@ -684,8 +672,6 @@ def _build_directory_entry(application) -> AttendeesDirectoryEntry:
         picture_url=human.picture_url if human else None,
         brings_kids=brings_kids,
         participation=products,
-        check_in=check_in,
-        check_out=check_out,
         associated_attendees=associated,
     )
 
@@ -757,8 +743,6 @@ async def export_attendees_directory_csv(
             "Age",
             "Gender",
             "Brings Kids",
-            "Check In",
-            "Check Out",
         ]
     )
     for e in entries:
@@ -774,8 +758,6 @@ async def export_attendees_directory_csv(
                 e.age or "",
                 e.gender or "",
                 str(e.brings_kids),
-                e.check_in.isoformat() if e.check_in else "",
-                e.check_out.isoformat() if e.check_out else "",
             ]
         )
 
