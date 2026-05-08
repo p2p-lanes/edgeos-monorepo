@@ -362,12 +362,18 @@ async def get_my_participation(
         db, human_id=current_human.id, popup_id=popup_id
     )
     if attendee:
+        from app.api.application.schemas import AttendeeTicketInfo
+
         return CompanionParticipation(
             attendee=AttendeeInfo(
                 id=attendee.id,
                 name=attendee.name,
                 category=attendee.category,
                 check_in_code=attendee.check_in_code,
+                tickets=[
+                    AttendeeTicketInfo(id=ap.id, check_in_code=ap.check_in_code)
+                    for ap in attendee.attendee_products
+                ],
             ),
             application_status=attendee.application.status,
         )

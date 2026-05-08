@@ -1621,6 +1621,14 @@ export const AttendeeInfoSchema = {
                 }
             ],
             title: 'Check In Code'
+        },
+        tickets: {
+            items: {
+                '$ref': '#/components/schemas/AttendeeTicketInfo'
+            },
+            type: 'array',
+            title: 'Tickets',
+            default: []
         }
     },
     type: 'object',
@@ -2068,6 +2076,28 @@ export const AttendeeStatsSchema = {
     type: 'object',
     title: 'AttendeeStats',
     description: 'Statistics for attendees.'
+} as const;
+
+export const AttendeeTicketInfoSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        check_in_code: {
+            type: 'string',
+            title: 'Check In Code'
+        }
+    },
+    type: 'object',
+    required: ['id', 'check_in_code'],
+    title: 'AttendeeTicketInfo',
+    description: `Per-ticket info exposed on companion participation responses.
+
+\`check_in_code\` is the per-ticket code from \`attendee_products\` — the
+source of truth post-\`ticket-as-first-class-entity\`. New clients MUST read
+from this list rather than the legacy \`AttendeeInfo.check_in_code\`.`
 } as const;
 
 export const AttendeeUpdateSchema = {

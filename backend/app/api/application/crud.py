@@ -17,7 +17,7 @@ from app.api.application.schemas import (
     ScholarshipDecisionRequest,
 )
 from app.api.application_review.models import ApplicationReviews
-from app.api.attendee.crud import attendees_crud, generate_check_in_code
+from app.api.attendee.crud import attendees_crud
 from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.human.models import Humans
 from app.api.human.schemas import HumanCreate, HumanUpdate
@@ -389,9 +389,6 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         session.flush()
 
         # Create main attendee
-        prefix = popup.slug[:3].upper() if popup.slug else "ATT"
-        check_in_code = generate_check_in_code(prefix)
-
         # Get name from human (just updated)
         session.refresh(human)
         name = (
@@ -405,7 +402,6 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             popup_id=application.popup_id,
             name=name,
             category="main",
-            check_in_code=check_in_code,
             email=human.email,
             gender=human.gender,
             human_id=human.id,
@@ -418,7 +414,6 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 application=application,
                 companions=app_data.companions,
                 tenant_id=tenant_id,
-                check_in_prefix=prefix,
             )
 
         # Apply approval strategy for non-group applications still in review
@@ -452,7 +447,6 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         application: Applications,
         companions: list,
         tenant_id: uuid.UUID,
-        check_in_prefix: str,
     ) -> None:
         """Create companion attendees (spouse/kids) for an application.
 
@@ -470,7 +464,6 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                         detail="Only one spouse attendee allowed per application",
                     )
 
-            check_in_code = generate_check_in_code(check_in_prefix)
             attendees_crud.create_internal(
                 session,
                 tenant_id=tenant_id,
@@ -478,7 +471,6 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 popup_id=application.popup_id,
                 name=companion.name,
                 category=companion.category,
-                check_in_code=check_in_code,
                 email=companion.email,
                 gender=companion.gender,
             )
@@ -623,9 +615,6 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         session.flush()
 
         # Create main attendee
-        prefix = popup.slug[:3].upper() if popup.slug else "ATT"
-        check_in_code = generate_check_in_code(prefix)
-
         session.refresh(human)
         name = (
             f"{human.first_name or ''} {human.last_name or ''}".strip() or human.email
@@ -638,7 +627,6 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             popup_id=application.popup_id,
             name=name,
             category="main",
-            check_in_code=check_in_code,
             email=human.email,
             gender=human.gender,
             human_id=human.id,
@@ -651,7 +639,6 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 application=application,
                 companions=app_data.companions,
                 tenant_id=tenant_id,
-                check_in_prefix=prefix,
             )
 
         # Apply approval strategy if status is IN_REVIEW
@@ -846,10 +833,6 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                     detail="Attendee with this email already exists",
                 )
 
-        # Generate check-in code
-        prefix = application.popup.slug[:3].upper() if application.popup.slug else "ATT"
-        check_in_code = generate_check_in_code(prefix)
-
         attendee = attendees_crud.create_internal(
             session,
             tenant_id=application.tenant_id,
@@ -857,7 +840,6 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             popup_id=application.popup_id,
             name=name,
             category=category,
-            check_in_code=check_in_code,
             email=email.lower() if email else None,
             gender=gender,
         )

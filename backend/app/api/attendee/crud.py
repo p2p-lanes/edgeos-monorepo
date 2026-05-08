@@ -130,7 +130,6 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         popup_id: uuid.UUID,
         name: str,
         category: str,
-        check_in_code: str,
         email: str | None = None,
         gender: str | None = None,
         human_id: uuid.UUID | None = None,
@@ -142,6 +141,9 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
 
         popup_id is REQUIRED — it's a NOT NULL column on attendees. Callers
         that work with an application should pass application.popup_id.
+
+        Attendees.check_in_code is no longer populated — per-ticket codes on
+        attendee_products are the source of truth post-`ticket-as-first-class-entity`.
         """
         # If email provided but no human_id, try to find matching Human
         if email and not human_id:
@@ -153,7 +155,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
             popup_id=popup_id,
             name=name,
             category=category,
-            check_in_code=check_in_code,
+            check_in_code=None,
             email=email,
             gender=gender,
             human_id=human_id,
@@ -199,16 +201,10 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
 
         Used for popups with sale_type="direct". The attendee is bound to a
         Human and a Popup directly — application_id remains NULL.
+
+        Attendees.check_in_code is no longer populated — per-ticket codes on
+        attendee_products are the source of truth post-`ticket-as-first-class-entity`.
         """
-        prefix = ""
-        # Short prefix from popup slug if available
-        from app.api.popup.models import Popups
-
-        popup = session.get(Popups, popup_id)
-        if popup and popup.slug:
-            prefix = popup.slug[:3].upper()
-        check_in_code = generate_check_in_code(prefix)
-
         attendee = Attendees(
             tenant_id=tenant_id,
             application_id=None,
@@ -216,7 +212,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
             human_id=human_id,
             name=name,
             category="main",
-            check_in_code=check_in_code,
+            check_in_code=None,
             email=email.lower() if email else None,
         )
         session.add(attendee)
@@ -369,7 +365,10 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
                 Applications.popup_id == popup_id,
                 Applications.human_id != human_id,
             )
-            .options(selectinload(Attendees.application))  # type: ignore[arg-type]
+            .options(
+                selectinload(Attendees.application),  # type: ignore[arg-type]
+                selectinload(Attendees.attendee_products),  # type: ignore[arg-type]
+            )
             .limit(1)
         )
         return session.exec(statement).first()
