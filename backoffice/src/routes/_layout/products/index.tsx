@@ -20,7 +20,7 @@ import { Suspense, useState } from "react"
 import {
   type ProductBatchItem,
   type ProductBatchResult,
-  type ProductPublicWithTier,
+  type ProductPublic,
   ProductsService,
 } from "@/client"
 import { CsvImportDialog } from "@/components/Common/CsvImportDialog"
@@ -102,7 +102,7 @@ function AddProductButton() {
   )
 }
 
-function ProductActionsMenu({ product }: { product: ProductPublicWithTier }) {
+function ProductActionsMenu({ product }: { product: ProductPublic }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const queryClient = useQueryClient()
@@ -187,23 +187,11 @@ function ProductActionsMenu({ product }: { product: ProductPublicWithTier }) {
   )
 }
 
-const columns: ColumnDef<ProductPublicWithTier>[] = [
+const columns: ColumnDef<ProductPublic>[] = [
   {
     accessorKey: "name",
     header: ({ column }) => <SortableHeader label="Name" column={column} />,
-    cell: ({ row }) => {
-      const phaseLabel = row.original.phase?.label?.trim()
-      return (
-        <span className="font-medium">
-          {row.original.name}
-          {phaseLabel && (
-            <span className="ml-1.5 text-muted-foreground font-normal">
-              ({phaseLabel})
-            </span>
-          )}
-        </span>
-      )
-    },
+    cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
   },
   {
     accessorKey: "price",

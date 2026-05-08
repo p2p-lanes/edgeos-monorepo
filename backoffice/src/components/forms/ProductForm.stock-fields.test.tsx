@@ -28,13 +28,6 @@ vi.mock("@/client", () => ({
   PopupsService: {
     getPopup: vi.fn(),
   },
-  TicketTierGroupsService: {
-    listTierGroups: vi.fn(),
-    getTierGroup: vi.fn(),
-    createTierGroup: vi.fn(),
-    createTierPhase: vi.fn(),
-    updateTierPhase: vi.fn(),
-  },
 }))
 
 vi.mock("@tanstack/react-router", () => ({
@@ -64,11 +57,7 @@ vi.mock("@/hooks/useUnsavedChanges", () => ({
   UnsavedChangesDialog: () => null,
 }))
 
-import {
-  PopupsService,
-  ProductsService,
-  TicketTierGroupsService,
-} from "@/client"
+import { PopupsService, ProductsService } from "@/client"
 import { ProductForm } from "./ProductForm"
 
 const mockGetPopup = vi.mocked(PopupsService.getPopup)
@@ -76,13 +65,11 @@ const mockListProductCategories = vi.mocked(
   ProductsService.listProductCategories,
 )
 const mockCreateProduct = vi.mocked(ProductsService.createProduct)
-const mockListTierGroups = vi.mocked(TicketTierGroupsService.listTierGroups)
 
 const POPUP_NO_TIER = {
   id: "popup-1",
   name: "Test Popup",
   slug: "test-popup",
-  tier_progression_enabled: false,
   supported_languages: ["en"],
   default_language: "en",
 }
@@ -112,11 +99,6 @@ describe("ProductForm — two-field stock layout (6.5)", () => {
       "housing",
       "merch",
     ] as Awaited<ReturnType<typeof ProductsService.listProductCategories>>)
-
-    mockListTierGroups.mockResolvedValue({
-      results: [],
-      paging: { offset: 0, limit: 100, total: 0 },
-    } as Awaited<ReturnType<typeof TicketTierGroupsService.listTierGroups>>)
 
     mockCreateProduct.mockResolvedValue({
       id: "product-new",

@@ -65,8 +65,8 @@ export const productCsvColumns: CsvColumnConfig<ProductBatchItem>[] = [
     parse: (v) => (v ? v.toLowerCase() : undefined),
   },
   {
-    header: "Start Date",
-    key: "start_date",
+    header: "Sale Starts At",
+    key: "sale_starts_at",
     validate: (v) => {
       if (!v) return null
       const d = new Date(v)
@@ -77,8 +77,8 @@ export const productCsvColumns: CsvColumnConfig<ProductBatchItem>[] = [
     parse: (v) => (v ? new Date(v).toISOString() : undefined),
   },
   {
-    header: "End Date",
-    key: "end_date",
+    header: "Sale Ends At",
+    key: "sale_ends_at",
     validate: (v) => {
       if (!v) return null
       const d = new Date(v)
