@@ -1833,30 +1833,6 @@ export const AttendeeProductPublicSchema = {
             ],
             title: 'Product Category'
         },
-        start_date: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'date-time'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Start Date'
-        },
-        end_date: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'date-time'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'End Date'
-        },
         duration_type: {
             anyOf: [
                 {
@@ -1869,6 +1845,7 @@ export const AttendeeProductPublicSchema = {
             title: 'Duration Type'
         }
     },
+    additionalProperties: false,
     type: 'object',
     required: ['id', 'attendee_id', 'product_id', 'check_in_code'],
     title: 'AttendeeProductPublic',
@@ -1877,10 +1854,10 @@ export const AttendeeProductPublicSchema = {
 requires_check_in is denormalized from the related Product so the frontend
 can decide whether to render a QR code without an extra round-trip.
 
-product_name, product_category, start_date, end_date, and duration_type are
-denormalized from the related Product at response-build time (current product
-state, not snapshot-at-purchase). All are optional with None defaults for
-backward compatibility with old clients that do not read them.`
+product_name, product_category, and duration_type are denormalized from the
+related Product at response-build time (current product state, not
+snapshot-at-purchase). All are optional with None defaults for backward
+compatibility with old clients that do not read them.`
 } as const;
 
 export const AttendeePublicSchema = {
@@ -2492,30 +2469,6 @@ export const AttendeesDirectoryEntrySchema = {
             type: 'array',
             title: 'Participation',
             default: []
-        },
-        check_in: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'date-time'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Check In'
-        },
-        check_out: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'date-time'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Check Out'
         },
         associated_attendees: {
             items: {
@@ -3604,26 +3557,6 @@ export const CheckoutRuntimeProductSchema = {
             type: 'boolean',
             title: 'Insurance Eligible',
             default: false
-        },
-        tier_group: {
-            anyOf: [
-                {
-                    '$ref': '#/components/schemas/TierGroupPublic'
-                },
-                {
-                    type: 'null'
-                }
-            ]
-        },
-        phase: {
-            anyOf: [
-                {
-                    '$ref': '#/components/schemas/TierPhasePublic'
-                },
-                {
-                    type: 'null'
-                }
-            ]
         }
     },
     type: 'object',
@@ -4120,30 +4053,6 @@ export const DirectoryProductSchema = {
                 }
             ],
             title: 'Duration Type'
-        },
-        start_date: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'date-time'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Start Date'
-        },
-        end_date: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'date-time'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'End Date'
         }
     },
     type: 'object',
@@ -8542,11 +8451,11 @@ export const ListModel_PopupReviewerPublic_Schema = {
     title: 'ListModel[PopupReviewerPublic]'
 } as const;
 
-export const ListModel_ProductPublicWithTier_Schema = {
+export const ListModel_ProductPublic_Schema = {
     properties: {
         results: {
             items: {
-                '$ref': '#/components/schemas/ProductPublicWithTier'
+                '$ref': '#/components/schemas/ProductPublic'
             },
             type: 'array',
             title: 'Results'
@@ -8557,7 +8466,7 @@ export const ListModel_ProductPublicWithTier_Schema = {
     },
     type: 'object',
     required: ['results', 'paging'],
-    title: 'ListModel[ProductPublicWithTier]'
+    title: 'ListModel[ProductPublic]'
 } as const;
 
 export const ListModel_TenantPublic_Schema = {
@@ -8594,24 +8503,6 @@ export const ListModel_TicketingStepPublic_Schema = {
     type: 'object',
     required: ['results', 'paging'],
     title: 'ListModel[TicketingStepPublic]'
-} as const;
-
-export const ListModel_TierGroupPublic_Schema = {
-    properties: {
-        results: {
-            items: {
-                '$ref': '#/components/schemas/TierGroupPublic'
-            },
-            type: 'array',
-            title: 'Results'
-        },
-        paging: {
-            '$ref': '#/components/schemas/Paging'
-        }
-    },
-    type: 'object',
-    required: ['results', 'paging'],
-    title: 'ListModel[TierGroupPublic]'
 } as const;
 
 export const ListModel_TrackPublic_Schema = {
@@ -9471,15 +9362,6 @@ export const PaymentUpdateSchema = {
     description: 'Schema for updating a payment (mainly status updates).'
 } as const;
 
-export const PhaseStateSchema = {
-    type: 'string',
-    enum: ['upcoming', 'available', 'sold_out', 'expired'],
-    title: 'PhaseState',
-    description: `Derived sales state for a ticket tier phase.
-
-Computed server-side by the progression service at read time; never persisted.`
-} as const;
-
 export const PopupAccessResponseSchema = {
     properties: {
         allowed: {
@@ -9844,11 +9726,6 @@ export const PopupAdminSchema = {
             '$ref': '#/components/schemas/ApplicationLayout',
             default: 'single_page'
         },
-        tier_progression_enabled: {
-            type: 'boolean',
-            title: 'Tier Progression Enabled',
-            default: false
-        },
         events_enabled: {
             type: 'boolean',
             title: 'Events Enabled',
@@ -10210,11 +10087,6 @@ export const PopupCreateSchema = {
             '$ref': '#/components/schemas/ApplicationLayout',
             default: 'single_page'
         },
-        tier_progression_enabled: {
-            type: 'boolean',
-            title: 'Tier Progression Enabled',
-            default: false
-        },
         events_enabled: {
             type: 'boolean',
             title: 'Events Enabled',
@@ -10495,11 +10367,6 @@ export const PopupPublicSchema = {
         application_layout: {
             '$ref': '#/components/schemas/ApplicationLayout',
             default: 'single_page'
-        },
-        tier_progression_enabled: {
-            type: 'boolean',
-            title: 'Tier Progression Enabled',
-            default: false
         },
         events_enabled: {
             type: 'boolean',
@@ -11031,17 +10898,6 @@ export const PopupUpdateSchema = {
                 }
             ]
         },
-        tier_progression_enabled: {
-            anyOf: [
-                {
-                    type: 'boolean'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Tier Progression Enabled'
-        },
         events_enabled: {
             anyOf: [
                 {
@@ -11054,6 +10910,7 @@ export const PopupUpdateSchema = {
             title: 'Events Enabled'
         }
     },
+    additionalProperties: false,
     type: 'object',
     title: 'PopupUpdate'
 } as const;
@@ -11289,7 +11146,7 @@ export const ProductBatchItemSchema = {
                 }
             ]
         },
-        start_date: {
+        sale_starts_at: {
             anyOf: [
                 {
                     type: 'string',
@@ -11299,9 +11156,9 @@ export const ProductBatchItemSchema = {
                     type: 'null'
                 }
             ],
-            title: 'Start Date'
+            title: 'Sale Starts At'
         },
-        end_date: {
+        sale_ends_at: {
             anyOf: [
                 {
                     type: 'string',
@@ -11311,7 +11168,7 @@ export const ProductBatchItemSchema = {
                     type: 'null'
                 }
             ],
-            title: 'End Date'
+            title: 'Sale Ends At'
         },
         is_active: {
             type: 'boolean',
@@ -11460,7 +11317,7 @@ export const ProductBatchResultSchema = {
                 }
             ]
         },
-        start_date: {
+        sale_starts_at: {
             anyOf: [
                 {
                     type: 'string',
@@ -11470,9 +11327,9 @@ export const ProductBatchResultSchema = {
                     type: 'null'
                 }
             ],
-            title: 'Start Date'
+            title: 'Sale Starts At'
         },
-        end_date: {
+        sale_ends_at: {
             anyOf: [
                 {
                     type: 'string',
@@ -11482,7 +11339,7 @@ export const ProductBatchResultSchema = {
                     type: 'null'
                 }
             ],
-            title: 'End Date'
+            title: 'Sale Ends At'
         },
         is_active: {
             type: 'boolean',
@@ -11698,7 +11555,7 @@ export const ProductCreateSchema = {
                 }
             ]
         },
-        start_date: {
+        sale_starts_at: {
             anyOf: [
                 {
                     type: 'string',
@@ -11708,9 +11565,9 @@ export const ProductCreateSchema = {
                     type: 'null'
                 }
             ],
-            title: 'Start Date'
+            title: 'Sale Starts At'
         },
-        end_date: {
+        sale_ends_at: {
             anyOf: [
                 {
                     type: 'string',
@@ -11720,7 +11577,7 @@ export const ProductCreateSchema = {
                     type: 'null'
                 }
             ],
-            title: 'End Date'
+            title: 'Sale Ends At'
         },
         is_active: {
             type: 'boolean',
@@ -11889,7 +11746,7 @@ export const ProductPublicSchema = {
                 }
             ]
         },
-        start_date: {
+        sale_starts_at: {
             anyOf: [
                 {
                     type: 'string',
@@ -11899,9 +11756,9 @@ export const ProductPublicSchema = {
                     type: 'null'
                 }
             ],
-            title: 'Start Date'
+            title: 'Sale Starts At'
         },
-        end_date: {
+        sale_ends_at: {
             anyOf: [
                 {
                     type: 'string',
@@ -11911,7 +11768,7 @@ export const ProductPublicSchema = {
                     type: 'null'
                 }
             ],
-            title: 'End Date'
+            title: 'Sale Ends At'
         },
         is_active: {
             type: 'boolean',
@@ -11976,202 +11833,6 @@ export const ProductPublicSchema = {
     required: ['tenant_id', 'popup_id', 'name', 'slug', 'price', 'id'],
     title: 'ProductPublic',
     description: 'Product schema for API responses.'
-} as const;
-
-export const ProductPublicWithTierSchema = {
-    properties: {
-        tenant_id: {
-            type: 'string',
-            format: 'uuid',
-            title: 'Tenant Id'
-        },
-        popup_id: {
-            type: 'string',
-            format: 'uuid',
-            title: 'Popup Id'
-        },
-        name: {
-            type: 'string',
-            title: 'Name'
-        },
-        slug: {
-            type: 'string',
-            title: 'Slug'
-        },
-        price: {
-            type: 'string',
-            pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
-            title: 'Price'
-        },
-        compare_price: {
-            anyOf: [
-                {
-                    type: 'string',
-                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Compare Price'
-        },
-        description: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Description'
-        },
-        image_url: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Image Url'
-        },
-        category: {
-            type: 'string',
-            title: 'Category',
-            default: 'ticket'
-        },
-        attendee_category: {
-            anyOf: [
-                {
-                    '$ref': '#/components/schemas/TicketAttendeeCategory'
-                },
-                {
-                    type: 'null'
-                }
-            ]
-        },
-        duration_type: {
-            anyOf: [
-                {
-                    '$ref': '#/components/schemas/TicketDuration'
-                },
-                {
-                    type: 'null'
-                }
-            ]
-        },
-        start_date: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'date-time'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Start Date'
-        },
-        end_date: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'date-time'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'End Date'
-        },
-        is_active: {
-            type: 'boolean',
-            title: 'Is Active',
-            default: true
-        },
-        exclusive: {
-            type: 'boolean',
-            title: 'Exclusive',
-            default: false
-        },
-        total_stock_cap: {
-            anyOf: [
-                {
-                    type: 'integer'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Total Stock Cap'
-        },
-        total_stock_remaining: {
-            anyOf: [
-                {
-                    type: 'integer'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Total Stock Remaining'
-        },
-        max_per_order: {
-            anyOf: [
-                {
-                    type: 'integer'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Max Per Order'
-        },
-        insurance_eligible: {
-            type: 'boolean',
-            title: 'Insurance Eligible',
-            default: false
-        },
-        requires_check_in: {
-            type: 'boolean',
-            title: 'Requires Check In',
-            default: false
-        },
-        id: {
-            type: 'string',
-            format: 'uuid',
-            title: 'Id'
-        },
-        tier_group: {
-            anyOf: [
-                {
-                    '$ref': '#/components/schemas/TierGroupPublic'
-                },
-                {
-                    type: 'null'
-                }
-            ]
-        },
-        phase: {
-            anyOf: [
-                {
-                    '$ref': '#/components/schemas/TierPhasePublic'
-                },
-                {
-                    type: 'null'
-                }
-            ]
-        }
-    },
-    type: 'object',
-    required: ['tenant_id', 'popup_id', 'name', 'slug', 'price', 'id'],
-    title: 'ProductPublicWithTier',
-    description: `ProductPublic enriched with optional tier group and phase information.
-
-Additive delta over ProductPublic — both fields are null for products that
-are not assigned to any tier group (BC-2 / BC-3 backward-compat).`
 } as const;
 
 export const ProductUpdateSchema = {
@@ -12283,7 +11944,7 @@ export const ProductUpdateSchema = {
                 }
             ]
         },
-        start_date: {
+        sale_starts_at: {
             anyOf: [
                 {
                     type: 'string',
@@ -12293,9 +11954,9 @@ export const ProductUpdateSchema = {
                     type: 'null'
                 }
             ],
-            title: 'Start Date'
+            title: 'Sale Starts At'
         },
-        end_date: {
+        sale_ends_at: {
             anyOf: [
                 {
                     type: 'string',
@@ -12305,7 +11966,7 @@ export const ProductUpdateSchema = {
                     type: 'null'
                 }
             ],
-            title: 'End Date'
+            title: 'Sale Ends At'
         },
         is_active: {
             anyOf: [
@@ -12477,7 +12138,7 @@ export const ProductWithQuantitySchema = {
                 }
             ]
         },
-        start_date: {
+        sale_starts_at: {
             anyOf: [
                 {
                     type: 'string',
@@ -12487,9 +12148,9 @@ export const ProductWithQuantitySchema = {
                     type: 'null'
                 }
             ],
-            title: 'Start Date'
+            title: 'Sale Starts At'
         },
-        end_date: {
+        sale_ends_at: {
             anyOf: [
                 {
                     type: 'string',
@@ -12499,7 +12160,7 @@ export const ProductWithQuantitySchema = {
                     type: 'null'
                 }
             ],
-            title: 'End Date'
+            title: 'Sale Ends At'
         },
         is_active: {
             type: 'boolean',
@@ -13879,311 +13540,6 @@ export const TicketingStepUpdateSchema = {
     },
     type: 'object',
     title: 'TicketingStepUpdate'
-} as const;
-
-export const TierGroupCreateSchema = {
-    properties: {
-        name: {
-            type: 'string',
-            minLength: 1,
-            title: 'Name'
-        },
-        shared_stock_cap: {
-            anyOf: [
-                {
-                    type: 'integer',
-                    minimum: 1
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Shared Stock Cap'
-        },
-        popup_id: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'uuid'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Popup Id'
-        }
-    },
-    type: 'object',
-    required: ['name'],
-    title: 'TierGroupCreate',
-    description: 'Schema for creating a new ticket tier group.'
-} as const;
-
-export const TierGroupPublicSchema = {
-    properties: {
-        id: {
-            type: 'string',
-            format: 'uuid',
-            title: 'Id'
-        },
-        tenant_id: {
-            type: 'string',
-            format: 'uuid',
-            title: 'Tenant Id'
-        },
-        name: {
-            type: 'string',
-            title: 'Name'
-        },
-        shared_stock_cap: {
-            anyOf: [
-                {
-                    type: 'integer'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Shared Stock Cap'
-        },
-        shared_stock_remaining: {
-            anyOf: [
-                {
-                    type: 'integer'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Shared Stock Remaining'
-        },
-        phases: {
-            items: {
-                '$ref': '#/components/schemas/TierPhasePublic'
-            },
-            type: 'array',
-            title: 'Phases',
-            default: []
-        }
-    },
-    type: 'object',
-    required: ['id', 'tenant_id', 'name'],
-    title: 'TierGroupPublic',
-    description: 'Public read schema for a ticket tier group, with embedded phases.'
-} as const;
-
-export const TierGroupUpdateSchema = {
-    properties: {
-        name: {
-            anyOf: [
-                {
-                    type: 'string',
-                    minLength: 1
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Name'
-        },
-        shared_stock_cap: {
-            anyOf: [
-                {
-                    type: 'integer',
-                    minimum: 1
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Shared Stock Cap'
-        }
-    },
-    type: 'object',
-    title: 'TierGroupUpdate',
-    description: 'Schema for updating a ticket tier group (all fields optional).'
-} as const;
-
-export const TierPhaseCreateSchema = {
-    properties: {
-        group_id: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'uuid'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Group Id'
-        },
-        product_id: {
-            type: 'string',
-            format: 'uuid',
-            title: 'Product Id'
-        },
-        label: {
-            type: 'string',
-            minLength: 1,
-            title: 'Label'
-        },
-        sale_starts_at: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'date-time'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Sale Starts At'
-        },
-        sale_ends_at: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'date-time'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Sale Ends At'
-        }
-    },
-    type: 'object',
-    required: ['product_id', 'label'],
-    title: 'TierPhaseCreate',
-    description: `Schema for creating a new ticket tier phase.
-
-group_id is optional here because the router endpoint at
-POST /ticket-tier-groups/{group_id}/phases injects it from the path param.
-
-\`order\` is not accepted on input: the backend derives it from
-\`sale_starts_at ASC\` (NULLS LAST) with a deterministic id tiebreak.`
-} as const;
-
-export const TierPhasePublicSchema = {
-    properties: {
-        id: {
-            type: 'string',
-            format: 'uuid',
-            title: 'Id'
-        },
-        group_id: {
-            type: 'string',
-            format: 'uuid',
-            title: 'Group Id'
-        },
-        product_id: {
-            type: 'string',
-            format: 'uuid',
-            title: 'Product Id'
-        },
-        order: {
-            type: 'integer',
-            title: 'Order'
-        },
-        label: {
-            type: 'string',
-            title: 'Label'
-        },
-        sale_starts_at: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'date-time'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Sale Starts At'
-        },
-        sale_ends_at: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'date-time'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Sale Ends At'
-        },
-        sales_state: {
-            '$ref': '#/components/schemas/PhaseState'
-        },
-        is_purchasable: {
-            type: 'boolean',
-            title: 'Is Purchasable'
-        },
-        remaining: {
-            anyOf: [
-                {
-                    type: 'integer'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Remaining'
-        }
-    },
-    type: 'object',
-    required: ['id', 'group_id', 'product_id', 'order', 'label', 'sales_state', 'is_purchasable'],
-    title: 'TierPhasePublic',
-    description: 'Public read schema for a ticket tier phase, with derived progression fields.'
-} as const;
-
-export const TierPhaseUpdateSchema = {
-    properties: {
-        label: {
-            anyOf: [
-                {
-                    type: 'string',
-                    minLength: 1
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Label'
-        },
-        sale_starts_at: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'date-time'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Sale Starts At'
-        },
-        sale_ends_at: {
-            anyOf: [
-                {
-                    type: 'string',
-                    format: 'date-time'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Sale Ends At'
-        }
-    },
-    type: 'object',
-    title: 'TierPhaseUpdate',
-    description: `Schema for updating a ticket tier phase (all fields optional).
-
-\`order\` is derived automatically; updates that change \`sale_starts_at\`
-trigger a full re-order of the group.`
 } as const;
 
 export const TimelinePointSchema = {
