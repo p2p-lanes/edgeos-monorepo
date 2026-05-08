@@ -125,11 +125,11 @@ class TestTenantScopedPopupSlugMigration:
                                     supported_languages, insurance_enabled,
                                     allows_scholarship, allows_incentive,
                                     requires_application_fee,
-                                    tier_progression_enabled, events_enabled,
+                                    events_enabled,
                                     application_layout)
                 VALUES (%s, %s, %s, %s, 'application', 'pass_system',
                         'draft', 'USD', 'en', '{en}', false,
-                        false, false, false, false, true, 'single_page')
+                        false, false, false, true, 'single_page')
                 """,
                 (str(uuid.uuid4()), f"Migration Test A {slug}", slug, str(tenant_a.id)),
             )
@@ -140,11 +140,11 @@ class TestTenantScopedPopupSlugMigration:
                                     supported_languages, insurance_enabled,
                                     allows_scholarship, allows_incentive,
                                     requires_application_fee,
-                                    tier_progression_enabled, events_enabled,
+                                    events_enabled,
                                     application_layout)
                 VALUES (%s, %s, %s, %s, 'application', 'pass_system',
                         'draft', 'USD', 'en', '{en}', false,
-                        false, false, false, false, true, 'single_page')
+                        false, false, false, true, 'single_page')
                 """,
                 (str(uuid.uuid4()), f"Migration Test B {slug}", slug, str(tenant_b.id)),
             )
