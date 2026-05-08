@@ -299,6 +299,7 @@ export function TicketSelectConfig({
                     onDelete={handleSectionDelete}
                     products={products}
                     showMediaFields={false}
+                    showAttendeeCategories={true}
                   />
                 ))}
             </div>

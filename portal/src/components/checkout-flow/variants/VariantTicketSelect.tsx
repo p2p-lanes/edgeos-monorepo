@@ -9,6 +9,7 @@ import QuantitySelector, {
   resolveMaxQuantity,
   supportsQuantitySelector,
 } from "@/components/ui/QuantitySelector"
+import { normalizeAttendeeCategory } from "@/lib/attendee-category"
 import { deriveProductState, type ProductSaleState } from "@/lib/product-state"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
@@ -27,6 +28,7 @@ interface TemplateSection {
   label: string
   order: number
   product_ids: string[]
+  attendee_categories?: string[] | null
 }
 
 const CATEGORY_ORDER = ["main", "spouse", "kid", "teen", "baby"]
@@ -262,8 +264,9 @@ function parseSections(
 }
 
 /** Returns groups of products for an attendee based on configured sections.
- *  Products not in any section are excluded. */
-function buildSectionGroups(
+ *  Products not in any section are excluded.
+ *  Sections gated by attendee_categories are filtered to the current attendee. */
+export function buildSectionGroups(
   attendee: AttendeePassState,
   sections: TemplateSection[],
 ): { section: TemplateSection; products: ProductsPass[] }[] {
@@ -272,13 +275,19 @@ function buildSectionGroups(
     return buildDurationGroups(attendee)
   }
 
+  const normalisedCategory = normalizeAttendeeCategory(attendee.category)
+  const visibleSections = sections.filter((s) => {
+    if (s.attendee_categories == null) return true
+    return s.attendee_categories.includes(normalisedCategory)
+  })
+
   const productMap = new Map(
     attendee.products
       .filter((p) => p.category !== "patreon")
       .map((p) => [p.id, p]),
   )
 
-  return sections
+  return visibleSections
     .map((section) => ({
       section,
       products: section.product_ids
