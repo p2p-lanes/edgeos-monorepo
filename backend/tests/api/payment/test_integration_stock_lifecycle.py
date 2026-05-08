@@ -9,14 +9,12 @@ Covers:
       → assert total_stock_remaining restored, payment EXPIRED.
   7.3 Cancel/reject restoration end-to-end: create payment → admin PATCH → assert restoration.
   7.4 Application flow enforcement end-to-end: add_product against capacity=0 → 409.
-  7.5 Tier × total_stock conflict validator end-to-end: attempt to set both → 422.
 
 Spec references:
   §Domain 1 "Atomic Stock Decrement"
   §Domain 2 "Eager Decrement at All Three Purchase Entry Points"
   §Domain 3 "Webhook Handlers Restore Both Counters"
   §Domain 5 "add_product Enforces Stock Caps"
-  §Domain 6 "total_stock_cap + shared_stock_cap conflict → 422"
 """
 
 import threading
@@ -31,7 +29,7 @@ from app.api.payment.models import PaymentProducts, Payments
 from app.api.payment.schemas import PaymentStatus
 from app.api.popup.models import Popups
 from app.api.product.crud import products_crud
-from app.api.product.models import Products, TicketTierGroup, TicketTierPhase
+from app.api.product.models import Products
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
@@ -550,64 +548,3 @@ class TestApplicationFlowEnforcement:
         assert exc_info.value.status_code == 409
 
 
-# ---------------------------------------------------------------------------
-# 7.5 Tier × total_stock conflict validator — HTTP layer
-# ---------------------------------------------------------------------------
-
-
-class TestTierTotalStockConflict:
-    """7.5 — Setting total_stock_cap on a product in a tier group with shared_stock_cap → 422."""
-
-    def test_update_product_with_total_stock_cap_when_in_tier_group_returns_422(
-        self,
-        client: TestClient,
-        db: Session,
-        tenant_a: Tenants,
-        admin_user_tenant_a: Users,
-    ) -> None:
-        popup = _make_direct_popup(db, tenant_a)
-
-        # Create a tier group with shared_stock_cap
-        tier_group = TicketTierGroup(
-            tenant_id=tenant_a.id,
-            name=f"group-conflict-{uuid.uuid4().hex[:6]}",
-            shared_stock_cap=100,
-            shared_stock_remaining=100,
-        )
-        db.add(tier_group)
-        db.flush()
-
-        # Create a product and link it to the tier group via a phase
-        product = _make_product(
-            db, tenant_a, popup,
-            total_stock_cap=None,  # no individual cap initially
-        )
-
-        phase = TicketTierPhase(
-            group_id=tier_group.id,
-            product_id=product.id,
-            order=1,
-            label="Phase 1",
-            sale_starts_at="2026-01-01T00:00:00Z",
-            sale_ends_at="2026-12-31T23:59:59Z",
-            sales_state="available",
-            is_purchasable=True,
-        )
-        db.add(phase)
-        db.commit()
-
-        admin_token = create_access_token(
-            subject=admin_user_tenant_a.id, token_type="user"
-        )
-
-        # Now try to set total_stock_cap on this product — should 422
-        response = client.patch(
-            f"/api/v1/products/{product.id}",
-            json={"total_stock_cap": 50},
-            headers={"Authorization": f"Bearer {admin_token}"},
-        )
-
-        assert response.status_code == 422, (
-            f"Expected 422 (total_stock vs shared_stock conflict), got {response.status_code}: {response.text}"
-        )
-        assert "total_stock_cap" in response.text.lower() or "shared" in response.text.lower()

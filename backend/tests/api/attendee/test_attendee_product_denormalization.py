@@ -4,15 +4,24 @@ T3.1 — Three scenarios:
 1. Active product → all 5 fields populated.
 2. Deactivated product (is_active=False) → still populated (deactivation doesn't suppress denorm).
 3. Null product guard → fields are None, no AttributeError.
+
+T2.8a — Schema guard scenarios (no DB required):
+4. Constructing AttendeeProductPublic with start_date raises ValidationError (extra="forbid").
+5. Constructing AttendeeProductPublic with end_date raises ValidationError (extra="forbid").
+6. Constructing AttendeeProductPublic with duration_type="multi_day" succeeds.
 """
 
 import uuid
+from datetime import UTC
 from decimal import Decimal
 
+import pytest
+from pydantic import ValidationError
 from sqlmodel import Session
 
 from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.attendee.router import _build_attendee_with_origin
+from app.api.attendee.schemas import AttendeeProductPublic
 from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.product.models import Products
@@ -254,7 +263,61 @@ def test_denorm_null_product_guard(
     ap = result.products[0]
     assert ap.product_name is None
     assert ap.product_category is None
-    assert ap.start_date is None
-    assert ap.end_date is None
     assert ap.duration_type is None
     assert ap.requires_check_in is False
+
+
+# ---------------------------------------------------------------------------
+# T2.8a — Schema guard: start_date/end_date removed from AttendeeProductPublic
+# ---------------------------------------------------------------------------
+
+
+_BASE_TICKET_KWARGS = {
+    "id": uuid.uuid4(),
+    "attendee_id": uuid.uuid4(),
+    "product_id": uuid.uuid4(),
+    "check_in_code": "TESTCODE01",
+}
+
+
+def test_attendee_product_public_rejects_start_date() -> None:
+    """AttendeeProductPublic with start_date raises ValidationError (extra='forbid').
+
+    start_date was removed from AttendeeProductPublic in PR 2. Pydantic must
+    reject it so stale callers surface a hard error rather than silently
+    ignoring the field.
+    """
+    from datetime import datetime
+
+    with pytest.raises(ValidationError) as exc_info:
+        AttendeeProductPublic(**_BASE_TICKET_KWARGS, start_date=datetime.now(tz=UTC))  # type: ignore[call-arg]
+    errors = exc_info.value.errors()
+    assert any("start_date" in str(e) for e in errors), (
+        f"expected start_date in errors, got: {errors}"
+    )
+
+
+def test_attendee_product_public_rejects_end_date() -> None:
+    """AttendeeProductPublic with end_date raises ValidationError (extra='forbid').
+
+    end_date was removed from AttendeeProductPublic in PR 2. Same rationale as
+    start_date above.
+    """
+    from datetime import datetime
+
+    with pytest.raises(ValidationError) as exc_info:
+        AttendeeProductPublic(**_BASE_TICKET_KWARGS, end_date=datetime.now(tz=UTC))  # type: ignore[call-arg]
+    errors = exc_info.value.errors()
+    assert any("end_date" in str(e) for e in errors), (
+        f"expected end_date in errors, got: {errors}"
+    )
+
+
+def test_attendee_product_public_accepts_duration_type_multi_day() -> None:
+    """AttendeeProductPublic with duration_type='multi_day' succeeds.
+
+    duration_type is a free-form string so 'multi_day' is a valid value.
+    This confirms the field remains present and accepts arbitrary string values.
+    """
+    ap = AttendeeProductPublic(**_BASE_TICKET_KWARGS, duration_type="multi_day")
+    assert ap.duration_type == "multi_day"

@@ -534,11 +534,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
           4. Atomic tier-group shared-stock decrement if applicable
           5. Insert the new ticket row
         """
-        from app.api.product.crud import (
-            _resolve_tier_group,
-            products_crud,
-            tier_groups_crud,
-        )
+        from app.api.product.crud import products_crud
         from app.api.product.models import Products
 
         product = session.get(Products, product_id)
@@ -562,11 +558,6 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
 
         # Atomic total-stock decrement (no-op when unlimited)
         products_crud.decrement_total_stock(session, product_id, 1)
-
-        # Atomic tier-group shared-stock decrement if applicable
-        group_id = _resolve_tier_group(session, product_id)
-        if group_id is not None:
-            tier_groups_crud.decrement_shared_stock(session, group_id, 1)
 
         if tenant_id is None:
             attendee = session.get(Attendees, attendee_id)

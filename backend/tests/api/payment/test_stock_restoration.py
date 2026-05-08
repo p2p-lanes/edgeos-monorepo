@@ -1,7 +1,5 @@
 """Integration tests for stock restoration — product-inventory-redesign, Slice 3 / Phase 5.
 
-TDD phase: RED — written BEFORE implementation.
-
 Payload source decision (Task ZERO):
   Path (b) — SimpleFI's payment_request_expired event carries only payment_request.id
   (stored locally as Payments.external_id).  The handler looks up the local Payments
@@ -9,8 +7,8 @@ Payload source decision (Task ZERO):
   No per-product data in the webhook payload itself.
 
 Covers:
-  5.1 _handle_payment_request_expired: total_stock + shared_stock restored;
-       idempotency (double webhook); NULL-stock no-op; multi-product mixed types.
+  5.1 _handle_payment_request_expired: total_stock restored;
+       idempotency (double webhook); NULL-stock no-op.
   5.3 update_status CANCELLED/REJECTED: same restoration matrix.
   Edge: payment with no products → no-op.
   Edge: payment already EXPIRED → restoration is no-op (idempotency).
@@ -31,8 +29,8 @@ from app.api.payment.crud import payments_crud
 from app.api.payment.models import PaymentProducts, Payments
 from app.api.payment.schemas import PaymentStatus
 from app.api.popup.models import Popups
-from app.api.product.crud import products_crud, tier_groups_crud
-from app.api.product.models import Products, TicketTierGroup, TicketTierPhase
+from app.api.product.crud import products_crud
+from app.api.product.models import Products
 from app.api.tenant.models import Tenants
 
 # ---------------------------------------------------------------------------
@@ -64,44 +62,6 @@ def _make_product(
     db.commit()
     db.refresh(product)
     return product
-
-
-def _make_tier_group(
-    db: Session,
-    tenant: Tenants,
-    *,
-    shared_stock_cap: int | None = 20,
-    shared_stock_remaining: int | None = 20,
-) -> TicketTierGroup:
-    suffix = uuid.uuid4().hex[:8]
-    group = TicketTierGroup(
-        tenant_id=tenant.id,
-        name=f"restore-group-{suffix}",
-        shared_stock_cap=shared_stock_cap,
-        shared_stock_remaining=shared_stock_remaining,
-    )
-    db.add(group)
-    db.commit()
-    db.refresh(group)
-    return group
-
-
-def _link_product_to_group(
-    db: Session,
-    product: Products,
-    group: TicketTierGroup,
-    order: int = 0,
-) -> TicketTierPhase:
-    phase = TicketTierPhase(
-        group_id=group.id,
-        product_id=product.id,
-        order=order,
-        label=f"Phase {order}",
-    )
-    db.add(phase)
-    db.commit()
-    db.refresh(phase)
-    return phase
 
 
 def _make_pending_payment(
@@ -195,12 +155,6 @@ def _decrement(db: Session, product: Products, qty: int) -> None:
     db.commit()
 
 
-def _decrement_group(db: Session, group: TicketTierGroup, qty: int) -> None:
-    """Simulate the shared-tier decrement that happens at purchase time."""
-    tier_groups_crud.decrement_shared_stock(db, group.id, qty)
-    db.commit()
-
-
 # ---------------------------------------------------------------------------
 # 5.1 — _handle_payment_request_expired restoration
 # ---------------------------------------------------------------------------
@@ -233,61 +187,6 @@ class TestHandlePaymentRequestExpiredRestoration:
         assert refreshed.total_stock_remaining == 10, (
             f"Expected remaining=10 after expiry, got {refreshed.total_stock_remaining}. "
             "update_status EXPIRED path must restore total_stock."
-        )
-
-    def test_tier_grouped_product_both_counters_restored(
-        self,
-        db: Session,
-        tenant_a: Tenants,
-        popup_tenant_a: Popups,
-    ) -> None:
-        """Tier-grouped product: BOTH total_stock_remaining AND shared_stock_remaining restored."""
-        group = _make_tier_group(db, tenant_a, shared_stock_cap=20, shared_stock_remaining=20)
-        product = _make_product(db, tenant_a, popup_tenant_a, total_stock_cap=None, total_stock_remaining=None)
-        _link_product_to_group(db, product, group)
-
-        _decrement_group(db, group, 2)  # simulates purchase: group remaining=18
-
-        payment = _make_pending_payment(db, tenant_a, popup_tenant_a, [(product, 2)])
-
-        payments_crud.update_status(db, payment.id, PaymentStatus.EXPIRED)
-
-        db.expire_all()
-        refreshed_group = db.get(TicketTierGroup, group.id)
-        assert refreshed_group.shared_stock_remaining == 20, (
-            f"Expected group remaining=20 after expiry, got {refreshed_group.shared_stock_remaining}. "
-            "update_status EXPIRED path must restore shared_stock."
-        )
-
-    def test_multi_product_mixed_types_all_restored(
-        self,
-        db: Session,
-        tenant_a: Tenants,
-        popup_tenant_a: Popups,
-    ) -> None:
-        """Multi-product payment with mixed types → all counters restored."""
-        # Standalone product
-        p1 = _make_product(db, tenant_a, popup_tenant_a, total_stock_cap=10, total_stock_remaining=10)
-        # Tier-grouped product (NULL individual cap)
-        group = _make_tier_group(db, tenant_a, shared_stock_cap=15, shared_stock_remaining=15)
-        p2 = _make_product(db, tenant_a, popup_tenant_a, total_stock_cap=None, total_stock_remaining=None)
-        _link_product_to_group(db, p2, group, order=0)
-
-        _decrement(db, p1, 2)        # p1: remaining=8
-        _decrement_group(db, group, 3)  # group: remaining=12
-
-        payment = _make_pending_payment(db, tenant_a, popup_tenant_a, [(p1, 2), (p2, 3)])
-
-        payments_crud.update_status(db, payment.id, PaymentStatus.EXPIRED)
-
-        db.expire_all()
-        rp1 = db.get(Products, p1.id)
-        rgroup = db.get(TicketTierGroup, group.id)
-        assert rp1.total_stock_remaining == 10, (
-            f"p1: expected remaining=10, got {rp1.total_stock_remaining}"
-        )
-        assert rgroup.shared_stock_remaining == 15, (
-            f"group: expected remaining=15, got {rgroup.shared_stock_remaining}"
         )
 
     def test_null_stock_product_no_error(
@@ -403,28 +302,6 @@ class TestUpdateStatusCancelledRejectedRestoration:
             f"Expected remaining=8 after cancel, got {refreshed.total_stock_remaining}"
         )
 
-    def test_cancel_from_pending_restores_shared_stock(
-        self,
-        db: Session,
-        tenant_a: Tenants,
-        popup_tenant_a: Popups,
-    ) -> None:
-        """update_status(CANCELLED) from PENDING → shared_stock_remaining restored."""
-        group = _make_tier_group(db, tenant_a, shared_stock_cap=10, shared_stock_remaining=10)
-        product = _make_product(db, tenant_a, popup_tenant_a, total_stock_cap=None, total_stock_remaining=None)
-        _link_product_to_group(db, product, group, order=1)
-        _decrement_group(db, group, 4)  # remaining=6
-
-        payment = _make_pending_payment(db, tenant_a, popup_tenant_a, [(product, 4)])
-
-        payments_crud.update_status(db, payment.id, PaymentStatus.CANCELLED)
-
-        db.expire_all()
-        refreshed_group = db.get(TicketTierGroup, group.id)
-        assert refreshed_group.shared_stock_remaining == 10, (
-            f"Expected group remaining=10 after cancel, got {refreshed_group.shared_stock_remaining}"
-        )
-
     def test_reject_from_pending_restores_total_stock(
         self,
         db: Session,
@@ -443,28 +320,6 @@ class TestUpdateStatusCancelledRejectedRestoration:
         refreshed = db.get(Products, product.id)
         assert refreshed.total_stock_remaining == 6, (
             f"Expected remaining=6 after reject, got {refreshed.total_stock_remaining}"
-        )
-
-    def test_reject_from_pending_restores_shared_stock(
-        self,
-        db: Session,
-        tenant_a: Tenants,
-        popup_tenant_a: Popups,
-    ) -> None:
-        """update_status(REJECTED) from PENDING → shared_stock_remaining restored."""
-        group = _make_tier_group(db, tenant_a, shared_stock_cap=12, shared_stock_remaining=12)
-        product = _make_product(db, tenant_a, popup_tenant_a, total_stock_cap=None, total_stock_remaining=None)
-        _link_product_to_group(db, product, group, order=2)
-        _decrement_group(db, group, 3)  # remaining=9
-
-        payment = _make_pending_payment(db, tenant_a, popup_tenant_a, [(product, 3)])
-
-        payments_crud.update_status(db, payment.id, PaymentStatus.REJECTED)
-
-        db.expire_all()
-        refreshed_group = db.get(TicketTierGroup, group.id)
-        assert refreshed_group.shared_stock_remaining == 12, (
-            f"Expected group remaining=12 after reject, got {refreshed_group.shared_stock_remaining}"
         )
 
     def test_cancel_from_approved_does_not_restore_stock(
