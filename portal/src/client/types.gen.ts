@@ -342,6 +342,7 @@ export type AttendeeInfo = {
     name: string;
     category: string;
     check_in_code?: (string | null);
+    tickets?: Array<AttendeeTicketInfo>;
 };
 
 /**
@@ -458,6 +459,18 @@ export type AttendeeStats = {
     main?: number;
     spouse?: number;
     kid?: number;
+};
+
+/**
+ * Per-ticket info exposed on companion participation responses.
+ *
+ * `check_in_code` is the per-ticket code from `attendee_products` — the
+ * source of truth post-`ticket-as-first-class-entity`. New clients MUST read
+ * from this list rather than the legacy `AttendeeInfo.check_in_code`.
+ */
+export type AttendeeTicketInfo = {
+    id: string;
+    check_in_code: string;
 };
 
 /**

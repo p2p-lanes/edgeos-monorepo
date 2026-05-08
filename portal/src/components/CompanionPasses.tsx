@@ -32,10 +32,14 @@ export function CompanionPasses({ participation }: CompanionPassesProps) {
   const myTicketEntry = allTickets.find((t) => t.id === attendee.id)
   const tickets = myTicketEntry?.products ?? []
 
+  // Prefer the per-ticket check-in code (source of truth post-`ticket-as-first-class-entity`).
+  // Fall back to the legacy attendee-level code for old data still carrying it.
+  const checkInCode =
+    attendee.tickets?.[0]?.check_in_code ?? attendee.check_in_code ?? null
+
   const isAccepted = application_status === "accepted"
   const hasTickets = tickets.length > 0
-  // check_in_code is nullable post-migration (direct-sale attendees may have null)
-  const canShowCheckIn = isAccepted && hasTickets && !!attendee.check_in_code
+  const canShowCheckIn = isAccepted && hasTickets && !!checkInCode
 
   return (
     <div className="space-y-6 pb-24 lg:pb-0">
@@ -134,9 +138,9 @@ export function CompanionPasses({ participation }: CompanionPassesProps) {
         </div>
       )}
 
-      {canShowCheckIn && attendee.check_in_code && (
+      {canShowCheckIn && checkInCode && (
         <QRcode
-          check_in_code={attendee.check_in_code}
+          check_in_code={checkInCode}
           isOpen={isQrModalOpen}
           onOpenChange={setIsQrModalOpen}
         />

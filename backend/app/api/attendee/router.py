@@ -164,7 +164,6 @@ async def create_my_attendee_for_popup(
     popup is not an application popup.
     """
     from app.api.application.crud import applications_crud
-    from app.api.attendee.crud import generate_check_in_code
     from app.api.popup.models import Popups
     from app.api.shared.enums import SaleType
 
@@ -194,9 +193,6 @@ async def create_my_attendee_for_popup(
             ],
         )
 
-    prefix = popup.slug[:3].upper() if popup.slug else ""
-    check_in_code = generate_check_in_code(prefix)
-
     attendee = crud.attendees_crud.create_internal(
         session=db,
         tenant_id=application.tenant_id,
@@ -204,7 +200,6 @@ async def create_my_attendee_for_popup(
         popup_id=popup_id,
         name=attendee_in.name,
         category=attendee_in.category,
-        check_in_code=check_in_code,
         email=attendee_in.email,
         gender=attendee_in.gender,
     )
