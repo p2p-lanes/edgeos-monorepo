@@ -218,8 +218,6 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
       insurance_enabled: defaultValues?.insurance_enabled ?? false,
       insurance_percentage:
         defaultValues?.insurance_percentage?.toString() ?? "",
-      tier_progression_enabled:
-        defaultValues?.tier_progression_enabled ?? false,
       events_enabled: defaultValues?.events_enabled ?? true,
     },
     onSubmit: ({ value }) => {
@@ -263,7 +261,6 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         insurance_percentage: value.insurance_enabled
           ? value.insurance_percentage || null
           : null,
-        tier_progression_enabled: value.tier_progression_enabled,
         events_enabled: value.events_enabled,
       }
       if (isEdit) {
@@ -1077,28 +1074,6 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
               </form.Field>
             )}
           </form.Subscribe>
-        </InlineSection>
-
-        <Separator />
-
-        {/* Ticket tier progression */}
-        <InlineSection title="Ticket tier progression">
-          <form.Field name="tier_progression_enabled">
-            {(field) => (
-              <InlineRow
-                icon={<Ticket className="h-4 w-4 text-muted-foreground" />}
-                label="Enable tier progression"
-                description="Group tickets into tiers (Early Bird → Regular → Late) so the portal shows the active phase and keeps sold-out phases visible."
-              >
-                <Switch
-                  id="tier_progression_enabled"
-                  checked={field.state.value}
-                  onCheckedChange={(checked) => field.handleChange(checked)}
-                  disabled={readOnly}
-                />
-              </InlineRow>
-            )}
-          </form.Field>
         </InlineSection>
 
         <Separator />

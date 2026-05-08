@@ -16,7 +16,6 @@ from app.api.form_field.crud import form_fields_crud
 from app.api.form_section.models import FormSections
 from app.api.popup.models import Popups
 from app.api.popup.schemas import PopupPublic, PopupStatus
-from app.api.product.crud import enrich_product_with_tier
 from app.api.product.models import Products
 from app.api.shared.enums import SaleType
 from app.api.ticketing_step.models import TicketingSteps
@@ -94,16 +93,7 @@ def runtime_for_slug(session: Session, slug: str, tenant_id: uuid.UUID) -> Check
     return CheckoutRuntimeResponse(
         popup=PopupPublic.model_validate(popup),
         products=[
-            CheckoutRuntimeProduct.model_validate(
-                {
-                    **CheckoutRuntimeProduct.model_validate(p).model_dump(),
-                    **(
-                        enrich_product_with_tier(session, p)
-                        if popup.tier_progression_enabled
-                        else {"tier_group": None, "phase": None}
-                    ),
-                }
-            )
+            CheckoutRuntimeProduct.model_validate(p)
             for p in products
         ],
         buyer_form=[

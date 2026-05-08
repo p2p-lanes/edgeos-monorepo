@@ -8,37 +8,33 @@ from app.api.user.models import Users
 
 
 class TestViewerReadonlyAccess:
-    def test_viewer_can_list_popups(
+    def test_viewer_cannot_list_popups(
         self,
         client: TestClient,
         viewer_token_tenant_a: str,
         popup_tenant_a: Popups,
     ) -> None:
-        """Viewer should be able to list popups (SELECT works)."""
+        """Viewer cannot list popups — GET /popups is now gated to CurrentCheckInOperator."""
         response = client.get(
             "/api/v1/popups",
             headers={"Authorization": f"Bearer {viewer_token_tenant_a}"},
         )
 
-        assert response.status_code == 200
-        data = response.json()
-        popup_ids = [p["id"] for p in data["results"]]
-        assert str(popup_tenant_a.id) in popup_ids
+        assert response.status_code == 403
 
-    def test_viewer_can_get_popup_by_id(
+    def test_viewer_cannot_get_popup_by_id(
         self,
         client: TestClient,
         viewer_token_tenant_a: str,
         popup_tenant_a: Popups,
     ) -> None:
-        """Viewer should be able to get a popup by ID (SELECT works)."""
+        """Viewer cannot get popup by ID — GET /popups/{id} gated to CurrentCheckInOperator."""
         response = client.get(
             f"/api/v1/popups/{popup_tenant_a.id}",
             headers={"Authorization": f"Bearer {viewer_token_tenant_a}"},
         )
 
-        assert response.status_code == 200
-        assert response.json()["id"] == str(popup_tenant_a.id)
+        assert response.status_code == 403
 
     def test_viewer_cannot_create_popup(
         self,
@@ -96,14 +92,18 @@ class TestViewerReadonlyAccess:
         viewer_token_tenant_a: str,
         popup_tenant_b: Popups,
     ) -> None:
-        """Viewer should NOT be able to see other tenant's popups (RLS)."""
+        """Viewer cannot reach popup endpoint at all (gated to CurrentCheckInOperator).
+
+        Previously this tested RLS blocking cross-tenant reads (404). Now the dep
+        itself rejects VIEWER before RLS is evaluated, so the response is 403.
+        """
         response = client.get(
             f"/api/v1/popups/{popup_tenant_b.id}",
             headers={"Authorization": f"Bearer {viewer_token_tenant_a}"},
         )
 
-        # RLS should filter this out
-        assert response.status_code == 404
+        # Dep rejects VIEWER with 403 before RLS is evaluated
+        assert response.status_code == 403
 
 
 class TestPopupRLS:

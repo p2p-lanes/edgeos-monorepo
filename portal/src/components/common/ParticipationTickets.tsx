@@ -4,14 +4,11 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { toDateRange } from "@/helpers/dates"
 import type { ProductsPass } from "@/types/Products"
 
 interface ParticipationProduct {
   category?: string | null
   duration_type?: string | null
-  start_date?: string | null
-  end_date?: string | null
 }
 
 const ParticipationTickets = ({
@@ -37,21 +34,8 @@ const ParticipationTickets = ({
 
   const weeks: (ProductsPass | null)[] = [null, null, null, null]
 
-  const toDay = (date: string) => {
-    const parsed = new Date(date)
-    if (Number.isNaN(parsed.getTime())) return ""
-    return parsed.toISOString().slice(0, 10)
-  }
-
   products.forEach((product, index) => {
-    if (
-      hasMonthPass ||
-      participation.find(
-        (p) =>
-          toDay(p.start_date ?? "") === toDay(product.start_date ?? "") &&
-          toDay(p.end_date ?? "") === toDay(product.end_date ?? ""),
-      )
-    ) {
+    if (hasMonthPass) {
       weeks[index] = { ...product, purchased: true }
       return
     }
@@ -74,10 +58,7 @@ const Ticket = ({
   week: ProductsPass | null
   isPatreon: boolean
 }) => {
-  const label =
-    week?.start_date && week?.end_date
-      ? toDateRange(week?.start_date, week?.end_date)
-      : "No date"
+  const label = week?.name ?? "No date"
 
   return (
     <Tooltip>

@@ -33,6 +33,7 @@ from app.api import (
     user,
 )
 from app.api.application.router import portal_router
+from app.api.check_in import router as check_in_router
 
 api_router = APIRouter()
 
@@ -46,7 +47,6 @@ api_router.include_router(popup.router)
 
 # Popup-related resources
 api_router.include_router(product.router)
-api_router.include_router(product.tier_router)
 api_router.include_router(coupon.router)
 api_router.include_router(group.router)
 api_router.include_router(form_section.router)
@@ -88,3 +88,6 @@ api_router.include_router(track.router)
 
 # Dashboard
 api_router.include_router(dashboard.router)
+
+# Ticket events (scan history)
+api_router.include_router(check_in_router.router)

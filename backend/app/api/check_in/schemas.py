@@ -1,50 +1,59 @@
+"""Schemas for the check_ins event log — one row per scan."""
+
 import uuid
 from datetime import datetime
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict
-from sqlmodel import DateTime, Field, SQLModel
 
 
-class CheckInBase(SQLModel):
-    """Base check-in schema."""
+class CheckInPayload(BaseModel):
+    """Typed payload stored in the check_ins.payload JSONB column.
 
-    tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
-    attendee_id: uuid.UUID = Field(foreign_key="attendees.id", unique=True, index=True)
-    arrival_date: datetime | None = Field(
-        default=None, nullable=True, sa_type=DateTime(timezone=True)
-    )
-    departure_date: datetime | None = Field(
-        default=None, nullable=True, sa_type=DateTime(timezone=True)
-    )
-    qr_check_in: bool = Field(default=False)
-    qr_scan_timestamp: datetime | None = Field(
-        default=None, nullable=True, sa_type=DateTime(timezone=True)
-    )
+    `source` discriminates how the scan occurred. `notes` is an optional
+    free-form operator annotation.
+    """
+
+    source: Literal["qr", "manual"]
+    notes: str | None = None
 
 
-class CheckInCreate(BaseModel):
-    """Check-in schema for creation."""
+class CheckInBase(BaseModel):
+    """Base fields shared by all check-in schemas."""
 
-    attendee_id: uuid.UUID
-    arrival_date: datetime | None = None
-    departure_date: datetime | None = None
-    qr_check_in: bool = False
-    qr_scan_timestamp: datetime | None = None
-
-
-class CheckInUpdate(BaseModel):
-    """Check-in schema for updates."""
-
-    arrival_date: datetime | None = None
-    departure_date: datetime | None = None
-    qr_check_in: bool | None = None
-    qr_scan_timestamp: datetime | None = None
+    id: uuid.UUID
+    tenant_id: uuid.UUID
+    popup_id: uuid.UUID
+    attendee_product_id: uuid.UUID
+    occurred_at: datetime
+    actor_user_id: uuid.UUID | None = None
+    payload: dict[str, Any] | None = None
+    created_at: datetime
 
 
 class CheckInPublic(CheckInBase):
-    """Check-in schema for API responses."""
+    """Full public representation of a check_ins row for API responses."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CheckInListItem(BaseModel):
+    """Enriched check-in row for the backoffice scan-history table.
+
+    Eager-loads attendee + product data so the table renders without N+1
+    fetches. `source` is extracted from payload["source"].
+    """
 
     id: uuid.UUID
-    created_at: datetime | None = None
+    attendee_product_id: uuid.UUID
+    occurred_at: datetime
+    source: str | None = None
+    attendee_name: str | None = None
+    attendee_email: str | None = None
+    product_name: str | None = None
+    actor_user_id: uuid.UUID | None = None
+    actor_user_name: str | None = None
+    actor_user_email: str | None = None
+    payload: dict | None = None  # full payload for expandable detail view
 
     model_config = ConfigDict(from_attributes=True)

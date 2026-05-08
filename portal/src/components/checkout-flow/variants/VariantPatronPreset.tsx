@@ -3,6 +3,11 @@
 import { Heart } from "lucide-react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import { Switch } from "@/components/ui/switch"
+import {
+  type PatronPriceMode,
+  resolvePatronPriceMode,
+} from "@/hooks/checkout/resolvePatronPriceMode"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
 import {
@@ -30,7 +35,8 @@ function parseTemplateConfig(templateConfig?: Record<string, unknown> | null) {
     templateConfig.minimum > 0
       ? templateConfig.minimum
       : PATRON_MINIMUM
-  return { presets, allowCustom, minimum }
+  const priceMode: PatronPriceMode = resolvePatronPriceMode(templateConfig)
+  return { presets, allowCustom, minimum, priceMode }
 }
 
 export default function VariantPatronPreset({
@@ -41,7 +47,8 @@ export default function VariantPatronPreset({
 }: VariantProps) {
   const { cart, addDynamicItem, removeDynamicItem } = useCheckout()
   const items = cart.dynamicItems[stepType] ?? []
-  const { presets, allowCustom, minimum } = parseTemplateConfig(templateConfig)
+  const { presets, allowCustom, minimum, priceMode } =
+    parseTemplateConfig(templateConfig)
 
   const product = products[0]
   const currentItem = items[0]
@@ -109,6 +116,47 @@ export default function VariantPatronPreset({
     )
   }
 
+  // Fixed-price branch: single "Add" toggle at the product's fixed price.
+  // Mirrors the toggle UI from PatronSection's non-variable branch.
+  if (priceMode === "fixed") {
+    const isEnabled = currentAmount > 0
+    const handleToggle = (checked: boolean) => {
+      if (checked) {
+        setAmount(product.price)
+      } else {
+        removeDynamicItem(stepType, product.id)
+      }
+    }
+    return (
+      <div className="space-y-4">
+        <div className="bg-checkout-card-bg rounded-2xl shadow-sm border border-border overflow-hidden">
+          <div className="w-full p-5 text-left">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-foreground text-lg">
+                Become a Patron
+              </h3>
+              <div className="flex items-center gap-3 shrink-0">
+                <span className="text-sm font-semibold text-foreground">
+                  {formatCurrency(product.price)}
+                </span>
+                <Switch
+                  checked={isEnabled}
+                  onCheckedChange={handleToggle}
+                  aria-label="Add patron support"
+                />
+              </div>
+            </div>
+            {product.description && (
+              <div className="text-sm text-muted-foreground leading-relaxed">
+                <p>{product.description}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   const sharedProps: PatronLayoutProps = {
     product,
     presets,
@@ -162,7 +210,6 @@ function PatronDefault({
   handlePreset,
   handleCustomChange,
   onRemove,
-  onSkip,
 }: PatronLayoutProps) {
   return (
     <div className="space-y-4">
@@ -251,7 +298,6 @@ function PatronCompact({
   handlePreset,
   handleCustomChange,
   onRemove,
-  onSkip,
 }: PatronLayoutProps) {
   return (
     <div className="space-y-3">
@@ -336,7 +382,6 @@ function PatronGrid({
   handlePreset,
   handleCustomChange,
   onRemove,
-  onSkip,
 }: PatronLayoutProps) {
   return (
     <div className="space-y-4">

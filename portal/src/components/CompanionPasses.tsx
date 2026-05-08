@@ -32,9 +32,14 @@ export function CompanionPasses({ participation }: CompanionPassesProps) {
   const myTicketEntry = allTickets.find((t) => t.id === attendee.id)
   const tickets = myTicketEntry?.products ?? []
 
+  // Prefer the per-ticket check-in code (source of truth post-`ticket-as-first-class-entity`).
+  // Fall back to the legacy attendee-level code for old data still carrying it.
+  const checkInCode =
+    attendee.tickets?.[0]?.check_in_code ?? attendee.check_in_code ?? null
+
   const isAccepted = application_status === "accepted"
   const hasTickets = tickets.length > 0
-  const canShowCheckIn = isAccepted && hasTickets && !!attendee.check_in_code
+  const canShowCheckIn = isAccepted && hasTickets && !!checkInCode
 
   return (
     <div className="space-y-6 pb-24 lg:pb-0">
@@ -81,19 +86,6 @@ export function CompanionPasses({ participation }: CompanionPassesProps) {
                   <Ticket className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                   <div className="flex items-baseline gap-2 flex-1 min-w-0">
                     <span className="font-medium text-sm">{ticket.name}</span>
-                    {ticket.start_date && ticket.end_date && (
-                      <span className="text-xs text-muted-foreground truncate">
-                        {new Date(ticket.start_date).toLocaleDateString(
-                          "en-US",
-                          { month: "short", day: "numeric" },
-                        )}{" "}
-                        to{" "}
-                        {new Date(ticket.end_date).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                        })}
-                      </span>
-                    )}
                   </div>
                   {ticket.quantity && ticket.quantity > 1 && (
                     <span className="text-xs text-muted-foreground">
@@ -133,9 +125,9 @@ export function CompanionPasses({ participation }: CompanionPassesProps) {
         </div>
       )}
 
-      {canShowCheckIn && (
+      {canShowCheckIn && checkInCode && (
         <QRcode
-          check_in_code={attendee.check_in_code!}
+          check_in_code={checkInCode}
           isOpen={isQrModalOpen}
           onOpenChange={setIsQrModalOpen}
         />

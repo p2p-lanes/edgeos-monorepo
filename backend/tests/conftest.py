@@ -80,6 +80,10 @@ def client(
         # engine in app.core.security; patch that bind to the testcontainer
         # so test_api_key_policy.py doesn't hit a real localhost Postgres.
         patch("app.core.security.engine", test_engine),
+        # check_in router resolves actor user details via the main engine
+        # (tenant_role lacks SELECT on users); same testcontainer redirection
+        # needed so the list endpoint works without a real localhost Postgres.
+        patch("app.api.check_in.router.engine", test_engine),
     ):
         with TestClient(application) as c:
             yield c
@@ -225,8 +229,93 @@ def admin_token_tenant_b(admin_user_tenant_b: Users) -> str:
 
 
 @pytest.fixture(scope="session")
+def viewer_user_tenant_b(db: Session, tenant_b: Tenants) -> Users:
+    user = db.exec(
+        select(Users).where(
+            Users.email == "viewer-b@test.com",
+            Users.deleted == False,  # noqa: E712
+        )
+    ).first()
+
+    if user is None:
+        user = Users(
+            email="viewer-b@test.com",
+            role=UserRole.VIEWER,
+            tenant_id=tenant_b.id,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+    return user
+
+
+@pytest.fixture(scope="session")
 def viewer_token_tenant_a(viewer_user_tenant_a: Users) -> str:
     return create_access_token(subject=viewer_user_tenant_a.id, token_type="user")
+
+
+@pytest.fixture(scope="session")
+def viewer_token_tenant_b(viewer_user_tenant_b: Users) -> str:
+    return create_access_token(subject=viewer_user_tenant_b.id, token_type="user")
+
+
+@pytest.fixture(scope="session")
+def check_in_controller_user_tenant_a(db: Session, tenant_a: Tenants) -> Users:
+    user = db.exec(
+        select(Users).where(
+            Users.email == "controller-a@test.com",
+            Users.deleted == False,  # noqa: E712
+        )
+    ).first()
+
+    if user is None:
+        user = Users(
+            email="controller-a@test.com",
+            role=UserRole.CHECK_IN_CONTROLLER,
+            tenant_id=tenant_a.id,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+    return user
+
+
+@pytest.fixture(scope="session")
+def check_in_controller_user_tenant_b(db: Session, tenant_b: Tenants) -> Users:
+    user = db.exec(
+        select(Users).where(
+            Users.email == "controller-b@test.com",
+            Users.deleted == False,  # noqa: E712
+        )
+    ).first()
+
+    if user is None:
+        user = Users(
+            email="controller-b@test.com",
+            role=UserRole.CHECK_IN_CONTROLLER,
+            tenant_id=tenant_b.id,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+    return user
+
+
+@pytest.fixture(scope="session")
+def check_in_controller_token_tenant_a(check_in_controller_user_tenant_a: Users) -> str:
+    return create_access_token(
+        subject=check_in_controller_user_tenant_a.id, token_type="user"
+    )
+
+
+@pytest.fixture(scope="session")
+def check_in_controller_token_tenant_b(check_in_controller_user_tenant_b: Users) -> str:
+    return create_access_token(
+        subject=check_in_controller_user_tenant_b.id, token_type="user"
+    )
 
 
 @pytest.fixture(scope="session")

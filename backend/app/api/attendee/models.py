@@ -79,11 +79,8 @@ class Attendees(AttendeeBase, table=True):
         return [ap.product for ap in self.attendee_products]
 
     def get_product_quantity(self, product_id: uuid.UUID) -> int:
-        """Get quantity of a specific product for this attendee."""
-        for ap in self.attendee_products:
-            if ap.product_id == product_id:
-                return ap.quantity
-        return 0
+        """Get quantity of a specific product for this attendee (count of ticket rows)."""
+        return sum(1 for ap in self.attendee_products if ap.product_id == product_id)
 
     def has_products(self) -> bool:
         """Check if attendee has any products."""

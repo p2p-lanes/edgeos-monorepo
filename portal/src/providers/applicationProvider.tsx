@@ -16,7 +16,6 @@ import { useApplicationsQuery } from "@/hooks/useGetApplications"
 import { useParticipationQuery } from "@/hooks/useParticipationQuery"
 import { queryKeys } from "@/lib/query-keys"
 import type { AttendeePassState } from "@/types/Attendee"
-import type { ProductsPass } from "@/types/Products"
 import { useCityProvider } from "./cityProvider"
 
 interface ApplicationContextProps {
@@ -71,7 +70,7 @@ const ApplicationProvider = ({ children }: { children: ReactNode }) => {
     if (!application) return []
     return (application.attendees ?? []).map((att) => ({
       ...att,
-      products: (att.products ?? []) as ProductsPass[],
+      products: [],
     }))
   }, [getRelevantApplication])
 

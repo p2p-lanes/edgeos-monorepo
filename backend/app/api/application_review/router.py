@@ -14,7 +14,7 @@ from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.api.user.models import Users
 from app.core.db import engine
-from app.core.dependencies.users import CurrentUser, CurrentWriter, TenantSession
+from app.core.dependencies.users import CurrentAdmin, CurrentWriter, TenantSession
 from app.services.email_helpers import send_application_status_email
 
 router = APIRouter(prefix="/applications", tags=["application-reviews"])
@@ -85,7 +85,7 @@ def _reviews_to_public_list(reviews: list) -> list[ApplicationReviewPublic]:
 async def list_reviews(
     application_id: uuid.UUID,
     db: TenantSession,
-    _: CurrentUser,
+    _: CurrentAdmin,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[ApplicationReviewPublic]:
@@ -114,7 +114,7 @@ async def list_reviews(
 async def get_review_summary(
     application_id: uuid.UUID,
     db: TenantSession,
-    _: CurrentUser,
+    _: CurrentAdmin,
 ) -> ReviewSummary:
     """Get a summary of reviews for an application."""
     from app.api.application.crud import applications_crud
@@ -240,7 +240,8 @@ async def list_pending_reviews(
     applications they haven't reviewed yet.
     """
     from app.api.application.crud import applications_crud
-    from app.api.application.schemas import ApplicationPublic, ApplicationStatus
+    from app.api.application.router import _build_application_public
+    from app.api.application.schemas import ApplicationStatus
     from app.api.popup_reviewer.crud import popup_reviewers_crud
 
     reviewer_assignments = popup_reviewers_crud.find_by_user(db, current_user.id)
@@ -281,7 +282,7 @@ async def list_pending_reviews(
     paginated = pending_apps[skip : skip + limit]
 
     return ListModel(
-        results=[ApplicationPublic.model_validate(a) for a in paginated],
+        results=[_build_application_public(a) for a in paginated],
         paging=Paging(offset=skip, limit=limit, total=total),
     )
 

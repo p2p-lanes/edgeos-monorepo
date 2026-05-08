@@ -6,39 +6,30 @@ import { cn } from "@/lib/utils"
 
 /**
  * Returns true when a product should render a +/- stepper instead of a toggle.
- * Rule: `max_quantity == null` (unlimited) OR `max_quantity > 1`.
+ * Rule: `max_per_order == null` (unlimited) OR `max_per_order > 1`.
  */
 export const supportsQuantitySelector = (
-  maxQty: number | null | undefined,
-): boolean => maxQty == null || maxQty > 1
+  maxPerOrder: number | null | undefined,
+): boolean => maxPerOrder == null || maxPerOrder > 1
 
 /**
  * Resolves the effective max allowed for a product's stepper.
- * - If `product.max_quantity` is set, returns that value.
- * - Else, if `dayPassFallbackToDateRange` is true and the product has a date range,
- *   returns the number of days in the range (preserves the legacy ProductDay behaviour).
- * - Otherwise returns `Number.POSITIVE_INFINITY` (unlimited).
+ *
+ * Effective cap = min(max_per_order, total_stock_remaining), respecting NULL = unlimited.
+ *
+ * - If both are NULL, unlimited (POSITIVE_INFINITY) — unless dayPassFallbackToDateRange
+ *   is true and the product has a date range, in which case the date-range cap applies.
+ * - Backend remains source of truth; this is a UX cap only.
  */
-export const resolveMaxQuantity = (
-  product: {
-    max_quantity?: number | null
-    start_date?: string | null
-    end_date?: string | null
-  },
-  opts?: { dayPassFallbackToDateRange?: boolean },
-): number => {
-  if (product.max_quantity != null) return product.max_quantity
-  if (
-    opts?.dayPassFallbackToDateRange &&
-    product.start_date &&
-    product.end_date
-  ) {
-    const start = new Date(product.start_date)
-    const end = new Date(product.end_date)
-    const diff = Math.abs(end.getTime() - start.getTime())
-    return Math.ceil(diff / (1000 * 60 * 60 * 24)) + 1
-  }
-  return Number.POSITIVE_INFINITY
+export const resolveMaxQuantity = (product: {
+  max_per_order?: number | null
+  total_stock_remaining?: number | null
+}): number => {
+  const perOrder = product.max_per_order ?? Number.POSITIVE_INFINITY
+  const stockRemaining =
+    product.total_stock_remaining ?? Number.POSITIVE_INFINITY
+  const cap = Math.min(perOrder, stockRemaining)
+  return cap
 }
 
 interface QuantitySelectorProps {

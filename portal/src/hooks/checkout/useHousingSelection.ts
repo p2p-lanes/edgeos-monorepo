@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react"
+import { resolveMaxQuantity } from "@/components/ui/QuantitySelector"
 import type { SelectedHousingItem } from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
 
@@ -20,20 +21,20 @@ function computeBasePrice(
 }
 
 function clampQuantity(product: ProductsPass, quantity: number): number {
-  const max = product.max_quantity
-  if (max == null) return Math.max(0, quantity)
+  const max = resolveMaxQuantity(product)
+  if (max === Number.POSITIVE_INFINITY) return Math.max(0, quantity)
   return Math.max(0, Math.min(quantity, max))
 }
 
 export function useHousingSelection(
-  housingProducts: ProductsPass[],
+  allActiveProducts: ProductsPass[],
   pricePerDay = true,
 ) {
   const [housing, setHousing] = useState<SelectedHousingItem | null>(null)
 
   const selectHousing = useCallback(
     (productId: string, checkIn: string, checkOut: string) => {
-      const product = housingProducts.find((p) => p.id === productId)
+      const product = allActiveProducts.find((p) => p.id === productId)
       if (!product) return
 
       const nights = computeNights(checkIn, checkOut)
@@ -58,7 +59,7 @@ export function useHousingSelection(
         }
       })
     },
-    [housingProducts, pricePerDay],
+    [allActiveProducts, pricePerDay],
   )
 
   const updateHousingQuantity = useCallback((quantity: number) => {

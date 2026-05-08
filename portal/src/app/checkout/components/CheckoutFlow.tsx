@@ -6,10 +6,9 @@ import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 import CartFooter from "@/components/checkout-flow/CartFooter"
 import DynamicProductStep from "@/components/checkout-flow/DynamicProductStep"
-import {
-  STEP_COMPONENT_REGISTRY,
-  shouldUseDynamicStep,
-} from "@/components/checkout-flow/registries/stepRegistry"
+import { shouldUseDynamicStep } from "@/components/checkout-flow/registries/stepRegistry"
+import ConfirmStep from "@/components/checkout-flow/steps/ConfirmStep"
+import OpenCheckoutBuyerStep from "@/components/checkout-flow/steps/OpenCheckoutBuyerStep"
 import PassSelectionSection from "@/components/checkout-flow/steps/PassSelectionSection"
 import SuccessStep from "@/components/checkout-flow/steps/SuccessStep"
 import { usePaymentVerification } from "@/hooks/checkout"
@@ -81,9 +80,7 @@ export default function CheckoutFlow({
     goToNextStep,
     goToPreviousStep,
     goToStep,
-    housingProducts,
-    merchProducts,
-    patronProducts,
+    getProductsForStep,
     submitPayment,
     cart,
   } = useCheckout()
@@ -183,6 +180,28 @@ export default function CheckoutFlow({
     : (stepConfig?.description ?? getDefaultStepSubtitle(currentStep, t))
 
   const renderStepContent = () => {
+    // Buyer and confirm are structural steps — wired explicitly.
+    if (currentStep === "buyer") return <OpenCheckoutBuyerStep />
+    if (currentStep === "confirm") {
+      // ConfirmStep reads its own config internally via useCheckout().
+      return <ConfirmStep />
+    }
+
+    // Success step has special paymentStatus prop
+    if (currentStep === "success") {
+      return (
+        <SuccessStep
+          paymentStatus={
+            isSimpleFIReturn && !redirectStateRestored
+              ? "verifying"
+              : isSimpleFIReturn
+                ? paymentStatus
+                : "approved"
+          }
+        />
+      )
+    }
+
     // Passes/tickets: dynamic step or fall-back default section
     if (currentStep === "passes" || currentStep === "tickets") {
       const ticketStepConfig = stepConfigs.find(
@@ -216,31 +235,18 @@ export default function CheckoutFlow({
       )
     }
 
-    // Success step has special paymentStatus prop
-    if (currentStep === "success") {
-      return (
-        <SuccessStep
-          paymentStatus={
-            isSimpleFIReturn && !redirectStateRestored
-              ? "verifying"
-              : isSimpleFIReturn
-                ? paymentStatus
-                : "approved"
-          }
-        />
-      )
-    }
-
-    // Product-availability guards for optional steps
-    if (currentStep === "housing" && housingProducts.length === 0) return null
-    if (currentStep === "merch" && merchProducts.length === 0) return null
-    if (currentStep === "patron" && patronProducts.length === 0) return null
-
-    // Check if the step should use a dynamic template
+    // All other product steps route through DynamicProductStep.
+    // Availability guard: hide the step if the resolver returns no products.
     const dynamicStepConfig = stepConfigs.find(
       (s) => s.step_type === currentStep,
     )
-    if (shouldUseDynamicStep(dynamicStepConfig)) {
+    if (dynamicStepConfig) {
+      const stepProducts = getProductsForStep(dynamicStepConfig)
+      // Hide optional steps with zero resolved products (useCheckoutSteps
+      // already gates visibility — this is a defense-in-depth guard).
+      if (stepProducts.length === 0 && dynamicStepConfig.template !== null) {
+        return null
+      }
       return (
         <AnimatePresence mode="wait">
           {isLoading ? (
@@ -248,27 +254,11 @@ export default function CheckoutFlow({
           ) : (
             <DynamicProductStep
               key={currentStep}
-              stepConfig={dynamicStepConfig!}
+              stepConfig={dynamicStepConfig}
               onSkip={handleSkip}
             />
           )}
         </AnimatePresence>
-      )
-    }
-
-    // Fallback: registry lookup for hardcoded components
-    const StepComponent = STEP_COMPONENT_REGISTRY[currentStep]
-    if (StepComponent) {
-      return <StepComponent onSkip={handleSkip} />
-    }
-
-    // Unknown step with config: try dynamic as last resort
-    if (dynamicStepConfig) {
-      return (
-        <DynamicProductStep
-          stepConfig={dynamicStepConfig}
-          onSkip={handleSkip}
-        />
       )
     }
 

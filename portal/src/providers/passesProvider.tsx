@@ -70,15 +70,17 @@ export function buildPurchasesMap(
   return map
 }
 
-function mergeAvailableAndPurchasedProducts(
+export function mergeAvailableAndPurchasedProducts(
   attendeeCategory: AttendeePassState["category"],
   products: ProductsPass[],
   purchased: ProductsPass[],
 ): ProductsPass[] {
-  const activeProducts = products.filter(
-    (product) =>
-      product.attendee_category === attendeeCategory && product.is_active,
-  )
+  // attendee_category filter removed (ticket-as-first-class-entity):
+  // product visibility is governed by ticketing-step template_config sections,
+  // not by attendee_category on the product. All active products are shown.
+  // The attendeeCategory parameter is kept for backward-compat with callers.
+  void attendeeCategory
+  const activeProducts = products.filter((product) => product.is_active)
 
   const missingPurchasedProducts = purchased.filter(
     (product) => !activeProducts.some((active) => active.id === product.id),
@@ -114,7 +116,7 @@ export function buildBaseAttendeePasses(
     ).map((product: ProductsPass) => {
       const isMultiUnit =
         product.duration_type !== "day" &&
-        supportsQuantitySelector(product.max_quantity)
+        supportsQuantitySelector(product.max_per_order)
       const originalQuantity =
         product.duration_type === "day"
           ? (purchased.find((p) => p.id === product.id)?.quantity ?? 0)
@@ -146,6 +148,8 @@ export function buildBaseAttendeePasses(
         attendeeProducts,
         purchased,
       ),
+      // Preserve per-ticket entries for QR rendering (ticket-as-first-class-entity)
+      ticket_entries: attendee.ticket_entries,
     }
   })
 }
@@ -183,7 +187,7 @@ function applyCartSelections(
       }
       // Non-day: multi-unit products restore the persisted quantity;
       // single-unit products stay at the legacy quantity of 1.
-      const isMultiUnit = supportsQuantitySelector(product.max_quantity)
+      const isMultiUnit = supportsQuantitySelector(product.max_per_order)
       return {
         ...product,
         selected: true,

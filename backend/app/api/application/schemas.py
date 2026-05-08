@@ -349,13 +349,29 @@ class ApplicationSnapshotPublic(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class AttendeeTicketInfo(BaseModel):
+    """Per-ticket info exposed on companion participation responses.
+
+    `check_in_code` is the per-ticket code from `attendee_products` — the
+    source of truth post-`ticket-as-first-class-entity`. New clients MUST read
+    from this list rather than the legacy `AttendeeInfo.check_in_code`.
+    """
+
+    id: uuid.UUID
+    check_in_code: str
+
+
 class AttendeeInfo(BaseModel):
     """Minimal attendee information for participation responses."""
 
     id: uuid.UUID
     name: str
     category: str
+    # Legacy attendee-level code. Kept for backwards compatibility with old
+    # clients that read it directly. New attendees no longer populate it —
+    # clients SHOULD prefer `tickets[].check_in_code`.
     check_in_code: str | None = None
+    tickets: list[AttendeeTicketInfo] = []
 
 
 class ApplicantParticipation(BaseModel):
@@ -415,8 +431,6 @@ class DirectoryProduct(BaseModel):
     slug: str
     category: str | None = None
     duration_type: str | None = None
-    start_date: datetime | None = None
-    end_date: datetime | None = None
 
 
 class AssociatedAttendee(BaseModel):
@@ -470,8 +484,6 @@ class AttendeesDirectoryEntry(BaseModel):
 
     # Participation
     participation: list[DirectoryProduct] = []
-    check_in: datetime | None = None
-    check_out: datetime | None = None
 
     # Associated attendees (spouse/kids)
     associated_attendees: list[AssociatedAttendee] = []

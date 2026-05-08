@@ -15,6 +15,7 @@ import { Route as LayoutIndexRouteImport } from './routes/_layout/index'
 import { Route as LayoutSettingsRouteImport } from './routes/_layout/settings'
 import { Route as LayoutPaymentsRouteImport } from './routes/_layout/payments'
 import { Route as LayoutAttendeesRouteImport } from './routes/_layout/attendees'
+import { Route as LayoutCheckInRouteImport } from './routes/_layout/check-in'
 import { Route as LayoutAbandonedCartsRouteImport } from './routes/_layout/abandoned-carts'
 import { Route as LayoutTicketingStepsIndexRouteImport } from './routes/_layout/ticketing-steps/index'
 import { Route as LayoutThemeIndexRouteImport } from './routes/_layout/theme/index'
@@ -92,6 +93,11 @@ const LayoutPaymentsRoute = LayoutPaymentsRouteImport.update({
 const LayoutAttendeesRoute = LayoutAttendeesRouteImport.update({
   id: '/attendees',
   path: '/attendees',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutCheckInRoute = LayoutCheckInRouteImport.update({
+  id: '/check-in',
+  path: '/check-in',
   getParentRoute: () => LayoutRoute,
 } as any)
 const LayoutAbandonedCartsRoute = LayoutAbandonedCartsRouteImport.update({
@@ -357,6 +363,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/abandoned-carts': typeof LayoutAbandonedCartsRoute
   '/attendees': typeof LayoutAttendeesRoute
+  '/check-in': typeof LayoutCheckInRoute
   '/payments': typeof LayoutPaymentsRoute
   '/settings': typeof LayoutSettingsRoute
   '/admin/new': typeof LayoutAdminNewRoute
@@ -412,6 +419,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/abandoned-carts': typeof LayoutAbandonedCartsRoute
   '/attendees': typeof LayoutAttendeesRoute
+  '/check-in': typeof LayoutCheckInRoute
   '/payments': typeof LayoutPaymentsRoute
   '/settings': typeof LayoutSettingsRoute
   '/': typeof LayoutIndexRoute
@@ -470,6 +478,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/_layout/abandoned-carts': typeof LayoutAbandonedCartsRoute
   '/_layout/attendees': typeof LayoutAttendeesRoute
+  '/_layout/check-in': typeof LayoutCheckInRoute
   '/_layout/payments': typeof LayoutPaymentsRoute
   '/_layout/settings': typeof LayoutSettingsRoute
   '/_layout/': typeof LayoutIndexRoute
@@ -529,6 +538,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/abandoned-carts'
     | '/attendees'
+    | '/check-in'
     | '/payments'
     | '/settings'
     | '/admin/new'
@@ -584,6 +594,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/abandoned-carts'
     | '/attendees'
+    | '/check-in'
     | '/payments'
     | '/settings'
     | '/'
@@ -641,6 +652,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/_layout/abandoned-carts'
     | '/_layout/attendees'
+    | '/_layout/check-in'
     | '/_layout/payments'
     | '/_layout/settings'
     | '/_layout/'
@@ -741,6 +753,13 @@ declare module '@tanstack/react-router' {
       path: '/attendees'
       fullPath: '/attendees'
       preLoaderRoute: typeof LayoutAttendeesRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/check-in': {
+      id: '/_layout/check-in'
+      path: '/check-in'
+      fullPath: '/check-in'
+      preLoaderRoute: typeof LayoutCheckInRouteImport
       parentRoute: typeof LayoutRoute
     }
     '/_layout/abandoned-carts': {
@@ -1092,6 +1111,7 @@ declare module '@tanstack/react-router' {
 interface LayoutRouteChildren {
   LayoutAbandonedCartsRoute: typeof LayoutAbandonedCartsRoute
   LayoutAttendeesRoute: typeof LayoutAttendeesRoute
+  LayoutCheckInRoute: typeof LayoutCheckInRoute
   LayoutPaymentsRoute: typeof LayoutPaymentsRoute
   LayoutSettingsRoute: typeof LayoutSettingsRoute
   LayoutIndexRoute: typeof LayoutIndexRoute
@@ -1148,6 +1168,7 @@ interface LayoutRouteChildren {
 const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutAbandonedCartsRoute: LayoutAbandonedCartsRoute,
   LayoutAttendeesRoute: LayoutAttendeesRoute,
+  LayoutCheckInRoute: LayoutCheckInRoute,
   LayoutPaymentsRoute: LayoutPaymentsRoute,
   LayoutSettingsRoute: LayoutSettingsRoute,
   LayoutIndexRoute: LayoutIndexRoute,

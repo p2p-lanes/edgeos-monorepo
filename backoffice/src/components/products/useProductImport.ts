@@ -65,8 +65,8 @@ export const productCsvColumns: CsvColumnConfig<ProductBatchItem>[] = [
     parse: (v) => (v ? v.toLowerCase() : undefined),
   },
   {
-    header: "Start Date",
-    key: "start_date",
+    header: "Sale Starts At",
+    key: "sale_starts_at",
     validate: (v) => {
       if (!v) return null
       const d = new Date(v)
@@ -77,8 +77,8 @@ export const productCsvColumns: CsvColumnConfig<ProductBatchItem>[] = [
     parse: (v) => (v ? new Date(v).toISOString() : undefined),
   },
   {
-    header: "End Date",
-    key: "end_date",
+    header: "Sale Ends At",
+    key: "sale_ends_at",
     validate: (v) => {
       if (!v) return null
       const d = new Date(v)
@@ -119,13 +119,25 @@ export const productCsvColumns: CsvColumnConfig<ProductBatchItem>[] = [
     },
   },
   {
-    header: "Max Quantity",
-    key: "max_quantity",
+    header: "Total Stock",
+    key: "total_stock_cap",
     validate: (v) => {
       if (!v) return null
       const n = Number(v)
       if (!Number.isInteger(n)) return "Must be a whole number"
-      if (n < 0) return "Must be >= 0"
+      if (n < 1) return "Must be >= 1"
+      return null
+    },
+    parse: (v) => (v ? Number(v) : undefined),
+  },
+  {
+    header: "Max Per Order",
+    key: "max_per_order",
+    validate: (v) => {
+      if (!v) return null
+      const n = Number(v)
+      if (!Number.isInteger(n)) return "Must be a whole number"
+      if (n < 1) return "Must be >= 1"
       return null
     },
     parse: (v) => (v ? Number(v) : undefined),

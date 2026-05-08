@@ -1,4 +1,4 @@
-import { ChevronRight, QrCode, Ticket, User } from "lucide-react"
+import { ChevronRight, QrCode, User } from "lucide-react"
 import React, { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { TICKET_CATEGORY } from "@/checkout/popupCheckoutPolicy"
@@ -15,6 +15,7 @@ import type { AttendeePassState } from "@/types/Attendee"
 import type { ProductsPass } from "@/types/Products"
 import { badgeName } from "../../constants/multiuse"
 import useModal from "../../hooks/useModal"
+import { compareByCategory, getCategoryIcon } from "../../utils/categoryDisplay"
 import { AttendeeModal } from "../AttendeeModal"
 import OptionsMenu from "./Buttons/OptionsMenu"
 import Product from "./Products/ProductTicket"
@@ -59,13 +60,15 @@ const AttendeeTicket = ({
   const { removeAttendee, editAttendee } = useAttendee()
   const hasPurchased = attendee.products.some((product) => product.purchased)
   const isMainAttendee = attendee.category === "main"
-  const [isQrModalOpen, setIsQrModalOpen] = useState(false)
 
+  // Used by buy mode <Product> components to disable day/week tickets when a
+  // monthly pass is selected/purchased (buy-mode logic is out of scope here).
   const hasMonthPurchased = attendee.products.some(
     (product) =>
       (product.duration_type === "month" || product.duration_type === "full") &&
       (product.purchased || product.selected),
   )
+
   // LEGACY: application.local_resident was removed from API
   const isLocalResident = false
 
@@ -75,18 +78,13 @@ const AttendeeTicket = ({
     (p) => p.category === TICKET_CATEGORY,
   )
 
-  // Get purchased passes for view mode display
-  const purchasedPasses = attendee.products
-    .filter((product) => {
-      if (!product.purchased || product.category === "patreon") return false
-      if (
-        hasMonthPurchased &&
-        (product.duration_type === "week" || product.duration_type === "day")
-      )
-        return false
-      return true
-    })
-    .sort(sortProductsByPriority)
+  // Ticket entries for view mode: exclude patreon, sort by category order
+  const ticketEntries = [...(attendee.ticket_entries ?? [])]
+    .filter((e) => e.product_category !== "patreon")
+    .sort(compareByCategory)
+
+  // Inline QR modal state — drives the shared <QRcode> modal at bottom of file
+  const [activeCode, setActiveCode] = useState<string | null>(null)
 
   // Collapsible open states
   const defaultLocalOpen = isLocalResident ? localProducts.length > 0 : false
@@ -120,10 +118,6 @@ const AttendeeTicket = ({
 
   const handleRemoveAttendee = () => {
     handleDelete(attendee)
-  }
-
-  const handleOpenQrModal = () => {
-    setIsQrModalOpen(true)
   }
 
   return (
@@ -217,50 +211,46 @@ const AttendeeTicket = ({
                 {t("passes.no_passes_yet_suffix")}
               </p>
             ) : !toggleProduct && hasPurchased ? (
-              /* View mode - with purchased passes - simple pass list */
-              <>
-                <div className="w-full">
-                  {purchasedPasses.map((pass, idx) => (
+              /* View mode - with purchased passes - flat list by category + inline QR */
+              <div className="w-full">
+                {ticketEntries.map((entry, idx) => {
+                  const CategoryIcon = getCategoryIcon(entry.product_category)
+                  return (
                     <div
-                      key={`${pass.id}-${attendee.id}`}
+                      key={entry.id}
                       className={cn(
                         "flex items-center gap-2 py-3",
-                        idx !== purchasedPasses.length - 1 &&
+                        idx !== ticketEntries.length - 1 &&
                           "border-b border-dotted border-border",
                       )}
                     >
-                      <Ticket className="w-4 h-4 lg:w-5 lg:h-5 text-pass-text flex-shrink-0" />
+                      <CategoryIcon className="w-4 h-4 lg:w-5 lg:h-5 text-pass-text flex-shrink-0" />
                       <div className="flex items-baseline gap-1.5 flex-1 min-w-0">
                         <span className="font-bold text-pass-title text-sm lg:text-base whitespace-nowrap">
-                          {pass.name}
+                          {entry.product_name}
                         </span>
-                        {pass.start_date && pass.end_date && (
-                          <span className="text-pass-text text-xs lg:text-sm truncate">
-                            {new Date(pass.start_date).toLocaleDateString(
-                              "en-US",
-                              { month: "short", day: "numeric" },
-                            )}{" "}
-                            to{" "}
-                            {new Date(pass.end_date).toLocaleDateString(
-                              "en-US",
-                              { month: "short", day: "numeric" },
-                            )}
-                          </span>
-                        )}
                       </div>
+                      {entry.requires_check_in === true && (
+                        <button
+                          type="button"
+                          onClick={() => setActiveCode(entry.check_in_code)}
+                          aria-label={t("passes.check_in_code")}
+                          className="text-pass-text hover:text-pass-title transition-colors cursor-pointer flex-shrink-0"
+                        >
+                          <QrCode className="w-5 h-5" />
+                        </button>
+                      )}
                     </div>
-                  ))}
-                </div>
-                {/* Check-in code indicator */}
-                <button
-                  type="button"
-                  onClick={handleOpenQrModal}
-                  className="flex items-center gap-1.5 mt-3 justify-end lg:absolute lg:bottom-6 lg:right-6 lg:mt-0 text-xs font-medium text-pass-text uppercase tracking-wider hover:text-pass-title transition-colors cursor-pointer"
-                >
-                  <span>{t("passes.check_in_code")}</span>
-                  <QrCode className="w-4 h-4" />
-                </button>
-              </>
+                  )
+                })}
+                <QRcode
+                  check_in_code={activeCode ?? ""}
+                  isOpen={activeCode !== null}
+                  onOpenChange={(open) => {
+                    if (!open) setActiveCode(null)
+                  }}
+                />
+              </div>
             ) : (
               /* Buy mode - collapsible sections */
               <div className="flex flex-col gap-3 w-full">
@@ -408,12 +398,6 @@ const AttendeeTicket = ({
         category={modal.category!}
         editingAttendee={modal.editingAttendee}
         isDelete={modal.isDelete}
-      />
-
-      <QRcode
-        check_in_code={attendee.check_in_code || ""}
-        isOpen={isQrModalOpen}
-        onOpenChange={setIsQrModalOpen}
       />
     </div>
   )

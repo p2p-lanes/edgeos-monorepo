@@ -1,12 +1,24 @@
-import type { AttendeePublic } from "@/client"
+import type { AttendeeProductPublic, AttendeePublic } from "@/client"
 import type { ProductsPass } from "./Products"
 
 export type AttendeeCategory = "main" | "spouse" | "kid" | "baby" | "teen"
 
-// Portal-specific: extends AttendeePublic with typed products for the passes UI state
+/**
+ * A single ticket entry as returned by the API's AttendeeProductPublic.
+ * All denormalized product fields (product_name, product_category, start_date,
+ * end_date, duration_type) are available directly — no client-side join needed.
+ */
+export type TicketEntry = AttendeeProductPublic
+
+// Portal-specific: extends AttendeePublic with typed products for the passes UI state.
+// ticket_entries carries the raw per-ticket AttendeeProductPublic rows from the API
+// (with denormalized product_name and requires_check_in for QR display).
 export type AttendeePassState = Omit<AttendeePublic, "products"> & {
   products: ProductsPass[]
+  ticket_entries?: TicketEntry[]
 }
+
+export type { AttendeeProductPublic }
 
 export interface DirectoryProduct {
   id: string

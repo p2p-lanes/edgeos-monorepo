@@ -4,7 +4,6 @@ import QuantitySelector, {
   resolveMaxQuantity,
   supportsQuantitySelector,
 } from "@/components/ui/QuantitySelector"
-import { formatDate } from "@/helpers/dates"
 import { cn } from "@/lib/utils"
 import { usePassesProvider } from "@/providers/passesProvider"
 import { formatCurrency } from "@/types/checkout"
@@ -68,7 +67,7 @@ const Product = ({
   // multi-unit passes is intentionally out of scope (see plan) — fall back to
   // the toggle path which drives the existing "give up for credit" flow.
   const showStepper =
-    supportsQuantitySelector(product.max_quantity) && !purchased && !isEditing
+    supportsQuantitySelector(product.max_per_order) && !purchased && !isEditing
   const maxQuantity = resolveMaxQuantity(product)
   const currentQuantity = product.quantity ?? 0
 
@@ -119,25 +118,6 @@ const Product = ({
           </div>
           <div className="flex flex-col pl-3 ">
             <p className="font-semibold text-sm text-left">{product.name}</p>
-
-            {product.start_date && product.end_date && (
-              <span
-                className={cn(
-                  `text-xs text-left text-muted-foreground ${product.purchased ? "text-primary-foreground" : ""}`,
-                  disabled && "text-neutral-300",
-                )}
-              >
-                {formatDate(product.start_date, {
-                  day: "numeric",
-                  month: "short",
-                })}{" "}
-                to{" "}
-                {formatDate(product.end_date, {
-                  day: "numeric",
-                  month: "short",
-                })}
-              </span>
-            )}
           </div>
         </div>
 

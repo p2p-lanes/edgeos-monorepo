@@ -6,23 +6,20 @@ import {
   Clock,
   DollarSign,
   Hash,
-  Layers,
   Plus,
   Power,
+  QrCode,
   Shield,
   ShieldCheck,
-  Users,
 } from "lucide-react"
 import { useMemo, useState } from "react"
 import {
   PopupsService,
   type ProductCreate,
-  type ProductPublicWithTier,
+  type ProductPublic,
   ProductsService,
   type ProductUpdate,
-  type TicketAttendeeCategory,
   type TicketDuration,
-  TicketTierGroupsService,
 } from "@/client"
 
 type ProductCategory = string
@@ -30,7 +27,6 @@ type ProductCategory = string
 import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
-import { TierGroupPicker } from "@/components/forms/TierGroupPicker"
 import { TranslationManager } from "@/components/translations/TranslationManager"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -72,7 +68,7 @@ import {
 import { createErrorHandler } from "@/utils"
 
 interface ProductFormProps {
-  defaultValues?: ProductPublicWithTier
+  defaultValues?: ProductPublic
   onSuccess: () => void
 }
 
@@ -93,13 +89,6 @@ const TICKET_DURATIONS: { value: TicketDuration; label: string }[] = [
   { value: "month", label: "Month Pass" },
   { value: "full", label: "Full Event" },
 ]
-
-const ATTENDEE_CATEGORIES: { value: TicketAttendeeCategory; label: string }[] =
-  [
-    { value: "main", label: "Main Attendee" },
-    { value: "spouse", label: "Spouse" },
-    { value: "kid", label: "Kid" },
-  ]
 
 /** Extract YYYY-MM-DD from an ISO date string like "2026-05-10T00:00:00Z" */
 const toDateInputValue = (iso?: string | null): string => {
@@ -131,29 +120,6 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
     queryKey: ["popups", popupId],
     queryFn: () => PopupsService.getPopup({ popupId: popupId! }),
     enabled: !!popupId,
-  })
-
-  // Tier group state (local until Save)
-  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(
-    defaultValues?.phase?.group_id ?? null,
-  )
-  const [phaseLabel, setPhaseLabel] = useState(
-    defaultValues?.phase?.label ?? "",
-  )
-  const [phaseSaleStartsAt, setPhaseSaleStartsAt] = useState(
-    defaultValues?.phase?.sale_starts_at?.slice(0, 10) ?? "",
-  )
-  const [phaseSaleEndsAt, setPhaseSaleEndsAt] = useState(
-    defaultValues?.phase?.sale_ends_at?.slice(0, 10) ?? "",
-  )
-  const [tierOverlapError, setTierOverlapError] = useState<string | null>(null)
-
-  // Fetch selected group (for overlap validation)
-  const { data: selectedGroupData } = useQuery({
-    queryKey: ["tier-groups", selectedGroupId],
-    queryFn: () =>
-      TicketTierGroupsService.getTierGroup({ groupId: selectedGroupId! }),
-    enabled: !!selectedGroupId,
   })
 
   // Merge hardcoded defaults + API categories + locally added ones (deduplicated)
@@ -209,67 +175,6 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
     onError: createErrorHandler(showErrorToast),
   })
 
-  // ── Tier Phase helpers ─────────────────────────────────────────────────────
-
-  /**
-   * Check if the candidate window [starts, ends] overlaps with any existing
-   * phase in the selected group (excluding this product's own existing phase).
-   */
-  const checkOverlap = (starts: string, ends: string): boolean => {
-    const phases = selectedGroupData?.phases ?? []
-    const currentProductPhaseId = defaultValues?.phase?.id
-    const s = new Date(starts).getTime()
-    const e = ends ? new Date(ends).getTime() : Number.POSITIVE_INFINITY
-
-    for (const phase of phases) {
-      if (phase.id === currentProductPhaseId) continue
-      if (!phase.sale_starts_at && !phase.sale_ends_at) continue
-      const ps = phase.sale_starts_at
-        ? new Date(phase.sale_starts_at).getTime()
-        : Number.NEGATIVE_INFINITY
-      const pe = phase.sale_ends_at
-        ? new Date(phase.sale_ends_at).getTime()
-        : Number.POSITIVE_INFINITY
-      if (s < pe && e > ps) return true
-    }
-    return false
-  }
-
-  const tierPhaseMutation = useMutation({
-    mutationFn: ({
-      productId,
-      existingPhaseId,
-    }: {
-      productId: string
-      existingPhaseId?: string
-    }) => {
-      if (existingPhaseId) {
-        return TicketTierGroupsService.updateTierPhase({
-          groupId: selectedGroupId!,
-          phaseId: existingPhaseId,
-          requestBody: {
-            label: phaseLabel || null,
-            sale_starts_at: phaseSaleStartsAt || null,
-            sale_ends_at: phaseSaleEndsAt || null,
-          },
-        })
-      }
-      return TicketTierGroupsService.createTierPhase({
-        groupId: selectedGroupId!,
-        requestBody: {
-          product_id: productId,
-          label: phaseLabel,
-          sale_starts_at: phaseSaleStartsAt || null,
-          sale_ends_at: phaseSaleEndsAt || null,
-        },
-      })
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tier-groups"] })
-    },
-    onError: createErrorHandler(showErrorToast),
-  })
-
   const form = useForm({
     defaultValues: {
       name: defaultValues?.name ?? "",
@@ -277,98 +182,73 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
       description: defaultValues?.description ?? "",
       image_url: defaultValues?.image_url ?? "",
       category: (defaultValues?.category ?? "ticket") as ProductCategory,
-      attendee_category: (defaultValues?.attendee_category ??
-        "main") as TicketAttendeeCategory,
       duration_type: (defaultValues?.duration_type ?? "full") as TicketDuration,
+      requires_check_in:
+        defaultValues?.requires_check_in ??
+        (defaultValues?.category ?? "ticket") === "ticket",
       is_active: defaultValues?.is_active ?? true,
       exclusive: defaultValues?.exclusive ?? false,
-      max_quantity: defaultValues?.max_quantity?.toString() ?? "",
-      start_date: toDateInputValue(defaultValues?.start_date),
-      end_date: toDateInputValue(defaultValues?.end_date),
+      total_stock_cap: defaultValues?.total_stock_cap?.toString() ?? "",
+      max_per_order: defaultValues?.max_per_order?.toString() ?? "",
+      sale_starts_at: toDateInputValue(defaultValues?.sale_starts_at),
+      sale_ends_at: toDateInputValue(defaultValues?.sale_ends_at),
       insurance_eligible: defaultValues?.insurance_eligible ?? false,
     },
     onSubmit: ({ value }) => {
       if (readOnly) return
 
       const isTicket = value.category === "ticket"
-      const tierEnabled = !!popupData?.tier_progression_enabled && isTicket
-      const hasGroupSelected = tierEnabled && !!selectedGroupId
 
-      // BA-3: client-side overlap validation before calling the API
-      if (hasGroupSelected && phaseSaleStartsAt) {
-        const overlaps = checkOverlap(phaseSaleStartsAt, phaseSaleEndsAt)
-        if (overlaps) {
-          setTierOverlapError(
-            "The sale window overlaps with another phase in this group. Adjust the dates.",
-          )
-          return
-        }
-      }
-      setTierOverlapError(null)
-
-      const maxQty = value.max_quantity
-        ? Number.parseInt(value.max_quantity, 10)
+      const totalStockCap = value.total_stock_cap
+        ? Number.parseInt(value.total_stock_cap, 10)
+        : null
+      const maxPerOrder = value.max_per_order
+        ? Number.parseInt(value.max_per_order, 10)
         : null
 
       if (isEdit) {
-        updateMutation.mutate(
-          {
-            name: value.name,
-            price: value.price,
-            description: value.description || null,
-            image_url: value.image_url || null,
-            category: value.category,
-            attendee_category: isTicket ? value.attendee_category : null,
-            duration_type: isTicket ? value.duration_type : null,
-            start_date: isTicket && value.start_date ? value.start_date : null,
-            end_date: isTicket && value.end_date ? value.end_date : null,
-            is_active: value.is_active,
-            exclusive: value.exclusive,
-            max_quantity: maxQty,
-            insurance_eligible: value.insurance_eligible,
-          },
-          {
-            onSuccess: () => {
-              if (hasGroupSelected) {
-                tierPhaseMutation.mutate({
-                  productId: defaultValues!.id,
-                  existingPhaseId: defaultValues?.phase?.id,
-                })
-              }
-            },
-          },
-        )
+        updateMutation.mutate({
+          name: value.name,
+          price: value.price,
+          description: value.description || null,
+          image_url: value.image_url || null,
+          category: value.category,
+          duration_type: isTicket ? value.duration_type : null,
+          sale_starts_at:
+            isTicket && value.sale_starts_at ? value.sale_starts_at : null,
+          sale_ends_at:
+            isTicket && value.sale_ends_at ? value.sale_ends_at : null,
+          requires_check_in: value.requires_check_in,
+          is_active: value.is_active,
+          exclusive: value.exclusive,
+          total_stock_cap: totalStockCap,
+          max_per_order: maxPerOrder,
+          insurance_eligible: value.insurance_eligible,
+        })
       } else {
         if (!selectedPopupId) {
           showErrorToast("Please select a popup first")
           return
         }
-        createMutation.mutate(
-          {
-            popup_id: selectedPopupId,
-            name: value.name,
-            price: value.price,
-            description: value.description || undefined,
-            image_url: value.image_url || undefined,
-            category: value.category,
-            attendee_category: isTicket ? value.attendee_category : undefined,
-            duration_type: isTicket ? value.duration_type : undefined,
-            start_date:
-              isTicket && value.start_date ? value.start_date : undefined,
-            end_date: isTicket && value.end_date ? value.end_date : undefined,
-            is_active: value.is_active,
-            exclusive: value.exclusive,
-            max_quantity: maxQty ?? undefined,
-            insurance_eligible: value.insurance_eligible,
-          },
-          {
-            onSuccess: (created) => {
-              if (hasGroupSelected) {
-                tierPhaseMutation.mutate({ productId: created.id })
-              }
-            },
-          },
-        )
+        createMutation.mutate({
+          popup_id: selectedPopupId,
+          name: value.name,
+          price: value.price,
+          description: value.description || undefined,
+          image_url: value.image_url || undefined,
+          category: value.category,
+          duration_type: isTicket ? value.duration_type : undefined,
+          sale_starts_at:
+            isTicket && value.sale_starts_at ? value.sale_starts_at : undefined,
+          sale_ends_at:
+            isTicket && value.sale_ends_at ? value.sale_ends_at : undefined,
+          requires_check_in: value.requires_check_in,
+          is_active: value.is_active,
+          exclusive: value.exclusive,
+          total_stock_cap: totalStockCap ?? undefined,
+          max_per_order: maxPerOrder ?? undefined,
+          insurance_eligible: value.insurance_eligible,
+        })
       }
     },
   })
@@ -543,13 +423,13 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
           </form.Field>
 
           <form.Field
-            name="max_quantity"
+            name="total_stock_cap"
             validators={{
               onBlur: ({ value }) => {
                 if (readOnly || !value) return undefined
                 const num = Number.parseInt(value, 10)
                 if (Number.isNaN(num) || num < 1) {
-                  return "Max quantity must be a positive number"
+                  return "Total stock must be a positive number. Leave empty for unlimited."
                 }
                 return undefined
               },
@@ -559,10 +439,57 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
               <div>
                 <InlineRow
                   icon={<Hash className="h-4 w-4 text-muted-foreground" />}
-                  label="Max Quantity"
-                  description="Leave empty for unlimited"
+                  label="Total stock"
+                  description="Maximum units available. Leave empty for unlimited."
                 >
                   <Input
+                    id="total_stock_cap"
+                    aria-label="Total stock"
+                    placeholder="Unlimited"
+                    type="number"
+                    min="1"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    disabled={readOnly}
+                    className="max-w-32 text-sm"
+                  />
+                </InlineRow>
+                <FieldError errors={field.state.meta.errors} />
+              </div>
+            )}
+          </form.Field>
+
+          <form.Field
+            name="max_per_order"
+            validators={{
+              onBlur: ({ value, fieldApi }) => {
+                if (readOnly || !value) return undefined
+                const num = Number.parseInt(value, 10)
+                if (Number.isNaN(num) || num < 1) {
+                  return "Max per order must be a positive number. Leave empty for unlimited."
+                }
+                const rawCap = fieldApi.form.getFieldValue("total_stock_cap")
+                if (rawCap) {
+                  const cap = Number.parseInt(rawCap, 10)
+                  if (!Number.isNaN(cap) && num > cap) {
+                    return `Cannot exceed total stock cap (${cap})`
+                  }
+                }
+                return undefined
+              },
+            }}
+          >
+            {(field) => (
+              <div>
+                <InlineRow
+                  icon={<Hash className="h-4 w-4 text-muted-foreground" />}
+                  label="Max per order"
+                  description="Per-cart cap. Leave empty for unlimited."
+                >
+                  <Input
+                    id="max_per_order"
+                    aria-label="Max per order"
                     placeholder="Unlimited"
                     type="number"
                     min="1"
@@ -598,6 +525,23 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
                     Eligible
                   </Label>
                 </div>
+              </InlineRow>
+            )}
+          </form.Field>
+
+          <form.Field name="requires_check_in">
+            {(field) => (
+              <InlineRow
+                icon={<QrCode className="h-4 w-4 text-muted-foreground" />}
+                label="Requires Check-in"
+                description="Enable for products that need scanning at the venue (tickets, parking, VIP access)"
+              >
+                <Switch
+                  id="requires_check_in"
+                  checked={field.state.value}
+                  onCheckedChange={(checked) => field.handleChange(checked)}
+                  disabled={readOnly}
+                />
               </InlineRow>
             )}
           </form.Field>
@@ -673,180 +617,45 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
                     )}
                   </form.Field>
 
-                  <form.Field name="attendee_category">
-                    {(field) => (
-                      <InlineRow
-                        icon={
-                          <Users className="h-4 w-4 text-muted-foreground" />
-                        }
-                        label="Attendee Type"
-                        description="Who can purchase this ticket"
-                      >
-                        <Select
-                          value={field.state.value}
-                          onValueChange={(val) =>
-                            field.handleChange(val as TicketAttendeeCategory)
-                          }
-                          disabled={readOnly}
-                        >
-                          <SelectTrigger className="w-auto text-sm">
-                            <SelectValue placeholder="Select type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {ATTENDEE_CATEGORIES.map((cat) => (
-                              <SelectItem key={cat.value} value={cat.value}>
-                                {cat.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </InlineRow>
-                    )}
-                  </form.Field>
-
-                  <form.Field name="start_date">
+                  <form.Field name="sale_starts_at">
                     {(field) => (
                       <InlineRow
                         icon={
                           <Calendar className="h-4 w-4 text-muted-foreground" />
                         }
-                        label="Start Date"
-                        description="When the ticket validity begins"
+                        label="Sale Starts At"
+                        description="When the ticket goes on sale"
                       >
                         <DatePicker
                           value={field.state.value}
                           onChange={(v) => field.handleChange(v)}
                           disabled={readOnly}
                           className="max-w-52"
-                          placeholder="Start date"
+                          placeholder="Sale start date"
                         />
                       </InlineRow>
                     )}
                   </form.Field>
 
-                  <form.Field name="end_date">
+                  <form.Field name="sale_ends_at">
                     {(field) => (
                       <InlineRow
                         icon={
                           <Calendar className="h-4 w-4 text-muted-foreground" />
                         }
-                        label="End Date"
-                        description="When the ticket validity ends"
+                        label="Sale Ends At"
+                        description="When the ticket stops being sold"
                       >
                         <DatePicker
                           value={field.state.value}
                           onChange={(v) => field.handleChange(v)}
                           disabled={readOnly}
                           className="max-w-52"
-                          placeholder="End date"
+                          placeholder="Sale end date"
                         />
                       </InlineRow>
                     )}
                   </form.Field>
-                </InlineSection>
-              </>
-            )
-          }
-        </form.Subscribe>
-
-        {/* Tier Group Section — only for tickets when popup flag is on */}
-        <form.Subscribe selector={(state) => state.values.category}>
-          {(category) =>
-            popupData?.tier_progression_enabled &&
-            category === "ticket" && (
-              <>
-                <Separator />
-                <InlineSection title="Tier Group">
-                  <div className="space-y-3">
-                    <p className="px-1 text-xs text-muted-foreground">
-                      Assign this ticket to a tier group to enable early-bird /
-                      regular / late progression.
-                    </p>
-                    <TierGroupPicker
-                      popupId={popupId!}
-                      value={selectedGroupId}
-                      onChange={(id) => {
-                        setSelectedGroupId(id)
-                        setTierOverlapError(null)
-                      }}
-                      className="max-w-sm"
-                    />
-                  </div>
-
-                  {selectedGroupId && (
-                    <div className="space-y-3 pt-2">
-                      <p className="px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                        Phase Details
-                      </p>
-
-                      {/* Phase Label */}
-                      <InlineRow
-                        icon={
-                          <Layers className="h-4 w-4 text-muted-foreground" />
-                        }
-                        label="Phase label"
-                        description='E.g. "Early Bird", "Regular"'
-                      >
-                        <Input
-                          id="phase-label"
-                          aria-label="Phase label"
-                          placeholder="Early Bird"
-                          value={phaseLabel}
-                          onChange={(e) => setPhaseLabel(e.target.value)}
-                          disabled={readOnly}
-                          className="max-w-48 text-sm"
-                        />
-                      </InlineRow>
-
-                      {/* Sale Starts At */}
-                      <InlineRow
-                        icon={
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                        }
-                        label="Sale starts"
-                        description="When this phase opens for purchase"
-                      >
-                        <Input
-                          id="phase-sale-starts-at"
-                          aria-label="Sale starts"
-                          type="date"
-                          value={phaseSaleStartsAt}
-                          onChange={(e) => setPhaseSaleStartsAt(e.target.value)}
-                          disabled={readOnly}
-                          className="max-w-44 text-sm"
-                        />
-                      </InlineRow>
-
-                      {/* Sale Ends At */}
-                      <InlineRow
-                        icon={
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                        }
-                        label="Sale ends"
-                        description="When this phase closes"
-                      >
-                        <Input
-                          id="phase-sale-ends-at"
-                          aria-label="Sale ends"
-                          type="date"
-                          value={phaseSaleEndsAt}
-                          onChange={(e) => setPhaseSaleEndsAt(e.target.value)}
-                          disabled={readOnly}
-                          className="max-w-44 text-sm"
-                        />
-                      </InlineRow>
-
-                      {/* Overlap error */}
-                      {tierOverlapError && (
-                        <p
-                          role="alert"
-                          className="px-1 text-sm text-destructive"
-                        >
-                          {tierOverlapError}
-                        </p>
-                      )}
-                    </div>
-                  )}
                 </InlineSection>
               </>
             )

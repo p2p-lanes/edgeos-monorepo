@@ -249,7 +249,7 @@
   "passes": {
     "your_passes": "我的通行证",
     "buy_passes": "购买通行证",
-    "your_passes_description": "在这里查看和管理您的通行证。需要更改？您可以在活动临近时更换您的周次以匹配您的计划！",
+    "your_passes_description": "在这里查看和管理您的订单。",
     "loading_passes": "正在加载通行证信息...",
     "add_spouse": "添加配偶",
     "add_children": "添加子女",
@@ -293,11 +293,16 @@
     "people_registered": "报名现已开放",
     "builders_registered": "加入这场体验",
     "buy": "购买",
-    "need_more_passes": "需要更多通行证？",
-    "add_family_or_weeks": "添加家庭成员或更多周次",
+    "need_more_passes": "想再添加吗？",
     "waiver_acknowledge": "我确认了解相关风险，并同意免责声明。",
     "waiver_info": "免责声明信息",
     "waiver_detail": "我了解参加此活动存在固有风险，包括受伤或损失的可能性。勾选此框即表示我已阅读并同意免责声明，我自愿承担这些风险并免除组织者与我参与相关的任何索赔。",
+    "categories": {
+      "ticket": "票",
+      "housing": "住宿",
+      "merch": "周边",
+      "other": "其他"
+    },
     "discounts": {
       "patron_free": "赞助人免费票",
       "week_credit": "周票抵扣",

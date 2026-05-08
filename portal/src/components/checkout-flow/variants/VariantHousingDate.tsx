@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import ExpandableDescription from "@/components/ui/ExpandableDescription"
 import QuantitySelector, {
+  resolveMaxQuantity,
   supportsQuantitySelector,
 } from "@/components/ui/QuantitySelector"
 import { cn } from "@/lib/utils"
@@ -227,8 +228,8 @@ function CompactCard({
       ? product.compare_price * nights
       : product.compare_price
     : null
-  const supportsQty = supportsQuantitySelector(product.max_quantity)
-  const maxQty = product.max_quantity ?? Number.POSITIVE_INFINITY
+  const supportsQty = supportsQuantitySelector(product.max_per_order)
+  const maxQty = resolveMaxQuantity(product)
 
   return (
     <button
@@ -344,8 +345,8 @@ function GridCard({
       ? product.compare_price * nights
       : product.compare_price
     : null
-  const supportsQty = supportsQuantitySelector(product.max_quantity)
-  const maxQty = product.max_quantity ?? Number.POSITIVE_INFINITY
+  const supportsQty = supportsQuantitySelector(product.max_per_order)
+  const maxQty = resolveMaxQuantity(product)
 
   return (
     <button
@@ -520,8 +521,8 @@ function DefaultSectionCard({
               ? product.compare_price * nights
               : product.compare_price
             : null
-          const supportsQty = supportsQuantitySelector(product.max_quantity)
-          const maxQty = product.max_quantity ?? Number.POSITIVE_INFINITY
+          const supportsQty = supportsQuantitySelector(product.max_per_order)
+          const maxQty = resolveMaxQuantity(product)
           const quantity = getQuantity(product.id)
 
           return (
@@ -614,7 +615,6 @@ function HousingDefault({
   getQuantity,
   onIncrement,
   onDecrement,
-  onSkip,
 }: CardListProps) {
   return (
     <div className="space-y-5">
@@ -717,8 +717,8 @@ function ShowcaseSectionCard({
                 ? product.compare_price * nights
                 : product.compare_price
               : null
-            const supportsQty = supportsQuantitySelector(product.max_quantity)
-            const maxQty = product.max_quantity ?? Number.POSITIVE_INFINITY
+            const supportsQty = supportsQuantitySelector(product.max_per_order)
+            const maxQty = resolveMaxQuantity(product)
             const quantity = getQuantity(product.id)
 
             return (
@@ -830,7 +830,6 @@ function HousingShowcase({
   getQuantity,
   onIncrement,
   onDecrement,
-  onSkip,
 }: CardListProps) {
   return (
     <div className="space-y-6">
@@ -863,7 +862,6 @@ function HousingCompact({
   getQuantity,
   onIncrement,
   onDecrement,
-  onSkip,
 }: CardListProps) {
   return (
     <div className="space-y-4">
@@ -902,7 +900,6 @@ function HousingGrid({
   getQuantity,
   onIncrement,
   onDecrement,
-  onSkip,
 }: CardListProps) {
   return (
     <div className="space-y-6">

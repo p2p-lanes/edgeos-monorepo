@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from enum import Enum, StrEnum
+from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, model_validator
 from sqlalchemy import Boolean, Numeric, Text
@@ -59,16 +59,26 @@ class ProductBase(SQLModel):
         default=None, nullable=True
     )
     duration_type: TicketDuration | None = Field(default=None, nullable=True)
-    start_date: datetime | None = Field(
+    sale_starts_at: datetime | None = Field(
         default=None, nullable=True, sa_type=DateTime(timezone=True)
     )
-    end_date: datetime | None = Field(
+    sale_ends_at: datetime | None = Field(
         default=None, nullable=True, sa_type=DateTime(timezone=True)
     )
     is_active: bool = Field(default=True)
     exclusive: bool = Field(default=False)
-    max_quantity: int | None = Field(default=None, nullable=True)
+    # Inventory fields — replaces the ambiguous max_quantity column.
+    # total_stock_cap:       Admin-set inventory ceiling. NULL = unlimited.
+    # total_stock_remaining: Live atomic counter. NULL = unlimited (no tracking).
+    # max_per_order:         Per-cart cap. NULL = unlimited. Pure validator; no counter.
+    total_stock_cap: int | None = Field(default=None, nullable=True)
+    total_stock_remaining: int | None = Field(default=None, nullable=True)
+    max_per_order: int | None = Field(default=None, nullable=True)
     insurance_eligible: bool = Field(
+        default=False,
+        sa_column=Column(Boolean, nullable=False, server_default="false"),
+    )
+    requires_check_in: bool = Field(
         default=False,
         sa_column=Column(Boolean, nullable=False, server_default="false"),
     )
@@ -95,12 +105,15 @@ class ProductCreate(BaseModel):
     category: str = "ticket"
     attendee_category: TicketAttendeeCategory | None = None
     duration_type: TicketDuration | None = None
-    start_date: datetime | None = None
-    end_date: datetime | None = None
+    sale_starts_at: datetime | None = None
+    sale_ends_at: datetime | None = None
     is_active: bool = True
     exclusive: bool = False
-    max_quantity: int | None = None
+    total_stock_cap: int | None = Field(default=None, ge=1)
+    total_stock_remaining: int | None = Field(default=None, ge=0)
+    max_per_order: int | None = Field(default=None, ge=1)
     insurance_eligible: bool = False
+    requires_check_in: bool = False
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -116,6 +129,27 @@ class ProductCreate(BaseModel):
                 raise ValueError("duration_type can only be set for ticket products")
         return self
 
+    @model_validator(mode="after")
+    def validate_max_per_order_vs_stock_cap(self) -> "ProductCreate":
+        """max_per_order must not exceed total_stock_cap when both are set."""
+        if self.max_per_order is not None and self.total_stock_cap is not None:
+            if self.max_per_order > self.total_stock_cap:
+                raise ValueError(
+                    "max_per_order cannot exceed total_stock_cap "
+                    f"({self.max_per_order} > {self.total_stock_cap})"
+                )
+        return self
+
+    @model_validator(mode="after")
+    def validate_sale_window(self) -> "ProductCreate":
+        """sale_starts_at must be before sale_ends_at when both are set."""
+        if self.sale_starts_at is not None and self.sale_ends_at is not None:
+            if self.sale_starts_at > self.sale_ends_at:
+                raise ValueError(
+                    "sale_starts_at must be before sale_ends_at"
+                )
+        return self
+
 
 class ProductUpdate(BaseModel):
     """Product schema for updates."""
@@ -129,12 +163,36 @@ class ProductUpdate(BaseModel):
     category: str | None = None
     attendee_category: TicketAttendeeCategory | None = None
     duration_type: TicketDuration | None = None
-    start_date: datetime | None = None
-    end_date: datetime | None = None
+    sale_starts_at: datetime | None = None
+    sale_ends_at: datetime | None = None
     is_active: bool | None = None
     exclusive: bool | None = None
-    max_quantity: int | None = None
+    total_stock_cap: int | None = Field(default=None, ge=1)
+    total_stock_remaining: int | None = Field(default=None, ge=0)
+    max_per_order: int | None = Field(default=None, ge=1)
     insurance_eligible: bool | None = None
+    requires_check_in: bool | None = None
+
+    @model_validator(mode="after")
+    def validate_max_per_order_vs_stock_cap(self) -> "ProductUpdate":
+        """max_per_order must not exceed total_stock_cap when both are set."""
+        if self.max_per_order is not None and self.total_stock_cap is not None:
+            if self.max_per_order > self.total_stock_cap:
+                raise ValueError(
+                    "max_per_order cannot exceed total_stock_cap "
+                    f"({self.max_per_order} > {self.total_stock_cap})"
+                )
+        return self
+
+    @model_validator(mode="after")
+    def validate_sale_window(self) -> "ProductUpdate":
+        """sale_starts_at must be before sale_ends_at when both are set."""
+        if self.sale_starts_at is not None and self.sale_ends_at is not None:
+            if self.sale_starts_at > self.sale_ends_at:
+                raise ValueError(
+                    "sale_starts_at must be before sale_ends_at"
+                )
+        return self
 
 
 class ProductBatchItem(BaseModel):
@@ -149,12 +207,15 @@ class ProductBatchItem(BaseModel):
     category: str = "ticket"
     attendee_category: TicketAttendeeCategory | None = None
     duration_type: TicketDuration | None = None
-    start_date: datetime | None = None
-    end_date: datetime | None = None
+    sale_starts_at: datetime | None = None
+    sale_ends_at: datetime | None = None
     is_active: bool = True
     exclusive: bool = False
-    max_quantity: int | None = None
+    total_stock_cap: int | None = Field(default=None, ge=1)
+    total_stock_remaining: int | None = Field(default=None, ge=0)
+    max_per_order: int | None = Field(default=None, ge=1)
     insurance_eligible: bool = False
+    requires_check_in: bool = False
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -168,6 +229,17 @@ class ProductBatchItem(BaseModel):
                 )
             if self.duration_type is not None:
                 raise ValueError("duration_type can only be set for ticket products")
+        return self
+
+    @model_validator(mode="after")
+    def validate_max_per_order_vs_stock_cap(self) -> "ProductBatchItem":
+        """max_per_order must not exceed total_stock_cap when both are set."""
+        if self.max_per_order is not None and self.total_stock_cap is not None:
+            if self.max_per_order > self.total_stock_cap:
+                raise ValueError(
+                    "max_per_order cannot exceed total_stock_cap "
+                    f"({self.max_per_order} > {self.total_stock_cap})"
+                )
         return self
 
 
@@ -192,115 +264,3 @@ class ProductWithQuantity(ProductPublic):
     quantity: int = 1
 
 
-# ---------------------------------------------------------------------------
-# Ticket Tier Progression schemas
-# ---------------------------------------------------------------------------
-
-
-class PhaseState(StrEnum):
-    """Derived sales state for a ticket tier phase.
-
-    Computed server-side by the progression service at read time; never persisted.
-    """
-
-    upcoming = "upcoming"
-    available = "available"
-    sold_out = "sold_out"
-    expired = "expired"
-
-
-class TierPhaseCreate(BaseModel):
-    """Schema for creating a new ticket tier phase.
-
-    group_id is optional here because the router endpoint at
-    POST /ticket-tier-groups/{group_id}/phases injects it from the path param.
-
-    `order` is not accepted on input: the backend derives it from
-    `sale_starts_at ASC` (NULLS LAST) with a deterministic id tiebreak.
-    """
-
-    group_id: uuid.UUID | None = None  # injected from path param when None
-    product_id: uuid.UUID
-    label: str = Field(min_length=1)
-    sale_starts_at: datetime | None = None
-    sale_ends_at: datetime | None = None
-
-    model_config = ConfigDict(str_strip_whitespace=True)
-
-
-class TierPhaseUpdate(BaseModel):
-    """Schema for updating a ticket tier phase (all fields optional).
-
-    `order` is derived automatically; updates that change `sale_starts_at`
-    trigger a full re-order of the group.
-    """
-
-    label: str | None = Field(default=None, min_length=1)
-    sale_starts_at: datetime | None = None
-    sale_ends_at: datetime | None = None
-
-    model_config = ConfigDict(str_strip_whitespace=True)
-
-
-class TierPhasePublic(BaseModel):
-    """Public read schema for a ticket tier phase, with derived progression fields."""
-
-    id: uuid.UUID
-    group_id: uuid.UUID
-    product_id: uuid.UUID
-    order: int
-    label: str
-    sale_starts_at: datetime | None = None
-    sale_ends_at: datetime | None = None
-    # Derived by the backend progression service — never persisted
-    sales_state: PhaseState
-    is_purchasable: bool
-    remaining: int | None = (
-        None  # min(phase cap remaining, shared remaining); null if both null
-    )
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class TierGroupCreate(BaseModel):
-    """Schema for creating a new ticket tier group."""
-
-    name: str = Field(min_length=1)
-    shared_stock_cap: int | None = Field(default=None, ge=1)
-    # popup_id is used by the router to check tier_progression_enabled; not persisted on group
-    popup_id: uuid.UUID | None = None
-
-    model_config = ConfigDict(str_strip_whitespace=True)
-
-
-class TierGroupUpdate(BaseModel):
-    """Schema for updating a ticket tier group (all fields optional)."""
-
-    name: str | None = Field(default=None, min_length=1)
-    shared_stock_cap: int | None = Field(default=None, ge=1)
-
-    model_config = ConfigDict(str_strip_whitespace=True)
-
-
-class TierGroupPublic(BaseModel):
-    """Public read schema for a ticket tier group, with embedded phases."""
-
-    id: uuid.UUID
-    tenant_id: uuid.UUID
-    name: str
-    shared_stock_cap: int | None = None
-    shared_stock_remaining: int | None = None
-    phases: list[TierPhasePublic] = []  # sorted by order asc
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class ProductPublicWithTier(ProductPublic):
-    """ProductPublic enriched with optional tier group and phase information.
-
-    Additive delta over ProductPublic — both fields are null for products that
-    are not assigned to any tier group (BC-2 / BC-3 backward-compat).
-    """
-
-    tier_group: TierGroupPublic | None = None
-    phase: TierPhasePublic | None = None

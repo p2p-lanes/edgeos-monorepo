@@ -81,7 +81,6 @@ class TestHumanAttendeeLink:
             popup_id=popup.id,
             name="Spouse Name",
             category="spouse",
-            check_in_code=f"TEST{uuid.uuid4().hex[:4].upper()}",
             email="spouse@example.com",  # Same email as existing human
         )
 
@@ -138,7 +137,6 @@ class TestHumanAttendeeLink:
             popup_id=popup.id,
             name="Spouse Name",
             category="spouse",
-            check_in_code=f"TEST{uuid.uuid4().hex[:4].upper()}",
             email="nonexistent@example.com",
         )
 
@@ -195,7 +193,6 @@ class TestHumanAttendeeLink:
             popup_id=popup.id,
             name="Spouse Name",
             category="spouse",
-            check_in_code=f"TEST{uuid.uuid4().hex[:4].upper()}",
             email="future-spouse@example.com",
             human_id=None,  # Not linked yet
         )

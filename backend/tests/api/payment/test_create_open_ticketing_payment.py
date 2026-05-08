@@ -1,4 +1,9 @@
-"""Tests for PaymentsCRUD.create_open_ticketing_payment — CAP-C, CAP-D, CAP-F."""
+"""Tests for PaymentsCRUD.create_open_ticketing_payment — CAP-C, CAP-D, CAP-F.
+
+Phase 5: Rewritten to match new design where one attendee is shared across all
+direct purchases by the same (human, popup), and each ticket becomes an
+AttendeeProducts row (no quantity aggregation).
+"""
 
 import uuid
 from datetime import UTC, datetime
@@ -152,10 +157,11 @@ def _purchase_create(
     )
 
 
-def test_create_open_ticketing_payment_creates_main_and_companions(
+def test_create_open_ticketing_payment_one_attendee_n_tickets(
     db: Session,
     tenant_a: Tenants,
 ) -> None:
+    """quantity=3 → 1 attendee + 3 AttendeeProducts rows.  Design §2.1/§2.2."""
     popup = _make_popup(db, tenant_a, slug_prefix="main-comp")
     product = _make_product(db, popup, name="GA", price="120.00")
     section = _make_section(db, popup, label="Buyer Info")
@@ -205,25 +211,25 @@ def test_create_open_ticketing_payment_creates_main_and_companions(
     assert payment.amount == Decimal("360.00")
     assert payment.external_id == "sf_open_ticketing_1"
 
+    # New design: 1 attendee for 3 tickets (not 3 attendees)
     attendees = list(
         db.exec(select(Attendees).where(Attendees.popup_id == popup.id)).all()
     )
-    assert len(attendees) == 3
+    assert len(attendees) == 1
     assert attendees[0].name == "Matias Walter"
     assert attendees[0].category == "main"
     assert attendees[0].email == "buyer@test.com"
-    assert attendees[1].name == ""
-    assert attendees[2].name == ""
-    assert all(attendee.category == "main" for attendee in attendees)
-    assert all(attendee.human_id == attendees[0].human_id for attendee in attendees)
 
+    # 3 AttendeeProducts rows, each with unique check_in_code
     attendee_products = list(
         db.exec(
             select(AttendeeProducts).where(AttendeeProducts.product_id == product.id)
         ).all()
     )
     assert len(attendee_products) == 3
-    assert all(link.quantity == 1 for link in attendee_products)
+    codes = {ap.check_in_code for ap in attendee_products}
+    assert len(codes) == 3, "Each ticket must have a distinct check_in_code"
+    assert all(ap.payment_id == payment.id for ap in attendee_products)
 
     payment_products = list(
         db.exec(
@@ -231,7 +237,6 @@ def test_create_open_ticketing_payment_creates_main_and_companions(
         ).all()
     )
     assert len(payment_products) == 3
-    assert all(link.quantity == 1 for link in payment_products)
 
     assert payment.buyer_snapshot is not None
     assert payment.buyer_snapshot["schema_version"] == 1
@@ -242,67 +247,58 @@ def test_create_open_ticketing_payment_creates_main_and_companions(
     assert snapshot_fields[1]["value"] == ["vegetarian", "gluten_free"]
 
 
-def test_create_open_ticketing_payment_respects_explicit_attendee_categories(
+def test_create_open_ticketing_payment_second_purchase_reuses_attendee(
     db: Session,
     tenant_a: Tenants,
 ) -> None:
-    popup = _make_popup(db, tenant_a, slug_prefix="categories")
-    main_product = _make_product(db, popup, name="GA", price="100.00")
-    spouse_product = _make_product(
-        db,
-        popup,
-        name="Spouse Pass",
-        price="80.00",
-        attendee_category=TicketAttendeeCategory.SPOUSE,
-    )
+    """Second purchase by same (human, popup) reuses the existing attendee.  Design §2.1 / Spec C2."""
+    popup = _make_popup(db, tenant_a, slug_prefix="reuse")
+    product = _make_product(db, popup, name="GA", price="50.00")
     section = _make_section(db, popup, label="Buyer Info")
     name_field = _make_field(
         db, popup, section, name="first_name", label="Nombre", required=True
     )
     db.commit()
 
-    obj = _purchase_create(
-        email="family@test.com",
-        first_name="Buyer",
-        last_name="Person",
-        products=[(main_product, 1), (spouse_product, 1)],
-        form_data={name_field.name: "Buyer"},
+    obj1 = _purchase_create(
+        email="repeat@test.com",
+        first_name="Repeat",
+        last_name="Buyer",
+        products=[(product, 1)],
+        form_data={name_field.name: "Repeat"},
     )
+    obj2 = _purchase_create(
+        email="repeat@test.com",
+        first_name="Repeat",
+        last_name="Buyer",
+        products=[(product, 2)],
+        form_data={name_field.name: "Repeat"},
+    )
+
+    sf_resp1 = SimpleNamespace(id="sf_reuse_1", status="pending", checkout_url="https://sf.test/1")
+    sf_resp2 = SimpleNamespace(id="sf_reuse_2", status="pending", checkout_url="https://sf.test/2")
 
     with patch("app.services.simplefi.get_simplefi_client") as mock_get_client:
-        mock_get_client.return_value.create_payment.return_value = SimpleNamespace(
-            id="sf_open_ticketing_2",
-            status="pending",
-            checkout_url="https://simplefi.test/checkout/2",
-        )
+        mock_get_client.return_value.create_payment.side_effect = [sf_resp1, sf_resp2]
 
-        payment, _ = payments_crud.create_open_ticketing_payment(
-            db,
-            obj=obj,
-            popup=popup,
-            tenant=tenant_a,
-        )
+        payments_crud.create_open_ticketing_payment(db, obj=obj1, popup=popup, tenant=tenant_a)
+        payments_crud.create_open_ticketing_payment(db, obj=obj2, popup=popup, tenant=tenant_a)
 
+    # Still exactly 1 attendee after two purchases
     attendees = list(
-        db.exec(
-            select(Attendees)
-            .where(Attendees.popup_id == popup.id)
-            .order_by(Attendees.created_at)
-        ).all()
+        db.exec(select(Attendees).where(Attendees.popup_id == popup.id)).all()
     )
-    assert len(attendees) == 2
-    assert attendees[0].category == "main"
-    assert attendees[1].category == "spouse"
+    assert len(attendees) == 1
 
-    payment_products = list(
+    # 3 AttendeeProducts rows total (1 + 2)
+    tickets = list(
         db.exec(
-            select(PaymentProducts).where(PaymentProducts.payment_id == payment.id)
+            select(AttendeeProducts).where(
+                AttendeeProducts.attendee_id == attendees[0].id
+            )
         ).all()
     )
-    spouse_link = next(
-        pp for pp in payment_products if pp.product_id == spouse_product.id
-    )
-    assert spouse_link.attendee_id == attendees[1].id
+    assert len(tickets) == 3
 
 
 def test_create_open_ticketing_payment_does_not_overwrite_existing_human(

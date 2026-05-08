@@ -1,6 +1,7 @@
 import csv
 import io
 import uuid
+from collections import Counter
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, status
@@ -37,7 +38,6 @@ from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, 
 from app.core.dependencies.users import (
     CurrentAdmin,
     CurrentHuman,
-    CurrentUser,
     CurrentWriter,
     HumanTenantSession,
     TenantSession,
@@ -55,31 +55,90 @@ def _build_application_public(
     review_decision=None,
 ) -> ApplicationPublic:
     """Build ApplicationPublic with attendees and products."""
+    from app.api.attendee.schemas import AttendeeProductPublic
+
     attendees = []
     for a in application.attendees:
-        products = []
-        for ap in a.attendee_products:
-            from app.api.product.schemas import ProductWithQuantity
-
-            product = ProductWithQuantity.model_validate(ap.product)
-            product.quantity = ap.quantity
-            products.append(product)
-
-        attendee_data = AttendeePublic.model_validate(a)
-        attendee_data.products = products
+        # AttendeePublic.products is list[AttendeeProductPublic] — one entry per
+        # ticket (per AttendeeProducts row), each carrying its own check_in_code,
+        # payment_id, and requires_check_in.
+        ticket_products = [
+            AttendeeProductPublic(
+                id=ap.id,
+                attendee_id=ap.attendee_id,
+                product_id=ap.product_id,
+                check_in_code=ap.check_in_code,
+                payment_id=ap.payment_id,
+                requires_check_in=ap.product.requires_check_in if ap.product else False,
+            )
+            for ap in a.attendee_products
+        ]
+        # Build the base dict from scalar ORM columns only — do NOT call
+        # AttendeePublic.model_validate(a) because it triggers ORM property
+        # traversal of attendee.products (a @property returning Products rows),
+        # which fails Pydantic coercion into AttendeeProductPublic[].
+        attendee_data = AttendeePublic(
+            id=a.id,
+            tenant_id=a.tenant_id,
+            application_id=a.application_id,
+            popup_id=a.popup_id,
+            human_id=a.human_id,
+            name=a.name,
+            category=a.category,
+            email=a.email,
+            gender=a.gender,
+            check_in_code=a.check_in_code,
+            poap_url=a.poap_url,
+            created_at=getattr(a, "created_at", None),
+            updated_at=getattr(a, "updated_at", None),
+            products=ticket_products,
+        )
         attendees.append(attendee_data)
 
-    app_public = ApplicationPublic.model_validate(application)
-    app_public.attendees = attendees
-    app_public.red_flag = application.red_flag
-    app_public.review_decision = review_decision
+    # Build ApplicationPublic explicitly. Calling model_validate(application)
+    # would trigger recursive coercion of `attendees` → AttendeePublic, which
+    # in turn reads the Attendees.products @property (returning Products rows)
+    # and fails Pydantic validation into AttendeeProductPublic[].
+    from app.api.human.schemas import HumanPublic
+
+    app_public = ApplicationPublic(
+        id=application.id,
+        tenant_id=application.tenant_id,
+        popup_id=application.popup_id,
+        human_id=application.human_id,
+        group_id=application.group_id,
+        referral=application.referral,
+        info_not_shared=application.info_not_shared or [],
+        status=application.status,
+        custom_fields=application.custom_fields or {},
+        custom_fields_schema=application.custom_fields_schema,
+        credit=application.credit,
+        submitted_at=application.submitted_at,
+        accepted_at=application.accepted_at,
+        created_at=getattr(application, "created_at", None),
+        updated_at=getattr(application, "updated_at", None),
+        scholarship_request=application.scholarship_request,
+        scholarship_details=application.scholarship_details,
+        scholarship_video_url=application.scholarship_video_url,
+        scholarship_status=application.scholarship_status,
+        discount_percentage=application.discount_percentage,
+        incentive_amount=application.incentive_amount,
+        incentive_currency=application.incentive_currency,
+        human=HumanPublic.model_validate(application.human) if application.human else None,
+        attendees=attendees,
+        red_flag=application.red_flag,
+        brings_spouse=application.brings_spouse,
+        brings_kids=application.brings_kids,
+        kid_count=application.kid_count,
+        review_decision=review_decision,
+    )
     return app_public
 
 
 @router.get("", response_model=ListModel[ApplicationPublic])
 async def list_applications(
     db: TenantSession,
-    _: CurrentUser,
+    _: CurrentAdmin,
     popup_id: uuid.UUID | None = None,
     human_id: uuid.UUID | None = None,
     reviewed_by: uuid.UUID | None = None,
@@ -180,7 +239,7 @@ async def create_application_admin(
 async def get_application(
     application_id: uuid.UUID,
     db: TenantSession,
-    _: CurrentUser,
+    _: CurrentAdmin,
 ) -> ApplicationPublic:
     """Get a single application (BO only)."""
     application = crud.applications_crud.get(db, application_id)
@@ -242,18 +301,17 @@ async def list_my_tickets(
         # raise AttributeError for direct-sale attendees.
         popup = attendee.popup
 
-        # Build product list
-        products = []
-        for ap in attendee.attendee_products:
-            products.append(
-                TicketProduct(
-                    name=ap.product.name,
-                    category=ap.product.category,
-                    start_date=ap.product.start_date,
-                    end_date=ap.product.end_date,
-                    quantity=ap.quantity,
-                )
+        # Build product list — group ticket rows by product_id and count.
+        counts = Counter(ap.product_id for ap in attendee.attendee_products)
+        seen = {ap.product_id: ap.product for ap in attendee.attendee_products}
+        products = [
+            TicketProduct(
+                name=seen[pid].name,
+                category=seen[pid].category,
+                quantity=qty,
             )
+            for pid, qty in counts.items()
+        ]
 
         results.append(
             AttendeeWithTickets(
@@ -302,12 +360,18 @@ async def get_my_participation(
         db, human_id=current_human.id, popup_id=popup_id
     )
     if attendee:
+        from app.api.application.schemas import AttendeeTicketInfo
+
         return CompanionParticipation(
             attendee=AttendeeInfo(
                 id=attendee.id,
                 name=attendee.name,
                 category=attendee.category,
                 check_in_code=attendee.check_in_code,
+                tickets=[
+                    AttendeeTicketInfo(id=ap.id, check_in_code=ap.check_in_code)
+                    for ap in attendee.attendee_products
+                ],
             ),
             application_status=attendee.application.status,
         )
@@ -332,10 +396,13 @@ async def get_my_purchases(
 
     results = []
     for attendee in attendees:
+        # Each AttendeeProducts row is one ticket — group by product_id and count.
+        counts = Counter(ap.product_id for ap in attendee.attendee_products)
+        seen = {ap.product_id: ap.product for ap in attendee.attendee_products}
         products = []
-        for ap in attendee.attendee_products:
-            product = ProductWithQuantity.model_validate(ap.product)
-            product.quantity = ap.quantity
+        for pid, qty in counts.items():
+            product = ProductWithQuantity.model_validate(seen[pid])
+            product.quantity = qty
             products.append(product)
 
         results.append(
@@ -553,11 +620,16 @@ def _build_directory_entry(application) -> AttendeesDirectoryEntry:
     # Find main attendee and their products
     main_attendee = application.get_main_attendee()
     products: list[DirectoryProduct] = []
-    check_in = None
-    check_out = None
 
     if main_attendee:
+        # Each AttendeeProducts row is one ticket — dedupe by product_id so
+        # the directory shows each product once even if the attendee bought
+        # multiple tickets of it.
+        seen_pids: set[uuid.UUID] = set()
         for ap in main_attendee.attendee_products:
+            if ap.product_id in seen_pids:
+                continue
+            seen_pids.add(ap.product_id)
             p = ap.product
             products.append(
                 DirectoryProduct(
@@ -566,16 +638,8 @@ def _build_directory_entry(application) -> AttendeesDirectoryEntry:
                     slug=p.slug,
                     category=p.category,
                     duration_type=p.duration_type,
-                    start_date=p.start_date,
-                    end_date=p.end_date,
                 )
             )
-            if p.start_date:
-                if check_in is None or p.start_date < check_in:
-                    check_in = p.start_date
-            if p.end_date:
-                if check_out is None or p.end_date > check_out:
-                    check_out = p.end_date
 
     has_kids = any(a.category == "kid" for a in application.attendees)
     brings_kids: bool | str = "*" if "brings_kids" in info_hidden else has_kids
@@ -608,8 +672,6 @@ def _build_directory_entry(application) -> AttendeesDirectoryEntry:
         picture_url=human.picture_url if human else None,
         brings_kids=brings_kids,
         participation=products,
-        check_in=check_in,
-        check_out=check_out,
         associated_attendees=associated,
     )
 
@@ -681,8 +743,6 @@ async def export_attendees_directory_csv(
             "Age",
             "Gender",
             "Brings Kids",
-            "Check In",
-            "Check Out",
         ]
     )
     for e in entries:
@@ -698,8 +758,6 @@ async def export_attendees_directory_csv(
                 e.age or "",
                 e.gender or "",
                 str(e.brings_kids),
-                e.check_in.isoformat() if e.check_in else "",
-                e.check_out.isoformat() if e.check_out else "",
             ]
         )
 

@@ -19,7 +19,7 @@ function createProduct(overrides: Partial<ProductsPass>): ProductsPass {
     quantity: overrides.quantity ?? 1,
     selected: overrides.selected,
     purchased: overrides.purchased,
-    max_quantity: overrides.max_quantity ?? 1,
+    max_per_order: overrides.max_per_order ?? 1,
     compare_price: overrides.compare_price ?? null,
   } as ProductsPass
 }
@@ -53,21 +53,21 @@ describe("getProductStrategy — category-scoped selection", () => {
       category: "housing",
       selected: true,
       duration_type: "week",
-      max_quantity: 1,
+      max_per_order: 1,
     })
     const h2 = createProduct({
       id: "h2",
       category: "housing",
       selected: true,
       duration_type: "week",
-      max_quantity: 1,
+      max_per_order: 1,
     })
     const h3 = createProduct({
       id: "h3",
       category: "housing",
       selected: true,
       duration_type: "week",
-      max_quantity: 1,
+      max_per_order: 1,
     })
     // h4 is the one being selected — reaching 4 weeks total
     const h4 = createProduct({
@@ -75,14 +75,14 @@ describe("getProductStrategy — category-scoped selection", () => {
       category: "housing",
       selected: false,
       duration_type: "week",
-      max_quantity: 1,
+      max_per_order: 1,
     })
     const monthHousing = createProduct({
       id: "h-month",
       category: "housing",
       selected: false,
       duration_type: "month",
-      max_quantity: 1,
+      max_per_order: 1,
     })
     const attendees = [createAttendee([h1, h2, h3, h4, monthHousing])]
     const strategy = getProductStrategy(h4, false, CHECKOUT_MODE.PASS_SYSTEM)
@@ -100,14 +100,14 @@ describe("getProductStrategy — category-scoped selection", () => {
       category: "merch",
       selected: false,
       duration_type: "week",
-      max_quantity: 1,
+      max_per_order: 1,
     })
     const monthMerch = createProduct({
       id: "m-month",
       category: "merch",
       selected: false,
       duration_type: "month",
-      max_quantity: 1,
+      max_per_order: 1,
     })
     const m2 = createProduct({
       id: "m2",
@@ -140,7 +140,7 @@ describe("getProductStrategy — category-scoped selection", () => {
       id: "s1",
       category: "supporter",
       selected: false,
-      max_quantity: 1,
+      max_per_order: 1,
     })
     const attendees = [createAttendee([supporter])]
     const strategy = getProductStrategy(
@@ -158,7 +158,7 @@ describe("getProductStrategy — category-scoped selection", () => {
       category: "ticket",
       selected: false,
       duration_type: "week",
-      max_quantity: 1,
+      max_per_order: 1,
     })
     const attendees = [createAttendee([ticket])]
     const strategy = getProductStrategy(
@@ -176,35 +176,35 @@ describe("getProductStrategy — category-scoped selection", () => {
       category: "ticket",
       selected: true,
       duration_type: "week",
-      max_quantity: 1,
+      max_per_order: 1,
     })
     const t2 = createProduct({
       id: "t2",
       category: "ticket",
       selected: true,
       duration_type: "week",
-      max_quantity: 1,
+      max_per_order: 1,
     })
     const t3 = createProduct({
       id: "t3",
       category: "ticket",
       selected: true,
       duration_type: "week",
-      max_quantity: 1,
+      max_per_order: 1,
     })
     const t4 = createProduct({
       id: "t4",
       category: "ticket",
       selected: false,
       duration_type: "week",
-      max_quantity: 1,
+      max_per_order: 1,
     })
     const monthTicket = createProduct({
       id: "t-month",
       category: "ticket",
       selected: false,
       duration_type: "month",
-      max_quantity: 1,
+      max_per_order: 1,
     })
     const attendees = [createAttendee([t1, t2, t3, t4, monthTicket])]
     const strategy = getProductStrategy(t4, false, CHECKOUT_MODE.PASS_SYSTEM)

@@ -35,8 +35,8 @@ from app.api.translation.service import (
     get_translations_for_entity,
 )
 from app.core.dependencies.users import (
+    CurrentCheckInOperator,
     CurrentHuman,
-    CurrentUser,
     CurrentWriter,
     HumanTenantSession,
     SessionDep,
@@ -122,7 +122,7 @@ def _seed_application_defaults(db: TenantSession, popup: Popups) -> None:
 @router.get("", response_model=ListModel[PopupAdmin])
 async def list_popups(
     db: TenantSession,
-    _: CurrentUser,
+    _: CurrentCheckInOperator,
     search: str | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
@@ -156,7 +156,7 @@ async def list_public_popups(
 async def get_popup(
     popup_id: uuid.UUID,
     db: TenantSession,
-    _: CurrentUser,
+    _: CurrentCheckInOperator,
 ) -> PopupAdmin:
     popup = crud.get(db, popup_id)
 

@@ -45,7 +45,6 @@ function Caption({ text }: { text?: string }) {
 
 function CarouselGallery({
   images,
-  onSkip,
 }: {
   images: GalleryImage[]
   onSkip?: () => void
@@ -134,7 +133,6 @@ function CarouselGallery({
 
 function MasonryGallery({
   images,
-  onSkip,
 }: {
   images: GalleryImage[]
   onSkip?: () => void
@@ -171,7 +169,6 @@ function MasonryGallery({
 
 function LightboxGallery({
   images,
-  onSkip,
 }: {
   images: GalleryImage[]
   onSkip?: () => void
@@ -290,7 +287,6 @@ function LightboxGallery({
 
 function SlideshowGallery({
   images,
-  onSkip,
 }: {
   images: GalleryImage[]
   onSkip?: () => void

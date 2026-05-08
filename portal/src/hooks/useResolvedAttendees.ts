@@ -1,6 +1,7 @@
 "use client"
 
 import { resolvePopupCheckoutPolicy } from "@/checkout/popupCheckoutPolicy"
+import type { AttendeeWithOriginPublic } from "@/client"
 import { sortAttendees } from "@/helpers/filters"
 import useAuth from "@/hooks/useAuth"
 import useHumanAttendeesQuery from "@/hooks/useHumanAttendeesQuery"
@@ -59,7 +60,7 @@ export function useResolvedAttendees(): AttendeePassState[] {
       category: "main",
       email: user.email,
       gender: user.gender ?? null,
-      check_in_code: "",
+      check_in_code: null,
       poap_url: null,
       created_at: null,
       updated_at: null,
@@ -73,10 +74,20 @@ export function useResolvedAttendees(): AttendeePassState[] {
   // While loading, return empty to avoid stale partial lists.
   if (isLoading || !humanAttendees) return []
 
-  // Cast AttendeeWithOriginPublic[] to AttendeePassState[].
+  // Map AttendeeWithOriginPublic[] to AttendeePassState[].
   // PassesProvider replaces products via buildBaseAttendeePasses anyway,
-  // so the product field difference is irrelevant here.
-  return sortAttendees(humanAttendees as unknown as AttendeePassState[])
+  // so the product field is overwritten. ticket_entries carries the raw
+  // per-ticket AttendeeProductPublic rows — all denormalized product fields
+  // (product_name, product_category, start_date, end_date, duration_type)
+  // are populated by the backend, so no client-side join is needed.
+  const withTicketEntries = humanAttendees.map(
+    (attendee: AttendeeWithOriginPublic): AttendeePassState => ({
+      ...(attendee as unknown as AttendeePassState),
+      products: [],
+      ticket_entries: attendee.products ?? [],
+    }),
+  )
+  return sortAttendees(withTicketEntries)
 }
 
 export default useResolvedAttendees

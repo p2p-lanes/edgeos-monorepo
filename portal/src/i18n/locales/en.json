@@ -249,7 +249,7 @@
   "passes": {
     "your_passes": "Your Passes",
     "buy_passes": "Buy Passes",
-    "your_passes_description": "View and manage your passes here. Need to make changes? You can switch your week closer to the event to match your plans!",
+    "your_passes_description": "View and manage your order here.",
     "loading_passes": "Loading passes information...",
     "add_spouse": "Add spouse",
     "add_children": "Add children",
@@ -293,11 +293,16 @@
     "people_registered": "Registration is now open",
     "builders_registered": "Join this experience",
     "buy": "Buy",
-    "need_more_passes": "Need more passes?",
-    "add_family_or_weeks": "Add family members or more weeks",
+    "need_more_passes": "Want to add more?",
     "waiver_acknowledge": "I acknowledge the risks involved and agree to the Waiver and Release of Liability.",
     "waiver_info": "Waiver information",
     "waiver_detail": "I understand that participating in this event involves inherent risks, including the possibility of injury or loss. By checking this box, I confirm that I have read and agree to the Waiver and Release of Liability, and I voluntarily accept these risks and release the organizers from any claims related to my participation.",
+    "categories": {
+      "ticket": "Ticket",
+      "housing": "Housing",
+      "merch": "Merch",
+      "other": "Other"
+    },
     "discounts": {
       "patron_free": "Patron Free Tickets",
       "week_credit": "Week Pass Credit",
