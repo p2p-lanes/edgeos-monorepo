@@ -278,6 +278,7 @@
     "no_passes_yet_prefix": "You do not yet have any passes for {{city}}, please go to",
     "no_passes_yet_suffix": "to purchase",
     "check_in_code": "Check-in code",
+    "qr_already_scanned": "QR already scanned",
     "latam_citizens": "Latam Citizens",
     "standard": "Standard",
     "id_required": "ID Required at check-in *",

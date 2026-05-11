@@ -16,7 +16,11 @@ from app.api.attendee.schemas import (
     TicketProductSnapshot,
     TicketPublic,
 )
-from app.api.check_in.crud import get_check_in_summary, record_check_in
+from app.api.check_in.crud import (
+    get_check_in_summary,
+    get_last_scan_by_tickets,
+    record_check_in,
+)
 from app.api.check_in.schemas import CheckInPayload
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
@@ -35,7 +39,10 @@ _AttendeeLimit = Annotated[
 ]
 
 
-def _build_attendee_with_origin(attendee) -> AttendeeWithOriginPublic:
+def _build_attendee_with_origin(
+    attendee,
+    last_scan_by_ticket: dict | None = None,
+) -> AttendeeWithOriginPublic:
     """Build an AttendeeWithOriginPublic from an Attendees ORM row.
 
     Constructs the response manually to avoid the Pydantic from_attributes
@@ -51,6 +58,11 @@ def _build_attendee_with_origin(attendee) -> AttendeeWithOriginPublic:
     (free / application grant) or no snapshot row exists (e.g., cancelled
     payment whose snapshot rows were deleted). start_date, end_date, and
     duration_type are not snapshotted and always read from the live product.
+
+    last_scan_by_ticket is an optional {attendee_product_id: last_scan_at} map
+    precomputed by the caller (typically via get_last_scan_by_tickets) so the
+    portal can flag already-scanned QR codes without an N+1 lookup. Missing
+    keys mean the ticket has never been scanned.
     """
     snapshot_by_pair = {
         (pp.payment_id, pp.product_id): pp for pp in attendee.payment_products
@@ -83,6 +95,9 @@ def _build_attendee_with_origin(attendee) -> AttendeeWithOriginPublic:
                 product_name=product_name,
                 product_category=product_category,
                 duration_type=(ap.product.duration_type if ap.product else None),
+                last_scan_at=(
+                    last_scan_by_ticket.get(ap.id) if last_scan_by_ticket else None
+                ),
             )
         )
     origin = "application" if attendee.application_id is not None else "direct_sale"
@@ -134,7 +149,11 @@ async def list_my_attendees_by_popup(
     attendees, total = crud.attendees_crud.find_by_human_popup(
         db, human_id=current_human.id, popup_id=popup_id, skip=skip, limit=limit
     )
-    results = [_build_attendee_with_origin(a) for a in attendees]
+    # Single aggregation across every ticket on the page so the portal can flag
+    # already-scanned QR codes without N+1 lookups per attendee.
+    ticket_ids = [ap.id for a in attendees for ap in a.attendee_products]
+    last_scan_by_ticket = get_last_scan_by_tickets(db, ticket_ids)
+    results = [_build_attendee_with_origin(a, last_scan_by_ticket) for a in attendees]
     return ListModel[AttendeeWithOriginPublic](
         results=results,
         paging=Paging(offset=skip, limit=limit, total=total),
@@ -202,7 +221,10 @@ async def create_my_attendee_for_popup(
         gender=attendee_in.gender,
     )
 
-    return _build_attendee_with_origin(attendee)
+    last_scan_by_ticket = get_last_scan_by_tickets(
+        db, [ap.id for ap in attendee.attendee_products]
+    )
+    return _build_attendee_with_origin(attendee, last_scan_by_ticket)
 
 
 @router.patch(
@@ -255,7 +277,10 @@ async def update_my_attendee_for_popup(
         )
 
     updated = crud.attendees_crud.update_attendee(db, attendee, attendee_in)
-    return _build_attendee_with_origin(updated)
+    last_scan_by_ticket = get_last_scan_by_tickets(
+        db, [ap.id for ap in updated.attendee_products]
+    )
+    return _build_attendee_with_origin(updated, last_scan_by_ticket)
 
 
 @router.delete(
@@ -382,7 +407,10 @@ async def get_attendee(
             detail="Attendee not found",
         )
 
-    return _build_attendee_with_origin(attendee)
+    last_scan_by_ticket = get_last_scan_by_tickets(
+        db, [ap.id for ap in attendee.attendee_products]
+    )
+    return _build_attendee_with_origin(attendee, last_scan_by_ticket)
 
 
 @router.patch("/{attendee_id}", response_model=AttendeeWithOriginPublic)
@@ -402,7 +430,10 @@ async def update_attendee(
         )
 
     updated = crud.attendees_crud.update_attendee(db, attendee, attendee_in)
-    return _build_attendee_with_origin(updated)
+    last_scan_by_ticket = get_last_scan_by_tickets(
+        db, [ap.id for ap in updated.attendee_products]
+    )
+    return _build_attendee_with_origin(updated, last_scan_by_ticket)
 
 
 @router.delete("/{attendee_id}", status_code=status.HTTP_204_NO_CONTENT)
