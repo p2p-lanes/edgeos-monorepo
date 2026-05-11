@@ -278,6 +278,7 @@
     "no_passes_yet_prefix": "您还没有 {{city}} 的通行证，请前往",
     "no_passes_yet_suffix": "进行购买",
     "check_in_code": "签到码",
+    "qr_already_scanned": "二维码已扫描",
     "latam_citizens": "拉美公民",
     "standard": "标准",
     "id_required": "签到时需要身份证明 *",

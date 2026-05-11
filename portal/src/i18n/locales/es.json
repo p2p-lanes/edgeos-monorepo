@@ -278,6 +278,7 @@
     "no_passes_yet_prefix": "Todavía no tenés pases para {{city}}, por favor andá a",
     "no_passes_yet_suffix": "para comprar",
     "check_in_code": "Código de check-in",
+    "qr_already_scanned": "QR ya escaneado",
     "latam_citizens": "Ciudadanos de Latam",
     "standard": "Estándar",
     "id_required": "Se requiere identificación en el check-in *",

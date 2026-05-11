@@ -1,6 +1,8 @@
 """CRUD functions for the check_ins table."""
 
 import uuid
+from collections.abc import Iterable
+from datetime import datetime
 from typing import Any
 
 from sqlmodel import Session, func, select
@@ -97,3 +99,29 @@ def get_check_in_summary(
         "first_scan_at": row.first_scan_at,
         "last_scan_at": row.last_scan_at,
     }
+
+
+def get_last_scan_by_tickets(
+    session: Session,
+    ticket_ids: Iterable[uuid.UUID],
+) -> dict[uuid.UUID, datetime]:
+    """Return {attendee_product_id: max(occurred_at)} for the given ticket IDs.
+
+    Only tickets that have at least one check-in row appear in the result —
+    callers should treat missing keys as "never scanned". Implemented as a
+    single aggregation to avoid N+1 when an attendee has multiple tickets.
+    """
+    ticket_id_list = list(ticket_ids)
+    if not ticket_id_list:
+        return {}
+
+    rows = session.exec(
+        select(
+            CheckIn.attendee_product_id,
+            func.max(CheckIn.occurred_at).label("last_scan_at"),
+        )
+        .where(CheckIn.attendee_product_id.in_(ticket_id_list))  # type: ignore[union-attr]
+        .group_by(CheckIn.attendee_product_id)
+    ).all()
+
+    return {row.attendee_product_id: row.last_scan_at for row in rows}
