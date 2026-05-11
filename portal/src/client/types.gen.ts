@@ -3792,6 +3792,12 @@ export type EventsUnhidePortalEventData = {
 
 export type EventsUnhidePortalEventResponse = (void);
 
+export type EventsCancelPortalEventData = {
+    eventId: string;
+};
+
+export type EventsCancelPortalEventResponse = (EventPublic);
+
 export type EventsExportPortalEventIcsData = {
     eventId: string;
 };

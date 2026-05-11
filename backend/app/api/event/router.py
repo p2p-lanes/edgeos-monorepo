@@ -1432,6 +1432,12 @@ async def list_portal_events(
         )
 
     visible = _portal_visibility_filter(db, events, current_human.id)
+    # Cancelled events are removed from every portal listing — owners who want
+    # to see them after the fact can still hit the detail URL directly. The
+    # ``event_status`` query param can't express "exclude cancelled" alongside
+    # ``None`` (which the "mine" channel uses to include drafts/pending), so we
+    # filter here unconditionally.
+    visible = [e for e in visible if e.status != EventStatus.CANCELLED]
 
     def _rsvp_lookup_key(e) -> tuple[uuid.UUID, datetime | None] | None:
         """Build the ``(event_id, occurrence_start)`` key used to find this
@@ -1858,6 +1864,34 @@ async def update_portal_event(
     updated = crud.events_crud.update(db, event, event_in)
     if _event_calendar_fields_changed(before, updated):
         await _bump_and_dispatch_itip_update(db, updated, before=before)
+    return _to_public(updated)
+
+
+@router.post("/portal/events/{event_id}/cancel", response_model=EventPublic)
+async def cancel_portal_event(
+    event_id: uuid.UUID,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+) -> EventPublic:
+    event = crud.events_crud.get(db, event_id)
+    if not event:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
+        )
+    if event.owner_id != current_human.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the event owner can cancel",
+        )
+    if event.status == EventStatus.CANCELLED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Event is already cancelled",
+        )
+
+    cancel_update = EventUpdate(status=EventStatus.CANCELLED)
+    updated = crud.events_crud.update(db, event, cancel_update)
+    await _bump_and_dispatch_itip_cancel(db, updated)
     return _to_public(updated)
 
 

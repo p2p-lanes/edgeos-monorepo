@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   AlertTriangle,
   ArrowLeft,
+  Ban,
   CalendarCheck,
   CalendarDays,
   CalendarPlus,
@@ -24,7 +25,7 @@ import {
   X,
 } from "lucide-react"
 import Link from "next/link"
-import { useParams, useSearchParams } from "next/navigation"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
@@ -40,6 +41,15 @@ import {
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 import { Pill } from "@/components/ui/pill"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
@@ -55,6 +65,7 @@ export default function EventDetailPage() {
   const { getCity } = useCityProvider()
   const city = getCity()
   const params = useParams<{ eventId: string }>()
+  const router = useRouter()
   const searchParams = useSearchParams()
   // Originating events-page URL search (e.g. "view=day&date=2026-05-15"),
   // set by Day-view links so "Back to events" can return to the same spot.
@@ -153,6 +164,29 @@ export default function EventDetailPage() {
         requestBody: rsvpBody,
       }),
     onSuccess: invalidateRsvpQueries,
+  })
+
+  const [cancelEventOpen, setCancelEventOpen] = useState(false)
+  const cancelEventMutation = useMutation({
+    mutationFn: () =>
+      EventsService.cancelPortalEvent({ eventId: params.eventId }),
+    onSuccess: () => {
+      toast.success(t("events.detail.cancel_event_success"))
+      queryClient.invalidateQueries({ queryKey: ["portal-events"] })
+      queryClient.invalidateQueries({ queryKey: ["portal-events-day"] })
+      queryClient.invalidateQueries({ queryKey: ["portal-events-calendar"] })
+      setCancelEventOpen(false)
+      router.push(backHref)
+    },
+    onError: (err: unknown) => {
+      const fallback = t("events.detail.cancel_event_error") as string
+      let detail = fallback
+      if (err instanceof ApiError && err.body && typeof err.body === "object") {
+        const body = err.body as { detail?: unknown }
+        if (typeof body.detail === "string") detail = body.detail
+      }
+      toast.error(detail)
+    },
   })
 
   const checkInMutation = useMutation({
@@ -304,17 +338,63 @@ export default function EventDetailPage() {
         >
           <ArrowLeft className="h-4 w-4" /> {t("events.common.back_to_events")}
         </Link>
-        {isOwner && (
-          <Button asChild variant="outline" size="sm" className="shrink-0">
-            <Link
-              href={`/portal/${city?.slug}/events/${event.id}/edit`}
-              aria-label={t("events.detail.edit_event_button")}
-            >
-              <Pencil className="mr-2 h-3.5 w-3.5" />
-              {t("events.detail.edit_event_button")}
-            </Link>
-          </Button>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {isOwner && event.status !== "cancelled" && (
+            <Dialog open={cancelEventOpen} onOpenChange={setCancelEventOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-destructive hover:text-destructive"
+                  disabled={cancelEventMutation.isPending}
+                  aria-label={t("events.detail.cancel_event_button")}
+                >
+                  <Ban className="mr-2 h-3.5 w-3.5" />
+                  {t("events.detail.cancel_event_button")}
+                </Button>
+              </DialogTrigger>
+              <DialogContent hasCloseButton={false}>
+                <DialogHeader>
+                  <DialogTitle>
+                    {t("events.detail.cancel_event_dialog_title")}
+                  </DialogTitle>
+                  <DialogDescription>
+                    {t("events.detail.cancel_event_dialog_description")}
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => setCancelEventOpen(false)}
+                    disabled={cancelEventMutation.isPending}
+                  >
+                    {t("events.detail.cancel_event_dialog_keep")}
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => cancelEventMutation.mutate()}
+                    disabled={cancelEventMutation.isPending}
+                  >
+                    {cancelEventMutation.isPending
+                      ? t("events.detail.cancel_event_dialog_loading")
+                      : t("events.detail.cancel_event_dialog_confirm")}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
+          {isOwner && (
+            <Button asChild variant="outline" size="sm">
+              <Link
+                href={`/portal/${city?.slug}/events/${event.id}/edit`}
+                aria-label={t("events.detail.edit_event_button")}
+              >
+                <Pencil className="mr-2 h-3.5 w-3.5" />
+                {t("events.detail.edit_event_button")}
+              </Link>
+            </Button>
+          )}
+        </div>
       </div>
 
       {event.status === "pending_approval" && (
