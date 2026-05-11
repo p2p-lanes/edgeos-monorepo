@@ -1,3 +1,9 @@
+/**
+ * @deprecated CSV product import was a one-off experiment. The dialog is no
+ * longer mounted from the Products page, and the backend `/products/batch`
+ * endpoint is marked deprecated. Don't add new callers.
+ */
+
 import type { ProductBatchItem, ProductBatchResult } from "@/client"
 import type { CsvColumnConfig } from "@/components/Common/CsvImportDialog"
 
