@@ -90,7 +90,6 @@ const TICKET_DURATIONS: { value: TicketDuration; label: string }[] = [
   { value: "full", label: "Full Event" },
 ]
 
-
 export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
