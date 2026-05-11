@@ -131,7 +131,7 @@ async def create_products_batch(
                     db, base_slug, batch.popup_id
                 )
 
-                product_data = item.model_dump()
+                product_data = crud.sale_dates_to_persistence(item.model_dump())
                 product_data["tenant_id"] = tenant_id
                 product_data["popup_id"] = batch.popup_id
                 product_data["slug"] = slug

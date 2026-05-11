@@ -5,6 +5,13 @@ const VALID_CATEGORIES = ["ticket", "housing", "merch", "other", "patreon"]
 const VALID_ATTENDEE_CATEGORIES = ["main", "spouse", "kid"]
 const VALID_DURATION_TYPES = ["day", "week", "month", "full"]
 
+const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/
+
+const validateSaleDate = (v: string): string | null =>
+  !v || DATE_ONLY_RE.test(v) ? null : "Must be in YYYY-MM-DD format"
+
+const passThrough = (v: string): string | undefined => v || undefined
+
 export const productCsvColumns: CsvColumnConfig<ProductBatchItem>[] = [
   {
     header: "Name",
@@ -67,26 +74,14 @@ export const productCsvColumns: CsvColumnConfig<ProductBatchItem>[] = [
   {
     header: "Sale Starts At",
     key: "sale_starts_at",
-    validate: (v) => {
-      if (!v) return null
-      const d = new Date(v)
-      return Number.isNaN(d.getTime())
-        ? "Must be a valid date (YYYY-MM-DD)"
-        : null
-    },
-    parse: (v) => (v ? new Date(v).toISOString() : undefined),
+    validate: validateSaleDate,
+    parse: passThrough,
   },
   {
     header: "Sale Ends At",
     key: "sale_ends_at",
-    validate: (v) => {
-      if (!v) return null
-      const d = new Date(v)
-      return Number.isNaN(d.getTime())
-        ? "Must be a valid date (YYYY-MM-DD)"
-        : null
-    },
-    parse: (v) => (v ? new Date(v).toISOString() : undefined),
+    validate: validateSaleDate,
+    parse: passThrough,
   },
   {
     header: "Exclusive",

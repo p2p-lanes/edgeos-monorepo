@@ -3510,6 +3510,30 @@ export const CheckoutRuntimeProductSchema = {
             ],
             title: 'End Date'
         },
+        sale_starts_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sale Starts At'
+        },
+        sale_ends_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sale Ends At'
+        },
         total_stock_cap: {
             anyOf: [
                 {
@@ -11146,7 +11170,7 @@ export const ProductBatchItemSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date-time'
+                    format: 'date'
                 },
                 {
                     type: 'null'
@@ -11158,7 +11182,7 @@ export const ProductBatchItemSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date-time'
+                    format: 'date'
                 },
                 {
                     type: 'null'
@@ -11317,7 +11341,7 @@ export const ProductBatchResultSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date-time'
+                    format: 'date'
                 },
                 {
                     type: 'null'
@@ -11329,7 +11353,7 @@ export const ProductBatchResultSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date-time'
+                    format: 'date'
                 },
                 {
                     type: 'null'
@@ -11555,7 +11579,7 @@ export const ProductCreateSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date-time'
+                    format: 'date'
                 },
                 {
                     type: 'null'
@@ -11567,7 +11591,7 @@ export const ProductCreateSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date-time'
+                    format: 'date'
                 },
                 {
                     type: 'null'
@@ -11746,7 +11770,7 @@ export const ProductPublicSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date-time'
+                    format: 'date'
                 },
                 {
                     type: 'null'
@@ -11758,7 +11782,7 @@ export const ProductPublicSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date-time'
+                    format: 'date'
                 },
                 {
                     type: 'null'
@@ -11944,7 +11968,7 @@ export const ProductUpdateSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date-time'
+                    format: 'date'
                 },
                 {
                     type: 'null'
@@ -11956,7 +11980,7 @@ export const ProductUpdateSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date-time'
+                    format: 'date'
                 },
                 {
                     type: 'null'
@@ -12138,7 +12162,7 @@ export const ProductWithQuantitySchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date-time'
+                    format: 'date'
                 },
                 {
                     type: 'null'
@@ -12150,7 +12174,7 @@ export const ProductWithQuantitySchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date-time'
+                    format: 'date'
                 },
                 {
                     type: 'null'

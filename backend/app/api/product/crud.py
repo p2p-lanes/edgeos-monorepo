@@ -6,6 +6,7 @@ from sqlalchemy import text
 from sqlmodel import Session, col, select
 
 from app.api.product.models import Products
+from app.api.product.sale_window import date_to_utc_instant
 from app.api.product.schemas import (
     ProductCreate,
     ProductUpdate,
@@ -15,11 +16,31 @@ from app.api.shared.crud import BaseCRUD
 SORT_FIELDS = {"name", "price", "attendee_category", "is_active"}
 
 
+def sale_dates_to_persistence(data: dict[str, object]) -> dict[str, object]:
+    """Convert input inclusive `date` fields to UTC `datetime` instants for ORM persistence."""
+    if "sale_starts_at" in data:
+        data["sale_starts_at"] = date_to_utc_instant(data["sale_starts_at"])
+    if "sale_ends_at" in data:
+        data["sale_ends_at"] = date_to_utc_instant(
+            data["sale_ends_at"], day_offset=1
+        )
+    return data
+
+
 class ProductsCRUD(BaseCRUD[Products, ProductCreate, ProductUpdate]):
     """CRUD operations for Products."""
 
     def __init__(self) -> None:
         super().__init__(Products)
+
+    def create(self, session: Session, obj_in: ProductCreate) -> Products:
+        """Create a product, converting sale window dates to UTC datetimes."""
+        data = sale_dates_to_persistence(obj_in.model_dump())
+        db_obj = Products(**data)
+        session.add(db_obj)
+        session.commit()
+        session.refresh(db_obj)
+        return db_obj
 
     def get(self, session: Session, id: uuid.UUID) -> Products | None:
         statement = select(Products).where(
@@ -159,7 +180,9 @@ class ProductsCRUD(BaseCRUD[Products, ProductCreate, ProductUpdate]):
         obj_in: ProductUpdate,
     ) -> Products:
         """Update product fields."""
-        update_data = obj_in.model_dump(exclude_unset=True)
+        update_data = sale_dates_to_persistence(
+            obj_in.model_dump(exclude_unset=True)
+        )
 
         for field, value in update_data.items():
             setattr(db_obj, field, value)

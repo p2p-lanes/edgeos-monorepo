@@ -770,6 +770,8 @@ export type CheckoutRuntimeProduct = {
     duration_type?: (string | null);
     start_date?: (unknown | null);
     end_date?: (unknown | null);
+    sale_starts_at?: (string | null);
+    sale_ends_at?: (string | null);
     total_stock_cap?: (number | null);
     total_stock_remaining?: (number | null);
     max_per_order?: (number | null);
