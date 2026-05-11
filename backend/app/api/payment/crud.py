@@ -35,6 +35,8 @@ from app.api.payment.schemas import (
     PaymentUpdate,
 )
 from app.api.product.models import Products
+from app.api.product.product_state import ProductSaleState, derive_product_state
+from app.api.product.schemas import ProductPublic
 from app.api.shared.crud import BaseCRUD
 
 # Decimal precision for money calculations
@@ -346,6 +348,19 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="Some products are not available or inactive",
             )
+
+        # Reject products outside their sale window. Closes the stale-tab
+        # loophole where the UI was rendered before sale_ends_at passed.
+        for product in valid_products:
+            state = derive_product_state(ProductPublic.model_validate(product))
+            if state != ProductSaleState.on_sale:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        f"Product '{product.name}' is not on sale "
+                        f"(state: {state.value})"
+                    ),
+                )
 
         products_map = {product.id: product for product in valid_products}
         fabricated_requests = [
