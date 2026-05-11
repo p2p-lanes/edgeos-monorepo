@@ -411,6 +411,20 @@ export default function EventDetailPage() {
         </div>
       )}
 
+      {isOwner && event.status === "rejected" && event.rejection_reason && (
+        <div className="flex items-start gap-2.5 rounded-xl border border-red-300 bg-red-50 p-3 text-red-900 dark:border-red-500/40 dark:bg-red-950/40 dark:text-red-100">
+          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-red-600 dark:text-red-400" />
+          <div className="text-sm">
+            <p className="font-semibold">
+              {t("events.detail.rejection_reason_label")}
+            </p>
+            <p className="text-red-900/90 dark:text-red-100/90">
+              {event.rejection_reason}
+            </p>
+          </div>
+        </div>
+      )}
+
       {coverUrl && (
         <div>
           <div className="w-full h-40 sm:h-52 rounded-xl overflow-hidden">

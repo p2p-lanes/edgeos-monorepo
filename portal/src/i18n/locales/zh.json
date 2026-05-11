@@ -466,10 +466,18 @@
       "highlighted_title": "精选活动",
       "owned_title": "由你创建"
     },
+    "status": {
+      "draft": "草稿",
+      "published": "已发布",
+      "pending_approval": "待审批",
+      "rejected": "已拒绝",
+      "cancelled": "已取消"
+    },
     "toolbar": {
       "search_placeholder": "搜索活动...",
       "my_rsvps": "我的报名",
       "my_events": "我的活动",
+      "my_events_title": "包含草稿、待审批和已拒绝的活动",
       "hidden": "已隐藏",
       "hidden_title_showing": "正在显示已隐藏的活动",
       "hidden_title_hidden": "显示已隐藏的活动",
@@ -533,6 +541,7 @@
     "detail": {
       "event_not_found": "未找到活动",
       "event_not_found_message": "此活动不存在或你没有访问权限。",
+      "rejection_reason_label": "拒绝原因",
       "photo_credit": "照片:{{venueName}}",
       "description_heading": "描述",
       "invite_attendees_heading": "邀请参与者",

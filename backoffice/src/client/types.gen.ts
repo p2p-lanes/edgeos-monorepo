@@ -1109,6 +1109,7 @@ export type EventPublic = {
     kind?: (string | null);
     status?: EventStatus;
     highlighted?: boolean;
+    rejection_reason?: (string | null);
     rrule?: (string | null);
     recurrence_master_id?: (string | null);
     recurrence_exdates?: Array<(string)>;

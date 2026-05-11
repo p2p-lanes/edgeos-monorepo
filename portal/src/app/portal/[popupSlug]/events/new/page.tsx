@@ -1,6 +1,6 @@
 "use client"
 
-import { useMutation, useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   ArrowLeft,
   Image as ImageIcon,
@@ -49,6 +49,7 @@ type Visibility = "public" | "private" | "unlisted"
 export default function NewPortalEventPage() {
   const { t } = useTranslation()
   const router = useRouter()
+  const queryClient = useQueryClient()
   const { getCity } = useCityProvider()
   const city = getCity()
   const popupId = city?.id
@@ -196,6 +197,9 @@ export default function NewPortalEventPage() {
       })
     },
     onSuccess: (event) => {
+      queryClient.invalidateQueries({ queryKey: ["portal-events"] })
+      queryClient.invalidateQueries({ queryKey: ["portal-events-day"] })
+      queryClient.invalidateQueries({ queryKey: ["portal-events-calendar"] })
       const messageKey =
         event.status === "pending_approval"
           ? "events.form.event_created_pending_approval_success"

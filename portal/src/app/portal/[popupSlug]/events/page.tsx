@@ -77,6 +77,9 @@ const statusColors: Record<string, string> = {
   published: "bg-primary/10 text-primary",
   draft: "bg-muted text-muted-foreground",
   cancelled: "bg-destructive/10 text-destructive",
+  pending_approval:
+    "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200",
+  rejected: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200",
 }
 
 export default function EventsPage() {
@@ -730,7 +733,7 @@ export default function EventsPage() {
                                 statusColors[event.status as string] ?? ""
                               }
                             >
-                              {event.status}
+                              {t(`events.status.${event.status}`)}
                             </Badge>
                           </div>
                           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">

@@ -466,10 +466,18 @@
       "highlighted_title": "Featured event",
       "owned_title": "Created by you"
     },
+    "status": {
+      "draft": "Draft",
+      "published": "Published",
+      "pending_approval": "Pending approval",
+      "rejected": "Rejected",
+      "cancelled": "Cancelled"
+    },
     "toolbar": {
       "search_placeholder": "Search events...",
       "my_rsvps": "My RSVPs",
       "my_events": "My events",
+      "my_events_title": "Includes drafts, pending and rejected events",
       "hidden": "Hidden",
       "hidden_title_showing": "Hiding hidden events",
       "hidden_title_hidden": "Show hidden events",
@@ -533,6 +541,7 @@
     "detail": {
       "event_not_found": "Event not found",
       "event_not_found_message": "This event does not exist or you do not have access to it.",
+      "rejection_reason_label": "Rejection reason",
       "photo_credit": "Photo: {{venueName}}",
       "description_heading": "Description",
       "invite_attendees_heading": "Invite attendees",

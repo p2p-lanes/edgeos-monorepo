@@ -466,10 +466,18 @@
       "highlighted_title": "Evento destacado",
       "owned_title": "Creado por ti"
     },
+    "status": {
+      "draft": "Borrador",
+      "published": "Publicado",
+      "pending_approval": "Pendiente de aprobación",
+      "rejected": "Rechazado",
+      "cancelled": "Cancelado"
+    },
     "toolbar": {
       "search_placeholder": "Buscar eventos...",
       "my_rsvps": "Mis RSVPs",
       "my_events": "Mis eventos",
+      "my_events_title": "Incluye borradores, pendientes y rechazados",
       "hidden": "Ocultos",
       "hidden_title_showing": "Mostrando eventos ocultos",
       "hidden_title_hidden": "Ver eventos ocultos",
@@ -533,6 +541,7 @@
     "detail": {
       "event_not_found": "Evento no encontrado",
       "event_not_found_message": "Este evento no existe o no tenés acceso.",
+      "rejection_reason_label": "Motivo del rechazo",
       "photo_credit": "Foto: {{venueName}}",
       "description_heading": "Descripción",
       "invite_attendees_heading": "Invitar asistentes",

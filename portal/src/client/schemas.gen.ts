@@ -5070,6 +5070,17 @@ export const EventPublicSchema = {
             title: 'Highlighted',
             default: false
         },
+        rejection_reason: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Rejection Reason'
+        },
         rrule: {
             anyOf: [
                 {

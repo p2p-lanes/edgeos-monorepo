@@ -70,7 +70,7 @@ export function MineToggle({
       }}
       aria-pressed={active}
       aria-label={t("events.toolbar.my_events")}
-      title={t("events.toolbar.my_events")}
+      title={t("events.toolbar.my_events_title")}
       className={cn("px-2 sm:px-3", className)}
     >
       <Crown className={cn("h-4 w-4", showLabel && "sm:mr-2")} />

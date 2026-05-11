@@ -94,6 +94,9 @@ class EventBase(SQLModel):
     highlighted: bool = Field(
         default=False, sa_column_kwargs={"server_default": "false"}
     )
+    # Admin-provided reason captured when an event is rejected. Persisted so
+    # the owner can see why their request was denied in the portal.
+    rejection_reason: str | None = Field(default=None, sa_type=Text())
     # --- Recurrence ------------------------------------------------------
     # Canonical RRULE string (RFC-5545 subset). NULL for one-off events.
     rrule: str | None = Field(default=None, sa_type=Text())
