@@ -9,7 +9,7 @@ import {
 import { useForm, useStore } from "@tanstack/react-form"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link, useNavigate } from "@tanstack/react-router"
-import { Home, Trash2, Video } from "lucide-react"
+import { Home, Trash2, UserSearch, Video } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import {
   type EventCreate,
@@ -18,6 +18,8 @@ import {
   EventsService,
   type EventUpdate,
   EventVenuesService,
+  type HumanPublic,
+  HumansService,
   PopupsService,
   TracksService,
 } from "@/client"
@@ -33,6 +35,11 @@ import {
 } from "@/components/ui/inline-form"
 import { Input } from "@/components/ui/input"
 import { LoadingButton } from "@/components/ui/loading-button"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import {
   Select,
   SelectContent,
@@ -121,9 +128,47 @@ export function EventForm({
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
   const { selectedPopupId } = useWorkspace()
-  const { isAdmin } = useAuth()
+  const { user, isAdmin } = useAuth()
   const readOnly = !isAdmin
   const isEdit = !!defaultValues
+
+  // Display name for the current user used by the "Use my name" quick-fill
+  // on the Displayed host field. Mirrors the fallback in CreatedByCard
+  // (name → email) so the shortcut produces a sensible string even when
+  // full_name isn't set on the user record.
+  const currentUserDisplayName = user?.full_name?.trim() || user?.email || ""
+
+  // --- Displayed host: participant picker --------------------------------
+  // Free-text Displayed host can also be filled by picking a human in the
+  // current popup. We debounce the search input so we don't fire a query
+  // per keystroke, and only run while the popover is open.
+  const [hostPickerOpen, setHostPickerOpen] = useState(false)
+  const [hostSearch, setHostSearch] = useState("")
+  const [debouncedHostSearch, setDebouncedHostSearch] = useState("")
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedHostSearch(hostSearch), 250)
+    return () => clearTimeout(handle)
+  }, [hostSearch])
+  const trimmedHostSearch = debouncedHostSearch.trim()
+  const { data: hostSearchResults, isFetching: hostSearchFetching } = useQuery({
+    queryKey: [
+      "humans",
+      "event-host-picker",
+      selectedPopupId,
+      trimmedHostSearch,
+    ],
+    queryFn: () =>
+      HumansService.listHumans({
+        popupId: selectedPopupId!,
+        search: trimmedHostSearch || null,
+        limit: 10,
+      }),
+    enabled: hostPickerOpen && !!selectedPopupId,
+  })
+  const humanDisplayName = (h: HumanPublic): string => {
+    const name = [h.first_name, h.last_name].filter(Boolean).join(" ").trim()
+    return name || h.email
+  }
 
   const { data: venues } = useQuery({
     queryKey: ["event-venues", selectedPopupId],
@@ -261,6 +306,7 @@ export function EventForm({
       // existing records keep round-tripping unchanged.
       require_approval: false,
       highlighted: defaultValues?.highlighted ?? false,
+      host_display_name: defaultValues?.host_display_name ?? "",
       status: defaultValues?.status ?? "draft",
       tags: defaultValues?.tags ?? [],
     },
@@ -307,11 +353,14 @@ export function EventForm({
       }
       const venueId = customSelected ? null : value.venue_id || null
 
+      const hostDisplayName = value.host_display_name.trim() || null
+
       if (isEdit) {
         const payload: EventUpdate = {
           title: value.title,
           content: value.content || null,
           kind: value.kind || null,
+          host_display_name: hostDisplayName,
           start_time: startDate.toISOString(),
           end_time: endDate.toISOString(),
           timezone: value.timezone,
@@ -337,6 +386,7 @@ export function EventForm({
           title: value.title,
           content: value.content || null,
           kind: value.kind || null,
+          host_display_name: hostDisplayName,
           start_time: startDate.toISOString(),
           end_time: endDate.toISOString(),
           timezone: value.timezone,
@@ -1308,6 +1358,124 @@ export function EventForm({
                 onCheckedChange={(v) => field.handleChange(v)}
                 disabled={readOnly}
               />
+            )}
+          </form.Field>
+        </InlineRow>
+
+        <InlineRow
+          label="Displayed host"
+          description={
+            popup?.name
+              ? `Name shown to participants on the event page. Leave blank to use "${popup.name}".`
+              : "Name shown to participants on the event page. Leave blank to use the pop-up name."
+          }
+        >
+          <form.Field name="host_display_name">
+            {(field) => (
+              <div className="flex w-full max-w-[380px] flex-col gap-2">
+                <Input
+                  value={field.state.value}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  placeholder={
+                    popup?.name ? `${popup.name} (default)` : "Optional"
+                  }
+                  maxLength={255}
+                  disabled={readOnly}
+                />
+                {!readOnly && (
+                  <div className="flex flex-wrap items-center justify-end gap-1.5">
+                    {popup?.name && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => field.handleChange(popup.name ?? "")}
+                      >
+                        Use {popup.name}
+                      </Button>
+                    )}
+                    {currentUserDisplayName && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        onClick={() =>
+                          field.handleChange(currentUserDisplayName)
+                        }
+                      >
+                        Use my name
+                      </Button>
+                    )}
+                    <Popover
+                      open={hostPickerOpen}
+                      onOpenChange={(open) => {
+                        setHostPickerOpen(open)
+                        if (!open) setHostSearch("")
+                      }}
+                    >
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          disabled={!selectedPopupId}
+                        >
+                          <UserSearch className="mr-1 h-3.5 w-3.5" />
+                          Pick participant…
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent align="end" className="w-72 p-0">
+                        <div className="border-b p-2">
+                          <Input
+                            autoFocus
+                            value={hostSearch}
+                            onChange={(e) => setHostSearch(e.target.value)}
+                            placeholder="Search participants"
+                            className="h-8"
+                          />
+                        </div>
+                        <div className="max-h-64 overflow-y-auto py-1">
+                          {hostSearchResults?.results?.length ? (
+                            hostSearchResults.results.map((h) => {
+                              const name = humanDisplayName(h)
+                              return (
+                                <button
+                                  key={h.id}
+                                  type="button"
+                                  className="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-sm hover:bg-muted"
+                                  onClick={() => {
+                                    field.handleChange(name)
+                                    setHostPickerOpen(false)
+                                    setHostSearch("")
+                                  }}
+                                >
+                                  <span className="font-medium">{name}</span>
+                                  {h.email && h.email !== name && (
+                                    <span className="text-xs text-muted-foreground">
+                                      {h.email}
+                                    </span>
+                                  )}
+                                </button>
+                              )
+                            })
+                          ) : (
+                            <p className="px-3 py-4 text-center text-xs text-muted-foreground">
+                              {hostSearchFetching
+                                ? "Searching…"
+                                : trimmedHostSearch
+                                  ? "No matches"
+                                  : "Type to search participants"}
+                            </p>
+                          )}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                )}
+              </div>
             )}
           </form.Field>
         </InlineRow>

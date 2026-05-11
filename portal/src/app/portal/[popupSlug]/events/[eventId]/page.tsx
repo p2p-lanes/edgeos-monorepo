@@ -19,6 +19,7 @@ import {
   Send,
   Tag,
   Trash2,
+  User,
   UserPlus,
   Users,
   Video,
@@ -534,6 +535,27 @@ export default function EventDetailPage() {
             )}
           </div>
         </div>
+        {(() => {
+          // Optional creator-chosen host name shown to participants. Falls
+          // back to the popup name so events created before this field
+          // existed (or with the field left blank) still show a host line.
+          const hostName =
+            event.host_display_name?.trim() || city?.name?.trim() || null
+          if (!hostName) return null
+          return (
+            <div className="flex items-center gap-2.5 pr-36">
+              <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
+                <User className="h-4 w-4 text-amber-600" />
+              </div>
+              <p className="text-sm">
+                <span className="text-muted-foreground">
+                  {t("events.detail.hosted_by", { defaultValue: "Hosted by " })}
+                </span>
+                <span className="font-medium">{hostName}</span>
+              </p>
+            </div>
+          )
+        })()}
         {event.rrule && (
           <div className="flex items-center gap-2.5 pr-36">
             <div className="h-8 w-8 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">

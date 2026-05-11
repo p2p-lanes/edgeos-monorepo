@@ -88,6 +88,11 @@ class EventBase(SQLModel):
     visibility: EventVisibility = Field(default=EventVisibility.PUBLIC, max_length=20)
     require_approval: bool = Field(default=False)
     kind: str | None = Field(default=None, max_length=100)
+    # Optional display name shown to participants on the portal event detail
+    # page. When NULL the portal falls back to the tenant's name. Free text;
+    # event creators choose any of: tenant name, their own name, a participant's
+    # name, or a custom value — all stored as plain text.
+    host_display_name: str | None = Field(default=None, max_length=255)
     status: EventStatus = Field(default=EventStatus.DRAFT)
     # When true, portal clients render the event with a "special" treatment
     # (badge, accent border) so it stands out in the list/day/calendar views.
@@ -197,6 +202,7 @@ class EventCreate(BaseModel):
     visibility: EventVisibility = EventVisibility.PUBLIC
     require_approval: bool = False
     kind: str | None = None
+    host_display_name: str | None = None
     status: EventStatus = EventStatus.DRAFT
     highlighted: bool = False
     recurrence: RecurrenceRule | None = None
@@ -232,6 +238,7 @@ class EventUpdate(BaseModel):
     visibility: EventVisibility | None = None
     require_approval: bool | None = None
     kind: str | None = None
+    host_display_name: str | None = None
     status: EventStatus | None = None
     highlighted: bool | None = None
 

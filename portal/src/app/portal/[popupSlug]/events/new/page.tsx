@@ -17,6 +17,7 @@ import { toast } from "sonner"
 import {
   ApiError,
   EventsService,
+  HumansService,
   type TrackPublic,
   TracksService,
 } from "@/client"
@@ -35,6 +36,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { useCityProvider } from "@/providers/cityProvider"
 import { EventScheduleFields } from "../components/EventScheduleFields"
 import { EventVenueField } from "../components/EventVenueField"
+import { HostDisplayField } from "../components/HostDisplayField"
 import { todayInTz, useEventScheduling } from "../lib/useEventScheduling"
 import {
   useEventTimezone,
@@ -53,6 +55,21 @@ export default function NewPortalEventPage() {
   const { getCity } = useCityProvider()
   const city = getCity()
   const popupId = city?.id
+
+  // Current human is used by the "Use my name" quick-fill on the Displayed
+  // host field. Mirrors the same query already used by the event list and
+  // detail pages for ownership checks.
+  const { data: currentHuman } = useQuery({
+    queryKey: ["currentHuman"],
+    queryFn: () => HumansService.getCurrentHumanInfo(),
+  })
+  const currentHumanName =
+    [currentHuman?.first_name, currentHuman?.last_name]
+      .filter(Boolean)
+      .join(" ")
+      .trim() ||
+    currentHuman?.email ||
+    ""
   const { timezone } = useEventTimezone(popupId)
   const displayTz = timezone || "UTC"
 
@@ -123,6 +140,7 @@ export default function NewPortalEventPage() {
   const [tags, setTags] = useState<string[]>([])
   const [trackId, setTrackId] = useState<string>("")
   const [coverUrl, setCoverUrl] = useState("")
+  const [hostDisplayName, setHostDisplayName] = useState("")
 
   // ---- venue + availability ------------------------------------------
   const {
@@ -192,6 +210,7 @@ export default function NewPortalEventPage() {
           meeting_url: isMeeting ? meetingUrl.trim() || null : null,
           cover_url: coverUrl || null,
           tags,
+          host_display_name: hostDisplayName.trim() || null,
           status: "published",
         },
       })
@@ -480,6 +499,14 @@ export default function NewPortalEventPage() {
             </SelectContent>
           </Select>
         </div>
+
+        <HostDisplayField
+          value={hostDisplayName}
+          onChange={setHostDisplayName}
+          currentUserName={currentHumanName}
+          popupName={city?.name}
+          popupId={popupId}
+        />
 
         {/* Description */}
         <div className="space-y-2">

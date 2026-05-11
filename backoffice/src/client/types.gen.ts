@@ -770,6 +770,8 @@ export type CheckoutRuntimeProduct = {
     duration_type?: (string | null);
     start_date?: (unknown | null);
     end_date?: (unknown | null);
+    sale_starts_at?: (string | null);
+    sale_ends_at?: (string | null);
     total_stock_cap?: (number | null);
     total_stock_remaining?: (number | null);
     max_per_order?: (number | null);
@@ -1016,6 +1018,7 @@ export type EventCreate = {
     visibility?: EventVisibility;
     require_approval?: boolean;
     kind?: (string | null);
+    host_display_name?: (string | null);
     status?: EventStatus;
     highlighted?: boolean;
     recurrence?: (RecurrenceRule | null);
@@ -1107,6 +1110,7 @@ export type EventPublic = {
     visibility?: EventVisibility;
     require_approval?: boolean;
     kind?: (string | null);
+    host_display_name?: (string | null);
     status?: EventStatus;
     highlighted?: boolean;
     rejection_reason?: (string | null);
@@ -1199,6 +1203,7 @@ export type EventUpdate = {
     visibility?: (EventVisibility | null);
     require_approval?: (boolean | null);
     kind?: (string | null);
+    host_display_name?: (string | null);
     status?: (EventStatus | null);
     highlighted?: (boolean | null);
 };
@@ -1540,6 +1545,20 @@ export type HumanCreate = {
 };
 
 /**
+ * Slim human profile for portal-facing pickers (event host, mentions…).
+ *
+ * Intentionally excludes email and contact fields: portal-authenticated
+ * callers can already see other humans' names in event participant lists,
+ * so name + avatar is the same privacy bar without leaking emails.
+ */
+export type HumanPortalPublic = {
+    id: string;
+    first_name?: (string | null);
+    last_name?: (string | null);
+    picture_url?: (string | null);
+};
+
+/**
  * Schema for humans updating their own profile.
  */
 export type HumanProfileUpdate = {
@@ -1682,6 +1701,11 @@ export type ListModel_FormSectionPublic_ = {
 
 export type ListModel_GroupPublic_ = {
     results: Array<GroupPublic>;
+    paging: Paging;
+};
+
+export type ListModel_HumanPortalPublic_ = {
+    results: Array<HumanPortalPublic>;
     paging: Paging;
 };
 
@@ -2286,6 +2310,11 @@ export type ProductLine = {
 
 /**
  * Product schema for API responses.
+ *
+ * Sale window fields are exposed as `date` (inclusive day) even though they
+ * are persisted as `datetime` UTC (exclusive instant). `sale_ends_at` is
+ * de-bumped by 1 day so the response shows the last day the product is on
+ * sale — the canonical "operator-friendly" representation.
  */
 export type ProductPublic = {
     tenant_id: string;
@@ -4259,6 +4288,20 @@ export type HumansUpdateCurrentHumanData = {
 };
 
 export type HumansUpdateCurrentHumanResponse = (HumanPublic);
+
+export type HumansSearchHumansPortalData = {
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    search?: (string | null);
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+};
+
+export type HumansSearchHumansPortalResponse = (ListModel_HumanPortalPublic_);
 
 export type HumansGetHumanData = {
     humanId: string;

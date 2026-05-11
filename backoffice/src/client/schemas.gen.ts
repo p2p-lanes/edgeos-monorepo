@@ -3510,6 +3510,30 @@ export const CheckoutRuntimeProductSchema = {
             ],
             title: 'End Date'
         },
+        sale_starts_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sale Starts At'
+        },
+        sale_ends_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sale Ends At'
+        },
         total_stock_cap: {
             anyOf: [
                 {
@@ -4558,6 +4582,17 @@ export const EventCreateSchema = {
             ],
             title: 'Kind'
         },
+        host_display_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Host Display Name'
+        },
         status: {
             '$ref': '#/components/schemas/EventStatus',
             default: 'draft'
@@ -5036,6 +5071,18 @@ export const EventPublicSchema = {
                 }
             ],
             title: 'Kind'
+        },
+        host_display_name: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Host Display Name'
         },
         status: {
             '$ref': '#/components/schemas/EventStatus',
@@ -5642,6 +5689,17 @@ export const EventUpdateSchema = {
                 }
             ],
             title: 'Kind'
+        },
+        host_display_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Host Display Name'
         },
         status: {
             anyOf: [
@@ -7741,6 +7799,57 @@ export const HumanCreateSchema = {
     description: 'Human schema for creation.'
 } as const;
 
+export const HumanPortalPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        first_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'First Name'
+        },
+        last_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Name'
+        },
+        picture_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Picture Url'
+        }
+    },
+    type: 'object',
+    required: ['id'],
+    title: 'HumanPortalPublic',
+    description: `Slim human profile for portal-facing pickers (event host, mentions…).
+
+Intentionally excludes email and contact fields: portal-authenticated
+callers can already see other humans' names in event participant lists,
+so name + avatar is the same privacy bar without leaking emails.`
+} as const;
+
 export const HumanProfileUpdateSchema = {
     properties: {
         first_name: {
@@ -8384,6 +8493,24 @@ export const ListModel_GroupPublic_Schema = {
     type: 'object',
     required: ['results', 'paging'],
     title: 'ListModel[GroupPublic]'
+} as const;
+
+export const ListModel_HumanPortalPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/HumanPortalPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[HumanPortalPublic]'
 } as const;
 
 export const ListModel_HumanPublic_Schema = {
@@ -11157,7 +11284,7 @@ export const ProductBatchItemSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date-time'
+                    format: 'date'
                 },
                 {
                     type: 'null'
@@ -11169,7 +11296,7 @@ export const ProductBatchItemSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date-time'
+                    format: 'date'
                 },
                 {
                     type: 'null'
@@ -11328,7 +11455,7 @@ export const ProductBatchResultSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date-time'
+                    format: 'date'
                 },
                 {
                     type: 'null'
@@ -11340,7 +11467,7 @@ export const ProductBatchResultSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date-time'
+                    format: 'date'
                 },
                 {
                     type: 'null'
@@ -11566,7 +11693,7 @@ export const ProductCreateSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date-time'
+                    format: 'date'
                 },
                 {
                     type: 'null'
@@ -11578,7 +11705,7 @@ export const ProductCreateSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date-time'
+                    format: 'date'
                 },
                 {
                     type: 'null'
@@ -11757,7 +11884,7 @@ export const ProductPublicSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date-time'
+                    format: 'date'
                 },
                 {
                     type: 'null'
@@ -11769,7 +11896,7 @@ export const ProductPublicSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date-time'
+                    format: 'date'
                 },
                 {
                     type: 'null'
@@ -11839,7 +11966,12 @@ export const ProductPublicSchema = {
     type: 'object',
     required: ['tenant_id', 'popup_id', 'name', 'slug', 'price', 'id'],
     title: 'ProductPublic',
-    description: 'Product schema for API responses.'
+    description: `Product schema for API responses.
+
+Sale window fields are exposed as \`date\` (inclusive day) even though they
+are persisted as \`datetime\` UTC (exclusive instant). \`sale_ends_at\` is
+de-bumped by 1 day so the response shows the last day the product is on
+sale — the canonical "operator-friendly" representation.`
 } as const;
 
 export const ProductUpdateSchema = {
@@ -11955,7 +12087,7 @@ export const ProductUpdateSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date-time'
+                    format: 'date'
                 },
                 {
                     type: 'null'
@@ -11967,7 +12099,7 @@ export const ProductUpdateSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date-time'
+                    format: 'date'
                 },
                 {
                     type: 'null'
@@ -12149,7 +12281,7 @@ export const ProductWithQuantitySchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date-time'
+                    format: 'date'
                 },
                 {
                     type: 'null'
@@ -12161,7 +12293,7 @@ export const ProductWithQuantitySchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date-time'
+                    format: 'date'
                 },
                 {
                     type: 'null'
