@@ -67,6 +67,12 @@ THEME_CONFIG: dict = {
         # mix recipe nearly hides it on dark hero photos; this override
         # surfaces it without baking the colour into the portal.
         "checkout_watermark_color": "rgba(255, 255, 255, 0.7)",
+        # Ticket-card surface — cream cards with deep-teal text, so each
+        # section reads cleanly on top of the verde-marino backdrop. Only
+        # applied to VariantTicketCard surfaces (buyer form / confirm
+        # cards stay on the global dark palette).
+        "card_background_color": "#f1ebe3",
+        "card_foreground_color": "#004a5a",
     }
 }
 
@@ -367,7 +373,7 @@ def _seed_ticketing_steps(
                 # Light surface keeps the tickets readable on the dark
                 # forest background — pinned regardless of the popup's
                 # global theme mode (which is dark for hero/nav contrast).
-                "surface": "light",
+                "surface": "theme",
                 "sections": [
                     {
                         "key": "ticket-4-dias",
@@ -481,7 +487,7 @@ def _seed_ticketing_steps(
             "template": "ticket-card",
             "template_config": {
                 "variant": "stacked",
-                "surface": "light",
+                "surface": "theme",
                 "sections": [
                     {
                         "key": "carpa-pre-armada",
@@ -553,7 +559,7 @@ def _seed_ticketing_steps(
             "template": "ticket-card",
             "template_config": {
                 "variant": "stacked",
-                "surface": "light",
+                "surface": "theme",
                 "sections": [
                     {
                         "key": "auto",
