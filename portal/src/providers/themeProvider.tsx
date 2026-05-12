@@ -33,6 +33,11 @@ interface ThemeColors {
   secondary_color?: string
   accent_color?: string
   checkout_navbar_bg?: string
+  /** Optional override for the watermark (giant section-name text behind
+   * the snap header). Defaults to a 92% bg-mix of the foreground so it
+   * sits quietly behind the title, but on dark hero photos that becomes
+   * invisible — tenants that want it visible can set e.g. an rgba white. */
+  checkout_watermark_color?: string
   /** Optional override for the step-nav text + icon colour. Required when
    * the admin picks a `checkout_navbar_bg` that doesn't match the chosen
    * `mode` (e.g. verde-marino navbar in a light-mode popup): without this
@@ -102,6 +107,9 @@ function computeThemeVars(
   if (colors.checkout_navbar_bg) {
     vars["--checkout-navbar-bg"] = colors.checkout_navbar_bg
     vars["--checkout-nav-bg"] = colors.checkout_navbar_bg
+  }
+  if (colors.checkout_watermark_color) {
+    vars["--checkout-watermark"] = colors.checkout_watermark_color
   }
   if (colors.checkout_nav_text_color) {
     // Force nav text/icon colour for both active and inactive states. The

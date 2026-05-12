@@ -2,16 +2,22 @@
 
 import {
   Check,
+  CircleUser,
+  Film,
   Heart,
   HelpCircle,
   Home,
   ImageIcon,
+  ParkingSquare,
   Play,
   Shield,
   ShoppingBag,
+  ShoppingCart,
+  Tent,
   Ticket,
+  User,
 } from "lucide-react"
-import type { ReactNode } from "react"
+import type { ComponentType, ReactNode, SVGProps } from "react"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
 import type { CheckoutStep } from "@/types/checkout"
@@ -19,25 +25,105 @@ import type { CheckoutStep } from "@/types/checkout"
 export type FooterDesign = "pill" | "stripe" | "dock"
 export type WatermarkStyle = "none" | "ghost" | "stroke" | "bold"
 
-const SECTION_ICONS: Record<string, typeof Ticket> = {
-  passes: Ticket,
-  housing: Home,
-  merch: ShoppingBag,
-  patron: Heart,
-  confirm: Shield,
+// Custom mushroom icon — Lucide doesn't ship one, so we trace a tiny inline
+// SVG that follows the same stroke style (currentColor, 2px stroke,
+// rounded caps) and slots cleanly next to the other Lucide icons.
+function MushroomIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      {...props}
+    >
+      {/* Cap: half-dome covering the top */}
+      <path d="M3 12a9 4 0 0 1 18 0v0a0 0 0 0 1 0 0H3a0 0 0 0 1 0 0Z" />
+      <path d="M3 12a9 9 0 0 1 18 0" />
+      {/* Stem */}
+      <path d="M10 12v6a2 2 0 0 0 4 0v-6" />
+      {/* Spots */}
+      <circle cx="9" cy="9" r="0.6" fill="currentColor" />
+      <circle cx="14" cy="7.5" r="0.6" fill="currentColor" />
+      <circle cx="17" cy="10" r="0.6" fill="currentColor" />
+    </svg>
+  )
 }
 
-const TEMPLATE_ICONS: Record<string, typeof Ticket> = {
+/** Curated icon registry. Tenants set `step.emoji` to one of these slug
+ * names (`"user"`, `"mushroom"`, `"tent"`, …) and the nav renders the
+ * matching component. Slug values are case-insensitive and may use
+ * dashes for readability. Anything else falls back to rendering the
+ * value as a literal emoji glyph. */
+type LucideLikeIcon = ComponentType<SVGProps<SVGSVGElement>>
+
+const ICON_REGISTRY: Record<string, LucideLikeIcon> = {
+  user: User,
+  "user-circle": CircleUser,
+  profile: User,
+  mushroom: MushroomIcon,
+  ticket: Ticket,
+  tent: Tent,
+  housing: Tent,
+  parking: ParkingSquare,
+  film: Film,
+  movie: Film,
+  image: ImageIcon,
+  photo: ImageIcon,
+  gallery: ImageIcon,
+  help: HelpCircle,
+  faq: HelpCircle,
+  cart: ShoppingCart,
+  checkout: ShoppingCart,
+  bag: ShoppingBag,
+  heart: Heart,
+  play: Play,
+  shield: Shield,
+  home: Home,
+}
+
+function resolveIconName(name: string): string {
+  return name.toLowerCase().replace(/[\s_]+/g, "-")
+}
+
+function getRegistryIcon(value: string | null | undefined): LucideLikeIcon | null {
+  if (!value) return null
+  const slug = resolveIconName(value)
+  return ICON_REGISTRY[slug] ?? null
+}
+
+const SECTION_ICONS: Record<string, LucideLikeIcon> = {
+  passes: Ticket,
+  housing: Tent,
+  parking: ParkingSquare,
+  merch: ShoppingBag,
+  patron: Heart,
+  confirm: ShoppingCart,
+  buyer: User,
+  hero: MushroomIcon,
+}
+
+const TEMPLATE_ICONS: Record<string, LucideLikeIcon> = {
   "ticket-select": Ticket,
+  "ticket-card": Ticket,
   "patron-preset": Heart,
-  "housing-date": Home,
+  "housing-date": Tent,
   "merch-image": ShoppingBag,
-  "youtube-video": Play,
+  "youtube-video": Film,
   "image-gallery": ImageIcon,
+  "rich-text": MushroomIcon,
+  "buyer-form": User,
   faqs: HelpCircle,
 }
 
-function resolveIcon(section: { id: string; template?: string | null }) {
+function resolveIcon(section: {
+  id: string
+  template?: string | null
+}): LucideLikeIcon {
   if (section.template && TEMPLATE_ICONS[section.template]) {
     return TEMPLATE_ICONS[section.template]
   }
@@ -126,23 +212,34 @@ export default function ScrollySectionNav({
                         : "text-checkout-badge-title-disabled hover:text-checkout-badge-title/80",
                     )}
                   >
-                    {emoji ? (
-                      <span
-                        aria-hidden
-                        // Inline style picks up the optional theme filter
-                        // (`--checkout-nav-emoji-filter`) so tenants can
-                        // force monochrome icons; falls back to no filter.
-                        style={{
-                          filter:
-                            "var(--checkout-nav-emoji-filter, none)" as string,
-                        }}
-                        className="text-sm leading-none shrink-0"
-                      >
-                        {emoji}
-                      </span>
-                    ) : (
-                      <Icon className="size-3.5 shrink-0" />
-                    )}
+                    {(() => {
+                      // Two ways a tenant can specify the nav icon: as a
+                      // slug into the curated Lucide registry (e.g. "user"
+                      // or "mushroom") which renders a flat-line SVG, OR
+                      // as a literal emoji character. If neither is set,
+                      // fall back to the step-type/template default. The
+                      // emoji branch also picks up the optional monochrome
+                      // filter so colorful glyphs can be forced to one tone.
+                      const RegistryIcon = getRegistryIcon(emoji)
+                      if (RegistryIcon) {
+                        return <RegistryIcon className="size-3.5 shrink-0" />
+                      }
+                      if (emoji) {
+                        return (
+                          <span
+                            aria-hidden
+                            style={{
+                              filter:
+                                "var(--checkout-nav-emoji-filter, none)" as string,
+                            }}
+                            className="text-sm leading-none shrink-0"
+                          >
+                            {emoji}
+                          </span>
+                        )
+                      }
+                      return <Icon className="size-3.5 shrink-0" />
+                    })()}
                     <span className="hidden truncate sm:inline">
                       {section.label}
                     </span>

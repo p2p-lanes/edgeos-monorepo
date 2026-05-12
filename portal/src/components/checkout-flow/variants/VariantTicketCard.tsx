@@ -265,8 +265,15 @@ function SectionCard({
             src={section.image_url}
             alt={section.label}
             fill
+            // Source thumbnails from prod / Gemstore are typically 800px on
+            // the long side. Tell Next we don't need anything larger so it
+            // doesn't request a 1440px variant that just upscales the
+            // 800px source. quality 95 preserves the visible texture
+            // without the default 75% JPEG-y blur.
             sizes="(max-width: 768px) 100vw, 720px"
+            quality={95}
             className="object-cover"
+            priority={false}
           />
         </div>
       )}
