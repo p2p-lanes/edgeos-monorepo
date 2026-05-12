@@ -539,52 +539,17 @@ async def create_event(
     event_data["tenant_id"] = tenant_id
     event_data["owner_id"] = current_user.id
 
-    # Approval overrides: an admin can create straight to published normally,
-    # but if the venue requires approval OR the requested capacity exceeds
-    # the venue's, we force the event into pending_approval and notify so
-    # the decision stays auditable even for admin-created events.
-    # Custom-location events skip this venue-based gate entirely (no venue,
-    # no booking_mode rule); the popup-level events_require_approval flag
-    # still applies further below for portal events.
-    requires_approval = False
-    approval_reason = ""
-    if event_in.venue_id is not None:
-        from app.api.event_venue import crud as venue_crud
-
-        venue = venue_crud.event_venues_crud.get(db, event_in.venue_id)
-        if venue and venue.booking_mode == "approval_required":
-            requires_approval = True
-            approval_reason = "Venue requires admin approval."
-        if (
-            venue
-            and venue.capacity
-            and event_in.max_participant
-            and event_in.max_participant > venue.capacity
-        ):
-            requires_approval = True
-            approval_reason = (
-                f"Requested max_participant ({event_in.max_participant}) "
-                f"exceeds venue capacity ({venue.capacity})."
-            )
-
-    if requires_approval:
-        event_data["status"] = EventStatus.PENDING_APPROVAL
-        event_data["visibility"] = EventVisibility.UNLISTED
+    # Admin-created events trust the requested status — picking "published"
+    # in the backoffice publishes immediately, even when the venue is
+    # ``approval_required`` or the requested capacity exceeds the venue's.
+    # The portal create endpoint still enforces its own approval gate for
+    # non-admin submissions.
 
     event = Events(**event_data)
 
     db.add(event)
     db.commit()
     db.refresh(event)
-
-    if requires_approval:
-        from app.api.event_settings.crud import event_settings_crud
-        from app.services.approval_notify import notify_event_pending_approval
-
-        settings = event_settings_crud.get_by_popup_id(db, event.popup_id)
-        await notify_event_pending_approval(
-            event, popup, settings, reason=approval_reason
-        )
 
     return _to_public(event)
 
