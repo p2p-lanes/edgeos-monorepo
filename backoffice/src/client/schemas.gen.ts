@@ -8225,6 +8225,17 @@ export const KeyMetricsSchema = {
     description: 'Top-level KPI cards with derived metrics.'
 } as const;
 
+export const LandingModeSchema = {
+    type: 'string',
+    enum: ['portal', 'checkout'],
+    title: 'LandingMode',
+    description: `Per-tenant landing mode for custom domains.
+
+- portal: standard portal experience (default for all tenants).
+- checkout: custom domain opens the active direct-sale popup checkout directly.
+Extensible for future modes (e.g. splash, events) without schema changes.`
+} as const;
+
 export const ListModelSchema = {
     properties: {
         results: {
@@ -13025,10 +13036,25 @@ export const TenantPublicSchema = {
             type: 'boolean',
             title: 'Custom Domain Active'
         },
+        landing_mode: {
+            '$ref': '#/components/schemas/LandingMode',
+            default: 'portal'
+        },
         id: {
             type: 'string',
             format: 'uuid',
             title: 'Id'
+        },
+        active_popup_slug: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Active Popup Slug'
         }
     },
     type: 'object',
@@ -13048,17 +13074,6 @@ export const TenantUpdateSchema = {
                 }
             ],
             title: 'Name'
-        },
-        slug: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Slug'
         },
         sender_email: {
             anyOf: [
@@ -13137,6 +13152,16 @@ export const TenantUpdateSchema = {
                 }
             ],
             title: 'Custom Domain Active'
+        },
+        landing_mode: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/LandingMode'
+                },
+                {
+                    type: 'null'
+                }
+            ]
         }
     },
     type: 'object',

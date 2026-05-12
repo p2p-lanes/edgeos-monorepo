@@ -1629,6 +1629,15 @@ export type KeyMetrics = {
     conversion_rate?: string;
 };
 
+/**
+ * Per-tenant landing mode for custom domains.
+ *
+ * - portal: standard portal experience (default for all tenants).
+ * - checkout: custom domain opens the active direct-sale popup checkout directly.
+ * Extensible for future modes (e.g. splash, events) without schema changes.
+ */
+export type LandingMode = 'portal' | 'checkout';
+
 export type ListModel = {
     results: Array<unknown>;
     paging: Paging;
@@ -2552,12 +2561,13 @@ export type TenantPublic = {
     logo_url?: (string | null);
     custom_domain?: (string | null);
     custom_domain_active: boolean;
+    landing_mode?: LandingMode;
     id: string;
+    active_popup_slug?: (string | null);
 };
 
 export type TenantUpdate = {
     name?: (string | null);
-    slug?: (string | null);
     sender_email?: (string | null);
     sender_name?: (string | null);
     image_url?: (string | null);
@@ -2565,6 +2575,7 @@ export type TenantUpdate = {
     logo_url?: (string | null);
     custom_domain?: (string | null);
     custom_domain_active?: (boolean | null);
+    landing_mode?: (LandingMode | null);
 };
 
 /**
