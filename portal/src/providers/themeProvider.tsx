@@ -156,6 +156,7 @@ function computeThemeVars(
     const secondary = colors.secondary_color || palette.muted
     const hasSecondaryBrand = Boolean(colors.secondary_color)
     const accent = colors.accent_color || mix(palette.card, primary, 90)
+    const hasAccentBrand = Boolean(colors.accent_color)
 
     vars["--primary"] = primary
     vars["--primary-foreground"] = primaryFg
@@ -169,11 +170,17 @@ function computeThemeVars(
     vars["--sidebar-primary"] = primary
     vars["--sidebar-primary-foreground"] = primaryFg
     vars["--sidebar-ring"] = primary
-    vars["--checkout-badge-bg"] = primary
-    vars["--checkout-badge-title"] = primaryFg
-    vars["--checkout-nav-text"] = primaryFg
-    vars["--checkout-button"] = primary
-    vars["--checkout-button-title"] = primaryFg
+    // Active-state highlights (step-nav pill, primary CTA button, cart badge)
+    // prefer accent over primary when the admin set one. Lets tenants paint
+    // the brand surface with primary and use accent for emphasis without
+    // having to also override every checkout-* token by hand.
+    const activeBg = hasAccentBrand ? accent : primary
+    const activeFg = hasAccentBrand ? palette.foreground : primaryFg
+    vars["--checkout-badge-bg"] = activeBg
+    vars["--checkout-badge-title"] = activeFg
+    vars["--checkout-nav-text"] = activeFg
+    vars["--checkout-button"] = activeBg
+    vars["--checkout-button-title"] = activeFg
   }
 
   return vars

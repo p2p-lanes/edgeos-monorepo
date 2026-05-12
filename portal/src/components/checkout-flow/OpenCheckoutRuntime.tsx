@@ -8,7 +8,9 @@ import {
   CouponsService,
   type ProductPublic,
 } from "@/client"
+import FaviconOverride from "@/components/checkout-flow/FaviconOverride"
 import ScrollyCheckoutFlow from "@/components/checkout-flow/ScrollyCheckoutFlow"
+import TrackingSnippet from "@/components/checkout-flow/TrackingSnippet"
 import { LanguageSwitcher } from "@/components/common/LanguageSwitcher"
 import { ApplicationContext } from "@/providers/applicationProvider"
 import { CheckoutProvider } from "@/providers/checkoutProvider"
@@ -227,7 +229,22 @@ export function OpenCheckoutRuntime({
                   submitMode="open-ticketing"
                   submitPopupSlug={popupSlug}
                 >
-                  <ScrollyCheckoutFlow navExtraContent={<LanguageSwitcher />} />
+                  <FaviconOverride
+                    url={
+                      (popup as { favicon_url?: string | null }).favicon_url ??
+                      null
+                    }
+                  />
+                  <TrackingSnippet
+                    anchor="cart"
+                    snippets={
+                      (popup as { tracking_snippets?: Record<string, unknown> })
+                        .tracking_snippets ?? null
+                    }
+                  />
+                  <ScrollyCheckoutFlow
+                    navExtraContent={<LanguageSwitcher compact />}
+                  />
                 </CheckoutProvider>
               </PassesProvider>
             </DiscountContext.Provider>
