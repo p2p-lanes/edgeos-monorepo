@@ -109,6 +109,7 @@ function ScrollyCheckoutFlowInner({
           id: step,
           label: config?.title ?? defaultLabels[step] ?? step,
           template: config?.template ?? null,
+          emoji: config?.emoji ?? null,
         }
       })
   }, [availableSteps, stepConfigs])

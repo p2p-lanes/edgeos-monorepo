@@ -202,6 +202,16 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
       application_fee_amount: defaultValues?.application_fee_amount ?? "",
       image_url: defaultValues?.image_url ?? "",
       icon_url: defaultValues?.icon_url ?? "",
+      favicon_url: defaultValues?.favicon_url ?? "",
+      tracking_cart_html:
+        (defaultValues?.tracking_snippets as Record<string, string> | null)
+          ?.cart ?? "",
+      tracking_buyer_html:
+        (defaultValues?.tracking_snippets as Record<string, string> | null)
+          ?.buyer ?? "",
+      tracking_thank_you_html:
+        (defaultValues?.tracking_snippets as Record<string, string> | null)
+          ?.thank_you ?? "",
       express_checkout_background:
         defaultValues?.express_checkout_background ?? "",
       currency: defaultValues?.currency ?? "USD",
@@ -246,6 +256,19 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
           : null,
         image_url: value.image_url || null,
         icon_url: value.icon_url || null,
+        favicon_url: value.favicon_url || null,
+        // Build tracking_snippets from the three individual slots. We send
+        // null when every slot is empty so the column stays NULL instead
+        // of becoming an empty object.
+        tracking_snippets: (() => {
+          const slots = {
+            cart: value.tracking_cart_html || null,
+            buyer: value.tracking_buyer_html || null,
+            thank_you: value.tracking_thank_you_html || null,
+          }
+          const hasAny = Object.values(slots).some((v) => v)
+          return hasAny ? slots : null
+        })(),
         express_checkout_background: value.express_checkout_background || null,
         currency: value.currency,
         web_url: value.web_url || null,
@@ -818,6 +841,30 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
             )}
           </form.Field>
 
+          <form.Field name="favicon_url">
+            {(field) => (
+              <div className="space-y-2 py-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+                    <Image className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Favicon</p>
+                    <p className="text-xs text-muted-foreground">
+                      Browser-tab icon overrides the tenant default on the
+                      public checkout for this popup.
+                    </p>
+                  </div>
+                </div>
+                <ImageUpload
+                  value={field.state.value || null}
+                  onChange={(url) => field.handleChange(url ?? "")}
+                  disabled={readOnly}
+                />
+              </div>
+            )}
+          </form.Field>
+
           <form.Field name="express_checkout_background">
             {(field) => (
               <div className="space-y-2 py-3">
@@ -947,6 +994,62 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
               </InlineRow>
             )}
           </form.Field>
+        </InlineSection>
+
+        <Separator />
+
+        {/* Tracking snippets — Facebook/Instagram/Google Ads pixels at three
+            anchors of the open-ticketing funnel. Each slot accepts raw
+            HTML/JS; the portal injects scripts as live elements. Tenants
+            who don't run paid ads can leave all three blank. */}
+        <InlineSection title="Tracking Snippets">
+          <p className="text-xs text-muted-foreground -mt-1">
+            Paste analytics pixels (Facebook, Instagram, Google Ads). Each
+            snippet runs as page JS at the matching step. Leave blank if
+            you don't track this popup.
+          </p>
+          {(
+            [
+              {
+                name: "tracking_cart_html",
+                label: "Cart",
+                description: "Fires on the public checkout page (ticket selection).",
+              },
+              {
+                name: "tracking_buyer_html",
+                label: "Buyer info",
+                description:
+                  "Fires when the buyer details step renders (lead event).",
+              },
+              {
+                name: "tracking_thank_you_html",
+                label: "Thank-you",
+                description:
+                  "Fires on the post-payment success page (purchase event).",
+              },
+            ] as const
+          ).map((slot) => (
+            <form.Field key={slot.name} name={slot.name}>
+              {(field) => (
+                <div className="space-y-1 py-3">
+                  <div>
+                    <p className="text-sm font-medium">{slot.label}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {slot.description}
+                    </p>
+                  </div>
+                  <textarea
+                    value={field.state.value}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    disabled={readOnly}
+                    rows={4}
+                    placeholder='<!-- e.g. <script>fbq("track","Lead")</script> -->'
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-mono shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                  />
+                </div>
+              )}
+            </form.Field>
+          ))}
         </InlineSection>
 
         <Separator />

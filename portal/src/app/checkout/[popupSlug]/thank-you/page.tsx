@@ -3,15 +3,33 @@
 import { CheckCircle, Home } from "lucide-react"
 import { useParams, useRouter } from "next/navigation"
 import { useTranslation } from "react-i18next"
+import FaviconOverride from "@/components/checkout-flow/FaviconOverride"
+import TrackingSnippet from "@/components/checkout-flow/TrackingSnippet"
 import { Button } from "@/components/ui/button"
+import { useCheckoutRuntime } from "../hooks/useCheckoutRuntime"
 
 export default function OpenCheckoutThankYouPage() {
   const { t } = useTranslation()
   const router = useRouter()
   const params = useParams<{ popupSlug: string }>()
+  const { data: runtime } = useCheckoutRuntime(params.popupSlug)
+  const popup = runtime?.popup as
+    | {
+        favicon_url?: string | null
+        tracking_snippets?: Record<string, unknown> | null
+      }
+    | undefined
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-6 py-12">
+      <FaviconOverride url={popup?.favicon_url ?? null} />
+      {/* Thank-you-page tracking snippet — typically where tenants drop the
+       * Facebook / Instagram / Google Ads "Purchase" pixel. Snippet runs
+       * client-side after the runtime fetch resolves. */}
+      <TrackingSnippet
+        anchor="thank_you"
+        snippets={popup?.tracking_snippets ?? null}
+      />
       <div className="w-full max-w-xl rounded-2xl border bg-card p-8 text-center shadow-sm">
         <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
           <CheckCircle className="size-9" />

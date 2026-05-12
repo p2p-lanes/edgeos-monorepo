@@ -1973,6 +1973,10 @@ export type PopupAdmin = {
     theme_config?: ({
     [key: string]: unknown;
 } | null);
+    favicon_url?: (string | null);
+    tracking_snippets?: ({
+    [key: string]: unknown;
+} | null);
     default_language?: string;
     supported_languages?: Array<(string)>;
     insurance_enabled?: boolean;
@@ -2016,6 +2020,10 @@ export type PopupCreate = {
     theme_config?: ({
     [key: string]: unknown;
 } | null);
+    favicon_url?: (string | null);
+    tracking_snippets?: ({
+    [key: string]: unknown;
+} | null);
     default_language?: string;
     supported_languages?: Array<(string)>;
     insurance_enabled?: boolean;
@@ -2055,6 +2063,10 @@ export type PopupPublic = {
     requires_application_fee?: boolean;
     application_fee_amount?: (string | null);
     theme_config?: ({
+    [key: string]: unknown;
+} | null);
+    favicon_url?: (string | null);
+    tracking_snippets?: ({
     [key: string]: unknown;
 } | null);
     default_language?: string;
@@ -2130,6 +2142,10 @@ export type PopupUpdate = {
     requires_application_fee?: (boolean | null);
     application_fee_amount?: (number | string | null);
     theme_config?: ({
+    [key: string]: unknown;
+} | null);
+    favicon_url?: (string | null);
+    tracking_snippets?: ({
     [key: string]: unknown;
 } | null);
     default_language?: (string | null);
@@ -2610,6 +2626,7 @@ export type TicketingStepCreate = {
     watermark?: (string | null);
     show_title?: boolean;
     show_watermark?: boolean;
+    emoji?: (string | null);
 };
 
 export type TicketingStepPublic = {
@@ -2630,6 +2647,7 @@ export type TicketingStepPublic = {
     watermark?: (string | null);
     show_title?: boolean;
     show_watermark?: boolean;
+    emoji?: (string | null);
 };
 
 export type TicketingStepUpdate = {
@@ -2645,6 +2663,7 @@ export type TicketingStepUpdate = {
     watermark?: (string | null);
     show_title?: (boolean | null);
     show_watermark?: (boolean | null);
+    emoji?: (string | null);
 };
 
 /**

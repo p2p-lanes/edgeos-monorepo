@@ -48,6 +48,8 @@ interface NavSection {
   id: string
   label: string
   template?: string | null
+  /** Tenant-picked emoji rendered in place of the Lucide icon when set. */
+  emoji?: string | null
 }
 
 interface ScrollySectionNavProps {
@@ -91,6 +93,11 @@ export default function ScrollySectionNav({
                 const isActive = section.id === activeSection
                 const isComplete =
                   !isActive && isStepComplete(section.id as CheckoutStep)
+                // Per-step emoji takes precedence over the built-in icon when
+                // the tenant set one in the backoffice. Plain text node — no
+                // sanitization needed since SQLAlchemy capped the column at 8
+                // chars and emoji are inert.
+                const emoji = section.emoji?.trim()
                 return (
                   <button
                     key={section.id}
@@ -104,7 +111,16 @@ export default function ScrollySectionNav({
                         : "text-checkout-badge-title-disabled hover:text-checkout-badge-title/80",
                     )}
                   >
-                    <Icon className="size-3.5 shrink-0" />
+                    {emoji ? (
+                      <span
+                        aria-hidden
+                        className="text-sm leading-none shrink-0"
+                      >
+                        {emoji}
+                      </span>
+                    ) : (
+                      <Icon className="size-3.5 shrink-0" />
+                    )}
                     <span className="hidden truncate sm:inline">
                       {section.label}
                     </span>

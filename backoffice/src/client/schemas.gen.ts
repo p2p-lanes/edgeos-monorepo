@@ -9780,6 +9780,29 @@ export const PopupAdminSchema = {
             ],
             title: 'Theme Config'
         },
+        favicon_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Favicon Url'
+        },
+        tracking_snippets: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Tracking Snippets'
+        },
         default_language: {
             type: 'string',
             title: 'Default Language',
@@ -10143,6 +10166,29 @@ export const PopupCreateSchema = {
             ],
             title: 'Theme Config'
         },
+        favicon_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Favicon Url'
+        },
+        tracking_snippets: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Tracking Snippets'
+        },
         default_language: {
             type: 'string',
             title: 'Default Language',
@@ -10431,6 +10477,29 @@ export const PopupPublicSchema = {
                 }
             ],
             title: 'Theme Config'
+        },
+        favicon_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Favicon Url'
+        },
+        tracking_snippets: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Tracking Snippets'
         },
         default_language: {
             type: 'string',
@@ -10939,6 +11008,29 @@ export const PopupUpdateSchema = {
                 }
             ],
             title: 'Theme Config'
+        },
+        favicon_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Favicon Url'
+        },
+        tracking_snippets: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Tracking Snippets'
         },
         default_language: {
             anyOf: [
@@ -13614,6 +13706,17 @@ export const TicketingStepCreateSchema = {
             type: 'boolean',
             title: 'Show Watermark',
             default: true
+        },
+        emoji: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Emoji'
         }
     },
     type: 'object',
@@ -13726,6 +13829,17 @@ export const TicketingStepPublicSchema = {
             type: 'boolean',
             title: 'Show Watermark',
             default: true
+        },
+        emoji: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Emoji'
         }
     },
     type: 'object',
@@ -13845,6 +13959,17 @@ export const TicketingStepUpdateSchema = {
                 }
             ],
             title: 'Show Watermark'
+        },
+        emoji: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Emoji'
         }
     },
     type: 'object',

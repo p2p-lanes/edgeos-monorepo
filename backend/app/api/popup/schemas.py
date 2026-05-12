@@ -115,6 +115,11 @@ class PopupBase(SQLModel):
         default=None,
         sa_column=Column(JSONB, nullable=True),
     )
+    favicon_url: str | None = None
+    tracking_snippets: dict | None = Field(
+        default=None,
+        sa_column=Column(JSONB, nullable=True),
+    )
     default_language: str = Field(default="en")
     supported_languages: list[str] = Field(
         default=["en"],
@@ -178,6 +183,8 @@ class PopupCreate(SQLModel):
     requires_application_fee: bool = False
     application_fee_amount: Decimal | None = None
     theme_config: dict | None = None
+    favicon_url: str | None = None
+    tracking_snippets: dict | None = None
     default_language: str = "en"
     supported_languages: list[str] = ["en"]
     insurance_enabled: bool = False
@@ -237,6 +244,8 @@ class PopupUpdate(SQLModel):
     requires_application_fee: bool | None = None
     application_fee_amount: Decimal | None = None
     theme_config: dict | None = None
+    favicon_url: str | None = None
+    tracking_snippets: dict | None = None
     default_language: str | None = None
     supported_languages: list[str] | None = None
     insurance_enabled: bool | None = None
@@ -302,6 +311,8 @@ class PopupPublic(SQLModel):
     requires_application_fee: bool = False
     application_fee_amount: Decimal | None = None
     theme_config: dict | None = None
+    favicon_url: str | None = None
+    tracking_snippets: dict | None = None
     default_language: str = "en"
     supported_languages: list[str] = ["en"]
     insurance_enabled: bool = False

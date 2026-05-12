@@ -107,6 +107,7 @@ function StepConfigContent({ stepId }: { stepId: string }) {
   const [showWatermark, setShowWatermark] = useState(
     step.show_watermark ?? true,
   )
+  const [emoji, setEmoji] = useState(step.emoji ?? "")
 
   const isDirty =
     title !== step.title ||
@@ -117,7 +118,8 @@ function StepConfigContent({ stepId }: { stepId: string }) {
     JSON.stringify(templateConfig) !==
       JSON.stringify(step.template_config ?? null) ||
     showTitle !== (step.show_title ?? true) ||
-    showWatermark !== (step.show_watermark ?? true)
+    showWatermark !== (step.show_watermark ?? true) ||
+    emoji !== (step.emoji ?? "")
 
   const blocker = useDirtyBlocker(
     isDirty,
@@ -134,6 +136,7 @@ function StepConfigContent({ stepId }: { stepId: string }) {
     setTemplateConfig((step.template_config as Record<string, unknown>) ?? null)
     setShowTitle(step.show_title ?? true)
     setShowWatermark(step.show_watermark ?? true)
+    setEmoji(step.emoji ?? "")
   }, [
     step.title,
     step.description,
@@ -143,6 +146,7 @@ function StepConfigContent({ stepId }: { stepId: string }) {
     step.template_config,
     step.show_title,
     step.show_watermark,
+    step.emoji,
   ])
 
   // Popup data (needed for insurance_enabled gate on confirm step)
@@ -184,6 +188,7 @@ function StepConfigContent({ stepId }: { stepId: string }) {
           template_config: templateConfig,
           show_title: showTitle,
           show_watermark: showWatermark,
+          emoji: emoji.trim() || null,
         },
       })
     },
@@ -235,11 +240,26 @@ function StepConfigContent({ stepId }: { stepId: string }) {
         <CardContent className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="step-title">Title</Label>
-            <Input
-              id="step-title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
+            <div className="flex gap-1.5">
+              <Input
+                id="step-emoji"
+                aria-label="Step emoji"
+                value={emoji}
+                onChange={(e) => setEmoji(e.target.value.slice(0, 8))}
+                placeholder="🎟️"
+                className="w-16 text-center text-lg"
+              />
+              <Input
+                id="step-title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="flex-1"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Optional emoji replaces the default icon in the checkout step
+              nav. Leave blank to keep the built-in icon.
+            </p>
           </div>
 
           <div className="flex flex-col gap-1.5">
