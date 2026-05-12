@@ -57,11 +57,16 @@ THEME_CONFIG: dict = {
         "accent_color": "#A89477",
         # Navbar: verde marino background with white text and white-tinted
         # monochrome emojis, matching the live production look on
-        # amanita.edgeos.world. These three tokens are tenant-configurable.
+        # amanita.edgeos.world. These tokens are tenant-configurable.
         "checkout_navbar_bg": "#071b28",
         "checkout_nav_text_color": "#ffffff",
         "checkout_nav_monochrome_emoji": True,
         "checkout_subtitle_color": "rgba(255, 255, 255, 0.85)",
+        # Section watermark (giant title behind each step) — bright white
+        # at 70% alpha so it reads on the dark forest background. Default
+        # mix recipe nearly hides it on dark hero photos; this override
+        # surfaces it without baking the colour into the portal.
+        "checkout_watermark_color": "rgba(255, 255, 255, 0.7)",
     }
 }
 
@@ -331,7 +336,7 @@ def _seed_ticketing_steps(
             "template": "buyer-form",
             "order": 0,
             "protected": True,
-            "emoji": "📝",
+            "emoji": "user",
         },
         {
             "step_type": "hero",
@@ -347,6 +352,7 @@ def _seed_ticketing_steps(
                 "max_width": "wide",
             },
             "order": 1,
+            "emoji": "mushroom",
         },
         {
             "step_type": "tickets",
@@ -459,7 +465,7 @@ def _seed_ticketing_steps(
             },
             "order": 2,
             "product_category": "ticket",
-            "emoji": "🎟️",
+            "emoji": "ticket",
         },
         {
             "step_type": "housing",
@@ -468,11 +474,14 @@ def _seed_ticketing_steps(
             "watermark": "Alojamiento",
             "show_title": False,
             "show_watermark": True,
-            "template": "housing-date",
+            # ticket-card template gives us multi-product cart, no date
+            # picker, no per-night multiplication — exactly the housing UX
+            # the user asked for. Same template as Tickets keeps the visual
+            # styling consistent.
+            "template": "ticket-card",
             "template_config": {
-                "design_variant": "grouped",
-                "show_date_picker": False,
-                "price_per_night": False,
+                "variant": "stacked",
+                "surface": "light",
                 "sections": [
                     {
                         "key": "carpa-pre-armada",
@@ -528,7 +537,7 @@ def _seed_ticketing_steps(
             "order": 3,
             "product_category": "housing",
             "footer_note": "*No hay reembolsos, sin excepción.\n• Entradas transferibles hasta el 30 de Octubre 2026, sin excepción.\n• Entrada con DNI y QR.",
-            "emoji": "🏠",
+            "emoji": "tent",
         },
         {
             "step_type": "parking",
@@ -540,11 +549,11 @@ def _seed_ticketing_steps(
             "watermark": "Estacionamiento",
             "show_title": False,
             "show_watermark": True,
-            "template": "housing-date",
+            # Same template as Tickets/Alojamiento — no dates, multi-select.
+            "template": "ticket-card",
             "template_config": {
-                "variant": "compact",
-                "show_date_picker": False,
-                "price_per_night": False,
+                "variant": "stacked",
+                "surface": "light",
                 "sections": [
                     {
                         "key": "auto",
@@ -564,7 +573,7 @@ def _seed_ticketing_steps(
             },
             "order": 4,
             "product_category": "parking",
-            "emoji": "🅿️",
+            "emoji": "parking",
         },
         {
             "step_type": "experience",
@@ -578,7 +587,7 @@ def _seed_ticketing_steps(
                 "youtube_url": "https://www.youtube.com/watch?v=lhJQ55IRWhQ",
             },
             "order": 5,
-            "emoji": "▶️",
+            "emoji": "film",
         },
         {
             "step_type": "gallery",
@@ -602,7 +611,7 @@ def _seed_ticketing_steps(
                 ],
             },
             "order": 6,
-            "emoji": "🖼️",
+            "emoji": "image",
         },
         {
             "step_type": "faqs",
@@ -630,7 +639,7 @@ def _seed_ticketing_steps(
                 ],
             },
             "order": 7,
-            "emoji": "❓",
+            "emoji": "help",
         },
         {
             "step_type": "confirm",
@@ -641,7 +650,7 @@ def _seed_ticketing_steps(
             "show_watermark": True,
             "order": 8,
             "protected": True,
-            "emoji": "✅",
+            "emoji": "cart",
         },
     ]
 
