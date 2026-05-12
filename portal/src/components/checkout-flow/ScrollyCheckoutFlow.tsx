@@ -24,12 +24,19 @@ interface ScrollyCheckoutFlowProps {
   onPaymentComplete?: () => void
   onBack?: () => void
   navExtraContent?: ReactNode
+  /** Tenant logo shown on the left side of the checkout nav. Usually
+   * `popup.icon_url` with a tenant fallback. */
+  brandLogoUrl?: string | null
+  /** Tenant/popup name for alt text on the logo. */
+  brandLabel?: string
 }
 
 function ScrollyCheckoutFlowInner({
   onPaymentComplete,
   onBack,
   navExtraContent,
+  brandLogoUrl,
+  brandLabel,
 }: ScrollyCheckoutFlowProps) {
   const { availableSteps, submitPayment, stepConfigs, isInitialLoading } =
     useCheckout()
@@ -312,6 +319,8 @@ function ScrollyCheckoutFlowInner({
           if (idx >= 0) scrollToIndexRef.current?.(idx)
         }}
         extraContent={navExtraContent}
+        brandLogoUrl={brandLogoUrl}
+        brandLabel={brandLabel}
       />
       {allSections.map((section) => {
         const config = getStepConfig(section.id)

@@ -244,6 +244,10 @@ export function OpenCheckoutRuntime({
                   />
                   <ScrollyCheckoutFlow
                     navExtraContent={<LanguageSwitcher compact />}
+                    brandLogoUrl={
+                      (popup as { icon_url?: string | null }).icon_url ?? null
+                    }
+                    brandLabel={popup.name}
                   />
                 </CheckoutProvider>
               </PassesProvider>

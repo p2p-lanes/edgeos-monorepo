@@ -26,17 +26,21 @@ export function LanguageSwitcher({ compact = false }: LanguageSwitcherProps) {
     <Select value={currentLanguage} onValueChange={setLanguage}>
       <SelectTrigger
         aria-label="Change language"
-        // Compact trigger shrinks the chevron and hides the current-language
-        // label — used in the checkout header where the switcher is meant to
-        // be a secondary affordance and shouldn't compete with the step nav.
+        // Compact trigger drops the current-language label entirely (globe
+        // icon + tight chevron only) and shrinks the chevron. Used in the
+        // checkout header where the switcher is a secondary affordance and
+        // shouldn't compete with the step nav. The chevron is rendered by
+        // <SelectTrigger> itself; sizing it down is via `[&>svg]:` so we
+        // don't have to fork the trigger component.
         className={cn(
           "w-auto gap-2 border-none bg-transparent shadow-none focus:ring-0 focus:ring-offset-0",
-          compact &&
-            "px-2 gap-1 [&>svg]:size-3 [&>span[data-slot='select-value']]:hidden",
+          compact && "px-2 gap-1 [&>svg]:size-3",
         )}
       >
         <Globe className="h-4 w-4" />
-        <SelectValue />
+        {/* SelectValue renders the current selection's label; we drop it
+            entirely in compact mode so the trigger is icon + chevron only. */}
+        {compact ? null : <SelectValue />}
       </SelectTrigger>
       <SelectContent>
         {supportedLanguages.map((code) => {

@@ -57,6 +57,11 @@ interface ScrollySectionNavProps {
   activeSection: string
   onSectionClick: (sectionId: string) => void
   extraContent?: ReactNode
+  /** Tenant logo (popup icon_url with tenant fallback) shown on the left
+   * of the nav. Skipped when null. */
+  brandLogoUrl?: string | null
+  /** Display name used as alt text on the logo. */
+  brandLabel?: string
 }
 
 export default function ScrollySectionNav({
@@ -64,6 +69,8 @@ export default function ScrollySectionNav({
   activeSection,
   onSectionClick,
   extraContent,
+  brandLogoUrl,
+  brandLabel,
 }: ScrollySectionNavProps) {
   const { isStepComplete } = useCheckout()
 
@@ -77,6 +84,14 @@ export default function ScrollySectionNav({
     <div data-snap-nav className="sticky top-0 z-20">
       <div className="bg-checkout-navbar-bg/85 px-2.5 py-1.5 backdrop-blur-xl">
         <div className="mx-auto flex max-w-4xl items-center gap-1.5">
+          {brandLogoUrl ? (
+            // biome-ignore lint: tenant logo, sized small, no need for next/image SSR
+            <img
+              src={brandLogoUrl}
+              alt={brandLabel ?? "Tenant logo"}
+              className="size-7 shrink-0 rounded-md object-contain"
+            />
+          ) : null}
           <div className="relative flex-1 overflow-hidden rounded-xl border border-white/10 bg-checkout-badge-bg-disabled/60 p-0.5">
             <div
               aria-hidden
