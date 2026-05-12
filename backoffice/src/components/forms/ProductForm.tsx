@@ -218,7 +218,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
             isTicket && value.sale_starts_at ? value.sale_starts_at : null,
           sale_ends_at:
             isTicket && value.sale_ends_at ? value.sale_ends_at : null,
-          requires_check_in: value.requires_check_in,
+          requires_check_in: isTicket && value.requires_check_in,
           is_active: value.is_active,
           exclusive: value.exclusive,
           total_stock_cap: totalStockCap,
@@ -242,7 +242,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
             isTicket && value.sale_starts_at ? value.sale_starts_at : undefined,
           sale_ends_at:
             isTicket && value.sale_ends_at ? value.sale_ends_at : undefined,
-          requires_check_in: value.requires_check_in,
+          requires_check_in: isTicket && value.requires_check_in,
           is_active: value.is_active,
           exclusive: value.exclusive,
           total_stock_cap: totalStockCap ?? undefined,
@@ -308,6 +308,9 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
                       return
                     }
                     field.handleChange(val as ProductCategory)
+                    if (val !== "ticket") {
+                      form.setFieldValue("requires_check_in", false)
+                    }
                   }}
                   disabled={readOnly}
                 >
@@ -529,22 +532,32 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
             )}
           </form.Field>
 
-          <form.Field name="requires_check_in">
-            {(field) => (
-              <InlineRow
-                icon={<QrCode className="h-4 w-4 text-muted-foreground" />}
-                label="Requires Check-in"
-                description="Enable for products that need scanning at the venue (tickets, parking, VIP access)"
-              >
-                <Switch
-                  id="requires_check_in"
-                  checked={field.state.value}
-                  onCheckedChange={(checked) => field.handleChange(checked)}
-                  disabled={readOnly}
-                />
-              </InlineRow>
-            )}
-          </form.Field>
+          <form.Subscribe selector={(state) => state.values.category}>
+            {(category) =>
+              category === "ticket" && (
+                <form.Field name="requires_check_in">
+                  {(field) => (
+                    <InlineRow
+                      icon={
+                        <QrCode className="h-4 w-4 text-muted-foreground" />
+                      }
+                      label="Requires Check-in"
+                      description="Enable for tickets that need scanning at the venue"
+                    >
+                      <Switch
+                        id="requires_check_in"
+                        checked={field.state.value}
+                        onCheckedChange={(checked) =>
+                          field.handleChange(checked)
+                        }
+                        disabled={readOnly}
+                      />
+                    </InlineRow>
+                  )}
+                </form.Field>
+              )
+            }
+          </form.Subscribe>
 
           <form.Field name="is_active">
             {(field) => (

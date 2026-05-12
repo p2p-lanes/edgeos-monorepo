@@ -3,7 +3,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { motion } from "framer-motion"
 import Image from "next/image"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { z } from "zod/v4"
@@ -11,12 +11,14 @@ import { ApiError, AuthService } from "@/client"
 import { ButtonAnimated } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { queryKeys } from "@/lib/query-keys"
+import { getSafeReturnTo } from "@/lib/safe-return-to"
 import { useTenant } from "@/providers/tenantProvider"
 
 export default function AuthForm() {
   const { t } = useTranslation()
   const { tenantId, tenant } = useTenant()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const queryClient = useQueryClient()
 
   const emailSchema = z.email(t("auth.invalid_email"))
@@ -86,7 +88,7 @@ export default function AuthForm() {
         timerRef.current = null
       }
       queryClient.invalidateQueries({ queryKey: queryKeys.profile.current })
-      router.replace("/portal")
+      router.replace(getSafeReturnTo(searchParams.get("returnTo")) ?? "/portal")
     },
     onError: (err) => {
       if (err instanceof ApiError) {

@@ -5,22 +5,210 @@ popup_id. One row per scan event with full history.
 """
 
 import uuid
+from datetime import datetime
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, status
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, func, select
 from sqlmodel import select as sa_select
 
+from app.api.application.models import Applications
 from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.check_in.models import CheckIn
-from app.api.check_in.schemas import CheckInListItem
+from app.api.check_in.schemas import (
+    CheckInListItem,
+    CheckInPayload,
+    SelfCheckInOptions,
+    SelfCheckInPopup,
+    SelfCheckInRequest,
+    SelfCheckInResult,
+    SelfCheckInTicket,
+)
+from app.api.popup.models import Popups
 from app.api.product.models import Products
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.api.user.models import Users
 from app.core.db import engine
-from app.core.dependencies.users import CurrentCheckInOperator, TenantSession
+from app.core.dependencies.users import (
+    CurrentCheckInOperator,
+    CurrentHuman,
+    HumanTenantSession,
+    TenantSession,
+)
 
 router = APIRouter(prefix="/check-ins", tags=["check_in"])
+
+
+def _get_self_check_in_popup(db: Session, popup_slug: str, tenant_id: uuid.UUID) -> Popups:
+    popup = db.exec(
+        select(Popups).where(Popups.slug == popup_slug, Popups.tenant_id == tenant_id)
+    ).first()
+    if popup is None or not popup.self_check_in_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Popup not found",
+        )
+    return popup
+
+
+def _human_ticket_owner_filter(human_id: uuid.UUID, popup_id: uuid.UUID):
+    return (
+        (Applications.human_id == human_id) & (Applications.popup_id == popup_id)
+    ) | (
+        (Attendees.human_id == human_id)
+        & (Attendees.popup_id == popup_id)
+        & Attendees.application_id.is_(None)  # type: ignore[union-attr]
+    )
+
+
+def _first_check_ins_by_ticket(
+    db: Session,
+    ticket_ids: list[uuid.UUID],
+) -> dict[uuid.UUID, datetime]:
+    if not ticket_ids:
+        return {}
+    rows = db.exec(
+        select(
+            CheckIn.attendee_product_id,
+            func.min(CheckIn.occurred_at).label("first_check_in_at"),
+        )
+        .where(CheckIn.attendee_product_id.in_(ticket_ids))  # type: ignore[union-attr]
+        .group_by(CheckIn.attendee_product_id)
+    ).all()
+    return {row.attendee_product_id: row.first_check_in_at for row in rows}
+
+
+def _build_self_check_in_ticket(
+    ticket: AttendeeProducts,
+    first_check_in_at: datetime | None,
+) -> SelfCheckInTicket:
+    attendee = ticket.attendee
+    product = ticket.product
+    return SelfCheckInTicket(
+        attendee_product_id=ticket.id,
+        attendee_name=attendee.name,
+        attendee_category=attendee.category,
+        product_name=product.name,
+        product_category=product.category,
+        duration_type=product.duration_type,
+        checked_in=first_check_in_at is not None,
+        first_check_in_at=first_check_in_at,
+    )
+
+
+@router.get("/my/{popup_slug}/options", response_model=SelfCheckInOptions)
+async def get_my_check_in_options(
+    popup_slug: str,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+) -> SelfCheckInOptions:
+    popup = _get_self_check_in_popup(db, popup_slug, current_human.tenant_id)
+    statement = (
+        select(AttendeeProducts)
+        .join(Attendees, AttendeeProducts.attendee_id == Attendees.id)  # type: ignore[arg-type]
+        .join(Products, AttendeeProducts.product_id == Products.id)  # type: ignore[arg-type]
+        .outerjoin(Applications, Attendees.application_id == Applications.id)  # type: ignore[arg-type]
+        .where(
+            AttendeeProducts.tenant_id == current_human.tenant_id,
+            Attendees.popup_id == popup.id,
+            Products.requires_check_in.is_(True),  # type: ignore[union-attr]
+            _human_ticket_owner_filter(current_human.id, popup.id),
+        )
+        .options(
+            selectinload(AttendeeProducts.attendee),  # type: ignore[arg-type]
+            selectinload(AttendeeProducts.product),  # type: ignore[arg-type]
+        )
+    )
+    tickets = list(db.exec(statement).all())
+    first_check_ins = _first_check_ins_by_ticket(db, [ticket.id for ticket in tickets])
+    return SelfCheckInOptions(
+        popup=SelfCheckInPopup(id=popup.id, name=popup.name, slug=popup.slug),
+        tickets=[
+            _build_self_check_in_ticket(ticket, first_check_ins.get(ticket.id))
+            for ticket in tickets
+        ],
+    )
+
+
+@router.post("/my/{popup_slug}", response_model=SelfCheckInResult)
+async def confirm_my_check_in(
+    popup_slug: str,
+    request: SelfCheckInRequest,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+) -> SelfCheckInResult:
+    popup = _get_self_check_in_popup(db, popup_slug, current_human.tenant_id)
+    ticket = db.exec(
+        select(AttendeeProducts)
+        .where(AttendeeProducts.id == request.attendee_product_id)
+        .with_for_update()
+        .options(
+            selectinload(AttendeeProducts.attendee),  # type: ignore[arg-type]
+            selectinload(AttendeeProducts.product),  # type: ignore[arg-type]
+        )
+    ).first()
+    if ticket is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Ticket not found"
+        )
+
+    attendee = ticket.attendee
+    product = ticket.product
+    owns_ticket = db.exec(
+        select(AttendeeProducts.id)
+        .join(Attendees, AttendeeProducts.attendee_id == Attendees.id)  # type: ignore[arg-type]
+        .outerjoin(Applications, Attendees.application_id == Applications.id)  # type: ignore[arg-type]
+        .where(
+            AttendeeProducts.id == ticket.id,
+            AttendeeProducts.tenant_id == current_human.tenant_id,
+            Attendees.popup_id == popup.id,
+            _human_ticket_owner_filter(current_human.id, popup.id),
+        )
+    ).first()
+    if owns_ticket is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Ticket not found"
+        )
+
+    if not product.requires_check_in:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Product does not require check-in",
+        )
+
+    existing = db.exec(
+        select(CheckIn.id).where(CheckIn.attendee_product_id == ticket.id).limit(1)
+    ).first()
+    if existing is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ticket is already checked in",
+        )
+
+    event = CheckIn(
+        id=uuid.uuid4(),
+        tenant_id=ticket.tenant_id,
+        popup_id=popup.id,
+        attendee_product_id=ticket.id,
+        actor_user_id=None,
+        payload=CheckInPayload(
+            source="self_service", human_id=current_human.id
+        ).model_dump(mode="json", exclude_none=True),
+    )
+    db.add(event)
+    db.commit()
+    db.refresh(event)
+
+    return SelfCheckInResult(
+        attendee_product_id=ticket.id,
+        attendee_name=attendee.name,
+        attendee_category=attendee.category,
+        product_name=product.name,
+        product_category=product.category,
+        duration_type=product.duration_type,
+        checked_in=True,
+        checked_in_at=event.occurred_at,
+    )
 
 
 @router.get("", response_model=ListModel[CheckInListItem])

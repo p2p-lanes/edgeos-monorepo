@@ -132,6 +132,8 @@ async def create_products_batch(
                 )
 
                 product_data = item.model_dump()
+                if product_data["category"] != "ticket":
+                    product_data["requires_check_in"] = False
                 product_data["tenant_id"] = tenant_id
                 product_data["popup_id"] = batch.popup_id
                 product_data["slug"] = slug
@@ -219,6 +221,8 @@ async def create_product(
     from app.api.product.models import Products
 
     product_data = product_in.model_dump()
+    if product_data["category"] != "ticket":
+        product_data["requires_check_in"] = False
     product_data["tenant_id"] = tenant_id
     product_data["slug"] = slug
     product = Products(**product_data)
@@ -257,6 +261,10 @@ async def update_product(
         product_in.slug = crud.products_crud.generate_unique_slug(
             db, product_in.slug, product.popup_id
         )
+
+    target_category = product_in.category if product_in.category is not None else product.category
+    if target_category != "ticket":
+        product_in.requires_check_in = False
 
     updated = crud.products_crud.update(db, product, product_in)
     return ProductPublic.model_validate(updated)

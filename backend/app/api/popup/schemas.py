@@ -136,6 +136,10 @@ class PopupBase(SQLModel):
         default=True,
         sa_column=Column(Boolean, nullable=False, server_default="true"),
     )
+    self_check_in_enabled: bool = Field(
+        default=False,
+        sa_column=Column(Boolean, nullable=False, server_default="false"),
+    )
 
     @field_validator("currency")
     @classmethod
@@ -180,6 +184,7 @@ class PopupCreate(SQLModel):
     insurance_percentage: Decimal | None = None
     application_layout: ApplicationLayout = ApplicationLayout.single_page
     events_enabled: bool = True
+    self_check_in_enabled: bool = False
 
     @field_validator("currency")
     @classmethod
@@ -242,6 +247,7 @@ class PopupUpdate(SQLModel):
     insurance_percentage: Decimal | None = None
     application_layout: ApplicationLayout | None = None
     events_enabled: bool | None = None
+    self_check_in_enabled: bool | None = None
 
     @field_validator("currency")
     @classmethod

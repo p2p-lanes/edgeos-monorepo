@@ -3241,8 +3241,20 @@ export const CheckInPayloadSchema = {
     properties: {
         source: {
             type: 'string',
-            enum: ['qr', 'manual'],
+            enum: ['qr', 'manual', 'self_service'],
             title: 'Source'
+        },
+        human_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Human Id'
         },
         notes: {
             anyOf: [
@@ -9747,6 +9759,11 @@ export const PopupAdminSchema = {
             title: 'Events Enabled',
             default: true
         },
+        self_check_in_enabled: {
+            type: 'boolean',
+            title: 'Self Check In Enabled',
+            default: false
+        },
         id: {
             type: 'string',
             format: 'uuid',
@@ -10107,6 +10124,11 @@ export const PopupCreateSchema = {
             type: 'boolean',
             title: 'Events Enabled',
             default: true
+        },
+        self_check_in_enabled: {
+            type: 'boolean',
+            title: 'Self Check In Enabled',
+            default: false
         }
     },
     type: 'object',
@@ -10924,6 +10946,17 @@ export const PopupUpdateSchema = {
                 }
             ],
             title: 'Events Enabled'
+        },
+        self_check_in_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Self Check In Enabled'
         }
     },
     additionalProperties: false,
@@ -12545,6 +12578,177 @@ export const ScholarshipStatusSchema = {
     enum: ['pending', 'approved', 'rejected'],
     title: 'ScholarshipStatus',
     description: 'Status of a scholarship request on an application.'
+} as const;
+
+export const SelfCheckInOptionsSchema = {
+    properties: {
+        popup: {
+            '$ref': '#/components/schemas/SelfCheckInPopup'
+        },
+        tickets: {
+            items: {
+                '$ref': '#/components/schemas/SelfCheckInTicket'
+            },
+            type: 'array',
+            title: 'Tickets'
+        }
+    },
+    type: 'object',
+    required: ['popup', 'tickets'],
+    title: 'SelfCheckInOptions'
+} as const;
+
+export const SelfCheckInPopupSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        slug: {
+            type: 'string',
+            title: 'Slug'
+        }
+    },
+    type: 'object',
+    required: ['id', 'name', 'slug'],
+    title: 'SelfCheckInPopup'
+} as const;
+
+export const SelfCheckInRequestSchema = {
+    properties: {
+        attendee_product_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Attendee Product Id'
+        }
+    },
+    type: 'object',
+    required: ['attendee_product_id'],
+    title: 'SelfCheckInRequest'
+} as const;
+
+export const SelfCheckInResultSchema = {
+    properties: {
+        attendee_product_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Attendee Product Id'
+        },
+        attendee_name: {
+            type: 'string',
+            title: 'Attendee Name'
+        },
+        attendee_category: {
+            type: 'string',
+            title: 'Attendee Category'
+        },
+        product_name: {
+            type: 'string',
+            title: 'Product Name'
+        },
+        product_category: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Product Category'
+        },
+        duration_type: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Duration Type'
+        },
+        checked_in: {
+            type: 'boolean',
+            title: 'Checked In'
+        },
+        checked_in_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Checked In At'
+        }
+    },
+    type: 'object',
+    required: ['attendee_product_id', 'attendee_name', 'attendee_category', 'product_name', 'checked_in', 'checked_in_at'],
+    title: 'SelfCheckInResult'
+} as const;
+
+export const SelfCheckInTicketSchema = {
+    properties: {
+        attendee_product_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Attendee Product Id'
+        },
+        attendee_name: {
+            type: 'string',
+            title: 'Attendee Name'
+        },
+        attendee_category: {
+            type: 'string',
+            title: 'Attendee Category'
+        },
+        product_name: {
+            type: 'string',
+            title: 'Product Name'
+        },
+        product_category: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Product Category'
+        },
+        duration_type: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Duration Type'
+        },
+        checked_in: {
+            type: 'boolean',
+            title: 'Checked In'
+        },
+        first_check_in_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'First Check In At'
+        }
+    },
+    type: 'object',
+    required: ['attendee_product_id', 'attendee_name', 'attendee_category', 'product_name', 'checked_in'],
+    title: 'SelfCheckInTicket'
 } as const;
 
 export const SendTestRequestSchema = {

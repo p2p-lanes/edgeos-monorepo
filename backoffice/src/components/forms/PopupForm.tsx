@@ -18,6 +18,7 @@ import {
   Lock,
   Mail,
   MapPin,
+  QrCode,
   Scale,
   ShieldCheck,
   ShoppingCart,
@@ -219,6 +220,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
       insurance_percentage:
         defaultValues?.insurance_percentage?.toString() ?? "",
       events_enabled: defaultValues?.events_enabled ?? true,
+      self_check_in_enabled: defaultValues?.self_check_in_enabled ?? false,
     },
     onSubmit: ({ value }) => {
       if (readOnly) return
@@ -262,6 +264,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
           ? value.insurance_percentage || null
           : null,
         events_enabled: value.events_enabled,
+        self_check_in_enabled: value.self_check_in_enabled,
       }
       if (isEdit) {
         updateMutation.mutate(payload)
@@ -1074,6 +1077,28 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
               </form.Field>
             )}
           </form.Subscribe>
+        </InlineSection>
+
+        <Separator />
+
+        {/* Self-service check-in feature flag */}
+        <InlineSection title="Self-service check-in">
+          <form.Field name="self_check_in_enabled">
+            {(field) => (
+              <InlineRow
+                icon={<QrCode className="h-4 w-4 text-muted-foreground" />}
+                label="Enable attendee self check-in"
+                description="Allow authenticated attendees to check themselves in from the hidden QR-code portal page."
+              >
+                <Switch
+                  id="self_check_in_enabled"
+                  checked={field.state.value}
+                  onCheckedChange={(checked) => field.handleChange(checked)}
+                  disabled={readOnly}
+                />
+              </InlineRow>
+            )}
+          </form.Field>
         </InlineSection>
 
         <Separator />

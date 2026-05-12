@@ -17,6 +17,7 @@ def record_check_in(
     popup_id: uuid.UUID,
     payload: CheckInPayload,
     actor_user_id: uuid.UUID | None,
+    commit: bool = True,
 ) -> CheckIn:
     """Insert a check_ins row and return the persisted instance.
 
@@ -44,11 +45,14 @@ def record_check_in(
         popup_id=popup_id,
         attendee_product_id=attendee_product_id,
         actor_user_id=actor_user_id,
-        payload=payload.model_dump(),
+        payload=payload.model_dump(mode="json", exclude_none=True),
     )
     session.add(event)
-    session.commit()
-    session.refresh(event)
+    if commit:
+        session.commit()
+        session.refresh(event)
+    else:
+        session.flush()
     return event
 
 
