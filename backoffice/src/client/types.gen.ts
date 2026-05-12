@@ -2552,6 +2552,10 @@ export type TenantPublic = {
     logo_url?: (string | null);
     custom_domain?: (string | null);
     custom_domain_active: boolean;
+    /** Manually patched — regenerating the client from the backend schema will replace this. */
+    landing_mode?: ('portal' | 'checkout');
+    /** Computed projection — only present when landing_mode=checkout. Manually patched. */
+    active_popup_slug?: (string | null);
     id: string;
 };
 
@@ -2565,6 +2569,8 @@ export type TenantUpdate = {
     logo_url?: (string | null);
     custom_domain?: (string | null);
     custom_domain_active?: (boolean | null);
+    /** Manually patched — regenerating the client from the backend schema will replace this. */
+    landing_mode?: ('portal' | 'checkout' | null);
 };
 
 /**
