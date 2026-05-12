@@ -1,6 +1,6 @@
 "use client"
 
-import { ShoppingBag } from "lucide-react"
+import { Check, ChevronRight, Plus, ShoppingBag } from "lucide-react"
 import Image from "next/image"
 import { useTranslation } from "react-i18next"
 import ExpandableDescription from "@/components/ui/ExpandableDescription"
@@ -123,6 +123,7 @@ function ProductRow({
   product,
   stepType,
 }: { product: ProductsPass; stepType: string }) {
+  const { t } = useTranslation()
   const { cart, addDynamicItem, removeDynamicItem, updateDynamicQuantity } =
     useCheckout()
 
@@ -163,15 +164,28 @@ function ProductRow({
     updateDynamicQuantity(stepType, product.id, qty)
   }
 
+  // CTA palette: gold (accent) fill + verde-marino (primary) text on
+  // Amanita; for any tenant, this resolves to whatever the theme
+  // provides via `--accent` / `--primary`. Falls back to neutral when
+  // neither is set so other popups keep their existing affordance.
+  const ctaClass = cn(
+    "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold tracking-wide shrink-0 transition-all whitespace-nowrap",
+    "shadow-sm border border-[color:var(--accent,transparent)]",
+    isAdded
+      ? "bg-[color:var(--primary,theme(colors.foreground))] text-[color:var(--primary-foreground,theme(colors.background))]"
+      : "bg-[color:var(--accent,theme(colors.foreground))] text-[color:var(--primary,theme(colors.background))] hover:brightness-95 active:scale-[0.98]",
+    rowDisabled && "cursor-not-allowed opacity-50",
+  )
+
   return (
     <div
       className={cn(
         "px-4 py-3 transition-colors",
-        isAdded && "bg-primary/10",
+        isAdded && "bg-[color:var(--accent,theme(colors.muted))]/10",
         rowDisabled && "opacity-40",
       )}
     >
-      <div className="flex items-start gap-3">
+      <div className="flex items-center gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h4 className="font-medium text-foreground text-sm">
@@ -191,46 +205,58 @@ function ProductRow({
             </p>
           )}
         </div>
-        <div className="text-right shrink-0">
-          {hasDiscount && (
-            <div className="text-[11px] text-muted-foreground line-through leading-none">
-              {formatCurrency(product.compare_price ?? 0, product.currency)}
-            </div>
-          )}
-          <div className="text-sm font-semibold text-foreground">
-            {formatCurrency(product.price, product.currency)}
-          </div>
-        </div>
-      </div>
-      <div className="mt-3 flex justify-end">
-        {showStepper ? (
-          <QuantitySelector
-            size="md"
-            value={quantity}
-            min={0}
-            max={max}
-            onIncrement={() => handleQuantityChange(quantity + 1)}
-            onDecrement={() =>
-              handleQuantityChange(Math.max(0, quantity - 1))
-            }
-            onAdd={() => handleAdd(1)}
-          />
-        ) : (
-          <button
-            type="button"
-            onClick={() => handleQuantityChange(isAdded ? 0 : 1)}
-            disabled={rowDisabled}
-            className={cn(
-              "px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors",
-              isAdded
-                ? "bg-primary text-primary-foreground border-primary"
-                : "bg-card text-foreground border-border hover:bg-muted",
-              rowDisabled && "cursor-not-allowed",
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="text-right">
+            {hasDiscount && (
+              <div className="text-[11px] text-muted-foreground line-through leading-none">
+                {formatCurrency(product.compare_price ?? 0, product.currency)}
+              </div>
             )}
-          >
-            {isAdded ? "Added" : "Add"}
-          </button>
-        )}
+            <div className="text-sm font-semibold text-foreground">
+              {formatCurrency(product.price, product.currency)}
+            </div>
+          </div>
+          {showStepper ? (
+            <QuantitySelector
+              size="md"
+              tone="accent"
+              value={quantity}
+              min={0}
+              max={max}
+              onIncrement={() => handleQuantityChange(quantity + 1)}
+              onDecrement={() => handleQuantityChange(Math.max(0, quantity - 1))}
+              onAdd={() => handleAdd(1)}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => handleQuantityChange(isAdded ? 0 : 1)}
+              disabled={rowDisabled}
+              className={ctaClass}
+              aria-label={
+                isAdded
+                  ? t("checkout.actions.remove_aria", {
+                      defaultValue: "Remove from cart",
+                    })
+                  : t("checkout.actions.add_aria", {
+                      defaultValue: "Add to cart",
+                    })
+              }
+            >
+              {isAdded ? (
+                <>
+                  <Check className="size-3.5" />
+                  {t("checkout.actions.added", { defaultValue: "Added" })}
+                </>
+              ) : (
+                <>
+                  <Plus className="size-3.5" />
+                  {t("checkout.actions.add", { defaultValue: "Add" })}
+                </>
+              )}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -315,6 +341,16 @@ function SectionCard({
             text={section.description}
             clamp={3}
             className="text-sm text-muted-foreground mt-1 whitespace-pre-line"
+            // Branded toggle: uppercase micro-caps + chevron glyph in the
+            // theme accent colour. Falls back to the card's foreground
+            // when the tenant didn't set an accent, so other popups stay
+            // readable without the plain-blue link.
+            buttonClassName={cn(
+              "mt-2 inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.2em] font-bold",
+              "text-[color:var(--accent,currentColor)] hover:opacity-80",
+              "transition-opacity no-underline hover:no-underline",
+              "after:content-['_›'] after:font-normal after:text-base after:leading-none after:relative after:top-[-1px]",
+            )}
           />
         )}
       </header>

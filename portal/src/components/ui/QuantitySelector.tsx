@@ -64,6 +64,14 @@ interface QuantitySelectorProps {
   onAdd?: () => void
   size?: "sm" | "md"
   className?: string
+  /** Colour treatment for the empty-slot Add button.
+   *  - `default` (legacy) → faint primary tile, primary icon.
+   *  - `accent` → filled accent (typically the popup's brand emphasis
+   *    colour, e.g. Amanita's dorado) with primary-coloured icon.
+   *    Used by VariantTicketCard so the Add CTA sits on the same row
+   *    as the price with a high-contrast pill — readable on light
+   *    cream surfaces where the bg-primary/20 fallback gets lost. */
+  tone?: "default" | "accent"
 }
 
 const BUTTON_SIZES: Record<
@@ -120,6 +128,7 @@ const QuantitySelector = ({
   onAdd,
   size = "md",
   className,
+  tone = "default",
 }: QuantitySelectorProps) => {
   const stopPropagation = (e: MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation()
@@ -131,6 +140,22 @@ const QuantitySelector = ({
   // Empty-slot state: single "+" add button — filled tile CTA, sized larger
   // than the +/- adjustment buttons so it reads as the primary action.
   if (value === 0 && onAdd && !disabled) {
+    const addClasses =
+      tone === "accent"
+        ? cn(
+            // Solid accent fill with primary-toned icon. Renders crisply
+            // on both dark navbars and light cream cards.
+            "transition-all duration-200 ease-out transform hover:scale-110 active:scale-95",
+            "flex items-center justify-center rounded-full shadow-sm",
+            "bg-[color:var(--accent,theme(colors.primary))]",
+            "text-[color:var(--primary,theme(colors.background))]",
+            "hover:brightness-95",
+            ADD_BUTTON_SIZES[size],
+          )
+        : cn(
+            "transition-all duration-200 ease-out transform hover:scale-110 active:scale-95 hover:bg-primary/30 flex items-center justify-center rounded-full bg-primary/20 text-primary shadow-sm",
+            ADD_BUTTON_SIZES[size],
+          )
     return (
       <div className={cn("flex items-center", className)}>
         <button
@@ -139,10 +164,7 @@ const QuantitySelector = ({
             stopPropagation(e)
             onAdd()
           }}
-          className={cn(
-            "transition-all duration-200 ease-out transform hover:scale-110 active:scale-95 hover:bg-primary/30 flex items-center justify-center rounded-full bg-primary/20 text-primary shadow-sm",
-            ADD_BUTTON_SIZES[size],
-          )}
+          className={addClasses}
           aria-label="Add item"
           tabIndex={0}
         >

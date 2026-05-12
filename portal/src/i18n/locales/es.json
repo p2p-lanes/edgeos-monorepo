@@ -223,7 +223,11 @@
       "confirm_edit": "Confirmar edición",
       "pay_and_confirm_edit": "Pagar y confirmar edición",
       "continue_to": "Continuar a {{step}}",
-      "review": "Revisar"
+      "review": "Revisar",
+      "add": "Agregar",
+      "added": "Agregado",
+      "add_aria": "Agregar al carrito",
+      "remove_aria": "Quitar del carrito"
     },
     "step_short": {
       "passes": "Pases",
