@@ -183,21 +183,13 @@ async def update_tenant(
     if (
         current_user.role == UserRole.ADMIN
         and tenant_in.custom_domain is not None
+        and tenant_in.custom_domain != tenant.custom_domain
         and tenant.custom_domain_active
     ):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Cannot change custom domain while it is active. Deactivate first.",
         )
-
-    # 5. Slug uniqueness check
-    if tenant_in.slug and tenant_in.slug != tenant.slug:
-        existing = crud.get_by_slug(db, tenant_in.slug)
-        if existing:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="A tenant with this slug already exists",
-            )
 
     # 6. Custom domain uniqueness check (don't reveal owner)
     if (
