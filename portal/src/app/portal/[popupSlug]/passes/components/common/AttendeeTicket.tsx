@@ -83,8 +83,12 @@ const AttendeeTicket = ({
     .filter((e) => e.product_category !== "patreon")
     .sort(compareByCategory)
 
-  // Inline QR modal state — drives the shared <QRcode> modal at bottom of file
-  const [activeCode, setActiveCode] = useState<string | null>(null)
+  // Inline QR modal state — drives the shared <QRcode> modal at bottom of file.
+  // Tracks lastScanAt alongside the code so the modal can flag already-used QRs.
+  const [activeTicket, setActiveTicket] = useState<{
+    code: string
+    lastScanAt: string | null
+  } | null>(null)
 
   // Collapsible open states
   const defaultLocalOpen = isLocalResident ? localProducts.length > 0 : false
@@ -215,6 +219,7 @@ const AttendeeTicket = ({
               <div className="w-full">
                 {ticketEntries.map((entry, idx) => {
                   const CategoryIcon = getCategoryIcon(entry.product_category)
+                  const isScanned = entry.last_scan_at != null
                   return (
                     <div
                       key={entry.id}
@@ -233,9 +238,23 @@ const AttendeeTicket = ({
                       {entry.requires_check_in === true && (
                         <button
                           type="button"
-                          onClick={() => setActiveCode(entry.check_in_code)}
-                          aria-label={t("passes.check_in_code")}
-                          className="text-pass-text hover:text-pass-title transition-colors cursor-pointer flex-shrink-0"
+                          onClick={() =>
+                            setActiveTicket({
+                              code: entry.check_in_code,
+                              lastScanAt: entry.last_scan_at ?? null,
+                            })
+                          }
+                          aria-label={
+                            isScanned
+                              ? t("passes.qr_already_scanned")
+                              : t("passes.check_in_code")
+                          }
+                          className={cn(
+                            "transition-colors cursor-pointer flex-shrink-0",
+                            isScanned
+                              ? "text-yellow-500 hover:text-yellow-700"
+                              : "text-pass-text hover:text-pass-title",
+                          )}
                         >
                           <QrCode className="w-5 h-5" />
                         </button>
@@ -244,10 +263,11 @@ const AttendeeTicket = ({
                   )
                 })}
                 <QRcode
-                  check_in_code={activeCode ?? ""}
-                  isOpen={activeCode !== null}
+                  check_in_code={activeTicket?.code ?? ""}
+                  lastScanAt={activeTicket?.lastScanAt ?? null}
+                  isOpen={activeTicket !== null}
                   onOpenChange={(open) => {
-                    if (!open) setActiveCode(null)
+                    if (!open) setActiveTicket(null)
                   }}
                 />
               </div>

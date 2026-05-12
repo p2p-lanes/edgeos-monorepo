@@ -170,6 +170,10 @@ class AttendeeProductPublic(BaseModel):
     related Product at response-build time (current product state, not
     snapshot-at-purchase). All are optional with None defaults for backward
     compatibility with old clients that do not read them.
+
+    last_scan_at is the most recent occurred_at from check_ins for this ticket
+    (None when the ticket has never been scanned). Populated by the router from
+    a batched aggregation so portal UIs can flag already-used QR codes.
     """
 
     id: uuid.UUID
@@ -181,6 +185,7 @@ class AttendeeProductPublic(BaseModel):
     product_name: str | None = None
     product_category: str | None = None
     duration_type: str | None = None
+    last_scan_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True, extra="forbid")
 
