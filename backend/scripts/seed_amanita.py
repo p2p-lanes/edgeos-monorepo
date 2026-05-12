@@ -55,6 +55,12 @@ THEME_CONFIG: dict = {
         "primary_color": "#071b28",
         "primary_foreground_color": "#ffffff",
         "accent_color": "#A89477",
+        # Navbar: verde marino background with white text and white-tinted
+        # monochrome emojis, matching the live production look on
+        # amanita.edgeos.world. These three tokens are tenant-configurable.
+        "checkout_navbar_bg": "#071b28",
+        "checkout_nav_text_color": "#ffffff",
+        "checkout_nav_monochrome_emoji": True,
         "checkout_subtitle_color": "rgba(255, 255, 255, 0.85)",
     }
 }
@@ -352,17 +358,34 @@ def _seed_ticketing_steps(
             "template": "ticket-card",
             "template_config": {
                 "variant": "stacked",
+                # Light surface keeps the tickets readable on the dark
+                # forest background — pinned regardless of the popup's
+                # global theme mode (which is dark for hero/nav contrast).
+                "surface": "light",
                 "sections": [
                     {
                         "key": "ticket-4-dias",
                         "label": "Ticket 4 Días",
                         "image_url": asset("ticket-4-dias.png"),
                         "image_aspect": "3:2",
+                        # Full "Ver más" copy carried over verbatim from the
+                        # live product description on the Gemstore landing.
                         "description": (
                             "La entrada te brinda acceso a todas las "
                             "actividades, talleres, y shows durante los "
-                            "cuatro días del festival.\n\nPodés ingresar "
-                            "a partir del Jueves 19 de Noviembre a las 18hs.\n\n"
+                            "cuatro días del festival.\n\n"
+                            "Podés participar de:\n"
+                            "Amanita Festival: 20 al 24 de Noviembre, 2026.\n\n"
+                            "Incluye:\n"
+                            "⛺ Días repletos de actividades en Comunidad\n"
+                            "🎵 Djs y Bandas en Vivo\n"
+                            "🎨 Arte Inmersivo\n"
+                            "🧘 Yoga, Meditación, Clases de Baile y Movimiento\n"
+                            "🎭 Talleres Interactivos, Charlas y Paneles\n"
+                            "Podés ingresar a partir del Jueves 19 de Noviembre "
+                            "a las 18hs.\n\n"
+                            "*El espacio de acampe, las comidas y el "
+                            "estacionamiento no están incluidos.\n\n"
                             "⚠️ No hay devoluciones (sin excepción).\n"
                             "⚠️ Tickets transferibles hasta 30 de Octubre, 2026 "
                             "(sin excepción)."
@@ -379,9 +402,23 @@ def _seed_ticketing_steps(
                         "image_url": asset("ticket-7-dias.png"),
                         "image_aspect": "3:2",
                         "description": (
-                            "Experiencia extendida: 17 al 24 de Noviembre. "
-                            "Incluye todas las actividades del festival más "
-                            "los 3 días previos (Pre-Festival)."
+                            "La entrada te brinda acceso a todas las "
+                            "actividades, talleres, y shows durante los "
+                            "siete días del festival.\n\n"
+                            "Podés participar de:\n"
+                            "Experiencia Extendida: 17, 18 y 19 de Noviembre, 2026\n"
+                            "Amanita Festival: 20 al 24 de Noviembre, 2026.\n\n"
+                            "Incluye:\n"
+                            "⛺ Días repletos de actividades en Comunidad\n"
+                            "🎵 Djs y Bandas en Vivo\n"
+                            "🎨 Arte Inmersivo\n"
+                            "🧘 Yoga, Meditación, Clases de Baile y Movimiento\n"
+                            "🎭 Talleres Interactivos, Charlas y Paneles\n\n"
+                            "*El espacio de acampe, las comidas y el "
+                            "estacionamiento no están incluidos.\n\n"
+                            "⚠️ No hay devoluciones (sin excepción).\n"
+                            "⚠️ Tickets transferibles hasta 30 de Octubre, 2026 "
+                            "(sin excepción)."
                         ),
                         "order": 1,
                         "product_ids": [
@@ -397,7 +434,20 @@ def _seed_ticketing_steps(
                         "description": (
                             "La entrada para niños es hasta los 12 años. "
                             "Es necesario que traigan su documento de "
-                            "identidad y que estén acompañados por un adulto."
+                            "identidad y que entren al evento acompañados "
+                            "por sus responsables. A partir de los 13 años, "
+                            "deberán pagar una entrada normal.\n\n"
+                            "Entrada niños: 0 a 6 años\n"
+                            "Entrada niños: 6 a 12 años\n\n"
+                            "Importante:\n"
+                            "Todo menor de 18 años debe estar acompañado por un "
+                            "adulto responsable en todo momento sin excepción.\n\n"
+                            "Incluye:\n"
+                            "⛺ 4 Días repletos de actividades en Comunidad\n"
+                            "🎵 Djs y Bandas en Vivo\n"
+                            "🎨 Arte Inmersivo\n"
+                            "🧘 Yoga, Meditación, Clases de Baile y Movimiento\n"
+                            "🎭 Talleres Interactivos, Charlas y Paneles"
                         ),
                         "order": 2,
                         "product_ids": [
@@ -427,7 +477,18 @@ def _seed_ticketing_steps(
                     {
                         "key": "carpa-pre-armada",
                         "label": "Alquiler Carpa Pre Armada - 2 personas",
-                        "description": "Hacemos que la experiencia de acampe sea más fácil y cómoda. Cuando llegues, te va a estar esperando tu carpa armada para 2 personas lista en el lugar!\n\nAdentro de la carpa, vas a encontrar un colchón inflable nuevo en su caja con el inflador. (Sí, vas a tener que inflar tu colchón. Tampoco podemos hacerlo tan fácil! 🤭)\n\nTraé tus sábanas, tu almohada y tu peluche preferido 🧸",
+                        "image_url": asset("housing-carpa.webp"),
+                        "description": (
+                            "Hacemos que la experiencia de acampe sea más fácil y "
+                            "cómoda. Cuando llegues, te va a estar esperando tu "
+                            "carpa armada para 2 personas lista en el lugar!\n\n"
+                            "Adentro de la carpa, vas a encontrar un colchón "
+                            "inflable nuevo en su caja con el inflador. (Sí, vas a "
+                            "tener que inflar tu colchón. Tampoco podemos hacerlo "
+                            "tan fácil! 🤭)\n\n"
+                            "Traé tus sábanas, tu almohada y tu peluche "
+                            "preferido 🧸"
+                        ),
                         "order": 0,
                         "product_ids": [
                             pid("carpa-colchon-inflable-doble"),
@@ -437,21 +498,28 @@ def _seed_ticketing_steps(
                     {
                         "key": "motorhome",
                         "label": "Motorhome",
-                        "description": "Reservá un espacio para venir con motorhome 🚙",
+                        "image_url": asset("housing-motorhome.webp"),
+                        "description": (
+                            "Reservá un espacio para venir con motorhome 🚙\n\n"
+                            "No se brinda servicio de agua, electricidad, ni "
+                            "descarga de aguas grises. Consultar medidas máximas "
+                            "por favor. Prohibido hacer fuego."
+                        ),
                         "order": 1,
                         "product_ids": [pid("espacio-motorhome-2026")],
                     },
                     {
                         "key": "glamping",
                         "label": "Glamping",
-                        "description": "Experiencia premium con todas las comodidades.",
+                        "image_url": asset("gallery-2-yoga.jpg"),
+                        "description": "Experiencia premium con todas las comodidades para los días del festival.",
                         "order": 2,
                         "product_ids": [pid("glamping-2026")],
                     },
                     {
                         "key": "acampe",
                         "label": "Derecho a Acampe",
-                        "description": "Traé tu propia carpa.",
+                        "description": "Traé tu propia carpa. Acceso al espacio de acampe durante el festival.",
                         "order": 3,
                         "product_ids": [pid("derecho-a-acampe-2026")],
                     },
