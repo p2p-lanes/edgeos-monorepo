@@ -33,6 +33,17 @@ interface ThemeColors {
   secondary_color?: string
   accent_color?: string
   checkout_navbar_bg?: string
+  /** Optional override for the step-nav text + icon colour. Required when
+   * the admin picks a `checkout_navbar_bg` that doesn't match the chosen
+   * `mode` (e.g. verde-marino navbar in a light-mode popup): without this
+   * the nav labels default to muted-foreground and disappear against the
+   * dark fill. Applied to both active and inactive nav items. */
+  checkout_nav_text_color?: string
+  /** When true, native emojis in the nav are forced to a single color
+   * (the nav text colour) via `filter: brightness(0) saturate(0)
+   * invert(1)`. Useful when the admin wants the emoji palette to feel
+   * "monochrome iconography" instead of OS-coloured pictographs. */
+  checkout_nav_monochrome_emoji?: boolean | string
   checkout_subtitle_color?: string
 }
 
@@ -91,6 +102,25 @@ function computeThemeVars(
   if (colors.checkout_navbar_bg) {
     vars["--checkout-navbar-bg"] = colors.checkout_navbar_bg
     vars["--checkout-nav-bg"] = colors.checkout_navbar_bg
+  }
+  if (colors.checkout_nav_text_color) {
+    // Force nav text/icon colour for both active and inactive states. The
+    // disabled token uses a slight opacity so the inactive labels still
+    // recede visually without becoming unreadable.
+    vars["--checkout-badge-title"] = colors.checkout_nav_text_color
+    vars["--checkout-nav-text"] = colors.checkout_nav_text_color
+    vars["--checkout-badge-title-disabled"] =
+      `color-mix(in srgb, ${colors.checkout_nav_text_color} 70%, transparent)`
+  }
+  // Monochrome emoji filter: native emojis ignore CSS `color`, so we use
+  // `filter` to force them to a single tone. The default chain inverts to
+  // white (works on dark navbars); when admins pass a custom filter string
+  // we just plumb it through.
+  if (colors.checkout_nav_monochrome_emoji) {
+    vars["--checkout-nav-emoji-filter"] =
+      typeof colors.checkout_nav_monochrome_emoji === "string"
+        ? colors.checkout_nav_monochrome_emoji
+        : "brightness(0) saturate(0) invert(1)"
   }
   if (colors.checkout_subtitle_color) {
     vars["--checkout-subtitle"] = colors.checkout_subtitle_color

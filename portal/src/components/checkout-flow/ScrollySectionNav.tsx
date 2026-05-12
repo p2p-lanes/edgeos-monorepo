@@ -129,6 +129,13 @@ export default function ScrollySectionNav({
                     {emoji ? (
                       <span
                         aria-hidden
+                        // Inline style picks up the optional theme filter
+                        // (`--checkout-nav-emoji-filter`) so tenants can
+                        // force monochrome icons; falls back to no filter.
+                        style={{
+                          filter:
+                            "var(--checkout-nav-emoji-filter, none)" as string,
+                        }}
                         className="text-sm leading-none shrink-0"
                       >
                         {emoji}
