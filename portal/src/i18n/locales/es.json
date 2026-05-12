@@ -201,10 +201,21 @@
     },
     "to_pay": "A pagar",
     "credit_label": "Crédito: {{amount}}",
+    "promo_code_placeholder": "Código promocional",
+    "apply": "Aplicar",
+    "housing_label": "Alojamiento",
+    "housing_nights_one": "{{count}} noche",
+    "housing_nights_other": "{{count}} noches",
+    "housing_full_stay": "Estadía completa",
+    "errors": {
+      "payment_failed": "Algo salió mal con tu pago. Por favor intentalo de nuevo.",
+      "generic": "Algo salió mal. Por favor intentalo de nuevo.",
+      "application_pending": "Ya tenés una postulación pendiente para este evento. Revisá tu email o contactá a soporte."
+    },
     "cart": {
       "close_aria": "Cerrar carrito",
       "empty_title": "Tu carrito está vacío",
-      "empty_description": "Por favor, volvé atrás y seleccioná algunos pases para continuar."
+      "empty_description": "Volvé atrás y elegí las entradas que querés llevar."
     },
     "actions": {
       "pay": "Pagar",

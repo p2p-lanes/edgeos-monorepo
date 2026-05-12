@@ -201,10 +201,21 @@
     },
     "to_pay": "To Pay",
     "credit_label": "Credit: {{amount}}",
+    "promo_code_placeholder": "Promo code",
+    "apply": "Apply",
+    "housing_label": "Housing",
+    "housing_nights_one": "{{count}} night",
+    "housing_nights_other": "{{count}} nights",
+    "housing_full_stay": "Full stay",
+    "errors": {
+      "payment_failed": "Something went wrong with your payment. Please try again.",
+      "generic": "Something went wrong. Please try again.",
+      "application_pending": "You already have a pending application for this pop-up. Please check your email or contact support."
+    },
     "cart": {
       "close_aria": "Close cart",
       "empty_title": "Your cart is empty",
-      "empty_description": "Please go back and select some passes to continue."
+      "empty_description": "Head back and pick the tickets you'd like to take with you."
     },
     "actions": {
       "pay": "Pay",

@@ -14,8 +14,8 @@ import { Route as LayoutRouteImport } from './routes/_layout'
 import { Route as LayoutIndexRouteImport } from './routes/_layout/index'
 import { Route as LayoutSettingsRouteImport } from './routes/_layout/settings'
 import { Route as LayoutPaymentsRouteImport } from './routes/_layout/payments'
-import { Route as LayoutAttendeesRouteImport } from './routes/_layout/attendees'
 import { Route as LayoutCheckInRouteImport } from './routes/_layout/check-in'
+import { Route as LayoutAttendeesRouteImport } from './routes/_layout/attendees'
 import { Route as LayoutAbandonedCartsRouteImport } from './routes/_layout/abandoned-carts'
 import { Route as LayoutTicketingStepsIndexRouteImport } from './routes/_layout/ticketing-steps/index'
 import { Route as LayoutThemeIndexRouteImport } from './routes/_layout/theme/index'
@@ -90,14 +90,14 @@ const LayoutPaymentsRoute = LayoutPaymentsRouteImport.update({
   path: '/payments',
   getParentRoute: () => LayoutRoute,
 } as any)
-const LayoutAttendeesRoute = LayoutAttendeesRouteImport.update({
-  id: '/attendees',
-  path: '/attendees',
-  getParentRoute: () => LayoutRoute,
-} as any)
 const LayoutCheckInRoute = LayoutCheckInRouteImport.update({
   id: '/check-in',
   path: '/check-in',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutAttendeesRoute = LayoutAttendeesRouteImport.update({
+  id: '/attendees',
+  path: '/attendees',
   getParentRoute: () => LayoutRoute,
 } as any)
 const LayoutAbandonedCartsRoute = LayoutAbandonedCartsRouteImport.update({
@@ -748,18 +748,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutPaymentsRouteImport
       parentRoute: typeof LayoutRoute
     }
-    '/_layout/attendees': {
-      id: '/_layout/attendees'
-      path: '/attendees'
-      fullPath: '/attendees'
-      preLoaderRoute: typeof LayoutAttendeesRouteImport
-      parentRoute: typeof LayoutRoute
-    }
     '/_layout/check-in': {
       id: '/_layout/check-in'
       path: '/check-in'
       fullPath: '/check-in'
       preLoaderRoute: typeof LayoutCheckInRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/attendees': {
+      id: '/_layout/attendees'
+      path: '/attendees'
+      fullPath: '/attendees'
+      preLoaderRoute: typeof LayoutAttendeesRouteImport
       parentRoute: typeof LayoutRoute
     }
     '/_layout/abandoned-carts': {

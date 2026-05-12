@@ -131,16 +131,26 @@ export default function ConfirmStep() {
       : null
 
   if (!hasCartItems) {
-    // Header copy ("Nothing to review yet" / "Head back and pick some passes…")
-    // already tells the user what to do — keep the body to a quiet icon so the
-    // message isn't doubled up.
+    // Empty-state inherits the popup's verde-marino card surface + dorado
+    // accent on the icon. Header copy in ScrollyCheckoutFlow (a layer up)
+    // already explains why the cart is empty, so we keep the message short
+    // and call out the action — "go back to tickets" — in friendly tone.
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-center">
-        <ShoppingBag
-          className="w-12 h-12 text-checkout-subtitle"
-          aria-hidden="true"
-        />
-        <span className="sr-only">{t("checkout.cart.empty_title")}</span>
+      <div className="rounded-2xl border border-border bg-card/60 py-12 px-6 flex flex-col items-center justify-center text-center">
+        <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-accent/15 text-accent">
+          <ShoppingBag className="size-7" aria-hidden="true" />
+        </div>
+        <h3 className="text-base font-semibold text-foreground">
+          {t("checkout.cart.empty_title", {
+            defaultValue: "Your cart is empty",
+          })}
+        </h3>
+        <p className="mt-1 text-sm text-checkout-subtitle">
+          {t("checkout.cart.empty_description", {
+            defaultValue:
+              "Head back and pick the tickets you'd like to take with you.",
+          })}
+        </p>
       </div>
     )
   }
@@ -270,7 +280,11 @@ export default function ConfirmStep() {
               <div className="flex items-center gap-2 mb-3">
                 <Home className="w-4 h-4 text-muted-foreground" />
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  Housing
+                  {/* Use the configured housing-step title so tenants in
+                      non-English locales (or with a custom label like
+                      "Alojamiento") see their own string here. */}
+                  {stepConfigs.find((s) => s.step_type === "housing")?.title ??
+                    t("checkout.housing_label", { defaultValue: "Housing" })}
                 </span>
               </div>
               <div className="flex items-start justify-between">
@@ -285,8 +299,14 @@ export default function ConfirmStep() {
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {cart.housing.pricePerDay !== false
-                      ? `${cart.housing.nights} night${cart.housing.nights !== 1 ? "s" : ""}`
-                      : "Full stay"}
+                      ? t("checkout.housing_nights", {
+                          count: cart.housing.nights,
+                          defaultValue_one: "{{count}} night",
+                          defaultValue_other: "{{count}} nights",
+                        })
+                      : t("checkout.housing_full_stay", {
+                          defaultValue: "Full stay",
+                        })}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {formatCheckoutDate(cart.housing.checkIn)} –{" "}
@@ -399,7 +419,9 @@ export default function ConfirmStep() {
                   handleApplyPromo()
                 }
               }}
-              placeholder="Promo code"
+              placeholder={t("checkout.promo_code_placeholder", {
+                defaultValue: "Promo code",
+              })}
               disabled={cart.promoCodeValid}
               className={cn(
                 "flex-1 px-3 py-2 border rounded-lg text-sm transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent",
@@ -434,7 +456,7 @@ export default function ConfirmStep() {
                 {promoLoading || isLoading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
-                  "Apply"
+                  t("checkout.apply", { defaultValue: "Apply" })
                 )}
               </button>
             )}

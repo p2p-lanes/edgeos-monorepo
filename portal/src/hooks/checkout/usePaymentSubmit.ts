@@ -2,6 +2,7 @@
 
 import { useQueryClient } from "@tanstack/react-query"
 import { useCallback, useEffect, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import type { CheckoutMode } from "@/checkout/popupCheckoutPolicy"
 import { CheckoutService, PaymentsService } from "@/client"
@@ -77,6 +78,7 @@ export function usePaymentSubmit({
   buyerData,
 }: UsePaymentSubmitParams) {
   const queryClient = useQueryClient()
+  const { t } = useTranslation()
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Reset isSubmitting when page is restored from bfcache
@@ -221,8 +223,9 @@ export function usePaymentSubmit({
       return { success: true }
     } catch (err: unknown) {
       console.error("Payment failed:", err)
-      const errorMsg =
-        "Something went wrong with your payment. Please try again."
+      const errorMsg = t("checkout.errors.payment_failed", {
+        defaultValue: "Something went wrong with your payment. Please try again.",
+      })
       setPromoError(errorMsg)
       toast.error(errorMsg)
       setIsSubmitting(false)

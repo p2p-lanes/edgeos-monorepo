@@ -2,6 +2,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useState } from "react"
+import { useTranslation } from "react-i18next"
 import {
   ApiError,
   type ApplicationCreate,
@@ -84,6 +85,7 @@ const useCheckoutState = ({
   schema,
 }: UseCheckoutStateProps) => {
   const queryClient = useQueryClient()
+  const { t } = useTranslation()
   const [checkoutState, setCheckoutState] = useState<CheckoutState>("form")
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const { setCookie } = useCookies()
@@ -206,15 +208,16 @@ const useCheckoutState = ({
         }
 
         setErrorMessage(
-          "You already have a pending application for this pop-up. Please check your email or contact support.",
+          t("checkout.errors.application_pending", {
+            defaultValue:
+              "You already have a pending application for this pop-up. Please check your email or contact support.",
+          }),
         )
       } else {
-        const msg =
-          detail ??
-          (error instanceof ApiError
-            ? "Something went wrong. Please try again."
-            : "Something went wrong. Please try again.")
-        setErrorMessage(msg)
+        const fallback = t("checkout.errors.generic", {
+          defaultValue: "Something went wrong. Please try again.",
+        })
+        setErrorMessage(detail ?? fallback)
       }
 
       setCheckoutState("form")

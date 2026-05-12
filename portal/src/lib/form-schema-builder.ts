@@ -4,7 +4,9 @@ import type {
   FormFieldSchema,
 } from "@/types/form-schema"
 
-function fieldToZod(field: FormFieldSchema): z.ZodType {
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+function fieldToZod(field: FormFieldSchema, fieldName: string): z.ZodType {
   switch (field.type) {
     case "boolean":
       return z.boolean()
@@ -12,7 +14,21 @@ function fieldToZod(field: FormFieldSchema): z.ZodType {
       return z.array(z.string())
     case "number":
       return z.string()
+    case "email":
+      return z.string().refine((v) => v === "" || EMAIL_RE.test(v), {
+        error: "Enter a valid email address",
+      })
     default:
+      // The open-ticketing buyer step's `email` slot is declared as a plain
+      // string in the runtime schema (because the backend has no `email`
+      // type for base fields), but the field name is literally "email" —
+      // surface a validation error if the value isn't a valid address so
+      // the user can't submit junk like "asdas".
+      if (fieldName === "email") {
+        return z.string().refine((v) => v === "" || EMAIL_RE.test(v), {
+          error: "Enter a valid email address",
+        })
+      }
       return z.string()
   }
 }
@@ -26,7 +42,7 @@ export function buildFormZodSchema(
 
   // Base fields from schema (all profile + application fields)
   for (const [name, field] of Object.entries(schema.base_fields)) {
-    const zodType = fieldToZod(field)
+    const zodType = fieldToZod(field, name)
     const isReplacedByChildrenSection =
       fieldsOptionalWhenChildrenSection?.has(name)
     shape[name] =
@@ -40,7 +56,7 @@ export function buildFormZodSchema(
 
   // Custom fields from schema
   for (const [name, field] of Object.entries(schema.custom_fields)) {
-    const zodType = fieldToZod(field)
+    const zodType = fieldToZod(field, `custom_${name}`)
     shape[`custom_${name}`] =
       isDraft || !field.required
         ? makeOptional(zodType)

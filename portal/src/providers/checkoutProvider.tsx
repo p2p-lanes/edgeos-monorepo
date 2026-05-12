@@ -186,8 +186,16 @@ export function CheckoutProvider({
       return configuredSteps
     }
 
-    // Inherit show_title/show_watermark from confirm: buyer sits adjacent to it
-    // and admins typically want consistent display between the two.
+    // Buyer step is now a real `TicketingStep` row (step_type="buyer",
+    // template="buyer-form") on direct-sale popups — admins can reorder it
+    // and edit its title/description in the backoffice like any other step.
+    // If a row already exists we use it as-is; otherwise we fall back to a
+    // synthetic row so legacy popups that haven't been backfilled keep
+    // working. The fallback can be removed once every direct-sale popup has
+    // a buyer row.
+    const existing = configuredSteps.find((s) => s.step_type === "buyer")
+    if (existing) return configuredSteps
+
     const confirmStep = configuredSteps.find(
       (step) => step.step_type === "confirm",
     )
@@ -203,28 +211,25 @@ export function CheckoutProvider({
       is_enabled: true,
       protected: true,
       product_category: null,
-      template: null,
+      template: "buyer-form",
       template_config: null,
       watermark: null,
       show_title: confirmStep?.show_title ?? true,
       show_watermark: confirmStep?.show_watermark ?? true,
     }
 
-    const withoutBuyer = configuredSteps.filter(
-      (step) => step.step_type !== "buyer",
-    )
-    const confirmIndex = withoutBuyer.findIndex(
+    const confirmIndex = configuredSteps.findIndex(
       (step) => step.step_type === "confirm",
     )
 
     if (confirmIndex === -1) {
-      return [...withoutBuyer, buyerStep]
+      return [...configuredSteps, buyerStep]
     }
 
     return [
-      ...withoutBuyer.slice(0, confirmIndex),
+      ...configuredSteps.slice(0, confirmIndex),
       buyerStep,
-      ...withoutBuyer.slice(confirmIndex),
+      ...configuredSteps.slice(confirmIndex),
     ]
   }, [buyerFormSchema, cityId, configuredSteps, submitMode, t])
 
