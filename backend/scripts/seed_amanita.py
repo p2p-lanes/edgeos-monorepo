@@ -39,6 +39,15 @@ ADMIN_EMAIL = "aromeoes@gmail.com"
 POPUP_SLUG = "amanita-festival-2026"
 POPUP_NAME = "Amanita Festival 2026"
 
+
+def asset(name: str) -> str:
+    """Build a portal-public asset URL.
+
+    Images live in `portal/public/amanita/` so the path resolves directly
+    from `/amanita/...` — no CDN, no cross-origin loading for SSR.
+    """
+    return f"/amanita/{name}"
+
 # Verde-marino + dorado palette extracted from tickets.amanitafestival.com.
 THEME_CONFIG: dict = {
     "colors": {
@@ -159,18 +168,37 @@ def _resolve_popup(session: Session, tenant_id: uuid.UUID) -> uuid.UUID:
     )
     from app.models import Popups
 
+    # Branding asset paths — served from portal/public/amanita. Copying real
+    # images into the public dir (instead of pointing at the prod CDN) keeps
+    # the test merchant fully self-contained and avoids cross-origin loading
+    # for SSR.
+    popup_assets = dict(
+        image_url=asset("hero-flyer.png"),
+        icon_url=asset("logo.png"),
+        favicon_url=asset("logo.png"),
+        express_checkout_background=asset("checkout-bg.webp"),
+    )
+
     popup = session.exec(
         select(Popups).where(
             Popups.tenant_id == tenant_id, Popups.slug == POPUP_SLUG
         )
     ).first()
     if popup:
-        # Refresh theme config — convenient for iterating on tokens.
+        # Re-apply branding/theme each run so tweaks to this script flow
+        # back into the existing test merchant without needing a fresh DB.
+        changed = False
         if popup.theme_config != THEME_CONFIG:
             popup.theme_config = THEME_CONFIG
+            changed = True
+        for attr, value in popup_assets.items():
+            if getattr(popup, attr) != value:
+                setattr(popup, attr, value)
+                changed = True
+        if changed:
             session.add(popup)
             session.commit()
-            logger.info(f"theme_config refreshed on {popup.slug}")
+            logger.info(f"branding refreshed on {popup.slug}")
         return popup.id
 
     popup = Popups(
@@ -191,6 +219,7 @@ def _resolve_popup(session: Session, tenant_id: uuid.UUID) -> uuid.UUID:
         default_language="es",
         supported_languages=["es", "en"],
         theme_config=THEME_CONFIG,
+        **popup_assets,
     )
     session.add(popup)
     session.commit()
@@ -255,7 +284,64 @@ def _seed_ticketing_steps(
     def pid(slug: str) -> str:
         return str(product_ids[slug])
 
+    # Hero markup matches the live Gemstore landing — date band + tagline +
+    # bullet list + "3 Cuotas Sin Interés" payment badge. Rendered via the
+    # rich-text content template so any tenant can author their own hero
+    # without code changes.
+    hero_html = """
+<section class=\"flex flex-col items-center gap-4 py-2\">
+  <h1 style=\"font-family: serif; letter-spacing: 0.35em; font-size: 2.5rem; margin: 0; color: white;\">AMANITA</h1>
+  <p style=\"letter-spacing: 0.45em; font-size: 0.7rem; margin: 0; color: rgba(255,255,255,0.7);\">FESTIVAL</p>
+  <div style=\"border-top: 1px solid #A89477; border-bottom: 1px solid #A89477; padding: 0.5rem 1.5rem; margin-top: 0.5rem;\">
+    <p style=\"font-size: 0.8rem; letter-spacing: 0.1em; color: #A89477; margin: 0;\">20-24 DE NOVIEMBRE, 2026 · BS AS, ARGENTINA</p>
+  </div>
+  <h2 style=\"font-size: 1.25rem; font-weight: 600; letter-spacing: 0.05em; margin-top: 1rem; color: white;\">4 DÍAS DE MÚSICA, ARTE, YOGA Y TALLERES</h2>
+  <p style=\"font-style: italic; color: rgba(255,255,255,0.8);\">Una celebración de amor, apertura y conexión</p>
+  <div style=\"border: 1px solid #A89477; border-radius: 4px; padding: 1rem 2rem; margin-top: 1.5rem;\">
+    <p style=\"font-size: 0.85rem; letter-spacing: 0.1em; color: #A89477; margin: 0; text-align: center;\">EXPERIENCIA EXTENDIDA<br/>17, 18 Y 19 DE NOVIEMBRE</p>
+  </div>
+  <ul style=\"list-style: none; padding: 0; margin-top: 1.5rem; color: rgba(255,255,255,0.95); line-height: 1.7;\">
+    <li>¡Asegurá tu lugar al menor precio posible!</li>
+    <li>+300 Artistas y Facilitadores</li>
+    <li>+10 Escenarios</li>
+    <li>Se parte de una experiencia única</li>
+    <li>Mercedes, Pcia de Bs.As</li>
+  </ul>
+  <span style=\"display:inline-block; background:#A89477; color:#071b28; padding: 0.5rem 1.5rem; border-radius: 4px; font-weight: 600; font-size: 0.9rem; margin-top: 1rem;\">3 Cuotas Sin Interés 💳</span>
+</section>
+""".strip()
+
+    # Step list. Buyer step intentionally at order 0 so "Tu información"
+    # opens the funnel — per the user's recording ("hay que reordenar los
+    # componentes como para que tu información sea lo primero").
     steps = [
+        {
+            "step_type": "buyer",
+            "title": "Tu información",
+            "description": "Completá tus datos antes de continuar.",
+            "watermark": "Tu información",
+            "show_title": False,
+            "show_watermark": True,
+            "template": "buyer-form",
+            "order": 0,
+            "protected": True,
+            "emoji": "📝",
+        },
+        {
+            "step_type": "hero",
+            "title": "Hero",
+            "description": "",
+            "watermark": "",
+            "show_title": False,
+            "show_watermark": False,
+            "template": "rich-text",
+            "template_config": {
+                "html": hero_html,
+                "alignment": "center",
+                "max_width": "wide",
+            },
+            "order": 1,
+        },
         {
             "step_type": "tickets",
             "title": "Tickets",
@@ -263,9 +349,6 @@ def _seed_ticketing_steps(
             "watermark": "Tickets",
             "show_title": False,
             "show_watermark": True,
-            # New ticket-card template — section-level hero image (16:9 or 3:2),
-            # one "Ver más" description per section, NO attendee-category
-            # accordion ("Main" pill). See feedback memo.
             "template": "ticket-card",
             "template_config": {
                 "variant": "stacked",
@@ -273,8 +356,8 @@ def _seed_ticketing_steps(
                     {
                         "key": "ticket-4-dias",
                         "label": "Ticket 4 Días",
-                        "image_url": "/amanita/ticket-4-dias.jpg",
-                        "image_aspect": "16:9",
+                        "image_url": asset("ticket-4-dias.png"),
+                        "image_aspect": "3:2",
                         "description": (
                             "La entrada te brinda acceso a todas las "
                             "actividades, talleres, y shows durante los "
@@ -293,8 +376,8 @@ def _seed_ticketing_steps(
                     {
                         "key": "ticket-7-dias",
                         "label": "Ticket 7 Días",
-                        "image_url": "/amanita/ticket-7-dias.jpg",
-                        "image_aspect": "16:9",
+                        "image_url": asset("ticket-7-dias.png"),
+                        "image_aspect": "3:2",
                         "description": (
                             "Experiencia extendida: 17 al 24 de Noviembre. "
                             "Incluye todas las actividades del festival más "
@@ -309,7 +392,7 @@ def _seed_ticketing_steps(
                     {
                         "key": "entrada-ninos",
                         "label": "Entrada Niños",
-                        "image_url": "/amanita/entrada-ninos.jpg",
+                        "image_url": asset("entrada-ninos.png"),
                         "image_aspect": "3:2",
                         "description": (
                             "La entrada para niños es hasta los 12 años. "
@@ -324,7 +407,7 @@ def _seed_ticketing_steps(
                     },
                 ],
             },
-            "order": 0,
+            "order": 2,
             "product_category": "ticket",
             "emoji": "🎟️",
         },
@@ -374,7 +457,7 @@ def _seed_ticketing_steps(
                     },
                 ],
             },
-            "order": 1,
+            "order": 3,
             "product_category": "housing",
             "footer_note": "*No hay reembolsos, sin excepción.\n• Entradas transferibles hasta el 30 de Octubre 2026, sin excepción.\n• Entrada con DNI y QR.",
             "emoji": "🏠",
@@ -398,7 +481,6 @@ def _seed_ticketing_steps(
                     {
                         "key": "auto",
                         "label": "Auto",
-                        "image_url": "/amanita/parking-auto.jpg",
                         "description": "Lugar para un vehículo durante todo el festival.",
                         "order": 0,
                         "product_ids": [pid("estacionamiento-auto")],
@@ -412,7 +494,7 @@ def _seed_ticketing_steps(
                     },
                 ],
             },
-            "order": 2,
+            "order": 4,
             "product_category": "parking",
             "emoji": "🅿️",
         },
@@ -427,7 +509,7 @@ def _seed_ticketing_steps(
             "template_config": {
                 "youtube_url": "https://www.youtube.com/watch?v=lhJQ55IRWhQ",
             },
-            "order": 3,
+            "order": 5,
             "emoji": "▶️",
         },
         {
@@ -441,15 +523,17 @@ def _seed_ticketing_steps(
             "template_config": {
                 "variant": "masonry",
                 "images": [
-                    {"id": "img1", "url": "/amanita/img1.jpg"},
-                    {"id": "img2", "url": "/amanita/img2.jpg"},
-                    {"id": "img3", "url": "/amanita/img3.jpg"},
-                    {"id": "img4", "url": "/amanita/img4.jpg"},
-                    {"id": "img5", "url": "/amanita/img5.jpg"},
-                    {"id": "img6", "url": "/amanita/img6.jpg"},
+                    {"id": "g1", "url": asset("gallery-1-blue-stage.jpg")},
+                    {"id": "g2", "url": asset("gallery-2-yoga.jpg")},
+                    {"id": "g3", "url": asset("gallery-3-dance.jpg")},
+                    {"id": "g4", "url": asset("gallery-4-dj-kevin.png")},
+                    {"id": "g5", "url": asset("gallery-5-ecstatic-dance.png")},
+                    {"id": "g6", "url": asset("gallery-6-deep-house-yoga.png")},
+                    {"id": "g7", "url": asset("gallery-7-elias.png")},
+                    {"id": "g8", "url": asset("gallery-8-yoga.png")},
                 ],
             },
-            "order": 4,
+            "order": 6,
             "emoji": "🖼️",
         },
         {
@@ -477,20 +561,8 @@ def _seed_ticketing_steps(
                      "answer": "Amamos a los animales, pero por razones de seguridad, higiene y cuidado del entorno, no se permite el ingreso con mascotas."},
                 ],
             },
-            "order": 5,
+            "order": 7,
             "emoji": "❓",
-        },
-        {
-            "step_type": "buyer",
-            "title": "Tu información",
-            "description": "Completá tus datos antes del pago.",
-            "watermark": "Tu información",
-            "show_title": False,
-            "show_watermark": True,
-            "template": "buyer-form",
-            "order": 6,
-            "protected": True,
-            "emoji": "📝",
         },
         {
             "step_type": "confirm",
@@ -499,7 +571,7 @@ def _seed_ticketing_steps(
             "watermark": "Confirmar",
             "show_title": False,
             "show_watermark": True,
-            "order": 7,
+            "order": 8,
             "protected": True,
             "emoji": "✅",
         },
