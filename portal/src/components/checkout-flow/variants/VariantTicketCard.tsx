@@ -43,6 +43,36 @@ interface TicketCardSection {
 
 type TicketCardVariant = "stacked" | "tabs" | "compact"
 
+/** Surface for the section card. `theme` follows the global theme tokens.
+ * `light` and `dark` pin the surface regardless of the popup theme — useful
+ * when the page background is dark (e.g. a hero photo) and the cards need
+ * to stay readable, or vice versa. */
+type TicketCardSurface = "theme" | "light" | "dark"
+
+const SURFACE_STYLE: Record<
+  Exclude<TicketCardSurface, "theme">,
+  Record<string, string>
+> = {
+  // Override the CSS variables that the card body consumes so descendants
+  // inherit the locked surface without needing component-level prop drilling.
+  light: {
+    "--card": "oklch(0.985 0 0)",
+    "--card-foreground": "oklch(0.145 0 0)",
+    "--foreground": "oklch(0.145 0 0)",
+    "--muted": "oklch(0.965 0.005 285)",
+    "--muted-foreground": "oklch(0.45 0.01 260)",
+    "--border": "oklch(0.9 0.005 285)",
+  },
+  dark: {
+    "--card": "oklch(0.205 0.015 285)",
+    "--card-foreground": "oklch(0.985 0 0)",
+    "--foreground": "oklch(0.985 0 0)",
+    "--muted": "oklch(0.26 0.005 285)",
+    "--muted-foreground": "oklch(0.7 0.02 260)",
+    "--border": "oklch(0.3 0.005 285)",
+  },
+}
+
 // ---------------------------------------------------------------------------
 // Parsers
 // ---------------------------------------------------------------------------
@@ -61,6 +91,14 @@ function parseVariant(
   const v = templateConfig?.variant
   if (v === "tabs" || v === "compact") return v
   return "stacked"
+}
+
+function parseSurface(
+  templateConfig: VariantProps["templateConfig"],
+): TicketCardSurface {
+  const s = templateConfig?.surface
+  if (s === "light" || s === "dark") return s
+  return "theme"
 }
 
 function resolveAspectClass(aspect?: SectionImageAspect): string {
@@ -196,15 +234,26 @@ function SectionCard({
   section,
   products,
   stepType,
+  surface,
 }: {
   section: TicketCardSection
   products: ProductsPass[]
   stepType: string
+  surface: TicketCardSurface
 }) {
   if (products.length === 0) return null
 
+  // When the admin pins surface to light/dark, scope the CSS variables to
+  // the card root so the entire subtree (title, description, prices, add
+  // button) inherits the correct surface tokens.
+  const surfaceStyle =
+    surface === "theme" ? undefined : (SURFACE_STYLE[surface] as React.CSSProperties)
+
   return (
-    <article className="rounded-2xl overflow-hidden border border-border bg-card shadow-sm">
+    <article
+      style={surfaceStyle}
+      className="rounded-2xl overflow-hidden border border-border bg-card text-card-foreground shadow-sm"
+    >
       {section.image_url && (
         <div
           className={cn(
@@ -249,9 +298,11 @@ function SectionCard({
 function StackedLayout({
   groups,
   stepType,
+  surface,
 }: {
   groups: { section: TicketCardSection; products: ProductsPass[] }[]
   stepType: string
+  surface: TicketCardSurface
 }) {
   return (
     <div className="space-y-4">
@@ -261,6 +312,7 @@ function StackedLayout({
           section={section}
           products={products}
           stepType={stepType}
+          surface={surface}
         />
       ))}
     </div>
@@ -270,14 +322,21 @@ function StackedLayout({
 function CompactLayout({
   groups,
   stepType,
+  surface,
 }: {
   groups: { section: TicketCardSection; products: ProductsPass[] }[]
   stepType: string
+  surface: TicketCardSurface
 }) {
   // Compact strips the image and renders sections as dense rows. Useful when
   // a popup has many sections and the tenant wants a "list view".
+  const surfaceStyle =
+    surface === "theme" ? undefined : (SURFACE_STYLE[surface] as React.CSSProperties)
   return (
-    <div className="rounded-2xl overflow-hidden border border-border bg-card divide-y divide-border">
+    <div
+      style={surfaceStyle}
+      className="rounded-2xl overflow-hidden border border-border bg-card text-card-foreground divide-y divide-border"
+    >
       {groups.map(({ section, products }) => (
         <div key={section.key}>
           <header className="px-4 py-2 bg-muted">
@@ -299,9 +358,11 @@ function CompactLayout({
 function TabsLayout({
   groups,
   stepType,
+  surface,
 }: {
   groups: { section: TicketCardSection; products: ProductsPass[] }[]
   stepType: string
+  surface: TicketCardSurface
 }) {
   // Renders section labels as a horizontal tab strip and shows one section's
   // contents at a time. Useful for narrow viewports + many sections.
@@ -333,6 +394,7 @@ function TabsLayout({
             section={section}
             products={products}
             stepType={stepType}
+            surface={surface}
           />
         ))}
       </div>
@@ -351,6 +413,7 @@ export default function VariantTicketCard({
 }: VariantProps) {
   const sections = parseSections(templateConfig)
   const variant = parseVariant(templateConfig)
+  const surface = parseSurface(templateConfig)
   const { t } = useTranslation()
 
   // No sections configured — show every product in a single ungrouped card.
@@ -393,10 +456,14 @@ export default function VariantTicketCard({
   }
 
   if (variant === "compact") {
-    return <CompactLayout groups={groups} stepType={stepType} />
+    return (
+      <CompactLayout groups={groups} stepType={stepType} surface={surface} />
+    )
   }
   if (variant === "tabs") {
-    return <TabsLayout groups={groups} stepType={stepType} />
+    return <TabsLayout groups={groups} stepType={stepType} surface={surface} />
   }
-  return <StackedLayout groups={groups} stepType={stepType} />
+  return (
+    <StackedLayout groups={groups} stepType={stepType} surface={surface} />
+  )
 }

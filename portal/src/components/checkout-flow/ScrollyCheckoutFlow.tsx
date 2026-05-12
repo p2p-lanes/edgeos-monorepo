@@ -89,7 +89,13 @@ function ScrollyCheckoutFlowInner({
     }
   }
 
-  const [activeSection, setActiveSection] = useState<string>("passes")
+  // Initial activeSection: first available step from the runtime, falling
+  // back to "passes" only when nothing has loaded yet. Hard-coding "passes"
+  // here caused the cart footer to mis-detect the first step when the
+  // popup put a different step (buyer, hero) at order 0.
+  const [activeSection, setActiveSection] = useState<string>(
+    availableSteps[0] ?? "passes",
+  )
   const scrollToIndexRef = useRef<((index: number) => void) | null>(null)
 
   const footerDesign = "pill" as const

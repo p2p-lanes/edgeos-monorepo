@@ -61,8 +61,11 @@ export default function CartFooter({
   // provided to avoid letting users skip required steps like buyer info.
   const positionStep = (activeSectionId ?? currentStep) as CheckoutStep
   const isConfirmStep = positionStep === "confirm" || isLastSection
-  const isFirstStep = positionStep === "passes"
   const currentIndex = availableSteps.indexOf(positionStep)
+  // First step is whatever is at index 0 of the actual configured step
+  // order — previously this was hardcoded to "passes", which broke once
+  // popups started putting buyer or hero steps first.
+  const isFirstStep = currentIndex === 0
   const nextStepId =
     currentIndex < availableSteps.length - 1
       ? availableSteps[currentIndex + 1]
