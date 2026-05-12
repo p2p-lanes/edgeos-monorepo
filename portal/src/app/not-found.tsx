@@ -1,5 +1,11 @@
 "use client"
 
+// Side-effect import: the not-found page can render outside the portal
+// <Providers> tree (e.g. from notFound() in /[popupSlug]/calendar), so
+// i18next isn't otherwise initialized and t("...") would render literal
+// keys.
+import "@/i18n/config"
+
 import Link from "next/link"
 import { useTranslation } from "react-i18next"
 

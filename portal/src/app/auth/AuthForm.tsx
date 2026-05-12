@@ -3,7 +3,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { motion } from "framer-motion"
 import Image from "next/image"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { z } from "zod/v4"
@@ -17,7 +17,17 @@ export default function AuthForm() {
   const { t } = useTranslation()
   const { tenantId, tenant } = useTenant()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const queryClient = useQueryClient()
+
+  // Whitelist post-login redirects to internal paths only. Scheme-relative
+  // (//evil.com) and absolute URLs would let an attacker craft an
+  // /auth?redirect=... link that pushes the user offsite after they log in.
+  const redirectParam = searchParams.get("redirect")
+  const safeRedirect =
+    redirectParam?.startsWith("/") && !redirectParam.startsWith("//")
+      ? redirectParam
+      : "/portal"
 
   const emailSchema = z.email(t("auth.invalid_email"))
   const codeSchema = z
@@ -86,7 +96,7 @@ export default function AuthForm() {
         timerRef.current = null
       }
       queryClient.invalidateQueries({ queryKey: queryKeys.profile.current })
-      router.replace("/portal")
+      router.replace(safeRedirect)
     },
     onError: (err) => {
       if (err instanceof ApiError) {

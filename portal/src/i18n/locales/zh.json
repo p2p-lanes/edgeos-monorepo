@@ -539,6 +539,19 @@
       "registered": "已登记",
       "checked_in": "已签到"
     },
+    "login_required": {
+      "title": "登录以查看此活动",
+      "message": "登录 {{popupName}} 以查看活动详情、报名并加入您的日历。",
+      "login": "登录",
+      "cancel": "取消"
+    },
+    "public_calendar": {
+      "heading": "活动",
+      "page_title": "{{popupName}} - 日历",
+      "page_title_fallback": "日历",
+      "subheading": "{{popupName}} 的即将到来的活动",
+      "subheading_with_tz": "{{popupName}} 的即将到来的活动 — 时间显示为 {{timezone}}"
+    },
     "detail": {
       "event_not_found": "未找到活动",
       "event_not_found_message": "此活动不存在或你没有访问权限。",

@@ -182,6 +182,67 @@ class EventPublic(EventBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+class EventPublicCalendarItem(BaseModel):
+    """Minimal, read-only event projection for the public calendar.
+
+    Excludes fields that are either sensitive (``meeting_url``,
+    ``tenant_id``, ``owner_id``, ``rejection_reason``) or only meaningful
+    to authenticated humans (``hidden``, ``my_rsvp_status``,
+    ``visibility``, ``require_approval``, ``ical_sequence``, ``content``).
+    """
+
+    id: uuid.UUID
+    title: str
+    start_time: datetime
+    end_time: datetime
+    timezone: str
+    kind: str | None = None
+    cover_url: str | None = None
+    max_participant: int | None = None
+    tags: list[str] = []
+    highlighted: bool = False
+    host_display_name: str | None = None
+    rrule: str | None = None
+    recurrence_master_id: uuid.UUID | None = None
+    occurrence_id: str | None = None
+    venue_id: uuid.UUID | None = None
+    venue_title: str | None = None
+    venue_location: str | None = None
+    venue_image_url: str | None = None
+    custom_location_name: str | None = None
+    track_id: uuid.UUID | None = None
+    track_title: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class EventCalendarTrack(BaseModel):
+    """Minimal track projection for the public calendar toolbar."""
+
+    id: uuid.UUID
+    name: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class EventCalendarMeta(BaseModel):
+    """Toolbar/filter metadata bundled with the public calendar list."""
+
+    allowed_tags: list[str] = []
+    allowed_tracks: list[EventCalendarTrack] = []
+    timezone: str = "UTC"
+    popup_id: uuid.UUID
+    popup_slug: str
+    popup_name: str
+
+
+class EventPublicCalendarResponse(BaseModel):
+    """Wrapper response for ``GET /events/public/calendar``."""
+
+    results: list[EventPublicCalendarItem]
+    meta: EventCalendarMeta
+
+
 class EventCreate(BaseModel):
     """Event schema for creation."""
 
