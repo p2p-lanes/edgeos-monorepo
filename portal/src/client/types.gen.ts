@@ -2552,6 +2552,8 @@ export type TenantPublic = {
     logo_url?: (string | null);
     custom_domain?: (string | null);
     custom_domain_active: boolean;
+    landing_mode: 'portal' | 'checkout';
+    active_popup_slug?: (string | null);
     id: string;
 };
 

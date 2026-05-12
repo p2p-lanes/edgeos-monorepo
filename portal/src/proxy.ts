@@ -7,6 +7,13 @@ if (!process.env.NEXT_PUBLIC_API_URL) {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL
 
+interface TenantByDomainResponse {
+  id: string
+  slug: string
+  landing_mode: "portal" | "checkout"
+  active_popup_slug: string | null
+}
+
 export async function proxy(request: NextRequest): Promise<NextResponse> {
   const host = request.headers.get("host") ?? ""
   const { isCustomDomain } = resolveHostname(host)
@@ -20,7 +27,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   // Strip port — domain identity is the hostname only (port is infrastructure).
   const domain = host.split(":")[0] ?? host
 
-  let tenantData: { id: string; slug: string } | null = null
+  let tenantData: TenantByDomainResponse | null = null
 
   try {
     const res = await fetch(
@@ -49,6 +56,45 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   requestHeaders.set("x-tenant-id", tenantData.id)
   requestHeaders.set("x-tenant-slug", tenantData.slug)
   requestHeaders.set("x-custom-domain", "true")
+  requestHeaders.set("x-landing-mode", tenantData.landing_mode)
+  if (tenantData.active_popup_slug != null) {
+    requestHeaders.set("x-active-popup-slug", tenantData.active_popup_slug)
+  }
+
+  // Rewrite decision: only trigger on the two exact path shapes that need
+  // transparent URL substitution. All other paths fall through unchanged.
+  const pathname = request.nextUrl.pathname
+
+  if (tenantData.landing_mode === "checkout") {
+    if (tenantData.active_popup_slug != null) {
+      const slug = tenantData.active_popup_slug
+
+      if (pathname === "/") {
+        const rewriteUrl = new URL(`/checkout/${slug}`, request.url)
+        return NextResponse.rewrite(rewriteUrl, {
+          request: { headers: requestHeaders },
+        })
+      }
+
+      if (pathname === "/thank-you") {
+        const rewriteUrl = new URL(
+          `/checkout/${slug}/thank-you${request.nextUrl.search}`,
+          request.url,
+        )
+        return NextResponse.rewrite(rewriteUrl, {
+          request: { headers: requestHeaders },
+        })
+      }
+    } else {
+      // No active popup — show Coming Soon page.
+      if (pathname === "/") {
+        const rewriteUrl = new URL("/coming-soon", request.url)
+        return NextResponse.rewrite(rewriteUrl, {
+          request: { headers: requestHeaders },
+        })
+      }
+    }
+  }
 
   return NextResponse.next({
     request: {

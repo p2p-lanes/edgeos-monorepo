@@ -38,12 +38,30 @@ interface TenantProviderProps {
    * API call is skipped and a cheaper by-slug call is made instead.
    */
   initialTenantSlug?: string | null
+  /**
+   * Landing mode resolved by middleware (custom domain path only).
+   * Available immediately from x-landing-mode header — no client fetch needed
+   * to read this value.
+   */
+  initialLandingMode?: "portal" | "checkout" | null
+  /**
+   * Active popup slug resolved by backend when landing_mode=checkout.
+   * Available immediately from x-active-popup-slug header.
+   */
+  initialActivePopupSlug?: string | null
 }
 
 export const TenantProvider = ({
   children,
   initialTenantId = null,
   initialTenantSlug = null,
+  // These are accepted to keep the component API consistent with the middleware
+  // headers the layout passes down. The landing_mode and active_popup_slug
+  // values are available automatically on the fetched TenantPublic object once
+  // the client-side fetch resolves; the initial props are reserved for future
+  // use (e.g. seeding state before the first fetch).
+  initialLandingMode: _initialLandingMode = null,
+  initialActivePopupSlug: _initialActivePopupSlug = null,
 }: TenantProviderProps) => {
   const [tenant, setTenant] = useState<TenantPublic | null>(null)
   const [isLoading, setIsLoading] = useState(true)
