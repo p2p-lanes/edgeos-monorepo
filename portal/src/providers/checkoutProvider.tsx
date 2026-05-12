@@ -111,6 +111,11 @@ interface CheckoutContextValue {
   buyerGeneralError: string | null
   setBuyerField: (fieldName: string, value: unknown) => void
   isBuyerInfoComplete: boolean
+  /** Email address that has completed the verification flow for this popup,
+   * or null if no email is currently verified. Mutating the email field
+   * resets this to null. */
+  verifiedEmail: string | null
+  setVerifiedEmail: (value: string | null) => void
   cartUiEnabled: boolean
 }
 
@@ -233,9 +238,30 @@ export function CheckoutProvider({
     ]
   }, [buyerFormSchema, cityId, configuredSteps, submitMode, t])
 
-  const isBuyerInfoComplete =
-    !buyerFormSchema ||
-    buildFormZodSchema(buyerFormSchema, false).safeParse(buyerValues).success
+  const [verifiedEmail, setVerifiedEmail] = useState<string | null>(null)
+
+  // Buyer step counts as complete only when (a) the Zod schema passes
+  // and (b) the buyer's email has cleared the email-verification flow
+  // for the current popup. The submit endpoint enforces the same check
+  // server-side, but gating the next-step CTA here is what gives the
+  // buyer a clean "verify first" UX before they hit Confirm.
+  const isBuyerInfoComplete = (() => {
+    if (!buyerFormSchema) return true
+    const schemaOk = buildFormZodSchema(
+      buyerFormSchema,
+      false,
+    ).safeParse(buyerValues).success
+    if (!schemaOk) return false
+    const email = typeof buyerValues.email === "string" ? buyerValues.email : ""
+    if (!email.trim()) return false
+    if (
+      submitMode === "open-ticketing" &&
+      verifiedEmail?.toLowerCase() !== email.trim().toLowerCase()
+    ) {
+      return false
+    }
+    return true
+  })()
 
   // True while step configs or products are still loading on first render.
   // Why: when both queries are pending, availableSteps falls back to
@@ -796,8 +822,15 @@ export function CheckoutProvider({
         return next
       })
       setBuyerGeneralError(null)
+      // Changing the email invalidates a prior verification; the user
+      // has to re-verify the new address before moving on.
+      if (fieldName === "email" && verifiedEmail) {
+        setVerifiedEmail(null)
+      }
     },
     isBuyerInfoComplete,
+    verifiedEmail,
+    setVerifiedEmail,
     cartUiEnabled,
   }
 

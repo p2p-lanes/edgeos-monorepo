@@ -10,6 +10,7 @@ import { useTranslation } from "react-i18next"
 import { DynamicField } from "@/app/portal/[popupSlug]/application/components/fields/dynamic-field"
 import type { ApplicationFormSchema } from "@/types/form-schema"
 import { getCheckoutSchemaSections } from "../../types"
+import { EmailVerificationField } from "./EmailVerificationField"
 
 interface OpenTicketingBuyerFormProps {
   schema: ApplicationFormSchema
@@ -74,28 +75,15 @@ export function OpenTicketingBuyerForm({
             {section.fields.map(({ name, field }) => {
               if (name === "email") {
                 return (
-                  <div key={name} className="space-y-2 md:col-span-2">
-                    <LabelRequired isRequired={field.required}>
-                      {field.label}
-                    </LabelRequired>
-                    {field.help_text ? (
-                      <p className="text-sm text-muted-foreground">
-                        {field.help_text}
-                      </p>
-                    ) : null}
-                    <Input
-                      id="checkout-email"
-                      type="email"
-                      value={String(values.email ?? "")}
-                      onChange={(event) =>
-                        onChange("email", event.target.value)
-                      }
-                      className="w-full"
-                    />
-                    {errors.email ? (
-                      <p className="text-sm text-destructive">{errors.email}</p>
-                    ) : null}
-                  </div>
+                  <EmailVerificationField
+                    key={name}
+                    label={field.label}
+                    required={field.required}
+                    helpText={field.help_text}
+                    value={String(values.email ?? "")}
+                    errorText={errors.email}
+                    onChange={(next) => onChange("email", next)}
+                  />
                 )
               }
 
