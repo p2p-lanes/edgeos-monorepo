@@ -1,21 +1,7 @@
 "use client"
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import {
-  CalendarDays,
-  CheckCircle,
-  Clock,
-  Crown,
-  Eye,
-  EyeOff,
-  Filter,
-  Layers,
-  MapPin,
-  Pencil,
-  Plus,
-  Repeat,
-  Tag,
-} from "lucide-react"
+import { CalendarDays, Plus } from "lucide-react"
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import {
@@ -36,7 +22,6 @@ import {
   HumansService,
   TracksService,
 } from "@/client"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useCityProvider } from "@/providers/cityProvider"
 import { CalendarBody } from "./lib/CalendarBody"
@@ -48,7 +33,7 @@ import {
   type EventsViewSnapshot,
   saveEventsViewState,
 } from "./lib/eventsViewState"
-import { summarizeRrule } from "./lib/summarizeRrule"
+import { ListBody } from "./lib/ListBody"
 import {
   useEventTimezone,
   usePortalEventSettings,
@@ -59,28 +44,6 @@ import {
 // while we wait for a regular useEffect tick) without React's SSR warning.
 const useIsomorphicLayoutEffect =
   typeof window !== "undefined" ? useLayoutEffect : useEffect
-
-function groupByDate(
-  events: EventPublic[],
-  formatDayKey: (d: string) => string,
-): [string, EventPublic[]][] {
-  const groups: Record<string, EventPublic[]> = {}
-  for (const event of events) {
-    const key = formatDayKey(event.start_time)
-    if (!groups[key]) groups[key] = []
-    groups[key].push(event)
-  }
-  return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b))
-}
-
-const statusColors: Record<string, string> = {
-  published: "bg-primary/10 text-primary",
-  draft: "bg-muted text-muted-foreground",
-  cancelled: "bg-destructive/10 text-destructive",
-  pending_approval:
-    "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200",
-  rejected: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200",
-}
 
 export default function EventsPage() {
   const { t } = useTranslation()
@@ -508,8 +471,6 @@ export default function EventsPage() {
     rsvpedQuery.data,
     currentHuman,
   ])
-  const grouped = groupByDate(events, formatDayKey)
-
   // Restore outer scroll position once after returning from event
   // detail. List view waits for events to load (so the page has the
   // scroll height to apply the restore); calendar/day view render their
@@ -665,205 +626,22 @@ export default function EventsPage() {
               onToggleFullscreen={toggleDayFullscreen}
             />
           )
-        ) : isLoading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-          </div>
-        ) : events.length === 0 ? (
-          <div className="text-center py-20">
-            <Filter className="mx-auto h-10 w-10 text-muted-foreground/50 mb-3" />
-            <p className="text-muted-foreground">
-              {t("events.list.empty_state")}
-            </p>
-          </div>
         ) : (
-          <div className="space-y-6">
-            {grouped.map(([date, dayEvents]) => (
-              <div key={date}>
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="h-2 w-2 rounded-full bg-primary" />
-                  <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    {formatDateShort(dayEvents[0].start_time)}
-                  </h2>
-                  <div className="flex-1 h-px bg-border" />
-                </div>
-                <div className="space-y-2 pl-5 border-l-2 border-border">
-                  {dayEvents.map((event) => {
-                    const isOwner =
-                      currentHuman != null && event.owner_id === currentHuman.id
-                    const isHidden = event.hidden === true
-                    const isHighlighted = event.highlighted === true
-                    const cardClass = isHidden
-                      ? "relative rounded-xl border bg-card opacity-60 hover:opacity-100 transition-opacity"
-                      : isHighlighted
-                        ? "relative rounded-xl border-2 border-amber-400 bg-amber-50 dark:bg-amber-950/30 hover:shadow-md transition-shadow"
-                        : "relative rounded-xl border bg-card hover:shadow-md transition-shadow"
-                    return (
-                      <div key={event.id} className={cardClass}>
-                        <Link
-                          href={
-                            event.occurrence_id
-                              ? `/portal/${city?.slug}/events/${event.id}?occ=${encodeURIComponent(event.start_time)}`
-                              : `/portal/${city?.slug}/events/${event.id}`
-                          }
-                          onClick={() => {
-                            const main =
-                              typeof document !== "undefined"
-                                ? document.querySelector("main")
-                                : null
-                            handleEventLinkClick("list", null, {
-                              outer: main?.scrollTop ?? 0,
-                            })
-                          }}
-                          className="block p-3 sm:p-4 pb-11"
-                        >
-                          <div className="flex items-start justify-between gap-2 mb-1 pr-8">
-                            <h3 className="font-medium text-sm sm:text-base flex items-center gap-1.5">
-                              {isOwner && (
-                                <Crown
-                                  className="h-3.5 w-3.5 shrink-0 text-amber-500"
-                                  aria-label={t("events.list.owned_title")}
-                                />
-                              )}
-                              <span>{event.title}</span>
-                            </h3>
-                            <Badge
-                              variant="secondary"
-                              className={
-                                statusColors[event.status as string] ?? ""
-                              }
-                            >
-                              {t(`events.status.${event.status}`)}
-                            </Badge>
-                          </div>
-                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                            <Clock className="h-3 w-3" />
-                            <span>
-                              {formatTime(event.start_time)} –{" "}
-                              {formatTime(event.end_time)}
-                            </span>
-                          </div>
-                          {event.venue_title && (
-                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
-                              <MapPin className="h-3 w-3" />
-                              <span className="truncate">
-                                {event.venue_title}
-                                {event.venue_location
-                                  ? ` · ${event.venue_location}`
-                                  : ""}
-                              </span>
-                            </div>
-                          )}
-                          {(event.rrule || event.recurrence_master_id) && (
-                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
-                              <Repeat className="h-3 w-3" />
-                              <span className="truncate">
-                                {summarizeRrule(event.rrule) ??
-                                  t("events.list.part_of_recurring_series")}
-                              </span>
-                            </div>
-                          )}
-                          {event.track_title && (
-                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
-                              <Layers className="h-3 w-3" />
-                              <span className="truncate">
-                                {event.track_title}
-                              </span>
-                            </div>
-                          )}
-                          {event.tags && event.tags.length > 0 && (
-                            <div className="flex items-center gap-1 mt-1.5 flex-wrap">
-                              {event.tags.slice(0, 3).map((tag: string) => (
-                                <span
-                                  key={tag}
-                                  className="inline-flex items-center gap-0.5 text-[10px] bg-muted px-1.5 py-0.5 rounded"
-                                >
-                                  <Tag className="h-2.5 w-2.5" />
-                                  {tag}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </Link>
-                        <div className="absolute bottom-2 right-2 flex items-center gap-1.5">
-                          {event.status === "published" &&
-                            (event.my_rsvp_status &&
-                            event.my_rsvp_status !== "cancelled" ? (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.preventDefault()
-                                  e.stopPropagation()
-                                  cancelRsvpMutation.mutate(event)
-                                }}
-                                className="inline-flex h-7 items-center gap-1 rounded-md border border-primary/30 bg-primary/10 px-2 text-xs font-medium text-primary hover:bg-primary/20"
-                              >
-                                <CheckCircle className="h-3 w-3" />
-                                {t("events.rsvp.going")}
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.preventDefault()
-                                  e.stopPropagation()
-                                  rsvpMutation.mutate(event)
-                                }}
-                                className="inline-flex h-7 items-center gap-1 rounded-md border bg-background px-2 text-xs font-medium shadow-sm hover:bg-muted"
-                              >
-                                {t("events.rsvp.rsvp")}
-                              </button>
-                            ))}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault()
-                              e.stopPropagation()
-                              if (isHidden) unhideMutation.mutate(event.id)
-                              else hideMutation.mutate(event.id)
-                            }}
-                            aria-label={
-                              isHidden
-                                ? t("events.list.unhide_event_aria", {
-                                    title: event.title,
-                                  })
-                                : t("events.list.hide_event_aria", {
-                                    title: event.title,
-                                  })
-                            }
-                            title={
-                              isHidden
-                                ? t("events.list.unhide_title")
-                                : t("events.list.hide_title")
-                            }
-                            className="inline-flex h-7 w-7 items-center justify-center rounded-md border bg-background text-muted-foreground shadow-sm transition-colors hover:text-foreground"
-                          >
-                            {isHidden ? (
-                              <EyeOff className="h-3.5 w-3.5" />
-                            ) : (
-                              <Eye className="h-3.5 w-3.5" />
-                            )}
-                          </button>
-                          {isOwner && (
-                            <Link
-                              href={`/portal/${city?.slug}/events/${event.id}/edit`}
-                              onClick={(e) => e.stopPropagation()}
-                              aria-label={t("events.list.edit_event_aria", {
-                                title: event.title,
-                              })}
-                              className="inline-flex h-7 w-7 items-center justify-center rounded-md border bg-background text-muted-foreground shadow-sm transition-colors hover:text-foreground"
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Link>
-                          )}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
+          <ListBody
+            events={events}
+            slug={city?.slug}
+            isLoading={isLoading}
+            formatTime={formatTime}
+            formatDateShort={formatDateShort}
+            formatDayKey={formatDayKey}
+            mode="authed"
+            onEventLinkClick={handleEventLinkClick}
+            currentHumanId={currentHuman?.id}
+            onRsvp={(e) => rsvpMutation.mutate(e)}
+            onCancelRsvp={(e) => cancelRsvpMutation.mutate(e)}
+            onHide={(id) => hideMutation.mutate(id)}
+            onUnhide={(id) => unhideMutation.mutate(id)}
+          />
         )}
       </div>
 

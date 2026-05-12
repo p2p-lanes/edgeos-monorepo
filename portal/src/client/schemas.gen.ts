@@ -4454,6 +4454,67 @@ export const EventAvailabilityResultSchema = {
     title: 'EventAvailabilityResult'
 } as const;
 
+export const EventCalendarMetaSchema = {
+    properties: {
+        allowed_tags: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Allowed Tags',
+            default: []
+        },
+        allowed_tracks: {
+            items: {
+                '$ref': '#/components/schemas/EventCalendarTrack'
+            },
+            type: 'array',
+            title: 'Allowed Tracks',
+            default: []
+        },
+        timezone: {
+            type: 'string',
+            title: 'Timezone',
+            default: 'UTC'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        popup_slug: {
+            type: 'string',
+            title: 'Popup Slug'
+        },
+        popup_name: {
+            type: 'string',
+            title: 'Popup Name'
+        }
+    },
+    type: 'object',
+    required: ['popup_id', 'popup_slug', 'popup_name'],
+    title: 'EventCalendarMeta',
+    description: 'Toolbar/filter metadata bundled with the public calendar list.'
+} as const;
+
+export const EventCalendarTrackSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        }
+    },
+    type: 'object',
+    required: ['id', 'name'],
+    title: 'EventCalendarTrack',
+    description: 'Minimal track projection for the public calendar toolbar.'
+} as const;
+
 export const EventCreateSchema = {
     properties: {
         popup_id: {
@@ -5247,6 +5308,232 @@ export const EventPublicSchema = {
     required: ['tenant_id', 'popup_id', 'owner_id', 'title', 'start_time', 'end_time', 'id'],
     title: 'EventPublic',
     description: 'Event schema for API responses.'
+} as const;
+
+export const EventPublicCalendarItemSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        start_time: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Start Time'
+        },
+        end_time: {
+            type: 'string',
+            format: 'date-time',
+            title: 'End Time'
+        },
+        timezone: {
+            type: 'string',
+            title: 'Timezone'
+        },
+        kind: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Kind'
+        },
+        cover_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Cover Url'
+        },
+        max_participant: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Participant'
+        },
+        tags: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Tags',
+            default: []
+        },
+        highlighted: {
+            type: 'boolean',
+            title: 'Highlighted',
+            default: false
+        },
+        host_display_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Host Display Name'
+        },
+        rrule: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Rrule'
+        },
+        recurrence_master_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Recurrence Master Id'
+        },
+        occurrence_id: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Occurrence Id'
+        },
+        venue_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Venue Id'
+        },
+        venue_title: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Venue Title'
+        },
+        venue_location: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Venue Location'
+        },
+        venue_image_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Venue Image Url'
+        },
+        custom_location_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Custom Location Name'
+        },
+        track_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Track Id'
+        },
+        track_title: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Track Title'
+        }
+    },
+    type: 'object',
+    required: ['id', 'title', 'start_time', 'end_time', 'timezone'],
+    title: 'EventPublicCalendarItem',
+    description: `Minimal, read-only event projection for the public calendar.
+
+Excludes fields that are either sensitive (\`\`meeting_url\`\`,
+\`\`tenant_id\`\`, \`\`owner_id\`\`, \`\`rejection_reason\`\`) or only meaningful
+to authenticated humans (\`\`hidden\`\`, \`\`my_rsvp_status\`\`,
+\`\`visibility\`\`, \`\`require_approval\`\`, \`\`ical_sequence\`\`, \`\`content\`\`).`
+} as const;
+
+export const EventPublicCalendarResponseSchema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/EventPublicCalendarItem'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        meta: {
+            '$ref': '#/components/schemas/EventCalendarMeta'
+        }
+    },
+    type: 'object',
+    required: ['results', 'meta'],
+    title: 'EventPublicCalendarResponse',
+    description: 'Wrapper response for ``GET /events/public/calendar``.'
 } as const;
 
 export const EventSettingsCreateSchema = {

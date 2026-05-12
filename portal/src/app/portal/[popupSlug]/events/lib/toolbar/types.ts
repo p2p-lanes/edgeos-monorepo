@@ -1,5 +1,3 @@
-import type { TrackPublic } from "@/client"
-
 export type EventsView = "list" | "calendar" | "day"
 
 export interface EventsToolbarProps {
@@ -7,17 +5,24 @@ export interface EventsToolbarProps {
   onViewChange: (view: EventsView) => void
   search: string
   onSearchChange: (value: string) => void
-  rsvpedOnly: boolean
-  onRsvpedOnlyChange: (value: boolean) => void
-  mineOnly: boolean
-  onMineOnlyChange: (value: boolean) => void
+  /**
+   * "My RSVPs" toggle. Omit ``onRsvpedOnlyChange`` to hide the toggle
+   * (used by the public calendar, which has no logged-in human).
+   */
+  rsvpedOnly?: boolean
+  onRsvpedOnlyChange?: (value: boolean) => void
+  /**
+   * "My events" toggle. Omit ``onMineOnlyChange`` to hide it.
+   */
+  mineOnly?: boolean
+  onMineOnlyChange?: (value: boolean) => void
   showHidden?: boolean
   onShowHiddenChange?: (value: boolean) => void
   hiddenCount?: number
   allowedTags?: string[]
   selectedTags?: string[]
   onSelectedTagsChange?: (tags: string[]) => void
-  allowedTracks?: TrackPublic[]
+  allowedTracks?: { id: string; name: string }[]
   selectedTrackIds?: string[]
   onSelectedTrackIdsChange?: (ids: string[]) => void
 }
