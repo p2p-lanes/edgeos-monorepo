@@ -13,6 +13,18 @@ class CredentialType(str, Enum):
     READONLY = "readonly"
 
 
+class LandingMode(StrEnum):
+    """Per-tenant landing mode for custom domains.
+
+    - portal: standard portal experience (default for all tenants).
+    - checkout: custom domain opens the active direct-sale popup checkout directly.
+    Extensible for future modes (e.g. splash, events) without schema changes.
+    """
+
+    portal = "portal"
+    checkout = "checkout"
+
+
 class SaleType(StrEnum):
     """Popup sale model.
 
