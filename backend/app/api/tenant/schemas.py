@@ -46,7 +46,6 @@ class TenantCreate(SQLModel):
 
 class TenantUpdate(SQLModel):
     name: str | None = None
-    slug: str | None = None
     sender_email: EmailStr | None = None
     sender_name: str | None = None
     image_url: str | None = None
@@ -55,12 +54,6 @@ class TenantUpdate(SQLModel):
     custom_domain: str | None = None
     custom_domain_active: bool | None = None
     landing_mode: LandingMode | None = None
-
-    @model_validator(mode="after")
-    def regenerate_slug(self) -> Self:
-        if self.name:
-            self.slug = slugify(self.name)
-        return self
 
     @model_validator(mode="after")
     def validate_custom_domain(self) -> Self:
