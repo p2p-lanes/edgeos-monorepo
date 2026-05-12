@@ -4357,38 +4357,6 @@ export const EmailTemplateUpdateSchema = {
     title: 'EmailTemplateUpdate'
 } as const;
 
-export const EmailVerificationConfirmRequestSchema = {
-    properties: {
-        email: {
-            type: 'string',
-            format: 'email',
-            title: 'Email'
-        },
-        code: {
-            type: 'string',
-            maxLength: 10,
-            minLength: 4,
-            title: 'Code'
-        }
-    },
-    type: 'object',
-    required: ['email', 'code'],
-    title: 'EmailVerificationConfirmRequest'
-} as const;
-
-export const EmailVerificationStartRequestSchema = {
-    properties: {
-        email: {
-            type: 'string',
-            format: 'email',
-            title: 'Email'
-        }
-    },
-    type: 'object',
-    required: ['email'],
-    title: 'EmailVerificationStartRequest'
-} as const;
-
 export const EnrichedDashboardStatsSchema = {
     properties: {
         key_metrics: {

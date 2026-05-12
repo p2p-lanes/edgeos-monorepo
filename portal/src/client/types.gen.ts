@@ -959,15 +959,6 @@ export type EmailTemplateUpdate = {
     is_active?: (boolean | null);
 };
 
-export type EmailVerificationConfirmRequest = {
-    email: string;
-    code: string;
-};
-
-export type EmailVerificationStartRequest = {
-    email: string;
-};
-
 /**
  * Full enriched dashboard response.
  */
@@ -3489,26 +3480,6 @@ export type CheckoutPurchaseOpenTicketingData = {
 };
 
 export type CheckoutPurchaseOpenTicketingResponse = (OpenTicketingPurchaseResponse);
-
-export type CheckoutStartEmailVerificationData = {
-    requestBody: EmailVerificationStartRequest;
-    slug: string;
-    xTenantId?: (string | null);
-};
-
-export type CheckoutStartEmailVerificationResponse = ({
-    [key: string]: (boolean);
-});
-
-export type CheckoutConfirmEmailVerificationData = {
-    requestBody: EmailVerificationConfirmRequest;
-    slug: string;
-    xTenantId?: (string | null);
-};
-
-export type CheckoutConfirmEmailVerificationResponse = ({
-    [key: string]: (boolean);
-});
 
 export type CouponsValidateCouponPublicData = {
     requestBody: CouponValidatePublicRequest;
