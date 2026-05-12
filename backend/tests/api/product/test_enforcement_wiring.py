@@ -388,12 +388,17 @@ def _ot_purchase(product: Products, qty: int = 1):
 class TestOpenTicketingPaymentEnforcement:
     """Spec §Domain 2 — create_open_ticketing_payment decrements stock."""
 
-    def test_sold_out_product_raises_409(
+    def test_sold_out_product_raises_422(
         self,
         db: Session,
         tenant_a: Tenants,
     ) -> None:
-        """total_stock_remaining=0 → 409 before SimpleFI is called."""
+        """total_stock_remaining=0 → 422 before SimpleFI is called.
+
+        Since the sale-window revalidation landed (commit 34882ad), any
+        product whose derived state is not `on_sale` (including `sold_out`)
+        is rejected with 422 before the stock-decrement path runs.
+        """
         from unittest.mock import patch
 
         popup = _make_ot_popup(db, tenant_a)
@@ -409,7 +414,8 @@ class TestOpenTicketingPaymentEnforcement:
                 payments_crud.create_open_ticketing_payment(
                     db, obj=obj, popup=popup, tenant=tenant_a
                 )
-        assert exc_info.value.status_code == 409
+        assert exc_info.value.status_code == 422
+        assert "sold_out" in exc_info.value.detail
         # SimpleFI must NOT have been called
         mock_sf.assert_not_called()
 
