@@ -16,6 +16,9 @@ export interface ProductSection {
   product_ids: string[]
   description?: string
   image_url?: string
+  /** Image aspect hint for templates that surface section hero art (e.g. ticket-card).
+   * Templates that ignore it (Housing's fixed landscape, etc.) just skip the field. */
+  image_aspect?: "16:9" | "3:2"
 }
 
 export function parseConfigSections(config: Record<string, unknown> | null): {
@@ -41,6 +44,10 @@ interface SortableSectionCardProps {
   products: Array<{ id: string; name: string }>
   assignLabel?: string
   showMediaFields?: boolean
+  /** Show an aspect-ratio picker next to the image upload. Off by default —
+   * templates that render the section image at a fixed aspect should leave
+   * it off so the field doesn't promise configurability it can't honour. */
+  showImageAspect?: boolean
 }
 
 export function SortableSectionCard({
@@ -50,6 +57,7 @@ export function SortableSectionCard({
   products,
   assignLabel = "Assign product",
   showMediaFields = true,
+  showImageAspect = false,
 }: SortableSectionCardProps) {
   const {
     attributes,
@@ -126,6 +134,32 @@ export function SortableSectionCard({
                 onUpdate(section.key, { image_url: url ?? "" })
               }
             />
+            {showImageAspect && (
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  Aspect
+                </span>
+                {(["16:9", "3:2"] as const).map((aspect) => {
+                  const isActive = (section.image_aspect ?? "16:9") === aspect
+                  return (
+                    <button
+                      key={aspect}
+                      type="button"
+                      onClick={() =>
+                        onUpdate(section.key, { image_aspect: aspect })
+                      }
+                      className={`text-xs rounded-md px-2 py-0.5 border transition-colors ${
+                        isActive
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-card text-foreground border-border hover:bg-muted"
+                      }`}
+                    >
+                      {aspect}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
           </div>
           <div className="flex flex-col gap-1">
             <label

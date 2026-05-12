@@ -1,11 +1,13 @@
 import {
   CheckCircle,
   CheckSquare,
+  FileText,
   Heart,
   HelpCircle,
   Home,
   HomeIcon,
   Images,
+  LayoutGrid,
   type LucideIcon,
   Shield,
   ShoppingBag,
@@ -32,6 +34,12 @@ export const TEMPLATE_DEFINITIONS: TemplateDefinition[] = [
     label: "Ticket Select",
     description: "Checkbox list with price and dates",
     icon: CheckSquare,
+  },
+  {
+    key: "ticket-card",
+    label: "Ticket Cards",
+    description: "Section cards with hero image + Read more description",
+    icon: LayoutGrid,
   },
   {
     key: "patron-preset",
@@ -69,6 +77,12 @@ export const TEMPLATE_DEFINITIONS: TemplateDefinition[] = [
     description: "Expandable list of questions and answers",
     icon: HelpCircle,
   },
+  {
+    key: "rich-text",
+    label: "Rich Text / Banner",
+    description: "Sanitized HTML for marketing banners and custom copy",
+    icon: FileText,
+  },
 ]
 
 /** Templates that don't display products and therefore don't need a product category. */
@@ -76,6 +90,7 @@ export const CONTENT_ONLY_TEMPLATES = new Set([
   "youtube-video",
   "image-gallery",
   "faqs",
+  "rich-text",
 ])
 
 export const STEP_TYPE_DEFINITIONS: StepTypeDefinition[] = [
