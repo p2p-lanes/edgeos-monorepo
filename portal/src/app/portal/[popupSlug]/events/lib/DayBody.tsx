@@ -52,6 +52,23 @@ interface DayBodyProps {
   /** Fallback when no `?date=` URL param is present. Defaults to today. */
   defaultDate?: Date | null
   /**
+   * "authed" (default) renders the full portal experience. "public"
+   * skips the authenticated current-human + venue queries, hides the
+   * RSVP buttons, and delegates event clicks to ``onEventClick``.
+   */
+  mode?: "authed" | "public"
+  /** Sources events from the parent instead of the authenticated query. */
+  eventsOverride?: EventPublic[]
+  /**
+   * Public venue list (id + title) sourced from outside the authenticated
+   * portal API — used to size the day-grid columns when ``mode==="public"``.
+   */
+  venuesOverride?: { id: string; title: string }[]
+  /** Click handler; return ``true`` to suppress the default navigation. */
+  onEventClick?: (event: EventPublic) => boolean | undefined
+  /** Hard-coded timezone (skips the authenticated event-settings query). */
+  timezoneOverride?: string
+  /**
    * If present, the body restores these scroll positions on its first
    * render after returning from event detail and skips the
    * auto-scroll-to-earliest effect for that one mount. Subsequent date
@@ -125,7 +142,14 @@ export function DayBody({
   onEventLinkClick,
   isFullscreen = false,
   onToggleFullscreen,
+  mode = "authed",
+  eventsOverride,
+  venuesOverride,
+  onEventClick,
+  timezoneOverride,
 }: DayBodyProps) {
+  const isAuthed = mode === "authed"
+  const useOverride = eventsOverride !== undefined
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   // Fall back to the popup's first booking day (or today, before the
@@ -139,7 +163,10 @@ export function DayBody({
     const resolved = typeof next === "function" ? next(selectedDate) : next
     onSelectedDateChange(resolved)
   }
-  const { timezone, formatTime, formatDayKey } = useEventTimezone(popupId)
+  const { timezone, formatTime, formatDayKey } = useEventTimezone(
+    popupId,
+    timezoneOverride,
+  )
   const scrollRef = useRef<HTMLDivElement>(null)
   const mobileScrollRef = useRef<HTMLDivElement>(null)
 
@@ -167,6 +194,7 @@ export function DayBody({
     queryKey: ["current-human"],
     queryFn: () => HumansService.getCurrentHumanInfo(),
     staleTime: 5 * 60 * 1000,
+    enabled: isAuthed,
   })
 
   const { data: venuesData } = useQuery({
@@ -176,11 +204,11 @@ export function DayBody({
         popupId: popupId!,
         limit: 200,
       }),
-    enabled: !!popupId,
+    enabled: isAuthed && !!popupId,
     staleTime: 5 * 60 * 1000,
   })
 
-  const { data: eventsData, isLoading } = useQuery({
+  const { data: eventsData, isLoading: eventsLoading } = useQuery({
     queryKey: [
       "portal-events-day",
       popupId,
@@ -202,8 +230,9 @@ export function DayBody({
         trackIds: trackIds?.length ? trackIds : undefined,
         limit: 500,
       }),
-    enabled: !!popupId,
+    enabled: isAuthed && !useOverride && !!popupId,
   })
+  const isLoading = useOverride ? false : eventsLoading
 
   // For recurring instances we must include occurrence_start; one-off events
   // must not. Use occurrence_id (set only on virtual occurrences) to decide.
@@ -264,9 +293,11 @@ export function DayBody({
 
   // Filter to events whose popup-timezone day matches the selected day.
   const dayEvents = useMemo(() => {
-    const all = eventsData?.results ?? []
+    const all = useOverride
+      ? (eventsOverride ?? [])
+      : (eventsData?.results ?? [])
     return all.filter((e) => formatDayKey(e.start_time) === dayKey)
-  }, [eventsData, dayKey, formatDayKey])
+  }, [eventsData, eventsOverride, useOverride, dayKey, formatDayKey])
 
   // Build the column list. Always show every venue we know about, even
   // those without events on this day, so the calendar layout is stable
@@ -274,7 +305,7 @@ export function DayBody({
   // only when at least one event lacks a venue, and a separate "off-site"
   // column at the very end for events that have a custom location.
   const columns: VenueColumn[] = useMemo(() => {
-    const venues = venuesData?.results ?? []
+    const venues = venuesOverride ?? venuesData?.results ?? []
     const cols: VenueColumn[] = venues.map((v) => ({
       id: v.id,
       title: v.title,
@@ -289,7 +320,7 @@ export function DayBody({
       })
     }
     return cols
-  }, [venuesData, dayEvents, t])
+  }, [venuesData, venuesOverride, dayEvents, t])
 
   // For each column, lay events into overlap lanes (same logic as the
   // first iteration, but scoped per venue so a busy venue doesn't squeeze
@@ -364,7 +395,17 @@ export function DayBody({
       ? `${base}&occ=${encodeURIComponent(event.start_time)}`
       : base
   }
-  const handleEventClick = () => {
+  const handleEventClick = (
+    event: EventPublic,
+    e: React.MouseEvent<HTMLAnchorElement>,
+  ) => {
+    if (onEventClick) {
+      const handled = onEventClick(event)
+      if (handled === true) {
+        e.preventDefault()
+        return
+      }
+    }
     if (!onEventLinkClick) return
     const main =
       typeof document !== "undefined"
@@ -632,7 +673,7 @@ export function DayBody({
                           <Link
                             key={event.id}
                             href={eventHref(event)}
-                            onClick={handleEventClick}
+                            onClick={(e) => handleEventClick(event, e)}
                             className={cn(
                               "absolute rounded-md border transition-colors p-1.5 overflow-hidden text-xs",
                               isHighlighted
@@ -718,36 +759,38 @@ export function DayBody({
                                   ))}
                                 </div>
                               )}
-                            {!isShort && event.status === "published" && (
-                              <div className="absolute bottom-1 right-1">
-                                {isRsvpd ? (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.preventDefault()
-                                      e.stopPropagation()
-                                      cancelRsvpMutation.mutate(event)
-                                    }}
-                                    className="inline-flex items-center gap-0.5 rounded border border-primary/40 bg-primary/20 px-1 py-0.5 text-[9px] font-medium text-primary hover:bg-primary/30"
-                                  >
-                                    <CheckCircle className="h-2.5 w-2.5" />
-                                    {t("events.rsvp.going")}
-                                  </button>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.preventDefault()
-                                      e.stopPropagation()
-                                      rsvpMutation.mutate(event)
-                                    }}
-                                    className="inline-flex items-center rounded border bg-background px-1 py-0.5 text-[9px] font-medium hover:bg-muted"
-                                  >
-                                    {t("events.rsvp.rsvp")}
-                                  </button>
-                                )}
-                              </div>
-                            )}
+                            {isAuthed &&
+                              !isShort &&
+                              event.status === "published" && (
+                                <div className="absolute bottom-1 right-1">
+                                  {isRsvpd ? (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                        cancelRsvpMutation.mutate(event)
+                                      }}
+                                      className="inline-flex items-center gap-0.5 rounded border border-primary/40 bg-primary/20 px-1 py-0.5 text-[9px] font-medium text-primary hover:bg-primary/30"
+                                    >
+                                      <CheckCircle className="h-2.5 w-2.5" />
+                                      {t("events.rsvp.going")}
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                        rsvpMutation.mutate(event)
+                                      }}
+                                      className="inline-flex items-center rounded border bg-background px-1 py-0.5 text-[9px] font-medium hover:bg-muted"
+                                    >
+                                      {t("events.rsvp.rsvp")}
+                                    </button>
+                                  )}
+                                </div>
+                              )}
                           </Link>
                         )
                       },
@@ -865,7 +908,7 @@ export function DayBody({
                           <Link
                             key={event.id}
                             href={eventHref(event)}
-                            onClick={handleEventClick}
+                            onClick={(e) => handleEventClick(event, e)}
                             className={cn(
                               "absolute rounded-md border transition-colors px-1.5 py-1 overflow-hidden",
                               isHighlighted
@@ -901,7 +944,7 @@ export function DayBody({
                                 {formatTime(event.start_time)}
                                 {!isShort && ` – ${formatTime(event.end_time)}`}
                               </span>
-                              {isRsvpd && (
+                              {isAuthed && isRsvpd && (
                                 <CheckCircle className="h-2.5 w-2.5 text-primary ml-auto shrink-0" />
                               )}
                             </div>

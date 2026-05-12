@@ -539,6 +539,19 @@
       "registered": "Registered",
       "checked_in": "Checked in"
     },
+    "login_required": {
+      "title": "Sign in to view this event",
+      "message": "Sign in to {{popupName}} to see event details, RSVP, and add it to your calendar.",
+      "login": "Sign in",
+      "cancel": "Cancel"
+    },
+    "public_calendar": {
+      "heading": "Events",
+      "page_title": "{{popupName}} - Calendar",
+      "page_title_fallback": "Calendar",
+      "subheading": "Upcoming events at {{popupName}}",
+      "subheading_with_tz": "Upcoming events at {{popupName}} — times shown in {{timezone}}"
+    },
     "detail": {
       "event_not_found": "Event not found",
       "event_not_found_message": "This event does not exist or you do not have access to it.",

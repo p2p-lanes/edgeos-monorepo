@@ -539,6 +539,19 @@
       "registered": "Anotado",
       "checked_in": "Check-in realizado"
     },
+    "login_required": {
+      "title": "Iniciá sesión para ver el evento",
+      "message": "Iniciá sesión en {{popupName}} para ver los detalles del evento, anotarte y agregarlo a tu calendario.",
+      "login": "Iniciar sesión",
+      "cancel": "Cancelar"
+    },
+    "public_calendar": {
+      "heading": "Eventos",
+      "page_title": "{{popupName}} - Calendario",
+      "page_title_fallback": "Calendario",
+      "subheading": "Próximos eventos en {{popupName}}",
+      "subheading_with_tz": "Próximos eventos en {{popupName}} — horarios en {{timezone}}"
+    },
     "detail": {
       "event_not_found": "Evento no encontrado",
       "event_not_found_message": "Este evento no existe o no tenés acceso.",

@@ -1003,6 +1003,26 @@ export type EventAvailabilityResult = {
 };
 
 /**
+ * Toolbar/filter metadata bundled with the public calendar list.
+ */
+export type EventCalendarMeta = {
+    allowed_tags?: Array<(string)>;
+    allowed_tracks?: Array<EventCalendarTrack>;
+    timezone?: string;
+    popup_id: string;
+    popup_slug: string;
+    popup_name: string;
+};
+
+/**
+ * Minimal track projection for the public calendar toolbar.
+ */
+export type EventCalendarTrack = {
+    id: string;
+    name: string;
+};
+
+/**
  * Event schema for creation.
  */
 export type EventCreate = {
@@ -1133,6 +1153,46 @@ export type EventPublic = {
     track_title?: (string | null);
     hidden?: boolean;
     my_rsvp_status?: (string | null);
+};
+
+/**
+ * Minimal, read-only event projection for the public calendar.
+ *
+ * Excludes fields that are either sensitive (``meeting_url``,
+ * ``tenant_id``, ``owner_id``, ``rejection_reason``) or only meaningful
+ * to authenticated humans (``hidden``, ``my_rsvp_status``,
+ * ``visibility``, ``require_approval``, ``ical_sequence``, ``content``).
+ */
+export type EventPublicCalendarItem = {
+    id: string;
+    title: string;
+    start_time: string;
+    end_time: string;
+    timezone: string;
+    kind?: (string | null);
+    cover_url?: (string | null);
+    max_participant?: (number | null);
+    tags?: Array<(string)>;
+    highlighted?: boolean;
+    host_display_name?: (string | null);
+    rrule?: (string | null);
+    recurrence_master_id?: (string | null);
+    occurrence_id?: (string | null);
+    venue_id?: (string | null);
+    venue_title?: (string | null);
+    venue_location?: (string | null);
+    venue_image_url?: (string | null);
+    custom_location_name?: (string | null);
+    track_id?: (string | null);
+    track_title?: (string | null);
+};
+
+/**
+ * Wrapper response for ``GET /events/public/calendar``.
+ */
+export type EventPublicCalendarResponse = {
+    results: Array<EventPublicCalendarItem>;
+    meta: EventCalendarMeta;
 };
 
 /**
@@ -3607,6 +3667,22 @@ export type EventParticipantsCheckInData = {
 };
 
 export type EventParticipantsCheckInResponse = (EventParticipantPublic);
+
+export type EventsListPublicCalendarData = {
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    popupSlug: string;
+    search?: (string | null);
+    startAfter?: (string | null);
+    startBefore?: (string | null);
+    tags?: (Array<(string)> | null);
+    trackIds?: (Array<(string)> | null);
+    xTenantId?: (string | null);
+};
+
+export type EventsListPublicCalendarResponse = (EventPublicCalendarResponse);
 
 export type EventsListEventsData = {
     eventStatus?: (EventStatus | null);

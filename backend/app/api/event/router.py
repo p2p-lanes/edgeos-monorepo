@@ -2,7 +2,7 @@ import uuid
 from collections.abc import Iterable
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from loguru import logger
 from pydantic import BaseModel
 from sqlmodel import Session
@@ -17,11 +17,15 @@ from app.api.event.recurrence import (
 from app.api.event.schemas import (
     EventAvailabilityCheck,
     EventAvailabilityResult,
+    EventCalendarMeta,
+    EventCalendarTrack,
     EventCreate,
     EventInvitationBulkCreate,
     EventInvitationBulkResult,
     EventInvitationPublic,
     EventPublic,
+    EventPublicCalendarItem,
+    EventPublicCalendarResponse,
     EventStatus,
     EventUpdate,
     EventVisibility,
@@ -29,13 +33,16 @@ from app.api.event.schemas import (
     RecurrenceUpdate,
 )
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
+from app.core.dependencies.tenants import PublicTenant
 from app.core.dependencies.users import (
     CurrentAdmin,
     CurrentHuman,
     CurrentWriter,
     HumanTenantSession,
+    SessionDep,
     TenantSession,
 )
+from app.core.rate_limit import RateLimit
 from app.services.event_itip import (
     bump_and_dispatch_cancel as _bump_and_dispatch_itip_cancel,
 )
@@ -423,6 +430,156 @@ def _invitation_visible_to_human(
     if event.owner_id == human_id:
         return True
     return human_id in invitation_human_ids
+
+
+# ---------------------------------------------------------------------------
+# Public calendar (anonymous)
+# ---------------------------------------------------------------------------
+
+
+def _calendar_publicize(
+    event,
+    venue_map: dict[uuid.UUID, VenueInfo] | None,
+    track_map: dict[uuid.UUID, str] | None,
+) -> EventPublicCalendarItem:
+    """Project an Events row (or expanded pseudo-row) into the narrow
+    public calendar schema.
+
+    Never reads / forwards sensitive fields (``meeting_url``, ``content``,
+    ``owner_id``, ``tenant_id``) regardless of what ``EventPublic`` would
+    have exposed — the public schema simply does not have those fields.
+    """
+    venue_title = None
+    venue_location = None
+    venue_image_url = None
+    if event.venue_id:
+        if venue_map is not None and event.venue_id in venue_map:
+            venue_title, venue_location, venue_image_url = venue_map[event.venue_id]
+        elif venue_map is None and getattr(event, "venue", None) is not None:
+            venue_title = event.venue.title
+            venue_location = event.venue.location
+            venue_image_url = event.venue.image_url
+
+    track_title = None
+    if event.track_id:
+        if track_map is not None and event.track_id in track_map:
+            track_title = track_map[event.track_id]
+        elif track_map is None and getattr(event, "track", None) is not None:
+            track_title = event.track.name
+
+    occurrence_id = (
+        event.__dict__.get("_occurrence_id") if hasattr(event, "__dict__") else None
+    )
+
+    return EventPublicCalendarItem(
+        id=event.id,
+        title=event.title,
+        start_time=event.start_time,
+        end_time=event.end_time,
+        timezone=event.timezone,
+        kind=event.kind,
+        cover_url=event.cover_url,
+        max_participant=event.max_participant,
+        tags=list(event.tags or []),
+        highlighted=bool(event.highlighted),
+        host_display_name=event.host_display_name,
+        rrule=event.rrule,
+        recurrence_master_id=event.recurrence_master_id,
+        occurrence_id=occurrence_id,
+        venue_id=event.venue_id,
+        venue_title=venue_title,
+        venue_location=venue_location,
+        venue_image_url=venue_image_url,
+        custom_location_name=event.custom_location_name,
+        track_id=event.track_id,
+        track_title=track_title,
+    )
+
+
+@router.get(
+    "/public/calendar",
+    response_model=EventPublicCalendarResponse,
+    dependencies=[
+        Depends(
+            RateLimit(limit=120, window_sec=60, key_prefix="rl:events-public-calendar")
+        ),
+    ],
+)
+async def list_public_calendar(
+    db: SessionDep,
+    tenant: PublicTenant,
+    popup_slug: str,
+    start_after: datetime | None = None,
+    start_before: datetime | None = None,
+    search: str | None = None,
+    tags: list[str] | None = Query(default=None),
+    track_ids: list[uuid.UUID] | None = Query(default=None),
+    limit: PaginationLimit = 200,
+) -> EventPublicCalendarResponse:
+    """Anonymous calendar feed for a popup.
+
+    Tenant is resolved from Origin/Referer (or X-Tenant-Id as last
+    resort). The popup is looked up by ``popup_slug`` and validated
+    against the resolved tenant so a slug from a sibling tenant can't
+    leak events here.
+
+    Returned events are restricted server-side to ``status=published``
+    and ``visibility=public`` — cancelled, draft, pending-approval,
+    rejected, private and unlisted events are filtered out. The
+    response shape is intentionally narrower than ``EventPublic`` so
+    sensitive fields (``meeting_url``, ``content``, owner/tenant ids)
+    cannot be returned even by accident.
+    """
+    from sqlmodel import select
+
+    from app.api.event_settings.crud import event_settings_crud
+    from app.api.popup.crud import popups_crud
+    from app.api.popup.schemas import PopupStatus
+    from app.api.track.models import Tracks
+
+    popup = popups_crud.get_by_slug(db, popup_slug)
+    if not popup or popup.tenant_id != tenant.id or popup.status != PopupStatus.active:
+        # Opaque 404 — never confirm sibling-tenant popups exist.
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Popup not found"
+        )
+
+    events, _ = crud.events_crud.find_by_popup(
+        db,
+        popup_id=popup.id,
+        skip=0,
+        limit=limit,
+        event_status=EventStatus.PUBLISHED,
+        visibility=EventVisibility.PUBLIC,
+        exclude_statuses=[EventStatus.CANCELLED],
+        start_after=start_after,
+        start_before=start_before,
+        search=search,
+        tags=tags,
+        track_ids=track_ids,
+    )
+
+    venue_map = _venue_map_for_events(db, events)
+    track_map = _track_map_for_events(db, events)
+
+    settings = event_settings_crud.get_by_popup_id(db, popup.id)
+    timezone = settings.timezone if settings else "UTC"
+    allowed_tags = list(settings.allowed_tags or []) if settings else []
+
+    track_rows = list(db.exec(select(Tracks).where(Tracks.popup_id == popup.id)).all())
+    allowed_tracks = [EventCalendarTrack(id=t.id, name=t.name) for t in track_rows]
+
+    return EventPublicCalendarResponse(
+        results=[_calendar_publicize(e, venue_map, track_map) for e in events],
+        meta=EventCalendarMeta(
+            allowed_tags=allowed_tags,
+            allowed_tracks=allowed_tracks,
+            timezone=timezone,
+            popup_id=popup.id,
+            popup_slug=popup.slug,
+            popup_name=popup.name,
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------
