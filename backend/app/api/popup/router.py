@@ -24,7 +24,7 @@ from app.api.popup.schemas import (
     PopupStatus,
     PopupUpdate,
 )
-from app.api.shared.enums import SaleType, UserRole
+from app.api.shared.enums import LandingMode, SaleType, UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.api.ticketing_step.constants import seed_ticketing_steps_for_popup
 from app.api.translation.service import (
@@ -239,6 +239,9 @@ async def update_popup(
                 detail="A popup with this slug already exists in this tenant",
             )
 
+    # Snapshot status before update for cache invalidation hook (ADR-2, cache event #4)
+    old_status = popup.status
+
     sale_type_change_requested = (
         popup_in.sale_type is not None and popup_in.sale_type != popup.sale_type
     )
@@ -321,6 +324,25 @@ async def update_popup(
             tenant_id=updated.tenant_id,
             section_map=section_map,
         )
+
+    # Cache invalidation hook — ADR-2 cache event #4.
+    # Lazy-open the main-platform DB session only on status transition so other
+    # popup PATCH calls don't carry a second connection.
+    if popup_in.status is not None and popup_in.status != old_status:
+        from sqlmodel import Session  # noqa: PLC0415
+
+        from app.api.tenant.models import Tenants  # noqa: PLC0415
+        from app.core.dependencies.users import engine as main_engine  # noqa: PLC0415
+        from app.core.redis import domain_cache  # noqa: PLC0415
+
+        with Session(main_engine) as main_db:
+            tenant_row = main_db.get(Tenants, updated.tenant_id)
+            if (
+                tenant_row is not None
+                and tenant_row.landing_mode == LandingMode.checkout
+                and tenant_row.custom_domain
+            ):
+                domain_cache.invalidate(tenant_row.custom_domain)
 
     return PopupAdmin.model_validate(updated)
 

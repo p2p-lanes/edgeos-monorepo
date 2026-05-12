@@ -34,6 +34,8 @@ _TENANT_A_ID = uuid.uuid4()
 
 def _make_tenant(tenant_id: uuid.UUID = _TENANT_A_ID) -> MagicMock:
     """Return a mock Tenants ORM instance with enough fields for TenantPublic.model_validate."""
+    from app.api.shared.enums import LandingMode
+
     t = MagicMock()
     t.id = tenant_id
     t.deleted = False
@@ -46,6 +48,8 @@ def _make_tenant(tenant_id: uuid.UUID = _TENANT_A_ID) -> MagicMock:
     t.logo_url = None
     t.custom_domain = None
     t.custom_domain_active = False
+    t.landing_mode = LandingMode.portal
+    t.active_popup_slug = None  # computed projection — not a DB column
     return t
 
 
@@ -55,7 +59,8 @@ def _make_tenant_public_json(tenant_id: uuid.UUID = _TENANT_A_ID) -> str:
         f'{{"id":"{tenant_id}","name":"Test","slug":"test",'
         f'"deleted":false,"sender_email":null,"sender_name":null,'
         f'"image_url":null,"icon_url":null,"logo_url":null,'
-        f'"custom_domain":null,"custom_domain_active":false}}'
+        f'"custom_domain":null,"custom_domain_active":false,'
+        f'"landing_mode":"portal","active_popup_slug":null}}'
     )
 
 

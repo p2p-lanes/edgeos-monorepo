@@ -462,10 +462,20 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
             portal_base = get_portal_url(tenant)
             simplefi_client = get_simplefi_client(popup.simplefi_api_key)
-            success_url = (
-                f"{portal_base}/checkout/{popup.slug}/thank-you?payment_id={payment.id}"
-            )
-            cancel_url = f"{portal_base}/checkout/{popup.slug}?cancelled=1"
+
+            # URL construction depends on tenant landing_mode (R-P1, R-P2, R-P3)
+            # When landing_mode=checkout the custom domain IS the checkout — no slug prefix.
+            # Application Fee flow (lines ~776-779) is UNCHANGED — see R-P5 / AC-P2.
+            from app.api.shared.enums import LandingMode  # noqa: PLC0415
+
+            if tenant.landing_mode == LandingMode.checkout:
+                success_url = f"{portal_base}/thank-you?payment_id={payment.id}"
+                cancel_url = f"{portal_base}/?cancelled=1"
+            else:
+                success_url = (
+                    f"{portal_base}/checkout/{popup.slug}/thank-you?payment_id={payment.id}"
+                )
+                cancel_url = f"{portal_base}/checkout/{popup.slug}?cancelled=1"
             reference = {
                 "email": buyer.email,
                 "human_id": str(buyer.id),

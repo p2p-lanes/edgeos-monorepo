@@ -22,6 +22,34 @@ from app.api.ticketing_step.models import TicketingSteps
 from app.api.ticketing_step.schemas import TicketingStepPublic
 
 
+def resolve_active_direct_popup_slug(db: Session, tenant_id: uuid.UUID) -> str | None:
+    """Return the slug of the earliest active direct-sale popup for a tenant.
+
+    Resolution rule (ADR, OI-4, OI-5):
+      WHERE status='active' AND sale_type='direct' AND tenant_id=:tid
+      ORDER BY start_date ASC NULLS LAST, id ASC
+      LIMIT 1
+
+    Returns None when no matching popup exists — callers handle None gracefully
+    (signals the Coming Soon path in the portal). Never raises.
+    """
+    popup = db.exec(
+        select(Popups)
+        .where(
+            Popups.tenant_id == tenant_id,
+            Popups.status == PopupStatus.active,
+            Popups.sale_type == SaleType.direct,
+        )
+        .order_by(
+            Popups.start_date.asc().nulls_last(),  # type: ignore[attr-defined]
+            Popups.id.asc(),  # type: ignore[attr-defined]
+        )
+        .limit(1)
+    ).first()
+
+    return popup.slug if popup is not None else None
+
+
 def get_open_ticketing_popup(session: Session, slug: str, tenant_id: uuid.UUID) -> Popups:
     """Resolve an active direct-sale popup by slug and tenant for open ticketing.
 
