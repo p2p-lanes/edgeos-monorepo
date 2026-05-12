@@ -460,15 +460,6 @@ export function CheckoutProvider({
     discountApplied.discount_value ?? 0,
     promoCodeDiscount ?? 0,
   )
-  console.log("[promo-debug] checkoutProvider effectiveDiscount", {
-    discountAppliedValue: discountApplied.discount_value,
-    discountAppliedCode: discountApplied.discount_code,
-    discountAppliedCityId: discountApplied.city_id,
-    promoCodeDiscount,
-    promoCode,
-    promoCodeValid,
-    effectiveDiscount,
-  })
 
   // Cart summary
   const { summary } = useCartSummary({

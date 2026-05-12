@@ -65,23 +65,6 @@ export function useCartSummary({
       merch.length +
       (patron ? 1 : 0)
 
-    console.log("[promo-debug] useCartSummary recompute", {
-      discountValue,
-      passesSubtotal,
-      passesOriginalSubtotal,
-      passesPerItem: selectedPasses.map((p) => ({
-        productId: p.productId,
-        price: p.price,
-        originalPrice: p.originalPrice,
-        quantity: p.quantity,
-      })),
-      originalSubtotal,
-      promoDiscount,
-      discountedSubtotal,
-      credit,
-      grandTotal,
-    })
-
     return {
       passesSubtotal,
       housingSubtotal,

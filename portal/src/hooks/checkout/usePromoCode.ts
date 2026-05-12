@@ -52,12 +52,6 @@ export function usePromoCode({
                 code: code.toUpperCase(),
               },
             })
-        console.log("[promo-debug] applyPromoCode API response", {
-          code: code.toUpperCase(),
-          rawResponse,
-          cityId,
-          discountAppliedValue,
-        })
         const discountValue =
           typeof rawResponse === "number"
             ? (rawResponse ?? 0)
@@ -67,19 +61,11 @@ export function usePromoCode({
         // A 0% (or missing) discount is meaningless — surfacing it as a valid
         // applied code confuses users ("Code applied!" + unchanged total).
         if (discountValue <= 0) {
-          console.warn("[promo-debug] applyPromoCode rejected: discount <= 0", {
-            discountValue,
-          })
           setError("Invalid promo code")
           return false
         }
 
         if (discountValue >= discountAppliedValue) {
-          console.log("[promo-debug] applyPromoCode setting state", {
-            discountValue,
-            discountAppliedValue,
-            willCallSetDiscount: true,
-          })
           setPromoCode(code.toUpperCase())
           setPromoCodeValid(true)
           setPromoCodeDiscount(discountValue)
@@ -93,13 +79,8 @@ export function usePromoCode({
 
           return true
         }
-        console.warn(
-          "[promo-debug] applyPromoCode rejected: discountValue < discountAppliedValue",
-          { discountValue, discountAppliedValue },
-        )
         return false
-      } catch (err) {
-        console.error("[promo-debug] applyPromoCode threw", err)
+      } catch {
         return false
       } finally {
         setIsLoading(false)
