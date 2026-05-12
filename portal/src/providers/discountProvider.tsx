@@ -38,9 +38,25 @@ const DiscountProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (city?.id && discountApplied.city_id !== city?.id) {
-      setDiscountApplied({ discount_value: 0, discount_type: "percentage" })
+      console.warn("[promo-debug] DiscountProvider city-change reset", {
+        cityId: city.id,
+        prevCityId: discountApplied.city_id,
+        prevDiscountValue: discountApplied.discount_value,
+        prevDiscountCode: discountApplied.discount_code,
+      })
+      setDiscountApplied({
+        discount_value: 0,
+        discount_type: "percentage",
+        discount_code: null,
+        city_id: city.id,
+      })
     }
-  }, [city?.id, discountApplied.city_id])
+  }, [
+    city?.id,
+    discountApplied.city_id,
+    discountApplied.discount_value,
+    discountApplied.discount_code,
+  ])
 
   useEffect(() => {
     if (application?.group_id && groups.length > 0) {
@@ -50,6 +66,11 @@ const DiscountProvider = ({ children }: { children: ReactNode }) => {
         group?.discount_percentage &&
         groupDiscount > discountApplied.discount_value
       ) {
+        console.warn("[promo-debug] DiscountProvider GROUP overrides", {
+          groupDiscount,
+          previousValue: discountApplied.discount_value,
+          previousCode: discountApplied.discount_code,
+        })
         setDiscountApplied({
           discount_value: groupDiscount,
           discount_type: "percentage",
@@ -57,13 +78,31 @@ const DiscountProvider = ({ children }: { children: ReactNode }) => {
         })
       }
     }
-  }, [application?.group_id, groups, discountApplied.discount_value])
+  }, [
+    application?.group_id,
+    groups,
+    discountApplied.discount_value,
+    discountApplied.discount_code,
+  ])
 
   const discountRef = useRef(discountApplied)
   discountRef.current = discountApplied
 
   const setDiscount = useCallback((discount: DiscountProps) => {
-    if (discount.discount_value <= discountRef.current.discount_value) return
+    // Use `<` (not `<=`) so a coupon matching the current discount can still
+    // overwrite metadata like discount_code / city_id, which the backend
+    // needs to record the conversion even when the percentage is unchanged.
+    if (discount.discount_value < discountRef.current.discount_value) {
+      console.warn("[promo-debug] DiscountProvider.setDiscount REJECTED", {
+        incoming: discount,
+        current: discountRef.current,
+      })
+      return
+    }
+    console.log("[promo-debug] DiscountProvider.setDiscount ACCEPTED", {
+      incoming: discount,
+      previous: discountRef.current,
+    })
     setDiscountApplied(discount)
   }, [])
 
