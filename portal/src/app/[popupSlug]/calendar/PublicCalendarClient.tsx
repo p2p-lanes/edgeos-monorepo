@@ -7,7 +7,7 @@ import "@/i18n/config"
 
 import { CalendarDays, Filter } from "lucide-react"
 import { notFound } from "next/navigation"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { CalendarBody } from "@/app/portal/[popupSlug]/events/lib/CalendarBody"
 import { DayBody } from "@/app/portal/[popupSlug]/events/lib/DayBody"
@@ -22,7 +22,6 @@ import {
   LoginRequiredDialog,
   type LoginRequiredEvent,
 } from "@/components/LoginRequiredDialog"
-import { SUPPORTED_LANGUAGES } from "@/i18n/config"
 import { useTenant } from "@/providers/tenantProvider"
 
 import { usePublicCalendarEvents } from "./usePublicCalendarEvents"
@@ -39,39 +38,8 @@ interface PublicCalendarClientProps {
  * ``/auth?redirect=...`` and back to the event detail on success.
  */
 export function PublicCalendarClient({ popupSlug }: PublicCalendarClientProps) {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const { tenantId } = useTenant()
-
-  // No CityProvider / LanguageProvider out here, so do the minimum:
-  // pick the first supported browser language and apply it once. The
-  // ref guard prevents the effect from re-running after
-  // ``i18n.changeLanguage`` triggers a re-render — otherwise we'd loop
-  // forever in some browsers whose i18n instance reference subtly shifts.
-  const didDetectLanguageRef = useRef(false)
-  useEffect(() => {
-    if (didDetectLanguageRef.current) return
-    didDetectLanguageRef.current = true
-    if (typeof navigator === "undefined") return
-    const allowed = Object.keys(SUPPORTED_LANGUAGES)
-    const candidates = navigator.languages?.length
-      ? navigator.languages
-      : [navigator.language]
-    for (const raw of candidates) {
-      if (!raw) continue
-      const lower = raw.toLowerCase()
-      const exact = allowed.includes(lower) ? lower : null
-      const base =
-        !exact && allowed.includes(lower.split("-")[0])
-          ? lower.split("-")[0]
-          : null
-      const next = exact ?? base
-      if (next && next !== i18n.language) {
-        i18n.changeLanguage(next)
-        document.documentElement.lang = next
-        return
-      }
-    }
-  }, [i18n])
 
   const [view, setView] = useState<EventsView>("list")
   const [search, setSearch] = useState("")
