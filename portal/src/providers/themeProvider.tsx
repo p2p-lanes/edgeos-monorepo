@@ -50,6 +50,14 @@ interface ThemeColors {
    * "monochrome iconography" instead of OS-coloured pictographs. */
   checkout_nav_monochrome_emoji?: boolean | string
   checkout_subtitle_color?: string
+  /** Override the ticket-card section surface for the whole popup.
+   * Drives `--ticket-card-bg` (and `--ticket-card-fg` for text). Only
+   * consumed by VariantTicketCard, so other `bg-card` surfaces in the
+   * checkout (buyer form, confirm step, cart drawer) keep the global
+   * theme palette. Use when the popup theme mode and the card surface
+   * need to disagree — e.g. a dark popup with cream-on-teal cards. */
+  card_background_color?: string
+  card_foreground_color?: string
 }
 
 interface ThemeConfig {
@@ -108,9 +116,6 @@ function computeThemeVars(
     vars["--checkout-navbar-bg"] = colors.checkout_navbar_bg
     vars["--checkout-nav-bg"] = colors.checkout_navbar_bg
   }
-  if (colors.checkout_watermark_color) {
-    vars["--checkout-watermark"] = colors.checkout_watermark_color
-  }
   if (colors.checkout_nav_text_color) {
     // Force nav text/icon colour for both active and inactive states. The
     // disabled token uses a slight opacity so the inactive labels still
@@ -132,6 +137,15 @@ function computeThemeVars(
   }
   if (colors.checkout_subtitle_color) {
     vars["--checkout-subtitle"] = colors.checkout_subtitle_color
+  }
+  // Ticket-card surface — written outside the `hasTheme` guard so tenants
+  // can opt into card colours without committing to a full mode/primary
+  // theme. Consumed by VariantTicketCard via `var(--ticket-card-bg, …)`.
+  if (colors.card_background_color) {
+    vars["--ticket-card-bg"] = colors.card_background_color
+  }
+  if (colors.card_foreground_color) {
+    vars["--ticket-card-fg"] = colors.card_foreground_color
   }
 
   // If no mode/primary is set, stop here — rest of the palette stays on the
@@ -177,7 +191,13 @@ function computeThemeVars(
     "--checkout-title": palette.foreground,
     "--checkout-subtitle":
       colors.checkout_subtitle_color || palette.foregroundSecondary,
-    "--checkout-watermark": mix(palette.background, palette.foreground, 92),
+    // Watermark falls back to a faint bg/foreground mix when the tenant
+    // hasn't set its own. Inline here (instead of an early-binding `if`)
+    // because the Object.assign below would otherwise clobber an early
+    // override — same shape as `--checkout-subtitle` above.
+    "--checkout-watermark":
+      colors.checkout_watermark_color ||
+      mix(palette.background, palette.foreground, 92),
     "--checkout-navbar-bg":
       colors.checkout_navbar_bg || mix(palette.background, "transparent", 85),
     "--checkout-nav-bg":

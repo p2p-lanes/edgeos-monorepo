@@ -43,10 +43,20 @@ interface TicketCardSection {
 
 type TicketCardVariant = "stacked" | "tabs" | "compact"
 
-/** Surface for the section card. `theme` follows the global theme tokens.
- * `light` and `dark` pin the surface regardless of the popup theme — useful
- * when the page background is dark (e.g. a hero photo) and the cards need
- * to stay readable, or vice versa. */
+/** Surface for the section card.
+ *
+ *  `theme` (default) — bg/text resolve from the popup theme. When the
+ *  tenant sets `card_background_color` / `card_foreground_color` in their
+ *  theme, those drive `--ticket-card-bg` / `--ticket-card-fg` and the
+ *  card uses them; otherwise the card falls back to `--card` /
+ *  `--card-foreground` from the global mode palette.
+ *
+ *  `light` / `dark` — hard-coded oklch presets pinned via inline style,
+ *  overriding everything for this step's card subtree. Useful when the
+ *  popup theme mode disagrees with what one specific step needs (e.g. a
+ *  dark popup with one cream cards step) and the tenant can't or doesn't
+ *  want to express that via theme tokens.
+ */
 type TicketCardSurface = "theme" | "light" | "dark"
 
 const SURFACE_STYLE: Record<
@@ -243,16 +253,35 @@ function SectionCard({
 }) {
   if (products.length === 0) return null
 
-  // When the admin pins surface to light/dark, scope the CSS variables to
-  // the card root so the entire subtree (title, description, prices, add
-  // button) inherits the correct surface tokens.
-  const surfaceStyle =
-    surface === "theme" ? undefined : (SURFACE_STYLE[surface] as React.CSSProperties)
+  // Resolution order:
+  //  * `surface = "light" | "dark"` → pin a hardcoded preset on the card
+  //    root, overriding everything for the subtree.
+  //  * `surface = "theme"` → bind the theme's `--ticket-card-bg` /
+  //    `--ticket-card-fg` to the card-scoped CSS variables so inner
+  //    elements (h3 with `text-foreground`, description with
+  //    `text-muted-foreground`, dividers via `--border`) all repaint
+  //    onto the card surface in one go. Falls back to the global
+  //    `--card` / `--card-foreground` when the tenant didn't set
+  //    card colours — that's the legacy single-mode behaviour.
+  const surfaceStyle: React.CSSProperties =
+    surface === "theme"
+      ? ({
+          "--card": "var(--ticket-card-bg, var(--card))",
+          "--card-foreground": "var(--ticket-card-fg, var(--card-foreground))",
+          "--foreground": "var(--ticket-card-fg, var(--card-foreground))",
+          "--muted-foreground":
+            "color-mix(in srgb, var(--ticket-card-fg, var(--card-foreground)) 75%, transparent)",
+          "--border":
+            "color-mix(in srgb, var(--ticket-card-fg, var(--card-foreground)) 18%, transparent)",
+          background: "var(--ticket-card-bg, var(--card))",
+          color: "var(--ticket-card-fg, var(--card-foreground))",
+        } as React.CSSProperties)
+      : (SURFACE_STYLE[surface] as React.CSSProperties)
 
   return (
     <article
       style={surfaceStyle}
-      className="rounded-2xl overflow-hidden border border-border bg-card text-card-foreground shadow-sm"
+      className="rounded-2xl overflow-hidden border border-border shadow-sm"
     >
       {section.image_url && (
         <div
@@ -336,13 +365,26 @@ function CompactLayout({
   surface: TicketCardSurface
 }) {
   // Compact strips the image and renders sections as dense rows. Useful when
-  // a popup has many sections and the tenant wants a "list view".
-  const surfaceStyle =
-    surface === "theme" ? undefined : (SURFACE_STYLE[surface] as React.CSSProperties)
+  // a popup has many sections and the tenant wants a "list view". Same
+  // surface resolution as the stacked SectionCard — see comments there.
+  const surfaceStyle: React.CSSProperties =
+    surface === "theme"
+      ? ({
+          "--card": "var(--ticket-card-bg, var(--card))",
+          "--card-foreground": "var(--ticket-card-fg, var(--card-foreground))",
+          "--foreground": "var(--ticket-card-fg, var(--card-foreground))",
+          "--muted-foreground":
+            "color-mix(in srgb, var(--ticket-card-fg, var(--card-foreground)) 75%, transparent)",
+          "--border":
+            "color-mix(in srgb, var(--ticket-card-fg, var(--card-foreground)) 18%, transparent)",
+          background: "var(--ticket-card-bg, var(--card))",
+          color: "var(--ticket-card-fg, var(--card-foreground))",
+        } as React.CSSProperties)
+      : (SURFACE_STYLE[surface] as React.CSSProperties)
   return (
     <div
       style={surfaceStyle}
-      className="rounded-2xl overflow-hidden border border-border bg-card text-card-foreground divide-y divide-border"
+      className="rounded-2xl overflow-hidden border border-border divide-y divide-border"
     >
       {groups.map(({ section, products }) => (
         <div key={section.key}>
