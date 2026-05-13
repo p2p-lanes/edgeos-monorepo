@@ -8,7 +8,7 @@ from app.api.shared.enums import UserRole
 from app.api.translation.crud import translations_crud
 from app.api.translation.schemas import TranslationCreate, TranslationPublic
 from app.api.translation.service import TRANSLATABLE_FIELDS
-from app.core.dependencies.users import CurrentUser, CurrentWriter, TenantSession
+from app.core.dependencies.users import CurrentOperator, CurrentUser, TenantSession
 
 router = APIRouter(prefix="/translations", tags=["translations"])
 
@@ -29,7 +29,7 @@ async def list_translations(
 async def upsert_translation(
     translation_in: TranslationCreate,
     db: TenantSession,
-    current_user: CurrentWriter,
+    current_user: CurrentOperator,
     x_tenant_id: Annotated[str | None, Header(alias="X-Tenant-Id")] = None,
 ) -> TranslationPublic:
     """Create or update a translation for an entity."""
@@ -63,7 +63,7 @@ class AITranslateRequest(BaseModel):
 async def ai_translate(
     request: AITranslateRequest,
     db: TenantSession,
-    _current_user: CurrentWriter,
+    _current_user: CurrentOperator,
 ) -> dict[str, str]:
     """Use AI to generate draft translations for an entity. Returns translated fields (not saved)."""
     if request.entity_type not in TRANSLATABLE_FIELDS:
@@ -115,7 +115,7 @@ async def ai_translate(
 async def delete_translation(
     translation_id: uuid.UUID,
     db: TenantSession,
-    _current_user: CurrentWriter,
+    _current_user: CurrentOperator,
     _x_tenant_id: Annotated[str | None, Header(alias="X-Tenant-Id")] = None,
 ) -> None:
     """Delete a translation."""

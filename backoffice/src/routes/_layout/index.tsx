@@ -31,7 +31,7 @@ export const Route = createFileRoute("/_layout/")({
 })
 
 function Dashboard() {
-  const { user: currentUser, isAdmin, isSuperadmin } = useAuth()
+  const { user: currentUser, isOperatorOrAbove, isSuperadmin } = useAuth()
   const { selectedPopupId, selectedTenantId, isContextReady } = useWorkspace()
 
   const {
@@ -70,7 +70,7 @@ function Dashboard() {
           </p>
         </div>
 
-        {isContextReady && isAdmin && (
+        {isContextReady && isOperatorOrAbove && (
           <NeedsAttention
             inReview={enriched?.applications.in_review ?? 0}
             selectedPopupId={selectedPopupId}
@@ -122,7 +122,7 @@ function Dashboard() {
           />
         </div>
 
-        {isContextReady && isAdmin && selectedPopupId && (
+        {isContextReady && isOperatorOrAbove && selectedPopupId && (
           <div>
             <SectionTitle>Recent Activity</SectionTitle>
             <RecentActivity

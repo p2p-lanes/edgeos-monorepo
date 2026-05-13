@@ -112,9 +112,9 @@ export function TemplateList() {
 
 export function EmailTemplatesPage() {
   const { needsTenantSelection, needsPopupSelection } = useWorkspace()
-  const { isAdmin } = useAuth()
+  const { isOperatorOrAbove } = useAuth()
 
-  if (!isAdmin) {
+  if (!isOperatorOrAbove) {
     return (
       <div className="flex flex-col gap-6 p-6">
         <h1 className="text-2xl font-bold tracking-tight">Email Templates</h1>

@@ -15,7 +15,7 @@ from app.api.email_template.schemas import (
 )
 from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
-from app.core.dependencies.users import CurrentUser, CurrentWriter, TenantSession
+from app.core.dependencies.users import CurrentOperator, CurrentUser, TenantSession
 
 router = APIRouter(prefix="/email-templates", tags=["email-templates"])
 
@@ -207,7 +207,7 @@ async def preview_template(
 @router.post("/send-test", status_code=status.HTTP_200_OK)
 async def send_test_email(
     body: SendTestRequest,
-    _: CurrentWriter,
+    _: CurrentOperator,
     db: TenantSession,
 ) -> dict[str, str]:
     from app.services.email.templates import (
@@ -331,7 +331,7 @@ async def get_email_template(
 async def create_email_template(
     template_in: EmailTemplateCreate,
     db: TenantSession,
-    current_user: CurrentWriter,
+    current_user: CurrentOperator,
 ) -> EmailTemplatePublic:
     from app.services.email.templates import (
         get_template_scope,
@@ -418,7 +418,7 @@ async def update_email_template(
     template_id: uuid.UUID,
     template_in: EmailTemplateUpdate,
     db: TenantSession,
-    _current_user: CurrentWriter,
+    _current_user: CurrentOperator,
 ) -> EmailTemplatePublic:
     template = crud.email_template_crud.get(db, template_id)
 
@@ -436,7 +436,7 @@ async def update_email_template(
 async def delete_email_template(
     template_id: uuid.UUID,
     db: TenantSession,
-    _current_user: CurrentWriter,
+    _current_user: CurrentOperator,
 ) -> None:
     template = crud.email_template_crud.get(db, template_id)
 

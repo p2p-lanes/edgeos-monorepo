@@ -55,7 +55,7 @@ const createActions = Object.values(CREATE_ROUTES).map((route) => ({
 export function CommandPalette() {
   const [open, setOpen] = useState(false)
   const navigate = useNavigate()
-  const { isAdmin, isSuperadmin } = useAuth()
+  const { isOperatorOrAbove, isSuperadmin } = useAuth()
   const isMac =
     typeof navigator !== "undefined" &&
     /Mac|iPhone|iPad/.test(navigator.userAgent)
@@ -78,7 +78,7 @@ export function CommandPalette() {
 
   const allPages = [
     ...pages,
-    ...(isAdmin ? adminPages : []),
+    ...(isOperatorOrAbove ? adminPages : []),
     ...(isSuperadmin ? superadminPages : []),
   ]
 
@@ -95,7 +95,7 @@ export function CommandPalette() {
             </CommandItem>
           ))}
         </CommandGroup>
-        {isAdmin && (
+        {isOperatorOrAbove && (
           <>
             <CommandSeparator />
             <CommandGroup heading="Create">
