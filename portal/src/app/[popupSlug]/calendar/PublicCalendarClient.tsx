@@ -6,7 +6,7 @@
 import "@/i18n/config"
 
 import { CalendarDays, Filter } from "lucide-react"
-import { notFound } from "next/navigation"
+import { notFound, useRouter } from "next/navigation"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { CalendarBody } from "@/app/portal/[popupSlug]/events/lib/CalendarBody"
@@ -22,6 +22,7 @@ import {
   LoginRequiredDialog,
   type LoginRequiredEvent,
 } from "@/components/LoginRequiredDialog"
+import { useIsAuthenticated } from "@/hooks/useIsAuthenticated"
 import { useTenant } from "@/providers/tenantProvider"
 
 import { usePublicCalendarEvents } from "./usePublicCalendarEvents"
@@ -40,6 +41,8 @@ interface PublicCalendarClientProps {
 export function PublicCalendarClient({ popupSlug }: PublicCalendarClientProps) {
   const { t } = useTranslation()
   const { tenantId } = useTenant()
+  const router = useRouter()
+  const isAuthenticated = useIsAuthenticated()
 
   const [view, setView] = useState<EventsView>("list")
   const [search, setSearch] = useState("")
@@ -142,17 +145,28 @@ export function PublicCalendarClient({ popupSlug }: PublicCalendarClientProps) {
     )
   }, [query.data, meta?.popup_id])
 
-  const handleEventClick = useCallback((event: EventPublic) => {
-    setLoginPrompt({
-      id: event.id,
-      title: event.title,
-      start_time: event.start_time,
-      occurrence_id: event.occurrence_id,
-    })
-    // Returning true tells the body components to prevent the underlying
-    // <Link> navigation — we surface the login dialog instead.
-    return true
-  }, [])
+  const handleEventClick = useCallback(
+    (event: EventPublic) => {
+      if (isAuthenticated) {
+        let href = `/portal/${popupSlug}/events/${event.id}`
+        if (event.occurrence_id) {
+          href += `?occ=${encodeURIComponent(event.start_time)}`
+        }
+        router.push(href)
+        return true
+      }
+      setLoginPrompt({
+        id: event.id,
+        title: event.title,
+        start_time: event.start_time,
+        occurrence_id: event.occurrence_id,
+      })
+      // Returning true tells the body components to prevent the underlying
+      // <Link> navigation — we surface the login dialog instead.
+      return true
+    },
+    [isAuthenticated, popupSlug, router],
+  )
 
   const { formatTime, formatDateShort, formatDayKey } = useEventTimezone(
     meta?.popup_id,
@@ -176,10 +190,17 @@ export function PublicCalendarClient({ popupSlug }: PublicCalendarClientProps) {
 
   return (
     <div className="max-w-4xl mx-auto p-4 sm:p-6 overflow-x-clip">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight">
-          {t("events.public_calendar.heading")}
+      {meta?.popup_name ? (
+        <h1 className="text-3xl font-bold tracking-tight mb-4">
+          {t("events.public_calendar.page_title", {
+            popupName: meta.popup_name,
+          })}
         </h1>
+      ) : null}
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold tracking-tight">
+          {t("events.public_calendar.heading")}
+        </h2>
         <p className="text-sm text-muted-foreground mt-1">
           {timezone && meta?.popup_name
             ? t("events.public_calendar.subheading_with_tz", {

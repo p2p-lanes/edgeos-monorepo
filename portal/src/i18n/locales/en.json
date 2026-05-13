@@ -541,7 +541,7 @@
     },
     "login_required": {
       "title": "Sign in to view this event",
-      "message": "Sign in to {{popupName}} to see event details, RSVP, and add it to your calendar.",
+      "message": "Event details are only visible to signed-in users. A ticket for {{popupName}} is required to participate.",
       "login": "Sign in",
       "cancel": "Cancel"
     },

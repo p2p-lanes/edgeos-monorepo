@@ -541,7 +541,7 @@
     },
     "login_required": {
       "title": "登录以查看此活动",
-      "message": "登录 {{popupName}} 以查看活动详情、报名并加入您的日历。",
+      "message": "活动详情仅对已登录用户可见。需要 {{popupName}} 的门票才能参与。",
       "login": "登录",
       "cancel": "取消"
     },
