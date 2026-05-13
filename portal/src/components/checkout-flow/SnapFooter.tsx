@@ -202,6 +202,8 @@ export default function SnapFooter({
   sections,
   onGoToConfirm,
   onGoToNextSection,
+  onGoToPreviousSection,
+  onScrollToStep,
 }: {
   footerDesign: FooterDesign
   onPay?: () => void
@@ -210,6 +212,8 @@ export default function SnapFooter({
   sections?: SnapFooterSection[]
   onGoToConfirm?: () => void
   onGoToNextSection?: () => void
+  onGoToPreviousSection?: () => void
+  onScrollToStep?: (stepId: string) => void
 }) {
   const { t } = useTranslation()
   const isMobile = useIsMobile()
@@ -256,6 +260,8 @@ export default function SnapFooter({
         onBack={onBack}
         nextSectionLabel={nextSectionLabel}
         onContinue={onGoToNextSection}
+        onPrevious={onGoToPreviousSection}
+        onScrollToStep={onScrollToStep}
         isLastSection={isOnConfirm}
         activeSectionId={activeSection}
       />

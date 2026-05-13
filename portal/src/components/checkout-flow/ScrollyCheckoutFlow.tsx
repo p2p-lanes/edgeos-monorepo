@@ -13,6 +13,7 @@ import type { WatermarkStyle } from "./ScrollySectionNav"
 import ScrollySectionNav from "./ScrollySectionNav"
 import SectionHeader from "./SectionHeader"
 import SnapDotNav from "./SnapDotNav"
+import CheckoutToast from "./CheckoutToast"
 import SnapFooter from "./SnapFooter"
 import SnapSection from "./SnapSection"
 import ConfirmStep from "./steps/ConfirmStep"
@@ -38,8 +39,13 @@ function ScrollyCheckoutFlowInner({
   brandLogoUrl,
   brandLabel,
 }: ScrollyCheckoutFlowProps) {
-  const { availableSteps, submitPayment, stepConfigs, isInitialLoading } =
-    useCheckout()
+  const {
+    availableSteps,
+    submitPayment,
+    stepConfigs,
+    isInitialLoading,
+    markStepVisited,
+  } = useCheckout()
 
   const getStepConfig = (stepType: string) =>
     stepConfigs.find(
@@ -123,9 +129,19 @@ function ScrollyCheckoutFlowInner({
           label: config?.title ?? defaultLabels[step] ?? step,
           template: config?.template ?? null,
           emoji: config?.emoji ?? null,
+          showInNavbar: config?.show_in_navbar ?? true,
         }
       })
   }, [availableSteps, stepConfigs])
+
+  // Sections rendered in the top nav chrome. Subset of allSections —
+  // the IntersectionObserver still tracks the full set so scroll
+  // behaviour is unchanged, but informational steps (FAQs, Gallery,
+  // etc.) can be hidden from the nav per-tenant via `show_in_navbar`.
+  const navSections = useMemo(
+    () => allSections.filter((s) => s.showInNavbar !== false),
+    [allSections],
+  )
 
   const goToConfirm = useCallback(() => {
     const idx = allSections.findIndex((s) => s.id === "confirm")
@@ -138,6 +154,25 @@ function ScrollyCheckoutFlowInner({
       scrollToIndexRef.current?.(idx + 1)
     }
   }, [allSections, activeSection])
+
+  const goToPreviousSection = useCallback(() => {
+    const idx = allSections.findIndex((s) => s.id === activeSection)
+    if (idx > 0) {
+      scrollToIndexRef.current?.(idx - 1)
+    }
+  }, [allSections, activeSection])
+
+  // Public escape-hatch: jump to a specific step by id. Used by the
+  // validation flow when Continuar/Pagar bounces the user back to a
+  // failing step ("Faltan datos en Tu información" toast → click chip →
+  // scrolls to buyer step).
+  const scrollToStep = useCallback(
+    (stepId: string) => {
+      const idx = allSections.findIndex((s) => s.id === stepId)
+      if (idx >= 0) scrollToIndexRef.current?.(idx)
+    },
+    [allSections],
+  )
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: isInitialLoading must trigger a re-run when sections mount in the DOM, even though it's not read inside.
   useEffect(() => {
@@ -214,6 +249,11 @@ function ScrollyCheckoutFlowInner({
         for (const entry of entries) {
           if (entry.isIntersecting && entry.intersectionRatio >= 0.3) {
             const id = entry.target.id
+            // Any section that crosses the 30% visibility threshold
+            // counts as "visited" for the wayfinding nav. Triggered
+            // both for normal scroll and programmatic scroll, so the
+            // user is credited for visits they actively chose.
+            markStepVisited(id)
             if (scrollTargetId !== null) {
               if (id === scrollTargetId) {
                 releaseScrollTarget()
@@ -266,7 +306,7 @@ function ScrollyCheckoutFlowInner({
       releaseScrollTarget()
       scrollToIndexRef.current = null
     }
-  }, [allSections, isInitialLoading])
+  }, [allSections, isInitialLoading, markStepVisited])
 
   const renderSectionContent = (stepId: string) => {
     // Buyer and confirm are structural steps — wired explicitly, not via DynamicProductStep.
@@ -318,7 +358,7 @@ function ScrollyCheckoutFlowInner({
   return (
     <div className="relative font-sans">
       <ScrollySectionNav
-        sections={allSections}
+        sections={navSections}
         activeSection={activeSection}
         onSectionClick={(sectionId) => {
           const idx = allSections.findIndex((s) => s.id === sectionId)
@@ -330,11 +370,40 @@ function ScrollyCheckoutFlowInner({
       />
       {allSections.map((section) => {
         const config = getStepConfig(section.id)
+        const tc = config?.template_config as
+          | Record<string, unknown>
+          | undefined
+        // Per-step card-colour overrides. Setting either of these on a
+        // step's template_config writes `--step-card-bg` / `--step-card-fg`
+        // onto the SnapSection wrapper; CSS cascade then paints every
+        // `stepCardSurfaceStyle()` consumer inside this step's subtree
+        // with the overridden palette. Sections without an override
+        // inherit the popup-root theme defaults.
+        const stepCardBg =
+          typeof tc?.card_background_color === "string"
+            ? (tc.card_background_color as string)
+            : undefined
+        const stepCardFg =
+          typeof tc?.card_foreground_color === "string"
+            ? (tc.card_foreground_color as string)
+            : undefined
+        const stepCardStyle =
+          stepCardBg || stepCardFg
+            ? ({
+                ...(stepCardBg
+                  ? { "--step-card-bg": stepCardBg }
+                  : undefined),
+                ...(stepCardFg
+                  ? { "--step-card-fg": stepCardFg }
+                  : undefined),
+              } as React.CSSProperties)
+            : undefined
         return (
           <SnapSection
             key={section.id}
             id={section.id}
             bottomPadding={section.id === lastSectionId ? "4rem" : "50vh"}
+            style={stepCardStyle}
           >
             <SectionHeader
               title={config?.title ?? section.label}
@@ -374,7 +443,10 @@ function ScrollyCheckoutFlowInner({
         sections={allSections}
         onGoToConfirm={goToConfirm}
         onGoToNextSection={goToNextSection}
+        onGoToPreviousSection={goToPreviousSection}
+        onScrollToStep={scrollToStep}
       />
+      <CheckoutToast onChipClick={scrollToStep} />
     </div>
   )
 }

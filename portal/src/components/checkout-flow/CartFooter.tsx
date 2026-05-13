@@ -9,6 +9,7 @@ import {
 } from "lucide-react"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
+import { stepCardSurfaceStyle } from "@/lib/stepCardSurface"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
 import { useCityProvider } from "@/providers/cityProvider"
@@ -21,15 +22,32 @@ interface CartFooterProps {
   onBack?: () => void
   nextSectionLabel?: string
   onContinue?: () => void
+  /**
+   * Scroll-based "previous step" handler from the funnel container.
+   * Volver uses this instead of the provider's `goToPreviousStep`
+   * because the latter only updates internal state — in scrolly mode
+   * it leaves the page parked on the current section.
+   */
+  onPrevious?: () => void
+  /** Provided by the funnel container so this component can jump back
+   *  to a failing step when the user clicks Continuar/Pagar without
+   *  filling required fields. */
+  onScrollToStep?: (stepId: string) => void
   isLastSection?: boolean
   activeSectionId?: string
 }
+
+// Past this character count we fall back to a generic "Siguiente →" on
+// the Continuar pill so the bottom bar doesn't break the row on mobile.
+const NEXT_LABEL_MOBILE_THRESHOLD = 14
 
 export default function CartFooter({
   onPay,
   onBack,
   nextSectionLabel,
   onContinue,
+  onPrevious,
+  onScrollToStep,
   isLastSection = false,
   activeSectionId,
 }: CartFooterProps) {
@@ -42,69 +60,173 @@ export default function CartFooter({
     attendees,
     goToNextStep,
     goToPreviousStep,
-    canProceedToStep,
     isSubmitting,
     isEditing,
     editCredit,
     termsAccepted,
     isBuyerInfoComplete,
     cartUiEnabled,
+    hasAnyCartItems,
+    getBuyerInvalidFields,
+    findFirstIncompleteStep,
+    findFirstProductStep,
+    markBuyerFieldsTouched,
+    triggerCheckoutToast,
+    dismissCheckoutToast,
+    visitedSteps,
   } = useCheckout()
   const { getCity } = useCityProvider()
   const popup = getCity()
 
   const [isExpanded, setIsExpanded] = useState(false)
 
-  // In scrolly mode `currentStep` stays at the initial value while the user
-  // scrolls. `activeSectionId` reflects the section actually in view, so
-  // position-based gating (next step, first step, etc.) must use it when
-  // provided to avoid letting users skip required steps like buyer info.
+  // In scrolly mode `currentStep` stays at the initial value while the
+  // user scrolls. `activeSectionId` reflects the section actually in
+  // view, so position-based gating (next step, first step, etc.) must
+  // use it when provided to avoid letting users skip required steps
+  // like buyer info.
   const positionStep = (activeSectionId ?? currentStep) as CheckoutStep
   const isConfirmStep = positionStep === "confirm" || isLastSection
+  const isBuyerStep = positionStep === "buyer"
   const currentIndex = availableSteps.indexOf(positionStep)
   // First step is whatever is at index 0 of the actual configured step
   // order — previously this was hardcoded to "passes", which broke once
   // popups started putting buyer or hero steps first.
   const isFirstStep = currentIndex === 0
-  const nextStepId =
-    currentIndex < availableSteps.length - 1
-      ? availableSteps[currentIndex + 1]
-      : null
 
   const hasEditChanges =
     isEditing && attendees.some((a) => a.products.some((p) => p.edit))
   const requiresTerms =
     isConfirmStep && !!popup?.terms_and_conditions_url && !termsAccepted
-  const hasDynamicItems = Object.values(cart.dynamicItems).some(
-    (items) => items.length > 0,
-  )
-  const canContinue = requiresTerms
-    ? false
-    : isEditing
-      ? cart.passes.length > 0
-      : isConfirmStep
-        ? (cart.passes.length > 0 ||
-            !!cart.housing ||
-            cart.merch.length > 0 ||
-            !!cart.patron ||
-            hasDynamicItems) &&
-          isBuyerInfoComplete
-        : nextStepId
-          ? canProceedToStep(nextStepId)
-          : false
-
   const hasItems =
-    summary.itemCount > 0 || hasDynamicItems || (isEditing && hasEditChanges)
+    summary.itemCount > 0 ||
+    hasAnyCartItems ||
+    (isEditing && hasEditChanges)
+
+  // New gating model — "enabled by default; click runs validation".
+  // The button only renders as disabled in the two states where it
+  // truly has no work to do: a submit in flight, or terms-acceptance
+  // gate on the confirm step. Everywhere else the click triggers a
+  // validation pass and (a) jumps to the failing step + raises the
+  // toast on failure, or (b) advances/pays on success.
+  const isHardDisabled = isSubmitting || requiresTerms
+
+  // Focus the first invalid field within a given step's section. Runs
+  // after React re-renders the inline errors so the right input has
+  // `aria-invalid="true"` to match. Idempotent (does nothing if the
+  // step has no invalid fields).
+  const focusFirstInvalidInStep = (stepId: string) => {
+    if (typeof document === "undefined") return
+    window.setTimeout(() => {
+      const section = document.getElementById(stepId)
+      if (!section) return
+      const target = section.querySelector<HTMLElement>(
+        '[aria-invalid="true"]',
+      )
+      target?.focus({ preventScroll: true })
+    }, 250)
+  }
 
   const handleContinue = () => {
-    if (isConfirmStep && onPay) {
-      onPay()
-    } else if (onContinue) {
+    if (isSubmitting) return
+
+    // --- Path A: confirm/pay attempt ----------------------------------
+    // Resolution order is funnel-order: we bounce the user back to the
+    // earliest fixable thing, not the closest. Required-input gaps
+    // (today: buyer info) come first because the buyer step lives
+    // before any product step in the funnel; the user will hit the
+    // cart-empty check next anyway after they've filled their info.
+    if (isConfirmStep) {
+      if (requiresTerms) return
+      const incomplete = findFirstIncompleteStep()
+      if (incomplete) {
+        if (incomplete === "buyer") {
+          markBuyerFieldsTouched(getBuyerInvalidFields())
+        }
+        onScrollToStep?.(incomplete)
+        focusFirstInvalidInStep(incomplete)
+        triggerCheckoutToast({
+          message: t("checkout.toast_buyer_incomplete_pay", {
+            defaultValue:
+              "Antes de pagar, completá los campos de Tu información.",
+          }),
+          chips: [
+            {
+              label: t("checkout.steps.buyer_short", {
+                defaultValue: "Tu información",
+              }),
+              stepId: incomplete,
+            },
+          ],
+        })
+        return
+      }
+      if (!hasItems) {
+        const target = findFirstProductStep(visitedSteps)
+        if (target) onScrollToStep?.(target)
+        triggerCheckoutToast({
+          message: t("checkout.toast_cart_empty", {
+            defaultValue:
+              "Necesitás agregar al menos un item antes de continuar.",
+          }),
+        })
+        return
+      }
+      dismissCheckoutToast()
+      onPay?.()
+      return
+    }
+
+    // --- Path B: Continuar from the buyer step --------------------------
+    // Local gate — don't let the user "advance forward" while leaving
+    // the form invalid behind them. Reveals all invalid fields, focuses
+    // the first one, and raises the toast.
+    if (isBuyerStep && !isBuyerInfoComplete) {
+      markBuyerFieldsTouched(getBuyerInvalidFields())
+      focusFirstInvalidInStep("buyer")
+      triggerCheckoutToast({
+        message: t("checkout.toast_buyer_incomplete_continue", {
+          defaultValue:
+            "Hay datos incompletos en Tu información. Revisalos para continuar.",
+        }),
+      })
+      return
+    }
+
+    // --- Path C: any other step --------------------------------------
+    dismissCheckoutToast()
+    if (onContinue) {
       onContinue()
     } else {
       goToNextStep()
     }
   }
+
+  // CTA label resolution. The named "Continuar a <Step>" pattern is
+  // the desktop default; on narrow viewports or long labels we fall
+  // back to a generic "Siguiente →" so the bottom bar stays clean.
+  const longNextLabel =
+    !!nextSectionLabel && nextSectionLabel.length > NEXT_LABEL_MOBILE_THRESHOLD
+  const continueText = isEditing
+    ? isConfirmStep
+      ? summary.grandTotal === 0
+        ? t("checkout.actions.confirm_edit")
+        : t("checkout.actions.pay_and_confirm_edit")
+      : nextSectionLabel
+        ? longNextLabel
+          ? // Generic-fallback on long labels keeps the pill width predictable.
+            t("common.continue")
+          : nextSectionLabel
+        : t("common.continue")
+    : isConfirmStep
+      ? summary.grandTotal === 0
+        ? t("checkout.actions.claim_pass")
+        : t("checkout.actions.pay")
+      : nextSectionLabel
+        ? longNextLabel
+          ? t("common.continue")
+          : nextSectionLabel
+        : t("common.continue")
 
   return (
     <div className="z-30">
@@ -120,9 +242,10 @@ export default function CartFooter({
       {/* Expanded Cart Drawer */}
       <div
         className={cn(
-          "bg-checkout-card-bg shadow-2xl transition-all duration-300 ease-in-out overflow-hidden rounded-2xl mb-2 relative z-30",
+          "shadow-2xl transition-all duration-300 ease-in-out overflow-hidden rounded-2xl mb-2 relative z-30",
           cartUiEnabled && isExpanded ? "max-h-[60vh]" : "max-h-0",
         )}
+        style={stepCardSurfaceStyle()}
       >
         <div className="px-4 py-4 overflow-y-auto max-h-[calc(60vh-80px)]">
           <CartItemList />
@@ -137,7 +260,11 @@ export default function CartFooter({
             {(!isFirstStep || onBack) && (
               <button
                 type="button"
-                onClick={isFirstStep ? onBack : goToPreviousStep}
+                onClick={
+                  isFirstStep
+                    ? onBack
+                    : (onPrevious ?? goToPreviousStep)
+                }
                 className="flex items-center justify-center p-2.5 lg:px-3 lg:py-2 text-checkout-bottom-bar-text/60 hover:text-checkout-bottom-bar-text hover:bg-white/10 rounded-lg transition-colors shrink-0"
               >
                 <ArrowLeft className="w-4 h-4" />
@@ -183,14 +310,16 @@ export default function CartFooter({
               </div>
             </button>
 
-            {/* Continue button */}
+            {/* Continue button — always enabled (except submit-in-flight
+                and the explicit terms-required gate). Failed validation
+                paths jump to the failing step instead of greying out. */}
             <button
               type="button"
               onClick={handleContinue}
-              disabled={!canContinue || isSubmitting}
+              disabled={isHardDisabled}
               className={cn(
                 "flex items-center justify-center gap-1.5 lg:gap-2 px-3 lg:px-6 py-3 lg:py-3.5 rounded-xl text-sm font-semibold transition-all shrink-0 whitespace-nowrap",
-                canContinue && !isSubmitting
+                !isHardDisabled
                   ? "bg-checkout-button text-checkout-button-title shadow-lg active:scale-95 hover:opacity-90"
                   : "bg-checkout-button-disabled text-checkout-button-title-disabled cursor-not-allowed",
               )}
@@ -202,19 +331,7 @@ export default function CartFooter({
                 </>
               ) : (
                 <>
-                  <span>
-                    {isEditing
-                      ? isConfirmStep
-                        ? summary.grandTotal === 0
-                          ? t("checkout.actions.confirm_edit")
-                          : t("checkout.actions.pay_and_confirm_edit")
-                        : (nextSectionLabel ?? t("common.continue"))
-                      : isConfirmStep
-                        ? summary.grandTotal === 0
-                          ? t("checkout.actions.claim_pass")
-                          : t("checkout.actions.pay")
-                        : (nextSectionLabel ?? t("common.continue"))}
-                  </span>
+                  <span>{continueText}</span>
                   <ArrowRight className="w-4 h-4 shrink-0" />
                 </>
               )}

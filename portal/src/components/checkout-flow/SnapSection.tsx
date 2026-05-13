@@ -7,10 +7,15 @@ export default function SnapSection({
   id,
   children,
   bottomPadding = "50vh",
+  style,
 }: {
   id: string
   children: React.ReactNode
   bottomPadding?: string
+  /** Extra style merged onto the `<section>`. Used to write per-step CSS
+   *  vars (e.g. `--step-card-bg`) that cascade into descendants for
+   *  step-scoped card-colour overrides. */
+  style?: React.CSSProperties
 }) {
   const ref = useRef<HTMLElement>(null)
   const [visible, setVisible] = useState(false)
@@ -93,6 +98,7 @@ export default function SnapSection({
         minHeight: "var(--snap-section-h, 100vh)",
         paddingTop: "calc(var(--snap-nav-h, 48px) + 1.5rem)",
         paddingBottom: bottomPadding,
+        ...style,
       }}
     >
       {children}

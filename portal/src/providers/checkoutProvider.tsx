@@ -111,7 +111,66 @@ interface CheckoutContextValue {
   buyerGeneralError: string | null
   setBuyerField: (fieldName: string, value: unknown) => void
   isBuyerInfoComplete: boolean
+  /**
+   * Field names within the buyer form that fail the current Zod schema.
+   * Empty when the form is complete or no schema is configured. Used by
+   * the funnel to (a) mark fields as touched + paint inline errors after
+   * a Continuar/Pagar attempt, (b) decide which step to scroll back to.
+   */
+  getBuyerInvalidFields: () => string[]
+  /**
+   * Returns the step_type of the first step (in funnel order) that has
+   * unmet required input — today that's the buyer step when its Zod
+   * schema isn't satisfied. Returns null when nothing's missing.
+   */
+  findFirstIncompleteStep: () => string | null
+  /**
+   * Returns the step_type of the first product-bearing step the user
+   * should be sent to when the cart is empty. Prefers visited steps,
+   * else falls back to the first product step in funnel order.
+   */
+  findFirstProductStep: (visited?: Set<string>) => string | null
+  /** True when at least one cartable item is present (regardless of price). */
+  hasAnyCartItems: boolean
+  /**
+   * Set of step_types the user has visited during this session.
+   * Updated by ScrollyCheckoutFlow's IntersectionObserver. Used by the
+   * nav to decide whether to paint a step amber (visited but incomplete)
+   * vs leave it neutral (not yet touched).
+   */
+  visitedSteps: Set<string>
+  markStepVisited: (stepType: string) => void
+  /**
+   * Buyer-form fields that should always render their on-blur error
+   * regardless of whether the user has actually focused them. Triggered
+   * when the user presses Continuar/Pagar with incomplete data — the
+   * funnel forcefully reveals every invalid field at once. Cleared
+   * when the user starts editing again.
+   */
+  forcedBuyerFieldsTouched: Set<string>
+  markBuyerFieldsTouched: (fieldNames: string[]) => void
+  clearForcedBuyerFieldsTouched: () => void
+  /**
+   * Persistent (until dismissed) banner the funnel raises when a
+   * Continuar/Pagar attempt fails validation. Holds the human message
+   * plus optional chip-shaped jump-targets back to the steps that need
+   * attention.
+   */
+  checkoutToast: CheckoutToastState | null
+  triggerCheckoutToast: (state: Omit<CheckoutToastState, "id">) => void
+  dismissCheckoutToast: () => void
   cartUiEnabled: boolean
+}
+
+export interface CheckoutToastChip {
+  label: string
+  stepId: string
+}
+
+export interface CheckoutToastState {
+  id: string
+  message: string
+  chips?: CheckoutToastChip[]
 }
 
 const CheckoutContext = createContext<CheckoutContextValue | null>(null)
@@ -237,6 +296,27 @@ export function CheckoutProvider({
     !buyerFormSchema ||
     buildFormZodSchema(buyerFormSchema, false).safeParse(buyerValues).success
 
+  // Returns the names of buyer-form fields that fail the current schema.
+  // Source of truth for "where did the user miss something?" so the
+  // funnel can scroll back, paint inline errors, and prompt the user
+  // through the toast. Returns [] when complete (or no schema).
+  const getBuyerInvalidFields = useCallback((): string[] => {
+    if (!buyerFormSchema) return []
+    const result = buildFormZodSchema(buyerFormSchema, false).safeParse(
+      buyerValues,
+    )
+    if (result.success) return []
+    const seen = new Set<string>()
+    for (const issue of result.error.issues) {
+      const fieldName =
+        Array.isArray(issue.path) && issue.path.length > 0
+          ? String(issue.path[0])
+          : null
+      if (fieldName) seen.add(fieldName)
+    }
+    return Array.from(seen)
+  }, [buyerFormSchema, buyerValues])
+
   // True while step configs or products are still loading on first render.
   // Why: when both queries are pending, availableSteps falls back to
   // ["passes", "confirm"] with default labels and the cart total reads $0,
@@ -291,6 +371,58 @@ export function CheckoutProvider({
   const [dynamicItems, setDynamicItems] = useState<
     Record<string, SelectedDynamicItem[]>
   >({})
+  // Steps the user has scrolled into / clicked through during this
+  // session. Session-only — no localStorage. Used purely for nav UX
+  // (paint amber when "started but didn't complete").
+  const [visitedSteps, setVisitedSteps] = useState<Set<string>>(
+    () => new Set<string>(),
+  )
+  const markStepVisited = useCallback((stepType: string) => {
+    setVisitedSteps((prev) => {
+      if (prev.has(stepType)) return prev
+      const next = new Set(prev)
+      next.add(stepType)
+      return next
+    })
+  }, [])
+  const [forcedBuyerFieldsTouched, setForcedBuyerFieldsTouched] = useState<
+    Set<string>
+  >(() => new Set<string>())
+  const markBuyerFieldsTouched = useCallback((fieldNames: string[]) => {
+    if (fieldNames.length === 0) return
+    setForcedBuyerFieldsTouched((prev) => {
+      let changed = false
+      const next = new Set(prev)
+      for (const name of fieldNames) {
+        if (!next.has(name)) {
+          next.add(name)
+          changed = true
+        }
+      }
+      return changed ? next : prev
+    })
+  }, [])
+  const clearForcedBuyerFieldsTouched = useCallback(() => {
+    setForcedBuyerFieldsTouched((prev) =>
+      prev.size === 0 ? prev : new Set<string>(),
+    )
+  }, [])
+  const [checkoutToast, setCheckoutToast] = useState<CheckoutToastState | null>(
+    null,
+  )
+  const triggerCheckoutToast = useCallback(
+    (state: Omit<CheckoutToastState, "id">) => {
+      setCheckoutToast({
+        ...state,
+        id:
+          typeof crypto !== "undefined" && "randomUUID" in crypto
+            ? crypto.randomUUID()
+            : `toast-${Date.now()}`,
+      })
+    },
+    [],
+  )
+  const dismissCheckoutToast = useCallback(() => setCheckoutToast(null), [])
 
   // Build selected passes from attendeePasses
   const selectedPasses = useMemo<SelectedPassItem[]>(() => {
@@ -576,6 +708,88 @@ export function CheckoutProvider({
     ],
   )
 
+  // Item-count check used by the "you must add something to pay" gate.
+  // Counts items, not money — a free product or 100%-off coupon still
+  // satisfies this because the cart has cartable rows.
+  const hasAnyCartItems = useMemo<boolean>(
+    () =>
+      selectedPasses.length > 0 ||
+      !!housing ||
+      merch.length > 0 ||
+      !!patron ||
+      Object.values(dynamicItems).some((items) => items.length > 0),
+    [selectedPasses, housing, merch, patron, dynamicItems],
+  )
+
+  // Returns the funnel step the user should be sent to when the gate
+  // fails. Order of precedence:
+  //   1. Buyer step, if its required fields aren't fully valid.
+  //   (Other product-step "at least one item" checks could grow here
+  //   later; today only the buyer step has formal field validation.)
+  const findFirstIncompleteStep = useCallback((): string | null => {
+    if (!isBuyerInfoComplete) {
+      const buyer = effectiveConfiguredSteps.find(
+        (s) => s.step_type === "buyer",
+      )
+      if (buyer) return buyer.step_type
+    }
+    return null
+  }, [isBuyerInfoComplete, effectiveConfiguredSteps])
+
+  // Returns the canonical step id the user should be jumped to when
+  // the cart is empty. Prefers a step they've already visited so the
+  // trip back feels short; otherwise lands on the first product-bearing
+  // step.
+  //
+  // A "product step" is one that actually carries purchasable inventory
+  // — heuristically, those with a `product_category` configured OR a
+  // template that exposes product rows (ticket-card, ticket-select,
+  // housing-date, merch-image, patron-preset). Informational templates
+  // (rich-text, image-gallery, youtube-video, faqs) are excluded so the
+  // bounce-back lands on a step where the buyer can actually add
+  // something.
+  //
+  // Returns the *checkout step id* (e.g. "passes") rather than the raw
+  // step_type ("tickets") so the value lines up with `availableSteps`,
+  // the DOM section ids, and the IntersectionObserver's visited set.
+  const findFirstProductStep = useCallback(
+    (visited?: Set<string>): string | null => {
+      const PRODUCT_TEMPLATES = new Set([
+        "ticket-card",
+        "ticket-select",
+        "housing-date",
+        "merch-image",
+        "patron-preset",
+      ])
+      const toCheckoutStepId = (stepType: string): string =>
+        stepType === "tickets" ? "passes" : stepType
+      const productSteps = effectiveConfiguredSteps.filter(
+        (s) =>
+          s.is_enabled &&
+          s.step_type !== "buyer" &&
+          s.step_type !== "confirm" &&
+          (!!s.product_category ||
+            (s.template && PRODUCT_TEMPLATES.has(s.template))),
+      )
+      if (productSteps.length === 0) return null
+      const candidateIds = productSteps.map((s) =>
+        toCheckoutStepId(s.step_type),
+      )
+      // Always send the buyer to the FIRST product step in funnel
+      // order — "you haven't added anything anywhere, start at the
+      // beginning of the product flow." `visited` is intentionally
+      // ignored: the IntersectionObserver only fires for sections that
+      // crossed the 30% threshold, so a fast scroll past Tickets while
+      // navigating to Confirm would otherwise mis-direct the bounce to
+      // a later step (e.g. Estacionamiento) that just happened to
+      // cross more slowly. The function still accepts the parameter so
+      // callers don't have to change as the rule evolves.
+      void visited
+      return candidateIds[0]
+    },
+    [effectiveConfiguredSteps],
+  )
+
   // Dynamic item actions
   const addDynamicItem = useCallback(
     (stepType: string, item: SelectedDynamicItem) => {
@@ -798,6 +1012,18 @@ export function CheckoutProvider({
       setBuyerGeneralError(null)
     },
     isBuyerInfoComplete,
+    getBuyerInvalidFields,
+    findFirstIncompleteStep,
+    findFirstProductStep,
+    hasAnyCartItems,
+    visitedSteps,
+    markStepVisited,
+    forcedBuyerFieldsTouched,
+    markBuyerFieldsTouched,
+    clearForcedBuyerFieldsTouched,
+    checkoutToast,
+    triggerCheckoutToast,
+    dismissCheckoutToast,
     cartUiEnabled,
   }
 
