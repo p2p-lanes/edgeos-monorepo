@@ -210,13 +210,68 @@ async def create_my_attendee_for_popup(
             ],
         )
 
+    # Validate category_id belongs to this popup (closes security hole per spec)
+    from app.api.attendee_category.crud import attendee_categories_crud as cat_crud
+
+    if attendee_in.category_id is not None:
+        category_row = cat_crud.get(db, attendee_in.category_id)
+        if category_row is None or category_row.popup_id != popup_id:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=[
+                    {
+                        "code": "invalid_category",
+                        "message": "Category does not belong to this popup",
+                    }
+                ],
+            )
+        if not category_row.enabled_in_passes_flow:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=[
+                    {
+                        "code": "category_disabled",
+                        "message": "This attendee type is not currently accepted",
+                    }
+                ],
+            )
+        if category_row.max_per_application is not None:
+            from sqlmodel import func, select  # noqa: PLC0415
+
+            from app.api.attendee.models import Attendees as _Attendees  # noqa: PLC0415
+
+            count = db.exec(
+                select(func.count()).where(
+                    _Attendees.application_id == application.id,
+                    _Attendees.category_id == category_row.id,
+                )
+            ).one()
+            if count >= category_row.max_per_application:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=[
+                        {
+                            "code": "max_reached",
+                            "message": f"Limit of {category_row.max_per_application} reached for this category",
+                        }
+                    ],
+                )
+        # Derive legacy category string from FK for backward compatibility
+        effective_category = category_row.key
+        effective_category_id = category_row.id
+    else:
+        # Legacy fallback: category string provided directly (deprecated path)
+        effective_category = attendee_in.category or "main"
+        effective_category_id = None
+
     attendee = crud.attendees_crud.create_internal(
         session=db,
         tenant_id=application.tenant_id,
         application_id=application.id,
         popup_id=popup_id,
         name=attendee_in.name,
-        category=attendee_in.category,
+        category=effective_category,
+        category_id=effective_category_id,
         email=attendee_in.email,
         gender=attendee_in.gender,
     )

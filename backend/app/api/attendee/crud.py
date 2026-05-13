@@ -133,6 +133,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         email: str | None = None,
         gender: str | None = None,
         human_id: uuid.UUID | None = None,
+        category_id: uuid.UUID | None = None,
     ) -> Attendees:
         """Create an attendee with internal fields.
 
@@ -155,6 +156,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
             popup_id=popup_id,
             name=name,
             category=category,
+            category_id=category_id,
             check_in_code=None,
             email=email,
             gender=gender,

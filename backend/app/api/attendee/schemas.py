@@ -10,7 +10,11 @@ from app.api.product.schemas import ProductWithQuantity
 
 
 class AttendeeCategory(str, Enum):
-    """Categories for attendees."""
+    """Categories for attendees — DEPRECATED, kept for backwards compatibility.
+
+    This enum is preserved for code that still references it (e.g., migration
+    tests, legacy endpoints). New code should use category_id FK instead.
+    """
 
     MAIN = "main"
     SPOUSE = "spouse"
@@ -29,7 +33,14 @@ class AttendeeBase(SQLModel):
         default=None, foreign_key="humans.id", index=True, nullable=True
     )
     name: str
-    category: str = Field(index=True)  # main, spouse, kid
+    category: str = Field(index=True)  # legacy string column — kept until PR 2
+    # FK to attendee_categories (authoritative post-migration)
+    category_id: uuid.UUID | None = Field(
+        default=None,
+        foreign_key="attendee_categories.id",
+        index=True,
+        nullable=True,
+    )
     email: str | None = Field(default=None, nullable=True)
     gender: str | None = Field(default=None, nullable=True)
     check_in_code: str | None = Field(default=None, index=True, nullable=True)
@@ -55,10 +66,17 @@ class AttendeePublic(AttendeeBase):
 
 
 class AttendeeCreate(BaseModel):
-    """Attendee schema for creation (by user)."""
+    """Attendee schema for creation (by user).
+
+    Accepts category_id (UUID FK) as the primary input. The legacy `category`
+    string field is kept for backward compatibility but the router now validates
+    via category_id against the popup's attendee_categories table.
+    """
 
     name: str
-    category: str  # main, spouse, kid
+    category_id: uuid.UUID | None = None
+    # Legacy string kept for existing callers; prefer category_id for new code
+    category: str | None = None
     email: str | None = None
     gender: str | None = None
 
@@ -68,14 +86,6 @@ class AttendeeCreate(BaseModel):
         if v:
             return v.lower().strip()
         return None
-
-    @field_validator("category")
-    @classmethod
-    def validate_category(cls, v: str) -> str:
-        allowed = [c.value for c in AttendeeCategory]
-        if v not in allowed:
-            raise ValueError(f"Category must be one of: {', '.join(allowed)}")
-        return v
 
     model_config = ConfigDict(str_strip_whitespace=True)
 

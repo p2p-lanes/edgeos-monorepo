@@ -27,6 +27,14 @@ from app.api.approval_strategy.schemas import (
 from app.api.attendee.models import AttendeeProducts, Attendees
 from app.api.attendee.schemas import AttendeeCreate, AttendeePublic, AttendeeUpdate
 
+# Attendee category (declarative per-popup categories replacing hardcoded enum)
+from app.api.attendee_category.models import AttendeeCategories
+from app.api.attendee_category.schemas import (
+    AttendeeCategoryCreate,
+    AttendeeCategoryPublic,
+    AttendeeCategoryUpdate,
+)
+
 # Auth
 from app.api.auth.pending_human_models import PendingHumans
 from app.api.check_in.models import CheckIn
@@ -129,6 +137,11 @@ from app.api.user.schemas import UserCreate, UserPublic, UserUpdate
 
 __all__ = [
     "SQLModel",
+    # Attendee categories
+    "AttendeeCategories",
+    "AttendeeCategoryCreate",
+    "AttendeeCategoryPublic",
+    "AttendeeCategoryUpdate",
     # API keys
     "ApiKeys",
     "ApiKeyCreate",

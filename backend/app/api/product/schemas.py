@@ -36,7 +36,11 @@ class TicketDuration(str, Enum):
 
 
 class TicketAttendeeCategory(str, Enum):
-    """Attendee categories for ticket products."""
+    """Attendee categories for ticket products — DEPRECATED.
+
+    Kept for backward compatibility during PR 1. Removed in PR 2.
+    New code should use attendee_category_id (UUID FK) instead.
+    """
 
     MAIN = "main"
     SPOUSE = "spouse"
@@ -59,6 +63,12 @@ class ProductBase(SQLModel):
     category: str = Field(default="ticket", index=True)
     attendee_category: TicketAttendeeCategory | None = Field(
         default=None, nullable=True
+    )
+    # FK to attendee_categories (authoritative post-migration)
+    attendee_category_id: uuid.UUID | None = Field(
+        default=None,
+        foreign_key="attendee_categories.id",
+        nullable=True,
     )
     duration_type: TicketDuration | None = Field(default=None, nullable=True)
     sale_starts_at: datetime | None = Field(

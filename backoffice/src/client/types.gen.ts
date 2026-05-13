@@ -325,11 +325,73 @@ export type AttachRateItem = {
 };
 
 /**
+ * Schema for creating an attendee category.
+ */
+export type AttendeeCategoryCreate = {
+    popup_id: string;
+    key: string;
+    sort_order?: number;
+    enabled_in_passes_flow?: boolean;
+    max_per_application?: (number | null);
+    required_fields?: Array<{
+        [key: string]: unknown;
+    }>;
+    display_meta?: {
+        [key: string]: unknown;
+    };
+};
+
+/**
+ * Public read model for attendee categories.
+ */
+export type AttendeeCategoryPublic = {
+    id: string;
+    tenant_id: string;
+    popup_id: string;
+    key: string;
+    is_primary?: boolean;
+    sort_order?: number;
+    enabled_in_passes_flow?: boolean;
+    max_per_application?: (number | null);
+    required_fields?: Array<{
+        [key: string]: unknown;
+    }>;
+    display_meta?: {
+        [key: string]: unknown;
+    };
+    created_at?: (string | null);
+    updated_at?: (string | null);
+};
+
+/**
+ * Schema for updating an attendee category.
+ *
+ * key and is_primary are deliberately not updatable — sending them
+ * causes a 422 validation error (extra="forbid").
+ */
+export type AttendeeCategoryUpdate = {
+    sort_order?: (number | null);
+    enabled_in_passes_flow?: (boolean | null);
+    max_per_application?: (number | null);
+    required_fields?: (Array<{
+    [key: string]: unknown;
+}> | null);
+    display_meta?: ({
+    [key: string]: unknown;
+} | null);
+};
+
+/**
  * Attendee schema for creation (by user).
+ *
+ * Accepts category_id (UUID FK) as the primary input. The legacy `category`
+ * string field is kept for backward compatibility but the router now validates
+ * via category_id against the popup's attendee_categories table.
  */
 export type AttendeeCreate = {
     name: string;
-    category: string;
+    category_id?: (string | null);
+    category?: (string | null);
     email?: (string | null);
     gender?: (string | null);
 };
@@ -359,6 +421,7 @@ export type AttendeeListItem = {
     human_id?: (string | null);
     name: string;
     category: string;
+    category_id?: (string | null);
     email?: (string | null);
     gender?: (string | null);
     check_in_code?: (string | null);
@@ -412,6 +475,7 @@ export type AttendeePublic = {
     human_id?: (string | null);
     name: string;
     category: string;
+    category_id?: (string | null);
     email?: (string | null);
     gender?: (string | null);
     check_in_code?: (string | null);
@@ -500,6 +564,7 @@ export type AttendeeWithOriginPublic = {
     human_id?: (string | null);
     name: string;
     category: string;
+    category_id?: (string | null);
     email?: (string | null);
     gender?: (string | null);
     check_in_code?: (string | null);
@@ -1719,6 +1784,11 @@ export type ListModel_ApplicationReviewPublic_ = {
     paging: Paging;
 };
 
+export type ListModel_AttendeeCategoryPublic_ = {
+    results: Array<AttendeeCategoryPublic>;
+    paging: Paging;
+};
+
 export type ListModel_AttendeeListItem_ = {
     results: Array<AttendeeListItem>;
     paging: Paging;
@@ -2330,6 +2400,7 @@ export type ProductBatchResult = {
     image_url?: (string | null);
     category?: string;
     attendee_category?: (TicketAttendeeCategory | null);
+    attendee_category_id?: (string | null);
     duration_type?: (TicketDuration | null);
     sale_starts_at?: (string | null);
     sale_ends_at?: (string | null);
@@ -2409,6 +2480,7 @@ export type ProductPublic = {
     image_url?: (string | null);
     category?: string;
     attendee_category?: (TicketAttendeeCategory | null);
+    attendee_category_id?: (string | null);
     duration_type?: (TicketDuration | null);
     sale_starts_at?: (string | null);
     sale_ends_at?: (string | null);
@@ -2460,6 +2532,7 @@ export type ProductWithQuantity = {
     image_url?: (string | null);
     category?: string;
     attendee_category?: (TicketAttendeeCategory | null);
+    attendee_category_id?: (string | null);
     duration_type?: (TicketDuration | null);
     sale_starts_at?: (string | null);
     sale_ends_at?: (string | null);
@@ -2684,7 +2757,10 @@ export type TenantUpdate = {
 };
 
 /**
- * Attendee categories for ticket products.
+ * Attendee categories for ticket products — DEPRECATED.
+ *
+ * Kept for backward compatibility during PR 1. Removed in PR 2.
+ * New code should use attendee_category_id (UUID FK) instead.
  */
 export type TicketAttendeeCategory = 'main' | 'spouse' | 'kid';
 
@@ -3279,6 +3355,35 @@ export type ApprovalStrategiesDeleteApprovalStrategyData = {
 };
 
 export type ApprovalStrategiesDeleteApprovalStrategyResponse = (void);
+
+export type AttendeeCategoriesListAttendeeCategoriesData = {
+    popupId: string;
+    xTenantId?: (string | null);
+};
+
+export type AttendeeCategoriesListAttendeeCategoriesResponse = (ListModel_AttendeeCategoryPublic_);
+
+export type AttendeeCategoriesCreateAttendeeCategoryData = {
+    requestBody: AttendeeCategoryCreate;
+    xTenantId?: (string | null);
+};
+
+export type AttendeeCategoriesCreateAttendeeCategoryResponse = (AttendeeCategoryPublic);
+
+export type AttendeeCategoriesUpdateAttendeeCategoryData = {
+    categoryId: string;
+    requestBody: AttendeeCategoryUpdate;
+    xTenantId?: (string | null);
+};
+
+export type AttendeeCategoriesUpdateAttendeeCategoryResponse = (AttendeeCategoryPublic);
+
+export type AttendeeCategoriesDeleteAttendeeCategoryData = {
+    categoryId: string;
+    xTenantId?: (string | null);
+};
+
+export type AttendeeCategoriesDeleteAttendeeCategoryResponse = (void);
 
 export type AttendeesListMyAttendeesByPopupData = {
     /**

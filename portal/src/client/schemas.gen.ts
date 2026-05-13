@@ -1557,14 +1557,253 @@ export const AttachRateItemSchema = {
     description: 'Accommodation attach rate per ticket type.'
 } as const;
 
+export const AttendeeCategoryCreateSchema = {
+    properties: {
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        key: {
+            type: 'string',
+            maxLength: 64,
+            title: 'Key'
+        },
+        sort_order: {
+            type: 'integer',
+            title: 'Sort Order',
+            default: 0
+        },
+        enabled_in_passes_flow: {
+            type: 'boolean',
+            title: 'Enabled In Passes Flow',
+            default: true
+        },
+        max_per_application: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Per Application'
+        },
+        required_fields: {
+            items: {
+                additionalProperties: true,
+                type: 'object'
+            },
+            type: 'array',
+            title: 'Required Fields',
+            default: []
+        },
+        display_meta: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Display Meta',
+            default: {}
+        }
+    },
+    type: 'object',
+    required: ['popup_id', 'key'],
+    title: 'AttendeeCategoryCreate',
+    description: 'Schema for creating an attendee category.'
+} as const;
+
+export const AttendeeCategoryPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        tenant_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Tenant Id'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        key: {
+            type: 'string',
+            title: 'Key'
+        },
+        is_primary: {
+            type: 'boolean',
+            title: 'Is Primary',
+            default: false
+        },
+        sort_order: {
+            type: 'integer',
+            title: 'Sort Order',
+            default: 0
+        },
+        enabled_in_passes_flow: {
+            type: 'boolean',
+            title: 'Enabled In Passes Flow',
+            default: true
+        },
+        max_per_application: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Per Application'
+        },
+        required_fields: {
+            items: {
+                additionalProperties: true,
+                type: 'object'
+            },
+            type: 'array',
+            title: 'Required Fields',
+            default: []
+        },
+        display_meta: {
+            additionalProperties: true,
+            type: 'object',
+            title: 'Display Meta',
+            default: {}
+        },
+        created_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created At'
+        },
+        updated_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Updated At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'tenant_id', 'popup_id', 'key'],
+    title: 'AttendeeCategoryPublic',
+    description: 'Public read model for attendee categories.'
+} as const;
+
+export const AttendeeCategoryUpdateSchema = {
+    properties: {
+        sort_order: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sort Order'
+        },
+        enabled_in_passes_flow: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Enabled In Passes Flow'
+        },
+        max_per_application: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Per Application'
+        },
+        required_fields: {
+            anyOf: [
+                {
+                    items: {
+                        additionalProperties: true,
+                        type: 'object'
+                    },
+                    type: 'array'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Required Fields'
+        },
+        display_meta: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Display Meta'
+        }
+    },
+    additionalProperties: false,
+    type: 'object',
+    title: 'AttendeeCategoryUpdate',
+    description: `Schema for updating an attendee category.
+
+key and is_primary are deliberately not updatable — sending them
+causes a 422 validation error (extra="forbid").`
+} as const;
+
 export const AttendeeCreateSchema = {
     properties: {
         name: {
             type: 'string',
             title: 'Name'
         },
+        category_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Category Id'
+        },
         category: {
-            type: 'string',
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
             title: 'Category'
         },
         email: {
@@ -1591,9 +1830,13 @@ export const AttendeeCreateSchema = {
         }
     },
     type: 'object',
-    required: ['name', 'category'],
+    required: ['name'],
     title: 'AttendeeCreate',
-    description: 'Attendee schema for creation (by user).'
+    description: `Attendee schema for creation (by user).
+
+Accepts category_id (UUID FK) as the primary input. The legacy \`category\`
+string field is kept for backward compatibility but the router now validates
+via category_id against the popup's attendee_categories table.`
 } as const;
 
 export const AttendeeInfoSchema = {
@@ -1680,6 +1923,18 @@ export const AttendeeListItemSchema = {
         category: {
             type: 'string',
             title: 'Category'
+        },
+        category_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Category Id'
         },
         email: {
             anyOf: [
@@ -1919,6 +2174,18 @@ export const AttendeePublicSchema = {
         category: {
             type: 'string',
             title: 'Category'
+        },
+        category_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Category Id'
         },
         email: {
             anyOf: [
@@ -2177,6 +2444,18 @@ export const AttendeeWithOriginPublicSchema = {
         category: {
             type: 'string',
             title: 'Category'
+        },
+        category_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Category Id'
         },
         email: {
             anyOf: [
@@ -8605,6 +8884,24 @@ export const ListModel_ApplicationReviewPublic_Schema = {
     title: 'ListModel[ApplicationReviewPublic]'
 } as const;
 
+export const ListModel_AttendeeCategoryPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/AttendeeCategoryPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[AttendeeCategoryPublic]'
+} as const;
+
 export const ListModel_AttendeeListItem_Schema = {
     properties: {
         results: {
@@ -11814,6 +12111,18 @@ export const ProductBatchResultSchema = {
                 }
             ]
         },
+        attendee_category_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Attendee Category Id'
+        },
         duration_type: {
             anyOf: [
                 {
@@ -12243,6 +12552,18 @@ export const ProductPublicSchema = {
                 }
             ]
         },
+        attendee_category_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Attendee Category Id'
+        },
         duration_type: {
             anyOf: [
                 {
@@ -12639,6 +12960,18 @@ export const ProductWithQuantitySchema = {
                     type: 'null'
                 }
             ]
+        },
+        attendee_category_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Attendee Category Id'
         },
         duration_type: {
             anyOf: [
@@ -13689,7 +14022,10 @@ export const TicketAttendeeCategorySchema = {
     type: 'string',
     enum: ['main', 'spouse', 'kid'],
     title: 'TicketAttendeeCategory',
-    description: 'Attendee categories for ticket products.'
+    description: `Attendee categories for ticket products — DEPRECATED.
+
+Kept for backward compatibility during PR 1. Removed in PR 2.
+New code should use attendee_category_id (UUID FK) instead.`
 } as const;
 
 export const TicketAttendeeSnapshotSchema = {

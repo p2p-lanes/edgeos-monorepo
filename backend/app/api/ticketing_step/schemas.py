@@ -6,8 +6,6 @@ from sqlalchemy import Column
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, SQLModel
 
-from app.api.attendee.schemas import AttendeeCategory
-
 
 class TicketSelectSection(BaseModel):
     """Typed representation of a single section inside ticket_select template_config.sections."""
@@ -18,7 +16,9 @@ class TicketSelectSection(BaseModel):
     product_ids: list[uuid.UUID] = []
     description: str | None = None
     image_url: str | None = None
-    attendee_categories: list[AttendeeCategory] | None = None
+    # Changed from list[AttendeeCategory] to list[uuid.UUID] per ADR-5
+    # Pydantic validates UUID structure only here. Router performs FK existence check.
+    attendee_categories: list[uuid.UUID] | None = None
 
     model_config = ConfigDict(extra="allow")
 
