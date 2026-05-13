@@ -243,7 +243,7 @@
     "summary_redirecting": "Redirecting...",
     "summary_pay": "Pay",
     "thank_you_title": "Payment completed",
-    "thank_you_description": "Thank you for your purchase. If you want to keep managing your tickets, you can continue in the portal.",
+    "thank_you_description": "Thank you for your purchase. We sent your confirmation and ticket details by email.",
     "thank_you_cta": "Go to portal"
   },
   "passes": {

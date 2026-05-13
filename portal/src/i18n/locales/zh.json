@@ -243,7 +243,7 @@
     "summary_redirecting": "正在跳转...",
     "summary_pay": "支付",
     "thank_you_title": "付款已完成",
-    "thank_you_description": "感谢您的购买。如果您想继续管理您的门票，可以前往门户。",
+    "thank_you_description": "感谢您的购买。我们已通过电子邮件发送您的确认信息和门票详情。",
     "thank_you_cta": "前往门户"
   },
   "passes": {
