@@ -179,10 +179,31 @@ class ProductsCRUD(BaseCRUD[Products, ProductCreate, ProductUpdate]):
         db_obj: Products,
         obj_in: ProductUpdate,
     ) -> Products:
-        """Update product fields."""
+        """Update product fields.
+
+        When `total_stock_cap` changes without an explicit `total_stock_remaining`,
+        recompute remaining to preserve `sold = old_cap - old_remaining`. Otherwise
+        the CHECK constraint `total_stock_remaining <= total_stock_cap` rejects
+        any cap reduction below the stale remaining.
+        """
         update_data = sale_dates_to_persistence(
             obj_in.model_dump(exclude_unset=True)
         )
+
+        if (
+            "total_stock_cap" in update_data
+            and "total_stock_remaining" not in update_data
+        ):
+            new_cap = update_data["total_stock_cap"]
+            old_cap = db_obj.total_stock_cap
+            old_remaining = db_obj.total_stock_remaining
+            if new_cap is None:
+                update_data["total_stock_remaining"] = None
+            elif old_cap is None or old_remaining is None:
+                update_data["total_stock_remaining"] = new_cap
+            else:
+                sold = old_cap - old_remaining
+                update_data["total_stock_remaining"] = max(0, new_cap - sold)
 
         for field, value in update_data.items():
             setattr(db_obj, field, value)
