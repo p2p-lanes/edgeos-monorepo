@@ -140,6 +140,74 @@ def test_create_product_with_inverted_sale_window_returns_422(
 
 
 # ---------------------------------------------------------------------------
+# CREATE seeds total_stock_remaining when only total_stock_cap is provided
+# Regression: backoffice form sends only cap, leaving remaining=NULL silently
+# treated as unlimited despite the admin setting a ceiling.
+# ---------------------------------------------------------------------------
+
+
+def test_create_product_with_cap_seeds_remaining(
+    client: TestClient,
+    admin_token_tenant_a: str,
+    popup_tenant_a: Popups,
+) -> None:
+    """POST cap=50 with no remaining → product has cap=50, remaining=50."""
+    suffix = uuid.uuid4().hex[:8]
+    resp = client.post(
+        "/api/v1/products",
+        headers=_admin_headers(admin_token_tenant_a),
+        json={
+            **_create_product_payload(popup_tenant_a.id, suffix=suffix),
+            "total_stock_cap": 50,
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    data = resp.json()
+    assert data["total_stock_cap"] == 50
+    assert data["total_stock_remaining"] == 50
+
+
+def test_create_product_without_cap_stays_unlimited(
+    client: TestClient,
+    admin_token_tenant_a: str,
+    popup_tenant_a: Popups,
+) -> None:
+    """POST without cap → both fields null (unlimited tracking preserved)."""
+    suffix = uuid.uuid4().hex[:8]
+    resp = client.post(
+        "/api/v1/products",
+        headers=_admin_headers(admin_token_tenant_a),
+        json=_create_product_payload(popup_tenant_a.id, suffix=suffix),
+    )
+    assert resp.status_code == 201, resp.text
+    data = resp.json()
+    assert data["total_stock_cap"] is None
+    assert data["total_stock_remaining"] is None
+
+
+def test_create_product_with_explicit_remaining_respected(
+    client: TestClient,
+    admin_token_tenant_a: str,
+    popup_tenant_a: Popups,
+) -> None:
+    """POST cap=50 remaining=10 → explicit remaining preserved (not overwritten)."""
+    suffix = uuid.uuid4().hex[:8]
+    resp = client.post(
+        "/api/v1/products",
+        headers=_admin_headers(admin_token_tenant_a),
+        json={
+            **_create_product_payload(popup_tenant_a.id, suffix=suffix),
+            "total_stock_cap": 50,
+            "total_stock_remaining": 10,
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    data = resp.json()
+    assert data["total_stock_cap"] == 50
+    assert data["total_stock_remaining"] == 10
+
+
+# ---------------------------------------------------------------------------
 # total_stock_cap update preserves `sold = old_cap - old_remaining`
 # Regression: bare cap change used to fail the CHECK constraint
 # (total_stock_remaining <= total_stock_cap) when remaining > new_cap.
