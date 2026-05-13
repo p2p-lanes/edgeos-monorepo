@@ -252,7 +252,7 @@ const AttendeeTicket = ({
                           className={cn(
                             "transition-colors cursor-pointer flex-shrink-0",
                             isScanned
-                              ? "text-red-500 hover:text-red-700"
+                              ? "text-yellow-500 hover:text-yellow-700"
                               : "text-pass-text hover:text-pass-title",
                           )}
                         >

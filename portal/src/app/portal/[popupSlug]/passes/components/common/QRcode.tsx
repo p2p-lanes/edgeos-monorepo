@@ -87,8 +87,8 @@ const QRcode = ({
           <DialogTitle>Check-in Code</DialogTitle>
         </DialogHeader>
         {lastScanAt ? (
-          <div className="flex items-center gap-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-            <span className="h-2 w-2 rounded-full bg-red-500" />
+          <div className="flex items-center gap-2 rounded-md bg-yellow-50 px-3 py-2 text-sm text-yellow-700">
+            <span className="h-2 w-2 rounded-full bg-yellow-500" />
             <span>
               {t("passes.qr_already_scanned")} ·{" "}
               {formatRelative(lastScanAt, i18n.language)}
