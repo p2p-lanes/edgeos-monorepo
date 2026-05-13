@@ -3,7 +3,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import CheckConstraint, Index, text
+from sqlalchemy import Index, text
 from sqlalchemy import Numeric as SaNumerical
 from sqlalchemy.dialects.postgresql import UUID
 from sqlmodel import Column, DateTime, Field, Relationship
@@ -26,10 +26,6 @@ class Products(ProductBase, table=True):
     """Product model for tickets, passes, and other purchasable items."""
 
     __table_args__ = (
-        CheckConstraint(
-            "category = 'ticket' OR requires_check_in = false",
-            name="ck_products_requires_check_in_ticket_only",
-        ),
         Index(
             "uq_product_slug_popup_id_active",
             "slug",

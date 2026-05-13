@@ -121,7 +121,6 @@ class ProductCreate(BaseModel):
     def validate_ticket_fields(self) -> "ProductCreate":
         """Validate that ticket-specific fields are only set for tickets."""
         if self.category != "ticket":
-            self.requires_check_in = False
             if self.attendee_category is not None:
                 raise ValueError(
                     "attendee_category can only be set for ticket products"
@@ -175,13 +174,6 @@ class ProductUpdate(BaseModel):
     requires_check_in: bool | None = None
 
     @model_validator(mode="after")
-    def validate_ticket_fields(self) -> "ProductUpdate":
-        """Normalize ticket-only fields when category is changed off ticket."""
-        if self.category is not None and self.category != "ticket":
-            self.requires_check_in = False
-        return self
-
-    @model_validator(mode="after")
     def validate_max_per_order_vs_stock_cap(self) -> "ProductUpdate":
         """max_per_order must not exceed total_stock_cap when both are set."""
         if self.max_per_order is not None and self.total_stock_cap is not None:
@@ -231,7 +223,6 @@ class ProductBatchItem(BaseModel):
     def validate_ticket_fields(self) -> "ProductBatchItem":
         """Validate that ticket-specific fields are only set for tickets."""
         if self.category != "ticket":
-            self.requires_check_in = False
             if self.attendee_category is not None:
                 raise ValueError(
                     "attendee_category can only be set for ticket products"
@@ -271,4 +262,3 @@ class ProductWithQuantity(ProductPublic):
     """Product with quantity for attendee products."""
 
     quantity: int = 1
-
