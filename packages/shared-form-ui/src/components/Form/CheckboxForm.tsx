@@ -51,7 +51,7 @@ export const CheckboxForm = ({
           </LabelMuted>
         )}
       </div>
-      {error && <p className="text-red-500 text-sm">{error}</p>}
+      {error && <p className="text-amber-600 text-sm">{error}</p>}
     </FormInputWrapper>
   )
 }

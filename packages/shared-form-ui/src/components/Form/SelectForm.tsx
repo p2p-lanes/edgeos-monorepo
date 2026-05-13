@@ -37,7 +37,7 @@ export const SelectForm = ({
           </LabelRequired>
         )}
         <Select onValueChange={onChange} value={value}>
-          <SelectTrigger id={id} className={error ? "border-red-500" : ""}>
+          <SelectTrigger id={id} className={error ? "border-amber-500" : ""}>
             <span className="flex-1 truncate text-left text-sm">
               {value ? (
                 (options.find((o) => o.value === value)?.label ?? value)
@@ -55,7 +55,7 @@ export const SelectForm = ({
           </SelectContent>
         </Select>
       </div>
-      {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+      {error && <p className="text-amber-600 text-sm mt-1">{error}</p>}
     </FormInputWrapper>
   )
 }

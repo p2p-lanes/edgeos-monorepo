@@ -43,9 +43,9 @@ export const AddonInputForm = ({
         placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={error ? "border-red-500" : ""}
+        className={error ? "border-amber-500" : ""}
       />
-      {error && <p className="text-red-500 text-sm">{error}</p>}
+      {error && <p className="text-amber-600 text-sm">{error}</p>}
     </FormInputWrapper>
   )
 }

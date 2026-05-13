@@ -210,7 +210,7 @@ export function SchemaField({
             })}
           </RadioGroup>
           {error && (
-            <p className="mt-1 text-sm text-red-500" role="alert">
+            <p className="mt-1 text-sm text-amber-600" role="alert">
               {error}
             </p>
           )}
@@ -242,7 +242,7 @@ export function SchemaField({
             disabled={isDisabled}
           />
           {error && (
-            <p className="text-red-500 text-sm">{error}</p>
+            <p className="text-amber-600 text-sm">{error}</p>
           )}
         </FormInputWrapper>
       )

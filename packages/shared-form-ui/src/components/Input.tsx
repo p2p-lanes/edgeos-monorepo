@@ -8,13 +8,13 @@ const inputVariants = {
     default:
       "shadow-sm rounded-md border border-input focus-visible:ring-1 focus-visible:ring-ring",
     disabled: "bg-muted border-muted-foreground/50",
-    error: "border-red-500",
+    error: "border-amber-500",
   },
   standard: {
     default:
       "border-b focus-visible:border-b-2 focus-visible:border-primary",
     disabled: "",
-    error: "border-red-500",
+    error: "border-amber-500",
   },
 } as const
 

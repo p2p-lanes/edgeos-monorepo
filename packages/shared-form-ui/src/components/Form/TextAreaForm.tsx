@@ -41,12 +41,12 @@ export const TextAreaForm = ({
       )}
       <Textarea
         id={id}
-        className={`min-h-[72px] mt-2 ${error ? "border-red-500" : ""}`}
+        className={`min-h-[72px] mt-2 ${error ? "border-amber-500" : ""}`}
         value={value}
         onChange={(e) => handleChange(e.target.value)}
         placeholder={placeholder}
       />
-      {error && <p className="text-red-500 text-sm">{error}</p>}
+      {error && <p className="text-amber-600 text-sm">{error}</p>}
     </FormInputWrapper>
   )
 }
