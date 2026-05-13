@@ -9,7 +9,12 @@ from app.api.tenant import crud
 from app.api.tenant.credential_schemas import CredentialInfo, TenantCredentialResponse
 from app.api.tenant.schemas import TenantCreate, TenantPublic, TenantUpdate
 from app.core.config import settings
-from app.core.dependencies.users import CurrentAdmin, CurrentSuperadmin, SessionDep
+from app.core.dependencies.users import (
+    CurrentAdmin,
+    CurrentOperator,
+    CurrentSuperadmin,
+    SessionDep,
+)
 from app.core.redis import domain_cache
 from app.core.tenant_db import get_tenant_credential, revoke_tenant_credentials
 
@@ -103,10 +108,10 @@ async def list_tenants(
 async def get_tenant(
     tenant_id: uuid.UUID,
     db: SessionDep,
-    current_user: CurrentAdmin,
+    current_user: CurrentOperator,
 ) -> TenantPublic:
-    # Admins can only view their own tenant
-    if current_user.role == UserRole.ADMIN and current_user.tenant_id != tenant_id:
+    # Non-superadmins can only view their own tenant
+    if current_user.role != UserRole.SUPERADMIN and current_user.tenant_id != tenant_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Cannot access other tenants",

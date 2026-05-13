@@ -16,17 +16,17 @@ export const Route = createFileRoute("/_layout/form-builder/new")({
 
 function NewFormField() {
   const navigate = useNavigate()
-  const { isAdmin, isUserLoading } = useAuth()
+  const { isOperatorOrAbove, isUserLoading } = useAuth()
   const { isContextReady } = useWorkspace()
 
   // Redirect viewers to form-fields list - they cannot create new fields
   useEffect(() => {
-    if (!isUserLoading && !isAdmin) {
+    if (!isUserLoading && !isOperatorOrAbove) {
       navigate({ to: "/form-builder" })
     }
-  }, [isAdmin, isUserLoading, navigate])
+  }, [isOperatorOrAbove, isUserLoading, navigate])
 
-  if (isUserLoading || !isAdmin) {
+  if (isUserLoading || !isOperatorOrAbove) {
     return null
   }
 

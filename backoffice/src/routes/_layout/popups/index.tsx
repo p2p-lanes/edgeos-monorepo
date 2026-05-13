@@ -153,7 +153,7 @@ function DeletePopup({
 
 function PopupActionsMenu({ popup }: { popup: PopupAdmin }) {
   const [open, setOpen] = useState(false)
-  const { isAdmin } = useAuth()
+  const { isOperatorOrAbove } = useAuth()
   const { data: tenant } = useCurrentTenant()
   const baseUrl = getPortalBaseUrl(tenant)
 
@@ -167,7 +167,7 @@ function PopupActionsMenu({ popup }: { popup: PopupAdmin }) {
       <DropdownMenuContent align="end">
         <DropdownMenuItem asChild>
           <Link to="/popups/$id/edit" params={{ id: popup.id }}>
-            {isAdmin ? (
+            {isOperatorOrAbove ? (
               <>
                 <Pencil className="mr-2 h-4 w-4" />
                 Edit
@@ -204,7 +204,7 @@ function PopupActionsMenu({ popup }: { popup: PopupAdmin }) {
             </DropdownMenuItem>
           </>
         )}
-        {isAdmin && (
+        {isOperatorOrAbove && (
           <DeletePopup popup={popup} onSuccess={() => setOpen(false)} />
         )}
       </DropdownMenuContent>
@@ -346,10 +346,11 @@ function PopupsTable() {
 }
 
 function Popups() {
-  const { isAdmin, isSuperadmin } = useAuth()
+  const { isOperatorOrAbove, isSuperadmin } = useAuth()
   const { needsTenantSelection, effectiveTenantId } = useWorkspace()
 
-  const canManagePopups = isAdmin && (!isSuperadmin || !!effectiveTenantId)
+  const canManagePopups =
+    isOperatorOrAbove && (!isSuperadmin || !!effectiveTenantId)
 
   return (
     <div className="flex flex-col gap-6">

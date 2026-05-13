@@ -541,7 +541,7 @@
     },
     "login_required": {
       "title": "Iniciá sesión para ver el evento",
-      "message": "Iniciá sesión en {{popupName}} para ver los detalles del evento, anotarte y agregarlo a tu calendario.",
+      "message": "Los detalles del evento solo son visibles para usuarios con sesión iniciada. Se requiere un ticket de {{popupName}} para participar.",
       "login": "Iniciar sesión",
       "cancel": "Cancelar"
     },

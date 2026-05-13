@@ -599,7 +599,7 @@ export function ApplicationDetail({
   onReviewSuccess,
   headerExtra,
 }: ApplicationDetailProps) {
-  const { isAdmin } = useAuth()
+  const { isOperatorOrAbove } = useAuth()
 
   const { data: schema } = useQuery({
     queryKey: ["form-fields-schema", application.popup_id],
@@ -635,7 +635,7 @@ export function ApplicationDetail({
   })
 
   const isWeightedVoting = approvalStrategy?.strategy_type === "weighted"
-  const canReview = isAdmin && application.status === "in review"
+  const canReview = isOperatorOrAbove && application.status === "in review"
   const companions =
     application.attendees?.filter((a) => a.category !== "main") ?? []
 

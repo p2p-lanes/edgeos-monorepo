@@ -2,6 +2,7 @@ import type { FormFieldSchema } from "../types"
 import { cn } from "../utils"
 import { CheckboxForm } from "./Form/CheckboxForm"
 import { InputForm } from "./Form/InputForm"
+import { PhoneInputForm } from "./Form/PhoneInputForm"
 import { SelectForm } from "./Form/SelectForm"
 import { TextAreaForm } from "./Form/TextAreaForm"
 import { FormInputWrapper } from "./FormInputWrapper"
@@ -245,6 +246,21 @@ export function SchemaField({
             <p className="text-red-500 text-sm">{error}</p>
           )}
         </FormInputWrapper>
+      )
+
+    case "phone":
+      return (
+        <PhoneInputForm
+          label={displayLabel}
+          id={name}
+          value={(value as string) ?? ""}
+          onChange={(v) => handleChange(name, v)}
+          error={error}
+          isRequired={showRequiredIndicator}
+          subtitle={displayHelpText}
+          placeholder={field.placeholder}
+          disabled={isDisabled}
+        />
       )
 
     default:

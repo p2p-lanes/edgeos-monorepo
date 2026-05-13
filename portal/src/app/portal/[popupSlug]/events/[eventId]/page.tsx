@@ -13,6 +13,7 @@ import {
   Home,
   Layers,
   Mail,
+  Map as MapIcon,
   MapPin,
   Pencil,
   Repeat,
@@ -589,7 +590,19 @@ export default function EventDetailPage() {
             const mapsUrl = mapsQuery
               ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapsQuery)}`
               : null
-            const inner = (
+            // Preserve the current event URL (incl. occ + originating
+            // events-list `from`) so the venue page can return here.
+            const eventDetailQs = new URLSearchParams()
+            if (occParam) eventDetailQs.set("occ", occParam)
+            if (fromSearch) eventDetailQs.set("from", fromSearch)
+            const eventDetailQsStr = eventDetailQs.toString()
+            const eventDetailHref = eventDetailQsStr
+              ? `/portal/${city?.slug}/events/${event.id}?${eventDetailQsStr}`
+              : `/portal/${city?.slug}/events/${event.id}`
+            const venueHref = event.venue_id
+              ? `/portal/${city?.slug}/events/venues/${event.venue_id}?from=${encodeURIComponent(eventDetailHref)}`
+              : null
+            const venueInner = (
               <>
                 <div className="h-8 w-8 rounded-lg bg-green-500/10 flex items-center justify-center shrink-0">
                   <MapPin className="h-4 w-4 text-green-600" />
@@ -598,7 +611,7 @@ export default function EventDetailPage() {
                   <p
                     className={cn(
                       "text-sm font-medium truncate",
-                      mapsUrl && "group-hover:underline",
+                      venueHref && "group-hover:underline",
                     )}
                   >
                     {event.venue_title}
@@ -612,20 +625,30 @@ export default function EventDetailPage() {
               </>
             )
             return (
-              <div className="pr-36">
-                {mapsUrl ? (
+              <div className="flex items-center gap-2">
+                {venueHref ? (
+                  <Link
+                    href={venueHref}
+                    className="group flex min-w-0 flex-1 items-center gap-2.5 -mx-2 px-2 py-1.5 rounded-md transition-colors hover:bg-muted/50"
+                  >
+                    {venueInner}
+                  </Link>
+                ) : (
+                  <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                    {venueInner}
+                  </div>
+                )}
+                {mapsUrl && (
                   <a
                     href={mapsUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="group flex min-w-0 items-center gap-2.5 -mx-2 px-2 py-1.5 rounded-md transition-colors hover:bg-muted/50"
+                    aria-label={t("events.detail.open_in_maps")}
+                    title={t("events.detail.open_in_maps") as string}
+                    className="shrink-0 inline-flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
                   >
-                    {inner}
+                    <MapIcon className="h-4 w-4" />
                   </a>
-                ) : (
-                  <div className="flex min-w-0 items-center gap-2.5">
-                    {inner}
-                  </div>
                 )}
               </div>
             )

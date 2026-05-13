@@ -397,7 +397,7 @@ function ApplicationActionsMenu({
   const navigate = useNavigate()
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [activeDialog, setActiveDialog] = useState<DialogType>(null)
-  const { isAdmin } = useAuth()
+  const { isOperatorOrAbove } = useAuth()
   const currentStatus = application.status
 
   const openDialog = (dialog: DialogType) => {
@@ -406,7 +406,7 @@ function ApplicationActionsMenu({
   }
 
   const canReview =
-    isAdmin && currentStatus === "in review" && !isWeightedVoting
+    isOperatorOrAbove && currentStatus === "in review" && !isWeightedVoting
 
   return (
     <>
@@ -582,7 +582,7 @@ const getColumns = (
 
 function ApplicationsTableContent() {
   const { selectedPopupId } = useWorkspace()
-  const { isAdmin } = useAuth()
+  const { isOperatorOrAbove } = useAuth()
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
   const navigate = useNavigate()
@@ -760,7 +760,7 @@ function ApplicationsTableContent() {
 
   const isWeightedVoting = approvalStrategy?.strategy_type === "weighted"
   const columns = getColumns(isWeightedVoting, !!reviewerId)
-  const canBulkReview = isAdmin && !isWeightedVoting
+  const canBulkReview = isOperatorOrAbove && !isWeightedVoting
 
   if (!applications) return <Skeleton className="h-64 w-full" />
 
@@ -866,7 +866,7 @@ function AddApplicationButton() {
 }
 
 function Applications() {
-  const { isAdmin, isSuperadmin } = useAuth()
+  const { isOperatorOrAbove, isSuperadmin } = useAuth()
   const { isContextReady, selectedPopupId } = useWorkspace()
   const [isExporting, setIsExporting] = useState(false)
 
@@ -959,7 +959,7 @@ function Applications() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {isContextReady && isAdmin && (
+          {isContextReady && isOperatorOrAbove && (
             <Button variant="outline" asChild>
               <Link to="/applications/review-queue">
                 <ListChecks className="mr-2 h-4 w-4" />

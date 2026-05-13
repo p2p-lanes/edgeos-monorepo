@@ -38,7 +38,7 @@ vi.mock("@/contexts/WorkspaceContext", () => ({
 }))
 
 vi.mock("@/hooks/useAuth", () => ({
-  default: () => ({ isAdmin: true }),
+  default: () => ({ isAdmin: true, isOperatorOrAbove: true }),
 }))
 
 vi.mock("@/hooks/useCustomToast", () => ({

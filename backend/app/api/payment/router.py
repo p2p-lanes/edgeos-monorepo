@@ -23,8 +23,8 @@ from app.api.payment.schemas import (
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
     CurrentHuman,
+    CurrentOperator,
     CurrentUser,
-    CurrentWriter,
     HumanTenantSession,
     SessionDep,
     TenantSession,
@@ -461,7 +461,7 @@ async def update_payment(
     payment_id: uuid.UUID,
     payment_in: PaymentUpdate,
     db: TenantSession,
-    _current_user: CurrentWriter,
+    _current_user: CurrentOperator,
 ) -> PaymentPublic:
     """Update a payment (BO only)."""
 

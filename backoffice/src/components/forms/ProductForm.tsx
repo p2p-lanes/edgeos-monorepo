@@ -95,9 +95,9 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
   const { selectedPopupId, isContextReady } = useWorkspace()
-  const { isAdmin } = useAuth()
+  const { isOperatorOrAbove } = useAuth()
   const isEdit = !!defaultValues
-  const readOnly = !isAdmin
+  const readOnly = !isOperatorOrAbove
 
   const [addCategoryOpen, setAddCategoryOpen] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState("")
@@ -528,7 +528,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
               <InlineRow
                 icon={<QrCode className="h-4 w-4 text-muted-foreground" />}
                 label="Requires Check-in"
-                description="Enable for products that need scanning at the venue (tickets, parking, VIP access)"
+                description="Enable for products that need scanning at the venue"
               >
                 <Switch
                   id="requires_check_in"

@@ -17,7 +17,11 @@ const getRoleBadgeVariant = (
       return "default"
     case "admin":
       return "secondary"
+    case "operator":
+      return "secondary"
     case "viewer":
+      return "outline"
+    case "check_in_controller":
       return "outline"
     default:
       return "outline"
@@ -30,8 +34,12 @@ const getRoleLabel = (role: UserRole): string => {
       return "Superadmin"
     case "admin":
       return "Admin"
+    case "operator":
+      return "Operator"
     case "viewer":
       return "Viewer"
+    case "check_in_controller":
+      return "Check-in controller"
     default:
       return role
   }

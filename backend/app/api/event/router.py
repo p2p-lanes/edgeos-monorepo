@@ -35,9 +35,8 @@ from app.api.event.schemas import (
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.tenants import PublicTenant
 from app.core.dependencies.users import (
-    CurrentAdmin,
     CurrentHuman,
-    CurrentWriter,
+    CurrentOperator,
     HumanTenantSession,
     SessionDep,
     TenantSession,
@@ -590,7 +589,7 @@ async def list_public_calendar(
 @router.get("", response_model=ListModel[EventPublic])
 async def list_events(
     db: TenantSession,
-    _: CurrentAdmin,
+    _: CurrentOperator,
     popup_id: uuid.UUID | None = None,
     event_status: EventStatus | None = None,
     kind: str | None = None,
@@ -638,7 +637,7 @@ async def list_events(
 async def get_event(
     event_id: uuid.UUID,
     db: TenantSession,
-    _: CurrentAdmin,
+    _: CurrentOperator,
 ) -> EventPublic:
     event = crud.events_crud.get(db, event_id)
     if not event:
@@ -652,7 +651,7 @@ async def get_event(
 async def create_event(
     event_in: EventCreate,
     db: TenantSession,
-    current_user: CurrentWriter,
+    current_user: CurrentOperator,
 ) -> EventPublic:
     from app.api.event.models import Events
     from app.api.popup.crud import popups_crud
@@ -716,7 +715,7 @@ async def update_event(
     event_id: uuid.UUID,
     event_in: EventUpdate,
     db: TenantSession,
-    _: CurrentWriter,
+    _: CurrentOperator,
 ) -> EventPublic:
     event = crud.events_crud.get(db, event_id)
     if not event:
@@ -778,7 +777,7 @@ async def update_event(
 async def cancel_event(
     event_id: uuid.UUID,
     db: TenantSession,
-    _: CurrentWriter,
+    _: CurrentOperator,
 ) -> EventPublic:
     event = crud.events_crud.get(db, event_id)
     if not event:
@@ -800,7 +799,7 @@ async def cancel_event(
 async def delete_event(
     event_id: uuid.UUID,
     db: TenantSession,
-    _: CurrentWriter,
+    _: CurrentOperator,
 ) -> None:
     event = crud.events_crud.get(db, event_id)
     if not event:
@@ -826,7 +825,7 @@ async def set_recurrence(
     event_id: uuid.UUID,
     payload: RecurrenceUpdate,
     db: TenantSession,
-    _: CurrentWriter,
+    _: CurrentOperator,
 ) -> EventPublic:
     """Set/replace/clear the RRULE on a series master.
 
@@ -880,7 +879,7 @@ async def detach_occurrence(
     event_id: uuid.UUID,
     payload: OccurrenceRef,
     db: TenantSession,
-    _: CurrentWriter,
+    _: CurrentOperator,
 ) -> EventPublic:
     """Materialize a single occurrence of a recurring series as its own row.
 
@@ -977,7 +976,7 @@ async def delete_occurrence(
     event_id: uuid.UUID,
     payload: OccurrenceRef,
     db: TenantSession,
-    _: CurrentWriter,
+    _: CurrentOperator,
 ) -> None:
     """Skip a single occurrence by appending it to the master's EXDATEs.
 
@@ -1062,7 +1061,7 @@ def _run_availability_check(
 async def check_availability(
     payload: EventAvailabilityCheck,
     db: TenantSession,
-    _: CurrentAdmin,
+    _: CurrentOperator,
 ) -> EventAvailabilityResult:
     """Check whether a venue is free for a candidate time window."""
     return _run_availability_check(db, payload)
@@ -1091,7 +1090,7 @@ async def check_availability_portal(
 async def list_invitations(
     event_id: uuid.UUID,
     db: TenantSession,
-    _: CurrentAdmin,
+    _: CurrentOperator,
 ) -> list[EventInvitationPublic]:
     from sqlmodel import select
 
@@ -1185,7 +1184,7 @@ async def bulk_invite(
     event_id: uuid.UUID,
     payload: EventInvitationBulkCreate,
     db: TenantSession,
-    current_user: CurrentWriter,
+    current_user: CurrentOperator,
 ) -> EventInvitationBulkResult:
     event = crud.events_crud.get(db, event_id)
     if not event:
@@ -1202,7 +1201,7 @@ async def delete_invitation(
     event_id: uuid.UUID,
     invitation_id: uuid.UUID,
     db: TenantSession,
-    _: CurrentWriter,
+    _: CurrentOperator,
 ) -> None:
     inv = crud.invitations_crud.get(db, invitation_id)
     if not inv or inv.event_id != event_id:
@@ -1351,7 +1350,7 @@ async def approve_event(
     event_id: uuid.UUID,
     payload: EventApprovalPayload,
     db: TenantSession,
-    _: CurrentWriter,
+    _: CurrentOperator,
 ) -> EventPublic:
     event = crud.events_crud.get(db, event_id)
     if not event:
@@ -1391,7 +1390,7 @@ async def reject_event(
     event_id: uuid.UUID,
     payload: EventApprovalPayload,
     db: TenantSession,
-    _: CurrentWriter,
+    _: CurrentOperator,
 ) -> EventPublic:
     event = crud.events_crud.get(db, event_id)
     if not event:
@@ -1453,7 +1452,7 @@ async def delete_portal_invitation(
 async def export_event_ics(
     event_id: uuid.UUID,
     db: TenantSession,
-    _: CurrentAdmin,
+    _: CurrentOperator,
 ) -> Response:
     event = crud.events_crud.get(db, event_id)
     if not event:

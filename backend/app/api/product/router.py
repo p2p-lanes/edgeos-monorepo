@@ -22,9 +22,9 @@ from app.api.translation.service import (
 )
 from app.core.dependencies.users import (
     CurrentHuman,
+    CurrentOperator,
     CurrentSuperadmin,
     CurrentUser,
-    CurrentWriter,
     HumanTenantSession,
     SessionDep,
     TenantSession,
@@ -197,7 +197,7 @@ async def get_product(
 async def create_product(
     product_in: ProductCreate,
     db: TenantSession,
-    current_user: CurrentWriter,
+    current_user: CurrentOperator,
 ) -> ProductPublic:
     """Create a new product."""
 
@@ -240,7 +240,7 @@ async def update_product(
     product_id: uuid.UUID,
     product_in: ProductUpdate,
     db: TenantSession,
-    _current_user: CurrentWriter,
+    _current_user: CurrentOperator,
 ) -> ProductPublic:
     """Update a product."""
 
@@ -271,7 +271,7 @@ async def update_product(
 async def delete_product(
     product_id: uuid.UUID,
     db: TenantSession,
-    _current_user: CurrentWriter,
+    _current_user: CurrentOperator,
 ) -> None:
     """Delete a product.
 

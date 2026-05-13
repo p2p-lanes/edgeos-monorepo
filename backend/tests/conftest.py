@@ -229,6 +229,60 @@ def admin_token_tenant_b(admin_user_tenant_b: Users) -> str:
 
 
 @pytest.fixture(scope="session")
+def operator_user_tenant_a(db: Session, tenant_a: Tenants) -> Users:
+    user = db.exec(
+        select(Users).where(
+            Users.email == "operator-a@test.com",
+            Users.deleted == False,  # noqa: E712
+        )
+    ).first()
+
+    if user is None:
+        user = Users(
+            email="operator-a@test.com",
+            role=UserRole.OPERATOR,
+            tenant_id=tenant_a.id,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+    return user
+
+
+@pytest.fixture(scope="session")
+def operator_user_tenant_b(db: Session, tenant_b: Tenants) -> Users:
+    user = db.exec(
+        select(Users).where(
+            Users.email == "operator-b@test.com",
+            Users.deleted == False,  # noqa: E712
+        )
+    ).first()
+
+    if user is None:
+        user = Users(
+            email="operator-b@test.com",
+            role=UserRole.OPERATOR,
+            tenant_id=tenant_b.id,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+    return user
+
+
+@pytest.fixture(scope="session")
+def operator_token_tenant_a(operator_user_tenant_a: Users) -> str:
+    return create_access_token(subject=operator_user_tenant_a.id, token_type="user")
+
+
+@pytest.fixture(scope="session")
+def operator_token_tenant_b(operator_user_tenant_b: Users) -> str:
+    return create_access_token(subject=operator_user_tenant_b.id, token_type="user")
+
+
+@pytest.fixture(scope="session")
 def viewer_user_tenant_b(db: Session, tenant_b: Tenants) -> Users:
     user = db.exec(
         select(Users).where(

@@ -27,6 +27,14 @@ export function getPopupCheckoutUrl(baseUrl: string, popupSlug: string) {
   return `${baseUrl}/checkout/${popupSlug}`
 }
 
+export function getSelfCheckInUrl(baseUrl: string, popupSlug: string) {
+  const url = new URL(`${baseUrl}/portal/${popupSlug}/check-in`)
+  if (url.hostname === "localhost" || url.hostname.endsWith(".localhost")) {
+    url.protocol = "http:"
+  }
+  return url.toString()
+}
+
 export function getGroupPortalUrl(baseUrl: string, groupSlug: string) {
   return `${baseUrl}/groups/${groupSlug}`
 }

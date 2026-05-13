@@ -104,7 +104,7 @@ function getAllFormSectionsQueryOptions(popupId: string | null) {
 }
 
 function FormBuilderPage() {
-  const { isAdmin } = useAuth()
+  const { isOperatorOrAbove } = useAuth()
   const { isContextReady, selectedPopupId } = useWorkspace()
 
   if (!isContextReady) {
@@ -115,7 +115,7 @@ function FormBuilderPage() {
     )
   }
 
-  if (!isAdmin) {
+  if (!isOperatorOrAbove) {
     return (
       <div className="flex flex-col gap-6 p-6">
         <h1 className="text-2xl font-bold tracking-tight">Form Builder</h1>

@@ -31,6 +31,7 @@ class UsersCRUD(BaseCRUD[Users, UserCreate, UserUpdate]):
         skip: int = 0,
         limit: int = 100,
         search: str | None = None,
+        roles_in: list[UserRole] | None = None,
     ) -> tuple[list[Users], int]:
         """Find users with optional filters."""
 
@@ -41,6 +42,9 @@ class UsersCRUD(BaseCRUD[Users, UserCreate, UserUpdate]):
 
         if role is not None:
             statement = statement.where(Users.role == role)
+
+        if roles_in is not None:
+            statement = statement.where(col(Users.role).in_(roles_in))
 
         # Apply text search if provided
         if search:

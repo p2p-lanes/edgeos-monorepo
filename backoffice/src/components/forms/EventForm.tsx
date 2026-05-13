@@ -128,8 +128,8 @@ export function EventForm({
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
   const { selectedPopupId } = useWorkspace()
-  const { user, isAdmin } = useAuth()
-  const readOnly = !isAdmin
+  const { user, isOperatorOrAbove } = useAuth()
+  const readOnly = !isOperatorOrAbove
   const isEdit = !!defaultValues
 
   // Display name for the current user used by the "Use my name" quick-fill

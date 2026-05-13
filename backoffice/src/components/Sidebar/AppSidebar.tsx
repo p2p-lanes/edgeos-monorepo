@@ -86,7 +86,7 @@ const superadminItems: Item[] = [
 ]
 
 export function AppSidebar() {
-  const { user: currentUser, isAdmin, isSuperadmin } = useAuth()
+  const { user: currentUser, isOperatorOrAbove, isSuperadmin } = useAuth()
   const { isContextReady, selectedPopupId } = useWorkspace()
 
   const { data: pendingReviews } = useQuery({
@@ -96,7 +96,7 @@ export function AppSidebar() {
         popupId: selectedPopupId!,
         limit: 1,
       }),
-    enabled: isContextReady && isAdmin,
+    enabled: isContextReady && isOperatorOrAbove,
     staleTime: 60_000,
     refetchInterval: 60_000,
   })
@@ -109,7 +109,7 @@ export function AppSidebar() {
         paymentStatus: "pending",
         limit: 1,
       }),
-    enabled: isContextReady && isAdmin,
+    enabled: isContextReady && isOperatorOrAbove,
     staleTime: 60_000,
     refetchInterval: 60_000,
   })
@@ -145,7 +145,7 @@ export function AppSidebar() {
 
   // For admins (non-superadmin), get their tenant-specific items
   const adminNavigationItems =
-    isAdmin && !isSuperadmin
+    isOperatorOrAbove && !isSuperadmin
       ? getAdminItems(currentUser?.tenant_id)
       : adminItems
 
@@ -181,7 +181,7 @@ export function AppSidebar() {
         </SidebarGroup>
 
         {/* Admin section (visible to admins+) */}
-        {isAdmin && (
+        {isOperatorOrAbove && (
           <SidebarGroup>
             <SidebarGroupLabel>Administration</SidebarGroupLabel>
             <Main items={adminNavigationItems} />

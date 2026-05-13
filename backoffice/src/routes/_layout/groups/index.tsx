@@ -215,7 +215,7 @@ function DeleteGroup({
 
 function GroupActionsMenu({ group }: { group: GroupPublic }) {
   const [open, setOpen] = useState(false)
-  const { isAdmin } = useAuth()
+  const { isOperatorOrAbove } = useAuth()
   const { data: tenant } = useCurrentTenant()
   const baseUrl = getPortalBaseUrl(tenant)
 
@@ -229,7 +229,7 @@ function GroupActionsMenu({ group }: { group: GroupPublic }) {
       <DropdownMenuContent align="end">
         <DropdownMenuItem asChild>
           <Link to="/groups/$id/edit" params={{ id: group.id }}>
-            {isAdmin ? (
+            {isOperatorOrAbove ? (
               <>
                 <Pencil className="mr-2 h-4 w-4" />
                 Edit
@@ -255,7 +255,7 @@ function GroupActionsMenu({ group }: { group: GroupPublic }) {
             </a>
           </DropdownMenuItem>
         )}
-        {isAdmin && (
+        {isOperatorOrAbove && (
           <DeleteGroup group={group} onSuccess={() => setOpen(false)} />
         )}
       </DropdownMenuContent>
@@ -354,7 +354,7 @@ function GroupsTableContent() {
 }
 
 function Groups() {
-  const { isAdmin } = useAuth()
+  const { isOperatorOrAbove } = useAuth()
   const { isContextReady } = useWorkspace()
 
   return (
@@ -367,7 +367,7 @@ function Groups() {
             Manage group registrations and discounts
           </p>
         </div>
-        {isAdmin && isContextReady && <AddGroupButton />}
+        {isOperatorOrAbove && isContextReady && <AddGroupButton />}
       </div>
       {isContextReady && (
         <QueryErrorBoundary>

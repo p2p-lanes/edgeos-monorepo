@@ -31,7 +31,7 @@ export const Route = createFileRoute("/_layout/ticketing-steps/")({
 })
 
 function TicketingStepsPage() {
-  const { isAdmin } = useAuth()
+  const { isOperatorOrAbove } = useAuth()
   const { isContextReady, selectedPopupId } = useWorkspace()
 
   if (!isContextReady) {
@@ -42,7 +42,7 @@ function TicketingStepsPage() {
     )
   }
 
-  if (!isAdmin) {
+  if (!isOperatorOrAbove) {
     return (
       <div className="flex flex-col gap-6 p-6">
         <h1 className="text-2xl font-bold tracking-tight">Ticketing Steps</h1>

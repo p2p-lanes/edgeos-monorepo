@@ -17,7 +17,7 @@ function useGlobalShortcuts({
 }: UseGlobalShortcutsOptions) {
   const navigate = useNavigate()
   const pathname = useRouterState({ select: (s) => s.location.pathname })
-  const { isAdmin } = useAuth()
+  const { isOperatorOrAbove } = useAuth()
   const { theme, setTheme } = useTheme()
 
   useEffect(() => {
@@ -35,7 +35,7 @@ function useGlobalShortcuts({
           return
         }
 
-        if (!isAdmin) {
+        if (!isOperatorOrAbove) {
           toast.info("You don't have permission to create items")
           return
         }
@@ -65,7 +65,14 @@ function useGlobalShortcuts({
 
     document.addEventListener("keydown", handleKeyDown)
     return () => document.removeEventListener("keydown", handleKeyDown)
-  }, [pathname, isAdmin, theme, setTheme, navigate, onShortcutsDialogToggle])
+  }, [
+    pathname,
+    isOperatorOrAbove,
+    theme,
+    setTheme,
+    navigate,
+    onShortcutsDialogToggle,
+  ])
 }
 
 export default useGlobalShortcuts

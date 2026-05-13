@@ -161,6 +161,17 @@ class ProductCreate(BaseModel):
         return self
 
     @model_validator(mode="after")
+    def seed_total_stock_remaining(self) -> "ProductCreate":
+        """Seed `total_stock_remaining = total_stock_cap` when the caller sets a
+        cap without explicit remaining. Without this, products created via the
+        backoffice form (which never surfaces `remaining`) keep `remaining=NULL`
+        and get treated as unlimited inventory downstream.
+        """
+        if self.total_stock_cap is not None and self.total_stock_remaining is None:
+            self.total_stock_remaining = self.total_stock_cap
+        return self
+
+    @model_validator(mode="after")
     def validate_sale_window(self) -> "ProductCreate":
         """sale_starts_at must be before sale_ends_at when both are set."""
         if self.sale_starts_at is not None and self.sale_ends_at is not None:
@@ -282,5 +293,3 @@ class ProductWithQuantity(ProductPublic):
     """Product with quantity for attendee products."""
 
     quantity: int = 1
-
-

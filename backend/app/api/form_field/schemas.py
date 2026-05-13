@@ -18,6 +18,7 @@ class FormFieldType(str, Enum):
     DATE = "date"
     EMAIL = "email"
     URL = "url"
+    PHONE = "phone"
 
 
 class FormFieldBase(SQLModel):

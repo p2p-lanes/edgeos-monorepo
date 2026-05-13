@@ -32,7 +32,11 @@ vi.mock("@/contexts/WorkspaceContext", () => ({
 }))
 
 vi.mock("@/hooks/useAuth", () => ({
-  default: () => ({ isAdmin: true, isUserLoading: false }),
+  default: () => ({
+    isAdmin: true,
+    isOperatorOrAbove: true,
+    isUserLoading: false,
+  }),
 }))
 
 vi.mock("@/components/Common/QueryErrorBoundary", () => ({

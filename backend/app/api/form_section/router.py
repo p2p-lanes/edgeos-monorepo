@@ -15,7 +15,7 @@ from app.api.form_section.schemas import (
 from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.api.translation.service import delete_translations_for_entity
-from app.core.dependencies.users import CurrentUser, CurrentWriter, TenantSession
+from app.core.dependencies.users import CurrentOperator, CurrentUser, TenantSession
 
 router = APIRouter(prefix="/form-sections", tags=["form-sections"])
 
@@ -83,7 +83,7 @@ async def get_form_section(
 async def create_form_section(
     section_in: FormSectionCreate,
     db: TenantSession,
-    current_user: CurrentWriter,
+    current_user: CurrentOperator,
 ) -> FormSectionPublic:
     from app.api.popup.crud import popups_crud
 
@@ -145,7 +145,7 @@ async def update_form_section(
     section_id: uuid.UUID,
     section_in: FormSectionUpdate,
     db: TenantSession,
-    _current_user: CurrentWriter,
+    _current_user: CurrentOperator,
 ) -> FormSectionPublic:
     section = crud.form_sections_crud.get(db, section_id)
 
@@ -163,7 +163,7 @@ async def update_form_section(
 async def delete_form_section(
     section_id: uuid.UUID,
     db: TenantSession,
-    _current_user: CurrentWriter,
+    _current_user: CurrentOperator,
 ) -> None:
     section = crud.form_sections_crud.get(db, section_id)
 

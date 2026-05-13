@@ -20,7 +20,7 @@ export const Route = createFileRoute("/_layout/applications/review-queue")({
 
 function ReviewQueuePage() {
   const { isContextReady, selectedPopupId } = useWorkspace()
-  const { isAdmin } = useAuth()
+  const { isOperatorOrAbove } = useAuth()
   const [currentIndex, setCurrentIndex] = useState(0)
   const queryClient = useQueryClient()
 
@@ -32,7 +32,7 @@ function ReviewQueuePage() {
         skip: 0,
         limit: 100,
       }),
-    enabled: isContextReady && isAdmin,
+    enabled: isContextReady && isOperatorOrAbove,
   })
 
   const applications = (pendingData?.results ??
@@ -40,7 +40,7 @@ function ReviewQueuePage() {
   const total = applications.length
   const current = applications[currentIndex]
 
-  if (!isContextReady || !isAdmin) {
+  if (!isContextReady || !isOperatorOrAbove) {
     return (
       <div className="flex flex-col gap-6">
         <div>

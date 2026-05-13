@@ -1,11 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
+import { Lock } from "lucide-react"
 import { Suspense } from "react"
 
 import { type EventSettingsCreate, EventSettingsService } from "@/client"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { ChipInput } from "@/components/forms/EventForm/ChipInput"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -17,6 +19,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { Switch } from "@/components/ui/switch"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
+import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
 import { createErrorHandler } from "@/utils"
 
@@ -60,6 +63,8 @@ function EventSettingsForm() {
   const { selectedPopupId } = useWorkspace()
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
+  const { isAdmin } = useAuth()
+  const readOnly = !isAdmin
 
   const { data: settings, isLoading } = useQuery({
     queryKey: ["event-settings", selectedPopupId],
@@ -106,6 +111,16 @@ function EventSettingsForm() {
 
   return (
     <div className="mx-auto space-y-6 max-w-lg">
+      {readOnly && (
+        <Alert>
+          <Lock className="h-4 w-4" />
+          <AlertTitle>Read-only access</AlertTitle>
+          <AlertDescription>
+            Event settings can only be changed by an admin. You can review the
+            current configuration but cannot edit it.
+          </AlertDescription>
+        </Alert>
+      )}
       <div className="space-y-2">
         <div className="flex items-center justify-between rounded-lg border p-4">
           <div className="space-y-0.5">
@@ -116,6 +131,7 @@ function EventSettingsForm() {
           </div>
           <Switch
             checked={currentSettings.event_enabled}
+            disabled={readOnly}
             onCheckedChange={(checked) =>
               upsertMutation.mutate({
                 ...currentSettings,
@@ -136,6 +152,7 @@ function EventSettingsForm() {
         <Label>Who Can Create Events</Label>
         <Select
           value={currentSettings.can_publish_event}
+          disabled={readOnly}
           onValueChange={(value) =>
             upsertMutation.mutate({
               ...currentSettings,
@@ -170,6 +187,7 @@ function EventSettingsForm() {
             </div>
             <Switch
               checked={currentSettings.events_require_approval ?? true}
+              disabled={readOnly}
               onCheckedChange={(checked) =>
                 upsertMutation.mutate({
                   ...currentSettings,
@@ -186,6 +204,7 @@ function EventSettingsForm() {
         <Label>Default Timezone</Label>
         <Select
           value={currentSettings.timezone}
+          disabled={readOnly}
           onValueChange={(value) =>
             upsertMutation.mutate({
               ...currentSettings,
@@ -214,6 +233,7 @@ function EventSettingsForm() {
         <Label>Allowed event tags</Label>
         <ChipInput
           value={currentSettings.allowed_tags ?? []}
+          disabled={readOnly}
           onChange={(next) =>
             upsertMutation.mutate({
               ...currentSettings,
@@ -233,6 +253,7 @@ function EventSettingsForm() {
         <Label>Allowed event types</Label>
         <ChipInput
           value={currentSettings.allowed_kinds ?? []}
+          disabled={readOnly}
           placeholder="Add type (or paste workshop, talk, social)"
           onChange={(next) =>
             upsertMutation.mutate({
@@ -252,6 +273,7 @@ function EventSettingsForm() {
         <Label>Approval notification emails</Label>
         <ChipInput
           value={currentSettings.approval_notification_emails ?? []}
+          disabled={readOnly}
           placeholder="admin@your-popup.com"
           validate={(entry) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(entry)}
           onChange={(next) =>
@@ -288,6 +310,7 @@ function EventSettingsForm() {
           </div>
           <Switch
             checked={currentSettings.humans_can_create_venues ?? false}
+            disabled={readOnly}
             onCheckedChange={(checked) =>
               upsertMutation.mutate({
                 ...currentSettings,
@@ -313,7 +336,7 @@ function EventSettingsForm() {
           </div>
           <Switch
             checked={currentSettings.venues_require_approval ?? true}
-            disabled={!currentSettings.humans_can_create_venues}
+            disabled={readOnly || !currentSettings.humans_can_create_venues}
             onCheckedChange={(checked) =>
               upsertMutation.mutate({
                 ...currentSettings,
