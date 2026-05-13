@@ -50,12 +50,12 @@ interface ThemeColors {
    * "monochrome iconography" instead of OS-coloured pictographs. */
   checkout_nav_monochrome_emoji?: boolean | string
   checkout_subtitle_color?: string
-  /** Override the ticket-card section surface for the whole popup.
-   * Drives `--ticket-card-bg` (and `--ticket-card-fg` for text). Only
-   * consumed by VariantTicketCard, so other `bg-card` surfaces in the
-   * checkout (buyer form, confirm step, cart drawer) keep the global
-   * theme palette. Use when the popup theme mode and the card surface
-   * need to disagree — e.g. a dark popup with cream-on-teal cards. */
+  /** Override the universal step-card surface for the whole popup.
+   * Drives `--step-card-bg` and `--step-card-fg`, consumed by every
+   * card-like surface in the checkout (ticket sections, buyer form,
+   * confirm summary, FAQ items, cart drawer, insurance card). Use when
+   * the popup theme mode and the card surface need to disagree — e.g.
+   * a dark popup with cream-on-teal cards. */
   card_background_color?: string
   card_foreground_color?: string
 }
@@ -138,14 +138,17 @@ function computeThemeVars(
   if (colors.checkout_subtitle_color) {
     vars["--checkout-subtitle"] = colors.checkout_subtitle_color
   }
-  // Ticket-card surface — written outside the `hasTheme` guard so tenants
-  // can opt into card colours without committing to a full mode/primary
-  // theme. Consumed by VariantTicketCard via `var(--ticket-card-bg, …)`.
+  // Universal step-card surface — written outside the `hasTheme` guard so
+  // tenants can opt into card colours without committing to a full
+  // mode/primary theme. Consumed by every card surface in the checkout
+  // via `stepCardSurfaceStyle()` (see `portal/src/lib/stepCardSurface.ts`),
+  // which reads `var(--step-card-bg, …)` and re-binds `--card`,
+  // `--foreground`, `--muted-foreground`, `--border` for its subtree.
   if (colors.card_background_color) {
-    vars["--ticket-card-bg"] = colors.card_background_color
+    vars["--step-card-bg"] = colors.card_background_color
   }
   if (colors.card_foreground_color) {
-    vars["--ticket-card-fg"] = colors.card_foreground_color
+    vars["--step-card-fg"] = colors.card_foreground_color
   }
 
   // If no mode/primary is set, stop here — rest of the palette stays on the

@@ -8,6 +8,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
+import { stepCardSurfaceStyle } from "@/lib/stepCardSurface"
 import { cn } from "@/lib/utils"
 import type { VariantProps } from "../registries/variantRegistry"
 
@@ -24,7 +25,16 @@ interface FaqItem {
 function parseFaqs(templateConfig: VariantProps["templateConfig"]): FaqItem[] {
   const raw = templateConfig?.items
   if (!Array.isArray(raw) || raw.length === 0) return []
-  return raw as FaqItem[]
+  // Seed/admin payloads often omit per-item `id`. Without a stable id the
+  // accordion's `openId === item.id` comparison collapses to
+  // `undefined === undefined` for every row, so opening one row opens
+  // the lot. Fall back to the array index so each row is uniquely
+  // addressable while preserving any explicit id the admin set.
+  return (raw as Partial<FaqItem>[]).map((item, idx) => ({
+    id: item.id ?? `faq-${idx}`,
+    question: item.question ?? "",
+    answer: item.answer ?? "",
+  }))
 }
 
 function SectionTitle({ title }: { title?: string }) {
@@ -64,9 +74,10 @@ function AccordionFaqs({
             >
               <div
                 className={cn(
-                  "rounded-xl border border-border bg-card overflow-hidden transition-shadow",
+                  "rounded-xl border border-border overflow-hidden transition-shadow",
                   isOpen && "shadow-sm",
                 )}
+                style={stepCardSurfaceStyle()}
               >
                 <CollapsibleTrigger asChild>
                   <button
@@ -148,7 +159,8 @@ function TwoColumnFaqs({
         {items.map((item) => (
           <div
             key={item.id}
-            className="rounded-xl border border-border bg-card p-4 space-y-1.5"
+            className="rounded-xl border border-border p-4 space-y-1.5"
+            style={stepCardSurfaceStyle()}
           >
             <h4 className="text-sm font-semibold text-foreground">
               {item.question || "Untitled question"}
@@ -182,7 +194,8 @@ function CardsFaqs({
         {items.map((item) => (
           <div
             key={item.id}
-            className="flex gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm"
+            className="flex gap-3 rounded-2xl border border-border p-4 shadow-sm"
+            style={stepCardSurfaceStyle()}
           >
             <div className="shrink-0 w-9 h-9 rounded-full bg-muted flex items-center justify-center">
               <HelpCircle className="w-4 h-4 text-muted-foreground" />

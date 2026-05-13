@@ -1,23 +1,11 @@
 "use client"
 
+import { Check } from "lucide-react"
+import type { ReactNode } from "react"
 import {
-  Check,
-  CircleUser,
-  Film,
-  Heart,
-  HelpCircle,
-  Home,
-  ImageIcon,
-  ParkingSquare,
-  Play,
-  Shield,
-  ShoppingBag,
-  ShoppingCart,
-  Tent,
-  Ticket,
-  User,
-} from "lucide-react"
-import type { ComponentType, ReactNode, SVGProps } from "react"
+  getRegistryIcon,
+  resolveStepIcon,
+} from "@/lib/checkoutStepIcons"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
 import type { CheckoutStep } from "@/types/checkout"
@@ -25,110 +13,10 @@ import type { CheckoutStep } from "@/types/checkout"
 export type FooterDesign = "pill" | "stripe" | "dock"
 export type WatermarkStyle = "none" | "ghost" | "stroke" | "bold"
 
-// Custom mushroom icon — Lucide doesn't ship one, so we trace a tiny inline
-// SVG that follows the same stroke style (currentColor, 2px stroke,
-// rounded caps) and slots cleanly next to the other Lucide icons.
-function MushroomIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      {...props}
-    >
-      {/* Cap: half-dome covering the top */}
-      <path d="M3 12a9 4 0 0 1 18 0v0a0 0 0 0 1 0 0H3a0 0 0 0 1 0 0Z" />
-      <path d="M3 12a9 9 0 0 1 18 0" />
-      {/* Stem */}
-      <path d="M10 12v6a2 2 0 0 0 4 0v-6" />
-      {/* Spots */}
-      <circle cx="9" cy="9" r="0.6" fill="currentColor" />
-      <circle cx="14" cy="7.5" r="0.6" fill="currentColor" />
-      <circle cx="17" cy="10" r="0.6" fill="currentColor" />
-    </svg>
-  )
-}
-
-/** Curated icon registry. Tenants set `step.emoji` to one of these slug
- * names (`"user"`, `"mushroom"`, `"tent"`, …) and the nav renders the
- * matching component. Slug values are case-insensitive and may use
- * dashes for readability. Anything else falls back to rendering the
- * value as a literal emoji glyph. */
-type LucideLikeIcon = ComponentType<SVGProps<SVGSVGElement>>
-
-const ICON_REGISTRY: Record<string, LucideLikeIcon> = {
-  user: User,
-  "user-circle": CircleUser,
-  profile: User,
-  mushroom: MushroomIcon,
-  ticket: Ticket,
-  tent: Tent,
-  housing: Tent,
-  parking: ParkingSquare,
-  film: Film,
-  movie: Film,
-  image: ImageIcon,
-  photo: ImageIcon,
-  gallery: ImageIcon,
-  help: HelpCircle,
-  faq: HelpCircle,
-  cart: ShoppingCart,
-  checkout: ShoppingCart,
-  bag: ShoppingBag,
-  heart: Heart,
-  play: Play,
-  shield: Shield,
-  home: Home,
-}
-
-function resolveIconName(name: string): string {
-  return name.toLowerCase().replace(/[\s_]+/g, "-")
-}
-
-function getRegistryIcon(value: string | null | undefined): LucideLikeIcon | null {
-  if (!value) return null
-  const slug = resolveIconName(value)
-  return ICON_REGISTRY[slug] ?? null
-}
-
-const SECTION_ICONS: Record<string, LucideLikeIcon> = {
-  passes: Ticket,
-  housing: Tent,
-  parking: ParkingSquare,
-  merch: ShoppingBag,
-  patron: Heart,
-  confirm: ShoppingCart,
-  buyer: User,
-  hero: MushroomIcon,
-}
-
-const TEMPLATE_ICONS: Record<string, LucideLikeIcon> = {
-  "ticket-select": Ticket,
-  "ticket-card": Ticket,
-  "patron-preset": Heart,
-  "housing-date": Tent,
-  "merch-image": ShoppingBag,
-  "youtube-video": Film,
-  "image-gallery": ImageIcon,
-  "rich-text": MushroomIcon,
-  "buyer-form": User,
-  faqs: HelpCircle,
-}
-
-function resolveIcon(section: {
-  id: string
-  template?: string | null
-}): LucideLikeIcon {
-  if (section.template && TEMPLATE_ICONS[section.template]) {
-    return TEMPLATE_ICONS[section.template]
-  }
-  return SECTION_ICONS[section.id] ?? Ticket
-}
+// Icon resolution lives in `@/lib/checkoutStepIcons` so the cart drawer
+// (and other surfaces) can render the same registry.
+const resolveIcon = (section: { id: string; template?: string | null }) =>
+  resolveStepIcon({ stepType: section.id, template: section.template })
 
 interface NavSection {
   id: string
@@ -158,7 +46,32 @@ export default function ScrollySectionNav({
   brandLogoUrl,
   brandLabel,
 }: ScrollySectionNavProps) {
-  const { isStepComplete } = useCheckout()
+  const {
+    isStepComplete,
+    visitedSteps,
+    isBuyerInfoComplete,
+    forcedBuyerFieldsTouched,
+  } = useCheckout()
+
+  // Predicate: is this step required-but-incomplete for the user right
+  // now? Only the buyer step has formal field validation today, but the
+  // helper is shaped so additional gated steps can join later (e.g. a
+  // future "require at least one ticket" rule).
+  //
+  // A step is shown as "incomplete" in the nav when:
+  //   * the user has scrolled past it (visited), OR
+  //   * the funnel forcefully revealed errors after a Continuar/Pagar
+  //     attempt (forcedBuyerFieldsTouched > 0).
+  // Untouched required steps are *not* flagged — anxiety-inducing to
+  // shout at users about fields they haven't seen.
+  const isStepIncomplete = (stepId: string): boolean => {
+    if (stepId === "buyer") {
+      if (isBuyerInfoComplete) return false
+      const surfacedByForce = forcedBuyerFieldsTouched.size > 0
+      return surfacedByForce || visitedSteps.has(stepId)
+    }
+    return false
+  }
 
   const activeIndex = Math.max(
     0,
@@ -194,6 +107,7 @@ export default function ScrollySectionNav({
                 const isActive = section.id === activeSection
                 const isComplete =
                   !isActive && isStepComplete(section.id as CheckoutStep)
+                const isIncomplete = !isActive && isStepIncomplete(section.id)
                 // Per-step emoji takes precedence over the built-in icon when
                 // the tenant set one in the backoffice. Plain text node — no
                 // sanitization needed since SQLAlchemy capped the column at 8
@@ -205,11 +119,16 @@ export default function ScrollySectionNav({
                     type="button"
                     onClick={() => onSectionClick(section.id)}
                     aria-current={isActive ? "step" : undefined}
+                    aria-invalid={isIncomplete || undefined}
                     className={cn(
                       "relative z-10 flex h-7 min-w-0 items-center justify-center gap-1 px-1.5 text-xs font-semibold transition-colors duration-200",
                       isActive
                         ? "text-checkout-badge-title"
-                        : "text-checkout-badge-title-disabled hover:text-checkout-badge-title/80",
+                        : isIncomplete
+                          ? // Muted amber tint — "needs your attention" without
+                            // the red-alarm rage of a destructive colour.
+                            "text-amber-400 hover:text-amber-300"
+                          : "text-checkout-badge-title-disabled hover:text-checkout-badge-title/80",
                     )}
                   >
                     {(() => {

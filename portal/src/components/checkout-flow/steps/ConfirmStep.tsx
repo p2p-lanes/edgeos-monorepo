@@ -13,6 +13,7 @@ import {
 } from "lucide-react"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
+import { stepCardSurfaceStyle } from "@/lib/stepCardSurface"
 import { cn } from "@/lib/utils"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCheckout } from "@/providers/checkoutProvider"
@@ -189,7 +190,10 @@ export default function ConfirmStep() {
         />
       )}
 
-      <div className="bg-checkout-card-bg rounded-2xl shadow-sm border border-border overflow-hidden">
+      <div
+        className="rounded-2xl shadow-sm border border-border overflow-hidden"
+        style={stepCardSurfaceStyle()}
+      >
         {/* Passes Section */}
         {cart.passes.length > 0 && (
           <div className="px-5 py-4">
@@ -447,10 +451,14 @@ export default function ConfirmStep() {
                 onClick={handleApplyPromo}
                 disabled={promoLoading || isLoading || !promoInput.trim()}
                 className={cn(
-                  "px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors shrink-0",
+                  "px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all shrink-0 border",
                   !promoInput.trim()
-                    ? "bg-muted text-muted-foreground cursor-not-allowed"
-                    : "bg-foreground text-background hover:bg-foreground/90",
+                    ? "bg-muted text-muted-foreground border-transparent cursor-not-allowed"
+                    : // Brand-aligned CTA: primary (verde-marino) fill +
+                      // accent (gold) text + thin primary border. Matches
+                      // the "+" tile in the ticket-card stepper so the
+                      // promo CTA reads as the same family of action.
+                      "bg-[color:var(--primary,theme(colors.foreground))] text-[color:var(--accent,theme(colors.background))] border-[color:var(--primary,transparent)] hover:brightness-110 active:scale-[0.98]",
                 )}
               >
                 {promoLoading || isLoading ? (

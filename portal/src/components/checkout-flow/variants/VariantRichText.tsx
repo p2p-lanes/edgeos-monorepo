@@ -2,6 +2,16 @@
 
 import DOMPurify from "isomorphic-dompurify"
 import { useMemo } from "react"
+
+// Inline type for the DOMPurify config we pass at sanitize-time. The
+// `dompurify` package's `Config` type isn't re-exported by
+// `isomorphic-dompurify`, so we narrow to just the fields we use here
+// rather than reaching past the public surface.
+interface DOMPurifyConfig {
+  ALLOWED_TAGS?: string[]
+  ALLOWED_ATTR?: string[]
+  ALLOWED_URI_REGEXP?: RegExp
+}
 import type { VariantProps } from "../registries/variantRegistry"
 
 // ---------------------------------------------------------------------------
@@ -31,7 +41,7 @@ interface RichTextConfig {
   max_width?: "narrow" | "wide"
 }
 
-const PURIFY_CONFIG: DOMPurify.Config = {
+const PURIFY_CONFIG: DOMPurifyConfig = {
   ALLOWED_TAGS: [
     "h1",
     "h2",

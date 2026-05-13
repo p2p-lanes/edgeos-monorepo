@@ -9,6 +9,7 @@ import QuantitySelector, {
   supportsQuantitySelector,
 } from "@/components/ui/QuantitySelector"
 import { resolveTierPhaseState } from "@/helpers/tierPhaseState"
+import { stepCardSurfaceStyle } from "@/lib/stepCardSurface"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
 import { formatCheckoutDate, formatCurrency } from "@/types/checkout"
@@ -33,7 +34,9 @@ interface TicketCardSection {
   label: string
   order: number
   product_ids: string[]
-  /** Optional hero image surfaced at the top of the section card. */
+  /** Optional hero image surfaced at the top of the section card.
+   *  Renders as a clean photo with no overlay — the title and
+   *  description follow below in the card body. */
   image_url?: string
   /** Optional aspect override; defaults to 16:9. */
   image_aspect?: SectionImageAspect
@@ -47,7 +50,7 @@ type TicketCardVariant = "stacked" | "tabs" | "compact"
  *
  *  `theme` (default) — bg/text resolve from the popup theme. When the
  *  tenant sets `card_background_color` / `card_foreground_color` in their
- *  theme, those drive `--ticket-card-bg` / `--ticket-card-fg` and the
+ *  theme, those drive `--step-card-bg` / `--step-card-fg` and the
  *  card uses them; otherwise the card falls back to `--card` /
  *  `--card-foreground` from the global mode palette.
  *
@@ -141,6 +144,13 @@ function ProductRow({
   const rowDisabled = tierState.blocked && !isAdded
   const hasDiscount =
     product.compare_price != null && product.compare_price > product.price
+  // Once a buyer adds more than one of the same product, show the line
+  // SUBTOTAL as the primary price (so the number to the right of the
+  // stepper actually matches what gets added to their total) and demote
+  // the unit price to a quiet "c/u" footnote underneath. Without this
+  // split it's ambiguous whether "$300,000" is per-unit or line-total.
+  const subtotal = product.price * quantity
+  const showSubtotal = quantity > 1
 
   const handleAdd = (qty: number = 1) => {
     addDynamicItem(stepType, {
@@ -164,25 +174,72 @@ function ProductRow({
     updateDynamicQuantity(stepType, product.id, qty)
   }
 
-  // CTA palette: gold (accent) fill + verde-marino (primary) text on
-  // Amanita; for any tenant, this resolves to whatever the theme
-  // provides via `--accent` / `--primary`. Falls back to neutral when
-  // neither is set so other popups keep their existing affordance.
+  // CTA palette mirrors the inverted "+" tile in QuantitySelector:
+  // PRIMARY (verde-marino) fill with ACCENT (gold) text/icon. Pops harder
+  // against the cream card surface than the previous gold-on-dark
+  // treatment. When added, swap to a softer accent fill so the toggle
+  // state is visually distinct without two competing dark pills on one
+  // row.
   const ctaClass = cn(
     "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold tracking-wide shrink-0 transition-all whitespace-nowrap",
-    "shadow-sm border border-[color:var(--accent,transparent)]",
+    "shadow-sm border border-[color:var(--primary,transparent)]",
     isAdded
-      ? "bg-[color:var(--primary,theme(colors.foreground))] text-[color:var(--primary-foreground,theme(colors.background))]"
-      : "bg-[color:var(--accent,theme(colors.foreground))] text-[color:var(--primary,theme(colors.background))] hover:brightness-95 active:scale-[0.98]",
+      ? "bg-[color:var(--accent,theme(colors.foreground))] text-[color:var(--primary,theme(colors.background))]"
+      : "bg-[color:var(--primary,theme(colors.foreground))] text-[color:var(--accent,theme(colors.background))] hover:brightness-110 active:scale-[0.98]",
     rowDisabled && "cursor-not-allowed opacity-50",
   )
 
+  // Row click = primary "add" affordance. Toggle products (max_per_order=1)
+  // flip in/out of the cart; multi-quantity products increment up to `max`.
+  // The +/- stepper and Add button below still take priority via
+  // stopPropagation so users can decrement / fine-tune without the row
+  // double-firing. Disabled rows opt out of the click + focus ring.
+  const handleRowActivate = () => {
+    if (rowDisabled) return
+    if (showStepper) {
+      if (quantity >= max) return
+      handleQuantityChange(quantity + 1)
+      return
+    }
+    handleQuantityChange(isAdded ? 0 : 1)
+  }
+
+  const stepperAtMax = showStepper && quantity >= max
+  const rowClickable = !rowDisabled && !stepperAtMax
+
   return (
     <div
+      role={rowClickable ? "button" : undefined}
+      tabIndex={rowClickable ? 0 : undefined}
+      aria-disabled={rowDisabled || undefined}
+      aria-label={
+        rowClickable
+          ? isAdded && !showStepper
+            ? t("checkout.actions.remove_aria", {
+                defaultValue: "Remove from cart",
+              })
+            : t("checkout.actions.add_aria", {
+                defaultValue: "Add to cart",
+              })
+          : undefined
+      }
+      onClick={rowClickable ? handleRowActivate : undefined}
+      onKeyDown={
+        rowClickable
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault()
+                handleRowActivate()
+              }
+            }
+          : undefined
+      }
       className={cn(
-        "px-4 py-3 transition-colors",
+        "px-4 py-3 transition-colors outline-none",
         isAdded && "bg-[color:var(--accent,theme(colors.muted))]/10",
-        rowDisabled && "opacity-40",
+        rowDisabled && "opacity-40 cursor-not-allowed",
+        rowClickable &&
+          "cursor-pointer hover:bg-[color:var(--accent,theme(colors.muted))]/15 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[color:var(--accent,theme(colors.foreground))]/40",
       )}
     >
       <div className="flex items-center gap-3">
@@ -205,17 +262,50 @@ function ProductRow({
             </p>
           )}
         </div>
-        <div className="flex items-center gap-3 shrink-0">
-          <div className="text-right">
-            {hasDiscount && (
-              <div className="text-[11px] text-muted-foreground line-through leading-none">
-                {formatCurrency(product.compare_price ?? 0, product.currency)}
+        <div className="flex items-center gap-4 shrink-0">
+          {/* Price column switches typography + color the moment a
+              product is added, so a glance down the list immediately
+              tells you which rows are "in cart" versus quotes. Unselected
+              → small, muted, mid-weight (informational). Selected →
+              one step bigger, bold, painted in the brand accent (gold on
+              Amanita) so the active line-item pops. Color transitions
+              smoothly; size/weight snap is part of the affordance. */}
+          <div
+            className={cn(
+              "text-right leading-tight transition-all duration-200 ease-out",
+              isAdded ? "-translate-y-0.5" : "translate-y-0",
+            )}
+          >
+            {hasDiscount && !showSubtotal && (
+              <div
+                className={cn(
+                  "text-[11px] line-through leading-none transition-colors duration-200",
+                  isAdded ? "text-foreground/60" : "text-muted-foreground",
+                )}
+              >
+                {formatCurrency(product.compare_price ?? 0)}
               </div>
             )}
-            <div className="text-sm font-semibold text-foreground">
-              {formatCurrency(product.price, product.currency)}
+            <div
+              className={cn(
+                "transition-all duration-200 ease-out leading-tight tabular-nums",
+                isAdded
+                  ? "text-base font-bold text-[color:var(--accent,theme(colors.foreground))]"
+                  : "text-sm font-medium text-muted-foreground",
+              )}
+            >
+              {formatCurrency(showSubtotal ? subtotal : product.price)}
             </div>
+            {showSubtotal && (
+              <div className="text-[10px] text-muted-foreground leading-none mt-0.5 tabular-nums">
+                {formatCurrency(product.price)}{" "}
+                {t("checkout.actions.per_unit", { defaultValue: "c/u" })}
+              </div>
+            )}
           </div>
+          {/* Thin vertical separator so the stepper feels visually
+              detached from the price column instead of crowding it. */}
+          <div className="border-l border-current/10 pl-4 h-9 flex items-center">
           {showStepper ? (
             <QuantitySelector
               size="md"
@@ -230,7 +320,10 @@ function ProductRow({
           ) : (
             <button
               type="button"
-              onClick={() => handleQuantityChange(isAdded ? 0 : 1)}
+              onClick={(e) => {
+                e.stopPropagation()
+                handleQuantityChange(isAdded ? 0 : 1)
+              }}
               disabled={rowDisabled}
               className={ctaClass}
               aria-label={
@@ -245,17 +338,18 @@ function ProductRow({
             >
               {isAdded ? (
                 <>
-                  <Check className="size-3.5" />
+                  <Check className="size-3.5 stroke-[2.5]" />
                   {t("checkout.actions.added", { defaultValue: "Added" })}
                 </>
               ) : (
                 <>
-                  <Plus className="size-3.5" />
+                  <Plus className="size-3.5 stroke-[3]" />
                   {t("checkout.actions.add", { defaultValue: "Add" })}
                 </>
               )}
             </button>
           )}
+          </div>
         </div>
       </div>
     </div>
@@ -282,26 +376,14 @@ function SectionCard({
   // Resolution order:
   //  * `surface = "light" | "dark"` → pin a hardcoded preset on the card
   //    root, overriding everything for the subtree.
-  //  * `surface = "theme"` → bind the theme's `--ticket-card-bg` /
-  //    `--ticket-card-fg` to the card-scoped CSS variables so inner
-  //    elements (h3 with `text-foreground`, description with
-  //    `text-muted-foreground`, dividers via `--border`) all repaint
-  //    onto the card surface in one go. Falls back to the global
-  //    `--card` / `--card-foreground` when the tenant didn't set
-  //    card colours — that's the legacy single-mode behaviour.
+  //  * `surface = "theme"` → use the shared step-card surface style so
+  //    this card paints with the same `--step-card-bg`/`-fg` palette as
+  //    every other card in the checkout. Falls back through the helper
+  //    chain (`--checkout-card-bg` → `--card`) when no card colours are
+  //    configured.
   const surfaceStyle: React.CSSProperties =
     surface === "theme"
-      ? ({
-          "--card": "var(--ticket-card-bg, var(--card))",
-          "--card-foreground": "var(--ticket-card-fg, var(--card-foreground))",
-          "--foreground": "var(--ticket-card-fg, var(--card-foreground))",
-          "--muted-foreground":
-            "color-mix(in srgb, var(--ticket-card-fg, var(--card-foreground)) 75%, transparent)",
-          "--border":
-            "color-mix(in srgb, var(--ticket-card-fg, var(--card-foreground)) 18%, transparent)",
-          background: "var(--ticket-card-bg, var(--card))",
-          color: "var(--ticket-card-fg, var(--card-foreground))",
-        } as React.CSSProperties)
+      ? stepCardSurfaceStyle()
       : (SURFACE_STYLE[surface] as React.CSSProperties)
 
   return (
@@ -332,15 +414,17 @@ function SectionCard({
           />
         </div>
       )}
-      <header className="px-4 pt-4 pb-2">
+      <header className="px-4 pt-4 pb-1">
         <h3 className="font-semibold text-foreground text-base">
           {section.label}
         </h3>
-        {section.description && (
+      </header>
+      {section.description && (
+        <div className="px-4 pt-1 pb-2">
           <ExpandableDescription
             text={section.description}
             clamp={3}
-            className="text-sm text-muted-foreground mt-1 whitespace-pre-line"
+            className="text-sm text-muted-foreground whitespace-pre-line"
             // Branded toggle: uppercase micro-caps + chevron glyph in the
             // theme accent colour. Falls back to the card's foreground
             // when the tenant didn't set an accent, so other popups stay
@@ -352,8 +436,8 @@ function SectionCard({
               "after:content-['_›'] after:font-normal after:text-base after:leading-none after:relative after:top-[-1px]",
             )}
           />
-        )}
-      </header>
+        </div>
+      )}
       <div className="divide-y divide-border">
         {products.map((p) => (
           <ProductRow key={p.id} product={p} stepType={stepType} />
@@ -405,17 +489,7 @@ function CompactLayout({
   // surface resolution as the stacked SectionCard — see comments there.
   const surfaceStyle: React.CSSProperties =
     surface === "theme"
-      ? ({
-          "--card": "var(--ticket-card-bg, var(--card))",
-          "--card-foreground": "var(--ticket-card-fg, var(--card-foreground))",
-          "--foreground": "var(--ticket-card-fg, var(--card-foreground))",
-          "--muted-foreground":
-            "color-mix(in srgb, var(--ticket-card-fg, var(--card-foreground)) 75%, transparent)",
-          "--border":
-            "color-mix(in srgb, var(--ticket-card-fg, var(--card-foreground)) 18%, transparent)",
-          background: "var(--ticket-card-bg, var(--card))",
-          color: "var(--ticket-card-fg, var(--card-foreground))",
-        } as React.CSSProperties)
+      ? stepCardSurfaceStyle()
       : (SURFACE_STYLE[surface] as React.CSSProperties)
   return (
     <div

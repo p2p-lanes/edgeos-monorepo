@@ -66,11 +66,13 @@ interface QuantitySelectorProps {
   className?: string
   /** Colour treatment for the empty-slot Add button.
    *  - `default` (legacy) → faint primary tile, primary icon.
-   *  - `accent` → filled accent (typically the popup's brand emphasis
-   *    colour, e.g. Amanita's dorado) with primary-coloured icon.
-   *    Used by VariantTicketCard so the Add CTA sits on the same row
-   *    as the price with a high-contrast pill — readable on light
-   *    cream surfaces where the bg-primary/20 fallback gets lost. */
+   *  - `accent` → SOLID PRIMARY tile (the popup's structural colour,
+   *    e.g. Amanita's verde-marino) with the icon painted in the
+   *    ACCENT colour (e.g. dorado gold) at stroke-3 for a deliberate
+   *    CTA pop. Used by VariantTicketCard so the Add tile reads as
+   *    a high-contrast pill against cream/light card surfaces — the
+   *    earlier gold-on-dark variant felt warm-on-warm on tenant
+   *    palettes like Amanita's. */
   tone?: "default" | "accent"
 }
 
@@ -143,13 +145,17 @@ const QuantitySelector = ({
     const addClasses =
       tone === "accent"
         ? cn(
-            // Solid accent fill with primary-toned icon. Renders crisply
-            // on both dark navbars and light cream cards.
+            // Inverted from the legacy gold-on-dark treatment: now a solid
+            // PRIMARY tile (e.g. Amanita's verde-marino) with the icon in
+            // the ACCENT colour (gold). Pops harder on cream/light card
+            // surfaces and reads as a deliberate CTA rather than a faint
+            // brand wash. Stroke-3 makes the "+" feel substantial at this
+            // tile size — a thinner glyph got lost against the dark fill.
             "transition-all duration-200 ease-out transform hover:scale-110 active:scale-95",
             "flex items-center justify-center rounded-full shadow-sm",
-            "bg-[color:var(--accent,theme(colors.primary))]",
-            "text-[color:var(--primary,theme(colors.background))]",
-            "hover:brightness-95",
+            "bg-[color:var(--primary,theme(colors.foreground))]",
+            "text-[color:var(--accent,theme(colors.background))]",
+            "hover:brightness-110",
             ADD_BUTTON_SIZES[size],
           )
         : cn(
@@ -168,7 +174,12 @@ const QuantitySelector = ({
           aria-label="Add item"
           tabIndex={0}
         >
-          <Plus className={cn(ADD_ICON_SIZES[size], "stroke-[2.5]")} />
+          <Plus
+            className={cn(
+              ADD_ICON_SIZES[size],
+              tone === "accent" ? "stroke-[3]" : "stroke-[2.5]",
+            )}
+          />
         </button>
       </div>
     )
