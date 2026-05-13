@@ -11,7 +11,7 @@ import {
   Users,
 } from "lucide-react"
 import Link from "next/link"
-import { useParams } from "next/navigation"
+import { useParams, useSearchParams } from "next/navigation"
 import { useTranslation } from "react-i18next"
 
 import {
@@ -28,8 +28,21 @@ import { CoverImage } from "../../lib/CoverImage"
 export default function PortalVenueDetailPage() {
   const { t } = useTranslation()
   const params = useParams<{ popupSlug: string; venueId: string }>()
+  const searchParams = useSearchParams()
   const { getCity } = useCityProvider()
   const city = getCity()
+
+  // When linked from an event detail page, `from` carries that page's
+  // full path+query so we can return there. Restrict to same-origin
+  // portal paths to avoid being used as an open redirect.
+  const fromParam = searchParams.get("from")
+  const cameFromEvent = !!fromParam && fromParam.startsWith("/portal/")
+  const backHref = cameFromEvent
+    ? (fromParam as string)
+    : `/portal/${city?.slug}/events/venues`
+  const backLabel = cameFromEvent
+    ? t("events.form.back_to_event")
+    : t("events.venues.detail.all_venues_link")
 
   // There is no single-venue portal endpoint; we fetch the full list and
   // pick the match. The list is capped at 200 on the server.
@@ -64,11 +77,10 @@ export default function PortalVenueDetailPage() {
     return (
       <div className="max-w-3xl mx-auto p-4 sm:p-6">
         <Link
-          href={`/portal/${city?.slug}/events/venues`}
+          href={backHref}
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-3"
         >
-          <ArrowLeft className="h-4 w-4" />{" "}
-          {t("events.venues.detail.all_venues_link")}
+          <ArrowLeft className="h-4 w-4" /> {backLabel}
         </Link>
         <p className="text-center py-20 text-muted-foreground">
           {t("events.venues.detail.venue_not_found")}
@@ -97,11 +109,10 @@ export default function PortalVenueDetailPage() {
     <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-6">
       <div className="flex items-center justify-between gap-2">
         <Link
-          href={`/portal/${city?.slug}/events/venues`}
+          href={backHref}
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
-          <ArrowLeft className="h-4 w-4" />{" "}
-          {t("events.venues.detail.all_venues_link")}
+          <ArrowLeft className="h-4 w-4" /> {backLabel}
         </Link>
         {isOwner && (
           <Link
