@@ -24,6 +24,8 @@ const useResources = () => {
   // Whether humans can *create* events is a separate setting handled
   // inside the events page itself (event_settings.event_enabled).
   const eventsEnabled = city?.events_enabled ?? true
+  const attendeeDirectoryEnabled =
+    city?.sale_type !== "direct" && (city?.show_attendee_directory ?? false)
 
   const isCompanion = participation?.type === "companion"
   const canSeeAttendees = application?.status === "accepted"
@@ -101,7 +103,7 @@ const useResources = () => {
     {
       name: t("sidebar.attendee_directory"),
       icon: Users,
-      status: canSeeAttendees ? "active" : "hidden",
+      status: canSeeAttendees && attendeeDirectoryEnabled ? "active" : "hidden",
       path: `/portal/${city?.slug}/attendees`,
     },
     {

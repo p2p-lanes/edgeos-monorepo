@@ -10179,6 +10179,11 @@ export const PopupAdminSchema = {
             title: 'Events Enabled',
             default: true
         },
+        show_attendee_directory: {
+            type: 'boolean',
+            title: 'Show Attendee Directory',
+            default: false
+        },
         id: {
             type: 'string',
             format: 'uuid',
@@ -10539,6 +10544,11 @@ export const PopupCreateSchema = {
             type: 'boolean',
             title: 'Events Enabled',
             default: true
+        },
+        show_attendee_directory: {
+            type: 'boolean',
+            title: 'Show Attendee Directory',
+            default: false
         }
     },
     type: 'object',
@@ -10820,6 +10830,11 @@ export const PopupPublicSchema = {
             type: 'boolean',
             title: 'Events Enabled',
             default: true
+        },
+        show_attendee_directory: {
+            type: 'boolean',
+            title: 'Show Attendee Directory',
+            default: false
         }
     },
     type: 'object',
@@ -11356,6 +11371,17 @@ export const PopupUpdateSchema = {
                 }
             ],
             title: 'Events Enabled'
+        },
+        show_attendee_directory: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Show Attendee Directory'
         }
     },
     additionalProperties: false,

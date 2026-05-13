@@ -20,6 +20,9 @@ const useExportCsv = (): UseExportCsvReturn => {
       toast.error("City not found. Please try again later.")
       return
     }
+    if (city.sale_type === "direct" || !city.show_attendee_directory) {
+      return
+    }
 
     const dismissId = toast.loading("Preparing CSV export...")
     setIsExporting(true)

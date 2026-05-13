@@ -22,6 +22,7 @@ import {
   ShieldCheck,
   ShoppingCart,
   Ticket,
+  Users,
 } from "lucide-react"
 import {
   ApprovalStrategiesService,
@@ -219,6 +220,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
       insurance_percentage:
         defaultValues?.insurance_percentage?.toString() ?? "",
       events_enabled: defaultValues?.events_enabled ?? true,
+      show_attendee_directory: defaultValues?.show_attendee_directory ?? false,
     },
     onSubmit: ({ value }) => {
       if (readOnly) return
@@ -262,6 +264,8 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
           ? value.insurance_percentage || null
           : null,
         events_enabled: value.events_enabled,
+        show_attendee_directory:
+          value.sale_type === "application" && value.show_attendee_directory,
       }
       if (isEdit) {
         updateMutation.mutate(payload)
@@ -1077,6 +1081,40 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         </InlineSection>
 
         <Separator />
+
+        {/* Attendee directory feature flag */}
+        <form.Subscribe selector={(state) => state.values.sale_type}>
+          {(saleType) =>
+            saleType === "application" ? (
+              <>
+                <InlineSection title="Attendee directory">
+                  <form.Field name="show_attendee_directory">
+                    {(field) => (
+                      <InlineRow
+                        icon={
+                          <Users className="h-4 w-4 text-muted-foreground" />
+                        }
+                        label="Show attendee directory"
+                        description="Show the directory in the portal for accepted applicants."
+                      >
+                        <Switch
+                          id="show_attendee_directory"
+                          checked={field.state.value}
+                          onCheckedChange={(checked) =>
+                            field.handleChange(checked)
+                          }
+                          disabled={readOnly}
+                        />
+                      </InlineRow>
+                    )}
+                  </form.Field>
+                </InlineSection>
+
+                <Separator />
+              </>
+            ) : null
+          }
+        </form.Subscribe>
 
         {/* Events module feature flag */}
         <InlineSection title="Events module">

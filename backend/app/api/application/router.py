@@ -33,7 +33,7 @@ from app.api.attendee.schemas import (
     AttendeeUpdate,
     AttendeeWithTickets,
 )
-from app.api.shared.enums import UserRole
+from app.api.shared.enums import SaleType, UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
     CurrentAdmin,
@@ -124,7 +124,9 @@ def _build_application_public(
         discount_percentage=application.discount_percentage,
         incentive_amount=application.incentive_amount,
         incentive_currency=application.incentive_currency,
-        human=HumanPublic.model_validate(application.human) if application.human else None,
+        human=HumanPublic.model_validate(application.human)
+        if application.human
+        else None,
         attendees=attendees,
         red_flag=application.red_flag,
         brings_spouse=application.brings_spouse,
@@ -676,6 +678,23 @@ def _build_directory_entry(application) -> AttendeesDirectoryEntry:
     )
 
 
+def _ensure_attendee_directory_enabled(
+    db: HumanTenantSession, popup_id: uuid.UUID
+) -> None:
+    from app.api.popup.crud import popups_crud
+
+    popup = popups_crud.get(db, popup_id)
+    if (
+        not popup
+        or popup.sale_type == SaleType.direct.value
+        or not popup.show_attendee_directory
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Attendee directory not found",
+        )
+
+
 @router.get(
     "/my/directory/{popup_id}", response_model=ListModel[AttendeesDirectoryEntry]
 )
@@ -692,6 +711,8 @@ async def list_attendees_directory(
     Returns accepted applications with at least one product.
     Respects info_not_shared masking.
     """
+    _ensure_attendee_directory_enabled(db, popup_id)
+
     applications, total = crud.applications_crud.find_directory(
         db,
         popup_id=popup_id,
@@ -719,6 +740,8 @@ async def export_attendees_directory_csv(
 
     No pagination — fetches all matching entries.
     """
+    _ensure_attendee_directory_enabled(db, popup_id)
+
     applications, _ = crud.applications_crud.find_directory(
         db,
         popup_id=popup_id,
