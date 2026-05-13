@@ -10,6 +10,7 @@ export interface FormFieldSchema {
     | "date"
     | "email"
     | "url"
+    | "phone"
   label: string
   required: boolean
   section?: string
