@@ -99,7 +99,7 @@ export const ApiKeyCreateSchema = {
         scopes: {
             items: {
                 type: 'string',
-                enum: ['events:read', 'events:write', 'rsvp:write']
+                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:write']
             },
             type: 'array',
             title: 'Scopes'
@@ -129,7 +129,7 @@ export const ApiKeyCreatedSchema = {
         scopes: {
             items: {
                 type: 'string',
-                enum: ['events:read', 'events:write', 'rsvp:write']
+                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:write']
             },
             type: 'array',
             title: 'Scopes'
@@ -205,7 +205,7 @@ export const ApiKeyPublicSchema = {
         scopes: {
             items: {
                 type: 'string',
-                enum: ['events:read', 'events:write', 'rsvp:write']
+                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:write']
             },
             type: 'array',
             title: 'Scopes'

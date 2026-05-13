@@ -14,7 +14,7 @@ from app.core.db import engine
 # Defined here (not in app.api.api_key.schemas) to avoid an import cycle:
 # api_key.router imports from core.dependencies.users which imports from
 # core.security, so security cannot import back into the api_key package.
-ApiKeyScope = Literal["events:read", "events:write", "rsvp:write"]
+ApiKeyScope = Literal["events:read", "events:write", "rsvp:write", "venues:write"]
 
 ALGORITHM = "HS256"
 
@@ -50,9 +50,12 @@ _PAT_ROUTE_POLICIES: dict[str, tuple[tuple[str, bool, ApiKeyScope], ...]] = {
     ),
     "POST": (
         ("/api/v1/events/portal/events", True, "events:write"),
+        ("/api/v1/event-venues/portal/venues", True, "venues:write"),
         ("/api/v1/event-participants/portal/register/", False, "rsvp:write"),
         ("/api/v1/event-participants/portal/cancel-registration/", False, "rsvp:write"),
     ),
+    "PATCH": (("/api/v1/event-venues/portal/venues/", False, "venues:write"),),
+    "DELETE": (("/api/v1/event-venues/portal/venues/", False, "venues:write"),),
 }
 
 
