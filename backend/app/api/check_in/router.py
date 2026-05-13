@@ -14,6 +14,7 @@ from sqlmodel import select as sa_select
 
 from app.api.application.models import Applications
 from app.api.attendee.models import AttendeeProducts, Attendees
+from app.api.check_in.crud import record_check_in
 from app.api.check_in.models import CheckIn
 from app.api.check_in.schemas import (
     CheckInListItem,
@@ -39,7 +40,9 @@ from app.core.dependencies.users import (
 router = APIRouter(prefix="/check-ins", tags=["check_in"])
 
 
-def _get_self_check_in_popup(db: Session, popup_slug: str, tenant_id: uuid.UUID) -> Popups:
+def _get_self_check_in_popup(
+    db: Session, popup_slug: str, tenant_id: uuid.UUID
+) -> Popups:
     popup = db.exec(
         select(Popups).where(Popups.slug == popup_slug, Popups.tenant_id == tenant_id)
     ).first()
@@ -138,10 +141,20 @@ async def confirm_my_check_in(
     current_human: CurrentHuman,
 ) -> SelfCheckInResult:
     popup = _get_self_check_in_popup(db, popup_slug, current_human.tenant_id)
+    # Lock ownership-matching ticket in a single FOR UPDATE statement so we
+    # never lock rows the human doesn't own and avoid a TOCTOU between the
+    # lock and the ownership check.
     ticket = db.exec(
         select(AttendeeProducts)
-        .where(AttendeeProducts.id == request.attendee_product_id)
-        .with_for_update()
+        .join(Attendees, AttendeeProducts.attendee_id == Attendees.id)  # type: ignore[arg-type]
+        .outerjoin(Applications, Attendees.application_id == Applications.id)  # type: ignore[arg-type]
+        .where(
+            AttendeeProducts.id == request.attendee_product_id,
+            AttendeeProducts.tenant_id == current_human.tenant_id,
+            Attendees.popup_id == popup.id,
+            _human_ticket_owner_filter(current_human.id, popup.id),
+        )
+        .with_for_update(of=AttendeeProducts)
         .options(
             selectinload(AttendeeProducts.attendee),  # type: ignore[arg-type]
             selectinload(AttendeeProducts.product),  # type: ignore[arg-type]
@@ -154,21 +167,6 @@ async def confirm_my_check_in(
 
     attendee = ticket.attendee
     product = ticket.product
-    owns_ticket = db.exec(
-        select(AttendeeProducts.id)
-        .join(Attendees, AttendeeProducts.attendee_id == Attendees.id)  # type: ignore[arg-type]
-        .outerjoin(Applications, Attendees.application_id == Applications.id)  # type: ignore[arg-type]
-        .where(
-            AttendeeProducts.id == ticket.id,
-            AttendeeProducts.tenant_id == current_human.tenant_id,
-            Attendees.popup_id == popup.id,
-            _human_ticket_owner_filter(current_human.id, popup.id),
-        )
-    ).first()
-    if owns_ticket is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Ticket not found"
-        )
 
     if not product.requires_check_in:
         raise HTTPException(
@@ -185,19 +183,13 @@ async def confirm_my_check_in(
             detail="Ticket is already checked in",
         )
 
-    event = CheckIn(
-        id=uuid.uuid4(),
-        tenant_id=ticket.tenant_id,
-        popup_id=popup.id,
+    event = record_check_in(
+        db,
         attendee_product_id=ticket.id,
+        popup_id=popup.id,
+        payload=CheckInPayload(source="self_service", human_id=current_human.id),
         actor_user_id=None,
-        payload=CheckInPayload(
-            source="self_service", human_id=current_human.id
-        ).model_dump(mode="json", exclude_none=True),
     )
-    db.add(event)
-    db.commit()
-    db.refresh(event)
 
     return SelfCheckInResult(
         attendee_product_id=ticket.id,
