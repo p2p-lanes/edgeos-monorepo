@@ -467,10 +467,18 @@
       "highlighted_title": "Evento destacado",
       "owned_title": "Creado por ti"
     },
+    "status": {
+      "draft": "Borrador",
+      "published": "Publicado",
+      "pending_approval": "Pendiente de aprobación",
+      "rejected": "Rechazado",
+      "cancelled": "Cancelado"
+    },
     "toolbar": {
       "search_placeholder": "Buscar eventos...",
       "my_rsvps": "Mis RSVPs",
       "my_events": "Mis eventos",
+      "my_events_title": "Incluye borradores, pendientes y rechazados",
       "hidden": "Ocultos",
       "hidden_title_showing": "Mostrando eventos ocultos",
       "hidden_title_hidden": "Ver eventos ocultos",
@@ -508,7 +516,9 @@
       "no_venues": "Este pop-up todavía no tiene venues configurados.",
       "no_venue_column": "Reunión",
       "offsite_column": "Fuera de sede",
-      "untitled_venue": "Venue sin título"
+      "untitled_venue": "Venue sin título",
+      "enter_fullscreen": "Pantalla completa",
+      "exit_fullscreen": "Salir de pantalla completa"
     },
     "add_to_calendar": {
       "title": "Agregar al calendario",
@@ -529,9 +539,23 @@
       "registered": "Anotado",
       "checked_in": "Check-in realizado"
     },
+    "login_required": {
+      "title": "Iniciá sesión para ver el evento",
+      "message": "Iniciá sesión en {{popupName}} para ver los detalles del evento, anotarte y agregarlo a tu calendario.",
+      "login": "Iniciar sesión",
+      "cancel": "Cancelar"
+    },
+    "public_calendar": {
+      "heading": "Eventos",
+      "page_title": "{{popupName}} - Calendario",
+      "page_title_fallback": "Calendario",
+      "subheading": "Próximos eventos en {{popupName}}",
+      "subheading_with_tz": "Próximos eventos en {{popupName}} — horarios en {{timezone}}"
+    },
     "detail": {
       "event_not_found": "Evento no encontrado",
       "event_not_found_message": "Este evento no existe o no tenés acceso.",
+      "rejection_reason_label": "Motivo del rechazo",
       "photo_credit": "Foto: {{venueName}}",
       "description_heading": "Descripción",
       "invite_attendees_heading": "Invitar asistentes",
@@ -540,6 +564,7 @@
       "invite_button": "Invitar",
       "inviting_button": "Invitando...",
       "join_meeting": "Unirse a la reunión",
+      "hosted_by": "Organizado por ",
       "add_to_calendar_button": "Agregar al calendario",
       "added_to_calendar_button": "Agregado al calendario",
       "manual_add_to_calendar_button": "Agregar manualmente al calendario",
@@ -555,6 +580,14 @@
       "enter_at_least_one_email": "Ingresá al menos un email",
       "remove_invitation_aria": "Quitar invitación para {{email}}",
       "edit_event_button": "Editar evento",
+      "cancel_event_button": "Cancelar evento",
+      "cancel_event_dialog_title": "¿Cancelar este evento?",
+      "cancel_event_dialog_description": "Se notificará por email a los registrados e invitados, y el evento se eliminará de sus calendarios. Esta acción no se puede deshacer.",
+      "cancel_event_dialog_keep": "Mantener evento",
+      "cancel_event_dialog_confirm": "Sí, cancelar evento",
+      "cancel_event_dialog_loading": "Cancelando…",
+      "cancel_event_success": "Evento cancelado",
+      "cancel_event_error": "No se pudo cancelar el evento",
       "pending_approval_banner_title": "Pendiente de aprobación",
       "pending_approval_banner_message": "Tu evento está pendiente de aprobación y aún no es visible para otros.",
       "open_in_maps": "Abrir en Google Maps"
@@ -599,6 +632,18 @@
       "visibility_public": "Público",
       "visibility_private": "Privado (solo invitados)",
       "visibility_unlisted": "No listado (oculto, link compartible)",
+      "host_label": "Organizador visible (opcional)",
+      "host_placeholder_default": "{{name}} (por defecto)",
+      "host_placeholder_optional": "Opcional",
+      "host_use_popup": "Usar {{name}}",
+      "host_use_me": "Usar mi nombre",
+      "host_pick_participant": "Elegir participante…",
+      "host_search_placeholder": "Buscar participantes",
+      "host_searching": "Buscando…",
+      "host_no_matches": "Sin coincidencias",
+      "host_type_to_search": "Escribe para buscar participantes",
+      "host_helper": "Nombre mostrado a los participantes en la página del evento.",
+      "host_helper_with_popup": "Nombre mostrado a los participantes. Dejar vacío para usar \"{{name}}\".",
       "visibility_private_short": "Privado",
       "visibility_unlisted_short": "No listado",
       "description_label": "Descripción (opcional)",
@@ -655,7 +700,8 @@
       "new": {
         "heading": "Nuevo lugar",
         "subheading": "Proponé un espacio donde realizar eventos en {{cityName}}.",
-        "requires_approval_note": "Requiere aprobación del admin antes de aparecer en la lista.",
+        "requires_approval_banner_title": "Requiere aprobación del admin",
+        "requires_approval_note": "Este lugar quedará pendiente de revisión y no aparecerá en la lista hasta que un admin lo apruebe.",
         "title_label": "Título",
         "title_placeholder": "Ej. Auditorio Principal",
         "location_label": "Ubicación",
@@ -712,6 +758,8 @@
         "booking_free": "Libre",
         "booking_approval": "Requiere aprobación",
         "booking_unbookable": "No reservable",
+        "approval_required_banner_title": "Aprobación requerida para eventos",
+        "approval_required_banner_message": "Los eventos en este lugar necesitan aprobación del admin. Cuando reserves este lugar, tu evento quedará pendiente de revisión y no será visible para otros hasta que sea aprobado.",
         "edit_button": "Editar lugar"
       }
     }

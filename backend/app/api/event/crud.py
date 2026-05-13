@@ -12,7 +12,7 @@ from app.api.event.recurrence import (
     parse_rrule,
     synthetic_occurrence_id,
 )
-from app.api.event.schemas import EventCreate, EventStatus, EventUpdate
+from app.api.event.schemas import EventCreate, EventStatus, EventUpdate, EventVisibility
 from app.api.human.models import Humans
 from app.api.shared.crud import BaseCRUD
 
@@ -37,6 +37,8 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
         track_ids: list[uuid.UUID] | None = None,
         tags: list[str] | None = None,
         search: str | None = None,
+        visibility: EventVisibility | None = None,
+        exclude_statuses: list[EventStatus] | None = None,
         expand_occurrences: bool | None = None,
     ) -> tuple[list[Events], int]:
         """Return events for a popup.
@@ -50,6 +52,10 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
 
         if event_status is not None:
             statement = statement.where(Events.status == event_status)
+        if exclude_statuses:
+            statement = statement.where(col(Events.status).not_in(exclude_statuses))
+        if visibility is not None:
+            statement = statement.where(Events.visibility == visibility)
         if kind is not None:
             statement = statement.where(Events.kind == kind)
         if venue_id is not None:

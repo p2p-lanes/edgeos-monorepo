@@ -1,29 +1,27 @@
 """Unit tests for derive_product_state — truth table coverage.
 
-TDD phase: RED-then-GREEN following the spec capability product-sale-state.
+Both ends of the sale window are inclusive (operator-friendly day semantics).
 
-Truth table (spec §product-sale-state):
-  | sale_starts_at | sale_ends_at | now relative        | expected  |
+Truth table:
+  | sale_starts_at | sale_ends_at | today relative      | expected  |
   |----------------|--------------|---------------------|-----------|
   | NULL           | NULL         | any                 | on_sale   |
-  | NULL           | future       | now < ends_at       | on_sale   |
-  | NULL           | past         | now >= ends_at      | ended     |
-  | future         | NULL         | now < starts_at     | upcoming  |
-  | future         | future       | now < starts_at     | upcoming  |
-  | past           | NULL         | now >= starts_at    | on_sale   |
+  | NULL           | future       | today <= ends       | on_sale   |
+  | NULL           | past         | today > ends        | ended     |
+  | future         | NULL         | today < starts      | upcoming  |
+  | future         | future       | today < starts      | upcoming  |
+  | past           | NULL         | today >= starts     | on_sale   |
   | past           | future       | within window       | on_sale   |
-  | past           | past         | now >= ends_at      | ended     |
-  | exact lower    | future       | now == starts_at    | on_sale   |  (inclusive)
-  | past           | exact upper  | now == ends_at      | ended     |  (exclusive)
+  | past           | past         | today > ends        | ended     |
+  | exact lower    | future       | today == starts     | on_sale   |  (inclusive)
+  | past           | exact upper  | today == ends       | on_sale   |  (inclusive)
   | past           | future       | within + stock=0    | sold_out  |  (stock overrides)
   | future         | future       | upcoming + stock=0  | sold_out  |  (stock overrides)
 
-ADR-1: sold_out is NOT in the enum for time-based derivation; stock semantics are
-a separate concern. But per spec, sold_out IS returned when stock_remaining <= 0
-regardless of time window. The function reads total_stock_remaining from the product.
+ADR-1: sold_out is returned when stock_remaining <= 0 regardless of time window.
 """
 
-from datetime import UTC, datetime, timedelta
+from datetime import date, timedelta
 from typing import Any
 
 from app.api.product.product_state import ProductSaleState, derive_product_state
@@ -32,14 +30,14 @@ from app.api.product.product_state import ProductSaleState, derive_product_state
 # Helpers
 # ---------------------------------------------------------------------------
 
-NOW = datetime(2026, 6, 15, 12, 0, 0, tzinfo=UTC)
-PAST = NOW - timedelta(days=30)
-FUTURE = NOW + timedelta(days=30)
+TODAY = date(2026, 6, 15)
+PAST = TODAY - timedelta(days=30)
+FUTURE = TODAY + timedelta(days=30)
 
 
 def _product(
-    sale_starts_at: datetime | None = None,
-    sale_ends_at: datetime | None = None,
+    sale_starts_at: date | None = None,
+    sale_ends_at: date | None = None,
     total_stock_remaining: int | None = None,
 ) -> Any:
     """Return a minimal object with the fields derive_product_state reads."""
@@ -63,54 +61,59 @@ class TestDeriveProductStateTruthTable:
     """Covers every (sale_starts_at, sale_ends_at) combination from the spec."""
 
     def test_both_null_returns_on_sale(self) -> None:
-        """NULL/NULL → on_sale (OQ1 locked — null-both defaults to open)."""
+        """NULL/NULL → on_sale (null-both defaults to open)."""
         p = _product(sale_starts_at=None, sale_ends_at=None)
-        assert derive_product_state(p, NOW) == ProductSaleState.on_sale
+        assert derive_product_state(p, TODAY) == ProductSaleState.on_sale
 
     def test_null_starts_future_ends_returns_on_sale(self) -> None:
         """NULL start, future end → on_sale (sale has started, not yet ended)."""
         p = _product(sale_starts_at=None, sale_ends_at=FUTURE)
-        assert derive_product_state(p, NOW) == ProductSaleState.on_sale
+        assert derive_product_state(p, TODAY) == ProductSaleState.on_sale
 
     def test_null_starts_past_ends_returns_ended(self) -> None:
         """NULL start, past end → ended (window closed)."""
         p = _product(sale_starts_at=None, sale_ends_at=PAST)
-        assert derive_product_state(p, NOW) == ProductSaleState.ended
+        assert derive_product_state(p, TODAY) == ProductSaleState.ended
 
     def test_future_starts_null_ends_returns_upcoming(self) -> None:
         """Future start, NULL end → upcoming (window not yet open)."""
         p = _product(sale_starts_at=FUTURE, sale_ends_at=None)
-        assert derive_product_state(p, NOW) == ProductSaleState.upcoming
+        assert derive_product_state(p, TODAY) == ProductSaleState.upcoming
 
     def test_future_starts_future_ends_returns_upcoming(self) -> None:
-        """Both future → upcoming (now is before the window)."""
+        """Both future → upcoming (today is before the window)."""
         p = _product(sale_starts_at=FUTURE, sale_ends_at=FUTURE + timedelta(days=10))
-        assert derive_product_state(p, NOW) == ProductSaleState.upcoming
+        assert derive_product_state(p, TODAY) == ProductSaleState.upcoming
 
     def test_past_starts_null_ends_returns_on_sale(self) -> None:
         """Past start, NULL end → on_sale (window open, no close)."""
         p = _product(sale_starts_at=PAST, sale_ends_at=None)
-        assert derive_product_state(p, NOW) == ProductSaleState.on_sale
+        assert derive_product_state(p, TODAY) == ProductSaleState.on_sale
 
     def test_past_starts_future_ends_returns_on_sale(self) -> None:
         """Past start, future end → on_sale (within the window)."""
         p = _product(sale_starts_at=PAST, sale_ends_at=FUTURE)
-        assert derive_product_state(p, NOW) == ProductSaleState.on_sale
+        assert derive_product_state(p, TODAY) == ProductSaleState.on_sale
 
     def test_past_starts_past_ends_returns_ended(self) -> None:
         """Both past → ended (window already closed)."""
         p = _product(sale_starts_at=PAST, sale_ends_at=PAST + timedelta(days=1))
-        assert derive_product_state(p, NOW) == ProductSaleState.ended
+        assert derive_product_state(p, TODAY) == ProductSaleState.ended
 
     def test_exact_lower_bound_is_inclusive(self) -> None:
-        """now == sale_starts_at → on_sale (inclusive lower bound)."""
-        p = _product(sale_starts_at=NOW, sale_ends_at=FUTURE)
-        assert derive_product_state(p, NOW) == ProductSaleState.on_sale
+        """today == sale_starts_at → on_sale (inclusive lower bound)."""
+        p = _product(sale_starts_at=TODAY, sale_ends_at=FUTURE)
+        assert derive_product_state(p, TODAY) == ProductSaleState.on_sale
 
-    def test_exact_upper_bound_is_exclusive(self) -> None:
-        """now == sale_ends_at → ended (exclusive upper bound)."""
-        p = _product(sale_starts_at=PAST, sale_ends_at=NOW)
-        assert derive_product_state(p, NOW) == ProductSaleState.ended
+    def test_exact_upper_bound_is_inclusive(self) -> None:
+        """today == sale_ends_at → on_sale (inclusive upper bound)."""
+        p = _product(sale_starts_at=PAST, sale_ends_at=TODAY)
+        assert derive_product_state(p, TODAY) == ProductSaleState.on_sale
+
+    def test_day_after_upper_bound_is_ended(self) -> None:
+        """today == sale_ends_at + 1 day → ended."""
+        p = _product(sale_starts_at=PAST, sale_ends_at=TODAY - timedelta(days=1))
+        assert derive_product_state(p, TODAY) == ProductSaleState.ended
 
 
 # ---------------------------------------------------------------------------
@@ -124,37 +127,37 @@ class TestDeriveProductStateSoldOut:
     def test_stock_zero_overrides_on_sale(self) -> None:
         """Within window but stock=0 → sold_out."""
         p = _product(sale_starts_at=PAST, sale_ends_at=FUTURE, total_stock_remaining=0)
-        assert derive_product_state(p, NOW) == ProductSaleState.sold_out
+        assert derive_product_state(p, TODAY) == ProductSaleState.sold_out
 
     def test_stock_zero_overrides_upcoming(self) -> None:
         """Upcoming but stock=0 → sold_out."""
         p = _product(sale_starts_at=FUTURE, sale_ends_at=None, total_stock_remaining=0)
-        assert derive_product_state(p, NOW) == ProductSaleState.sold_out
+        assert derive_product_state(p, TODAY) == ProductSaleState.sold_out
 
     def test_stock_negative_overrides_on_sale(self) -> None:
         """Negative stock (over-sold edge case) → sold_out."""
         p = _product(sale_starts_at=PAST, sale_ends_at=FUTURE, total_stock_remaining=-1)
-        assert derive_product_state(p, NOW) == ProductSaleState.sold_out
+        assert derive_product_state(p, TODAY) == ProductSaleState.sold_out
 
     def test_null_stock_does_not_trigger_sold_out(self) -> None:
         """NULL total_stock_remaining → unlimited; no sold_out override."""
         p = _product(sale_starts_at=PAST, sale_ends_at=FUTURE, total_stock_remaining=None)
-        assert derive_product_state(p, NOW) == ProductSaleState.on_sale
+        assert derive_product_state(p, TODAY) == ProductSaleState.on_sale
 
     def test_positive_stock_does_not_trigger_sold_out(self) -> None:
         """Positive stock → time window governs normally."""
         p = _product(sale_starts_at=PAST, sale_ends_at=FUTURE, total_stock_remaining=1)
-        assert derive_product_state(p, NOW) == ProductSaleState.on_sale
+        assert derive_product_state(p, TODAY) == ProductSaleState.on_sale
 
 
 # ---------------------------------------------------------------------------
-# Default now=None uses datetime.now(UTC)
+# Default today=None uses datetime.now(UTC).date()
 # ---------------------------------------------------------------------------
 
 
-class TestDeriveProductStateDefaultNow:
-    def test_default_now_resolves_to_utc(self) -> None:
-        """Calling without now= argument must not raise and must return a valid state."""
+class TestDeriveProductStateDefaultToday:
+    def test_default_today_resolves_to_utc(self) -> None:
+        """Calling without today= argument must not raise and must return a valid state."""
         p = _product(sale_starts_at=None, sale_ends_at=None)
         result = derive_product_state(p)
         assert result in iter(ProductSaleState)

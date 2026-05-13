@@ -4,11 +4,18 @@ import { CheckCircle, Home } from "lucide-react"
 import { useParams, useRouter } from "next/navigation"
 import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
+import { useTenant } from "@/providers/tenantProvider"
 
 export default function OpenCheckoutThankYouPage() {
   const { t } = useTranslation()
   const router = useRouter()
   const params = useParams<{ popupSlug: string }>()
+  const { tenant } = useTenant()
+
+  // In direct-checkout mode the user arrives via the tenant's custom domain —
+  // there is no /portal/{slug} to navigate back to. Hide the CTA entirely so
+  // the page layout does not show a broken navigation target.
+  const showBackCta = tenant?.landing_mode !== "checkout"
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-6 py-12">
@@ -24,12 +31,14 @@ export default function OpenCheckoutThankYouPage() {
           {t("openCheckout.thank_you_description")}
         </p>
 
-        <div className="mt-8 flex justify-center">
-          <Button onClick={() => router.push(`/portal/${params.popupSlug}`)}>
-            <Home className="size-4" />
-            {t("openCheckout.thank_you_cta")}
-          </Button>
-        </div>
+        {showBackCta && (
+          <div className="mt-8 flex justify-center">
+            <Button onClick={() => router.push(`/portal/${params.popupSlug}`)}>
+              <Home className="size-4" />
+              {t("openCheckout.thank_you_cta")}
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   )

@@ -2,9 +2,9 @@
 
 import { useMutation, useQuery } from "@tanstack/react-query"
 import {
+  AlertTriangle,
   ArrowLeft,
   CircleAlert,
-  Hourglass,
   Loader2,
   MapPin,
   Upload,
@@ -213,16 +213,21 @@ export default function NewPortalVenuePage() {
       </div>
       <p className="text-sm text-muted-foreground mb-6">
         {t("events.venues.new.subheading", { cityName: city?.name })}
-        {requiresApproval && (
-          <>
-            {" "}
-            <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-400">
-              <Hourglass className="h-3 w-3" />{" "}
-              {t("events.venues.new.requires_approval_note")}
-            </span>
-          </>
-        )}
       </p>
+
+      {requiresApproval && (
+        <div className="mb-6 flex items-start gap-2.5 rounded-xl border border-amber-300 bg-amber-50 p-3 text-amber-900 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-100">
+          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
+          <div className="text-sm">
+            <p className="font-semibold">
+              {t("events.venues.new.requires_approval_banner_title")}
+            </p>
+            <p className="text-amber-900/90 dark:text-amber-100/90">
+              {t("events.venues.new.requires_approval_note")}
+            </p>
+          </div>
+        </div>
+      )}
 
       <form
         className="space-y-4"

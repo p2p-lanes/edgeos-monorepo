@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query"
 import {
+  AlertTriangle,
   ArrowLeft,
   ArrowUpRight,
   Clock,
@@ -112,6 +113,20 @@ export default function PortalVenueDetailPage() {
           </Link>
         )}
       </div>
+
+      {venue.booking_mode === "approval_required" && (
+        <div className="flex items-start gap-2.5 rounded-xl border border-amber-300 bg-amber-50 p-3 text-amber-900 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-100">
+          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
+          <div className="text-sm">
+            <p className="font-semibold">
+              {t("events.venues.detail.approval_required_banner_title")}
+            </p>
+            <p className="text-amber-900/90 dark:text-amber-100/90">
+              {t("events.venues.detail.approval_required_banner_message")}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Cover */}
       {venue.image_url && (

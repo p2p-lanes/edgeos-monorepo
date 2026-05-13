@@ -96,6 +96,9 @@ export const PopupCheckoutContent = ({
 
   useEffect(() => {
     if (hasSkippedForm.current) return
+    // Branch guarded by sale_type=application. Direct-checkout (landing_mode=checkout)
+    // only resolves direct-sale popups (backend resolve_active_direct_popup_slug),
+    // so this redirect to /portal is structurally unreachable in checkout mode.
     if (policy.saleType !== "application") return
     if (!existingApplication || checkoutState !== "form") return
 

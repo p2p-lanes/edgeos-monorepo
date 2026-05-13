@@ -13,6 +13,9 @@ dist-ssr
 *.local
 openapi.json
 
+# Next.js auto-generated, rewritten on every dev/build
+next-env.d.ts
+
 # Environment files
 .env
 .env.*

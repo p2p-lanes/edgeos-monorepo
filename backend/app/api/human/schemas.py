@@ -56,6 +56,22 @@ class HumanPublic(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class HumanPortalPublic(BaseModel):
+    """Slim human profile for portal-facing pickers (event host, mentions…).
+
+    Intentionally excludes email and contact fields: portal-authenticated
+    callers can already see other humans' names in event participant lists,
+    so name + avatar is the same privacy bar without leaking emails.
+    """
+
+    id: uuid.UUID
+    first_name: str | None = None
+    last_name: str | None = None
+    picture_url: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class HumanCreate(BaseModel):
     """Human schema for creation."""
 

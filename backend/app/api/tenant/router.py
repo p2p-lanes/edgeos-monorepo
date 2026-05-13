@@ -3,7 +3,7 @@ import uuid
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 
-from app.api.shared.enums import CredentialType, UserRole
+from app.api.shared.enums import CredentialType, LandingMode, UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.api.tenant import crud
 from app.api.tenant.credential_schemas import CredentialInfo, TenantCredentialResponse
@@ -47,6 +47,16 @@ async def get_tenant_by_domain(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
 
     result = TenantPublic.model_validate(tenant)
+
+    # Populate active_popup_slug for checkout-mode tenants (OI-2, R-T5, ADR — OI-2)
+    # Local import avoids circular: tenant.router -> checkout.crud -> checkout.__init__ -> checkout.router -> payment.crud
+    if tenant.landing_mode == LandingMode.checkout:
+        from app.api.checkout.crud import (
+            resolve_active_direct_popup_slug,  # noqa: PLC0415
+        )
+
+        result.active_popup_slug = resolve_active_direct_popup_slug(db, tenant.id)
+
     domain_cache.set(domain, result.model_dump_json())
     return result
 
@@ -162,25 +172,24 @@ async def update_tenant(
             detail="Only superadmin can modify custom_domain_active",
         )
 
+    # 3b. ADMIN cannot set landing_mode (only SUPERADMIN may — ADR-4)
+    if current_user.role == UserRole.ADMIN and tenant_in.landing_mode is not None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only superadmin can modify landing_mode",
+        )
+
     # 4. ADMIN cannot change custom_domain while it is active
     if (
         current_user.role == UserRole.ADMIN
         and tenant_in.custom_domain is not None
+        and tenant_in.custom_domain != tenant.custom_domain
         and tenant.custom_domain_active
     ):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Cannot change custom domain while it is active. Deactivate first.",
         )
-
-    # 5. Slug uniqueness check
-    if tenant_in.slug and tenant_in.slug != tenant.slug:
-        existing = crud.get_by_slug(db, tenant_in.slug)
-        if existing:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="A tenant with this slug already exists",
-            )
 
     # 6. Custom domain uniqueness check (don't reveal owner)
     if (
@@ -196,10 +205,37 @@ async def update_tenant(
                 detail="This domain is already in use",
             )
 
-    # 7. Snapshot old domain for cache invalidation after update
-    old_domain = tenant.custom_domain
+    # 7. Merged-state validation for landing_mode=checkout (ADR-1, R-T2, Scenario T-2, T-3)
+    # The schema-level validator catches obvious bad payloads; this catches the
+    # cross-field case where the payload only has landing_mode but the current DB
+    # row has custom_domain_active=False or custom_domain=None.
+    if tenant_in.landing_mode == LandingMode.checkout:
+        effective_active = (
+            tenant_in.custom_domain_active
+            if tenant_in.custom_domain_active is not None
+            else tenant.custom_domain_active
+        )
+        effective_domain = (
+            tenant_in.custom_domain
+            if tenant_in.custom_domain is not None
+            else tenant.custom_domain
+        )
+        if not effective_active or not effective_domain:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "landing_mode=checkout requires custom_domain_active=true and a "
+                    "non-null custom_domain. Ensure the custom domain is configured "
+                    "and active before switching to checkout mode."
+                ),
+            )
 
-    # 8. Perform update (IntegrityError → unique constraint race condition)
+    # 8. Snapshot old domain and fields for cache invalidation after update
+    old_domain = tenant.custom_domain
+    old_landing_mode = tenant.landing_mode
+    old_custom_domain_active = tenant.custom_domain_active
+
+    # 9. Perform update (IntegrityError → unique constraint race condition)
     try:
         updated = crud.update(db, tenant, tenant_in)
     except IntegrityError:
@@ -208,12 +244,32 @@ async def update_tenant(
             detail="This domain is already in use",
         )
 
-    # 9. Invalidate domain cache for old and new domain values
+    # 10. Invalidate domain cache for old and new domain values, and on field changes
+    # that affect the cached TenantPublic payload (ADR-2).
     new_domain = updated.custom_domain
-    if old_domain:
-        domain_cache.invalidate(old_domain)
+    new_landing_mode = updated.landing_mode
+    new_custom_domain_active = updated.custom_domain_active
+
+    domains_to_invalidate: set[str] = set()
+
+    # Always invalidate old domain when domain changes
+    if old_domain and new_domain != old_domain:
+        domains_to_invalidate.add(old_domain)
+
+    # Invalidate current domain when landing_mode changes (R-T4)
+    if new_landing_mode != old_landing_mode and new_domain:
+        domains_to_invalidate.add(new_domain)
+
+    # Invalidate current domain when custom_domain_active flips (ADR-2 latent gap fix)
+    if new_custom_domain_active != old_custom_domain_active and new_domain:
+        domains_to_invalidate.add(new_domain)
+
+    # Also invalidate new domain when domain changes (existing behavior)
     if new_domain and new_domain != old_domain:
-        domain_cache.invalidate(new_domain)
+        domains_to_invalidate.add(new_domain)
+
+    for d in domains_to_invalidate:
+        domain_cache.invalidate(d)
 
     return TenantPublic.model_validate(updated)
 

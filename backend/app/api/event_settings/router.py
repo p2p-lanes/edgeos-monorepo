@@ -54,7 +54,7 @@ async def upsert_event_settings(
     existing = crud.event_settings_crud.get_by_popup_id(db, popup_id)
     if existing:
         # Build the update from every ``EventSettingsUpdate`` field so any new
-        # settings field (e.g. ``allowed_tags``, ``approval_notification_email``)
+        # settings field (e.g. ``allowed_tags``, ``approval_notification_emails``)
         # flows through without having to edit this list each time.
         update_data = settings_in.model_dump(
             include=set(EventSettingsUpdate.model_fields.keys())

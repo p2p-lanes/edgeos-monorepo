@@ -6,7 +6,6 @@ import { type EventSettingsCreate, EventSettingsService } from "@/client"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { ChipInput } from "@/components/forms/EventForm/ChipInput"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -102,7 +101,7 @@ function EventSettingsForm() {
     events_require_approval: true,
     allowed_tags: [] as string[],
     allowed_kinds: [] as string[],
-    approval_notification_email: null as string | null,
+    approval_notification_emails: [] as string[],
   }
 
   return (
@@ -250,25 +249,24 @@ function EventSettingsForm() {
       </div>
 
       <div className="space-y-2">
-        <Label>Approval notification email</Label>
-        <Input
-          type="email"
+        <Label>Approval notification emails</Label>
+        <ChipInput
+          value={currentSettings.approval_notification_emails ?? []}
           placeholder="admin@your-popup.com"
-          defaultValue={currentSettings.approval_notification_email ?? ""}
-          onBlur={(e) => {
-            const next = e.target.value.trim() || null
-            if (next === (currentSettings.approval_notification_email ?? null))
-              return
+          validate={(entry) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(entry)}
+          onChange={(next) =>
             upsertMutation.mutate({
               ...currentSettings,
               popup_id: selectedPopupId!,
-              approval_notification_email: next,
+              approval_notification_emails: next,
             })
-          }}
+          }
         />
         <p className="text-sm text-muted-foreground">
-          Recipient for "event/venue pending approval" emails. Falls back to the
-          tenant sender email when empty.
+          Recipients for "event/venue pending approval" emails. Falls back to
+          the tenant sender email when empty. Tip: paste{" "}
+          <code>a@x.com, b@y.com</code> and press Enter to add many at once;
+          invalid entries are dropped.
         </p>
       </div>
 

@@ -30,11 +30,21 @@ export function usePortalEventSettings(popupId: string | undefined) {
 /**
  * Returns a popup's configured timezone along with reusable formatters.
  * Falls back to the browser timezone when settings are missing.
+ *
+ * ``timezoneOverride`` skips the authenticated event-settings query and
+ * uses the provided value verbatim — used by the public calendar where
+ * the timezone is sourced from the public endpoint's response meta.
  */
-export function useEventTimezone(popupId: string | undefined) {
-  const { data: settings, isLoading } = usePortalEventSettings(popupId)
+export function useEventTimezone(
+  popupId: string | undefined,
+  timezoneOverride?: string,
+) {
+  const { data: settings, isLoading: settingsLoading } = usePortalEventSettings(
+    timezoneOverride ? undefined : popupId,
+  )
 
-  const timezone = settings?.timezone || DEFAULT_TZ
+  const timezone = timezoneOverride || settings?.timezone || DEFAULT_TZ
+  const isLoading = timezoneOverride ? false : settingsLoading
 
   return useMemo(() => {
     const formatTime = (dateStr: string) =>

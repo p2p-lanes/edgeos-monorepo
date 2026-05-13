@@ -104,13 +104,18 @@ async def list_products(
     "/batch",
     response_model=list[ProductBatchResult],
     status_code=status.HTTP_207_MULTI_STATUS,
+    deprecated=True,
 )
 async def create_products_batch(
     batch: ProductBatch,
     db: TenantSession,
     _current_user: CurrentSuperadmin,
 ) -> list[ProductBatchResult]:
-    """Batch-create products (superadmin only)."""
+    """Batch-create products (superadmin only).
+
+    DEPRECATED: this endpoint was a one-off CSV import experiment. The
+    backoffice no longer exposes it. Slated for removal.
+    """
     from app.api.popup.crud import popups_crud
     from app.api.product.models import Products
 
@@ -131,7 +136,7 @@ async def create_products_batch(
                     db, base_slug, batch.popup_id
                 )
 
-                product_data = item.model_dump()
+                product_data = crud.sale_dates_to_persistence(item.model_dump())
                 product_data["tenant_id"] = tenant_id
                 product_data["popup_id"] = batch.popup_id
                 product_data["slug"] = slug

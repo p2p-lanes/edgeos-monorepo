@@ -3,9 +3,12 @@
 import { CheckCircle, Home } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import { useTenant } from "@/providers/tenantProvider"
 
 export default function CheckoutSuccessPage() {
   const router = useRouter()
+  const { tenant } = useTenant()
+  const showBackCta = tenant?.landing_mode !== "checkout"
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-6 py-12">
@@ -22,12 +25,14 @@ export default function CheckoutSuccessPage() {
           your event information.
         </p>
 
-        <div className="mt-8 flex justify-center">
-          <Button onClick={() => router.push("/portal")}>
-            <Home className="size-4" />
-            Go to portal
-          </Button>
-        </div>
+        {showBackCta && (
+          <div className="mt-8 flex justify-center">
+            <Button onClick={() => router.push("/portal")}>
+              <Home className="size-4" />
+              Go to portal
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   )

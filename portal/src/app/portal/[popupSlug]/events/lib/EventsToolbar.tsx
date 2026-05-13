@@ -55,16 +55,22 @@ export function EventsToolbar(props: EventsToolbarProps) {
         />
       </div>
       <div className="flex flex-wrap items-center gap-1.5">
-        <RsvpedToggle
-          active={rsvpedOnly}
-          onChange={onRsvpedOnlyChange}
-          onMutuallyExclusive={() => mineOnly && onMineOnlyChange(false)}
-        />
-        <MineToggle
-          active={mineOnly}
-          onChange={onMineOnlyChange}
-          onMutuallyExclusive={() => rsvpedOnly && onRsvpedOnlyChange(false)}
-        />
+        {onRsvpedOnlyChange && (
+          <RsvpedToggle
+            active={!!rsvpedOnly}
+            onChange={onRsvpedOnlyChange}
+            onMutuallyExclusive={() => mineOnly && onMineOnlyChange?.(false)}
+          />
+        )}
+        {onMineOnlyChange && (
+          <MineToggle
+            active={!!mineOnly}
+            onChange={onMineOnlyChange}
+            onMutuallyExclusive={() =>
+              rsvpedOnly && onRsvpedOnlyChange?.(false)
+            }
+          />
+        )}
         {onShowHiddenChange && (
           <HiddenToggle
             active={!!showHidden}
