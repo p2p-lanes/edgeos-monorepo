@@ -2071,6 +2071,7 @@ export type PopupAdmin = {
     insurance_percentage?: (string | null);
     application_layout?: ApplicationLayout;
     events_enabled?: boolean;
+    show_attendee_directory?: boolean;
     id: string;
 };
 
@@ -2113,6 +2114,7 @@ export type PopupCreate = {
     insurance_percentage?: (number | string | null);
     application_layout?: ApplicationLayout;
     events_enabled?: boolean;
+    show_attendee_directory?: boolean;
 };
 
 /**
@@ -2153,6 +2155,7 @@ export type PopupPublic = {
     insurance_percentage?: (string | null);
     application_layout?: ApplicationLayout;
     events_enabled?: boolean;
+    show_attendee_directory?: boolean;
 };
 
 /**
@@ -2227,6 +2230,7 @@ export type PopupUpdate = {
     insurance_percentage?: (number | string | null);
     application_layout?: (ApplicationLayout | null);
     events_enabled?: (boolean | null);
+    show_attendee_directory?: (boolean | null);
 };
 
 /**

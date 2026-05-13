@@ -359,6 +359,7 @@ export function CalendarBody({
                   return (
                     <div
                       key={event.id}
+                      id={`event-card-${event.id}`}
                       className={cn(
                         "relative rounded-xl border bg-card hover:shadow-md transition-shadow overflow-hidden",
                         isHighlighted &&

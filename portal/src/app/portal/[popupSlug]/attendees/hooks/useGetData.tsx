@@ -8,6 +8,8 @@ import type { AttendeeDirectory } from "@/types/Attendee"
 const useGetData = () => {
   const { getCity } = useCityProvider()
   const city = getCity()
+  const attendeeDirectoryEnabled =
+    city?.sale_type !== "direct" && (city?.show_attendee_directory ?? false)
   const [currentPage, setCurrentPage] = useState<number>(1)
   const [pageSize, setPageSize] = useState<number>(10)
 
@@ -44,7 +46,7 @@ const useGetData = () => {
         total: result.paging.total,
       }
     },
-    enabled: !!city?.id,
+    enabled: !!city?.id && attendeeDirectoryEnabled,
   })
 
   const handlePageChange = (page: number) => {
@@ -66,6 +68,7 @@ const useGetData = () => {
     handlePageSizeChange,
     searchQuery,
     setSearchQuery,
+    attendeeDirectoryEnabled,
   }
 }
 

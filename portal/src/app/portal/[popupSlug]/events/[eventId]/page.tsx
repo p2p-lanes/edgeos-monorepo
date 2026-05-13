@@ -70,10 +70,15 @@ export default function EventDetailPage() {
   const searchParams = useSearchParams()
   // Originating events-page URL search (e.g. "view=day&date=2026-05-15"),
   // set by Day-view links so "Back to events" can return to the same spot.
+  // We also stamp `focus=<eventId>` so the events page can scroll the
+  // matching card into view; the page consumes the param once and cleans
+  // it from the URL, so it survives a refresh on this detail page but
+  // never sticks around on the list once used.
   const fromSearch = searchParams.get("from") ?? ""
+  const focusQs = `focus=${encodeURIComponent(params.eventId)}`
   const backHref = fromSearch
-    ? `/portal/${city?.slug}/events?${fromSearch}`
-    : `/portal/${city?.slug}/events`
+    ? `/portal/${city?.slug}/events?${fromSearch}&${focusQs}`
+    : `/portal/${city?.slug}/events?${focusQs}`
   // For an expanded recurring instance, the calendar passes the occurrence's
   // ISO start time via ?occ=. We render that in place of the master's
   // start_time (and shift end_time by the same offset) so the user sees the
@@ -335,6 +340,16 @@ export default function EventDetailPage() {
       <div className="flex items-center justify-between gap-2">
         <Link
           href={backHref}
+          // Next.js's default `scroll={true}` triggers a scroll-to-top
+          // on navigation, scheduled in a layout-level layout-effect
+          // that runs *after* the page's own layout-effects. That
+          // overrode the events page's `scrollIntoView` on the focused
+          // card and left the user back at scrollTop=0 even though
+          // `?focus=` was consumed. Disabling auto-scroll here lets the
+          // page own the scroll position; `focus=` is always present on
+          // this back href so the page will scroll the card into view
+          // itself.
+          scroll={false}
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" /> {t("events.common.back_to_events")}

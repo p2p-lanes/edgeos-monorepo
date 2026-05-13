@@ -27,8 +27,13 @@ const Page = () => {
     handlePageSizeChange,
     searchQuery,
     setSearchQuery,
+    attendeeDirectoryEnabled,
   } = useGetData()
   const { isExporting, handleExportCsv } = useExportCsv()
+
+  if (!attendeeDirectoryEnabled) {
+    return null
+  }
 
   return (
     <TooltipProvider>

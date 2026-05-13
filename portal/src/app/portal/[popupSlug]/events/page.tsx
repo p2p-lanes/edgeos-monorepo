@@ -50,6 +50,19 @@ export default function EventsPage() {
   const { getCity } = useCityProvider()
   const city = getCity()
 
+  // `useSearchParams()` is router-aware: when the user returns from the
+  // detail page via the `<Link>` back-button, Next.js wraps the
+  // navigation in a transition and the new URL is committed to the
+  // router store *before* the page renders — so this hook reflects
+  // `?focus=<id>` (and `?view=`, `?date=`) from the first render, even
+  // though `window.location.search` may still point at the previous
+  // route during the transition. Reading from here is what makes the
+  // post-navigation focus/filter restore actually fire (a hard refresh
+  // doesn't have this distinction and works either way).
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
   // One-shot restore of UI state from sessionStorage when the user comes
   // back from an event detail page. The detail page's "Back to events"
   // link round-trips `?view=...&date=...`; we use those to look up the
@@ -64,15 +77,44 @@ export default function EventsPage() {
   if (restoreSnapshotRef.current === null) {
     let value: EventsViewSnapshot | null = null
     if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search)
-      const v = (params.get("view") as EventsView | null) ?? "list"
-      const d = params.get("date")
+      // Prefer router-aware searchParams; fall back to window.location
+      // only if it lags (e.g. SSR/hydration edge cases).
+      const vFromRouter =
+        (searchParams.get("view") as EventsView | null) ?? null
+      const dFromRouter = searchParams.get("date")
+      let v: EventsView = vFromRouter ?? "list"
+      let d: string | null = dFromRouter
+      if (vFromRouter == null && dFromRouter == null) {
+        const fallback = new URLSearchParams(window.location.search)
+        v = (fallback.get("view") as EventsView | null) ?? "list"
+        d = fallback.get("date")
+      }
       value = consumeEventsViewState(v, d)
     }
     restoreSnapshotRef.current = { value }
   }
   const restoredFilters = restoreSnapshotRef.current.value?.listFilters
   const restoredScroll = restoreSnapshotRef.current.value?.scroll
+
+  // The detail page round-trips `?focus=<eventId>` on its back link so we
+  // can scroll the matching card into view on return — more reliable than
+  // restoring an outer scrollTop, which drifts when card heights change
+  // (fonts, images, recurrence summary settling late) or the viewport
+  // differs. Captured once on the very first render so router.replace()
+  // calls from setView / setSelectedDate can't wipe it before we consume
+  // it, and StrictMode's double-render doesn't read a stale value the
+  // second time. We read from `useSearchParams()` (router-aware, set
+  // synchronously by `router.push` during a client-side transition) and
+  // fall back to `window.location.search` so a hard refresh on the
+  // events page with the param in the URL still works.
+  const focusEventRef = useRef<{ id: string | null } | null>(null)
+  if (focusEventRef.current === null) {
+    let id: string | null = searchParams.get("focus")
+    if (!id && typeof window !== "undefined") {
+      id = new URLSearchParams(window.location.search).get("focus")
+    }
+    focusEventRef.current = { id }
+  }
 
   const [search, setSearch] = useState(() => restoredFilters?.search ?? "")
   const [rsvpedOnly, setRsvpedOnly] = useState(
@@ -98,9 +140,9 @@ export default function EventsPage() {
   // the "Back to events" link all land on the same view+day with no
   // hydration race. The setters update the URL via `router.replace`
   // (no history entries) and React re-derives on the next render.
-  const router = useRouter()
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
+  // (`router`, `pathname`, and `searchParams` are declared above the
+  // restore-snapshot refs so those refs can read router-aware params on
+  // the first render.)
   const view: EventsView =
     (searchParams.get("view") as EventsView | null) ?? "list"
   const setView = useCallback(
@@ -487,6 +529,10 @@ export default function EventsPage() {
   const didRestoreOuterScrollRef = useRef(false)
   useIsomorphicLayoutEffect(() => {
     if (didRestoreOuterScrollRef.current) return
+    // Focus-by-id takes priority — `scrollIntoView` on the matching card
+    // is more reliable than restoring a cached scrollTop, so we skip the
+    // outer restore entirely to avoid a double-scroll/fight.
+    if (focusEventRef.current?.id) return
     if (!restoredScroll || restoredScroll.outer == null) return
     if (view === "list" && (isLoading || events.length === 0)) return
     didRestoreOuterScrollRef.current = true
@@ -515,6 +561,61 @@ export default function EventsPage() {
       cancelled = true
     }
   }, [view, restoredScroll, isLoading, events.length])
+
+  // Scroll the focused event-card into view after returning from the
+  // detail page. The detail's back link stamps `?focus=<eventId>` and
+  // ListBody/CalendarBody/DayBody render each card with
+  // id={`event-card-${event.id}`}. We use scrollIntoView (not a cached
+  // scrollTop) so it stays correct even if card heights settle late or
+  // the viewport changed. The card may not be mounted on the first pass
+  // (recurrence summary, image, fonts, query result still loading), so
+  // we retry across a handful of frames before giving up. Either way
+  // the `focus` param is cleaned from the URL via router.replace so a
+  // later refresh doesn't re-scroll, and so the URL stays tidy.
+  const didConsumeFocusRef = useRef(false)
+  useIsomorphicLayoutEffect(() => {
+    if (didConsumeFocusRef.current) return
+    const focusId = focusEventRef.current?.id
+    if (!focusId) return
+    // For list view, the query must finish first; otherwise the card
+    // is guaranteed not to be in the DOM yet.
+    if (view === "list" && (isLoading || events.length === 0)) return
+
+    const cleanFocusParam = () => {
+      if (typeof window === "undefined") return
+      const params = new URLSearchParams(window.location.search)
+      if (!params.has("focus")) return
+      params.delete("focus")
+      const qs = params.toString()
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+    }
+
+    let cancelled = false
+    let frames = 0
+    const MAX_FRAMES = 30
+    const tryFocus = () => {
+      if (cancelled) return
+      const el = document.getElementById(`event-card-${focusId}`)
+      if (el) {
+        didConsumeFocusRef.current = true
+        el.scrollIntoView({ behavior: "auto", block: "center" })
+        cleanFocusParam()
+        return
+      }
+      if (++frames >= MAX_FRAMES) {
+        // Card never mounted (filtered out, missing, etc.). Clean the
+        // URL anyway so a later interaction doesn't keep retrying.
+        didConsumeFocusRef.current = true
+        cleanFocusParam()
+        return
+      }
+      requestAnimationFrame(tryFocus)
+    }
+    tryFocus()
+    return () => {
+      cancelled = true
+    }
+  }, [view, isLoading, events.length, router, pathname])
 
   if (!moduleEnabled) {
     return (

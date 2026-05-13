@@ -163,7 +163,11 @@ export function ListBody({
                 }
               }
               return (
-                <div key={event.id} className={cardClass}>
+                <div
+                  key={event.id}
+                  id={`event-card-${event.id}`}
+                  className={cardClass}
+                >
                   <Link
                     href={href}
                     onClick={handleClick}
