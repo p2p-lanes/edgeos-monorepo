@@ -20,7 +20,6 @@ from app.api.user.models import Users
 from app.core.security import create_access_token
 from tests._role_assertions import assert_authorized, assert_forbidden
 
-
 # ---------------------------------------------------------------------------
 # OPERATOR is authorized on operational routes (CRUD on products, events, etc.)
 # ---------------------------------------------------------------------------
