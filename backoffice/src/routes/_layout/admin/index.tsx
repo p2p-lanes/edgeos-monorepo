@@ -82,7 +82,7 @@ function AddUserButton() {
 }
 
 function TenantUsersTableContent({ tenantId }: { tenantId: string | null }) {
-  const { user: currentUser } = useAuth()
+  const { user: currentUser, isOperator } = useAuth()
   const searchParams = Route.useSearch()
   const { search, pagination, setSearch, setPagination } = useTableSearchParams(
     searchParams,
@@ -101,9 +101,15 @@ function TenantUsersTableContent({ tenantId }: { tenantId: string | null }) {
 
   if (!users) return <Skeleton className="h-64 w-full" />
 
-  const tenantUsers = users.results.filter(
-    (user: UserPublic) => user.role !== "superadmin",
-  )
+  // Operators can only see roles strictly below them (viewer, check_in_controller).
+  // Others see everyone except superadmins.
+  const tenantUsers = users.results.filter((user: UserPublic) => {
+    if (user.role === "superadmin") return false
+    if (isOperator) {
+      return user.role === "viewer" || user.role === "check_in_controller"
+    }
+    return true
+  })
 
   const tableData: UserTableData[] = tenantUsers.map((user: UserPublic) => ({
     ...user,
@@ -230,7 +236,7 @@ function SuperadminsTable() {
 }
 
 function Admin() {
-  const { isAdmin, isSuperadmin } = useAuth()
+  const { isOperatorOrAbove, isSuperadmin } = useAuth()
   const { effectiveTenantId } = useWorkspace()
 
   return (
@@ -242,7 +248,7 @@ function Admin() {
             Manage user accounts and permissions
           </p>
         </div>
-        {isAdmin && <AddUserButton />}
+        {isOperatorOrAbove && <AddUserButton />}
       </div>
       {isSuperadmin ? (
         <Tabs defaultValue="tenant-users">

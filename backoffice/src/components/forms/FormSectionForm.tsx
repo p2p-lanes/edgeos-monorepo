@@ -49,9 +49,9 @@ export function FormSectionForm({
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
   const { selectedPopupId, isContextReady } = useWorkspace()
-  const { isAdmin } = useAuth()
+  const { isOperatorOrAbove } = useAuth()
   const isEdit = !!defaultValues
-  const readOnly = !isAdmin
+  const readOnly = !isOperatorOrAbove
   const isProtectedSection =
     isEdit && defaultValues ? isSpecialSection(defaultValues) : false
 

@@ -14,16 +14,16 @@ export const Route = createFileRoute("/_layout/groups/new")({
 
 function NewGroup() {
   const navigate = useNavigate()
-  const { isAdmin, isUserLoading } = useAuth()
+  const { isOperatorOrAbove, isUserLoading } = useAuth()
 
   // Redirect viewers to groups list - they cannot create new groups
   useEffect(() => {
-    if (!isUserLoading && !isAdmin) {
+    if (!isUserLoading && !isOperatorOrAbove) {
       navigate({ to: "/groups" })
     }
-  }, [isAdmin, isUserLoading, navigate])
+  }, [isOperatorOrAbove, isUserLoading, navigate])
 
-  if (isUserLoading || !isAdmin) {
+  if (isUserLoading || !isOperatorOrAbove) {
     return null
   }
 

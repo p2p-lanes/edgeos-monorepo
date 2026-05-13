@@ -145,7 +145,7 @@ function EventActionsMenu({
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const { showSuccessToast, showErrorToast } = useCustomToast()
-  const { isAdmin } = useAuth()
+  const { isOperatorOrAbove } = useAuth()
 
   const occurrenceRef = parseOccurrenceId(event.occurrence_id)
   const isOccurrence = occurrenceRef !== null
@@ -241,7 +241,7 @@ function EventActionsMenu({
   return (
     <>
       <div className="flex items-center justify-end gap-0.5">
-        {isAdmin && isPendingApproval && (
+        {isOperatorOrAbove && isPendingApproval && (
           <>
             <Button
               variant="ghost"
@@ -272,17 +272,17 @@ function EventActionsMenu({
         <Button
           variant="ghost"
           size="icon"
-          aria-label={isAdmin ? "Edit event" : "View event"}
-          title={isAdmin ? "Edit" : "View"}
+          aria-label={isOperatorOrAbove ? "Edit event" : "View event"}
+          title={isOperatorOrAbove ? "Edit" : "View"}
           onClick={handleEdit}
         >
-          {isAdmin ? (
+          {isOperatorOrAbove ? (
             <Pencil className="h-4 w-4" />
           ) : (
             <Eye className="h-4 w-4" />
           )}
         </Button>
-        {isAdmin && (
+        {isOperatorOrAbove && (
           <Button
             variant="ghost"
             size="icon"

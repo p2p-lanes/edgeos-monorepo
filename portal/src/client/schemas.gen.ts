@@ -14675,7 +14675,7 @@ export const UserPublicSchema = {
 
 export const UserRoleSchema = {
     type: 'string',
-    enum: ['superadmin', 'admin', 'viewer', 'check_in_controller'],
+    enum: ['superadmin', 'admin', 'operator', 'viewer', 'check_in_controller'],
     title: 'UserRole'
 } as const;
 

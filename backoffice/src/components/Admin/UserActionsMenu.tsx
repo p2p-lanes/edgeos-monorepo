@@ -19,7 +19,7 @@ interface UserActionsMenuProps {
 
 export const UserActionsMenu = ({ user }: UserActionsMenuProps) => {
   const [open, setOpen] = useState(false)
-  const { user: currentUser, isSuperadmin } = useAuth()
+  const { user: currentUser, isSuperadmin, isOperator } = useAuth()
 
   // Don't show actions for current user
   if (user.id === currentUser?.id) {
@@ -28,6 +28,16 @@ export const UserActionsMenu = ({ user }: UserActionsMenuProps) => {
 
   // Non-superadmins can only manage users with lower or equal roles
   if (!isSuperadmin && user.role === "superadmin") {
+    return null
+  }
+
+  // Operators cannot manage admins, fellow operators, or superadmins
+  if (
+    isOperator &&
+    (user.role === "admin" ||
+      user.role === "operator" ||
+      user.role === "superadmin")
+  ) {
     return null
   }
 

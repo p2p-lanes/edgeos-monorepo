@@ -89,9 +89,9 @@ export function FormFieldForm({
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
   const { selectedPopupId, isContextReady } = useWorkspace()
-  const { isAdmin } = useAuth()
+  const { isOperatorOrAbove } = useAuth()
   const isEdit = !!defaultValues
-  const readOnly = !isAdmin
+  const readOnly = !isOperatorOrAbove
   const isProtectedField =
     isEdit && defaultValues ? isSpecialField(defaultValues) : false
 

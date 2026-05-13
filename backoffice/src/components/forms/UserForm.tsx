@@ -42,6 +42,7 @@ const emailSchema = z.string().email({ message: "Invalid email address" })
 const roleSchema = z.enum([
   "superadmin",
   "admin",
+  "operator",
   "viewer",
   "check_in_controller",
 ] as const)
@@ -60,6 +61,11 @@ const ROLE_OPTIONS: {
     value: "admin",
     label: "Admin",
     description: "Full tenant access",
+  },
+  {
+    value: "operator",
+    label: "Operator",
+    description: "Day-to-day product operations",
   },
   {
     value: "viewer",
@@ -82,14 +88,18 @@ export function UserForm({ defaultValues, onSuccess }: UserFormProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
-  const { isSuperadmin, user: currentUser } = useAuth()
+  const { isSuperadmin, isOperator, user: currentUser } = useAuth()
   const { effectiveTenantId } = useWorkspace()
   const isEdit = !!defaultValues
   const isCurrentUser = currentUser?.id === defaultValues?.id
 
   const availableRoles = isSuperadmin
     ? ROLE_OPTIONS
-    : ROLE_OPTIONS.filter((r) => r.value !== "superadmin")
+    : isOperator
+      ? ROLE_OPTIONS.filter(
+          (r) => r.value === "viewer" || r.value === "check_in_controller",
+        )
+      : ROLE_OPTIONS.filter((r) => r.value !== "superadmin")
 
   const createMutation = useMutation({
     mutationFn: (data: UserCreate) =>
@@ -161,6 +171,7 @@ export function UserForm({ defaultValues, onSuccess }: UserFormProps) {
   const getRoleBadgeVariant = (role: UserRole) => {
     if (role === "superadmin") return "default" as const
     if (role === "admin") return "secondary" as const
+    if (role === "operator") return "secondary" as const
     return "outline" as const
   }
 

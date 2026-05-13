@@ -23,6 +23,32 @@ const isAdmin = (user: UserPublic | null | undefined): boolean => {
 }
 
 /**
+ * Check if user is operator
+ */
+const isOperator = (user: UserPublic | null | undefined): boolean => {
+  return user?.role === "operator"
+}
+
+/**
+ * Check if user has operator or higher role (operator, admin, superadmin)
+ */
+const isOperatorOrAbove = (user: UserPublic | null | undefined): boolean => {
+  return (
+    user?.role === "superadmin" ||
+    user?.role === "admin" ||
+    user?.role === "operator"
+  )
+}
+
+/**
+ * Check if user can manage admin-level users and structural settings.
+ * Operators cannot — only superadmin and admin can.
+ */
+const canManageAdmins = (user: UserPublic | null | undefined): boolean => {
+  return user?.role === "superadmin" || user?.role === "admin"
+}
+
+/**
  * Check if user is superadmin
  */
 const isSuperadmin = (user: UserPublic | null | undefined): boolean => {
@@ -85,6 +111,9 @@ const useAuth = () => {
     user,
     isUserLoading,
     isAdmin: isAdmin(user),
+    isOperator: isOperator(user),
+    isOperatorOrAbove: isOperatorOrAbove(user),
+    canManageAdmins: canManageAdmins(user),
     isSuperadmin: isSuperadmin(user),
     isViewer: isViewer(user),
     requestCodeMutation,
@@ -93,5 +122,13 @@ const useAuth = () => {
   }
 }
 
-export { isLoggedIn, isAdmin, isSuperadmin, isViewer }
+export {
+  isLoggedIn,
+  isAdmin,
+  isOperator,
+  isOperatorOrAbove,
+  canManageAdmins,
+  isSuperadmin,
+  isViewer,
+}
 export default useAuth

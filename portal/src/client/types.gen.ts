@@ -2887,7 +2887,7 @@ export type UserPublic = {
     id: string;
 };
 
-export type UserRole = 'superadmin' | 'admin' | 'viewer' | 'check_in_controller';
+export type UserRole = 'superadmin' | 'admin' | 'operator' | 'viewer' | 'check_in_controller';
 
 /**
  * Statuses that users can set (subset of ApplicationStatus).

@@ -21,8 +21,8 @@ from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, 
 from app.api.translation.service import delete_translations_for_entity
 from app.core.dependencies.users import (
     CurrentHuman,
+    CurrentOperator,
     CurrentUser,
-    CurrentWriter,
     SessionDep,
     TenantSession,
 )
@@ -120,7 +120,7 @@ async def get_group(
 async def create_group(
     group_in: GroupCreate,
     db: TenantSession,
-    current_user: CurrentWriter,
+    current_user: CurrentOperator,
 ) -> GroupPublic:
     """Create a new group (BO only)."""
 
@@ -162,7 +162,7 @@ async def update_group(
     group_id: uuid.UUID,
     group_in: GroupAdminUpdate,
     db: TenantSession,
-    _current_user: CurrentWriter,
+    _current_user: CurrentOperator,
 ) -> GroupPublic:
     """Update a group (BO only - full admin access)."""
 
@@ -190,7 +190,7 @@ async def update_group(
 async def delete_group(
     group_id: uuid.UUID,
     db: TenantSession,
-    _current_user: CurrentWriter,
+    _current_user: CurrentOperator,
 ) -> None:
     """Delete a group (BO only)."""
 

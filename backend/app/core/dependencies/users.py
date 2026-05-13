@@ -148,6 +148,21 @@ def get_admin(
     return current_user
 
 
+def get_operator(
+    current_user: Annotated["UserPublic", Depends(get_current_user)],
+) -> "UserPublic":
+    if current_user.role not in [
+        UserRole.SUPERADMIN,
+        UserRole.ADMIN,
+        UserRole.OPERATOR,
+    ]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Operator access required",
+        )
+    return current_user
+
+
 def require_write_permission(
     current_user: Annotated["UserPublic", Depends(get_current_user)],
 ) -> "UserPublic":
@@ -165,6 +180,7 @@ def get_check_in_operator(
     if current_user.role not in [
         UserRole.SUPERADMIN,
         UserRole.ADMIN,
+        UserRole.OPERATOR,
         UserRole.CHECK_IN_CONTROLLER,
     ]:
         raise HTTPException(
@@ -178,6 +194,7 @@ CurrentUser = Annotated["UserPublic", Depends(get_current_user)]
 CurrentHuman = Annotated["HumanPublic", Depends(get_current_human)]
 CurrentSuperadmin = Annotated["UserPublic", Depends(get_superadmin)]
 CurrentAdmin = Annotated["UserPublic", Depends(get_admin)]
+CurrentOperator = Annotated["UserPublic", Depends(get_operator)]
 CurrentWriter = Annotated["UserPublic", Depends(require_write_permission)]
 CurrentCheckInOperator = Annotated["UserPublic", Depends(get_check_in_operator)]
 

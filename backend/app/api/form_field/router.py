@@ -23,8 +23,8 @@ from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, 
 from app.api.translation.service import delete_translations_for_entity
 from app.core.dependencies.users import (
     CurrentHuman,
+    CurrentOperator,
     CurrentUser,
-    CurrentWriter,
     HumanTenantSession,
     TenantSession,
 )
@@ -185,7 +185,7 @@ async def create_base_field_config(
     popup_id: uuid.UUID,
     field_name: str,
     db: TenantSession,
-    _current_user: CurrentWriter,
+    _current_user: CurrentOperator,
 ) -> FormFieldPublic:
     """Add a catalog base field to a popup by creating its BaseFieldConfig."""
     from app.api.popup.crud import popups_crud
@@ -290,7 +290,7 @@ async def get_form_field(
 async def create_form_field(
     field_in: FormFieldCreate,
     db: TenantSession,
-    current_user: CurrentWriter,
+    current_user: CurrentOperator,
 ) -> FormFieldPublic:
     if current_user.role == UserRole.SUPERADMIN:
         from app.api.popup.crud import popups_crud
@@ -327,7 +327,7 @@ async def update_form_field(
     field_id: uuid.UUID,
     field_in: FormFieldUpdate,
     db: TenantSession,
-    _current_user: CurrentWriter,
+    _current_user: CurrentOperator,
 ) -> FormFieldPublic:
     field = crud.form_fields_crud.get(db, field_id)
 
@@ -382,7 +382,7 @@ async def update_form_field(
 async def delete_form_field(
     field_id: uuid.UUID,
     db: TenantSession,
-    _current_user: CurrentWriter,
+    _current_user: CurrentOperator,
 ) -> None:
     field = crud.form_fields_crud.get(db, field_id)
 
