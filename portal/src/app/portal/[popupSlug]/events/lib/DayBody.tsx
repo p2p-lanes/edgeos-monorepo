@@ -672,6 +672,7 @@ export function DayBody({
                         return (
                           <Link
                             key={event.id}
+                            id={`event-card-${event.id}`}
                             href={eventHref(event)}
                             onClick={(e) => handleEventClick(event, e)}
                             className={cn(
@@ -907,6 +908,7 @@ export function DayBody({
                         return (
                           <Link
                             key={event.id}
+                            id={`event-card-${event.id}`}
                             href={eventHref(event)}
                             onClick={(e) => handleEventClick(event, e)}
                             className={cn(
