@@ -216,7 +216,7 @@ export function OpenCheckoutRuntime({
                       : {}
                   }
                   cartPersistenceEnabled={false}
-                  cartUiEnabled={false}
+                  cartUiEnabled={true}
                   validatePromoCodeOverride={async (code) => {
                     const result = await CouponsService.validateCouponPublic({
                       requestBody: {

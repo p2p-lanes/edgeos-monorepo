@@ -2,6 +2,7 @@
 
 import { Heart, Home, Shield, ShoppingBag, Tag, Ticket, X } from "lucide-react"
 import { useTranslation } from "react-i18next"
+import { resolveStepIcon } from "@/lib/checkoutStepIcons"
 import { useCheckout } from "@/providers/checkoutProvider"
 import { formatCurrency } from "@/types/checkout"
 
@@ -19,6 +20,7 @@ export default function CartItemList() {
     clearPromoCode,
     removeDynamicItem,
     isEditing,
+    stepConfigs,
   } = useCheckout()
 
   const hasDynamicItems = Object.values(cart.dynamicItems).some(
@@ -46,6 +48,27 @@ export default function CartItemList() {
     }
   }
 
+  // Group dynamic items by their step so the drawer renders one
+  // section per step type ("Alojamiento", "Estacionamiento", …) with
+  // the matching icon — instead of dumping them all under one
+  // "Tickets" heading regardless of provenance.
+  const dynamicGroups = Object.entries(cart.dynamicItems)
+    .filter(([, items]) => items.length > 0)
+    .map(([stepType, items]) => {
+      const stepConfig = stepConfigs.find((s) => s.step_type === stepType)
+      const Icon = resolveStepIcon({
+        stepType,
+        template: stepConfig?.template,
+        emoji: stepConfig?.emoji,
+      })
+      return {
+        stepType,
+        label: stepConfig?.title ?? stepType,
+        Icon,
+        items,
+      }
+    })
+
   return (
     <>
       {/* Passes */}
@@ -63,17 +86,17 @@ export default function CartItemList() {
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <Ticket className="w-4 h-4 text-muted-foreground shrink-0" />
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-checkout-title truncate">
+                    <p className="text-sm font-medium text-foreground truncate">
                       {getAttendeeName(pass.attendeeId)}
                     </p>
-                    <p className="text-xs text-checkout-subtitle">
+                    <p className="text-xs text-muted-foreground">
                       {pass.quantity > 1 && <span>{pass.quantity} × </span>}
                       {pass.product.name}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-checkout-title">
+                  <span className="text-sm font-medium text-foreground">
                     {formatCurrency(pass.originalPrice ?? pass.price)}
                   </span>
                   <button
@@ -102,7 +125,7 @@ export default function CartItemList() {
             <div className="flex items-center gap-3 flex-1 min-w-0">
               <Home className="w-4 h-4 text-muted-foreground shrink-0" />
               <div className="min-w-0">
-                <p className="text-sm font-medium text-checkout-title truncate">
+                <p className="text-sm font-medium text-foreground truncate">
                   {cart.housing.quantity > 1 && (
                     <span className="text-muted-foreground">
                       {cart.housing.quantity} ×{" "}
@@ -110,7 +133,7 @@ export default function CartItemList() {
                   )}
                   {cart.housing.product.name}
                 </p>
-                <p className="text-xs text-checkout-subtitle">
+                <p className="text-xs text-muted-foreground">
                   {cart.housing.pricePerDay !== false
                     ? `${cart.housing.nights} night${cart.housing.nights !== 1 ? "s" : ""}`
                     : "Full stay"}
@@ -118,7 +141,7 @@ export default function CartItemList() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-checkout-title">
+              <span className="text-sm font-medium text-foreground">
                 {formatCurrency(cart.housing.totalPrice)}
               </span>
               <button
@@ -148,7 +171,7 @@ export default function CartItemList() {
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <ShoppingBag className="w-4 h-4 text-muted-foreground shrink-0" />
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-checkout-title truncate">
+                    <p className="text-sm font-medium text-foreground truncate">
                       {item.quantity > 1 && (
                         <span className="text-muted-foreground">
                           {item.quantity} ×{" "}
@@ -159,7 +182,7 @@ export default function CartItemList() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-checkout-title">
+                  <span className="text-sm font-medium text-foreground">
                     {formatCurrency(item.totalPrice)}
                   </span>
                   <button
@@ -185,12 +208,12 @@ export default function CartItemList() {
           <div className="flex items-center justify-between py-2">
             <div className="flex items-center gap-3">
               <Heart className="w-4 h-4 text-muted-foreground shrink-0" />
-              <span className="text-sm font-medium text-checkout-title">
+              <span className="text-sm font-medium text-foreground">
                 Community Support
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-checkout-title">
+              <span className="text-sm font-medium text-foreground">
                 {formatCurrency(cart.patron.amount)}
               </span>
               <button
@@ -205,52 +228,51 @@ export default function CartItemList() {
         </div>
       )}
 
-      {/* Dynamic Items */}
-      {hasDynamicItems && (
-        <div className="mb-4">
-          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-            Tickets
+      {/* Dynamic Items — one group per step (Alojamiento, Estacionamiento, …) */}
+      {dynamicGroups.map(({ stepType, label, Icon, items }) => (
+        <div key={stepType} className="mb-4">
+          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <Icon className="w-3.5 h-3.5" />
+            <span>{label}</span>
           </h4>
           <div className="space-y-2">
-            {Object.values(cart.dynamicItems)
-              .flat()
-              .map((item) => (
-                <div
-                  key={item.productId}
-                  className="flex items-center justify-between py-2 border-b border-border last:border-0"
-                >
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <Ticket className="w-4 h-4 text-muted-foreground shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-checkout-title truncate">
-                        {item.quantity > 1 && (
-                          <span className="text-muted-foreground">
-                            {item.quantity} ×{" "}
-                          </span>
-                        )}
-                        {item.product.name}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-checkout-title">
-                      {formatCurrency(item.price)}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        removeDynamicItem(item.stepType, item.productId)
-                      }
-                      className="p-1 text-muted-foreground hover:text-destructive transition-colors"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
+            {items.map((item) => (
+              <div
+                key={item.productId}
+                className="flex items-center justify-between py-2 border-b border-border last:border-0"
+              >
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <Icon className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">
+                      {item.quantity > 1 && (
+                        <span className="text-muted-foreground">
+                          {item.quantity} ×{" "}
+                        </span>
+                      )}
+                      {item.product.name}
+                    </p>
                   </div>
                 </div>
-              ))}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-foreground">
+                    {formatCurrency(item.price * item.quantity)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      removeDynamicItem(item.stepType, item.productId)
+                    }
+                    className="p-1 text-muted-foreground hover:text-destructive transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
-      )}
+      ))}
 
       {/* Insurance */}
       {cart.insurance && summary.insuranceSubtotal > 0 && (
@@ -261,11 +283,11 @@ export default function CartItemList() {
           <div className="flex items-center justify-between py-2">
             <div className="flex items-center gap-3">
               <Shield className="w-4 h-4 text-muted-foreground shrink-0" />
-              <span className="text-sm font-medium text-checkout-title">
+              <span className="text-sm font-medium text-foreground">
                 Coverage for all passes
               </span>
             </div>
-            <span className="text-sm font-medium text-checkout-title">
+            <span className="text-sm font-medium text-foreground">
               {formatCurrency(summary.insuranceSubtotal)}
             </span>
           </div>
