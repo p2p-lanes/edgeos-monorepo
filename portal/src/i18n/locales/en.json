@@ -167,6 +167,15 @@
     "express_title": "Express Checkout",
     "buyer_step_title": "Your information",
     "buyer_step_description": "Complete your information before payment.",
+    "buyer_hero_title": "You're almost there!",
+    "buyer_hero_subtitle": "We need a couple of details to lock in your spot.",
+    "buyer_hero_trust": "Your privacy matters to us. We don't share your data with anyone.",
+    "email_invalid": "That doesn't look like a valid email",
+    "field_required": "This field is required",
+    "toast_dismiss_aria": "Dismiss notice",
+    "toast_buyer_incomplete_continue": "Your information has missing fields. Review them to continue.",
+    "toast_buyer_incomplete_pay": "Before paying, complete the fields in Your information.",
+    "toast_cart_empty": "Add at least one item before continuing.",
     "loading_info": "Loading your information",
     "processing": "Processing your registration",
     "processing_subtitle": "This might take a few moments",
@@ -227,7 +236,8 @@
       "add": "Add",
       "added": "Added",
       "add_aria": "Add to cart",
-      "remove_aria": "Remove from cart"
+      "remove_aria": "Remove from cart",
+      "per_unit": "ea."
     },
     "step_short": {
       "passes": "Passes",

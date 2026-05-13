@@ -309,13 +309,13 @@ def _seed_ticketing_steps(
 <section class=\"flex flex-col items-center gap-4 py-2\">
   <h1 style=\"font-family: serif; letter-spacing: 0.35em; font-size: 2.5rem; margin: 0; color: white;\">AMANITA</h1>
   <p style=\"letter-spacing: 0.45em; font-size: 0.7rem; margin: 0; color: rgba(255,255,255,0.7);\">FESTIVAL</p>
-  <div style=\"border-top: 1px solid #A89477; border-bottom: 1px solid #A89477; padding: 0.5rem 1.5rem; margin-top: 0.5rem;\">
-    <p style=\"font-size: 0.8rem; letter-spacing: 0.1em; color: #A89477; margin: 0;\">20-24 DE NOVIEMBRE, 2026 · BS AS, ARGENTINA</p>
+  <div style=\"background: #A89477; padding: 0.5rem 1.5rem; margin-top: 0.5rem; border-radius: 4px;\">
+    <p style=\"font-size: 0.8rem; letter-spacing: 0.1em; color: #071b28; margin: 0; font-weight: 600;\">20-24 DE NOVIEMBRE, 2026 · BS AS, ARGENTINA</p>
   </div>
   <h2 style=\"font-size: 1.25rem; font-weight: 600; letter-spacing: 0.05em; margin-top: 1rem; color: white;\">4 DÍAS DE MÚSICA, ARTE, YOGA Y TALLERES</h2>
   <p style=\"font-style: italic; color: rgba(255,255,255,0.8);\">Una celebración de amor, apertura y conexión</p>
-  <div style=\"border: 1px solid #A89477; border-radius: 4px; padding: 1rem 2rem; margin-top: 1.5rem;\">
-    <p style=\"font-size: 0.85rem; letter-spacing: 0.1em; color: #A89477; margin: 0; text-align: center;\">EXPERIENCIA EXTENDIDA<br/>17, 18 Y 19 DE NOVIEMBRE</p>
+  <div style=\"background: #A89477; border-radius: 4px; padding: 1rem 2rem; margin-top: 1.5rem;\">
+    <p style=\"font-size: 0.85rem; letter-spacing: 0.1em; color: #071b28; margin: 0; text-align: center; font-weight: 600;\">EXPERIENCIA EXTENDIDA<br/>17, 18 Y 19 DE NOVIEMBRE</p>
   </div>
   <ul style=\"list-style: none; padding: 0; margin-top: 1.5rem; color: rgba(255,255,255,0.95); line-height: 1.7;\">
     <li>¡Asegurá tu lugar al menor precio posible!</li>
@@ -333,18 +333,6 @@ def _seed_ticketing_steps(
     # componentes como para que tu información sea lo primero").
     steps = [
         {
-            "step_type": "buyer",
-            "title": "Tu información",
-            "description": "Completá tus datos antes de continuar.",
-            "watermark": "Tu información",
-            "show_title": False,
-            "show_watermark": True,
-            "template": "buyer-form",
-            "order": 0,
-            "protected": True,
-            "emoji": "user",
-        },
-        {
             "step_type": "hero",
             "title": "Hero",
             "description": "",
@@ -357,8 +345,20 @@ def _seed_ticketing_steps(
                 "alignment": "center",
                 "max_width": "wide",
             },
-            "order": 1,
+            "order": 0,
             "emoji": "mushroom",
+        },
+        {
+            "step_type": "buyer",
+            "title": "Tu información",
+            "description": "Completá tus datos para continuar.",
+            "watermark": "Tu información",
+            "show_title": False,
+            "show_watermark": True,
+            "template": "buyer-form",
+            "order": 1,
+            "protected": True,
+            "emoji": "user",
         },
         {
             "step_type": "tickets",
@@ -601,7 +601,7 @@ def _seed_ticketing_steps(
             "description": "",
             "watermark": "Galería",
             "show_title": False,
-            "show_watermark": False,
+            "show_watermark": True,
             "template": "image-gallery",
             "template_config": {
                 "variant": "masonry",
@@ -625,7 +625,7 @@ def _seed_ticketing_steps(
             "description": "",
             "watermark": "FAQs",
             "show_title": False,
-            "show_watermark": False,
+            "show_watermark": True,
             "template": "faqs",
             "template_config": {
                 "design_variant": "accordion",
