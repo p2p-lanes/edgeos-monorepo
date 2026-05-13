@@ -38,7 +38,12 @@ const DiscountProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (city?.id && discountApplied.city_id !== city?.id) {
-      setDiscountApplied({ discount_value: 0, discount_type: "percentage" })
+      setDiscountApplied({
+        discount_value: 0,
+        discount_type: "percentage",
+        discount_code: null,
+        city_id: city.id,
+      })
     }
   }, [city?.id, discountApplied.city_id])
 
@@ -63,7 +68,10 @@ const DiscountProvider = ({ children }: { children: ReactNode }) => {
   discountRef.current = discountApplied
 
   const setDiscount = useCallback((discount: DiscountProps) => {
-    if (discount.discount_value <= discountRef.current.discount_value) return
+    // Use `<` (not `<=`) so a coupon matching the current discount can still
+    // overwrite metadata like discount_code / city_id, which the backend
+    // needs to record the conversion even when the percentage is unchanged.
+    if (discount.discount_value < discountRef.current.discount_value) return
     setDiscountApplied(discount)
   }, [])
 

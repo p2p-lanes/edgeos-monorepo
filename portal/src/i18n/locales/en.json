@@ -243,7 +243,7 @@
     "summary_redirecting": "Redirecting...",
     "summary_pay": "Pay",
     "thank_you_title": "Payment completed",
-    "thank_you_description": "Thank you for your purchase. If you want to keep managing your tickets, you can continue in the portal.",
+    "thank_you_description": "Thank you for your purchase. We sent your confirmation and ticket details by email.",
     "thank_you_cta": "Go to portal"
   },
   "passes": {
@@ -467,10 +467,18 @@
       "highlighted_title": "Featured event",
       "owned_title": "Created by you"
     },
+    "status": {
+      "draft": "Draft",
+      "published": "Published",
+      "pending_approval": "Pending approval",
+      "rejected": "Rejected",
+      "cancelled": "Cancelled"
+    },
     "toolbar": {
       "search_placeholder": "Search events...",
       "my_rsvps": "My RSVPs",
       "my_events": "My events",
+      "my_events_title": "Includes drafts, pending and rejected events",
       "hidden": "Hidden",
       "hidden_title_showing": "Hiding hidden events",
       "hidden_title_hidden": "Show hidden events",
@@ -508,7 +516,9 @@
       "no_venues": "No venues configured for this pop-up yet.",
       "no_venue_column": "Meeting",
       "offsite_column": "Off-site",
-      "untitled_venue": "Untitled venue"
+      "untitled_venue": "Untitled venue",
+      "enter_fullscreen": "Fullscreen",
+      "exit_fullscreen": "Exit fullscreen"
     },
     "add_to_calendar": {
       "title": "Add to calendar",
@@ -529,9 +539,23 @@
       "registered": "Registered",
       "checked_in": "Checked in"
     },
+    "login_required": {
+      "title": "Sign in to view this event",
+      "message": "Sign in to {{popupName}} to see event details, RSVP, and add it to your calendar.",
+      "login": "Sign in",
+      "cancel": "Cancel"
+    },
+    "public_calendar": {
+      "heading": "Events",
+      "page_title": "{{popupName}} - Calendar",
+      "page_title_fallback": "Calendar",
+      "subheading": "Upcoming events at {{popupName}}",
+      "subheading_with_tz": "Upcoming events at {{popupName}} — times shown in {{timezone}}"
+    },
     "detail": {
       "event_not_found": "Event not found",
       "event_not_found_message": "This event does not exist or you do not have access to it.",
+      "rejection_reason_label": "Rejection reason",
       "photo_credit": "Photo: {{venueName}}",
       "description_heading": "Description",
       "invite_attendees_heading": "Invite attendees",
@@ -540,6 +564,7 @@
       "invite_button": "Invite",
       "inviting_button": "Inviting...",
       "join_meeting": "Join meeting",
+      "hosted_by": "Hosted by ",
       "add_to_calendar_button": "Add to calendar",
       "added_to_calendar_button": "Added to calendar",
       "manual_add_to_calendar_button": "Manual add to calendar",
@@ -555,6 +580,14 @@
       "enter_at_least_one_email": "Enter at least one email",
       "remove_invitation_aria": "Remove invitation for {{email}}",
       "edit_event_button": "Edit event",
+      "cancel_event_button": "Cancel event",
+      "cancel_event_dialog_title": "Cancel this event?",
+      "cancel_event_dialog_description": "Registered attendees and invitees will be notified by email and the event will be removed from their calendars. This cannot be undone.",
+      "cancel_event_dialog_keep": "Keep event",
+      "cancel_event_dialog_confirm": "Yes, cancel event",
+      "cancel_event_dialog_loading": "Cancelling…",
+      "cancel_event_success": "Event cancelled",
+      "cancel_event_error": "Couldn't cancel event",
       "pending_approval_banner_title": "Pending approval",
       "pending_approval_banner_message": "Your event is pending approval and not yet visible to others.",
       "open_in_maps": "Open in Google Maps"
@@ -599,6 +632,18 @@
       "visibility_public": "Public",
       "visibility_private": "Private (invitees only)",
       "visibility_unlisted": "Unlisted (hidden, shareable link)",
+      "host_label": "Displayed host (optional)",
+      "host_placeholder_default": "{{name}} (default)",
+      "host_placeholder_optional": "Optional",
+      "host_use_popup": "Use {{name}}",
+      "host_use_me": "Use my name",
+      "host_pick_participant": "Pick participant…",
+      "host_search_placeholder": "Search participants",
+      "host_searching": "Searching…",
+      "host_no_matches": "No matches",
+      "host_type_to_search": "Type to search participants",
+      "host_helper": "Name shown to participants on the event page.",
+      "host_helper_with_popup": "Name shown to participants. Leave blank to use \"{{name}}\".",
       "visibility_private_short": "Private",
       "visibility_unlisted_short": "Unlisted",
       "description_label": "Description (optional)",
@@ -655,7 +700,8 @@
       "new": {
         "heading": "New venue",
         "subheading": "Propose a space that events at {{cityName}} can be booked against.",
-        "requires_approval_note": "Requires admin approval before it appears in the venue list.",
+        "requires_approval_banner_title": "Requires admin approval",
+        "requires_approval_note": "This venue will be pending review and won't appear in the venue list until an admin approves it.",
         "title_label": "Title",
         "title_placeholder": "e.g. Main Auditorium",
         "location_label": "Location",
@@ -712,6 +758,8 @@
         "booking_free": "Permissionless",
         "booking_approval": "Approval required",
         "booking_unbookable": "Not bookable",
+        "approval_required_banner_title": "Approval required for events",
+        "approval_required_banner_message": "Events at this venue need admin approval. When you book this venue, your event will be pending review and won't be visible to others until it's approved.",
         "edit_button": "Edit venue"
       }
     }

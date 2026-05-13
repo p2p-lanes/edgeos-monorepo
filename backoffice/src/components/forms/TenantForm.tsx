@@ -1,9 +1,20 @@
 import { useForm } from "@tanstack/react-form"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
-import { Check, Copy, Globe, Image, Info, Lock, Mail, User } from "lucide-react"
+import {
+  Check,
+  Copy,
+  Globe,
+  Image,
+  Info,
+  Lock,
+  Mail,
+  ShoppingCart,
+  User,
+} from "lucide-react"
 import { useState } from "react"
 import {
+  PopupsService,
   type TenantCreate,
   type TenantPublic,
   TenantsService,
@@ -23,6 +34,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { LoadingButton } from "@/components/ui/loading-button"
 import { Separator } from "@/components/ui/separator"
+import { Switch } from "@/components/ui/switch"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
 import {
@@ -66,6 +78,16 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
   }
   const { showSuccessToast, showErrorToast } = useCustomToast()
   const isEdit = !!defaultValues
+
+  // Query active popups for the landing_mode warning (OI-3, ADR-8)
+  const { data: popupsData } = useQuery({
+    queryKey: ["popups", { tenantId: defaultValues?.id, status: "active" }],
+    queryFn: () => PopupsService.listPopups({ limit: 100 }),
+    enabled: isEdit && isSuperadmin,
+  })
+  const activePopupCount = (popupsData?.results ?? []).filter(
+    (p) => p.status === "active",
+  ).length
 
   const createMutation = useMutation({
     mutationFn: (data: TenantCreate) =>
@@ -127,6 +149,9 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
       icon_url: defaultValues?.icon_url ?? "",
       logo_url: defaultValues?.logo_url ?? "",
       custom_domain: defaultValues?.custom_domain ?? "",
+      landing_mode: (defaultValues?.landing_mode ?? "portal") as
+        | "portal"
+        | "checkout",
     },
     onSubmit: ({ value }) => {
       if (isEdit) {
@@ -139,6 +164,7 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
           logo_url: value.logo_url || null,
           // Map empty string to null for domain; never send custom_domain_active
           custom_domain: value.custom_domain || null,
+          landing_mode: value.landing_mode,
         })
       } else {
         createMutation.mutate({
@@ -424,6 +450,58 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
                 )}
               </AlertDescription>
             </Alert>
+
+            {/* Landing Mode toggle — SUPERADMIN only (ADR-4, ADR-8) */}
+            {isSuperadmin && (
+              <form.Field name="landing_mode">
+                {(field) => {
+                  const isDomainActive = !!defaultValues?.custom_domain_active
+                  const isCheckout = field.state.value === "checkout"
+                  const showMultiPopupWarning =
+                    isCheckout && activePopupCount > 1
+
+                  return (
+                    <div>
+                      <InlineRow
+                        icon={
+                          <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+                        }
+                        label="Landing Mode"
+                        description={
+                          isDomainActive
+                            ? "Switch to Direct Checkout to send visitors straight to the checkout flow."
+                            : "Activate the custom domain first to enable direct-checkout mode."
+                        }
+                      >
+                        <Switch
+                          id="landing_mode"
+                          aria-label="Landing Mode"
+                          checked={isCheckout}
+                          onCheckedChange={(val) =>
+                            field.handleChange(val ? "checkout" : "portal")
+                          }
+                          disabled={!isDomainActive}
+                        />
+                      </InlineRow>
+
+                      {showMultiPopupWarning && (
+                        <Alert className="border-orange-200 bg-orange-50 text-orange-900 mt-2">
+                          <Info className="h-4 w-4 text-orange-600" />
+                          <AlertDescription className="text-orange-800">
+                            This tenant has more than one active popup. Only one
+                            will be used as the landing checkout — the one with
+                            the earliest start date. Make sure the intended
+                            popup is a <strong>direct-sale popup</strong>.
+                            Application-type popups are not eligible and will
+                            show a Coming Soon page instead.
+                          </AlertDescription>
+                        </Alert>
+                      )}
+                    </div>
+                  )
+                }}
+              </form.Field>
+            )}
           </InlineSection>
         )}
 

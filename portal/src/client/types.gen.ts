@@ -776,6 +776,8 @@ export type CheckoutRuntimeProduct = {
     duration_type?: (string | null);
     start_date?: (unknown | null);
     end_date?: (unknown | null);
+    sale_starts_at?: (string | null);
+    sale_ends_at?: (string | null);
     total_stock_cap?: (number | null);
     total_stock_remaining?: (number | null);
     max_per_order?: (number | null);
@@ -1002,6 +1004,26 @@ export type EventAvailabilityResult = {
 };
 
 /**
+ * Toolbar/filter metadata bundled with the public calendar list.
+ */
+export type EventCalendarMeta = {
+    allowed_tags?: Array<(string)>;
+    allowed_tracks?: Array<EventCalendarTrack>;
+    timezone?: string;
+    popup_id: string;
+    popup_slug: string;
+    popup_name: string;
+};
+
+/**
+ * Minimal track projection for the public calendar toolbar.
+ */
+export type EventCalendarTrack = {
+    id: string;
+    name: string;
+};
+
+/**
  * Event schema for creation.
  */
 export type EventCreate = {
@@ -1022,6 +1044,7 @@ export type EventCreate = {
     visibility?: EventVisibility;
     require_approval?: boolean;
     kind?: (string | null);
+    host_display_name?: (string | null);
     status?: EventStatus;
     highlighted?: boolean;
     recurrence?: (RecurrenceRule | null);
@@ -1113,8 +1136,10 @@ export type EventPublic = {
     visibility?: EventVisibility;
     require_approval?: boolean;
     kind?: (string | null);
+    host_display_name?: (string | null);
     status?: EventStatus;
     highlighted?: boolean;
+    rejection_reason?: (string | null);
     rrule?: (string | null);
     recurrence_master_id?: (string | null);
     recurrence_exdates?: Array<(string)>;
@@ -1132,6 +1157,46 @@ export type EventPublic = {
 };
 
 /**
+ * Minimal, read-only event projection for the public calendar.
+ *
+ * Excludes fields that are either sensitive (``meeting_url``,
+ * ``tenant_id``, ``owner_id``, ``rejection_reason``) or only meaningful
+ * to authenticated humans (``hidden``, ``my_rsvp_status``,
+ * ``visibility``, ``require_approval``, ``ical_sequence``, ``content``).
+ */
+export type EventPublicCalendarItem = {
+    id: string;
+    title: string;
+    start_time: string;
+    end_time: string;
+    timezone: string;
+    kind?: (string | null);
+    cover_url?: (string | null);
+    max_participant?: (number | null);
+    tags?: Array<(string)>;
+    highlighted?: boolean;
+    host_display_name?: (string | null);
+    rrule?: (string | null);
+    recurrence_master_id?: (string | null);
+    occurrence_id?: (string | null);
+    venue_id?: (string | null);
+    venue_title?: (string | null);
+    venue_location?: (string | null);
+    venue_image_url?: (string | null);
+    custom_location_name?: (string | null);
+    track_id?: (string | null);
+    track_title?: (string | null);
+};
+
+/**
+ * Wrapper response for ``GET /events/public/calendar``.
+ */
+export type EventPublicCalendarResponse = {
+    results: Array<EventPublicCalendarItem>;
+    meta: EventCalendarMeta;
+};
+
+/**
  * Event settings schema for creation.
  */
 export type EventSettingsCreate = {
@@ -1144,7 +1209,7 @@ export type EventSettingsCreate = {
     timezone?: string;
     allowed_tags?: Array<(string)>;
     allowed_kinds?: Array<(string)>;
-    approval_notification_email?: (string | null);
+    approval_notification_emails?: Array<(string)>;
 };
 
 /**
@@ -1161,7 +1226,7 @@ export type EventSettingsPublic = {
     timezone?: string;
     allowed_tags?: Array<(string)>;
     allowed_kinds?: Array<(string)>;
-    approval_notification_email?: (string | null);
+    approval_notification_emails?: Array<(string)>;
     created_at?: string;
     updated_at?: string;
     id: string;
@@ -1179,7 +1244,7 @@ export type EventSettingsUpdate = {
     timezone?: (string | null);
     allowed_tags?: (Array<(string)> | null);
     allowed_kinds?: (Array<(string)> | null);
-    approval_notification_email?: (string | null);
+    approval_notification_emails?: (Array<(string)> | null);
 };
 
 export type EventStatus = 'draft' | 'published' | 'cancelled' | 'pending_approval' | 'rejected';
@@ -1204,6 +1269,7 @@ export type EventUpdate = {
     visibility?: (EventVisibility | null);
     require_approval?: (boolean | null);
     kind?: (string | null);
+    host_display_name?: (string | null);
     status?: (EventStatus | null);
     highlighted?: (boolean | null);
 };
@@ -1545,6 +1611,20 @@ export type HumanCreate = {
 };
 
 /**
+ * Slim human profile for portal-facing pickers (event host, mentions…).
+ *
+ * Intentionally excludes email and contact fields: portal-authenticated
+ * callers can already see other humans' names in event participant lists,
+ * so name + avatar is the same privacy bar without leaking emails.
+ */
+export type HumanPortalPublic = {
+    id: string;
+    first_name?: (string | null);
+    last_name?: (string | null);
+    picture_url?: (string | null);
+};
+
+/**
  * Schema for humans updating their own profile.
  */
 export type HumanProfileUpdate = {
@@ -1609,6 +1689,15 @@ export type KeyMetrics = {
     accommodation_percentage?: string;
     conversion_rate?: string;
 };
+
+/**
+ * Per-tenant landing mode for custom domains.
+ *
+ * - portal: standard portal experience (default for all tenants).
+ * - checkout: custom domain opens the active direct-sale popup checkout directly.
+ * Extensible for future modes (e.g. splash, events) without schema changes.
+ */
+export type LandingMode = 'portal' | 'checkout';
 
 export type ListModel = {
     results: Array<unknown>;
@@ -1687,6 +1776,11 @@ export type ListModel_FormSectionPublic_ = {
 
 export type ListModel_GroupPublic_ = {
     results: Array<GroupPublic>;
+    paging: Paging;
+};
+
+export type ListModel_HumanPortalPublic_ = {
+    results: Array<HumanPortalPublic>;
     paging: Paging;
 };
 
@@ -1979,6 +2073,7 @@ export type PopupAdmin = {
     application_layout?: ApplicationLayout;
     events_enabled?: boolean;
     self_check_in_enabled?: boolean;
+    show_attendee_directory?: boolean;
     id: string;
 };
 
@@ -2022,6 +2117,7 @@ export type PopupCreate = {
     application_layout?: ApplicationLayout;
     events_enabled?: boolean;
     self_check_in_enabled?: boolean;
+    show_attendee_directory?: boolean;
 };
 
 /**
@@ -2062,6 +2158,7 @@ export type PopupPublic = {
     insurance_percentage?: (string | null);
     application_layout?: ApplicationLayout;
     events_enabled?: boolean;
+    show_attendee_directory?: boolean;
 };
 
 /**
@@ -2137,6 +2234,7 @@ export type PopupUpdate = {
     application_layout?: (ApplicationLayout | null);
     events_enabled?: (boolean | null);
     self_check_in_enabled?: (boolean | null);
+    show_attendee_directory?: (boolean | null);
 };
 
 /**
@@ -2294,6 +2392,11 @@ export type ProductLine = {
 
 /**
  * Product schema for API responses.
+ *
+ * Sale window fields are exposed as `date` (inclusive day) even though they
+ * are persisted as `datetime` UTC (exclusive instant). `sale_ends_at` is
+ * de-bumped by 1 day so the response shows the last day the product is on
+ * sale — the canonical "operator-friendly" representation.
  */
 export type ProductPublic = {
     tenant_id: string;
@@ -2563,12 +2666,13 @@ export type TenantPublic = {
     logo_url?: (string | null);
     custom_domain?: (string | null);
     custom_domain_active: boolean;
+    landing_mode?: LandingMode;
     id: string;
+    active_popup_slug?: (string | null);
 };
 
 export type TenantUpdate = {
     name?: (string | null);
-    slug?: (string | null);
     sender_email?: (string | null);
     sender_name?: (string | null);
     image_url?: (string | null);
@@ -2576,6 +2680,7 @@ export type TenantUpdate = {
     logo_url?: (string | null);
     custom_domain?: (string | null);
     custom_domain_active?: (boolean | null);
+    landing_mode?: (LandingMode | null);
 };
 
 /**
@@ -3626,6 +3731,22 @@ export type EventParticipantsCheckInData = {
 
 export type EventParticipantsCheckInResponse = (EventParticipantPublic);
 
+export type EventsListPublicCalendarData = {
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    popupSlug: string;
+    search?: (string | null);
+    startAfter?: (string | null);
+    startBefore?: (string | null);
+    tags?: (Array<(string)> | null);
+    trackIds?: (Array<(string)> | null);
+    xTenantId?: (string | null);
+};
+
+export type EventsListPublicCalendarResponse = (EventPublicCalendarResponse);
+
 export type EventsListEventsData = {
     eventStatus?: (EventStatus | null);
     kind?: (string | null);
@@ -3850,6 +3971,12 @@ export type EventsUnhidePortalEventData = {
 };
 
 export type EventsUnhidePortalEventResponse = (void);
+
+export type EventsCancelPortalEventData = {
+    eventId: string;
+};
+
+export type EventsCancelPortalEventResponse = (EventPublic);
 
 export type EventsExportPortalEventIcsData = {
     eventId: string;
@@ -4311,6 +4438,20 @@ export type HumansUpdateCurrentHumanData = {
 };
 
 export type HumansUpdateCurrentHumanResponse = (HumanPublic);
+
+export type HumansSearchHumansPortalData = {
+    /**
+     * Maximum number of items to return
+     */
+    limit?: number;
+    search?: (string | null);
+    /**
+     * Number of items to skip
+     */
+    skip?: number;
+};
+
+export type HumansSearchHumansPortalResponse = (ListModel_HumanPortalPublic_);
 
 export type HumansGetHumanData = {
     humanId: string;

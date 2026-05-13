@@ -452,6 +452,15 @@ export function CheckoutProvider({
     },
   )
 
+  // Defence-in-depth: take the highest discount available so the total reflects
+  // it even if one of the state vectors lags (DiscountProvider's <= guard
+  // rejecting an update, or usePromoCode's re-validation effect clobbering
+  // promoCodeDiscount with 0 from a stale saved-cart response).
+  const effectiveDiscount = Math.max(
+    discountApplied.discount_value ?? 0,
+    promoCodeDiscount ?? 0,
+  )
+
   // Cart summary
   const { summary } = useCartSummary({
     selectedPasses,
@@ -463,6 +472,7 @@ export function CheckoutProvider({
     editCredit,
     monthUpgradeCredit,
     appCredit,
+    discountValue: effectiveDiscount,
   })
 
   // Reset state when city changes so we re-restore from new city's cart

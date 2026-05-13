@@ -166,11 +166,6 @@ function ScrollyCheckoutFlowInner({
 
     const sectionsSnapshot = allSections
 
-    const getScrollTop = (el: HTMLElement): number =>
-      mainEl.scrollTop +
-      el.getBoundingClientRect().top -
-      mainEl.getBoundingClientRect().top
-
     const prevSnapType = mainEl.style.scrollSnapType
     mainEl.style.scrollSnapType = "y mandatory"
 
@@ -179,7 +174,12 @@ function ScrollyCheckoutFlowInner({
       .filter(Boolean) as HTMLElement[]
     for (const el of sectionEls) {
       el.style.scrollSnapAlign = "start"
-      el.style.scrollSnapStop = "always"
+      // Why: `scroll-snap-stop: always` makes Chrome/Safari refuse to leave
+      // the current snap point on programmatic scrollTo / scrollIntoView,
+      // so clicking the footer or nav while already snapped to a section
+      // does nothing visually. Mandatory snap alone still snaps to the
+      // nearest section at the end of any user-driven scroll.
+      el.style.scrollSnapStop = "normal"
     }
 
     // While a programmatic scroll is in flight we lock the active section to
@@ -187,9 +187,12 @@ function ScrollyCheckoutFlowInner({
     // intermediate section as they pass under the viewport.
     let scrollTargetId: string | null = null
     let scrollTargetTimeout: number | null = null
-    const releaseScrollTarget = () => {
+    // Whether to clear the pending snap-restore timeout when releasing.
+    // Observer-driven release (target reached during animation) must NOT
+    // clear it, otherwise snap-type stays "none" forever after a scroll.
+    const releaseScrollTarget = (clearTimer = false) => {
       scrollTargetId = null
-      if (scrollTargetTimeout !== null) {
+      if (clearTimer && scrollTargetTimeout !== null) {
         window.clearTimeout(scrollTargetTimeout)
         scrollTargetTimeout = null
       }
@@ -227,13 +230,25 @@ function ScrollyCheckoutFlowInner({
       if (scrollTargetTimeout !== null) {
         window.clearTimeout(scrollTargetTimeout)
       }
-      // Safety net in case the target never reaches the threshold (e.g. user
-      // interrupts the scroll). 1500ms covers smooth scroll across many steps.
-      scrollTargetTimeout = window.setTimeout(releaseScrollTarget, 1500)
-      mainEl.scrollTo({
-        top: getScrollTop(el),
-        behavior: reduceMotion ? "auto" : "smooth",
-      })
+      // Why: mandatory snap pinned to a section makes Chrome ignore
+      // programmatic scrolls. Disable snap during the animation; the
+      // timeout below restores it once the destination is reached.
+      mainEl.style.scrollSnapType = "none"
+      scrollTargetTimeout = window.setTimeout(() => {
+        mainEl.style.scrollSnapType = "y mandatory"
+        releaseScrollTarget()
+      }, 1500)
+      const targetTop = el.offsetTop
+      // Why: when the click originates inside a `position: fixed` element
+      // (e.g. the footer button), Chrome silently swallows scrollTo issued
+      // in the same tick. Deferring to the next macrotask lets the browser
+      // finish its focus/tap handling first, then the scroll runs.
+      window.setTimeout(() => {
+        mainEl.scrollTo({
+          top: targetTop,
+          behavior: reduceMotion ? "auto" : "smooth",
+        })
+      }, 0)
       setActiveSection(targetId)
     }
 
@@ -249,7 +264,7 @@ function ScrollyCheckoutFlowInner({
       observer.disconnect()
       ro.disconnect()
       navRo.disconnect()
-      releaseScrollTarget()
+      releaseScrollTarget(true)
       scrollToIndexRef.current = null
     }
   }, [allSections, isInitialLoading])

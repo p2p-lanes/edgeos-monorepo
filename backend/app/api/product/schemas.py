@@ -1,11 +1,13 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 from sqlalchemy import Boolean, Numeric, Text
 from sqlmodel import Column, DateTime, Field, SQLModel
+
+from app.api.product.sale_window import datetime_to_inclusive_date
 
 # ProductCategory is now a free-form string so admins can create custom categories.
 # Known built-in values are listed below for reference.
@@ -85,11 +87,29 @@ class ProductBase(SQLModel):
 
 
 class ProductPublic(ProductBase):
-    """Product schema for API responses."""
+    """Product schema for API responses.
+
+    Sale window fields are exposed as `date` (inclusive day) even though they
+    are persisted as `datetime` UTC (exclusive instant). `sale_ends_at` is
+    de-bumped by 1 day so the response shows the last day the product is on
+    sale — the canonical "operator-friendly" representation.
+    """
 
     id: uuid.UUID
+    sale_starts_at: date | None = None  # type: ignore[assignment]
+    sale_ends_at: date | None = None  # type: ignore[assignment]
 
     model_config = ConfigDict(from_attributes=True)
+
+    @field_validator("sale_starts_at", mode="before")
+    @classmethod
+    def _starts_to_date(cls, v: object) -> object:
+        return datetime_to_inclusive_date(v)
+
+    @field_validator("sale_ends_at", mode="before")
+    @classmethod
+    def _ends_to_date(cls, v: object) -> object:
+        return datetime_to_inclusive_date(v, day_offset=-1)
 
 
 class ProductCreate(BaseModel):
@@ -105,8 +125,8 @@ class ProductCreate(BaseModel):
     category: str = "ticket"
     attendee_category: TicketAttendeeCategory | None = None
     duration_type: TicketDuration | None = None
-    sale_starts_at: datetime | None = None
-    sale_ends_at: datetime | None = None
+    sale_starts_at: date | None = None
+    sale_ends_at: date | None = None
     is_active: bool = True
     exclusive: bool = False
     total_stock_cap: int | None = Field(default=None, ge=1)
@@ -163,8 +183,8 @@ class ProductUpdate(BaseModel):
     category: str | None = None
     attendee_category: TicketAttendeeCategory | None = None
     duration_type: TicketDuration | None = None
-    sale_starts_at: datetime | None = None
-    sale_ends_at: datetime | None = None
+    sale_starts_at: date | None = None
+    sale_ends_at: date | None = None
     is_active: bool | None = None
     exclusive: bool | None = None
     total_stock_cap: int | None = Field(default=None, ge=1)
@@ -207,8 +227,8 @@ class ProductBatchItem(BaseModel):
     category: str = "ticket"
     attendee_category: TicketAttendeeCategory | None = None
     duration_type: TicketDuration | None = None
-    sale_starts_at: datetime | None = None
-    sale_ends_at: datetime | None = None
+    sale_starts_at: date | None = None
+    sale_ends_at: date | None = None
     is_active: bool = True
     exclusive: bool = False
     total_stock_cap: int | None = Field(default=None, ge=1)

@@ -3,7 +3,7 @@ from datetime import datetime
 from enum import Enum
 
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import Column, Text
+from sqlalchemy import Column
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import DateTime, Field, SQLModel
 
@@ -40,9 +40,13 @@ class EventSettingsBase(SQLModel):
         default_factory=list,
         sa_column=Column(JSONB, nullable=False, server_default="[]"),
     )
-    # Email that receives notifications when an event or venue is submitted
-    # and requires approval. Falls back to the popup owner if unset.
-    approval_notification_email: str | None = Field(default=None, sa_type=Text())
+    # Emails that receive notifications when an event or venue is submitted
+    # and requires approval. Falls back to the tenant contact/sender email
+    # when the list is empty.
+    approval_notification_emails: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSONB, nullable=False, server_default="[]"),
+    )
     created_at: datetime = Field(
         default_factory=datetime.utcnow, sa_type=DateTime(timezone=True)
     )
@@ -71,7 +75,7 @@ class EventSettingsCreate(BaseModel):
     timezone: str = "UTC"
     allowed_tags: list[str] = []
     allowed_kinds: list[str] = []
-    approval_notification_email: str | None = None
+    approval_notification_emails: list[str] = []
 
 
 class EventSettingsUpdate(BaseModel):
@@ -85,4 +89,4 @@ class EventSettingsUpdate(BaseModel):
     timezone: str | None = None
     allowed_tags: list[str] | None = None
     allowed_kinds: list[str] | None = None
-    approval_notification_email: str | None = None
+    approval_notification_emails: list[str] | None = None

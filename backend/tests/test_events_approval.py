@@ -452,7 +452,35 @@ class TestApproveRejectTransitions:
         )
 
         assert resp.status_code == 200, resp.text
-        assert resp.json()["status"] == EventStatus.REJECTED.value
+        body = resp.json()
+        assert body["status"] == EventStatus.REJECTED.value
+        assert body["rejection_reason"] == "Wrong venue"
+
+    def test_reject_persists_rejection_reason_in_db(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        event = self._pending_event(db, tenant_a, popup)
+
+        resp = client.post(
+            f"/api/v1/events/{event.id}/reject",
+            headers=_auth(admin_token_tenant_a),
+            json={"reason": "Solapa con otro workshop"},
+        )
+
+        assert resp.status_code == 200, resp.text
+
+        # The endpoint commits through its own session — expire identity-map
+        # entries so the test session re-reads from the row instead of the
+        # cached pre-reject snapshot.
+        db.expire_all()
+        stored = db.exec(select(Events).where(Events.id == event.id)).one()
+        assert stored.status == EventStatus.REJECTED
+        assert stored.rejection_reason == "Solapa con otro workshop"
 
     def test_approve_on_already_published_rejected(
         self,
@@ -484,6 +512,52 @@ class TestApproveRejectTransitions:
         )
 
         assert resp.status_code == 400, resp.text
+
+    def test_portal_list_shows_owner_own_unlisted_pending_event(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        """Owner sees their own pending_approval (UNLISTED) event in the
+        portal listing — other humans don't.
+        """
+        popup = _make_popup(db, tenant_a)
+        owner = _make_human(db, tenant_a)
+        other = _make_human(db, tenant_a)
+
+        event = Events(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            owner_id=owner.id,
+            title="My Pending Event",
+            start_time="2026-05-05T14:00:00+00:00",
+            end_time="2026-05-05T15:00:00+00:00",
+            timezone="UTC",
+            visibility=EventVisibility.UNLISTED,
+            status=EventStatus.PENDING_APPROVAL,
+        )
+        db.add(event)
+        db.commit()
+        db.refresh(event)
+
+        owner_resp = client.get(
+            "/api/v1/events/portal/events",
+            headers=_human_auth(owner),
+            params={"popup_id": str(popup.id)},
+        )
+        assert owner_resp.status_code == 200, owner_resp.text
+        owner_ids = {row["id"] for row in owner_resp.json()["results"]}
+        assert str(event.id) in owner_ids
+
+        other_resp = client.get(
+            "/api/v1/events/portal/events",
+            headers=_human_auth(other),
+            params={"popup_id": str(popup.id)},
+        )
+        assert other_resp.status_code == 200, other_resp.text
+        other_ids = {row["id"] for row in other_resp.json()["results"]}
+        assert str(event.id) not in other_ids
 
     def test_reject_on_already_cancelled_rejected(
         self,

@@ -90,6 +90,13 @@ export default async function RootLayout({
   const middlewareTenantSlug = isCustomDomain
     ? (headersList.get("x-tenant-slug") ?? null)
     : null
+  const middlewareLandingMode = isCustomDomain
+    ? ((headersList.get("x-landing-mode") as "portal" | "checkout" | null) ??
+      null)
+    : null
+  const middlewareActivePopupSlug = isCustomDomain
+    ? (headersList.get("x-active-popup-slug") ?? null)
+    : null
 
   return (
     <html lang="en">
@@ -102,6 +109,8 @@ export default async function RootLayout({
           <TenantProvider
             initialTenantId={middlewareTenantId}
             initialTenantSlug={middlewareTenantSlug}
+            initialLandingMode={middlewareLandingMode}
+            initialActivePopupSlug={middlewareActivePopupSlug}
           >
             <div className="w-full">{children}</div>
           </TenantProvider>

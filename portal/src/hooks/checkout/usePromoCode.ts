@@ -44,16 +44,26 @@ export function usePromoCode({
       setError(null)
 
       try {
-        const discountValue = validatePromoCodeOverride
-          ? ((await validatePromoCodeOverride(code.toUpperCase())) ?? 0)
-          : ((
-              await CouponsService.validateCoupon({
-                requestBody: {
-                  popup_id: cityId!,
-                  code: code.toUpperCase(),
-                },
-              })
-            ).discount_value ?? 0)
+        const rawResponse = validatePromoCodeOverride
+          ? await validatePromoCodeOverride(code.toUpperCase())
+          : await CouponsService.validateCoupon({
+              requestBody: {
+                popup_id: cityId!,
+                code: code.toUpperCase(),
+              },
+            })
+        const discountValue =
+          typeof rawResponse === "number"
+            ? (rawResponse ?? 0)
+            : ((rawResponse as { discount_value?: number })?.discount_value ??
+              0)
+
+        // A 0% (or missing) discount is meaningless — surfacing it as a valid
+        // applied code confuses users ("Code applied!" + unchanged total).
+        if (discountValue <= 0) {
+          setError("Invalid promo code")
+          return false
+        }
 
         if (discountValue >= discountAppliedValue) {
           setPromoCode(code.toUpperCase())
@@ -91,6 +101,14 @@ export function usePromoCode({
   useEffect(() => {
     if (hasRevalidatedPromoRef.current || !hasRestoredCheckoutRef.current)
       return
+    // If the user already applied a promo this session, skip re-validation —
+    // applyPromoCode is authoritative. Without this guard, a saved-cart write
+    // triggered by applyPromoCode itself can race back here and clobber
+    // promoCodeDiscount to 0 if the API response is missing discount_value.
+    if (promoCodeValid) {
+      hasRevalidatedPromoRef.current = true
+      return
+    }
     if (!savedCart?.promo_code || !cityId || validatePromoCodeOverride) return
 
     hasRevalidatedPromoRef.current = true
@@ -103,6 +121,10 @@ export function usePromoCode({
     })
       .then((result) => {
         const discountValue = result.discount_value ?? 0
+        if (discountValue <= 0) {
+          toast.info("Your promo code is no longer valid")
+          return
+        }
         setPromoCode(savedCart.promo_code!)
         setPromoCodeValid(true)
         setPromoCodeDiscount(discountValue)
@@ -122,6 +144,7 @@ export function usePromoCode({
     setDiscount,
     hasRestoredCheckoutRef.current,
     validatePromoCodeOverride,
+    promoCodeValid,
   ])
 
   return {

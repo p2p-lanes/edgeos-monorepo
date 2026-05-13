@@ -48,23 +48,21 @@ def test_patch_product_sets_sale_window(
     assert create_resp.status_code == 201, create_resp.text
     product_id = create_resp.json()["id"]
 
-    # 2. PATCH with sale window
+    # 2. PATCH with sale window (date-only; backend stores datetime internally)
     patch_resp = client.patch(
         f"/api/v1/products/{product_id}",
         headers=_admin_headers(admin_token_tenant_a),
         json={
-            "sale_starts_at": "2026-06-01T00:00:00Z",
-            "sale_ends_at": "2026-07-01T00:00:00Z",
+            "sale_starts_at": "2026-06-01",
+            "sale_ends_at": "2026-07-01",
         },
     )
     assert patch_resp.status_code == 200, patch_resp.text
     data = patch_resp.json()
 
-    assert data["sale_starts_at"] is not None
-    assert data["sale_ends_at"] is not None
-    # ISO strings must round-trip; compare by date portion only (tz formatting may vary)
-    assert data["sale_starts_at"].startswith("2026-06-01")
-    assert data["sale_ends_at"].startswith("2026-07-01")
+    # Response exposes the inclusive day the operator picked, verbatim.
+    assert data["sale_starts_at"] == "2026-06-01"
+    assert data["sale_ends_at"] == "2026-07-01"
 
 
 # ---------------------------------------------------------------------------
@@ -94,8 +92,8 @@ def test_patch_product_clears_sale_window(
         f"/api/v1/products/{product_id}",
         headers=_admin_headers(admin_token_tenant_a),
         json={
-            "sale_starts_at": "2026-06-01T00:00:00Z",
-            "sale_ends_at": "2026-07-01T00:00:00Z",
+            "sale_starts_at": "2026-06-01",
+            "sale_ends_at": "2026-07-01",
         },
     )
     assert set_resp.status_code == 200, set_resp.text
@@ -129,8 +127,8 @@ def test_create_product_with_inverted_sale_window_returns_422(
     suffix = uuid.uuid4().hex[:8]
     payload = {
         **_create_product_payload(popup_tenant_a.id, suffix=suffix),
-        "sale_starts_at": "2026-07-01T00:00:00Z",  # starts after ends
-        "sale_ends_at": "2026-06-01T00:00:00Z",
+        "sale_starts_at": "2026-07-01",  # starts after ends
+        "sale_ends_at": "2026-06-01",
     }
 
     resp = client.post(

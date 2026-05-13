@@ -11,6 +11,7 @@ import {
   type EventPublic,
   EventsService,
   type EventUpdate,
+  HumansService,
   type TrackPublic,
   TracksService,
 } from "@/client"
@@ -18,6 +19,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { EventScheduleFields } from "../../components/EventScheduleFields"
+import { HostDisplayField } from "../../components/HostDisplayField"
 import {
   formatDateKeyInTz,
   formatHhmmInTz,
@@ -59,6 +61,21 @@ export function EditEventForm({
   const { t } = useTranslation()
   const router = useRouter()
   const queryClient = useQueryClient()
+
+  // Current human is used by the "Use my name" quick-fill on the Displayed
+  // host field. Matches the same query used elsewhere in the portal for
+  // ownership checks, so the cache is shared.
+  const { data: currentHuman } = useQuery({
+    queryKey: ["currentHuman"],
+    queryFn: () => HumansService.getCurrentHumanInfo(),
+  })
+  const currentHumanName =
+    [currentHuman?.first_name, currentHuman?.last_name]
+      .filter(Boolean)
+      .join(" ")
+      .trim() ||
+    currentHuman?.email ||
+    ""
 
   const { timezone } = useEventTimezone(popupId)
   const displayTz = timezone || "UTC"
@@ -261,6 +278,14 @@ export function EditEventForm({
         <VisibilityField
           value={form.visibility}
           onChange={form.setVisibility}
+        />
+
+        <HostDisplayField
+          value={form.hostDisplayName}
+          onChange={form.setHostDisplayName}
+          currentUserName={currentHumanName}
+          popupName={cityName}
+          popupId={popupId}
         />
 
         <div className="space-y-2">

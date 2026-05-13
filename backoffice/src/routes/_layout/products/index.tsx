@@ -13,23 +13,15 @@ import {
   Pencil,
   Plus,
   Trash2,
-  Upload,
 } from "lucide-react"
 import { Suspense, useState } from "react"
 
-import {
-  type ProductBatchItem,
-  type ProductBatchResult,
-  type ProductPublic,
-  ProductsService,
-} from "@/client"
-import { CsvImportDialog } from "@/components/Common/CsvImportDialog"
+import { type ProductPublic, ProductsService } from "@/client"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { StatusBadge } from "@/components/Common/StatusBadge"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
-import { productCsvColumns } from "@/components/products/useProductImport"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -298,28 +290,8 @@ function ProductsTableContent() {
 }
 
 function Products() {
-  const { isAdmin, isSuperadmin } = useAuth()
-  const { isContextReady, selectedPopupId, selectedTenantId } = useWorkspace()
-  const [importOpen, setImportOpen] = useState(false)
-  const queryClient = useQueryClient()
-  const { showSuccessToast, showErrorToast } = useCustomToast()
-
-  const importMutation = useMutation({
-    mutationFn: (rows: ProductBatchItem[]) =>
-      ProductsService.createProductsBatch({
-        requestBody: {
-          popup_id: selectedPopupId!,
-          products: rows,
-        },
-        xTenantId: isSuperadmin ? (selectedTenantId ?? undefined) : undefined,
-      }),
-    onSuccess: (results) => {
-      const successCount = results.filter((r) => r.success).length
-      showSuccessToast(`${successCount} product(s) imported`)
-      queryClient.invalidateQueries({ queryKey: ["products"] })
-    },
-    onError: createErrorHandler(showErrorToast),
-  })
+  const { isAdmin } = useAuth()
+  const { isContextReady } = useWorkspace()
 
   return (
     <div className="flex flex-col gap-6">
@@ -332,12 +304,6 @@ function Products() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {isSuperadmin && isContextReady && (
-            <Button variant="outline" onClick={() => setImportOpen(true)}>
-              <Upload className="mr-2 h-4 w-4" />
-              Import CSV
-            </Button>
-          )}
           {isAdmin && isContextReady && <AddProductButton />}
         </div>
       </div>
@@ -348,14 +314,6 @@ function Products() {
           </Suspense>
         </QueryErrorBoundary>
       )}
-      <CsvImportDialog<ProductBatchItem, ProductBatchResult>
-        open={importOpen}
-        onOpenChange={setImportOpen}
-        columns={productCsvColumns}
-        resourceName="Product"
-        onImport={(rows) => importMutation.mutateAsync(rows)}
-        isPending={importMutation.isPending}
-      />
     </div>
   )
 }

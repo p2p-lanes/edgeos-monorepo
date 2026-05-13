@@ -35,6 +35,8 @@ from app.api.payment.schemas import (
     PaymentUpdate,
 )
 from app.api.product.models import Products
+from app.api.product.product_state import ProductSaleState, derive_product_state
+from app.api.product.schemas import ProductPublic
 from app.api.shared.crud import BaseCRUD
 
 # Decimal precision for money calculations
@@ -347,6 +349,19 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 detail="Some products are not available or inactive",
             )
 
+        # Reject products outside their sale window. Closes the stale-tab
+        # loophole where the UI was rendered before sale_ends_at passed.
+        for product in valid_products:
+            state = derive_product_state(ProductPublic.model_validate(product))
+            if state != ProductSaleState.on_sale:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        f"Product '{product.name}' is not on sale "
+                        f"(state: {state.value})"
+                    ),
+                )
+
         products_map = {product.id: product for product in valid_products}
         fabricated_requests = [
             PaymentProductRequest(
@@ -447,10 +462,20 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
             portal_base = get_portal_url(tenant)
             simplefi_client = get_simplefi_client(popup.simplefi_api_key)
-            success_url = (
-                f"{portal_base}/checkout/{popup.slug}/thank-you?payment_id={payment.id}"
-            )
-            cancel_url = f"{portal_base}/checkout/{popup.slug}?cancelled=1"
+
+            # URL construction depends on tenant landing_mode (R-P1, R-P2, R-P3)
+            # When landing_mode=checkout the custom domain IS the checkout — no slug prefix.
+            # Application Fee flow (lines ~776-779) is UNCHANGED — see R-P5 / AC-P2.
+            from app.api.shared.enums import LandingMode  # noqa: PLC0415
+
+            if tenant.landing_mode == LandingMode.checkout:
+                success_url = f"{portal_base}/thank-you?payment_id={payment.id}"
+                cancel_url = f"{portal_base}/?cancelled=1"
+            else:
+                success_url = (
+                    f"{portal_base}/checkout/{popup.slug}/thank-you?payment_id={payment.id}"
+                )
+                cancel_url = f"{portal_base}/checkout/{popup.slug}?cancelled=1"
             reference = {
                 "email": buyer.email,
                 "human_id": str(buyer.id),

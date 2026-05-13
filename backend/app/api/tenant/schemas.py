@@ -5,6 +5,7 @@ from typing import Self
 from pydantic import EmailStr, model_validator
 from sqlmodel import Field, SQLModel
 
+from app.api.shared.enums import LandingMode
 from app.utils.utils import slugify
 
 
@@ -19,6 +20,7 @@ class TenantBase(SQLModel):
     logo_url: str | None = None
     custom_domain: str | None = Field(default=None, max_length=253)
     custom_domain_active: bool = False
+    landing_mode: LandingMode = LandingMode.portal
 
 
 class TenantCreate(SQLModel):
@@ -44,7 +46,6 @@ class TenantCreate(SQLModel):
 
 class TenantUpdate(SQLModel):
     name: str | None = None
-    slug: str | None = None
     sender_email: EmailStr | None = None
     sender_name: str | None = None
     image_url: str | None = None
@@ -52,12 +53,7 @@ class TenantUpdate(SQLModel):
     logo_url: str | None = None
     custom_domain: str | None = None
     custom_domain_active: bool | None = None
-
-    @model_validator(mode="after")
-    def regenerate_slug(self) -> Self:
-        if self.name:
-            self.slug = slugify(self.name)
-        return self
+    landing_mode: LandingMode | None = None
 
     @model_validator(mode="after")
     def validate_custom_domain(self) -> Self:
@@ -74,7 +70,47 @@ class TenantUpdate(SQLModel):
                 raise ValueError("custom_domain must be a valid hostname")
         return self
 
+    @model_validator(mode="after")
+    def validate_landing_mode(self) -> Self:
+        """Reject landing_mode=checkout when the same payload explicitly invalidates it.
+
+        ADR-1 (option A): schema-level check catches obvious bad payloads.
+        The router performs the definitive merged-state check against the DB row.
+
+        Rules checked here (payload-level only — None means "not changing"):
+        - checkout + custom_domain_active=False explicitly in payload → rejected (R-T2)
+        - checkout + custom_domain_active=True AND custom_domain=None in payload → rejected (R-T2)
+          (Only when custom_domain_active is explicitly True in payload and no domain provided)
+
+        When custom_domain and/or custom_domain_active are omitted from the payload
+        (None = "unchanged"), validation defers to the router's merged-state check.
+        """
+        if self.landing_mode != LandingMode.checkout:
+            return self
+
+        # Explicit deactivation in same payload
+        if self.custom_domain_active is False:
+            raise ValueError(
+                "landing_mode=checkout requires custom_domain_active=True. "
+                "Set custom_domain_active to true first."
+            )
+
+        # If custom_domain_active is explicitly True in this payload but no domain provided
+        if self.custom_domain_active is True and self.custom_domain is None:
+            raise ValueError(
+                "landing_mode=checkout requires a non-null custom_domain. "
+                "Set a custom_domain before switching to checkout mode."
+            )
+
+        # If both are absent from the payload (None), defer to router merged-state check.
+        # This allows: PATCH {"landing_mode": "checkout"} when DB already has domain active.
+
+        return self
+
 
 class TenantPublic(TenantBase):
     id: uuid.UUID
     custom_domain_active: bool  # required, no default — forces non-optional in OpenAPI
+    # Computed projection — NOT a DB column. Populated by the router after resolving
+    # the active direct-sale popup for tenants in landing_mode=checkout.
+    active_popup_slug: str | None = None

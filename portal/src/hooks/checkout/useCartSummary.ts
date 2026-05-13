@@ -17,6 +17,7 @@ interface UseCartSummaryParams {
   editCredit: number
   monthUpgradeCredit: number
   appCredit: string | number | null | undefined
+  discountValue: number
 }
 
 export function useCartSummary({
@@ -29,6 +30,7 @@ export function useCartSummary({
   editCredit,
   monthUpgradeCredit,
   appCredit,
+  discountValue,
 }: UseCartSummaryParams) {
   const summary = useMemo<CheckoutCartSummary>(() => {
     const passesSubtotal = selectedPasses.reduce((sum, p) => sum + p.price, 0)
@@ -41,24 +43,21 @@ export function useCartSummary({
     const patronSubtotal = patron?.amount ?? 0
     const insuranceSubtotal = insuranceAmount
 
-    const subtotal =
-      passesSubtotal +
-      housingSubtotal +
-      merchSubtotal +
-      patronSubtotal +
-      insuranceSubtotal
     const originalSubtotal =
       passesOriginalSubtotal +
       housingSubtotal +
       merchSubtotal +
       patronSubtotal +
       insuranceSubtotal
-    const discount = originalSubtotal - subtotal
+    // Apply discount on the original subtotal so the result is idempotent even
+    // if PassesProvider has already mutated pass prices via priceStrategy.
+    const promoDiscount = (originalSubtotal * discountValue) / 100
+    const discountedSubtotal = originalSubtotal - promoDiscount
     const accountCredit = appCredit ? Number(appCredit) : 0
     const credit = isEditing
       ? editCredit + accountCredit
       : accountCredit + monthUpgradeCredit
-    const grandTotal = Math.max(0, subtotal - credit)
+    const grandTotal = Math.max(0, discountedSubtotal - credit)
 
     const itemCount =
       selectedPasses.length +
@@ -74,7 +73,7 @@ export function useCartSummary({
       insuranceSubtotal,
       dynamicSubtotal: 0,
       subtotal: originalSubtotal,
-      discount,
+      discount: promoDiscount,
       credit,
       grandTotal,
       itemCount,
@@ -89,6 +88,7 @@ export function useCartSummary({
     editCredit,
     monthUpgradeCredit,
     appCredit,
+    discountValue,
   ])
 
   return { summary }

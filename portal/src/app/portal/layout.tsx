@@ -23,7 +23,15 @@ export default function PortalLayout({
         <BackofficeSidebar collapsible="icon" />
         <SidebarInset className="max-h-svh overflow-hidden">
           {!isProfilePage && <HeaderBar />}
-          <main className="flex-1 overflow-y-auto bg-background">
+          {/* `id` lets pages target this exact element for scroll-position
+              save/restore. `document.querySelector("main")` would resolve to
+              the outer <main> rendered by SidebarInset, which has
+              overflow-hidden and never scrolls — so reads return 0 and
+              writes are no-ops. Keep this id stable. */}
+          <main
+            id="portal-scroll"
+            className="flex-1 overflow-y-auto bg-background"
+          >
             <ResumeCheckoutBanner />
             {children}
           </main>

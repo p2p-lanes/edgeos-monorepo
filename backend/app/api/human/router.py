@@ -8,6 +8,7 @@ from app.api.api_key.schemas import ApiKeyPublic
 from app.api.human import crud
 from app.api.human.schemas import (
     HumanCreate,
+    HumanPortalPublic,
     HumanProfileUpdate,
     HumanPublic,
     HumanUpdate,
@@ -131,6 +132,34 @@ async def update_current_human(
 
     updated = crud.update(db, human, human_in)
     return HumanPublic.model_validate(updated)
+
+
+@router.get("/portal/search", response_model=ListModel[HumanPortalPublic])
+async def search_humans_portal(
+    db: HumanTenantSession,
+    _: CurrentHuman,
+    search: str | None = None,
+    skip: PaginationSkip = 0,
+    limit: PaginationLimit = 20,
+) -> ListModel[HumanPortalPublic]:
+    """Search humans in the current tenant for portal pickers.
+
+    Used by the event-creation Displayed-host field to let a creator pick a
+    participant by name. RLS already scopes to the caller's tenant via
+    HumanTenantSession; the slim response schema omits email so this isn't
+    a wider exposure than the participant lists portal users can already see.
+    """
+    humans, total = crud.find(
+        db,
+        skip=skip,
+        limit=limit,
+        search=search,
+        search_fields=["first_name", "last_name"],
+    )
+    return ListModel[HumanPortalPublic](
+        results=[HumanPortalPublic.model_validate(h) for h in humans],
+        paging=Paging(offset=skip, limit=limit, total=total),
+    )
 
 
 @router.get("/{human_id}", response_model=HumanPublic)

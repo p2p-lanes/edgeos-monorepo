@@ -2,7 +2,6 @@
 
 import { Layers } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import type { TrackPublic } from "@/client"
 import { Button } from "@/components/ui/button"
 import {
   Popover,
@@ -12,7 +11,7 @@ import {
 import { cn } from "@/lib/utils"
 
 interface TracksPopoverProps {
-  allowedTracks: TrackPublic[]
+  allowedTracks: { id: string; name: string }[]
   selectedTrackIds: string[]
   onChange: (ids: string[]) => void
   triggerClassName?: string

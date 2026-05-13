@@ -2,14 +2,19 @@ import type { ProductPublic } from "@/client"
 
 export type ProductSaleState = "upcoming" | "on_sale" | "ended" | "sold_out"
 
+/** YYYY-MM-DD for "today" in UTC, built from native Date UTC accessors. */
+const todayUtcYmd = (): string => {
+  const now = new Date()
+  const pad = (n: number) => String(n).padStart(2, "0")
+  return `${now.getUTCFullYear()}-${pad(now.getUTCMonth() + 1)}-${pad(now.getUTCDate())}`
+}
+
 /**
  * Mirror of backend `derive_product_state` (see backend/app/api/product/product_state.py).
  *
- * Reads only sale_starts_at, sale_ends_at, and stock state. Does NOT read popup
- * fields. Sold-out always wins when stock is exhausted.
- *
- * Note: the portal Product type uses total_stock_cap + total_stock_remaining
- * (not max_quantity); sold_out fires when a cap is set and remaining <= 0.
+ * Both ends of the sale window are inclusive: `sale_ends_at = "2026-01-10"`
+ * keeps the product on sale through all of Jan 10 UTC. Comparisons are
+ * lexicographic on YYYY-MM-DD strings (calendar order matches string order).
  */
 export function deriveProductState(
   product: Pick<
@@ -19,22 +24,16 @@ export function deriveProductState(
     | "total_stock_remaining"
     | "total_stock_cap"
   >,
-  now: Date = new Date(),
+  today: string = todayUtcYmd(),
 ): ProductSaleState {
-  // Determine sold_out first (overrides time-based state).
   const cap = product.total_stock_cap ?? null
   const remaining = product.total_stock_remaining ?? null
   if (cap !== null && remaining !== null && remaining <= 0) {
     return "sold_out"
   }
 
-  const starts = product.sale_starts_at
-    ? new Date(product.sale_starts_at)
-    : null
-  const ends = product.sale_ends_at ? new Date(product.sale_ends_at) : null
-
-  if (starts === null && ends === null) return "on_sale"
-  if (starts !== null && now < starts) return "upcoming"
-  if (ends !== null && now >= ends) return "ended"
+  const { sale_starts_at, sale_ends_at } = product
+  if (sale_ends_at && today > sale_ends_at) return "ended"
+  if (sale_starts_at && today < sale_starts_at) return "upcoming"
   return "on_sale"
 }

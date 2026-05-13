@@ -243,7 +243,7 @@
     "summary_redirecting": "正在跳转...",
     "summary_pay": "支付",
     "thank_you_title": "付款已完成",
-    "thank_you_description": "感谢您的购买。如果您想继续管理您的门票，可以前往门户。",
+    "thank_you_description": "感谢您的购买。我们已通过电子邮件发送您的确认信息和门票详情。",
     "thank_you_cta": "前往门户"
   },
   "passes": {
@@ -467,10 +467,18 @@
       "highlighted_title": "精选活动",
       "owned_title": "由你创建"
     },
+    "status": {
+      "draft": "草稿",
+      "published": "已发布",
+      "pending_approval": "待审批",
+      "rejected": "已拒绝",
+      "cancelled": "已取消"
+    },
     "toolbar": {
       "search_placeholder": "搜索活动...",
       "my_rsvps": "我的报名",
       "my_events": "我的活动",
+      "my_events_title": "包含草稿、待审批和已拒绝的活动",
       "hidden": "已隐藏",
       "hidden_title_showing": "正在显示已隐藏的活动",
       "hidden_title_hidden": "显示已隐藏的活动",
@@ -508,7 +516,9 @@
       "no_venues": "此 pop-up 暂未配置场地。",
       "no_venue_column": "会议",
       "offsite_column": "外部地点",
-      "untitled_venue": "未命名场地"
+      "untitled_venue": "未命名场地",
+      "enter_fullscreen": "全屏",
+      "exit_fullscreen": "退出全屏"
     },
     "add_to_calendar": {
       "title": "添加到日历",
@@ -529,9 +539,23 @@
       "registered": "已登记",
       "checked_in": "已签到"
     },
+    "login_required": {
+      "title": "登录以查看此活动",
+      "message": "登录 {{popupName}} 以查看活动详情、报名并加入您的日历。",
+      "login": "登录",
+      "cancel": "取消"
+    },
+    "public_calendar": {
+      "heading": "活动",
+      "page_title": "{{popupName}} - 日历",
+      "page_title_fallback": "日历",
+      "subheading": "{{popupName}} 的即将到来的活动",
+      "subheading_with_tz": "{{popupName}} 的即将到来的活动 — 时间显示为 {{timezone}}"
+    },
     "detail": {
       "event_not_found": "未找到活动",
       "event_not_found_message": "此活动不存在或你没有访问权限。",
+      "rejection_reason_label": "拒绝原因",
       "photo_credit": "照片:{{venueName}}",
       "description_heading": "描述",
       "invite_attendees_heading": "邀请参与者",
@@ -540,6 +564,7 @@
       "invite_button": "邀请",
       "inviting_button": "邀请中...",
       "join_meeting": "加入会议",
+      "hosted_by": "主办方：",
       "add_to_calendar_button": "添加到日历",
       "added_to_calendar_button": "已添加到日历",
       "manual_add_to_calendar_button": "手动添加到日历",
@@ -555,6 +580,14 @@
       "enter_at_least_one_email": "请至少输入一个邮箱",
       "remove_invitation_aria": "移除 {{email}} 的邀请",
       "edit_event_button": "编辑活动",
+      "cancel_event_button": "取消活动",
+      "cancel_event_dialog_title": "取消此活动？",
+      "cancel_event_dialog_description": "已报名和被邀请的参与者将收到邮件通知，活动也会从他们的日历中移除。此操作无法撤销。",
+      "cancel_event_dialog_keep": "保留活动",
+      "cancel_event_dialog_confirm": "是的，取消活动",
+      "cancel_event_dialog_loading": "正在取消…",
+      "cancel_event_success": "活动已取消",
+      "cancel_event_error": "无法取消活动",
       "pending_approval_banner_title": "等待审批",
       "pending_approval_banner_message": "你的活动正在等待审批,其他人暂时无法查看。",
       "open_in_maps": "在 Google 地图中打开"
@@ -599,6 +632,18 @@
       "visibility_public": "公开",
       "visibility_private": "私密(仅限受邀者)",
       "visibility_unlisted": "不公开列出(隐藏,可分享链接)",
+      "host_label": "显示的主办方(可选)",
+      "host_placeholder_default": "{{name}}(默认)",
+      "host_placeholder_optional": "可选",
+      "host_use_popup": "使用 {{name}}",
+      "host_use_me": "使用我的姓名",
+      "host_pick_participant": "选择参与者…",
+      "host_search_placeholder": "搜索参与者",
+      "host_searching": "搜索中…",
+      "host_no_matches": "无匹配项",
+      "host_type_to_search": "输入以搜索参与者",
+      "host_helper": "参与者在活动页面看到的名字。",
+      "host_helper_with_popup": "参与者看到的名字。留空将使用 \"{{name}}\"。",
       "visibility_private_short": "私密",
       "visibility_unlisted_short": "不公开",
       "description_label": "描述(可选)",
@@ -655,7 +700,8 @@
       "new": {
         "heading": "新建场地",
         "subheading": "在 {{cityName}} 提议一个可供活动预订的场地。",
-        "requires_approval_note": "需要管理员审核后才会出现在场地列表中。",
+        "requires_approval_banner_title": "需要管理员审核",
+        "requires_approval_note": "该场地需经审核,在管理员批准前不会出现在场地列表中。",
         "title_label": "标题",
         "title_placeholder": "例如:主礼堂",
         "location_label": "位置",
@@ -712,6 +758,8 @@
         "booking_free": "可自由预订",
         "booking_approval": "需要审核",
         "booking_unbookable": "不可预订",
+        "approval_required_banner_title": "活动需要管理员审核",
+        "approval_required_banner_message": "在此场地举办的活动需要管理员审核。预订此场地后,你的活动将处于待审核状态,在获得批准前其他人无法查看。",
         "edit_button": "编辑场地"
       }
     }

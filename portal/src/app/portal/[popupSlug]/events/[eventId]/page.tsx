@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   AlertTriangle,
   ArrowLeft,
+  Ban,
   CalendarCheck,
   CalendarDays,
   CalendarPlus,
@@ -18,13 +19,14 @@ import {
   Send,
   Tag,
   Trash2,
+  User,
   UserPlus,
   Users,
   Video,
   X,
 } from "lucide-react"
 import Link from "next/link"
-import { useParams, useSearchParams } from "next/navigation"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
@@ -40,6 +42,15 @@ import {
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 import { Pill } from "@/components/ui/pill"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
@@ -55,13 +66,19 @@ export default function EventDetailPage() {
   const { getCity } = useCityProvider()
   const city = getCity()
   const params = useParams<{ eventId: string }>()
+  const router = useRouter()
   const searchParams = useSearchParams()
   // Originating events-page URL search (e.g. "view=day&date=2026-05-15"),
   // set by Day-view links so "Back to events" can return to the same spot.
+  // We also stamp `focus=<eventId>` so the events page can scroll the
+  // matching card into view; the page consumes the param once and cleans
+  // it from the URL, so it survives a refresh on this detail page but
+  // never sticks around on the list once used.
   const fromSearch = searchParams.get("from") ?? ""
+  const focusQs = `focus=${encodeURIComponent(params.eventId)}`
   const backHref = fromSearch
-    ? `/portal/${city?.slug}/events?${fromSearch}`
-    : `/portal/${city?.slug}/events`
+    ? `/portal/${city?.slug}/events?${fromSearch}&${focusQs}`
+    : `/portal/${city?.slug}/events?${focusQs}`
   // For an expanded recurring instance, the calendar passes the occurrence's
   // ISO start time via ?occ=. We render that in place of the master's
   // start_time (and shift end_time by the same offset) so the user sees the
@@ -153,6 +170,29 @@ export default function EventDetailPage() {
         requestBody: rsvpBody,
       }),
     onSuccess: invalidateRsvpQueries,
+  })
+
+  const [cancelEventOpen, setCancelEventOpen] = useState(false)
+  const cancelEventMutation = useMutation({
+    mutationFn: () =>
+      EventsService.cancelPortalEvent({ eventId: params.eventId }),
+    onSuccess: () => {
+      toast.success(t("events.detail.cancel_event_success"))
+      queryClient.invalidateQueries({ queryKey: ["portal-events"] })
+      queryClient.invalidateQueries({ queryKey: ["portal-events-day"] })
+      queryClient.invalidateQueries({ queryKey: ["portal-events-calendar"] })
+      setCancelEventOpen(false)
+      router.push(backHref)
+    },
+    onError: (err: unknown) => {
+      const fallback = t("events.detail.cancel_event_error") as string
+      let detail = fallback
+      if (err instanceof ApiError && err.body && typeof err.body === "object") {
+        const body = err.body as { detail?: unknown }
+        if (typeof body.detail === "string") detail = body.detail
+      }
+      toast.error(detail)
+    },
   })
 
   const checkInMutation = useMutation({
@@ -300,21 +340,77 @@ export default function EventDetailPage() {
       <div className="flex items-center justify-between gap-2">
         <Link
           href={backHref}
+          // Next.js's default `scroll={true}` triggers a scroll-to-top
+          // on navigation, scheduled in a layout-level layout-effect
+          // that runs *after* the page's own layout-effects. That
+          // overrode the events page's `scrollIntoView` on the focused
+          // card and left the user back at scrollTop=0 even though
+          // `?focus=` was consumed. Disabling auto-scroll here lets the
+          // page own the scroll position; `focus=` is always present on
+          // this back href so the page will scroll the card into view
+          // itself.
+          scroll={false}
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" /> {t("events.common.back_to_events")}
         </Link>
-        {isOwner && (
-          <Button asChild variant="outline" size="sm" className="shrink-0">
-            <Link
-              href={`/portal/${city?.slug}/events/${event.id}/edit`}
-              aria-label={t("events.detail.edit_event_button")}
-            >
-              <Pencil className="mr-2 h-3.5 w-3.5" />
-              {t("events.detail.edit_event_button")}
-            </Link>
-          </Button>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {isOwner && event.status !== "cancelled" && (
+            <Dialog open={cancelEventOpen} onOpenChange={setCancelEventOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-destructive hover:text-destructive"
+                  disabled={cancelEventMutation.isPending}
+                  aria-label={t("events.detail.cancel_event_button")}
+                >
+                  <Ban className="mr-2 h-3.5 w-3.5" />
+                  {t("events.detail.cancel_event_button")}
+                </Button>
+              </DialogTrigger>
+              <DialogContent hasCloseButton={false}>
+                <DialogHeader>
+                  <DialogTitle>
+                    {t("events.detail.cancel_event_dialog_title")}
+                  </DialogTitle>
+                  <DialogDescription>
+                    {t("events.detail.cancel_event_dialog_description")}
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => setCancelEventOpen(false)}
+                    disabled={cancelEventMutation.isPending}
+                  >
+                    {t("events.detail.cancel_event_dialog_keep")}
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => cancelEventMutation.mutate()}
+                    disabled={cancelEventMutation.isPending}
+                  >
+                    {cancelEventMutation.isPending
+                      ? t("events.detail.cancel_event_dialog_loading")
+                      : t("events.detail.cancel_event_dialog_confirm")}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
+          {isOwner && (
+            <Button asChild variant="outline" size="sm">
+              <Link
+                href={`/portal/${city?.slug}/events/${event.id}/edit`}
+                aria-label={t("events.detail.edit_event_button")}
+              >
+                <Pencil className="mr-2 h-3.5 w-3.5" />
+                {t("events.detail.edit_event_button")}
+              </Link>
+            </Button>
+          )}
+        </div>
       </div>
 
       {event.status === "pending_approval" && (
@@ -326,6 +422,20 @@ export default function EventDetailPage() {
             </p>
             <p className="text-amber-900/90 dark:text-amber-100/90">
               {t("events.detail.pending_approval_banner_message")}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {isOwner && event.status === "rejected" && event.rejection_reason && (
+        <div className="flex items-start gap-2.5 rounded-xl border border-red-300 bg-red-50 p-3 text-red-900 dark:border-red-500/40 dark:bg-red-950/40 dark:text-red-100">
+          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-red-600 dark:text-red-400" />
+          <div className="text-sm">
+            <p className="font-semibold">
+              {t("events.detail.rejection_reason_label")}
+            </p>
+            <p className="text-red-900/90 dark:text-red-100/90">
+              {event.rejection_reason}
             </p>
           </div>
         </div>
@@ -440,6 +550,27 @@ export default function EventDetailPage() {
             )}
           </div>
         </div>
+        {(() => {
+          // Optional creator-chosen host name shown to participants. Falls
+          // back to the popup name so events created before this field
+          // existed (or with the field left blank) still show a host line.
+          const hostName =
+            event.host_display_name?.trim() || city?.name?.trim() || null
+          if (!hostName) return null
+          return (
+            <div className="flex items-center gap-2.5 pr-36">
+              <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
+                <User className="h-4 w-4 text-amber-600" />
+              </div>
+              <p className="text-sm">
+                <span className="text-muted-foreground">
+                  {t("events.detail.hosted_by", { defaultValue: "Hosted by " })}
+                </span>
+                <span className="font-medium">{hostName}</span>
+              </p>
+            </div>
+          )
+        })()}
         {event.rrule && (
           <div className="flex items-center gap-2.5 pr-36">
             <div className="h-8 w-8 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">
@@ -452,10 +583,12 @@ export default function EventDetailPage() {
         )}
         {event.venue_title &&
           (() => {
-            const venueHref =
-              event.venue_id && city?.slug
-                ? `/portal/${city.slug}/events/venues/${event.venue_id}`
-                : null
+            const mapsQuery = [event.venue_title, event.venue_location]
+              .filter(Boolean)
+              .join(", ")
+            const mapsUrl = mapsQuery
+              ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapsQuery)}`
+              : null
             const inner = (
               <>
                 <div className="h-8 w-8 rounded-lg bg-green-500/10 flex items-center justify-center shrink-0">
@@ -465,7 +598,7 @@ export default function EventDetailPage() {
                   <p
                     className={cn(
                       "text-sm font-medium truncate",
-                      venueHref && "group-hover:underline",
+                      mapsUrl && "group-hover:underline",
                     )}
                   >
                     {event.venue_title}
@@ -478,15 +611,23 @@ export default function EventDetailPage() {
                 </div>
               </>
             )
-            return venueHref ? (
-              <Link
-                href={venueHref}
-                className="group flex items-center gap-2.5 pr-36 -mx-2 px-2 py-1.5 rounded-md hover:bg-muted/50 transition-colors"
-              >
-                {inner}
-              </Link>
-            ) : (
-              <div className="flex items-center gap-2.5 pr-36">{inner}</div>
+            return (
+              <div className="pr-36">
+                {mapsUrl ? (
+                  <a
+                    href={mapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group flex min-w-0 items-center gap-2.5 -mx-2 px-2 py-1.5 rounded-md transition-colors hover:bg-muted/50"
+                  >
+                    {inner}
+                  </a>
+                ) : (
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    {inner}
+                  </div>
+                )}
+              </div>
             )
           })()}
         {!event.venue_title && event.custom_location_name && (

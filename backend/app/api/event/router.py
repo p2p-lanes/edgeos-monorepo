@@ -2,7 +2,7 @@ import uuid
 from collections.abc import Iterable
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from loguru import logger
 from pydantic import BaseModel
 from sqlmodel import Session
@@ -17,11 +17,15 @@ from app.api.event.recurrence import (
 from app.api.event.schemas import (
     EventAvailabilityCheck,
     EventAvailabilityResult,
+    EventCalendarMeta,
+    EventCalendarTrack,
     EventCreate,
     EventInvitationBulkCreate,
     EventInvitationBulkResult,
     EventInvitationPublic,
     EventPublic,
+    EventPublicCalendarItem,
+    EventPublicCalendarResponse,
     EventStatus,
     EventUpdate,
     EventVisibility,
@@ -29,13 +33,16 @@ from app.api.event.schemas import (
     RecurrenceUpdate,
 )
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
+from app.core.dependencies.tenants import PublicTenant
 from app.core.dependencies.users import (
     CurrentAdmin,
     CurrentHuman,
     CurrentWriter,
     HumanTenantSession,
+    SessionDep,
     TenantSession,
 )
+from app.core.rate_limit import RateLimit
 from app.services.event_itip import (
     bump_and_dispatch_cancel as _bump_and_dispatch_itip_cancel,
 )
@@ -426,6 +433,156 @@ def _invitation_visible_to_human(
 
 
 # ---------------------------------------------------------------------------
+# Public calendar (anonymous)
+# ---------------------------------------------------------------------------
+
+
+def _calendar_publicize(
+    event,
+    venue_map: dict[uuid.UUID, VenueInfo] | None,
+    track_map: dict[uuid.UUID, str] | None,
+) -> EventPublicCalendarItem:
+    """Project an Events row (or expanded pseudo-row) into the narrow
+    public calendar schema.
+
+    Never reads / forwards sensitive fields (``meeting_url``, ``content``,
+    ``owner_id``, ``tenant_id``) regardless of what ``EventPublic`` would
+    have exposed — the public schema simply does not have those fields.
+    """
+    venue_title = None
+    venue_location = None
+    venue_image_url = None
+    if event.venue_id:
+        if venue_map is not None and event.venue_id in venue_map:
+            venue_title, venue_location, venue_image_url = venue_map[event.venue_id]
+        elif venue_map is None and getattr(event, "venue", None) is not None:
+            venue_title = event.venue.title
+            venue_location = event.venue.location
+            venue_image_url = event.venue.image_url
+
+    track_title = None
+    if event.track_id:
+        if track_map is not None and event.track_id in track_map:
+            track_title = track_map[event.track_id]
+        elif track_map is None and getattr(event, "track", None) is not None:
+            track_title = event.track.name
+
+    occurrence_id = (
+        event.__dict__.get("_occurrence_id") if hasattr(event, "__dict__") else None
+    )
+
+    return EventPublicCalendarItem(
+        id=event.id,
+        title=event.title,
+        start_time=event.start_time,
+        end_time=event.end_time,
+        timezone=event.timezone,
+        kind=event.kind,
+        cover_url=event.cover_url,
+        max_participant=event.max_participant,
+        tags=list(event.tags or []),
+        highlighted=bool(event.highlighted),
+        host_display_name=event.host_display_name,
+        rrule=event.rrule,
+        recurrence_master_id=event.recurrence_master_id,
+        occurrence_id=occurrence_id,
+        venue_id=event.venue_id,
+        venue_title=venue_title,
+        venue_location=venue_location,
+        venue_image_url=venue_image_url,
+        custom_location_name=event.custom_location_name,
+        track_id=event.track_id,
+        track_title=track_title,
+    )
+
+
+@router.get(
+    "/public/calendar",
+    response_model=EventPublicCalendarResponse,
+    dependencies=[
+        Depends(
+            RateLimit(limit=120, window_sec=60, key_prefix="rl:events-public-calendar")
+        ),
+    ],
+)
+async def list_public_calendar(
+    db: SessionDep,
+    tenant: PublicTenant,
+    popup_slug: str,
+    start_after: datetime | None = None,
+    start_before: datetime | None = None,
+    search: str | None = None,
+    tags: list[str] | None = Query(default=None),
+    track_ids: list[uuid.UUID] | None = Query(default=None),
+    limit: PaginationLimit = 200,
+) -> EventPublicCalendarResponse:
+    """Anonymous calendar feed for a popup.
+
+    Tenant is resolved from Origin/Referer (or X-Tenant-Id as last
+    resort). The popup is looked up by ``popup_slug`` and validated
+    against the resolved tenant so a slug from a sibling tenant can't
+    leak events here.
+
+    Returned events are restricted server-side to ``status=published``
+    and ``visibility=public`` — cancelled, draft, pending-approval,
+    rejected, private and unlisted events are filtered out. The
+    response shape is intentionally narrower than ``EventPublic`` so
+    sensitive fields (``meeting_url``, ``content``, owner/tenant ids)
+    cannot be returned even by accident.
+    """
+    from sqlmodel import select
+
+    from app.api.event_settings.crud import event_settings_crud
+    from app.api.popup.crud import popups_crud
+    from app.api.popup.schemas import PopupStatus
+    from app.api.track.models import Tracks
+
+    popup = popups_crud.get_by_slug(db, popup_slug)
+    if not popup or popup.tenant_id != tenant.id or popup.status != PopupStatus.active:
+        # Opaque 404 — never confirm sibling-tenant popups exist.
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Popup not found"
+        )
+
+    events, _ = crud.events_crud.find_by_popup(
+        db,
+        popup_id=popup.id,
+        skip=0,
+        limit=limit,
+        event_status=EventStatus.PUBLISHED,
+        visibility=EventVisibility.PUBLIC,
+        exclude_statuses=[EventStatus.CANCELLED],
+        start_after=start_after,
+        start_before=start_before,
+        search=search,
+        tags=tags,
+        track_ids=track_ids,
+    )
+
+    venue_map = _venue_map_for_events(db, events)
+    track_map = _track_map_for_events(db, events)
+
+    settings = event_settings_crud.get_by_popup_id(db, popup.id)
+    timezone = settings.timezone if settings else "UTC"
+    allowed_tags = list(settings.allowed_tags or []) if settings else []
+
+    track_rows = list(db.exec(select(Tracks).where(Tracks.popup_id == popup.id)).all())
+    allowed_tracks = [EventCalendarTrack(id=t.id, name=t.name) for t in track_rows]
+
+    return EventPublicCalendarResponse(
+        results=[_calendar_publicize(e, venue_map, track_map) for e in events],
+        meta=EventCalendarMeta(
+            allowed_tags=allowed_tags,
+            allowed_tracks=allowed_tracks,
+            timezone=timezone,
+            popup_id=popup.id,
+            popup_slug=popup.slug,
+            popup_name=popup.name,
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
 # Backoffice endpoints (user token)
 # ---------------------------------------------------------------------------
 
@@ -539,52 +696,17 @@ async def create_event(
     event_data["tenant_id"] = tenant_id
     event_data["owner_id"] = current_user.id
 
-    # Approval overrides: an admin can create straight to published normally,
-    # but if the venue requires approval OR the requested capacity exceeds
-    # the venue's, we force the event into pending_approval and notify so
-    # the decision stays auditable even for admin-created events.
-    # Custom-location events skip this venue-based gate entirely (no venue,
-    # no booking_mode rule); the popup-level events_require_approval flag
-    # still applies further below for portal events.
-    requires_approval = False
-    approval_reason = ""
-    if event_in.venue_id is not None:
-        from app.api.event_venue import crud as venue_crud
-
-        venue = venue_crud.event_venues_crud.get(db, event_in.venue_id)
-        if venue and venue.booking_mode == "approval_required":
-            requires_approval = True
-            approval_reason = "Venue requires admin approval."
-        if (
-            venue
-            and venue.capacity
-            and event_in.max_participant
-            and event_in.max_participant > venue.capacity
-        ):
-            requires_approval = True
-            approval_reason = (
-                f"Requested max_participant ({event_in.max_participant}) "
-                f"exceeds venue capacity ({venue.capacity})."
-            )
-
-    if requires_approval:
-        event_data["status"] = EventStatus.PENDING_APPROVAL
-        event_data["visibility"] = EventVisibility.UNLISTED
+    # Admin-created events trust the requested status — picking "published"
+    # in the backoffice publishes immediately, even when the venue is
+    # ``approval_required`` or the requested capacity exceeds the venue's.
+    # The portal create endpoint still enforces its own approval gate for
+    # non-admin submissions.
 
     event = Events(**event_data)
 
     db.add(event)
     db.commit()
     db.refresh(event)
-
-    if requires_approval:
-        from app.api.event_settings.crud import event_settings_crud
-        from app.services.approval_notify import notify_event_pending_approval
-
-        settings = event_settings_crud.get_by_popup_id(db, event.popup_id)
-        await notify_event_pending_approval(
-            event, popup, settings, reason=approval_reason
-        )
 
     return _to_public(event)
 
@@ -1280,6 +1402,7 @@ async def reject_event(
             detail=f"Event is not pending approval (status={event.status})",
         )
     event.status = EventStatus.REJECTED
+    event.rejection_reason = payload.reason
     db.add(event)
     db.commit()
     db.refresh(event)
@@ -1354,8 +1477,9 @@ def _portal_visibility_filter(db, events: list, human_id: uuid.UUID) -> list:
     Rules:
     - public: visible to all.
     - private: only owner + invited humans.
-    - unlisted: visible to all humans (hidden from list, but respected here so
-      that the same helper covers both list and detail calls).
+    - unlisted: hidden from public listings, but the owner still sees their
+      own unlisted events (e.g. pending_approval requests they created).
+      Detail is reachable via direct link for non-owners.
     """
     from sqlmodel import select
 
@@ -1381,8 +1505,8 @@ def _portal_visibility_filter(db, events: list, human_id: uuid.UUID) -> list:
         if e.visibility == EventVisibility.PUBLIC:
             visible.append(e)
         elif e.visibility == EventVisibility.UNLISTED:
-            # Hide from listings; detail is reachable via direct link check.
-            continue
+            if e.owner_id == human_id:
+                visible.append(e)
         elif e.visibility == EventVisibility.PRIVATE:
             if _invitation_visible_to_human(e, human_id, invited_map.get(e.id, set())):
                 visible.append(e)
@@ -1432,6 +1556,12 @@ async def list_portal_events(
         )
 
     visible = _portal_visibility_filter(db, events, current_human.id)
+    # Cancelled events are removed from every portal listing — owners who want
+    # to see them after the fact can still hit the detail URL directly. The
+    # ``event_status`` query param can't express "exclude cancelled" alongside
+    # ``None`` (which the "mine" channel uses to include drafts/pending), so we
+    # filter here unconditionally.
+    visible = [e for e in visible if e.status != EventStatus.CANCELLED]
 
     def _rsvp_lookup_key(e) -> tuple[uuid.UUID, datetime | None] | None:
         """Build the ``(event_id, occurrence_start)`` key used to find this
@@ -1858,6 +1988,34 @@ async def update_portal_event(
     updated = crud.events_crud.update(db, event, event_in)
     if _event_calendar_fields_changed(before, updated):
         await _bump_and_dispatch_itip_update(db, updated, before=before)
+    return _to_public(updated)
+
+
+@router.post("/portal/events/{event_id}/cancel", response_model=EventPublic)
+async def cancel_portal_event(
+    event_id: uuid.UUID,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+) -> EventPublic:
+    event = crud.events_crud.get(db, event_id)
+    if not event:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
+        )
+    if event.owner_id != current_human.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the event owner can cancel",
+        )
+    if event.status == EventStatus.CANCELLED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Event is already cancelled",
+        )
+
+    cancel_update = EventUpdate(status=EventStatus.CANCELLED)
+    updated = crud.events_crud.update(db, event, cancel_update)
+    await _bump_and_dispatch_itip_cancel(db, updated)
     return _to_public(updated)
 
 

@@ -62,6 +62,29 @@ interface CalendarBodyProps {
     dayKey: string,
     scroll: EventsScrollSnapshot,
   ) => void
+  /**
+   * "authed" (default) wires up the authenticated portal experience:
+   * fetches the current human, renders the owner Crown badge, exposes
+   * RSVP buttons. "public" skips all of those — the calendar becomes
+   * read-only and event clicks delegate to ``onEventClick`` instead of
+   * navigating to the detail page.
+   */
+  mode?: "authed" | "public"
+  /**
+   * When provided, the body uses this list as the source of truth and
+   * skips the authenticated ``listPortalEvents`` query. Used by the
+   * public calendar route, which has its own anonymous data source.
+   */
+  eventsOverride?: EventPublic[]
+  /**
+   * Called when the user clicks an event card. Return ``true`` to
+   * intercept the default link navigation (the public calendar uses
+   * this to surface the LoginRequiredDialog instead of routing).
+   */
+  onEventClick?: (event: EventPublic) => boolean | undefined
+  /** Timezone forwarded to ``useEventTimezone`` when settings aren't
+   * available (public mode has no authenticated settings endpoint). */
+  timezoneOverride?: string
 }
 
 /**
@@ -78,7 +101,13 @@ export function CalendarBody({
   trackIds,
   defaultDate,
   onEventLinkClick,
+  mode = "authed",
+  eventsOverride,
+  onEventClick,
+  timezoneOverride,
 }: CalendarBodyProps) {
+  const isAuthed = mode === "authed"
+  const useOverride = eventsOverride !== undefined
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [currentMonth, setCurrentMonth] = useState(
@@ -98,13 +127,16 @@ export function CalendarBody({
     setCurrentMonth(defaultDate)
     setSelectedDate(defaultDate)
   }, [defaultDate])
-  const { formatTime, formatDayKey, formatGridDayKey } =
-    useEventTimezone(popupId)
+  const { formatTime, formatDayKey, formatGridDayKey } = useEventTimezone(
+    popupId,
+    timezoneOverride,
+  )
 
   const { data: currentHuman } = useQuery({
     queryKey: ["current-human"],
     queryFn: () => HumansService.getCurrentHumanInfo(),
     staleTime: 5 * 60 * 1000,
+    enabled: isAuthed,
   })
 
   const { data } = useQuery({
@@ -129,7 +161,7 @@ export function CalendarBody({
         trackIds: trackIds?.length ? trackIds : undefined,
         limit: 200,
       }),
-    enabled: !!popupId,
+    enabled: isAuthed && !useOverride && !!popupId,
   })
 
   // For recurring instances we must include occurrence_start; one-off events
@@ -157,7 +189,7 @@ export function CalendarBody({
     },
   })
 
-  const events = data?.results ?? []
+  const events = useOverride ? (eventsOverride ?? []) : (data?.results ?? [])
 
   function getEventsForDate(date: Date): EventPublic[] {
     const cellKey = formatGridDayKey(date)
@@ -192,10 +224,22 @@ export function CalendarBody({
       ? `${base}${fromParam ? "&" : "?"}occ=${encodeURIComponent(event.start_time)}`
       : base
   }
-  const handleEventClick = () => {
+  const handleEventClick = (
+    event: EventPublic,
+    e: React.MouseEvent<HTMLAnchorElement>,
+  ) => {
+    if (onEventClick) {
+      const handled = onEventClick(event)
+      if (handled === true) {
+        e.preventDefault()
+        return
+      }
+    }
     if (!onEventLinkClick || !selectedDayKey) return
     const main =
-      typeof document !== "undefined" ? document.querySelector("main") : null
+      typeof document !== "undefined"
+        ? document.getElementById("portal-scroll")
+        : null
     onEventLinkClick("calendar", selectedDayKey, {
       outer: main?.scrollTop ?? 0,
     })
@@ -315,6 +359,7 @@ export function CalendarBody({
                   return (
                     <div
                       key={event.id}
+                      id={`event-card-${event.id}`}
                       className={cn(
                         "relative rounded-xl border bg-card hover:shadow-md transition-shadow overflow-hidden",
                         isHighlighted &&
@@ -323,7 +368,7 @@ export function CalendarBody({
                     >
                       <Link
                         href={eventHref(event)}
-                        onClick={handleEventClick}
+                        onClick={(e) => handleEventClick(event, e)}
                         className="block p-3"
                       >
                         <div className="flex items-start gap-3">
@@ -412,7 +457,7 @@ export function CalendarBody({
                           </div>
                         </div>
                       </Link>
-                      {event.status === "published" && (
+                      {isAuthed && event.status === "published" && (
                         <div className="absolute top-2 right-2">
                           {event.my_rsvp_status &&
                           event.my_rsvp_status !== "cancelled" ? (

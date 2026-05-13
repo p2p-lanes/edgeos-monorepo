@@ -90,12 +90,6 @@ const TICKET_DURATIONS: { value: TicketDuration; label: string }[] = [
   { value: "full", label: "Full Event" },
 ]
 
-/** Extract YYYY-MM-DD from an ISO date string like "2026-05-10T00:00:00Z" */
-const toDateInputValue = (iso?: string | null): string => {
-  if (!iso) return ""
-  return iso.slice(0, 10)
-}
-
 export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -190,8 +184,8 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
       exclusive: defaultValues?.exclusive ?? false,
       total_stock_cap: defaultValues?.total_stock_cap?.toString() ?? "",
       max_per_order: defaultValues?.max_per_order?.toString() ?? "",
-      sale_starts_at: toDateInputValue(defaultValues?.sale_starts_at),
-      sale_ends_at: toDateInputValue(defaultValues?.sale_ends_at),
+      sale_starts_at: defaultValues?.sale_starts_at ?? "",
+      sale_ends_at: defaultValues?.sale_ends_at ?? "",
       insurance_eligible: defaultValues?.insurance_eligible ?? false,
     },
     onSubmit: ({ value }) => {

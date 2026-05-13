@@ -8,6 +8,9 @@ interface ChipInputProps {
   onChange: (next: string[]) => void
   disabled?: boolean
   placeholder?: string
+  // Optional per-entry validator. Entries that return false are silently
+  // dropped on add — pair with a hint in the help text.
+  validate?: (entry: string) => boolean
 }
 
 export function ChipInput({
@@ -15,6 +18,7 @@ export function ChipInput({
   onChange,
   disabled,
   placeholder,
+  validate,
 }: ChipInputProps) {
   const [draft, setDraft] = useState("")
 
@@ -22,10 +26,11 @@ export function ChipInput({
   // pasting "a, b, c" then pressing Enter creates 3 chips at once.
   const addMany = (raw: string) => {
     if (disabled) return
-    const incoming = raw
+    let incoming = raw
       .split(",")
       .map((t) => t.trim().toLowerCase())
       .filter(Boolean)
+    if (validate) incoming = incoming.filter(validate)
     if (incoming.length === 0) {
       setDraft("")
       return

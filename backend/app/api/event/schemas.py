@@ -88,12 +88,20 @@ class EventBase(SQLModel):
     visibility: EventVisibility = Field(default=EventVisibility.PUBLIC, max_length=20)
     require_approval: bool = Field(default=False)
     kind: str | None = Field(default=None, max_length=100)
+    # Optional display name shown to participants on the portal event detail
+    # page. When NULL the portal falls back to the tenant's name. Free text;
+    # event creators choose any of: tenant name, their own name, a participant's
+    # name, or a custom value — all stored as plain text.
+    host_display_name: str | None = Field(default=None, max_length=255)
     status: EventStatus = Field(default=EventStatus.DRAFT)
     # When true, portal clients render the event with a "special" treatment
     # (badge, accent border) so it stands out in the list/day/calendar views.
     highlighted: bool = Field(
         default=False, sa_column_kwargs={"server_default": "false"}
     )
+    # Admin-provided reason captured when an event is rejected. Persisted so
+    # the owner can see why their request was denied in the portal.
+    rejection_reason: str | None = Field(default=None, sa_type=Text())
     # --- Recurrence ------------------------------------------------------
     # Canonical RRULE string (RFC-5545 subset). NULL for one-off events.
     rrule: str | None = Field(default=None, sa_type=Text())
@@ -174,6 +182,67 @@ class EventPublic(EventBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+class EventPublicCalendarItem(BaseModel):
+    """Minimal, read-only event projection for the public calendar.
+
+    Excludes fields that are either sensitive (``meeting_url``,
+    ``tenant_id``, ``owner_id``, ``rejection_reason``) or only meaningful
+    to authenticated humans (``hidden``, ``my_rsvp_status``,
+    ``visibility``, ``require_approval``, ``ical_sequence``, ``content``).
+    """
+
+    id: uuid.UUID
+    title: str
+    start_time: datetime
+    end_time: datetime
+    timezone: str
+    kind: str | None = None
+    cover_url: str | None = None
+    max_participant: int | None = None
+    tags: list[str] = []
+    highlighted: bool = False
+    host_display_name: str | None = None
+    rrule: str | None = None
+    recurrence_master_id: uuid.UUID | None = None
+    occurrence_id: str | None = None
+    venue_id: uuid.UUID | None = None
+    venue_title: str | None = None
+    venue_location: str | None = None
+    venue_image_url: str | None = None
+    custom_location_name: str | None = None
+    track_id: uuid.UUID | None = None
+    track_title: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class EventCalendarTrack(BaseModel):
+    """Minimal track projection for the public calendar toolbar."""
+
+    id: uuid.UUID
+    name: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class EventCalendarMeta(BaseModel):
+    """Toolbar/filter metadata bundled with the public calendar list."""
+
+    allowed_tags: list[str] = []
+    allowed_tracks: list[EventCalendarTrack] = []
+    timezone: str = "UTC"
+    popup_id: uuid.UUID
+    popup_slug: str
+    popup_name: str
+
+
+class EventPublicCalendarResponse(BaseModel):
+    """Wrapper response for ``GET /events/public/calendar``."""
+
+    results: list[EventPublicCalendarItem]
+    meta: EventCalendarMeta
+
+
 class EventCreate(BaseModel):
     """Event schema for creation."""
 
@@ -194,6 +263,7 @@ class EventCreate(BaseModel):
     visibility: EventVisibility = EventVisibility.PUBLIC
     require_approval: bool = False
     kind: str | None = None
+    host_display_name: str | None = None
     status: EventStatus = EventStatus.DRAFT
     highlighted: bool = False
     recurrence: RecurrenceRule | None = None
@@ -229,6 +299,7 @@ class EventUpdate(BaseModel):
     visibility: EventVisibility | None = None
     require_approval: bool | None = None
     kind: str | None = None
+    host_display_name: str | None = None
     status: EventStatus | None = None
     highlighted: bool | None = None
 

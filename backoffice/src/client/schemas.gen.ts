@@ -3538,6 +3538,30 @@ export const CheckoutRuntimeProductSchema = {
             ],
             title: 'End Date'
         },
+        sale_starts_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sale Starts At'
+        },
+        sale_ends_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Sale Ends At'
+        },
         total_stock_cap: {
             anyOf: [
                 {
@@ -4442,6 +4466,67 @@ export const EventAvailabilityResultSchema = {
     title: 'EventAvailabilityResult'
 } as const;
 
+export const EventCalendarMetaSchema = {
+    properties: {
+        allowed_tags: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Allowed Tags',
+            default: []
+        },
+        allowed_tracks: {
+            items: {
+                '$ref': '#/components/schemas/EventCalendarTrack'
+            },
+            type: 'array',
+            title: 'Allowed Tracks',
+            default: []
+        },
+        timezone: {
+            type: 'string',
+            title: 'Timezone',
+            default: 'UTC'
+        },
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        popup_slug: {
+            type: 'string',
+            title: 'Popup Slug'
+        },
+        popup_name: {
+            type: 'string',
+            title: 'Popup Name'
+        }
+    },
+    type: 'object',
+    required: ['popup_id', 'popup_slug', 'popup_name'],
+    title: 'EventCalendarMeta',
+    description: 'Toolbar/filter metadata bundled with the public calendar list.'
+} as const;
+
+export const EventCalendarTrackSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        }
+    },
+    type: 'object',
+    required: ['id', 'name'],
+    title: 'EventCalendarTrack',
+    description: 'Minimal track projection for the public calendar toolbar.'
+} as const;
+
 export const EventCreateSchema = {
     properties: {
         popup_id: {
@@ -4585,6 +4670,17 @@ export const EventCreateSchema = {
                 }
             ],
             title: 'Kind'
+        },
+        host_display_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Host Display Name'
         },
         status: {
             '$ref': '#/components/schemas/EventStatus',
@@ -5065,6 +5161,18 @@ export const EventPublicSchema = {
             ],
             title: 'Kind'
         },
+        host_display_name: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 255
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Host Display Name'
+        },
         status: {
             '$ref': '#/components/schemas/EventStatus',
             default: 'draft'
@@ -5073,6 +5181,17 @@ export const EventPublicSchema = {
             type: 'boolean',
             title: 'Highlighted',
             default: false
+        },
+        rejection_reason: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Rejection Reason'
         },
         rrule: {
             anyOf: [
@@ -5203,6 +5322,232 @@ export const EventPublicSchema = {
     description: 'Event schema for API responses.'
 } as const;
 
+export const EventPublicCalendarItemSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        title: {
+            type: 'string',
+            title: 'Title'
+        },
+        start_time: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Start Time'
+        },
+        end_time: {
+            type: 'string',
+            format: 'date-time',
+            title: 'End Time'
+        },
+        timezone: {
+            type: 'string',
+            title: 'Timezone'
+        },
+        kind: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Kind'
+        },
+        cover_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Cover Url'
+        },
+        max_participant: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Max Participant'
+        },
+        tags: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Tags',
+            default: []
+        },
+        highlighted: {
+            type: 'boolean',
+            title: 'Highlighted',
+            default: false
+        },
+        host_display_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Host Display Name'
+        },
+        rrule: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Rrule'
+        },
+        recurrence_master_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Recurrence Master Id'
+        },
+        occurrence_id: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Occurrence Id'
+        },
+        venue_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Venue Id'
+        },
+        venue_title: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Venue Title'
+        },
+        venue_location: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Venue Location'
+        },
+        venue_image_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Venue Image Url'
+        },
+        custom_location_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Custom Location Name'
+        },
+        track_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Track Id'
+        },
+        track_title: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Track Title'
+        }
+    },
+    type: 'object',
+    required: ['id', 'title', 'start_time', 'end_time', 'timezone'],
+    title: 'EventPublicCalendarItem',
+    description: `Minimal, read-only event projection for the public calendar.
+
+Excludes fields that are either sensitive (\`\`meeting_url\`\`,
+\`\`tenant_id\`\`, \`\`owner_id\`\`, \`\`rejection_reason\`\`) or only meaningful
+to authenticated humans (\`\`hidden\`\`, \`\`my_rsvp_status\`\`,
+\`\`visibility\`\`, \`\`require_approval\`\`, \`\`ical_sequence\`\`, \`\`content\`\`).`
+} as const;
+
+export const EventPublicCalendarResponseSchema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/EventPublicCalendarItem'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        meta: {
+            '$ref': '#/components/schemas/EventCalendarMeta'
+        }
+    },
+    type: 'object',
+    required: ['results', 'meta'],
+    title: 'EventPublicCalendarResponse',
+    description: 'Wrapper response for ``GET /events/public/calendar``.'
+} as const;
+
 export const EventSettingsCreateSchema = {
     properties: {
         popup_id: {
@@ -5255,16 +5600,13 @@ export const EventSettingsCreateSchema = {
             title: 'Allowed Kinds',
             default: []
         },
-        approval_notification_email: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Approval Notification Email'
+        approval_notification_emails: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Approval Notification Emails',
+            default: []
         }
     },
     type: 'object',
@@ -5329,16 +5671,12 @@ export const EventSettingsPublicSchema = {
             type: 'array',
             title: 'Allowed Kinds'
         },
-        approval_notification_email: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Approval Notification Email'
+        approval_notification_emails: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Approval Notification Emails'
         },
         created_at: {
             type: 'string',
@@ -5457,16 +5795,19 @@ export const EventSettingsUpdateSchema = {
             ],
             title: 'Allowed Kinds'
         },
-        approval_notification_email: {
+        approval_notification_emails: {
             anyOf: [
                 {
-                    type: 'string'
+                    items: {
+                        type: 'string'
+                    },
+                    type: 'array'
                 },
                 {
                     type: 'null'
                 }
             ],
-            title: 'Approval Notification Email'
+            title: 'Approval Notification Emails'
         }
     },
     type: 'object',
@@ -5663,6 +6004,17 @@ export const EventUpdateSchema = {
                 }
             ],
             title: 'Kind'
+        },
+        host_display_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Host Display Name'
         },
         status: {
             anyOf: [
@@ -7762,6 +8114,57 @@ export const HumanCreateSchema = {
     description: 'Human schema for creation.'
 } as const;
 
+export const HumanPortalPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        first_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'First Name'
+        },
+        last_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Name'
+        },
+        picture_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Picture Url'
+        }
+    },
+    type: 'object',
+    required: ['id'],
+    title: 'HumanPortalPublic',
+    description: `Slim human profile for portal-facing pickers (event host, mentions…).
+
+Intentionally excludes email and contact fields: portal-authenticated
+callers can already see other humans' names in event participant lists,
+so name + avatar is the same privacy bar without leaking emails.`
+} as const;
+
 export const HumanProfileUpdateSchema = {
     properties: {
         first_name: {
@@ -8121,6 +8524,17 @@ export const KeyMetricsSchema = {
     description: 'Top-level KPI cards with derived metrics.'
 } as const;
 
+export const LandingModeSchema = {
+    type: 'string',
+    enum: ['portal', 'checkout'],
+    title: 'LandingMode',
+    description: `Per-tenant landing mode for custom domains.
+
+- portal: standard portal experience (default for all tenants).
+- checkout: custom domain opens the active direct-sale popup checkout directly.
+Extensible for future modes (e.g. splash, events) without schema changes.`
+} as const;
+
 export const ListModelSchema = {
     properties: {
         results: {
@@ -8405,6 +8819,24 @@ export const ListModel_GroupPublic_Schema = {
     type: 'object',
     required: ['results', 'paging'],
     title: 'ListModel[GroupPublic]'
+} as const;
+
+export const ListModel_HumanPortalPublic_Schema = {
+    properties: {
+        results: {
+            items: {
+                '$ref': '#/components/schemas/HumanPortalPublic'
+            },
+            type: 'array',
+            title: 'Results'
+        },
+        paging: {
+            '$ref': '#/components/schemas/Paging'
+        }
+    },
+    type: 'object',
+    required: ['results', 'paging'],
+    title: 'ListModel[HumanPortalPublic]'
 } as const;
 
 export const ListModel_HumanPublic_Schema = {
@@ -9764,6 +10196,11 @@ export const PopupAdminSchema = {
             title: 'Self Check In Enabled',
             default: false
         },
+        show_attendee_directory: {
+            type: 'boolean',
+            title: 'Show Attendee Directory',
+            default: false
+        },
         id: {
             type: 'string',
             format: 'uuid',
@@ -10129,6 +10566,11 @@ export const PopupCreateSchema = {
             type: 'boolean',
             title: 'Self Check In Enabled',
             default: false
+        },
+        show_attendee_directory: {
+            type: 'boolean',
+            title: 'Show Attendee Directory',
+            default: false
         }
     },
     type: 'object',
@@ -10410,6 +10852,11 @@ export const PopupPublicSchema = {
             type: 'boolean',
             title: 'Events Enabled',
             default: true
+        },
+        show_attendee_directory: {
+            type: 'boolean',
+            title: 'Show Attendee Directory',
+            default: false
         }
     },
     type: 'object',
@@ -10957,6 +11404,17 @@ export const PopupUpdateSchema = {
                 }
             ],
             title: 'Self Check In Enabled'
+        },
+        show_attendee_directory: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Show Attendee Directory'
         }
     },
     additionalProperties: false,
@@ -11199,7 +11657,7 @@ export const ProductBatchItemSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date-time'
+                    format: 'date'
                 },
                 {
                     type: 'null'
@@ -11211,7 +11669,7 @@ export const ProductBatchItemSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date-time'
+                    format: 'date'
                 },
                 {
                     type: 'null'
@@ -11370,7 +11828,7 @@ export const ProductBatchResultSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date-time'
+                    format: 'date'
                 },
                 {
                     type: 'null'
@@ -11382,7 +11840,7 @@ export const ProductBatchResultSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date-time'
+                    format: 'date'
                 },
                 {
                     type: 'null'
@@ -11608,7 +12066,7 @@ export const ProductCreateSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date-time'
+                    format: 'date'
                 },
                 {
                     type: 'null'
@@ -11620,7 +12078,7 @@ export const ProductCreateSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date-time'
+                    format: 'date'
                 },
                 {
                     type: 'null'
@@ -11799,7 +12257,7 @@ export const ProductPublicSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date-time'
+                    format: 'date'
                 },
                 {
                     type: 'null'
@@ -11811,7 +12269,7 @@ export const ProductPublicSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date-time'
+                    format: 'date'
                 },
                 {
                     type: 'null'
@@ -11881,7 +12339,12 @@ export const ProductPublicSchema = {
     type: 'object',
     required: ['tenant_id', 'popup_id', 'name', 'slug', 'price', 'id'],
     title: 'ProductPublic',
-    description: 'Product schema for API responses.'
+    description: `Product schema for API responses.
+
+Sale window fields are exposed as \`date\` (inclusive day) even though they
+are persisted as \`datetime\` UTC (exclusive instant). \`sale_ends_at\` is
+de-bumped by 1 day so the response shows the last day the product is on
+sale — the canonical "operator-friendly" representation.`
 } as const;
 
 export const ProductUpdateSchema = {
@@ -11997,7 +12460,7 @@ export const ProductUpdateSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date-time'
+                    format: 'date'
                 },
                 {
                     type: 'null'
@@ -12009,7 +12472,7 @@ export const ProductUpdateSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date-time'
+                    format: 'date'
                 },
                 {
                     type: 'null'
@@ -12191,7 +12654,7 @@ export const ProductWithQuantitySchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date-time'
+                    format: 'date'
                 },
                 {
                     type: 'null'
@@ -12203,7 +12666,7 @@ export const ProductWithQuantitySchema = {
             anyOf: [
                 {
                     type: 'string',
-                    format: 'date-time'
+                    format: 'date'
                 },
                 {
                     type: 'null'
@@ -13090,10 +13553,25 @@ export const TenantPublicSchema = {
             type: 'boolean',
             title: 'Custom Domain Active'
         },
+        landing_mode: {
+            '$ref': '#/components/schemas/LandingMode',
+            default: 'portal'
+        },
         id: {
             type: 'string',
             format: 'uuid',
             title: 'Id'
+        },
+        active_popup_slug: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Active Popup Slug'
         }
     },
     type: 'object',
@@ -13113,17 +13591,6 @@ export const TenantUpdateSchema = {
                 }
             ],
             title: 'Name'
-        },
-        slug: {
-            anyOf: [
-                {
-                    type: 'string'
-                },
-                {
-                    type: 'null'
-                }
-            ],
-            title: 'Slug'
         },
         sender_email: {
             anyOf: [
@@ -13202,6 +13669,16 @@ export const TenantUpdateSchema = {
                 }
             ],
             title: 'Custom Domain Active'
+        },
+        landing_mode: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/LandingMode'
+                },
+                {
+                    type: 'null'
+                }
+            ]
         }
     },
     type: 'object',

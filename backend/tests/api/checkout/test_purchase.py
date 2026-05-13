@@ -1,6 +1,7 @@
 """Tests for POST /checkout/{slug}/purchase — CAP-C."""
 
 import uuid
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -42,7 +43,13 @@ def _make_popup(
 
 
 def _make_product(
-    db: Session, popup: Popups, *, name: str = "GA", price: str = "100.00"
+    db: Session,
+    popup: Popups,
+    *,
+    name: str = "GA",
+    price: str = "100.00",
+    sale_starts_at: datetime | None = None,
+    sale_ends_at: datetime | None = None,
 ) -> Products:
     product = Products(
         id=uuid.uuid4(),
@@ -53,6 +60,8 @@ def _make_product(
         price=price,
         category="ticket",
         is_active=True,
+        sale_starts_at=sale_starts_at,
+        sale_ends_at=sale_ends_at,
     )
     db.add(product)
     db.flush()
@@ -242,6 +251,74 @@ def test_purchase_provider_failure_returns_502(
         )
 
     assert response.status_code == 502, response.text
+
+
+def test_purchase_with_ended_sale_window_returns_422(
+    client: TestClient,
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    """Product whose sale_ends_at has already passed cannot be purchased."""
+    popup = _make_popup(db, tenant_a, slug_prefix="ended")
+    # sale_ends_at = yesterday 00:00 UTC → exclusive instant, means last on-sale
+    # day was the day before yesterday. derive_product_state → ended.
+    yesterday_midnight = datetime.now(UTC).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    ) - timedelta(days=1)
+    product = _make_product(db, popup, sale_ends_at=yesterday_midnight)
+    section = _make_section(db, popup)
+    field = _make_field(db, popup, section)
+    db.commit()
+
+    response = client.post(
+        f"/api/v1/checkout/{popup.slug}/purchase",
+        json={
+            "products": [{"product_id": str(product.id), "quantity": 1}],
+            "buyer": {
+                "email": "buyer@test.com",
+                "first_name": "Matias",
+                "last_name": "Walter",
+                "form_data": {field.name: "Matias"},
+            },
+        },
+        headers={"X-Tenant-Id": str(tenant_a.id)},
+    )
+
+    assert response.status_code == 422, response.text
+    assert "not on sale" in response.json()["detail"]
+
+
+def test_purchase_with_upcoming_sale_window_returns_422(
+    client: TestClient,
+    db: Session,
+    tenant_a: Tenants,
+) -> None:
+    """Product whose sale_starts_at is in the future cannot be purchased yet."""
+    popup = _make_popup(db, tenant_a, slug_prefix="upcoming")
+    tomorrow_midnight = datetime.now(UTC).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    ) + timedelta(days=2)
+    product = _make_product(db, popup, sale_starts_at=tomorrow_midnight)
+    section = _make_section(db, popup)
+    field = _make_field(db, popup, section)
+    db.commit()
+
+    response = client.post(
+        f"/api/v1/checkout/{popup.slug}/purchase",
+        json={
+            "products": [{"product_id": str(product.id), "quantity": 1}],
+            "buyer": {
+                "email": "buyer@test.com",
+                "first_name": "Matias",
+                "last_name": "Walter",
+                "form_data": {field.name: "Matias"},
+            },
+        },
+        headers={"X-Tenant-Id": str(tenant_a.id)},
+    )
+
+    assert response.status_code == 422, response.text
+    assert "not on sale" in response.json()["detail"]
 
 
 def test_purchase_rate_limit_returns_429(
