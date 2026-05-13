@@ -2626,6 +2626,7 @@ export type TicketingStepCreate = {
     watermark?: (string | null);
     show_title?: boolean;
     show_watermark?: boolean;
+    show_in_navbar?: boolean;
     emoji?: (string | null);
 };
 
@@ -2647,6 +2648,7 @@ export type TicketingStepPublic = {
     watermark?: (string | null);
     show_title?: boolean;
     show_watermark?: boolean;
+    show_in_navbar?: boolean;
     emoji?: (string | null);
 };
 
@@ -2663,6 +2665,7 @@ export type TicketingStepUpdate = {
     watermark?: (string | null);
     show_title?: (boolean | null);
     show_watermark?: (boolean | null);
+    show_in_navbar?: (boolean | null);
     emoji?: (string | null);
 };
 

@@ -23,6 +23,7 @@ class TicketingStepBase(SQLModel):
     watermark: str | None = Field(default=None, nullable=True)
     show_title: bool = Field(default=True)
     show_watermark: bool = Field(default=True)
+    show_in_navbar: bool = Field(default=True)
     emoji: str | None = Field(default=None, nullable=True, max_length=8)
 
 
@@ -42,6 +43,7 @@ class TicketingStepPublic(BaseModel):
     watermark: str | None = None
     show_title: bool = True
     show_watermark: bool = True
+    show_in_navbar: bool = True
     emoji: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
@@ -60,6 +62,7 @@ class TicketingStepCreate(BaseModel):
     watermark: str | None = None
     show_title: bool = True
     show_watermark: bool = True
+    show_in_navbar: bool = True
     emoji: str | None = None
 
 
@@ -74,4 +77,5 @@ class TicketingStepUpdate(BaseModel):
     watermark: str | None = None
     show_title: bool | None = None
     show_watermark: bool | None = None
+    show_in_navbar: bool | None = None
     emoji: str | None = None

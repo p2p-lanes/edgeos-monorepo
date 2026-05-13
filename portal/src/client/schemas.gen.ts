@@ -13707,6 +13707,11 @@ export const TicketingStepCreateSchema = {
             title: 'Show Watermark',
             default: true
         },
+        show_in_navbar: {
+            type: 'boolean',
+            title: 'Show In Navbar',
+            default: true
+        },
         emoji: {
             anyOf: [
                 {
@@ -13828,6 +13833,11 @@ export const TicketingStepPublicSchema = {
         show_watermark: {
             type: 'boolean',
             title: 'Show Watermark',
+            default: true
+        },
+        show_in_navbar: {
+            type: 'boolean',
+            title: 'Show In Navbar',
             default: true
         },
         emoji: {
@@ -13959,6 +13969,17 @@ export const TicketingStepUpdateSchema = {
                 }
             ],
             title: 'Show Watermark'
+        },
+        show_in_navbar: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Show In Navbar'
         },
         emoji: {
             anyOf: [
