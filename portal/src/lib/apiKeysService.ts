@@ -5,7 +5,11 @@ import {
   ApiKeysService as GeneratedApiKeysService,
 } from "@/client"
 
-export type ApiKeyScope = "events:read" | "events:write" | "rsvp:write"
+export type ApiKeyScope =
+  | "events:read"
+  | "events:write"
+  | "rsvp:write"
+  | "venues:write"
 export type ApiKeyCreateBody = ApiKeyCreate
 export type { ApiKeyCreated, ApiKeyPublic }
 
