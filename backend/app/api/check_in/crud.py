@@ -44,7 +44,7 @@ def record_check_in(
         popup_id=popup_id,
         attendee_product_id=attendee_product_id,
         actor_user_id=actor_user_id,
-        payload=payload.model_dump(),
+        payload=payload.model_dump(mode="json", exclude_none=True),
     )
     session.add(event)
     session.commit()

@@ -15,6 +15,9 @@ vi.mock("@/client", () => ({
   CheckInService: {
     listCheckIns: vi.fn(),
   },
+  PopupsService: {
+    getPopup: vi.fn(),
+  },
 }))
 
 vi.mock("@tanstack/react-router", async () => {

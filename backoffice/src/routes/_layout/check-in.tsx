@@ -1,20 +1,43 @@
-import { keepPreviousData, useQuery } from "@tanstack/react-query"
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
 import type { ColumnDef, Row } from "@tanstack/react-table"
-import { ChevronDown, ChevronRight, ClipboardCheck } from "lucide-react"
+import {
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Clipboard,
+  ClipboardCheck,
+} from "lucide-react"
 import { Suspense } from "react"
+import QRCode from "react-qr-code"
 
-import { type CheckInListItem, CheckInService } from "@/client"
+import { type CheckInListItem, CheckInService, PopupsService } from "@/client"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
+import { Button } from "@/components/ui/button"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
+import { useCopyToClipboard } from "@/hooks/useCopyToClipboard"
+import { useCurrentTenant } from "@/hooks/useCurrentTenant"
 import {
   useTableSearchParams,
   validateTableSearch,
 } from "@/hooks/useTableSearchParams"
+import { getPortalBaseUrl, getSelfCheckInUrl } from "@/lib/portal-urls"
 
 // ── Search params ─────────────────────────────────────────────────────────────
 
@@ -194,6 +217,99 @@ function CheckInTableContent() {
   )
 }
 
+function SelfServiceCheckInCard() {
+  const { selectedPopupId } = useWorkspace()
+  const queryClient = useQueryClient()
+  const { data: tenant, isLoading: isTenantLoading } = useCurrentTenant()
+  const [copiedText, copy] = useCopyToClipboard()
+  const { data: popup, isLoading } = useQuery({
+    queryKey: ["popups", selectedPopupId],
+    queryFn: () => PopupsService.getPopup({ popupId: selectedPopupId! }),
+    enabled: !!selectedPopupId,
+  })
+  const toggleMutation = useMutation({
+    mutationFn: (enabled: boolean) =>
+      PopupsService.updatePopup({
+        popupId: selectedPopupId!,
+        requestBody: { self_check_in_enabled: enabled },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["popups"] })
+    },
+  })
+
+  if (isLoading || isTenantLoading) return <Skeleton className="h-56 w-full" />
+
+  const baseUrl = getPortalBaseUrl(tenant)
+  const selfCheckInUrl =
+    baseUrl && popup?.slug ? getSelfCheckInUrl(baseUrl, popup.slug) : null
+  const copied = copiedText === selfCheckInUrl
+
+  if (!selfCheckInUrl) return null
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Self-service check-in</CardTitle>
+        <CardDescription>
+          Share this URL or QR code with attendees so they can check themselves
+          in from the portal.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {!popup?.self_check_in_enabled ? (
+          <div className="flex flex-col gap-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between">
+            <span>Self-service check-in is disabled for this pop-up</span>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="border-amber-300 bg-white text-amber-950 hover:bg-amber-100"
+              disabled={toggleMutation.isPending}
+              onClick={() => toggleMutation.mutate(true)}
+            >
+              {toggleMutation.isPending ? "Enabling..." : "Enable"}
+            </Button>
+          </div>
+        ) : (
+          <div className="grid gap-5 md:grid-cols-[1fr_auto]">
+            <div className="space-y-4">
+              <div className="rounded-md border bg-muted/40 p-3 font-mono text-sm break-all">
+                {selfCheckInUrl}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => copy(selfCheckInUrl)}
+                >
+                  {copied ? (
+                    <Check className="h-4 w-4" />
+                  ) : (
+                    <Clipboard className="h-4 w-4" />
+                  )}
+                  {copied ? "Copied" : "Copy URL"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={toggleMutation.isPending}
+                  onClick={() => toggleMutation.mutate(false)}
+                >
+                  {toggleMutation.isPending ? "Disabling..." : "Disable"}
+                </Button>
+              </div>
+            </div>
+            <div className="rounded-lg border bg-white p-3">
+              <QRCode value={selfCheckInUrl} size={160} />
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 function CheckIn() {
@@ -212,6 +328,7 @@ function CheckIn() {
       ) : (
         <QueryErrorBoundary>
           <Suspense fallback={<Skeleton className="h-64 w-full" />}>
+            <SelfServiceCheckInCard />
             <CheckInTableContent />
           </Suspense>
         </QueryErrorBoundary>

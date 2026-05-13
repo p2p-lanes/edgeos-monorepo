@@ -282,5 +282,3 @@ class ProductWithQuantity(ProductPublic):
     """Product with quantity for attendee products."""
 
     quantity: int = 1
-
-

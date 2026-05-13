@@ -11,6 +11,7 @@ import { ApiError, AuthService } from "@/client"
 import { ButtonAnimated } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { queryKeys } from "@/lib/query-keys"
+import { getSafeReturnTo } from "@/lib/safe-return-to"
 import { useTenant } from "@/providers/tenantProvider"
 
 export default function AuthForm() {
@@ -19,15 +20,6 @@ export default function AuthForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const queryClient = useQueryClient()
-
-  // Whitelist post-login redirects to internal paths only. Scheme-relative
-  // (//evil.com) and absolute URLs would let an attacker craft an
-  // /auth?redirect=... link that pushes the user offsite after they log in.
-  const redirectParam = searchParams.get("redirect")
-  const safeRedirect =
-    redirectParam?.startsWith("/") && !redirectParam.startsWith("//")
-      ? redirectParam
-      : "/portal"
 
   const emailSchema = z.email(t("auth.invalid_email"))
   const codeSchema = z
@@ -96,7 +88,7 @@ export default function AuthForm() {
         timerRef.current = null
       }
       queryClient.invalidateQueries({ queryKey: queryKeys.profile.current })
-      router.replace(safeRedirect)
+      router.replace(getSafeReturnTo(searchParams.get("returnTo")) ?? "/portal")
     },
     onError: (err) => {
       if (err instanceof ApiError) {

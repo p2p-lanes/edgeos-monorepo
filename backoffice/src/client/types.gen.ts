@@ -719,11 +719,12 @@ export type CheckInListItem = {
  * free-form operator annotation.
  */
 export type CheckInPayload = {
-    source: 'qr' | 'manual';
+    source: 'qr' | 'manual' | 'self_service';
+    human_id?: (string | null);
     notes?: (string | null);
 };
 
-export type source = 'qr' | 'manual';
+export type source = 'qr' | 'manual' | 'self_service';
 
 /**
  * Public buyer-form field for the checkout runtime.
@@ -2071,6 +2072,7 @@ export type PopupAdmin = {
     insurance_percentage?: (string | null);
     application_layout?: ApplicationLayout;
     events_enabled?: boolean;
+    self_check_in_enabled?: boolean;
     show_attendee_directory?: boolean;
     id: string;
 };
@@ -2114,6 +2116,7 @@ export type PopupCreate = {
     insurance_percentage?: (number | string | null);
     application_layout?: ApplicationLayout;
     events_enabled?: boolean;
+    self_check_in_enabled?: boolean;
     show_attendee_directory?: boolean;
 };
 
@@ -2230,6 +2233,7 @@ export type PopupUpdate = {
     insurance_percentage?: (number | string | null);
     application_layout?: (ApplicationLayout | null);
     events_enabled?: (boolean | null);
+    self_check_in_enabled?: (boolean | null);
     show_attendee_directory?: (boolean | null);
 };
 
@@ -2564,6 +2568,43 @@ export type ScholarshipDecisionRequest = {
  * Status of a scholarship request on an application.
  */
 export type ScholarshipStatus = 'pending' | 'approved' | 'rejected';
+
+export type SelfCheckInOptions = {
+    popup: SelfCheckInPopup;
+    tickets: Array<SelfCheckInTicket>;
+};
+
+export type SelfCheckInPopup = {
+    id: string;
+    name: string;
+    slug: string;
+};
+
+export type SelfCheckInRequest = {
+    attendee_product_id: string;
+};
+
+export type SelfCheckInResult = {
+    attendee_product_id: string;
+    attendee_name: string;
+    attendee_category: string;
+    product_name: string;
+    product_category?: (string | null);
+    duration_type?: (string | null);
+    checked_in: boolean;
+    checked_in_at: string;
+};
+
+export type SelfCheckInTicket = {
+    attendee_product_id: string;
+    attendee_name: string;
+    attendee_category: string;
+    product_name: string;
+    product_category?: (string | null);
+    duration_type?: (string | null);
+    checked_in: boolean;
+    first_check_in_at?: (string | null);
+};
 
 export type SendTestRequest = {
     html_content: string;
@@ -3423,6 +3464,19 @@ export type CartsDeleteMyCartData = {
 };
 
 export type CartsDeleteMyCartResponse = (void);
+
+export type CheckInGetMyCheckInOptionsData = {
+    popupSlug: string;
+};
+
+export type CheckInGetMyCheckInOptionsResponse = (SelfCheckInOptions);
+
+export type CheckInConfirmMyCheckInData = {
+    popupSlug: string;
+    requestBody: SelfCheckInRequest;
+};
+
+export type CheckInConfirmMyCheckInResponse = (SelfCheckInResult);
 
 export type CheckInListCheckInsData = {
     attendeeProductId?: (string | null);

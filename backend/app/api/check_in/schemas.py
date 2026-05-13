@@ -14,8 +14,46 @@ class CheckInPayload(BaseModel):
     free-form operator annotation.
     """
 
-    source: Literal["qr", "manual"]
+    source: Literal["qr", "manual", "self_service"]
+    human_id: uuid.UUID | None = None
     notes: str | None = None
+
+
+class SelfCheckInPopup(BaseModel):
+    id: uuid.UUID
+    name: str
+    slug: str
+
+
+class SelfCheckInTicket(BaseModel):
+    attendee_product_id: uuid.UUID
+    attendee_name: str
+    attendee_category: str
+    product_name: str
+    product_category: str | None = None
+    duration_type: str | None = None
+    checked_in: bool
+    first_check_in_at: datetime | None = None
+
+
+class SelfCheckInOptions(BaseModel):
+    popup: SelfCheckInPopup
+    tickets: list[SelfCheckInTicket]
+
+
+class SelfCheckInRequest(BaseModel):
+    attendee_product_id: uuid.UUID
+
+
+class SelfCheckInResult(BaseModel):
+    attendee_product_id: uuid.UUID
+    attendee_name: str
+    attendee_category: str
+    product_name: str
+    product_category: str | None = None
+    duration_type: str | None = None
+    checked_in: bool
+    checked_in_at: datetime
 
 
 class CheckInBase(BaseModel):
