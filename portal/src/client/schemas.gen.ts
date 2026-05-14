@@ -9151,7 +9151,7 @@ export const PaymentCreateSchema = {
         },
         products: {
             items: {
-                '$ref': '#/components/schemas/PaymentProductRequest'
+                '$ref': '#/components/schemas/PaymentProductRequest-Input'
             },
             type: 'array',
             title: 'Products'
@@ -9196,7 +9196,7 @@ export const PaymentPreviewSchema = {
         },
         products: {
             items: {
-                '$ref': '#/components/schemas/PaymentProductRequest'
+                '$ref': '#/components/schemas/PaymentProductRequest-Output'
             },
             type: 'array',
             title: 'Products'
@@ -9319,7 +9319,7 @@ export const PaymentPreviewSchema = {
     description: 'Schema for payment preview (before creating).'
 } as const;
 
-export const PaymentProductRequestSchema = {
+export const PaymentProductRequest_InputSchema = {
     properties: {
         product_id: {
             type: 'string',
@@ -9335,6 +9335,57 @@ export const PaymentProductRequestSchema = {
             type: 'integer',
             title: 'Quantity',
             default: 1
+        },
+        unit_price_override: {
+            anyOf: [
+                {
+                    type: 'number'
+                },
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Unit Price Override'
+        }
+    },
+    type: 'object',
+    required: ['product_id', 'attendee_id'],
+    title: 'PaymentProductRequest',
+    description: 'Product selection for payment.'
+} as const;
+
+export const PaymentProductRequest_OutputSchema = {
+    properties: {
+        product_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Product Id'
+        },
+        attendee_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Attendee Id'
+        },
+        quantity: {
+            type: 'integer',
+            title: 'Quantity',
+            default: 1
+        },
+        unit_price_override: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Unit Price Override'
         }
     },
     type: 'object',
@@ -9378,6 +9429,18 @@ export const PaymentProductResponseSchema = {
             type: 'string',
             pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$',
             title: 'Product Price'
+        },
+        effective_unit_price: {
+            anyOf: [
+                {
+                    type: 'string',
+                    pattern: '^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Effective Unit Price'
         },
         product_category: {
             type: 'string',

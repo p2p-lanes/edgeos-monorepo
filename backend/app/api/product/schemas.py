@@ -138,6 +138,16 @@ class ProductCreate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     @model_validator(mode="after")
+    def validate_patreon_price(self) -> "ProductCreate":
+        """Patreon products must have price = 0."""
+        if self.category == "patreon" and self.price > 0:
+            raise ValueError(
+                "Patron products must have a price of 0. "
+                "The donation amount is set by the donor at checkout."
+            )
+        return self
+
+    @model_validator(mode="after")
     def validate_ticket_fields(self) -> "ProductCreate":
         """Validate that ticket-specific fields are only set for tickets."""
         if self.category != "ticket":
@@ -176,9 +186,7 @@ class ProductCreate(BaseModel):
         """sale_starts_at must be before sale_ends_at when both are set."""
         if self.sale_starts_at is not None and self.sale_ends_at is not None:
             if self.sale_starts_at > self.sale_ends_at:
-                raise ValueError(
-                    "sale_starts_at must be before sale_ends_at"
-                )
+                raise ValueError("sale_starts_at must be before sale_ends_at")
         return self
 
 
@@ -205,6 +213,16 @@ class ProductUpdate(BaseModel):
     requires_check_in: bool | None = None
 
     @model_validator(mode="after")
+    def validate_patreon_price(self) -> "ProductUpdate":
+        """Reject updates that set category=patreon with a nonzero price."""
+        if self.category == "patreon" and self.price is not None and self.price > 0:
+            raise ValueError(
+                "Patron products must have a price of 0. "
+                "The donation amount is set by the donor at checkout."
+            )
+        return self
+
+    @model_validator(mode="after")
     def validate_max_per_order_vs_stock_cap(self) -> "ProductUpdate":
         """max_per_order must not exceed total_stock_cap when both are set."""
         if self.max_per_order is not None and self.total_stock_cap is not None:
@@ -220,9 +238,7 @@ class ProductUpdate(BaseModel):
         """sale_starts_at must be before sale_ends_at when both are set."""
         if self.sale_starts_at is not None and self.sale_ends_at is not None:
             if self.sale_starts_at > self.sale_ends_at:
-                raise ValueError(
-                    "sale_starts_at must be before sale_ends_at"
-                )
+                raise ValueError("sale_starts_at must be before sale_ends_at")
         return self
 
 

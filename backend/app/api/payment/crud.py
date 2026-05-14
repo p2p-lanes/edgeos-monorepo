@@ -43,6 +43,63 @@ from app.api.shared.crud import BaseCRUD
 MONEY_PRECISION = Decimal("0.01")
 
 
+def resolve_patron_template_config(
+    session: Session, popup_id: uuid.UUID
+) -> dict | None:
+    """Return the active patron-preset step's template_config for a popup, or None.
+
+    If somehow multiple steps exist (race before the DB index was enforced),
+    picks the one with the lowest order value.
+    """
+    from app.api.ticketing_step.models import TicketingSteps
+
+    stmt = (
+        select(TicketingSteps)
+        .where(
+            TicketingSteps.popup_id == popup_id,
+            TicketingSteps.template == "patron-preset",
+            TicketingSteps.is_enabled == True,  # noqa: E712
+        )
+        .order_by(TicketingSteps.order)
+        .limit(1)
+    )
+    step = session.exec(stmt).first()
+    if step is None:
+        return None
+    return step.template_config
+
+
+def validate_patron_amount(amount: Decimal, template_config: dict) -> None:
+    """Validate a patron donation amount against the step's template_config.
+
+    Raises HTTPException(422) on:
+    - amount < template_config["minimum"]  (raw currency units — NO /100 conversion)
+    - allow_custom is False and amount not in template_config["presets"]
+
+    Units are raw popup-currency values (e.g. USD 1000 means $1000, not $10).
+    """
+    minimum = Decimal(str(template_config["minimum"]))
+    if amount < minimum:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"The amount must be at least {minimum}. Please enter a valid amount."
+            ),
+        )
+
+    allow_custom = template_config.get("allow_custom", True)
+    if not allow_custom:
+        presets = [Decimal(str(p)) for p in template_config.get("presets", [])]
+        if amount not in presets:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "The selected amount is not a valid preset option. "
+                    "Please choose one of the available amounts."
+                ),
+            )
+
+
 def calculate_insurance_amount(
     popup: "Any",
     product_quantity_pairs: "list[tuple[Any, int]]",
@@ -472,9 +529,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 success_url = f"{portal_base}/thank-you?payment_id={payment.id}"
                 cancel_url = f"{portal_base}/?cancelled=1"
             else:
-                success_url = (
-                    f"{portal_base}/checkout/{popup.slug}/thank-you?payment_id={payment.id}"
-                )
+                success_url = f"{portal_base}/checkout/{popup.slug}/thank-you?payment_id={payment.id}"
                 cancel_url = f"{portal_base}/checkout/{popup.slug}?cancelled=1"
             reference = {
                 "email": buyer.email,
@@ -1015,7 +1070,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             product = products_map.get(req.product_id)
             if product is None:
                 continue
-            if product.max_per_order is not None and req.quantity > product.max_per_order:
+            if (
+                product.max_per_order is not None
+                and req.quantity > product.max_per_order
+            ):
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                     detail=(
@@ -1306,6 +1364,50 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         # Validate per-order caps (in-memory, fail fast, 422 on violation).
         self._validate_max_per_order(obj.products, valid_products)
 
+        # Validate patron-product rules: quantity=1, unit_price_override required,
+        # resolve template_config and validate amount. Raises 422 on any violation.
+        # Also rejects unit_price_override on non-patreon products.
+        products_map_for_patron = {p.id: p for p in valid_products}
+        popup_id_for_patron = valid_products[0].popup_id if valid_products else None
+        patron_template_config: dict | None = None  # resolved lazily once
+        for req_prod in obj.products:
+            product = products_map_for_patron.get(req_prod.product_id)
+            if product is None:
+                continue
+            is_patreon = product.category == "patreon"
+            if is_patreon:
+                if req_prod.quantity != 1:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail="Patron products must be purchased one at a time.",
+                    )
+                if req_prod.unit_price_override is None:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail="A donation amount is required for patron products.",
+                    )
+                if patron_template_config is None and popup_id_for_patron:
+                    patron_template_config = resolve_patron_template_config(
+                        session, popup_id_for_patron
+                    )
+                if patron_template_config is None:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail=(
+                            "This popup has no patron step configured. "
+                            "Please set up a patron step before processing patron payments."
+                        ),
+                    )
+                validate_patron_amount(
+                    req_prod.unit_price_override, patron_template_config
+                )
+            else:
+                if req_prod.unit_price_override is not None:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail="unit_price_override is only allowed for patron products.",
+                    )
+
         # Atomically decrement total-stock counters.
         self._decrement_total_stocks(session, obj.products, valid_products)
 
@@ -1375,6 +1477,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             for req_prod in obj.products:
                 product = products_map.get(req_prod.product_id)
                 if product:
+                    is_patreon = product.category == "patreon"
                     payment_product = PaymentProducts(
                         tenant_id=application.tenant_id,
                         payment_id=payment.id,
@@ -1383,9 +1486,12 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                         quantity=req_prod.quantity,
                         product_name=product.name,
                         product_description=product.description,
-                        product_price=product.price,
+                        product_price=Decimal("0") if is_patreon else product.price,
                         product_category=product.category or "",
                         product_currency=preview.currency,
+                        effective_unit_price=req_prod.unit_price_override
+                        if is_patreon
+                        else None,
                     )
                     session.add(payment_product)
 
@@ -1513,6 +1619,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         for req_prod in obj.products:
             product = products_map.get(req_prod.product_id)
             if product:
+                is_patreon = product.category == "patreon"
                 payment_product = PaymentProducts(
                     tenant_id=application.tenant_id,
                     payment_id=payment.id,
@@ -1521,9 +1628,12 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     quantity=req_prod.quantity,
                     product_name=product.name,
                     product_description=product.description,
-                    product_price=product.price,
+                    product_price=Decimal("0") if is_patreon else product.price,
                     product_category=product.category or "",
                     product_currency=preview.currency,
+                    effective_unit_price=req_prod.unit_price_override
+                    if is_patreon
+                    else None,
                 )
                 session.add(payment_product)
 
@@ -1845,7 +1955,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         # APPROVED → CANCELLED (refund flow) is explicitly OUT OF SCOPE per design
         # §4.2 — no stock restoration in that path (separate future feature).
         if (
-            new_status in (PaymentStatus.CANCELLED, PaymentStatus.REJECTED, PaymentStatus.EXPIRED)
+            new_status
+            in (PaymentStatus.CANCELLED, PaymentStatus.REJECTED, PaymentStatus.EXPIRED)
             and old_status == PaymentStatus.PENDING.value
         ):
             self._restore_payment_stock(session, payment)
