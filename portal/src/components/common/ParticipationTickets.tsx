@@ -27,10 +27,7 @@ const ParticipationTickets = ({
   const hasMonthPass = participation.some(
     (product) => product.duration_type === "month",
   )
-  const products = passes.filter(
-    (product) =>
-      product.duration_type === "week" && product.attendee_category === "main",
-  )
+  const products = passes.filter((product) => product.duration_type === "week")
 
   const weeks: (ProductsPass | null)[] = [null, null, null, null]
 

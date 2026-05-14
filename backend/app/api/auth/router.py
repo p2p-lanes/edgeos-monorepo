@@ -105,7 +105,11 @@ async def scanner_authenticate(
         session=session,
         email=request.email,
         code=request.code,
-        allowed_roles={UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.CHECK_IN_CONTROLLER},
+        allowed_roles={
+            UserRole.SUPERADMIN,
+            UserRole.ADMIN,
+            UserRole.CHECK_IN_CONTROLLER,
+        },
     )
 
     access_token = create_access_token(subject=user.id, token_type="user")

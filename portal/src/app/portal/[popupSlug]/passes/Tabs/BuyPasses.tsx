@@ -101,8 +101,8 @@ const BuyPasses = ({
           canEdit={canEdit}
           viewInvoices={viewInvoices}
           positionCoupon={positionCoupon}
-          canAddSpouse={city?.allows_spouse ?? false}
-          canAddChildren={city?.allows_children ?? false}
+          canAddSpouse={false}
+          canAddChildren={false}
           allows_coupons={city?.allows_coupons ?? false}
         />
       </div>

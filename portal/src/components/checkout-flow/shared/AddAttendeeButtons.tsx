@@ -37,8 +37,9 @@ export default function AddAttendeeButtons({
   const hasSpouse = attendees.some((a) => a.category === "spouse")
   const hasMain = attendees.length > 0
 
-  const canShowSpouse = !!city?.allows_spouse
-  const canShowKids = !!city?.allows_children
+  const canShowSpouse = false
+  const canShowKids = false
+  void city // suppress unused-variable warning
 
   if (!canShowSpouse && !canShowKids) return null
 

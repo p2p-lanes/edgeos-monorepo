@@ -70,8 +70,33 @@ class TestTemplateConfigAttendeeCategories:
         admin_token_tenant_a: str,
         popup_tenant_a: Popups,
     ) -> None:
-        """POST section with valid attendee_categories → 201, GET returns exact list."""
-        section = {**_base_section("valid"), "attendee_categories": ["main", "spouse"]}
+        """POST section with valid attendee_categories (UUIDs) → 201, GET returns exact list."""
+        # Fetch the main category UUID for this popup
+        cats_resp = client.get(
+            f"/api/v1/popups/{popup_tenant_a.id}/attendee-categories",
+            headers=_admin_headers(admin_token_tenant_a),
+        )
+        assert cats_resp.status_code == 200, cats_resp.text
+        categories = cats_resp.json().get("results", cats_resp.json())
+        # popup_tenant_a may not have categories seeded (created via db.add, not API).
+        # Create a non-primary category to use in the test.
+        if not categories:
+            create_resp = client.post(
+                "/api/v1/attendee-categories",
+                headers=_admin_headers(admin_token_tenant_a),
+                json={
+                    "popup_id": str(popup_tenant_a.id),
+                    "key": "vip",
+                    "sort_order": 1,
+                    "enabled_in_passes_flow": True,
+                },
+            )
+            assert create_resp.status_code == 201, create_resp.text
+            cat_id = create_resp.json()["id"]
+        else:
+            cat_id = categories[0]["id"]
+
+        section = {**_base_section("valid"), "attendee_categories": [cat_id]}
         resp = client.post(
             "/api/v1/ticketing-steps",
             headers=_admin_headers(admin_token_tenant_a),
@@ -86,7 +111,7 @@ class TestTemplateConfigAttendeeCategories:
         )
         assert get_resp.status_code == 200, get_resp.text
         stored_section = get_resp.json()["template_config"]["sections"][0]
-        assert stored_section["attendee_categories"] == ["main", "spouse"]
+        assert stored_section["attendee_categories"] == [cat_id]
 
     def test_section_with_invalid_category_value(
         self,

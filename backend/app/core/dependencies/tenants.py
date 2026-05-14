@@ -44,7 +44,9 @@ def _extract_host(header_value: str | None) -> str | None:
     return host if host else None
 
 
-def _resolve_host_with_cache(db: SessionDep, host: str, portal_domain: str) -> Tenants | None:
+def _resolve_host_with_cache(
+    db: SessionDep, host: str, portal_domain: str
+) -> Tenants | None:
     """DomainCache-first tenant lookup.
 
     Cache stores serialized TenantPublic JSON or the sentinel string "null".

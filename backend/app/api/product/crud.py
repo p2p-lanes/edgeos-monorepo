@@ -21,9 +21,7 @@ def sale_dates_to_persistence(data: dict[str, object]) -> dict[str, object]:
     if "sale_starts_at" in data:
         data["sale_starts_at"] = date_to_utc_instant(data["sale_starts_at"])
     if "sale_ends_at" in data:
-        data["sale_ends_at"] = date_to_utc_instant(
-            data["sale_ends_at"], day_offset=1
-        )
+        data["sale_ends_at"] = date_to_utc_instant(data["sale_ends_at"], day_offset=1)
     return data
 
 
@@ -186,9 +184,7 @@ class ProductsCRUD(BaseCRUD[Products, ProductCreate, ProductUpdate]):
         the CHECK constraint `total_stock_remaining <= total_stock_cap` rejects
         any cap reduction below the stale remaining.
         """
-        update_data = sale_dates_to_persistence(
-            obj_in.model_dump(exclude_unset=True)
-        )
+        update_data = sale_dates_to_persistence(obj_in.model_dump(exclude_unset=True))
 
         if (
             "total_stock_cap" in update_data
