@@ -469,7 +469,7 @@
     },
     "status": {
       "draft": "Draft",
-      "published": "Published",
+      "published": "Public",
       "pending_approval": "Pending approval",
       "rejected": "Rejected",
       "cancelled": "Cancelled"

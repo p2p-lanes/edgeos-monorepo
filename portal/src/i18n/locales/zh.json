@@ -469,7 +469,7 @@
     },
     "status": {
       "draft": "草稿",
-      "published": "已发布",
+      "published": "公开",
       "pending_approval": "待审批",
       "rejected": "已拒绝",
       "cancelled": "已取消"
