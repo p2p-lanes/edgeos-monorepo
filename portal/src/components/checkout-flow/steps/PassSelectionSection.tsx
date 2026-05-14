@@ -195,7 +195,9 @@ export default function PassSelectionSection() {
 
       {/* Toolbar: Add Family Members */}
       {canManageAttendees && (
-        <AddAttendeeButtons onAttendeeAdded={setFocusedAttendeeId} />
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          <AddAttendeeButtons onAttendeeAdded={setFocusedAttendeeId} />
+        </div>
       )}
 
       {getPassSelectionLayout(policy.checkoutMode) === "flat" ? (
@@ -225,7 +227,11 @@ export default function PassSelectionSection() {
 interface VariantProps {
   groupedByCategory: [string, AttendeePassState[]][]
   allAttendees: AttendeePassState[]
-  toggleProduct: (attendeeId: string, product: ProductsPass) => void
+  toggleProduct: (
+    attendeeId: string,
+    product: ProductsPass,
+    exclusivityScopeIds?: string[],
+  ) => void
   isEditing: boolean
   focusedAttendeeId?: string | null
 }
@@ -237,7 +243,11 @@ function SimpleQuantityVariant({
   focusedAttendeeId,
 }: {
   attendees: AttendeePassState[]
-  toggleProduct: (attendeeId: string, product: ProductsPass) => void
+  toggleProduct: (
+    attendeeId: string,
+    product: ProductsPass,
+    exclusivityScopeIds?: string[],
+  ) => void
   isEditing: boolean
   focusedAttendeeId?: string | null
 }) {
@@ -380,7 +390,11 @@ function StackedVariant({
 
 interface AttendeePassCardBodyProps {
   attendee: AttendeePassState
-  toggleProduct: (attendeeId: string, product: ProductsPass) => void
+  toggleProduct: (
+    attendeeId: string,
+    product: ProductsPass,
+    exclusivityScopeIds?: string[],
+  ) => void
   isEditing: boolean
   allAttendees: AttendeePassState[]
 }
@@ -412,6 +426,13 @@ function AttendeePassCardBody({
     (p) => p.duration_type === "week",
   )
   const dayProducts = standardProducts.filter((p) => p.duration_type === "day")
+
+  // Exclusivity scope: products in the same visual group (same duration_type).
+  // This stops a "full" exclusive from clearing a "day" pass, and vice versa.
+  const fullScopeIds = fullProducts.map((p) => p.id)
+  const monthScopeIds = monthProducts.map((p) => p.id)
+  const weekScopeIds = weekProducts.map((p) => p.id)
+  const dayScopeIds = dayProducts.map((p) => p.id)
 
   const hasFullOrMonthSelected = attendee.products.some(
     (p) =>
@@ -471,7 +492,9 @@ function AttendeePassCardBody({
                 <PassOption
                   key={product.id}
                   product={product}
-                  onClick={() => toggleProduct(attendee.id, product)}
+                  onClick={() =>
+                    toggleProduct(attendee.id, product, fullScopeIds)
+                  }
                   disabled={product.disabled || disabledForSpouse}
                   disabledReason={
                     disabledForSpouse
@@ -511,7 +534,9 @@ function AttendeePassCardBody({
                 <PassOption
                   key={product.id}
                   product={product}
-                  onClick={() => toggleProduct(attendee.id, product)}
+                  onClick={() =>
+                    toggleProduct(attendee.id, product, monthScopeIds)
+                  }
                   disabled={product.disabled || disabledForSpouse}
                   disabledReason={
                     disabledForSpouse
@@ -548,7 +573,9 @@ function AttendeePassCardBody({
                 <PassOption
                   key={product.id}
                   product={product}
-                  onClick={() => toggleProduct(attendee.id, product)}
+                  onClick={() =>
+                    toggleProduct(attendee.id, product, weekScopeIds)
+                  }
                   disabled={
                     product.disabled ||
                     hasFullOrMonthSelected ||
@@ -590,7 +617,11 @@ function AttendeePassCardBody({
                   key={product.id}
                   product={product}
                   onQuantityChange={(quantity) =>
-                    toggleProduct(attendee.id, { ...product, quantity })
+                    toggleProduct(
+                      attendee.id,
+                      { ...product, quantity },
+                      dayScopeIds,
+                    )
                   }
                   disabled={
                     product.disabled ||

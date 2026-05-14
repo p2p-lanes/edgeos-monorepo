@@ -28,7 +28,11 @@ import { useDiscount } from "./discountProvider"
 
 interface PassesContext_interface {
   attendeePasses: AttendeePassState[]
-  toggleProduct: (attendeeId: string, product: ProductsPass) => void
+  toggleProduct: (
+    attendeeId: string,
+    product: ProductsPass,
+    exclusivityScopeIds?: string[],
+  ) => void
   products: ProductsPass[]
   isEditing: boolean
   toggleEditing: (editing?: boolean) => void
@@ -288,7 +292,11 @@ const PassesProvider = ({
 
   // Stable toggleProduct — reads discount & editing from refs, never recreated
   const toggleProduct = useCallback(
-    (attendeeId: string, product: ProductsPass) => {
+    (
+      attendeeId: string,
+      product: ProductsPass,
+      exclusivityScopeIds?: string[],
+    ) => {
       if (!product) return
       const strategy = getProductStrategy(
         product,
@@ -301,6 +309,7 @@ const PassesProvider = ({
           attendeeId,
           product,
           discountRef.current,
+          exclusivityScopeIds,
         ),
       )
     },
