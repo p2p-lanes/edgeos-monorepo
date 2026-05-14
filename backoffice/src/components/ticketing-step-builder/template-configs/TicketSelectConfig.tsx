@@ -165,6 +165,9 @@ export function TicketSelectConfig({
   const products = productsResults.map((p) => ({
     id: p.id,
     name: p.name,
+    price: p.price,
+    slug: p.slug,
+    is_active: p.is_active,
   }))
 
   const categoriesResults = Array.isArray(categoriesData?.results)

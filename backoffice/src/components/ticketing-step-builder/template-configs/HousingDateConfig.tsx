@@ -170,6 +170,9 @@ export function HousingDateConfig({
   const products = (productsData?.results ?? []).map((p) => ({
     id: p.id,
     name: p.name,
+    price: p.price,
+    slug: p.slug,
+    is_active: p.is_active,
   }))
 
   const sensors = useSensors(
