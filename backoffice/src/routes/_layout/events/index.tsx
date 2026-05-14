@@ -24,6 +24,7 @@ import {
   EventSettingsService,
   EventsService,
   EventVenuesService,
+  HumansService,
 } from "@/client"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
@@ -419,6 +420,36 @@ function EventActionsMenu({
   )
 }
 
+function EventHostCell({ event }: { event: EventPublic }) {
+  const ownerId = event.owner_id
+  const { data: owner } = useQuery({
+    queryKey: ["human", ownerId],
+    queryFn: () => HumansService.getHuman({ humanId: ownerId }),
+    enabled: !!ownerId,
+    staleTime: 5 * 60_000,
+  })
+
+  const displayName = event.host_display_name?.trim() || null
+  const ownerFullName =
+    owner && (owner.first_name || owner.last_name)
+      ? [owner.first_name, owner.last_name].filter(Boolean).join(" ").trim() ||
+        null
+      : null
+  const primary = displayName || ownerFullName
+  const ownerEmail = owner?.email
+
+  return (
+    <div className="flex flex-col leading-tight max-w-[220px]">
+      <span className="text-sm truncate">{primary ?? "—"}</span>
+      {ownerEmail && (
+        <span className="text-xs text-muted-foreground truncate">
+          {ownerEmail}
+        </span>
+      )}
+    </div>
+  )
+}
+
 function buildEventColumns(
   venueNameById: Map<string, string>,
   timezone: string | undefined,
@@ -481,6 +512,12 @@ function buildEventColumns(
           {row.original.kind || "—"}
         </span>
       ),
+    },
+    {
+      id: "host",
+      accessorKey: "host_display_name",
+      header: "Host",
+      cell: ({ row }) => <EventHostCell event={row.original} />,
     },
     {
       accessorKey: "start_time",
@@ -633,7 +670,7 @@ function EventsTableContent() {
         columns={columns}
         data={events.results}
         searchPlaceholder="Search by title..."
-        hiddenOnMobile={["kind", "venue_id", "start_time"]}
+        hiddenOnMobile={["kind", "host", "venue_id", "start_time"]}
         searchValue={search}
         onSearchChange={setSearch}
         serverPagination={{
