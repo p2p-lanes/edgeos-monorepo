@@ -469,7 +469,7 @@
     },
     "status": {
       "draft": "Borrador",
-      "published": "Publicado",
+      "published": "Público",
       "pending_approval": "Pendiente de aprobación",
       "rejected": "Rechazado",
       "cancelled": "Cancelado"

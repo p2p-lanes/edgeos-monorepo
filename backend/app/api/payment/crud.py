@@ -43,6 +43,71 @@ from app.api.shared.crud import BaseCRUD
 MONEY_PRECISION = Decimal("0.01")
 
 
+def resolve_patron_template_config(
+    session: Session, popup_id: uuid.UUID
+) -> dict | None:
+    """Return the active patron-preset step's template_config for a popup.
+
+    Returns None only when no enabled patron-preset step exists. A step with a
+    NULL or empty template_config is treated as "configured with defaults" and
+    returns an empty dict, so callers can validate amounts permissively.
+
+    If somehow multiple steps exist (race before the DB index was enforced),
+    picks the one with the lowest order value.
+    """
+    from app.api.ticketing_step.models import TicketingSteps
+
+    stmt = (
+        select(TicketingSteps)
+        .where(
+            TicketingSteps.popup_id == popup_id,
+            TicketingSteps.template == "patron-preset",
+            TicketingSteps.is_enabled == True,  # noqa: E712
+        )
+        .order_by(TicketingSteps.order)
+        .limit(1)
+    )
+    step = session.exec(stmt).first()
+    if step is None:
+        return None
+    return step.template_config or {}
+
+
+def validate_patron_amount(amount: Decimal, template_config: dict) -> None:
+    """Validate a patron donation amount against the step's template_config.
+
+    Raises HTTPException(422) on:
+    - amount < template_config["minimum"] when minimum is configured (raw currency units)
+    - allow_custom is False and amount not in template_config["presets"]
+
+    Units are raw popup-currency values (e.g. USD 1000 means $1000, not $10).
+    A missing `minimum` key means no floor is enforced.
+    """
+    minimum_raw = template_config.get("minimum")
+    if minimum_raw is not None:
+        minimum = Decimal(str(minimum_raw))
+        if amount < minimum:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    f"The amount must be at least {minimum}. "
+                    "Please enter a valid amount."
+                ),
+            )
+
+    allow_custom = template_config.get("allow_custom", True)
+    if not allow_custom:
+        presets = [Decimal(str(p)) for p in template_config.get("presets", [])]
+        if amount not in presets:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "The selected amount is not a valid preset option. "
+                    "Please choose one of the available amounts."
+                ),
+            )
+
+
 def calculate_insurance_amount(
     popup: "Any",
     product_quantity_pairs: "list[tuple[Any, int]]",
@@ -93,21 +158,15 @@ def _get_discounted_price(price: Decimal, discount_value: Decimal) -> Decimal:
 def _get_credit(application: Applications, discount_value: Decimal) -> Decimal:
     """Calculate credit from previously paid products.
 
-    Each AttendeeProducts row represents one ticket (quantity=1).
-    Credit is sum of ap.product.price per row (not price * quantity).
+    Each AttendeeProducts row represents one ticket (quantity=1). Patron rows
+    are donations, not refundable ticket purchases — they contribute nothing to
+    credit. Tickets purchased alongside a patron donation do contribute.
     """
     total = Decimal("0")
     for attendee in application.attendees:
-        patreon = False
-        subtotal = Decimal("0")
         for ap in attendee.attendee_products:
-            if ap.product.category == "patreon":
-                patreon = True
-                subtotal = Decimal("0")
-            elif not patreon:
-                subtotal += ap.product.price  # each row = 1 ticket = 1× price
-        if not patreon:
-            total += subtotal
+            if ap.product.category != "patreon":
+                total += ap.product.price
 
     credit = Decimal(str(application.credit)) if application.credit else Decimal("0")
     return _get_discounted_price(total, discount_value) + credit
@@ -116,7 +175,6 @@ def _get_credit(application: Applications, discount_value: Decimal) -> Decimal:
 def _calculate_amounts(
     session: Session,
     requested_products: list[PaymentProductRequest],
-    already_patreon: bool,
 ) -> tuple[Decimal, Decimal, Decimal]:
     """
     Calculate standard, supporter, and patreon amounts.
@@ -146,16 +204,14 @@ def _calculate_amounts(
                 "patreon": Decimal("0"),
             }
 
-        # Skip if this attendee already has patreon in this order
-        if attendees[attendee_id]["patreon"] > 0:
-            continue
-
         if product_model.category == "patreon":
-            attendees[attendee_id]["patreon"] = (
-                product_model.price * quantity if not already_patreon else Decimal("0")
-            )
-            attendees[attendee_id]["standard"] = Decimal("0")
-            attendees[attendee_id]["supporter"] = Decimal("0")
+            # Patron donations are independent from ticket prices. The amount
+            # lives on the request's unit_price_override (raw popup currency
+            # units, quantity is always 1). product_model.price is 0 for
+            # patreon products and must not be used to derive the donation
+            # amount. Tickets in the same order are still charged in full.
+            donation_amount = req_prod.unit_price_override or Decimal("0")
+            attendees[attendee_id]["patreon"] += donation_amount
         elif product_model.category == "supporter":
             attendees[attendee_id]["supporter"] += product_model.price * quantity
         else:
@@ -1073,31 +1129,6 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 detail="Some attendees do not belong to this application",
             )
 
-    def _check_patreon_status(
-        self,
-        application: Applications,
-        valid_products: list[Products],
-        edit_passes: bool,
-    ) -> bool:
-        """Check if application already has patreon and validate patreon rules."""
-        # Get all products from all attendees
-        application_products = application.get_all_products()
-        already_patreon = any(p.category == "patreon" for p in application_products)
-
-        is_buying_patreon = any(p.category == "patreon" for p in valid_products)
-
-        if edit_passes and is_buying_patreon and not already_patreon:
-            logger.error(
-                "Cannot edit passes for Patreon products. %s",
-                application.email,  # type: ignore[attr-defined]
-            )
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cannot edit passes for Patreon products",
-            )
-
-        return already_patreon
-
     def _calculate_insurance(
         self,
         session: Session,
@@ -1132,7 +1163,6 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         session: Session,
         obj: PaymentCreate,
         application: Applications,
-        already_patreon: bool,
     ) -> PaymentPreview:
         """Calculate all discounts and return payment preview."""
         discount_assigned = Decimal("0")
@@ -1150,7 +1180,6 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         standard_amount, supporter_amount, patreon_amount = _calculate_amounts(
             session,
             obj.products,
-            already_patreon,
         )
 
         response.original_amount = standard_amount + supporter_amount + patreon_amount
@@ -1253,13 +1282,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             )
 
         self._validate_application(application)
-        valid_products = self._validate_products(session, obj.products, application)
+        self._validate_products(session, obj.products, application)
         self._validate_attendees(session, obj.products, application)
-        already_patreon = self._check_patreon_status(
-            application, valid_products, obj.edit_passes
-        )
 
-        return self._apply_discounts(session, obj, application, already_patreon)
+        return self._apply_discounts(session, obj, application)
 
     def _get_application_with_products(
         self, session: Session, application_id: uuid.UUID
@@ -1306,6 +1332,50 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         # Validate per-order caps (in-memory, fail fast, 422 on violation).
         self._validate_max_per_order(obj.products, valid_products)
+
+        # Validate patron-product rules: quantity=1, unit_price_override required,
+        # resolve template_config and validate amount. Raises 422 on any violation.
+        # Also rejects unit_price_override on non-patreon products.
+        products_map_for_patron = {p.id: p for p in valid_products}
+        popup_id_for_patron = valid_products[0].popup_id if valid_products else None
+        patron_template_config: dict | None = None  # resolved lazily once
+        for req_prod in obj.products:
+            product = products_map_for_patron.get(req_prod.product_id)
+            if product is None:
+                continue
+            is_patreon = product.category == "patreon"
+            if is_patreon:
+                if req_prod.quantity != 1:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail="Patron products must be purchased one at a time.",
+                    )
+                if req_prod.unit_price_override is None:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail="A donation amount is required for patron products.",
+                    )
+                if patron_template_config is None and popup_id_for_patron:
+                    patron_template_config = resolve_patron_template_config(
+                        session, popup_id_for_patron
+                    )
+                if patron_template_config is None:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail=(
+                            "This popup has no patron step configured. "
+                            "Please set up a patron step before processing patron payments."
+                        ),
+                    )
+                validate_patron_amount(
+                    req_prod.unit_price_override, patron_template_config
+                )
+            else:
+                if req_prod.unit_price_override is not None:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail="unit_price_override is only allowed for patron products.",
+                    )
 
         # Atomically decrement total-stock counters.
         self._decrement_total_stocks(session, obj.products, valid_products)
@@ -1376,6 +1446,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             for req_prod in obj.products:
                 product = products_map.get(req_prod.product_id)
                 if product:
+                    is_patreon = product.category == "patreon"
                     payment_product = PaymentProducts(
                         tenant_id=application.tenant_id,
                         payment_id=payment.id,
@@ -1384,9 +1455,12 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                         quantity=req_prod.quantity,
                         product_name=product.name,
                         product_description=product.description,
-                        product_price=product.price,
+                        product_price=Decimal("0") if is_patreon else product.price,
                         product_category=product.category or "",
                         product_currency=preview.currency,
+                        effective_unit_price=req_prod.unit_price_override
+                        if is_patreon
+                        else None,
                     )
                     session.add(payment_product)
 
@@ -1514,6 +1588,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         for req_prod in obj.products:
             product = products_map.get(req_prod.product_id)
             if product:
+                is_patreon = product.category == "patreon"
                 payment_product = PaymentProducts(
                     tenant_id=application.tenant_id,
                     payment_id=payment.id,
@@ -1522,9 +1597,12 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     quantity=req_prod.quantity,
                     product_name=product.name,
                     product_description=product.description,
-                    product_price=product.price,
+                    product_price=Decimal("0") if is_patreon else product.price,
                     product_category=product.category or "",
                     product_currency=preview.currency,
+                    effective_unit_price=req_prod.unit_price_override
+                    if is_patreon
+                    else None,
                 )
                 session.add(payment_product)
 

@@ -6,16 +6,7 @@ import {
 } from "@tanstack/react-query"
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
-import {
-  CalendarRange,
-  Check,
-  CheckCircle2,
-  Eye,
-  MapPin,
-  Pencil,
-  Plus,
-  Trash2,
-} from "lucide-react"
+import { CalendarRange, Check, CheckCircle2, MapPin, Plus } from "lucide-react"
 import { Suspense, useMemo, useState } from "react"
 
 import { type EventVenuePublic, EventVenuesService } from "@/client"
@@ -26,16 +17,6 @@ import { StatusBadge } from "@/components/Common/StatusBadge"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { LoadingButton } from "@/components/ui/loading-button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
@@ -103,22 +84,10 @@ const columns: ColumnDef<EventVenuePublic>[] = [
 ]
 
 function VenueRowActions({ venue }: { venue: EventVenuePublic }) {
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
   const { isAdmin } = useAuth()
-
-  const deleteMutation = useMutation({
-    mutationFn: () => EventVenuesService.deleteVenue({ venueId: venue.id }),
-    onSuccess: () => {
-      showSuccessToast("Venue deleted successfully")
-      setDeleteDialogOpen(false)
-    },
-    onError: createErrorHandler(showErrorToast),
-    onSettled: () =>
-      queryClient.invalidateQueries({ queryKey: ["event-venues"] }),
-  })
 
   const approveMutation = useMutation({
     mutationFn: () =>
@@ -133,100 +102,41 @@ function VenueRowActions({ venue }: { venue: EventVenuePublic }) {
   })
 
   const isPending = venue.status === "pending"
-  const editLabel = isAdmin ? "Edit venue" : "View venue"
 
   return (
-    <>
-      <div className="flex items-center justify-end gap-0.5">
+    <div className="flex items-center justify-end gap-0.5">
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label="Schedule venue"
+        title="Schedule"
+        onClick={() =>
+          navigate({
+            to: "/events/venues/$venueId/schedule",
+            params: { venueId: venue.id },
+          })
+        }
+      >
+        <CalendarRange className="h-4 w-4" />
+      </Button>
+      {isAdmin && isPending && (
         <Button
           variant="ghost"
           size="icon"
-          aria-label="Schedule venue"
-          title="Schedule"
-          onClick={() =>
-            navigate({
-              to: "/events/venues/$venueId/schedule",
-              params: { venueId: venue.id },
-            })
-          }
+          aria-label="Approve venue"
+          title="Approve"
+          disabled={approveMutation.isPending}
+          onClick={() => approveMutation.mutate()}
         >
-          <CalendarRange className="h-4 w-4" />
+          <Check className="h-4 w-4" />
         </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label={editLabel}
-          title={isAdmin ? "Edit" : "View"}
-          onClick={() =>
-            navigate({
-              to: "/events/venues/$venueId/edit",
-              params: { venueId: venue.id },
-            })
-          }
-        >
-          {isAdmin ? (
-            <Pencil className="h-4 w-4" />
-          ) : (
-            <Eye className="h-4 w-4" />
-          )}
-        </Button>
-        {isAdmin && isPending && (
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Approve venue"
-            title="Approve"
-            disabled={approveMutation.isPending}
-            onClick={() => approveMutation.mutate()}
-          >
-            <Check className="h-4 w-4" />
-          </Button>
-        )}
-        {isAdmin && (
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Delete venue"
-            title="Delete"
-            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-            onClick={() => setDeleteDialogOpen(true)}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        )}
-      </div>
-
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Venue</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete "{venue.title || "Untitled venue"}
-              "? Events referencing this venue will lose the reference. This
-              action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="outline" disabled={deleteMutation.isPending}>
-                Cancel
-              </Button>
-            </DialogClose>
-            <LoadingButton
-              variant="destructive"
-              loading={deleteMutation.isPending}
-              onClick={() => deleteMutation.mutate()}
-            >
-              Delete
-            </LoadingButton>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+      )}
+    </div>
   )
 }
 
 function VenuesTableContent() {
+  const navigate = useNavigate()
   const searchParams = Route.useSearch()
   const { selectedPopupId } = useWorkspace()
   const { search, pagination, setSearch, setPagination } = useTableSearchParams(
@@ -296,6 +206,12 @@ function VenuesTableContent() {
         searchPlaceholder="Search venues..."
         searchValue={search}
         onSearchChange={setSearch}
+        onRowClick={(venue) =>
+          navigate({
+            to: "/events/venues/$venueId/edit",
+            params: { venueId: venue.id },
+          })
+        }
         serverPagination={
           // When filtering client-side, server pagination stops making
           // sense — fall back to unpaged rendering until pendingOnly is off.

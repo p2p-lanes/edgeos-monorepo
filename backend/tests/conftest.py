@@ -453,3 +453,43 @@ def popup_tenant_b_summer_fest(db: Session, tenant_b: Tenants) -> Popups:
 def with_origin(host: str) -> dict[str, str]:
     """Return a headers dict with an Origin pointing at the given host."""
     return {"Origin": f"https://{host}"}
+
+
+@pytest.fixture(autouse=True)
+def _scrub_patron_state(db: Session) -> Generator[None, None, None]:
+    """Reset patron singletons between tests.
+
+    Why: the partial unique indexes from `patron-product-rules` allow at most one
+    active patreon product and one enabled patron-preset ticketing step per popup.
+    The session-scoped `db` fixture means tests share a single SQLAlchemy session,
+    so a patron row created by one test would otherwise collide with the next test
+    that uses the same shared popup.
+    """
+    from datetime import UTC, datetime
+
+    from sqlalchemy import update
+
+    from app.api.product.models import Products
+    from app.api.ticketing_step.models import TicketingSteps
+
+    yield
+
+    try:
+        db.rollback()
+    except Exception:
+        pass
+
+    db.exec(
+        update(Products)
+        .where(Products.category == "patreon", Products.deleted_at.is_(None))
+        .values(deleted_at=datetime.now(UTC))
+    )
+    db.exec(
+        update(TicketingSteps)
+        .where(
+            TicketingSteps.template == "patron-preset",
+            TicketingSteps.is_enabled.is_(True),
+        )
+        .values(is_enabled=False)
+    )
+    db.commit()

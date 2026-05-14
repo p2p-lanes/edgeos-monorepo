@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
-import { createFileRoute, Link } from "@tanstack/react-router"
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import { AlertCircle, Plus, Users } from "lucide-react"
 import { Suspense, useState } from "react"
 
@@ -81,8 +81,32 @@ function AddUserButton() {
   )
 }
 
+// Row click only navigates when the menu would have shown for this user.
+// Mirrors the gating that lived in the deleted UserActionsMenu component.
+function canManageUser(
+  user: UserPublic,
+  ctx: {
+    currentUserId: string | undefined
+    isSuperadmin: boolean
+    isOperator: boolean
+  },
+): boolean {
+  if (user.id === ctx.currentUserId) return false
+  if (!ctx.isSuperadmin && user.role === "superadmin") return false
+  if (
+    ctx.isOperator &&
+    (user.role === "admin" ||
+      user.role === "operator" ||
+      user.role === "superadmin")
+  ) {
+    return false
+  }
+  return true
+}
+
 function TenantUsersTableContent({ tenantId }: { tenantId: string | null }) {
-  const { user: currentUser, isOperator } = useAuth()
+  const navigate = useNavigate()
+  const { user: currentUser, isOperator, isSuperadmin } = useAuth()
   const searchParams = Route.useSearch()
   const { search, pagination, setSearch, setPagination } = useTableSearchParams(
     searchParams,
@@ -124,6 +148,18 @@ function TenantUsersTableContent({ tenantId }: { tenantId: string | null }) {
       hiddenOnMobile={["role", "deleted"]}
       searchValue={search}
       onSearchChange={setSearch}
+      onRowClick={(user) => {
+        if (
+          !canManageUser(user, {
+            currentUserId: currentUser?.id,
+            isSuperadmin,
+            isOperator,
+          })
+        ) {
+          return
+        }
+        navigate({ to: "/admin/$id/edit", params: { id: user.id } })
+      }}
       serverPagination={{
         total: users.paging.total,
         pagination: pagination,
@@ -151,7 +187,8 @@ function TenantUsersTableContent({ tenantId }: { tenantId: string | null }) {
 }
 
 function SuperadminsTableContent() {
-  const { user: currentUser } = useAuth()
+  const navigate = useNavigate()
+  const { user: currentUser, isOperator, isSuperadmin } = useAuth()
   const [pagination, setPagination] = useState({
     pageIndex: 0,
     pageSize: PAGE_SIZE,
@@ -184,6 +221,18 @@ function SuperadminsTableContent() {
       onSearchChange={(value) => {
         setSearch(value)
         setPagination((prev) => ({ ...prev, pageIndex: 0 }))
+      }}
+      onRowClick={(user) => {
+        if (
+          !canManageUser(user, {
+            currentUserId: currentUser?.id,
+            isSuperadmin,
+            isOperator,
+          })
+        ) {
+          return
+        }
+        navigate({ to: "/admin/$id/edit", params: { id: user.id } })
       }}
       serverPagination={{
         total: users.paging.total,

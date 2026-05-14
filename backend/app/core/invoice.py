@@ -220,7 +220,11 @@ def generate_invoice_pdf(
     subtotal_amount = 0.0
     for item in payment.products_snapshot:
         line_currency = item.product_currency or sale_currency
-        unit_price = float(item.product_price)
+        unit_price = float(
+            item.effective_unit_price
+            if item.effective_unit_price is not None
+            else item.product_price
+        )
         qty = int(item.quantity)
         line_total = unit_price * qty
         subtotal_amount += line_total

@@ -742,7 +742,7 @@ export function DayBody({
                               </div>
                             )}
                             {!isShort && event.track_title && (
-                              <div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-0.5">
+                              <div className="flex items-center gap-1 text-[10px] font-medium text-violet-700 dark:text-violet-300 mt-0.5">
                                 <Layers className="h-2.5 w-2.5" />
                                 <span className="truncate">
                                   {event.track_title}
@@ -756,7 +756,7 @@ export function DayBody({
                                   {event.tags.slice(0, 2).map((tag) => (
                                     <span
                                       key={tag}
-                                      className="inline-flex items-center gap-0.5 text-[9px] bg-background/60 px-1 py-0.5 rounded"
+                                      className="inline-flex items-center gap-0.5 text-[9px] px-1 py-0.5 rounded border border-border bg-background/60 text-muted-foreground"
                                     >
                                       <Tag className="h-2 w-2" />
                                       {tag}
@@ -776,7 +776,7 @@ export function DayBody({
                                         e.stopPropagation()
                                         cancelRsvpMutation.mutate(event)
                                       }}
-                                      className="inline-flex items-center gap-0.5 rounded border border-primary/40 bg-primary/20 px-1 py-0.5 text-[9px] font-medium text-primary hover:bg-primary/30"
+                                      className="inline-flex items-center gap-0.5 rounded border border-emerald-300 bg-emerald-50 px-1 py-0.5 text-[9px] font-medium text-emerald-700 hover:bg-emerald-100 dark:border-emerald-500/40 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/60"
                                     >
                                       <CheckCircle className="h-2.5 w-2.5" />
                                       {t("events.rsvp.going")}
@@ -955,7 +955,7 @@ export function DayBody({
                                 {!isShort && ` – ${formatTime(event.end_time)}`}
                               </span>
                               {isAuthed && isRsvpd && (
-                                <CheckCircle className="h-2.5 w-2.5 text-primary ml-auto shrink-0" />
+                                <CheckCircle className="h-2.5 w-2.5 text-emerald-600 dark:text-emerald-400 ml-auto shrink-0" />
                               )}
                             </div>
                           </Link>

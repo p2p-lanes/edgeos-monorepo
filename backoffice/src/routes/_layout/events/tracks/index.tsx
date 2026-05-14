@@ -1,20 +1,8 @@
-import {
-  keepPreviousData,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query"
-import { createFileRoute, Link } from "@tanstack/react-router"
+import { keepPreviousData, useQuery } from "@tanstack/react-query"
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
-import {
-  EllipsisVertical,
-  Eye,
-  ListTree,
-  Pencil,
-  Plus,
-  Trash2,
-} from "lucide-react"
-import { Suspense, useState } from "react"
+import { ListTree, Plus } from "lucide-react"
+import { Suspense } from "react"
 
 import { type TrackPublic, TracksService } from "@/client"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
@@ -23,31 +11,12 @@ import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { LoadingButton } from "@/components/ui/loading-button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
-import useAuth from "@/hooks/useAuth"
-import useCustomToast from "@/hooks/useCustomToast"
 import {
   useTableSearchParams,
   validateTableSearch,
 } from "@/hooks/useTableSearchParams"
-import { createErrorHandler } from "@/utils"
 
 export const Route = createFileRoute("/_layout/events/tracks/")({
   component: TracksPage,
@@ -56,91 +25,6 @@ export const Route = createFileRoute("/_layout/events/tracks/")({
     meta: [{ title: "Tracks - EdgeOS" }],
   }),
 })
-
-function TrackActionsMenu({ track }: { track: TrackPublic }) {
-  const [open, setOpen] = useState(false)
-  const [deleteOpen, setDeleteOpen] = useState(false)
-  const queryClient = useQueryClient()
-  const { showSuccessToast, showErrorToast } = useCustomToast()
-  const { isOperatorOrAbove } = useAuth()
-
-  const deleteMutation = useMutation({
-    mutationFn: () => TracksService.deleteTrack({ trackId: track.id }),
-    onSuccess: () => {
-      showSuccessToast("Track deleted successfully")
-      setDeleteOpen(false)
-      setOpen(false)
-    },
-    onError: createErrorHandler(showErrorToast),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ["tracks"] }),
-  })
-
-  return (
-    <>
-      <DropdownMenu open={open} onOpenChange={setOpen}>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" aria-label="Track actions">
-            <EllipsisVertical className="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem asChild>
-            <Link
-              to="/events/tracks/$trackId/edit"
-              params={{ trackId: track.id }}
-            >
-              {isOperatorOrAbove ? (
-                <>
-                  <Pencil className="mr-2 h-4 w-4" />
-                  Edit
-                </>
-              ) : (
-                <>
-                  <Eye className="mr-2 h-4 w-4" />
-                  View
-                </>
-              )}
-            </Link>
-          </DropdownMenuItem>
-          {isOperatorOrAbove && (
-            <DropdownMenuItem
-              variant="destructive"
-              onSelect={(e) => e.preventDefault()}
-              onClick={() => setDeleteOpen(true)}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete
-            </DropdownMenuItem>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
-
-      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Track</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete "{track.name}"? This action cannot
-              be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="outline">Cancel</Button>
-            </DialogClose>
-            <LoadingButton
-              variant="destructive"
-              loading={deleteMutation.isPending}
-              onClick={() => deleteMutation.mutate()}
-            >
-              Delete
-            </LoadingButton>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
-  )
-}
 
 const columns: ColumnDef<TrackPublic>[] = [
   {
@@ -176,32 +60,10 @@ const columns: ColumnDef<TrackPublic>[] = [
       </span>
     ),
   },
-  {
-    id: "events",
-    header: () => <span className="sr-only">Events</span>,
-    cell: ({ row }) => (
-      <Button variant="link" size="sm" asChild className="px-0">
-        <Link
-          to="/events/tracks/$trackId/edit"
-          params={{ trackId: row.original.id }}
-        >
-          View events
-        </Link>
-      </Button>
-    ),
-  },
-  {
-    id: "actions",
-    header: () => <span className="sr-only">Actions</span>,
-    cell: ({ row }) => (
-      <div className="flex justify-end">
-        <TrackActionsMenu track={row.original} />
-      </div>
-    ),
-  },
 ]
 
 function TracksTableContent() {
+  const navigate = useNavigate()
   const searchParams = Route.useSearch()
   const { selectedPopupId } = useWorkspace()
   const { search, pagination, setSearch, setPagination } = useTableSearchParams(
@@ -240,6 +102,12 @@ function TracksTableContent() {
       hiddenOnMobile={["description", "topic"]}
       searchValue={search}
       onSearchChange={setSearch}
+      onRowClick={(track) =>
+        navigate({
+          to: "/events/tracks/$trackId/edit",
+          params: { trackId: track.id },
+        })
+      }
       serverPagination={{
         total: tracks.paging.total,
         pagination: pagination,

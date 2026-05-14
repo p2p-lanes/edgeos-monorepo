@@ -3,7 +3,6 @@ import type { ColumnDef } from "@tanstack/react-table"
 import type { UserPublic, UserRole } from "@/client"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import { UserActionsMenu } from "./UserActionsMenu"
 
 export type UserTableData = UserPublic & {
   isCurrentUser: boolean
@@ -103,14 +102,5 @@ export const columns: ColumnDef<UserTableData>[] = [
         </div>
       )
     },
-  },
-  {
-    id: "actions",
-    header: () => <span className="sr-only">Actions</span>,
-    cell: ({ row }) => (
-      <div className="flex justify-end">
-        <UserActionsMenu user={row.original} />
-      </div>
-    ),
   },
 ]

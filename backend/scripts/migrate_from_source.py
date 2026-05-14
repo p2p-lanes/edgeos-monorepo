@@ -50,7 +50,7 @@ SOURCE_DB_URL = os.environ.get("SOURCE_DB_URL", "")
 
 # ! Important: You MUST populate the email and full_name for each reviewer to ensure proper mapping to target User records.
 REVIEWER_MAP = {
-    "name_review": {"email": "", "full_name": ""},
+    "timour_review": {"email": "timour@edgecity.live", "full_name": "Timour"},
 }
 
 REVIEW_VALUE_MAP = {
@@ -407,8 +407,6 @@ def sync_popup(
         sp = src_popup[0]
         popup.start_date = sp.get("start_date")
         popup.end_date = sp.get("end_date")
-        popup.allows_spouse = parse_bool(sp.get("allows_spouse"))
-        popup.allows_children = parse_bool(sp.get("allows_children"))
         popup.allows_coupons = parse_bool(sp.get("allows_coupons"))
         popup.image_url = parse_optional_str(sp.get("image_url"))
         popup.express_checkout_background = parse_optional_str(
@@ -439,6 +437,7 @@ def run_import(
     from sqlmodel import Session, select
 
     from app.api.approval_strategy.schemas import ApprovalStrategyType
+    from app.api.attendee.crud import generate_check_in_code
     from app.api.product.schemas import (
         CATEGORY_PATREON,
         CATEGORY_TICKET,
@@ -451,9 +450,9 @@ def run_import(
         Applications,
         ApplicationSnapshots,
         ApprovalStrategies,
+        AttendeeCategories,
         AttendeeProducts,
         Attendees,
-        CheckIns,
         Coupons,
         FormFields,
         GroupLeaders,
@@ -486,7 +485,6 @@ def run_import(
         "Payments",
         "PaymentProducts",
         "AttendeeProducts",
-        "CheckIns",
     ]:
         stats.init(entity)
 
@@ -547,8 +545,6 @@ def run_import(
             sp = src_popup[0]
             popup.start_date = sp.get("start_date")
             popup.end_date = sp.get("end_date")
-            popup.allows_spouse = parse_bool(sp.get("allows_spouse"))
-            popup.allows_children = parse_bool(sp.get("allows_children"))
             popup.allows_coupons = parse_bool(sp.get("allows_coupons"))
             popup.image_url = parse_optional_str(sp.get("image_url"))
             popup.express_checkout_background = parse_optional_str(
@@ -576,12 +572,6 @@ def run_import(
 
         # Delete in reverse FK order
         cleanup_ops = [
-            (
-                "check_ins",
-                delete(CheckIns).where(
-                    CheckIns.attendee_id.in_(attendee_ids_subq)  # type: ignore[attr-defined]
-                ),
-            ),
             (
                 "attendee_products",
                 delete(AttendeeProducts).where(
@@ -1042,6 +1032,25 @@ def run_import(
         # ===============================================================
         logger.info("Step 6: Importing attendees...")
 
+        # Source-to-target attendee category key rename map.
+        # Source has legacy/dynamic keys (baby, teen, younger kid) that fold into 'kid'.
+        # Unknown source keys (e.g. 'nanny') fall through and are auto-created on the
+        # target popup below.
+        source_category_renames = {
+            "baby": "kid",
+            "teen": "kid",
+            "younger kid": "kid",
+        }
+
+        # Build lookup: category key -> attendee_categories.id for this popup.
+        # Required because attendees.category (text) was dropped; category_id (FK) is authoritative.
+        existing_categories = session.exec(
+            select(AttendeeCategories).where(AttendeeCategories.popup_id == popup_id)
+        ).all()
+        category_key_to_id: dict[str, uuid_mod.UUID] = {
+            cat.key: cat.id for cat in existing_categories
+        }
+
         src_attendees = fetch_all(
             source_conn,
             """
@@ -1055,6 +1064,39 @@ def run_import(
         stats.set_source("Attendees", len(src_attendees))
         logger.info(f"  Source attendees: {len(src_attendees)}")
 
+        # Pre-pass: auto-create any attendee_categories missing on the target popup.
+        # Iterates source rows once to collect every mapped key, then inserts the
+        # ones not already present. Defaults match a "secondary, no extra fields"
+        # category — operator can tweak via admin UI after import.
+        needed_keys: set[str] = set()
+        for row in src_attendees:
+            raw_key = (row.get("category") or "main").strip().lower()
+            needed_keys.add(source_category_renames.get(raw_key, raw_key))
+
+        missing_keys = needed_keys - set(category_key_to_id.keys())
+        if missing_keys:
+            next_sort = (
+                max((c.sort_order for c in existing_categories), default=-1) + 1
+            )
+            created_cats: list[AttendeeCategories] = []
+            for key in sorted(missing_keys):
+                cat = AttendeeCategories(
+                    tenant_id=tenant_id,
+                    popup_id=popup_id,
+                    key=key,
+                    sort_order=next_sort,
+                )
+                created_cats.append(cat)
+                next_sort += 1
+            session.add_all(created_cats)
+            session.flush()
+            for cat in created_cats:
+                category_key_to_id[cat.key] = cat.id
+            logger.info(
+                f"  Auto-created {len(created_cats)} attendee_categories: "
+                f"{sorted(missing_keys)}"
+            )
+
         new_attendees: list[Attendees] = []
         for row in src_attendees:
             application_uuid = app_map.get(row["application_id"])
@@ -1065,10 +1107,15 @@ def run_import(
                 stats.inc("Attendees", "errors")
                 continue
 
-            # Map category: baby/teen → kid
-            category = (row.get("category") or "main").strip().lower()
-            if category in ("baby", "teen"):
-                category = "kid"
+            # Resolve attendee_categories.id via rename map + auto-created keys
+            raw_key = (row.get("category") or "main").strip().lower()
+            category_key = source_category_renames.get(raw_key, raw_key)
+            category_id = category_key_to_id.get(category_key)
+            if category_id is None:
+                logger.warning(
+                    f"  No attendee_category for key '{category_key}' on popup {popup_id} "
+                    f"(attendee {row['id']}); leaving category_id NULL"
+                )
 
             # Resolve human_id by email
             att_email = parse_optional_str(row.get("email"))
@@ -1085,7 +1132,7 @@ def run_import(
                 application_id=application_uuid,
                 human_id=human_uuid,
                 name=parse_optional_str(row.get("name")) or "Unknown",
-                category=category,
+                category_id=category_id,
                 email=att_email_clean,
                 gender=parse_optional_str(row.get("gender")),
                 check_in_code=check_in_code,
@@ -1315,15 +1362,12 @@ def run_import(
                 counter += 1
             product_seen_slugs.add(slug)
 
-            start_date = row.get("start_date")
-            end_date = row.get("end_date")
             is_active = (
                 parse_bool(row.get("is_active"))
                 if row.get("is_active") is not None
                 else True
             )
             exclusive = parse_bool(row.get("exclusive"))
-            max_quantity = row.get("max_quantity")
 
             product = Products(
                 tenant_id=tenant_id,
@@ -1334,11 +1378,8 @@ def run_import(
                 description=parse_optional_str(row.get("description")),
                 category=category,
                 duration_type=duration_type,
-                start_date=start_date,
-                end_date=end_date,
                 is_active=is_active,
                 exclusive=exclusive,
-                max_quantity=max_quantity,
             )
             new_products.append(product)
             product_map[row["id"]] = product.id
@@ -1502,9 +1543,10 @@ def run_import(
         # Build product info lookup for snapshots
         product_info: dict[uuid_mod.UUID, Products] = {p.id: p for p in new_products}
 
-        # Dedup structures
+        # Dedup PaymentProducts by composite (payment, product, attendee).
+        # AttendeeProducts is a first-class ticket entity post-migration a51d7b0ab836:
+        # each row is one ticket with a unique check_in_code, no quantity column.
         seen_pp: dict[tuple, PaymentProducts] = {}
-        seen_ap: dict[tuple, AttendeeProducts] = {}
         new_payment_products: list[PaymentProducts] = []
         new_attendee_products: list[AttendeeProducts] = []
 
@@ -1554,29 +1596,25 @@ def run_import(
                     product_name=product.name if product else "Unknown",
                     product_description=product.description if product else None,
                     product_price=product.price if product else Decimal("0"),
-                    product_category=product.category.value
-                    if product and hasattr(product.category, "value")
-                    else "ticket",
+                    product_category=product.category if product else "ticket",
                 )
                 new_payment_products.append(pp)
                 seen_pp[pp_key] = pp
                 stats.inc("PaymentProducts", "imported")
 
-            # Build AttendeeProducts only from approved payments
+            # Build AttendeeProducts only from approved payments.
+            # One row per ticket — explode quantity into N rows, each with a
+            # unique check_in_code (used as QR token).
             if pay_uuid in approved_payment_ids:
-                ap_key = (str(att_uuid), str(prod_uuid))
-                existing_ap = seen_ap.get(ap_key)
-                if existing_ap:
-                    existing_ap.quantity += quantity
-                else:
+                for _ in range(quantity):
                     ap = AttendeeProducts(
                         tenant_id=tenant_id,
                         attendee_id=att_uuid,
                         product_id=prod_uuid,
-                        quantity=quantity,
+                        payment_id=pay_uuid,
+                        check_in_code=generate_check_in_code(),
                     )
                     new_attendee_products.append(ap)
-                    seen_ap[ap_key] = ap
                     stats.inc("AttendeeProducts", "imported")
 
         stats.set_source("AttendeeProducts", len(src_pp))  # approximation
@@ -1588,51 +1626,6 @@ def run_import(
             f"  PaymentProducts: {stats.data['PaymentProducts']['imported']} imported, "
             f"AttendeeProducts: {stats.data['AttendeeProducts']['imported']} imported"
         )
-
-        # ===============================================================
-        # Step 12: Import CheckIns
-        # ===============================================================
-        logger.info("Step 12: Importing check-ins...")
-
-        src_checkins = fetch_all(
-            source_conn,
-            """
-            SELECT ci.*
-            FROM check_ins ci
-            JOIN attendees att ON ci.attendee_id = att.id
-            JOIN applications a ON att.application_id = a.id
-            WHERE a.popup_city_id = %s
-        """,
-            (source_popup_id,),
-        )
-        stats.set_source("CheckIns", len(src_checkins))
-        logger.info(f"  Source check_ins: {len(src_checkins)}")
-
-        new_checkins: list[CheckIns] = []
-        for row in src_checkins:
-            att_uuid = attendee_map.get(row["attendee_id"])
-            if not att_uuid:
-                logger.warning(
-                    f"  No attendee mapping for check_in {row.get('id', '?')}"
-                )
-                stats.inc("CheckIns", "errors")
-                continue
-
-            checkin = CheckIns(
-                tenant_id=tenant_id,
-                attendee_id=att_uuid,
-                arrival_date=row.get("arrival_date"),
-                departure_date=row.get("departure_date"),
-                qr_check_in=parse_bool(row.get("qr_check_in")),
-                qr_scan_timestamp=row.get("qr_scan_timestamp"),
-            )
-            new_checkins.append(checkin)
-            stats.inc("CheckIns", "imported")
-
-        if new_checkins:
-            session.add_all(new_checkins)
-
-        logger.info(f"  CheckIns: {stats.data['CheckIns']['imported']} imported")
 
         # ===============================================================
         # Final: commit or rollback the entire transaction

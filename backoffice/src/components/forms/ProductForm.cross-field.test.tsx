@@ -58,6 +58,7 @@ const mockGetPopup = vi.mocked(PopupsService.getPopup)
 const mockListProductCategories = vi.mocked(
   ProductsService.listProductCategories,
 )
+const mockListProducts = vi.mocked(ProductsService.listProducts)
 
 const POPUP_NO_TIER = {
   id: "popup-1",
@@ -88,6 +89,10 @@ describe("ProductForm — cross-field max_per_order vs total_stock_cap", () => {
     mockListProductCategories.mockResolvedValue(["ticket", "merch"] as Awaited<
       ReturnType<typeof ProductsService.listProductCategories>
     >)
+    mockListProducts.mockResolvedValue({
+      results: [],
+      paging: { total: 0 },
+    } as Awaited<ReturnType<typeof ProductsService.listProducts>>)
   })
 
   it("(a) shows cross-field error when max_per_order > total_stock_cap", async () => {

@@ -140,6 +140,10 @@ async def create_ticketing_step(
     else:
         tenant_id = current_user.tenant_id
 
+    # Singleton guard: only one enabled patron-preset step per popup.
+    if step_in.template == "patron-preset" and step_in.is_enabled:
+        crud.ticketing_steps_crud._assert_no_active_patron_preset(db, step_in.popup_id)
+
     # FK existence check for attendee_categories in template_config (Pattern B, ADR-5)
     _validate_template_config_fk(
         step_in.template, step_in.template_config, step_in.popup_id, db

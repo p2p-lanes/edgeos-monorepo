@@ -12,11 +12,8 @@ import {
   CalendarIcon,
   CalendarRange,
   CheckCircle2,
-  Eye,
-  Pencil,
   Plus,
   Repeat,
-  Trash2,
   Video,
   XCircle,
 } from "lucide-react"
@@ -189,26 +186,15 @@ function parseOccurrenceId(
   return { masterId, start: iso }
 }
 
-function EventActionsMenu({
-  event,
-  timezone,
-}: {
-  event: EventPublic
-  timezone?: string
-}) {
-  const [deleteOpen, setDeleteOpen] = useState(false)
-  const [editChoiceOpen, setEditChoiceOpen] = useState(false)
+function EventApprovalActions({ event }: { event: EventPublic }) {
   const [decisionOpen, setDecisionOpen] = useState<null | "approve" | "reject">(
     null,
   )
   const [decisionReason, setDecisionReason] = useState("")
   const queryClient = useQueryClient()
-  const navigate = useNavigate()
   const { showSuccessToast, showErrorToast } = useCustomToast()
   const { isOperatorOrAbove } = useAuth()
 
-  const occurrenceRef = parseOccurrenceId(event.occurrence_id)
-  const isOccurrence = occurrenceRef !== null
   const isPendingApproval = event.status === "pending_approval"
 
   const approveMutation = useMutation({
@@ -241,119 +227,35 @@ function EventActionsMenu({
     onSettled: () => queryClient.invalidateQueries({ queryKey: ["events"] }),
   })
 
-  const detachMutation = useMutation({
-    mutationFn: async () => {
-      if (!occurrenceRef) throw new Error("Not an occurrence")
-      return EventsService.detachOccurrence({
-        eventId: occurrenceRef.masterId,
-        requestBody: { occurrence_start: occurrenceRef.start },
-      })
-    },
-    onSuccess: (child) => {
-      showSuccessToast("Detached occurrence for editing")
-      setEditChoiceOpen(false)
-      queryClient.invalidateQueries({ queryKey: ["events"] })
-      navigate({
-        to: "/events/$eventId/edit",
-        params: { eventId: child.id },
-      })
-    },
-    onError: createErrorHandler(showErrorToast),
-  })
-
-  const deleteOccurrenceMutation = useMutation({
-    mutationFn: async () => {
-      if (!occurrenceRef) throw new Error("Not an occurrence")
-      return EventsService.deleteOccurrence({
-        eventId: occurrenceRef.masterId,
-        requestBody: { occurrence_start: occurrenceRef.start },
-      })
-    },
-    onSuccess: () => {
-      showSuccessToast("Occurrence removed")
-      setDeleteOpen(false)
-    },
-    onError: createErrorHandler(showErrorToast),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ["events"] }),
-  })
-
-  const deleteMutation = useMutation({
-    mutationFn: () => EventsService.deleteEvent({ eventId: event.id }),
-    onSuccess: () => {
-      showSuccessToast("Event deleted successfully")
-      setDeleteOpen(false)
-    },
-    onError: createErrorHandler(showErrorToast),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ["events"] }),
-  })
-
-  const handleEdit = () => {
-    if (isOccurrence) {
-      setEditChoiceOpen(true)
-    } else {
-      navigate({
-        to: "/events/$eventId/edit",
-        params: { eventId: event.id },
-      })
-    }
-  }
+  if (!isOperatorOrAbove || !isPendingApproval) return null
 
   return (
     <>
       <div className="flex items-center justify-end gap-0.5">
-        {isOperatorOrAbove && isPendingApproval && (
-          <>
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Approve event"
-              title="Approve"
-              onClick={() => {
-                setDecisionOpen("approve")
-                setDecisionReason("")
-              }}
-            >
-              <CheckCircle2 className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Reject event"
-              title="Reject"
-              onClick={() => {
-                setDecisionOpen("reject")
-                setDecisionReason("")
-              }}
-            >
-              <XCircle className="h-4 w-4" />
-            </Button>
-          </>
-        )}
         <Button
           variant="ghost"
           size="icon"
-          aria-label={isOperatorOrAbove ? "Edit event" : "View event"}
-          title={isOperatorOrAbove ? "Edit" : "View"}
-          onClick={handleEdit}
+          aria-label="Approve event"
+          title="Approve"
+          onClick={() => {
+            setDecisionOpen("approve")
+            setDecisionReason("")
+          }}
         >
-          {isOperatorOrAbove ? (
-            <Pencil className="h-4 w-4" />
-          ) : (
-            <Eye className="h-4 w-4" />
-          )}
+          <CheckCircle2 className="h-4 w-4" />
         </Button>
-        {isOperatorOrAbove && (
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Delete event"
-            title="Delete"
-            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-            onClick={() => setDeleteOpen(true)}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        )}
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Reject event"
+          title="Reject"
+          onClick={() => {
+            setDecisionOpen("reject")
+            setDecisionReason("")
+          }}
+        >
+          <XCircle className="h-4 w-4" />
+        </Button>
       </div>
 
       <Dialog
@@ -404,78 +306,78 @@ function EventActionsMenu({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <Dialog open={editChoiceOpen} onOpenChange={setEditChoiceOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit recurring event</DialogTitle>
-            <DialogDescription>
-              This is one instance of a recurring series. Would you like to edit
-              only this event, or the entire series?
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="outline">Cancel</Button>
-            </DialogClose>
-            <Button
-              variant="outline"
-              onClick={() => {
-                if (!occurrenceRef) return
-                setEditChoiceOpen(false)
-                navigate({
-                  to: "/events/$eventId/edit",
-                  params: { eventId: occurrenceRef.masterId },
-                })
-              }}
-            >
-              Edit series
-            </Button>
-            <LoadingButton
-              loading={detachMutation.isPending}
-              onClick={() => detachMutation.mutate()}
-            >
-              Edit only this event
-            </LoadingButton>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {isOccurrence ? "Delete this occurrence" : "Delete Event"}
-            </DialogTitle>
-            <DialogDescription>
-              {isOccurrence
-                ? `Skip the "${event.title}" occurrence starting ${formatDateTime(event.start_time, timezone)}? Other occurrences in this series will remain.`
-                : `Are you sure you want to delete "${event.title}"? This action cannot be undone.`}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="outline">Cancel</Button>
-            </DialogClose>
-            <LoadingButton
-              variant="destructive"
-              loading={
-                isOccurrence
-                  ? deleteOccurrenceMutation.isPending
-                  : deleteMutation.isPending
-              }
-              onClick={() =>
-                isOccurrence
-                  ? deleteOccurrenceMutation.mutate()
-                  : deleteMutation.mutate()
-              }
-            >
-              {isOccurrence ? "Skip" : "Delete"}
-            </LoadingButton>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
+  )
+}
+
+function EditOccurrenceDialog({
+  event,
+  onClose,
+}: {
+  event: EventPublic | null
+  onClose: () => void
+}) {
+  const queryClient = useQueryClient()
+  const navigate = useNavigate()
+  const { showSuccessToast, showErrorToast } = useCustomToast()
+  const occurrenceRef = event ? parseOccurrenceId(event.occurrence_id) : null
+
+  const detachMutation = useMutation({
+    mutationFn: async () => {
+      if (!occurrenceRef) throw new Error("Not an occurrence")
+      return EventsService.detachOccurrence({
+        eventId: occurrenceRef.masterId,
+        requestBody: { occurrence_start: occurrenceRef.start },
+      })
+    },
+    onSuccess: (child) => {
+      showSuccessToast("Detached occurrence for editing")
+      onClose()
+      queryClient.invalidateQueries({ queryKey: ["events"] })
+      navigate({
+        to: "/events/$eventId/edit",
+        params: { eventId: child.id },
+      })
+    },
+    onError: createErrorHandler(showErrorToast),
+  })
+
+  return (
+    <Dialog open={!!event} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Edit recurring event</DialogTitle>
+          <DialogDescription>
+            This is one instance of a recurring series. Would you like to edit
+            only this event, or the entire series?
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="outline">Cancel</Button>
+          </DialogClose>
+          <Button
+            variant="outline"
+            onClick={() => {
+              if (!occurrenceRef) return
+              onClose()
+              navigate({
+                to: "/events/$eventId/edit",
+                params: { eventId: occurrenceRef.masterId },
+              })
+            }}
+          >
+            Edit series
+          </Button>
+          <LoadingButton
+            loading={detachMutation.isPending}
+            onClick={() => detachMutation.mutate()}
+          >
+            Edit only this event
+          </LoadingButton>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -624,7 +526,7 @@ function buildEventColumns(
       header: () => <span className="sr-only">Actions</span>,
       cell: ({ row }) => (
         <div className="flex justify-end">
-          <EventActionsMenu event={row.original} timezone={timezone} />
+          <EventApprovalActions event={row.original} />
         </div>
       ),
     },
@@ -797,6 +699,24 @@ function EventsTableContent() {
     "/events",
   )
   const { status, venueId, startDate, endDate } = searchParams
+  // Picking an occurrence row pops a "series or this only" prompt; non-recurring
+  // rows skip the dialog and navigate straight to /events/:id/edit.
+  const [occurrenceEditTarget, setOccurrenceEditTarget] =
+    useState<EventPublic | null>(null)
+
+  const handleRowClick = useCallback(
+    (event: EventPublic) => {
+      if (parseOccurrenceId(event.occurrence_id)) {
+        setOccurrenceEditTarget(event)
+        return
+      }
+      navigate({
+        to: "/events/$eventId/edit",
+        params: { eventId: event.id },
+      })
+    },
+    [navigate],
+  )
 
   const setStatus = useCallback(
     (value: EventStatus | undefined) => {
@@ -966,6 +886,7 @@ function EventsTableContent() {
         hiddenOnMobile={["kind", "host", "venue_id", "start_time"]}
         searchValue={search}
         onSearchChange={setSearch}
+        onRowClick={handleRowClick}
         serverPagination={{
           total: events.paging.total,
           pagination: pagination,
@@ -1017,6 +938,10 @@ function EventsTableContent() {
             />
           ) : undefined
         }
+      />
+      <EditOccurrenceDialog
+        event={occurrenceEditTarget}
+        onClose={() => setOccurrenceEditTarget(null)}
       />
     </div>
   )

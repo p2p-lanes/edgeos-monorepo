@@ -14,6 +14,11 @@ if (typeof Element !== "undefined" && !Element.prototype.hasPointerCapture) {
   Element.prototype.releasePointerCapture = () => {}
 }
 
+// Polyfill scrollIntoView (not in jsdom — Radix Select calls it on scroll-to-active-item)
+if (typeof Element !== "undefined" && !Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = () => {}
+}
+
 // Polyfill matchMedia (not in jsdom)
 Object.defineProperty(window, "matchMedia", {
   writable: true,

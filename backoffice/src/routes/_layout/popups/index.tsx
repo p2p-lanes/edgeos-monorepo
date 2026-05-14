@@ -1,10 +1,5 @@
-import {
-  keepPreviousData,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query"
-import { createFileRoute, Link } from "@tanstack/react-router"
+import { keepPreviousData, useQuery } from "@tanstack/react-query"
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
 import { format } from "date-fns"
 import {
@@ -12,11 +7,8 @@ import {
   CalendarDays,
   EllipsisVertical,
   ExternalLink,
-  Eye,
-  Pencil,
   Plus,
   ShoppingCart,
-  Trash2,
 } from "lucide-react"
 import { Suspense, useState } from "react"
 
@@ -28,26 +20,15 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { LoadingButton } from "@/components/ui/loading-button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
 import { useCurrentTenant } from "@/hooks/useCurrentTenant"
-import useCustomToast from "@/hooks/useCustomToast"
 import {
   useTableSearchParams,
   validateTableSearch,
@@ -57,7 +38,6 @@ import {
   getPopupPortalUrl,
   getPortalBaseUrl,
 } from "@/lib/portal-urls"
-import { createErrorHandler } from "@/utils"
 
 function getPopupsQueryOptions(
   page: number,
@@ -94,68 +74,13 @@ function AddPopupButton() {
   )
 }
 
-function DeletePopup({
-  popup,
-  onSuccess,
-}: {
-  popup: PopupAdmin
-  onSuccess: () => void
-}) {
-  const [isOpen, setIsOpen] = useState(false)
-  const queryClient = useQueryClient()
-  const { showSuccessToast, showErrorToast } = useCustomToast()
-
-  const mutation = useMutation({
-    mutationFn: () => PopupsService.deletePopup({ popupId: popup.id }),
-    onSuccess: () => {
-      showSuccessToast("Pop-up deleted successfully")
-      setIsOpen(false)
-      onSuccess()
-    },
-    onError: createErrorHandler(showErrorToast),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ["popups"] }),
-  })
-
-  return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DropdownMenuItem
-        variant="destructive"
-        onSelect={(e) => e.preventDefault()}
-        onClick={() => setIsOpen(true)}
-      >
-        <Trash2 className="mr-2 h-4 w-4" />
-        Delete
-      </DropdownMenuItem>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Delete Pop-up</DialogTitle>
-          <DialogDescription>
-            Are you sure you want to delete "{popup.name}"? This action cannot
-            be undone.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="outline">Cancel</Button>
-          </DialogClose>
-          <LoadingButton
-            variant="destructive"
-            loading={mutation.isPending}
-            onClick={() => mutation.mutate()}
-          >
-            Delete
-          </LoadingButton>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
 function PopupActionsMenu({ popup }: { popup: PopupAdmin }) {
   const [open, setOpen] = useState(false)
-  const { isOperatorOrAbove } = useAuth()
   const { data: tenant } = useCurrentTenant()
   const baseUrl = getPortalBaseUrl(tenant)
+  const hasPortalLinks = !!baseUrl && !!popup.slug
+
+  if (!hasPortalLinks) return null
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
@@ -166,47 +91,25 @@ function PopupActionsMenu({ popup }: { popup: PopupAdmin }) {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem asChild>
-          <Link to="/popups/$id/edit" params={{ id: popup.id }}>
-            {isOperatorOrAbove ? (
-              <>
-                <Pencil className="mr-2 h-4 w-4" />
-                Edit
-              </>
-            ) : (
-              <>
-                <Eye className="mr-2 h-4 w-4" />
-                View
-              </>
-            )}
-          </Link>
+          <a
+            href={getPopupPortalUrl(baseUrl, popup.slug)}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <ExternalLink className="mr-2 h-4 w-4" />
+            Open Portal
+          </a>
         </DropdownMenuItem>
-        {baseUrl && popup.slug && (
-          <>
-            <DropdownMenuItem asChild>
-              <a
-                href={getPopupPortalUrl(baseUrl, popup.slug)}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <ExternalLink className="mr-2 h-4 w-4" />
-                Open Portal
-              </a>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <a
-                href={getPopupCheckoutUrl(baseUrl, popup.slug)}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <ShoppingCart className="mr-2 h-4 w-4" />
-                Open checkout
-              </a>
-            </DropdownMenuItem>
-          </>
-        )}
-        {isOperatorOrAbove && (
-          <DeletePopup popup={popup} onSuccess={() => setOpen(false)} />
-        )}
+        <DropdownMenuItem asChild>
+          <a
+            href={getPopupCheckoutUrl(baseUrl, popup.slug)}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <ShoppingCart className="mr-2 h-4 w-4" />
+            Open checkout
+          </a>
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   )
@@ -288,6 +191,7 @@ const columns: ColumnDef<PopupAdmin>[] = [
 ]
 
 function PopupsTableContent() {
+  const navigate = useNavigate()
   const searchParams = Route.useSearch()
   const { search, pagination, setSearch, setPagination } = useTableSearchParams(
     searchParams,
@@ -309,6 +213,9 @@ function PopupsTableContent() {
       hiddenOnMobile={["sale_type", "start_date", "end_date"]}
       searchValue={search}
       onSearchChange={setSearch}
+      onRowClick={(popup) =>
+        navigate({ to: "/popups/$id/edit", params: { id: popup.id } })
+      }
       serverPagination={{
         total: popups.paging.total,
         pagination: pagination,

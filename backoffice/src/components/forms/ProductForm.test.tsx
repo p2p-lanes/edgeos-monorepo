@@ -61,6 +61,7 @@ const mockListProductCategories = vi.mocked(
   ProductsService.listProductCategories,
 )
 const mockCreateProduct = vi.mocked(ProductsService.createProduct)
+const mockListProducts = vi.mocked(ProductsService.listProducts)
 
 const POPUP_BASE = {
   id: "popup-1",
@@ -92,6 +93,11 @@ describe("ProductForm — ticket-as-first-class-entity (Phase 8.2)", () => {
       "housing",
       "merch",
     ] as Awaited<ReturnType<typeof ProductsService.listProductCategories>>)
+
+    mockListProducts.mockResolvedValue({
+      results: [],
+      paging: { total: 0 },
+    } as Awaited<ReturnType<typeof ProductsService.listProducts>>)
 
     mockGetPopup.mockResolvedValue(
       POPUP_BASE as Awaited<ReturnType<typeof PopupsService.getPopup>>,

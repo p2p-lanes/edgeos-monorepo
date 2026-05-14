@@ -60,6 +60,10 @@ class PaymentProductBase(SQLModel):
     product_name: str
     product_description: str | None = Field(default=None, sa_type=Text())
     product_price: Decimal = Field(sa_column=Column(Numeric(10, 2), nullable=False))
+    effective_unit_price: Decimal | None = Field(
+        default=None,
+        sa_column=Column(Numeric(10, 2), nullable=True),
+    )
     product_category: str
     product_currency: str = Field(
         default="USD",
@@ -133,6 +137,14 @@ class PaymentProductRequest(BaseModel):
     product_id: uuid.UUID
     attendee_id: uuid.UUID
     quantity: int = 1
+    unit_price_override: Decimal | None = None
+
+    @model_validator(mode="after")
+    def validate_unit_price_override(self) -> "PaymentProductRequest":
+        """Structural validation: unit_price_override must be non-negative if provided."""
+        if self.unit_price_override is not None and self.unit_price_override < 0:
+            raise ValueError("unit_price_override must be non-negative")
+        return self
 
 
 class PaymentProductResponse(BaseModel):
@@ -144,6 +156,7 @@ class PaymentProductResponse(BaseModel):
     product_name: str
     product_description: str | None = None
     product_price: Decimal
+    effective_unit_price: Decimal | None = None
     product_category: str
     product_currency: str
     attendee_name: str | None = None

@@ -11,7 +11,6 @@ import {
   ClipboardList,
   Download,
   EllipsisVertical,
-  Eye,
   ListChecks,
   Plus,
   ThumbsDown,
@@ -53,7 +52,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { LoadingButton } from "@/components/ui/loading-button"
@@ -394,7 +392,6 @@ function ApplicationActionsMenu({
   application: ApplicationPublic
   isWeightedVoting?: boolean
 }) {
-  const navigate = useNavigate()
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [activeDialog, setActiveDialog] = useState<DialogType>(null)
   const { isOperatorOrAbove } = useAuth()
@@ -408,6 +405,8 @@ function ApplicationActionsMenu({
   const canReview =
     isOperatorOrAbove && currentStatus === "in review" && !isWeightedVoting
 
+  if (!canReview) return null
+
   return (
     <>
       <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
@@ -417,35 +416,17 @@ function ApplicationActionsMenu({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem
-            onSelect={() => {
-              setDropdownOpen(false)
-              navigate({
-                to: "/applications/$id",
-                params: { id: application.id },
-              })
-            }}
-          >
-            <Eye className="mr-2 h-4 w-4" />
-            View Details
+          <DropdownMenuItem onSelect={() => openDialog("approve")}>
+            <ThumbsUp className="mr-2 h-4 w-4" />
+            Approve
           </DropdownMenuItem>
-
-          {canReview && (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => openDialog("approve")}>
-                <ThumbsUp className="mr-2 h-4 w-4" />
-                Approve
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                variant="destructive"
-                onSelect={() => openDialog("reject")}
-              >
-                <ThumbsDown className="mr-2 h-4 w-4" />
-                Reject
-              </DropdownMenuItem>
-            </>
-          )}
+          <DropdownMenuItem
+            variant="destructive"
+            onSelect={() => openDialog("reject")}
+          >
+            <ThumbsDown className="mr-2 h-4 w-4" />
+            Reject
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -773,6 +754,12 @@ function ApplicationsTableContent() {
       hiddenOnMobile={["attendees", "red_flag", "submitted_at", "referral"]}
       searchValue={search}
       onSearchChange={setSearch}
+      onRowClick={(application) =>
+        navigate({
+          to: "/applications/$id",
+          params: { id: application.id },
+        })
+      }
       filterBar={
         <div className="flex flex-wrap items-center gap-2">
           <StatusDropdownFilter
