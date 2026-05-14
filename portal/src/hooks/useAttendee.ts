@@ -50,6 +50,7 @@ const useAttendee = () => {
           name: data.name,
           email: data.email,
           category: data.category,
+          category_id: data.category_id,
           gender: data.gender,
         },
       })

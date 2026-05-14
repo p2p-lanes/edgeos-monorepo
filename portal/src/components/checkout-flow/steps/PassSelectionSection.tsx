@@ -44,8 +44,6 @@ function scrollToAttendeeCard(attendeeId: string) {
   })
 }
 
-const CATEGORY_ORDER = ["main", "spouse", "kid", "teen", "baby"]
-
 const getCategoryLabel = (category: AttendeeCategory): string => {
   return badgeName[category] || category
 }
@@ -157,9 +155,13 @@ export default function PassSelectionSection() {
       if (!map.has(cat)) map.set(cat, [])
       map.get(cat)!.push(a)
     }
-    return [...map.entries()].sort(
-      ([a], [b]) => CATEGORY_ORDER.indexOf(a) - CATEGORY_ORDER.indexOf(b),
-    )
+    // Sort: main first, then alphabetically by category key
+    return [...map.entries()].sort(([a], [b]) => {
+      const aIsMain = a === "main" ? 0 : 1
+      const bIsMain = b === "main" ? 0 : 1
+      if (aIsMain !== bIsMain) return aIsMain - bIsMain
+      return a.localeCompare(b)
+    })
   }, [attendeePasses])
 
   return (

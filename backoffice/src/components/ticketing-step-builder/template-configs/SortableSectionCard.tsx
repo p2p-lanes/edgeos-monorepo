@@ -37,14 +37,11 @@ export function toKey(label: string): string {
     .replace(/^-+|-+$/g, "")
 }
 
-const ATTENDEE_CATEGORY_OPTIONS: Array<{
-  value: string
+interface AttendeeCategoryOption {
+  id: string
+  key: string
   label: string
-}> = [
-  { value: "main", label: "Main" },
-  { value: "spouse", label: "Spouse" },
-  { value: "kid", label: "Kid" },
-]
+}
 
 interface SortableSectionCardProps {
   section: ProductSection
@@ -54,6 +51,7 @@ interface SortableSectionCardProps {
   assignLabel?: string
   showMediaFields?: boolean
   showAttendeeCategories?: boolean
+  attendeeCategories?: AttendeeCategoryOption[]
 }
 
 export function SortableSectionCard({
@@ -64,6 +62,7 @@ export function SortableSectionCard({
   assignLabel = "Assign product",
   showMediaFields = true,
   showAttendeeCategories = false,
+  attendeeCategories = [],
 }: SortableSectionCardProps) {
   const {
     attributes,
@@ -90,12 +89,14 @@ export function SortableSectionCard({
 
   const [showProductPicker, setShowProductPicker] = useState(false)
 
-  const handleCategoryToggle = (cat: string, checked: boolean) => {
+  const handleCategoryToggle = (catId: string, checked: boolean) => {
     const current = section.attendee_categories ?? []
-    const next = checked ? [...current, cat] : current.filter((c) => c !== cat)
-    // Collapse rule: empty OR all-3-checked → null (visible to all)
+    const next = checked
+      ? [...current, catId]
+      : current.filter((c) => c !== catId)
+    // Collapse rule: empty OR all categories checked → null (visible to all)
     const resolved =
-      next.length === 0 || next.length === ATTENDEE_CATEGORY_OPTIONS.length
+      next.length === 0 || next.length === attendeeCategories.length
         ? null
         : next
     onUpdate(section.key, { attendee_categories: resolved })
@@ -179,19 +180,17 @@ export function SortableSectionCard({
               Visible to
             </Label>
             <div className="flex items-center gap-4">
-              {ATTENDEE_CATEGORY_OPTIONS.map(({ value, label }) => (
-                <div key={value} className="flex items-center gap-1.5">
+              {attendeeCategories.map(({ id, label }) => (
+                <div key={id} className="flex items-center gap-1.5">
                   <Checkbox
-                    id={`${section.key}-cat-${value}`}
-                    checked={(section.attendee_categories ?? []).includes(
-                      value,
-                    )}
+                    id={`${section.key}-cat-${id}`}
+                    checked={(section.attendee_categories ?? []).includes(id)}
                     onCheckedChange={(checked) =>
-                      handleCategoryToggle(value, checked === true)
+                      handleCategoryToggle(id, checked === true)
                     }
                   />
                   <label
-                    htmlFor={`${section.key}-cat-${value}`}
+                    htmlFor={`${section.key}-cat-${id}`}
                     className="text-xs cursor-pointer"
                   >
                     {label}
