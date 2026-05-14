@@ -158,21 +158,15 @@ def _get_discounted_price(price: Decimal, discount_value: Decimal) -> Decimal:
 def _get_credit(application: Applications, discount_value: Decimal) -> Decimal:
     """Calculate credit from previously paid products.
 
-    Each AttendeeProducts row represents one ticket (quantity=1).
-    Credit is sum of ap.product.price per row (not price * quantity).
+    Each AttendeeProducts row represents one ticket (quantity=1). Patron rows
+    are donations, not refundable ticket purchases — they contribute nothing to
+    credit. Tickets purchased alongside a patron donation do contribute.
     """
     total = Decimal("0")
     for attendee in application.attendees:
-        patreon = False
-        subtotal = Decimal("0")
         for ap in attendee.attendee_products:
-            if ap.product.category == "patreon":
-                patreon = True
-                subtotal = Decimal("0")
-            elif not patreon:
-                subtotal += ap.product.price  # each row = 1 ticket = 1× price
-        if not patreon:
-            total += subtotal
+            if ap.product.category != "patreon":
+                total += ap.product.price
 
     credit = Decimal(str(application.credit)) if application.credit else Decimal("0")
     return _get_discounted_price(total, discount_value) + credit
@@ -181,7 +175,6 @@ def _get_credit(application: Applications, discount_value: Decimal) -> Decimal:
 def _calculate_amounts(
     session: Session,
     requested_products: list[PaymentProductRequest],
-    already_patreon: bool,
 ) -> tuple[Decimal, Decimal, Decimal]:
     """
     Calculate standard, supporter, and patreon amounts.
@@ -211,20 +204,14 @@ def _calculate_amounts(
                 "patreon": Decimal("0"),
             }
 
-        # Skip if this attendee already has patreon in this order
-        if attendees[attendee_id]["patreon"] > 0:
-            continue
-
         if product_model.category == "patreon":
-            # Patron amount lives on the request's unit_price_override (raw popup
-            # currency units, quantity is always 1). product_model.price is 0 for
-            # patreon products and must not be used to derive the donation amount.
+            # Patron donations are independent from ticket prices. The amount
+            # lives on the request's unit_price_override (raw popup currency
+            # units, quantity is always 1). product_model.price is 0 for
+            # patreon products and must not be used to derive the donation
+            # amount. Tickets in the same order are still charged in full.
             donation_amount = req_prod.unit_price_override or Decimal("0")
-            attendees[attendee_id]["patreon"] = (
-                donation_amount if not already_patreon else Decimal("0")
-            )
-            attendees[attendee_id]["standard"] = Decimal("0")
-            attendees[attendee_id]["supporter"] = Decimal("0")
+            attendees[attendee_id]["patreon"] += donation_amount
         elif product_model.category == "supporter":
             attendees[attendee_id]["supporter"] += product_model.price * quantity
         else:
@@ -1142,31 +1129,6 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 detail="Some attendees do not belong to this application",
             )
 
-    def _check_patreon_status(
-        self,
-        application: Applications,
-        valid_products: list[Products],
-        edit_passes: bool,
-    ) -> bool:
-        """Check if application already has patreon and validate patreon rules."""
-        # Get all products from all attendees
-        application_products = application.get_all_products()
-        already_patreon = any(p.category == "patreon" for p in application_products)
-
-        is_buying_patreon = any(p.category == "patreon" for p in valid_products)
-
-        if edit_passes and is_buying_patreon and not already_patreon:
-            logger.error(
-                "Cannot edit passes for Patreon products. %s",
-                application.email,  # type: ignore[attr-defined]
-            )
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cannot edit passes for Patreon products",
-            )
-
-        return already_patreon
-
     def _calculate_insurance(
         self,
         session: Session,
@@ -1201,7 +1163,6 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         session: Session,
         obj: PaymentCreate,
         application: Applications,
-        already_patreon: bool,
     ) -> PaymentPreview:
         """Calculate all discounts and return payment preview."""
         discount_assigned = Decimal("0")
@@ -1219,7 +1180,6 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         standard_amount, supporter_amount, patreon_amount = _calculate_amounts(
             session,
             obj.products,
-            already_patreon,
         )
 
         response.original_amount = standard_amount + supporter_amount + patreon_amount
@@ -1322,13 +1282,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             )
 
         self._validate_application(application)
-        valid_products = self._validate_products(session, obj.products, application)
+        self._validate_products(session, obj.products, application)
         self._validate_attendees(session, obj.products, application)
-        already_patreon = self._check_patreon_status(
-            application, valid_products, obj.edit_passes
-        )
 
-        return self._apply_discounts(session, obj, application, already_patreon)
+        return self._apply_discounts(session, obj, application)
 
     def _get_application_with_products(
         self, session: Session, application_id: uuid.UUID

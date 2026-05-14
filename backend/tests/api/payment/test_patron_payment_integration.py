@@ -311,6 +311,51 @@ class TestPatronPaymentCreation:
             db.delete(product)
             db.commit()
 
+    def test_patron_donation_adds_to_ticket_price_not_replace(
+        self, db: Session, tenant_a, popup_tenant_a: Popups, human_tenant_a
+    ) -> None:
+        """Patron + tickets in the same order are billed as the sum, not the patron alone.
+
+        Before the decoupling, _calculate_amounts zeroed out standard/supporter when a
+        patron product appeared in the order, so a ticket-paying donor was effectively
+        only charged the donation amount. Tickets must now be charged in full alongside
+        the donation.
+        """
+        from app.api.payment.crud import _calculate_amounts
+
+        patron_product = _make_patreon_product(db, popup_tenant_a)
+        ticket_product = _make_ticket_product(db, popup_tenant_a, price="3000")
+        step = _make_patron_step(db, popup_tenant_a)
+        application, attendee = _make_application_with_attendee(
+            db, popup_tenant_a, human_tenant_a
+        )
+        db.commit()
+        try:
+            requested = [
+                PaymentProductRequest(
+                    product_id=ticket_product.id,
+                    attendee_id=attendee.id,
+                    quantity=1,
+                ),
+                PaymentProductRequest(
+                    product_id=patron_product.id,
+                    attendee_id=attendee.id,
+                    quantity=1,
+                    unit_price_override=Decimal("5000"),
+                ),
+            ]
+            standard, supporter, patreon = _calculate_amounts(db, requested)
+            assert standard == Decimal("3000")
+            assert supporter == Decimal("0")
+            assert patreon == Decimal("5000")
+        finally:
+            db.delete(attendee)
+            db.delete(application)
+            db.delete(step)
+            db.delete(ticket_product)
+            db.delete(patron_product)
+            db.commit()
+
     def test_patron_payment_no_step_raises_422(
         self, db: Session, tenant_a, human_tenant_a
     ) -> None:
