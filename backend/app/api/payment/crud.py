@@ -73,19 +73,23 @@ def validate_patron_amount(amount: Decimal, template_config: dict) -> None:
     """Validate a patron donation amount against the step's template_config.
 
     Raises HTTPException(422) on:
-    - amount < template_config["minimum"]  (raw currency units — NO /100 conversion)
+    - amount < template_config["minimum"] when minimum is configured (raw currency units)
     - allow_custom is False and amount not in template_config["presets"]
 
     Units are raw popup-currency values (e.g. USD 1000 means $1000, not $10).
+    A missing `minimum` key means no floor is enforced.
     """
-    minimum = Decimal(str(template_config["minimum"]))
-    if amount < minimum:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=(
-                f"The amount must be at least {minimum}. Please enter a valid amount."
-            ),
-        )
+    minimum_raw = template_config.get("minimum")
+    if minimum_raw is not None:
+        minimum = Decimal(str(minimum_raw))
+        if amount < minimum:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    f"The amount must be at least {minimum}. "
+                    "Please enter a valid amount."
+                ),
+            )
 
     allow_custom = template_config.get("allow_custom", True)
     if not allow_custom:

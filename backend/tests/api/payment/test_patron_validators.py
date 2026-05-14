@@ -98,6 +98,21 @@ class TestValidatePatronAmount:
         # 1000 raw units == 1000 raw units: must pass
         self.validate(Decimal("1000"), template_config)
 
+    def test_missing_minimum_key_skips_floor_check(self) -> None:
+        """A template_config without `minimum` enforces no floor.
+
+        Admin may configure a patron step without setting a minimum. The validator
+        treats this as "any amount is acceptable" rather than crashing.
+        """
+        template_config = {"allow_custom": True, "presets": []}
+        self.validate(Decimal("1"), template_config)
+        self.validate(Decimal("999999"), template_config)
+
+    def test_null_minimum_skips_floor_check(self) -> None:
+        """An explicit `minimum: None` is treated the same as missing."""
+        template_config = {"minimum": None, "allow_custom": True, "presets": []}
+        self.validate(Decimal("1"), template_config)
+
 
 class TestResolvePatronTemplateConfig:
     """resolve_patron_template_config returns dict or None."""
