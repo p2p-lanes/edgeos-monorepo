@@ -194,7 +194,7 @@ export function ListBody({
                         />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2 mb-1 pr-8">
+                        <div className="flex items-start justify-between gap-2 mb-1">
                           <h3 className="font-medium text-sm sm:text-base flex items-center gap-1.5">
                             {isOwner && (
                               <Crown
@@ -243,7 +243,7 @@ export function ListBody({
                           </div>
                         )}
                         {event.track_title && (
-                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                          <div className="flex items-center gap-1.5 text-xs font-medium text-violet-700 dark:text-violet-300 mt-0.5">
                             <Layers className="h-3 w-3" />
                             <span className="truncate">
                               {event.track_title}
@@ -255,7 +255,7 @@ export function ListBody({
                             {event.tags.slice(0, 3).map((tag: string) => (
                               <span
                                 key={tag}
-                                className="inline-flex items-center gap-0.5 text-[10px] bg-muted px-1.5 py-0.5 rounded"
+                                className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded border border-border bg-muted/60 text-muted-foreground"
                               >
                                 <Tag className="h-2.5 w-2.5" />
                                 {tag}
@@ -278,7 +278,7 @@ export function ListBody({
                               e.stopPropagation()
                               onCancelRsvp?.(event)
                             }}
-                            className="inline-flex h-7 items-center gap-1 rounded-md border border-primary/30 bg-primary/10 px-2 text-xs font-medium text-primary hover:bg-primary/20"
+                            className="inline-flex h-7 items-center gap-1 rounded-md border border-emerald-300 bg-emerald-50 px-2 text-xs font-medium text-emerald-700 hover:bg-emerald-100 dark:border-emerald-500/40 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/60"
                           >
                             <CheckCircle className="h-3 w-3" />
                             {t("events.rsvp.going")}
