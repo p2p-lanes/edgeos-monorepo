@@ -1,6 +1,6 @@
 import uuid
 from collections.abc import Iterable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from loguru import logger
@@ -293,8 +293,13 @@ def _check_event_within_popup_window(
     """Reject events that fall outside the popup's [start_date, end_date].
 
     Both popup bounds are optional — only enforced when set. Comparisons
-    are timezone-aware: bounds without tzinfo are treated as UTC. Used by
-    portal-facing endpoints; backoffice/admin paths are not restricted.
+    are timezone-aware: bounds without tzinfo are treated as UTC.
+
+    `end_date` is treated as an inclusive calendar day (the popup form is a
+    date-picker that stores midnight UTC of the chosen day), so events ending
+    anywhere on that day are accepted — i.e. the effective upper bound is
+    `end_date + 1 day`. Used by portal-facing endpoints; backoffice/admin
+    paths are not restricted.
     """
     if popup is None:
         return
@@ -314,7 +319,9 @@ def _check_event_within_popup_window(
                 f"({start_bound.isoformat()})."
             ),
         )
-    if end_bound is not None and _aware(end_time) > _aware(end_bound):
+    if end_bound is not None and _aware(end_time) > _aware(end_bound) + timedelta(
+        days=1
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
