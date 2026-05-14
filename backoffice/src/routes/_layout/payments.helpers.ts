@@ -1,4 +1,4 @@
-import type { PaymentStatus } from "@/client"
+import type { PaymentProductResponse, PaymentStatus } from "@/client"
 
 interface PaymentsQueryInput {
   popupId: string | null
@@ -63,6 +63,19 @@ export function buildPaymentsQueryConfig({
       },
     ],
   }
+}
+
+/**
+ * Returns the effective unit price for a payment line item.
+ * Patron lines carry a non-null effective_unit_price (the donor-chosen amount).
+ * Non-patron lines carry null and fall back to the catalogued product_price.
+ * Uses nullish coalescing so that a legitimate 0-value effective_unit_price
+ * is honoured rather than falling through to product_price.
+ */
+export function resolveLineUnitPrice(
+  item: Pick<PaymentProductResponse, "effective_unit_price" | "product_price">,
+): number {
+  return Number(item.effective_unit_price ?? item.product_price)
 }
 
 export function buildPaymentsTableState<TPayment>({

@@ -46,6 +46,7 @@ import { exportToCsv, fetchAllPages } from "@/lib/export"
 import {
   buildPaymentsQueryConfig,
   buildPaymentsTableState,
+  resolveLineUnitPrice,
 } from "./payments.helpers"
 
 function getPaymentsQueryOptions(
@@ -391,7 +392,7 @@ function PaymentSubRow({ row }: { row: Row<PaymentPublic> }) {
 
   const entries = Object.entries(byAttendee)
   const subtotal = products.reduce(
-    (sum, p) => sum + Number(p.product_price) * p.quantity,
+    (sum, p) => sum + resolveLineUnitPrice(p) * p.quantity,
     0,
   )
   const total = Number(payment.amount)
@@ -431,7 +432,8 @@ function PaymentSubRow({ row }: { row: Row<PaymentPublic> }) {
                 </td>
               </tr>
               {items.map((item, i) => {
-                const lineTotal = Number(item.product_price) * item.quantity
+                const unitPrice = resolveLineUnitPrice(item)
+                const lineTotal = unitPrice * item.quantity
                 return (
                   <tr
                     key={`${attendeeId}-${item.product_name}-${i}`}
@@ -446,7 +448,7 @@ function PaymentSubRow({ row }: { row: Row<PaymentPublic> }) {
                       {item.quantity}
                     </td>
                     <td className="py-1.5 text-right font-mono tabular-nums text-muted-foreground">
-                      ${Number(item.product_price)}
+                      ${unitPrice}
                     </td>
                     <td className="py-1.5 pl-4 text-right font-mono tabular-nums">
                       ${lineTotal}
