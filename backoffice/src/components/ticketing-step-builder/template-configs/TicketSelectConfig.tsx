@@ -14,7 +14,7 @@ import {
 import { useQuery } from "@tanstack/react-query"
 import { Check, Plus } from "lucide-react"
 
-import { ProductsService } from "@/client"
+import { AttendeeCategoriesService, ProductsService } from "@/client"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
@@ -150,10 +150,38 @@ export function TicketSelectConfig({
     enabled: !!popupId,
   })
 
-  const products = (productsData?.results ?? []).map((p) => ({
+  const { data: categoriesData } = useQuery({
+    queryKey: ["attendee-categories", popupId],
+    queryFn: () =>
+      AttendeeCategoriesService.listAttendeeCategories({ popupId }),
+    enabled: !!popupId,
+    staleTime: 0,
+    refetchOnMount: "always",
+  })
+
+  const productsResults = Array.isArray(productsData?.results)
+    ? productsData.results
+    : []
+  const products = productsResults.map((p) => ({
     id: p.id,
     name: p.name,
   }))
+
+  const categoriesResults = Array.isArray(categoriesData?.results)
+    ? categoriesData.results
+    : []
+  const attendeeCategories = [...categoriesResults]
+    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+    .map((c) => {
+      const meta = c.display_meta as Record<string, unknown> | undefined
+      const label =
+        meta?.label &&
+        typeof meta.label === "string" &&
+        meta.label.trim() !== ""
+          ? meta.label
+          : c.key.charAt(0).toUpperCase() + c.key.slice(1)
+      return { id: c.id, key: c.key, label }
+    })
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -300,6 +328,7 @@ export function TicketSelectConfig({
                     products={products}
                     showMediaFields={false}
                     showAttendeeCategories={true}
+                    attendeeCategories={attendeeCategories}
                   />
                 ))}
             </div>

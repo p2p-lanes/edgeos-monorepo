@@ -12,7 +12,6 @@ import { splitForCreate, splitForUpdate } from "@/lib/form-data-splitter"
 import { queryKeys } from "@/lib/query-keys"
 import { useApplication } from "@/providers/applicationProvider"
 import type { ApplicationFormSchema } from "@/types/form-schema"
-import type { CompanionWithId } from "../components/companions-section"
 
 /** Virtual/synthetic form values that have no entry in schema.base_fields
  * but do surface on errors. Maps them to an i18n key. */
@@ -42,7 +41,6 @@ interface UseSubmitApplicationArgs {
   popup: PopupPublic
   schema: ApplicationFormSchema
   values: Record<string, unknown>
-  companions: CompanionWithId[]
   application: ApplicationPublic | null | undefined
   validate: (isDraft: boolean) => {
     isValid: boolean
@@ -57,7 +55,6 @@ export function useSubmitApplication({
   popup,
   schema,
   values,
-  companions,
   application,
   validate,
 }: UseSubmitApplicationArgs) {
@@ -74,8 +71,6 @@ export function useSubmitApplication({
 
   const submitMutation = useMutation({
     mutationFn: async (status: "draft" | "in review") => {
-      const companionPayload = companions.map(({ _id, ...rest }) => rest)
-
       if (application?.id) {
         return ApplicationsService.updateMyApplication({
           popupId: popup.id,
@@ -87,7 +82,6 @@ export function useSubmitApplication({
         requestBody: splitForCreate({
           values,
           popupId: popup.id,
-          companions: companionPayload,
           status,
           schema,
         }),
@@ -95,7 +89,17 @@ export function useSubmitApplication({
     },
     onSuccess: (result) => {
       updateApplication(result)
+      const popupId = String(popup.id)
       queryClient.invalidateQueries({ queryKey: queryKeys.applications.mine() })
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.attendees.byHumanPopup(popupId),
+      })
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.humanPopupAccess.byPopup(popupId),
+      })
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.participation.byPopup(popupId),
+      })
     },
   })
 

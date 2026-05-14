@@ -15,7 +15,9 @@ class ApiKeyCreate(BaseModel):
 
     name: str = Field(min_length=1, max_length=100)
     expires_at: datetime | None = None
-    scopes: list[ApiKeyScope] = Field(default_factory=lambda: list(DEFAULT_API_KEY_SCOPES))
+    scopes: list[ApiKeyScope] = Field(
+        default_factory=lambda: list(DEFAULT_API_KEY_SCOPES)
+    )
 
     @field_validator("scopes")
     @classmethod

@@ -50,7 +50,9 @@ def resolve_active_direct_popup_slug(db: Session, tenant_id: uuid.UUID) -> str |
     return popup.slug if popup is not None else None
 
 
-def get_open_ticketing_popup(session: Session, slug: str, tenant_id: uuid.UUID) -> Popups:
+def get_open_ticketing_popup(
+    session: Session, slug: str, tenant_id: uuid.UUID
+) -> Popups:
     """Resolve an active direct-sale popup by slug and tenant for open ticketing.
 
     Raises:
@@ -82,7 +84,9 @@ def get_open_ticketing_popup(session: Session, slug: str, tenant_id: uuid.UUID) 
     return popup
 
 
-def runtime_for_slug(session: Session, slug: str, tenant_id: uuid.UUID) -> CheckoutRuntimeResponse:
+def runtime_for_slug(
+    session: Session, slug: str, tenant_id: uuid.UUID
+) -> CheckoutRuntimeResponse:
     """Load the public runtime data for an open-ticketing checkout page."""
     popup = get_open_ticketing_popup(session, slug, tenant_id)
 
@@ -120,10 +124,7 @@ def runtime_for_slug(session: Session, slug: str, tenant_id: uuid.UUID) -> Check
 
     return CheckoutRuntimeResponse(
         popup=PopupPublic.model_validate(popup),
-        products=[
-            CheckoutRuntimeProduct.model_validate(p)
-            for p in products
-        ],
+        products=[CheckoutRuntimeProduct.model_validate(p) for p in products],
         buyer_form=[
             CheckoutBuyerSection(
                 id=sec.id,

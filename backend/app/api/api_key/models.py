@@ -30,15 +30,9 @@ class ApiKeys(SQLModel, table=True):
         default_factory=list,
         sa_column=Column(JSONB, nullable=False, server_default="[]"),
     )
-    last_used_at: datetime | None = Field(
-        default=None, sa_type=DateTime(timezone=True)
-    )
-    revoked_at: datetime | None = Field(
-        default=None, sa_type=DateTime(timezone=True)
-    )
-    expires_at: datetime | None = Field(
-        default=None, sa_type=DateTime(timezone=True)
-    )
+    last_used_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))
+    revoked_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))
+    expires_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))
     created_at: datetime = Field(
         default_factory=datetime.utcnow, sa_type=DateTime(timezone=True)
     )

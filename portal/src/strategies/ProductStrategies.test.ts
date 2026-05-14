@@ -10,7 +10,8 @@ function createProduct(overrides: Partial<ProductsPass>): ProductsPass {
     name: overrides.name ?? "Product",
     slug: overrides.slug ?? "product",
     popup_id: overrides.popup_id ?? "popup-1",
-    attendee_category: overrides.attendee_category ?? "main",
+    tenant_id: overrides.tenant_id ?? "tenant-1",
+    attendee_category_id: overrides.attendee_category_id ?? null,
     category: overrides.category ?? "ticket",
     duration_type: overrides.duration_type ?? "week",
     is_active: overrides.is_active ?? true,
@@ -213,5 +214,153 @@ describe("getProductStrategy — category-scoped selection", () => {
     expect(result[0]?.products.find((p) => p.id === "t-month")?.selected).toBe(
       true,
     )
+    // Non-purchased weeks are cleared so the cart shows only the month
+    // (otherwise the user pays for month + 4 weeks simultaneously).
+    for (const id of ["t1", "t2", "t3", "t4"]) {
+      expect(result[0]?.products.find((p) => p.id === id)?.selected).toBe(false)
+    }
+  })
+
+  it("auto-upgrade to month keeps purchased weeks selected (cannot retroactively refund)", () => {
+    const t1 = createProduct({
+      id: "t1",
+      category: "ticket",
+      selected: true,
+      purchased: true,
+      duration_type: "week",
+      max_per_order: 1,
+    })
+    const t2 = createProduct({
+      id: "t2",
+      category: "ticket",
+      selected: true,
+      duration_type: "week",
+      max_per_order: 1,
+    })
+    const t3 = createProduct({
+      id: "t3",
+      category: "ticket",
+      selected: true,
+      duration_type: "week",
+      max_per_order: 1,
+    })
+    const t4 = createProduct({
+      id: "t4",
+      category: "ticket",
+      selected: false,
+      duration_type: "week",
+      max_per_order: 1,
+    })
+    const monthTicket = createProduct({
+      id: "t-month",
+      category: "ticket",
+      selected: false,
+      duration_type: "month",
+      max_per_order: 1,
+    })
+    const attendees = [createAttendee([t1, t2, t3, t4, monthTicket])]
+    const strategy = getProductStrategy(t4, false, CHECKOUT_MODE.PASS_SYSTEM)
+    const result = strategy.handleSelection(attendees, "attendee-1", t4)
+    expect(result[0]?.products.find((p) => p.id === "t-month")?.selected).toBe(
+      true,
+    )
+    // Purchased week stays as-is; non-purchased ones get cleared.
+    expect(result[0]?.products.find((p) => p.id === "t1")?.selected).toBe(true)
+    expect(result[0]?.products.find((p) => p.id === "t2")?.selected).toBe(false)
+    expect(result[0]?.products.find((p) => p.id === "t3")?.selected).toBe(false)
+    expect(result[0]?.products.find((p) => p.id === "t4")?.selected).toBe(false)
+  })
+})
+
+describe("ExclusivityGuard — section scope (tech-summit reproduction)", () => {
+  // Reproduces: GA + VIP both exclusive, multi-unit (max_per_order=null), duration_type=full.
+  // Pre-state: GA quantity=1 selected, VIP quantity=0 not selected.
+  // Action: user clicks +1 on VIP.
+  // Expected: VIP quantity=1 selected, GA quantity=0 NOT selected.
+  it("clicking + on VIP cancels GA when both are exclusive multi-unit full passes in same section", () => {
+    const ga = {
+      ...createProduct({
+        id: "ga",
+        name: "General Admission",
+        category: "ticket",
+        duration_type: "full",
+        quantity: 1,
+        selected: true,
+      }),
+      max_per_order: null,
+      exclusive: true,
+    } as ProductsPass
+    const vip = {
+      ...createProduct({
+        id: "vip",
+        name: "VIP Pass",
+        category: "ticket",
+        duration_type: "full",
+        quantity: 0,
+        selected: false,
+      }),
+      max_per_order: null,
+      exclusive: true,
+    } as ProductsPass
+    const attendees = [createAttendee([ga, vip])]
+    const strategy = getProductStrategy(vip, false, CHECKOUT_MODE.PASS_SYSTEM)
+
+    // Simulate the stepper +1: caller passes product with quantity=1 and the section scope.
+    const result = strategy.handleSelection(
+      attendees,
+      "attendee-1",
+      { ...vip, quantity: 1 },
+      undefined,
+      ["ga", "vip"],
+    )
+
+    const updatedGa = result[0]?.products.find((p) => p.id === "ga")
+    const updatedVip = result[0]?.products.find((p) => p.id === "vip")
+    expect(updatedVip?.quantity).toBe(1)
+    expect(updatedVip?.selected).toBe(true)
+    expect(updatedGa?.quantity).toBe(0)
+    expect(updatedGa?.selected).toBe(false)
+  })
+
+  it("clicking + on GA cancels VIP (symmetric)", () => {
+    const ga = {
+      ...createProduct({
+        id: "ga",
+        name: "General Admission",
+        category: "ticket",
+        duration_type: "full",
+        quantity: 0,
+        selected: false,
+      }),
+      max_per_order: null,
+      exclusive: true,
+    } as ProductsPass
+    const vip = {
+      ...createProduct({
+        id: "vip",
+        name: "VIP Pass",
+        category: "ticket",
+        duration_type: "full",
+        quantity: 1,
+        selected: true,
+      }),
+      max_per_order: null,
+      exclusive: true,
+    } as ProductsPass
+    const attendees = [createAttendee([ga, vip])]
+    const strategy = getProductStrategy(ga, false, CHECKOUT_MODE.PASS_SYSTEM)
+    const result = strategy.handleSelection(
+      attendees,
+      "attendee-1",
+      { ...ga, quantity: 1 },
+      undefined,
+      ["ga", "vip"],
+    )
+    const updatedGa = result[0]?.products.find((p) => p.id === "ga")
+    const updatedVip = result[0]?.products.find((p) => p.id === "vip")
+    expect(updatedGa?.quantity).toBe(1)
+    expect(updatedGa?.selected).toBe(true)
+    expect(updatedVip?.quantity).toBe(0)
+    expect(updatedVip?.selected).toBe(false)
   })
 })

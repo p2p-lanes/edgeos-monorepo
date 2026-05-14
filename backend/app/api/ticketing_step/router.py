@@ -73,6 +73,52 @@ async def get_ticketing_step(
     return TicketingStepPublic.model_validate(step)
 
 
+def _validate_template_config_fk(
+    template: str | None,
+    template_config: dict | None,
+    popup_id: uuid.UUID,
+    db,
+) -> None:
+    """Validate that attendee_categories UUIDs in template_config sections exist in the popup.
+
+    Pattern B (locked decision #1268): Pydantic validates UUID structure,
+    router validates FK existence. This keeps schemas pure.
+    """
+    if template != "ticket_select" or not template_config:
+        return
+    sections = template_config.get("sections") or []
+    from app.api.attendee_category.crud import attendee_categories_crud
+
+    all_uuids: list[uuid.UUID] = []
+    for section in sections:
+        cats = section.get("attendee_categories")
+        if cats:
+            for cat in cats:
+                if isinstance(cat, str):
+                    try:
+                        all_uuids.append(uuid.UUID(cat))
+                    except ValueError:
+                        raise HTTPException(
+                            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            detail=f"Invalid UUID in attendee_categories: {cat}",
+                        )
+                elif isinstance(cat, uuid.UUID):
+                    all_uuids.append(cat)
+
+    if all_uuids and not attendee_categories_crud.exists_in_popup(
+        db, all_uuids, popup_id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=[
+                {
+                    "code": "invalid_attendee_category",
+                    "message": "One or more attendee_categories UUIDs do not belong to this popup",
+                }
+            ],
+        )
+
+
 @router.post(
     "", response_model=TicketingStepPublic, status_code=status.HTTP_201_CREATED
 )
@@ -93,6 +139,11 @@ async def create_ticketing_step(
         tenant_id = popup.tenant_id
     else:
         tenant_id = current_user.tenant_id
+
+    # FK existence check for attendee_categories in template_config (Pattern B, ADR-5)
+    _validate_template_config_fk(
+        step_in.template, step_in.template_config, step_in.popup_id, db
+    )
 
     from app.api.ticketing_step.models import TicketingSteps
 
@@ -127,6 +178,16 @@ async def update_ticketing_step(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot disable a protected step",
+        )
+
+    # FK existence check for attendee_categories in template_config (Pattern B, ADR-5)
+    effective_template = step_in.template or step.template
+    effective_config = (
+        step_in.template_config if step_in.template_config is not None else None
+    )
+    if effective_config is not None:
+        _validate_template_config_fk(
+            effective_template, effective_config, step.popup_id, db
         )
 
     updated = crud.ticketing_steps_crud.update(db, step, step_in)
