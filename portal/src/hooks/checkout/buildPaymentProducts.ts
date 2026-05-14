@@ -2,7 +2,7 @@ import {
   CHECKOUT_MODE,
   type CheckoutMode,
 } from "@/checkout/popupCheckoutPolicy"
-import type { PaymentProductRequest } from "@/client"
+import type { PaymentProductRequest_Input as PaymentProductRequest } from "@/client"
 import type { AttendeePassState } from "@/types/Attendee"
 import type {
   SelectedDynamicItem,
