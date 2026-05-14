@@ -3,6 +3,7 @@ import { useSearchParams } from "next/navigation"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { TICKET_CATEGORY } from "@/checkout/popupCheckoutPolicy"
+import AddAttendeeButtons from "@/components/checkout-flow/shared/AddAttendeeButtons"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -74,6 +75,7 @@ const YourPasses = ({ access: _access, onSwitchToBuy }: YourPassesProps) => {
 
         {/* Inline Text Links */}
         <div className="flex flex-wrap items-center gap-3 text-sm mt-2">
+          <AddAttendeeButtons />
           {city?.invoice_company_name && (
             <button
               type="button"
@@ -238,12 +240,12 @@ const YourPasses = ({ access: _access, onSwitchToBuy }: YourPassesProps) => {
       </div>
 
       {/* Modals */}
-      {modal.isOpen && (
+      {modal.isOpen && modal.category && (
         <AttendeeModal
           open={modal.isOpen}
           onClose={handleCloseModal}
           onSubmit={handleSubmit}
-          category={modal.category!}
+          category={modal.category}
           editingAttendee={modal.editingAttendee}
         />
       )}

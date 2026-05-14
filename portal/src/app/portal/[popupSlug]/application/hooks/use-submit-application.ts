@@ -89,7 +89,17 @@ export function useSubmitApplication({
     },
     onSuccess: (result) => {
       updateApplication(result)
+      const popupId = String(popup.id)
       queryClient.invalidateQueries({ queryKey: queryKeys.applications.mine() })
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.attendees.byHumanPopup(popupId),
+      })
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.humanPopupAccess.byPopup(popupId),
+      })
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.participation.byPopup(popupId),
+      })
     },
   })
 
