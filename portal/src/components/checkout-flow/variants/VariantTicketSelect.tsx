@@ -30,57 +30,50 @@ interface TemplateSection {
   attendee_categories?: string[] | null
 }
 
-const CATEGORY_ORDER = ["main", "spouse", "kid", "teen", "baby"]
-
-const CATEGORY_META: Record<
-  string,
-  { label: string; header: string; accent: string; badge: string; tab: string }
-> = {
-  main: {
-    label: "Main",
-    header: "bg-gray-900 text-white",
-    accent: "border-l-gray-900",
-    badge: "bg-gray-100 text-gray-800",
-    tab: "text-gray-900 border-gray-900",
-  },
-  spouse: {
-    label: "Spouse",
-    header: "bg-indigo-600 text-white",
-    accent: "border-l-indigo-600",
-    badge: "bg-indigo-50 text-indigo-700",
-    tab: "text-indigo-600 border-indigo-600",
-  },
-  kid: {
-    label: "Kid",
-    header: "bg-amber-500 text-white",
-    accent: "border-l-amber-500",
-    badge: "bg-amber-50 text-amber-700",
-    tab: "text-amber-600 border-amber-500",
-  },
-  teen: {
-    label: "Teen",
-    header: "bg-amber-500 text-white",
-    accent: "border-l-amber-500",
-    badge: "bg-amber-50 text-amber-700",
-    tab: "text-amber-600 border-amber-500",
-  },
-  baby: {
-    label: "Baby",
-    header: "bg-amber-400 text-white",
-    accent: "border-l-amber-400",
-    badge: "bg-amber-50 text-amber-600",
-    tab: "text-amber-500 border-amber-400",
-  },
-}
-
-const getCategoryMeta = (cat: string) =>
-  CATEGORY_META[cat] ?? {
-    label: cat.charAt(0).toUpperCase() + cat.slice(1),
-    header: "bg-gray-700 text-white",
-    accent: "border-l-gray-700",
-    badge: "bg-gray-100 text-gray-700",
-    tab: "text-gray-700 border-gray-700",
+const getCategoryMeta = (cat: string) => {
+  // Fixed palette for well-known legacy category keys; generic fallback for all others
+  const palette: Record<
+    string,
+    {
+      label: string
+      header: string
+      accent: string
+      badge: string
+      tab: string
+    }
+  > = {
+    main: {
+      label: "Main",
+      header: "bg-gray-900 text-white",
+      accent: "border-l-gray-900",
+      badge: "bg-gray-100 text-gray-800",
+      tab: "text-gray-900 border-gray-900",
+    },
+    spouse: {
+      label: "Spouse",
+      header: "bg-indigo-600 text-white",
+      accent: "border-l-indigo-600",
+      badge: "bg-indigo-50 text-indigo-700",
+      tab: "text-indigo-600 border-indigo-600",
+    },
+    kid: {
+      label: "Kid",
+      header: "bg-amber-500 text-white",
+      accent: "border-l-amber-500",
+      badge: "bg-amber-50 text-amber-700",
+      tab: "text-amber-600 border-amber-500",
+    },
   }
+  return (
+    palette[cat] ?? {
+      label: cat.charAt(0).toUpperCase() + cat.slice(1),
+      header: "bg-gray-700 text-white",
+      accent: "border-l-gray-700",
+      badge: "bg-gray-100 text-gray-700",
+      tab: "text-gray-700 border-gray-700",
+    }
+  )
+}
 
 function SaleStateBadge({ state }: { state: ProductSaleState }) {
   if (state === "on_sale") return null
@@ -137,10 +130,14 @@ type TicketSelectVariant = "stacked" | "tabs" | "compact" | "accordion"
 // ---------------------------------------------------------------------------
 
 function sortedAttendees(attendees: AttendeePassState[]): AttendeePassState[] {
+  // Sort: primary (main) first, then by the category string as a stable fallback.
+  // Authoritative ordering by sort_order is enforced on the backend; the API
+  // returns attendees with the main attendee first.
   return [...attendees].sort((a, b) => {
-    const ia = CATEGORY_ORDER.indexOf(a.category ?? "")
-    const ib = CATEGORY_ORDER.indexOf(b.category ?? "")
-    return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib)
+    const aIsMain = a.category === "main" ? 0 : 1
+    const bIsMain = b.category === "main" ? 0 : 1
+    if (aIsMain !== bIsMain) return aIsMain - bIsMain
+    return (a.category ?? "").localeCompare(b.category ?? "")
   })
 }
 

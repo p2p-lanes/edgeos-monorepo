@@ -3,6 +3,8 @@ import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
 import useAttendee from "@/hooks/useAttendee"
+import { useAttendeeCategories } from "@/hooks/useAttendeeCategories"
+import { resolveCategoryLabel } from "@/lib/attendee-category-label"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import type { AttendeePassState } from "@/types/Attendee"
@@ -17,8 +19,6 @@ interface ToolbarTopProps {
   viewInvoices?: boolean
   positionCoupon?: "top" | "bottom" | "right"
   onSwitchToBuy?: () => void
-  canAddSpouse?: boolean
-  canAddChildren?: boolean
   allows_coupons?: boolean
 }
 
@@ -27,8 +27,6 @@ const ToolbarTop = ({
   viewInvoices = true,
   positionCoupon = "bottom",
   onSwitchToBuy,
-  canAddSpouse = true,
-  canAddChildren = true,
   allows_coupons = true,
 }: ToolbarTopProps) => {
   const { t } = useTranslation()
@@ -39,20 +37,28 @@ const ToolbarTop = ({
   const { getCity } = useCityProvider()
   const city = getCity()
 
+  const { categories } = useAttendeeCategories(city?.id ? String(city.id) : "")
+
   const attendees = getAttendees()
-  const hasSpouse = attendees.some((a) => a.category === "spouse")
 
   // Check if current date is before city start_date
   const canEditDate = city?.start_date
     ? new Date() < new Date(city.start_date)
     : true
 
-  const handleSubmit = async (data: AttendeePassState) => {
+  // Filter to non-primary categories that are enabled in passes flow
+  const passesCategories = (categories ?? [])
+    .filter((c) => c.enabled_in_passes_flow && !c.is_primary)
+    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+
+  const handleSubmit = async (
+    data: AttendeePassState & { category_id?: string },
+  ) => {
     if (modal.category) {
       await addAttendee({
-        name: data.name,
+        name: data.name ?? "",
         email: data.email ?? "",
-        category: (data.category as any) ?? modal.category,
+        category_id: modal.category.id,
         gender: data.gender ?? "",
       })
     }
@@ -62,36 +68,25 @@ const ToolbarTop = ({
   return (
     <div className="flex justify-between w-full flex-wrap gap-2">
       <div className="flex gap-2 flex-wrap">
-        {canAddSpouse && !hasSpouse && (
+        {passesCategories.map((cat) => (
           <Button
+            key={cat.id}
             variant="outline"
             className="bg-card text-foreground hover:bg-card hover:shadow-md transition-all"
             disabled={!attendees.length}
-            onClick={() => handleOpenModal("spouse")}
+            onClick={() => handleOpenModal(cat)}
           >
             <PlusIcon className="h-4 w-4 mr-2" />
-            {t("passes.add_spouse")}
+            {resolveCategoryLabel(cat, t)}
           </Button>
-        )}
+        ))}
 
-        {canAddChildren && (
-          <Button
-            variant="default"
-            className="bg-card text-foreground hover:bg-card hover:shadow-md transition-all"
-            disabled={!attendees.length}
-            onClick={() => handleOpenModal("kid")}
-          >
-            <PlusIcon className="h-4 w-4 mr-2" />
-            {t("passes.add_children")}
-          </Button>
-        )}
-
-        {modal.isOpen && (
+        {modal.isOpen && modal.category && (
           <AttendeeModal
             open={modal.isOpen}
             onClose={handleCloseModal}
             onSubmit={handleSubmit}
-            category={modal.category!}
+            category={modal.category}
             editingAttendee={modal.editingAttendee}
           />
         )}

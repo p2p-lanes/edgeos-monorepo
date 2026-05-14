@@ -108,8 +108,6 @@ const AttendeeTicket = ({
         await editAttendee(attendee.id ?? "", {
           name: data.name ?? "",
           email: data.email ?? "",
-          category: (data.category ??
-            "main") as import("@/types/Attendee").AttendeeCategory,
           gender: data.gender ?? "",
         })
       }

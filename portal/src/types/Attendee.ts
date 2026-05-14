@@ -58,6 +58,9 @@ export interface AttendeeDirectory {
 export interface CreateAttendee {
   name: string
   email: string
-  category: AttendeeCategory
+  /** @deprecated Use category_id instead — kept for backward compat with edit flows */
+  category?: AttendeeCategory
+  /** UUID of the attendee category row */
+  category_id?: string
   gender: string
 }
