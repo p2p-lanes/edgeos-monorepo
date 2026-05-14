@@ -112,6 +112,7 @@ def _build_attendee_with_origin(
         "popup_id": attendee.popup_id,
         "human_id": attendee.human_id,
         "name": attendee.name,
+        "category_id": attendee.category_id,
         "category": attendee.category,
         "email": attendee.email,
         "gender": attendee.gender,
