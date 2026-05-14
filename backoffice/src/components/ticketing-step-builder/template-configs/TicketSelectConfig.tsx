@@ -155,14 +155,22 @@ export function TicketSelectConfig({
     queryFn: () =>
       AttendeeCategoriesService.listAttendeeCategories({ popupId }),
     enabled: !!popupId,
+    staleTime: 0,
+    refetchOnMount: "always",
   })
 
-  const products = (productsData?.results ?? []).map((p) => ({
+  const productsResults = Array.isArray(productsData?.results)
+    ? productsData.results
+    : []
+  const products = productsResults.map((p) => ({
     id: p.id,
     name: p.name,
   }))
 
-  const attendeeCategories = [...(categoriesData?.results ?? [])]
+  const categoriesResults = Array.isArray(categoriesData?.results)
+    ? categoriesData.results
+    : []
+  const attendeeCategories = [...categoriesResults]
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
     .map((c) => {
       const meta = c.display_meta as Record<string, unknown> | undefined

@@ -35,6 +35,11 @@ interface DialogState {
   label: string
   sortOrder: string
   enabledInPassesFlow: boolean
+  /** Empty string = unlimited (null on the server). */
+  maxPerApplication: string
+  /** Raw JSON text the admin edits; parsed on save. */
+  requiredFieldsJson: string
+  requiredFieldsError: string | null
 }
 
 const EMPTY_DIALOG: DialogState = {
@@ -44,6 +49,9 @@ const EMPTY_DIALOG: DialogState = {
   label: "",
   sortOrder: "",
   enabledInPassesFlow: true,
+  maxPerApplication: "",
+  requiredFieldsJson: "[]",
+  requiredFieldsError: null,
 }
 
 function resolveCategoryLabel(category: AttendeeCategoryPublic): string {
@@ -65,36 +73,63 @@ export function AttendeeCategoriesEditor({
 
   const queryKey = ["attendee-categories", popupId]
 
-  const { data: categories = [] } = useQuery({
+  const { data } = useQuery({
     queryKey,
     queryFn: async () => {
       const result = await AttendeeCategoriesService.listAttendeeCategories({
         popupId,
       })
-      return [...(result.results ?? [])].sort(
-        (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0),
-      )
+      const list = Array.isArray(result?.results) ? result.results : []
+      return [...list].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
     },
     enabled: !!popupId,
+    staleTime: 0,
+    refetchOnMount: "always",
   })
+  // Defensive: a stale persisted cache or unexpected response shape could yield
+  // a non-array `data`; treat anything that isn't an array as empty.
+  const categories: AttendeeCategoryPublic[] = Array.isArray(data) ? data : []
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey })
 
+  // Parse the JSON the admin typed; null on parse error or non-array.
+  const parseRequiredFields = (): Array<Record<string, unknown>> | null => {
+    try {
+      const trimmed = state.requiredFieldsJson.trim()
+      if (trimmed === "") return []
+      const parsed = JSON.parse(trimmed)
+      if (!Array.isArray(parsed)) return null
+      // Coerce: every entry must be a plain object — schema is `[{...}]` only.
+      return parsed.every((it) => it && typeof it === "object")
+        ? (parsed as Array<Record<string, unknown>>)
+        : null
+    } catch {
+      return null
+    }
+  }
+
   const createMutation = useMutation({
-    mutationFn: () =>
-      AttendeeCategoriesService.createAttendeeCategory({
+    mutationFn: () => {
+      const fields = parseRequiredFields()
+      return AttendeeCategoriesService.createAttendeeCategory({
         requestBody: {
           popup_id: popupId,
           key: state.key.trim(),
           sort_order:
             state.sortOrder !== "" ? Number(state.sortOrder) : undefined,
           enabled_in_passes_flow: state.enabledInPassesFlow,
+          max_per_application:
+            state.maxPerApplication !== ""
+              ? Number(state.maxPerApplication)
+              : undefined,
+          required_fields: fields ?? undefined,
           display_meta:
             state.label.trim() !== ""
               ? { label: state.label.trim() }
               : undefined,
         },
-      }),
+      })
+    },
     onSuccess: () => {
       showSuccessToast("Category created")
       invalidate()
@@ -104,15 +139,22 @@ export function AttendeeCategoriesEditor({
   })
 
   const updateMutation = useMutation({
-    mutationFn: () =>
-      AttendeeCategoriesService.updateAttendeeCategory({
+    mutationFn: () => {
+      const fields = parseRequiredFields()
+      return AttendeeCategoriesService.updateAttendeeCategory({
         categoryId: state.editing!.id,
         requestBody: {
           sort_order: state.sortOrder !== "" ? Number(state.sortOrder) : null,
           enabled_in_passes_flow: state.enabledInPassesFlow,
+          max_per_application:
+            state.maxPerApplication !== ""
+              ? Number(state.maxPerApplication)
+              : null,
+          required_fields: fields ?? undefined,
           display_meta: { label: state.label.trim() || state.editing!.key },
         },
-      }),
+      })
+    },
     onSuccess: () => {
       showSuccessToast("Category updated")
       invalidate()
@@ -135,6 +177,7 @@ export function AttendeeCategoriesEditor({
 
   const openEdit = (cat: AttendeeCategoryPublic) => {
     const meta = cat.display_meta as Record<string, unknown> | undefined
+    const fields = Array.isArray(cat.required_fields) ? cat.required_fields : []
     setState({
       open: true,
       editing: cat,
@@ -142,12 +185,36 @@ export function AttendeeCategoriesEditor({
       label: (meta?.label as string) ?? "",
       sortOrder: cat.sort_order != null ? String(cat.sort_order) : "",
       enabledInPassesFlow: cat.enabled_in_passes_flow ?? true,
+      maxPerApplication:
+        cat.max_per_application != null ? String(cat.max_per_application) : "",
+      requiredFieldsJson: JSON.stringify(fields, null, 2),
+      requiredFieldsError: null,
     })
   }
 
   const save = () => {
     if (!state.key.trim() && !state.editing) {
       showErrorToast("Key is required")
+      return
+    }
+    // Validate required_fields JSON before firing the mutation so the admin
+    // gets an inline error instead of a confusing 422 from the server.
+    if (state.requiredFieldsJson.trim() !== "") {
+      const fields = parseRequiredFields()
+      if (fields === null) {
+        setState((prev) => ({
+          ...prev,
+          requiredFieldsError: "Invalid JSON — must be an array",
+        }))
+        return
+      }
+    }
+    if (
+      state.maxPerApplication !== "" &&
+      (!Number.isInteger(Number(state.maxPerApplication)) ||
+        Number(state.maxPerApplication) < 1)
+    ) {
+      showErrorToast("Max per application must be a positive integer or empty")
       return
     }
     if (state.editing) {
@@ -303,6 +370,57 @@ export function AttendeeCategoriesEditor({
                   }))
                 }
               />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="cat-max">Max per application</Label>
+              <Input
+                id="cat-max"
+                type="number"
+                min="1"
+                value={state.maxPerApplication}
+                placeholder="Unlimited"
+                onChange={(e) =>
+                  setState((prev) => ({
+                    ...prev,
+                    maxPerApplication: e.target.value,
+                  }))
+                }
+              />
+              <p className="text-xs text-muted-foreground">
+                How many attendees of this type a single applicant can add.
+                Leave empty for unlimited.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="cat-required-fields">
+                Required fields (JSON)
+              </Label>
+              <textarea
+                id="cat-required-fields"
+                className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                value={state.requiredFieldsJson}
+                spellCheck={false}
+                placeholder='[{"name":"age","label":"Age","type":"select","required":true,"options":[{"value":"1","label":"1 year old"},{"value":"2","label":"2 years old"}]}]'
+                onChange={(e) =>
+                  setState((prev) => ({
+                    ...prev,
+                    requiredFieldsJson: e.target.value,
+                    requiredFieldsError: null,
+                  }))
+                }
+              />
+              {state.requiredFieldsError && (
+                <p className="text-xs text-destructive">
+                  {state.requiredFieldsError}
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Schema for extra fields shown in the portal modal. Each item:{" "}
+                {`{name, label?, type, required?, options?, display_as_subtitle?}`}
+                . Options accept strings or {`{value,label}`} pairs.
+              </p>
             </div>
           </div>
 
