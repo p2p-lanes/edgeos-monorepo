@@ -8,7 +8,7 @@ from sqlmodel import Session, select
 
 from app.api.api_key import crud as api_key_crud
 from app.api.api_key.models import ApiKeys
-from app.api.event.models import Events
+from app.api.event.models import EventInvitations, Events
 from app.api.event.schemas import EventStatus, EventVisibility
 from app.api.event_settings.models import EventSettings
 from app.api.event_settings.schemas import PublishPermission
@@ -381,6 +381,370 @@ class TestApiKeyPolicy:
         body = resp.json()
         assert len(body) == 2
         assert all("key" not in row for row in body)
+
+    def test_pat_can_patch_own_event(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        _set_event_settings(db, tenant_a, popup, events_require_approval=False)
+        human = _make_human(db, tenant_a)
+        event = Events(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            owner_id=human.id,
+            title="Before",
+            start_time=datetime.now(UTC) + timedelta(days=3),
+            end_time=datetime.now(UTC) + timedelta(days=3, hours=1),
+            timezone="UTC",
+            visibility=EventVisibility.PUBLIC,
+            status=EventStatus.PUBLISHED,
+        )
+        db.add(event)
+        db.commit()
+        db.refresh(event)
+
+        raw_key = _make_pat(
+            db,
+            tenant_a,
+            human,
+            scopes=["events:read", "events:write"],
+        )
+
+        resp = client.patch(
+            f"/api/v1/events/portal/events/{event.id}",
+            headers=_pat_auth(raw_key),
+            json={"title": "After"},
+        )
+
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["title"] == "After"
+
+        db.expire_all()
+        row = db.get(Events, event.id)
+        assert row is not None
+        assert row.title == "After"
+
+    def test_pat_cannot_patch_others_event(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        owner = _make_human(db, tenant_a)
+        attacker = _make_human(db, tenant_a)
+        event = Events(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            owner_id=owner.id,
+            title="Owned",
+            start_time=datetime.now(UTC) + timedelta(days=3),
+            end_time=datetime.now(UTC) + timedelta(days=3, hours=1),
+            timezone="UTC",
+            visibility=EventVisibility.PUBLIC,
+            status=EventStatus.PUBLISHED,
+        )
+        db.add(event)
+        db.commit()
+        db.refresh(event)
+
+        raw_key = _make_pat(
+            db,
+            tenant_a,
+            attacker,
+            scopes=["events:read", "events:write"],
+        )
+
+        resp = client.patch(
+            f"/api/v1/events/portal/events/{event.id}",
+            headers=_pat_auth(raw_key),
+            json={"title": "Hijack"},
+        )
+
+        assert resp.status_code == 403, resp.text
+        assert resp.json()["detail"] == "Only the event owner can edit"
+
+    def test_pat_patch_requires_events_write_scope(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        human = _make_human(db, tenant_a)
+        event = Events(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            owner_id=human.id,
+            title="ReadScopeOnly",
+            start_time=datetime.now(UTC) + timedelta(days=3),
+            end_time=datetime.now(UTC) + timedelta(days=3, hours=1),
+            timezone="UTC",
+            visibility=EventVisibility.PUBLIC,
+            status=EventStatus.PUBLISHED,
+        )
+        db.add(event)
+        db.commit()
+        db.refresh(event)
+
+        raw_key = _make_pat(db, tenant_a, human, scopes=["events:read"])
+
+        resp = client.patch(
+            f"/api/v1/events/portal/events/{event.id}",
+            headers=_pat_auth(raw_key),
+            json={"title": "Nope"},
+        )
+
+        assert resp.status_code == 403, resp.text
+        assert resp.json()["detail"] == "API key lacks required scope: events:write"
+
+    def test_pat_can_cancel_own_event(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        human = _make_human(db, tenant_a)
+        event = Events(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            owner_id=human.id,
+            title="Cancelable",
+            start_time=datetime.now(UTC) + timedelta(days=3),
+            end_time=datetime.now(UTC) + timedelta(days=3, hours=1),
+            timezone="UTC",
+            visibility=EventVisibility.PUBLIC,
+            status=EventStatus.PUBLISHED,
+        )
+        db.add(event)
+        db.commit()
+        db.refresh(event)
+
+        raw_key = _make_pat(
+            db,
+            tenant_a,
+            human,
+            scopes=["events:read", "events:write"],
+        )
+
+        resp = client.post(
+            f"/api/v1/events/portal/events/{event.id}/cancel",
+            headers=_pat_auth(raw_key),
+        )
+
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["status"] == EventStatus.CANCELLED.value
+
+        db.expire_all()
+        row = db.get(Events, event.id)
+        assert row is not None
+        assert row.status == EventStatus.CANCELLED
+
+    def test_pat_can_bulk_invite(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        owner = _make_human(db, tenant_a)
+        invitee = _make_human(db, tenant_a)
+        event = Events(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            owner_id=owner.id,
+            title="InviteHere",
+            start_time=datetime.now(UTC) + timedelta(days=3),
+            end_time=datetime.now(UTC) + timedelta(days=3, hours=1),
+            timezone="UTC",
+            visibility=EventVisibility.UNLISTED,
+            status=EventStatus.PUBLISHED,
+        )
+        db.add(event)
+        db.commit()
+        db.refresh(event)
+
+        raw_key = _make_pat(
+            db,
+            tenant_a,
+            owner,
+            scopes=["events:read", "events:write"],
+        )
+
+        resp = client.post(
+            f"/api/v1/events/portal/events/{event.id}/invitations",
+            headers=_pat_auth(raw_key),
+            json={"emails": [invitee.email]},
+        )
+
+        assert resp.status_code == 201, resp.text
+        body = resp.json()
+        assert len(body["invited"]) == 1
+        assert body["invited"][0]["human_id"] == str(invitee.id)
+
+    def test_pat_can_list_invitations(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        owner = _make_human(db, tenant_a)
+        invitee = _make_human(db, tenant_a)
+        event = Events(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            owner_id=owner.id,
+            title="ListInvites",
+            start_time=datetime.now(UTC) + timedelta(days=3),
+            end_time=datetime.now(UTC) + timedelta(days=3, hours=1),
+            timezone="UTC",
+            visibility=EventVisibility.UNLISTED,
+            status=EventStatus.PUBLISHED,
+        )
+        db.add(event)
+        db.add(
+            EventInvitations(
+                tenant_id=tenant_a.id,
+                event_id=event.id,
+                human_id=invitee.id,
+                invited_by=owner.id,
+            )
+        )
+        db.commit()
+        db.refresh(event)
+
+        raw_key = _make_pat(db, tenant_a, owner, scopes=["events:read"])
+
+        resp = client.get(
+            f"/api/v1/events/portal/events/{event.id}/invitations",
+            headers=_pat_auth(raw_key),
+        )
+
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert len(body) == 1
+        assert body[0]["human_id"] == str(invitee.id)
+
+    def test_pat_can_delete_invitation(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        owner = _make_human(db, tenant_a)
+        invitee = _make_human(db, tenant_a)
+        event = Events(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            owner_id=owner.id,
+            title="DeleteInvite",
+            start_time=datetime.now(UTC) + timedelta(days=3),
+            end_time=datetime.now(UTC) + timedelta(days=3, hours=1),
+            timezone="UTC",
+            visibility=EventVisibility.UNLISTED,
+            status=EventStatus.PUBLISHED,
+        )
+        db.add(event)
+        db.commit()
+        db.refresh(event)
+
+        inv = EventInvitations(
+            tenant_id=tenant_a.id,
+            event_id=event.id,
+            human_id=invitee.id,
+            invited_by=owner.id,
+        )
+        db.add(inv)
+        db.commit()
+        db.refresh(inv)
+
+        raw_key = _make_pat(
+            db,
+            tenant_a,
+            owner,
+            scopes=["events:read", "events:write"],
+        )
+
+        resp = client.delete(
+            f"/api/v1/events/portal/events/{event.id}/invitations/{inv.id}",
+            headers=_pat_auth(raw_key),
+        )
+
+        assert resp.status_code == 204, resp.text
+
+        inv_id = inv.id
+        db.expunge(inv)
+        remaining = db.exec(
+            select(EventInvitations).where(EventInvitations.id == inv_id)
+        ).first()
+        assert remaining is None
+
+    def test_pat_invitation_routes_require_ownership(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        owner = _make_human(db, tenant_a)
+        attacker = _make_human(db, tenant_a)
+        invitee = _make_human(db, tenant_a)
+        event = Events(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            owner_id=owner.id,
+            title="OwnedInvites",
+            start_time=datetime.now(UTC) + timedelta(days=3),
+            end_time=datetime.now(UTC) + timedelta(days=3, hours=1),
+            timezone="UTC",
+            visibility=EventVisibility.UNLISTED,
+            status=EventStatus.PUBLISHED,
+        )
+        db.add(event)
+        db.commit()
+        db.refresh(event)
+
+        inv = EventInvitations(
+            tenant_id=tenant_a.id,
+            event_id=event.id,
+            human_id=invitee.id,
+            invited_by=owner.id,
+        )
+        db.add(inv)
+        db.commit()
+        db.refresh(inv)
+
+        raw_key = _make_pat(
+            db,
+            tenant_a,
+            attacker,
+            scopes=["events:read", "events:write"],
+        )
+
+        post_resp = client.post(
+            f"/api/v1/events/portal/events/{event.id}/invitations",
+            headers=_pat_auth(raw_key),
+            json={"emails": [invitee.email]},
+        )
+        assert post_resp.status_code == 403, post_resp.text
+        assert (
+            post_resp.json()["detail"] == "Only the event owner can manage invitations"
+        )
+
+        del_resp = client.delete(
+            f"/api/v1/events/portal/events/{event.id}/invitations/{inv.id}",
+            headers=_pat_auth(raw_key),
+        )
+        assert del_resp.status_code == 403, del_resp.text
+        assert (
+            del_resp.json()["detail"] == "Only the event owner can manage invitations"
+        )
 
     def test_flagging_human_revokes_existing_api_keys(
         self,

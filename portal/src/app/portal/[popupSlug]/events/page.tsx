@@ -107,13 +107,22 @@ export default function EventsPage() {
   // synchronously by `router.push` during a client-side transition) and
   // fall back to `window.location.search` so a hard refresh on the
   // events page with the param in the URL still works.
-  const focusEventRef = useRef<{ id: string | null } | null>(null)
+  // `occ` is the ISO start_time of the specific recurring occurrence; without
+  // it, every expanded instance of a recurring event would share the same
+  // DOM id and we'd always scroll to the first one.
+  const focusEventRef = useRef<{
+    id: string | null
+    occ: string | null
+  } | null>(null)
   if (focusEventRef.current === null) {
     let id: string | null = searchParams.get("focus")
+    let occ: string | null = searchParams.get("focusOcc")
     if (!id && typeof window !== "undefined") {
-      id = new URLSearchParams(window.location.search).get("focus")
+      const fallback = new URLSearchParams(window.location.search)
+      id = fallback.get("focus")
+      occ = fallback.get("focusOcc")
     }
-    focusEventRef.current = { id }
+    focusEventRef.current = { id, occ }
   }
 
   const [search, setSearch] = useState(() => restoredFilters?.search ?? "")
@@ -563,19 +572,22 @@ export default function EventsPage() {
   }, [view, restoredScroll, isLoading, events.length])
 
   // Scroll the focused event-card into view after returning from the
-  // detail page. The detail's back link stamps `?focus=<eventId>` and
+  // detail page. The detail's back link stamps `?focus=<eventId>` (and
+  // `&focusOcc=<ISO start_time>` for a specific recurring occurrence) and
   // ListBody/CalendarBody/DayBody render each card with
-  // id={`event-card-${event.id}`}. We use scrollIntoView (not a cached
+  // id={`event-card-${event.id}`} — or `event-card-${id}__${start_time}`
+  // for expanded recurring instances. We use scrollIntoView (not a cached
   // scrollTop) so it stays correct even if card heights settle late or
   // the viewport changed. The card may not be mounted on the first pass
   // (recurrence summary, image, fonts, query result still loading), so
   // we retry across a handful of frames before giving up. Either way
-  // the `focus` param is cleaned from the URL via router.replace so a
+  // the `focus` params are cleaned from the URL via router.replace so a
   // later refresh doesn't re-scroll, and so the URL stays tidy.
   const didConsumeFocusRef = useRef(false)
   useIsomorphicLayoutEffect(() => {
     if (didConsumeFocusRef.current) return
     const focusId = focusEventRef.current?.id
+    const focusOcc = focusEventRef.current?.occ
     if (!focusId) return
     // For list view, the query must finish first; otherwise the card
     // is guaranteed not to be in the DOM yet.
@@ -584,18 +596,23 @@ export default function EventsPage() {
     const cleanFocusParam = () => {
       if (typeof window === "undefined") return
       const params = new URLSearchParams(window.location.search)
-      if (!params.has("focus")) return
+      if (!params.has("focus") && !params.has("focusOcc")) return
       params.delete("focus")
+      params.delete("focusOcc")
       const qs = params.toString()
       router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
     }
+
+    const targetDomId = focusOcc
+      ? `event-card-${focusId}__${focusOcc}`
+      : `event-card-${focusId}`
 
     let cancelled = false
     let frames = 0
     const MAX_FRAMES = 30
     const tryFocus = () => {
       if (cancelled) return
-      const el = document.getElementById(`event-card-${focusId}`)
+      const el = document.getElementById(targetDomId)
       if (el) {
         didConsumeFocusRef.current = true
         el.scrollIntoView({ behavior: "auto", block: "center" })

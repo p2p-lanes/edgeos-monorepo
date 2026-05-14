@@ -1,6 +1,7 @@
 "use client"
 
 import { Layers } from "lucide-react"
+import { useMemo } from "react"
 import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
 import {
@@ -26,6 +27,13 @@ export function TracksPopover({
   const { t } = useTranslation()
   const count = selectedTrackIds.length
   const active = count > 0
+  const sortedTracks = useMemo(
+    () =>
+      [...allowedTracks].sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
+      ),
+    [allowedTracks],
+  )
 
   return (
     <Popover>
@@ -60,7 +68,7 @@ export function TracksPopover({
           )}
         </div>
         <div className="flex flex-wrap gap-2">
-          {allowedTracks.map((track) => {
+          {sortedTracks.map((track) => {
             const isActive = selectedTrackIds.includes(track.id)
             return (
               <button

@@ -6,7 +6,7 @@ from sqlalchemy import Text, Time
 from sqlalchemy.dialects.postgresql import UUID
 from sqlmodel import Column, DateTime, Field, Relationship, SQLModel
 
-from app.api.event_venue.schemas import EventVenueBase
+from app.api.event_venue.schemas import EventVenueBase, VenueBookingMode
 
 if TYPE_CHECKING:
     from app.api.event.models import Events
@@ -119,6 +119,7 @@ class VenueWeeklyHours(SQLModel, table=True):
         default=None, sa_column=Column(Time(timezone=False))
     )
     is_closed: bool = Field(default=False)
+    booking_mode: VenueBookingMode | None = Field(default=None, max_length=30)
 
     venue: "EventVenues" = Relationship(back_populates="weekly_hours")
 

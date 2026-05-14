@@ -120,6 +120,7 @@ class TestPopupRLS:
         # Access Tenant A popups
         response_a = client.get(
             "/api/v1/popups",
+            params={"search": "Popup Tenant"},
             headers={
                 "Authorization": f"Bearer {superadmin_token}",
                 "X-Tenant-Id": str(tenant_a.id),
@@ -133,6 +134,7 @@ class TestPopupRLS:
         # Access Tenant B popups
         response_b = client.get(
             "/api/v1/popups",
+            params={"search": "Popup Tenant"},
             headers={
                 "Authorization": f"Bearer {superadmin_token}",
                 "X-Tenant-Id": str(tenant_b.id),
@@ -166,6 +168,7 @@ class TestPopupRLS:
         """Tenant A admin should only see Tenant A popups."""
         response = client.get(
             "/api/v1/popups",
+            params={"search": "Popup Tenant"},
             headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
         )
 
@@ -188,6 +191,7 @@ class TestPopupRLS:
         """Tenant B admin should only see Tenant B popups."""
         response = client.get(
             "/api/v1/popups",
+            params={"search": "Popup Tenant"},
             headers={"Authorization": f"Bearer {admin_token_tenant_b}"},
         )
 

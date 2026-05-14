@@ -85,7 +85,7 @@ interface EventFormProps {
 
 const EVENT_STATUSES = [
   { value: "draft", label: "Draft" },
-  { value: "published", label: "Published" },
+  { value: "published", label: "Public" },
 ] as const
 
 const VISIBILITY_OPTIONS = [

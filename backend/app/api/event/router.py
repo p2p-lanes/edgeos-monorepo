@@ -1,6 +1,6 @@
 import uuid
 from collections.abc import Iterable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from loguru import logger
@@ -99,7 +99,6 @@ def _check_venue_open_hours(
     primary gate, this is the safety net for direct API callers / stale
     clients.
     """
-    from datetime import timedelta
     from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
     from sqlmodel import select
@@ -138,14 +137,35 @@ def _check_venue_open_hours(
     s = _aware(start_time)
     e = _aware(end_time)
 
-    # Build candidate open ranges spanning the request window. Mirrors the
-    # weekly-hours expansion in ``_compute_availability`` but only for the
-    # 1–2 days the request crosses (events virtually never span more).
-    candidate_ranges: list[tuple[datetime, datetime]] = []
-    s_local = s.astimezone(tz)
-    e_local = e.astimezone(tz)
+    expanded = _expand_weekly_slots(weekly_rows, tz, s, e)
+    candidate_ranges: list[tuple[datetime, datetime]] = [
+        (r_s, r_e) for r_s, r_e, _row in expanded
+    ]
+    for exc in open_exceptions:
+        candidate_ranges.append((_aware(exc.start_datetime), _aware(exc.end_datetime)))
+
+    if any(r_s <= s and e <= r_e for r_s, r_e in candidate_ranges):
+        return
+
+    raise HTTPException(
+        status_code=400,
+        detail="Selected time falls outside the venue's open hours.",
+    )
+
+
+def _expand_weekly_slots(weekly_rows, tz, aware_start, aware_end):
+    """Expand weekly_hours rows into concrete ``(open, close, row)`` ranges
+    covering the days that [aware_start, aware_end] crosses, in ``tz``.
+
+    Used by both the open-hours check and the per-slot booking-mode
+    resolver. Returns ranges where ``row`` is the source ``VenueWeeklyHours``
+    so callers can read its ``booking_mode``.
+    """
+    s_local = aware_start.astimezone(tz)
+    e_local = aware_end.astimezone(tz)
     day_cursor = s_local.date()
     last_day = e_local.date()
+    ranges: list[tuple[datetime, datetime, object]] = []
     while day_cursor <= last_day + timedelta(days=1):
         dow = day_cursor.weekday()
         for row in weekly_rows:
@@ -160,18 +180,78 @@ def _check_venue_open_hours(
             close_local = datetime.combine(day_cursor, row.close_time, tzinfo=tz)
             if close_local <= open_local:
                 close_local = close_local + timedelta(days=1)
-            candidate_ranges.append((open_local, close_local))
+            ranges.append((open_local, close_local, row))
         day_cursor = day_cursor + timedelta(days=1)
-    for exc in open_exceptions:
-        candidate_ranges.append((_aware(exc.start_datetime), _aware(exc.end_datetime)))
+    return ranges
 
-    if any(r_s <= s and e <= r_e for r_s, r_e in candidate_ranges):
-        return
 
-    raise HTTPException(
-        status_code=400,
-        detail="Selected time falls outside the venue's open hours.",
+def _resolve_effective_booking_mode(
+    db,
+    venue,
+    start_time: datetime,
+    end_time: datetime,
+) -> str:
+    """Return the most restrictive booking_mode that applies to
+    [start_time, end_time]. Considers every venue_weekly_hours slot that
+    overlaps the window (in the popup's timezone); slots with NULL
+    booking_mode contribute ``venue.booking_mode``. If no slot overlaps,
+    returns ``venue.booking_mode``.
+
+    Precedence: ``unbookable`` > ``approval_required`` > ``free``.
+    """
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+    from sqlmodel import select
+
+    from app.api.event_venue.models import VenueWeeklyHours
+    from app.api.event_venue.router import _resolve_popup_timezone
+    from app.api.event_venue.schemas import VenueBookingMode
+
+    venue_default = venue.booking_mode
+    if isinstance(venue_default, VenueBookingMode):
+        venue_default = venue_default.value
+
+    weekly_rows = list(
+        db.exec(
+            select(VenueWeeklyHours).where(VenueWeeklyHours.venue_id == venue.id)
+        ).all()
     )
+    if not weekly_rows:
+        return venue_default
+
+    tz_name = _resolve_popup_timezone(db, venue.popup_id)
+    try:
+        tz = ZoneInfo(tz_name)
+    except ZoneInfoNotFoundError:
+        tz = ZoneInfo("UTC")
+
+    def _aware(dt: datetime) -> datetime:
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=UTC)
+        return dt
+
+    s = _aware(start_time)
+    e = _aware(end_time)
+
+    expanded = _expand_weekly_slots(weekly_rows, tz, s, e)
+    precedence = {
+        VenueBookingMode.UNBOOKABLE.value: 3,
+        VenueBookingMode.APPROVAL_REQUIRED.value: 2,
+        VenueBookingMode.FREE.value: 1,
+    }
+
+    overlapping_modes: list[str] = []
+    for r_s, r_e, row in expanded:
+        if r_s < e and r_e > s:
+            row_mode = row.booking_mode
+            if isinstance(row_mode, VenueBookingMode):
+                row_mode = row_mode.value
+            overlapping_modes.append(row_mode or venue_default)
+
+    if not overlapping_modes:
+        return venue_default
+
+    return max(overlapping_modes, key=lambda m: precedence.get(m, 0))
 
 
 def _check_venue_availability(
@@ -189,8 +269,11 @@ def _check_venue_availability(
     venue = db.get(EventVenues, venue_id)
     if not venue:
         raise HTTPException(status_code=404, detail="Venue not found")
-    if venue.booking_mode == VenueBookingMode.UNBOOKABLE.value:
-        raise HTTPException(status_code=409, detail="Venue is not bookable")
+    effective_mode = _resolve_effective_booking_mode(db, venue, start_time, end_time)
+    if effective_mode == VenueBookingMode.UNBOOKABLE.value:
+        raise HTTPException(
+            status_code=409, detail="Venue is not bookable at the selected time"
+        )
 
     _check_venue_open_hours(db, venue, start_time, end_time)
 
@@ -293,8 +376,13 @@ def _check_event_within_popup_window(
     """Reject events that fall outside the popup's [start_date, end_date].
 
     Both popup bounds are optional — only enforced when set. Comparisons
-    are timezone-aware: bounds without tzinfo are treated as UTC. Used by
-    portal-facing endpoints; backoffice/admin paths are not restricted.
+    are timezone-aware: bounds without tzinfo are treated as UTC.
+
+    `end_date` is treated as an inclusive calendar day (the popup form is a
+    date-picker that stores midnight UTC of the chosen day), so events ending
+    anywhere on that day are accepted — i.e. the effective upper bound is
+    `end_date + 1 day`. Used by portal-facing endpoints; backoffice/admin
+    paths are not restricted.
     """
     if popup is None:
         return
@@ -314,7 +402,9 @@ def _check_event_within_popup_window(
                 f"({start_bound.isoformat()})."
             ),
         )
-    if end_bound is not None and _aware(end_time) > _aware(end_bound):
+    if end_bound is not None and _aware(end_time) > _aware(end_bound) + timedelta(
+        days=1
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
@@ -594,6 +684,7 @@ async def list_events(
     event_status: EventStatus | None = None,
     kind: str | None = None,
     venue_id: uuid.UUID | None = None,
+    location_kind: str | None = None,
     track_ids: list[uuid.UUID] | None = Query(default=None),
     start_after: datetime | None = None,
     start_before: datetime | None = None,
@@ -601,7 +692,12 @@ async def list_events(
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[EventPublic]:
-    """List events with optional filters (backoffice)."""
+    """List events with optional filters (backoffice).
+
+    ``location_kind`` narrows results to events without a ``venue_id``:
+    - ``"custom"``  → events with a ``custom_location_name`` set.
+    - ``"meeting"`` → online-only events (no venue, no custom location).
+    """
     if popup_id:
         events, total = crud.events_crud.find_by_popup(
             db,
@@ -611,6 +707,7 @@ async def list_events(
             event_status=event_status,
             kind=kind,
             venue_id=venue_id,
+            location_kind=location_kind,
             track_ids=track_ids,
             start_after=start_after,
             start_before=start_before,
@@ -1030,11 +1127,15 @@ def _run_availability_check(
     venue = db.get(EventVenues, payload.venue_id)
     if not venue:
         raise HTTPException(status_code=404, detail="Venue not found")
-    if venue.booking_mode == VenueBookingMode.UNBOOKABLE.value:
+    effective_mode = _resolve_effective_booking_mode(
+        db, venue, payload.start_time, payload.end_time
+    )
+    if effective_mode == VenueBookingMode.UNBOOKABLE.value:
         return EventAvailabilityResult(
             available=False,
             conflicts=[],
-            reason="Venue is not bookable",
+            reason="Venue is not bookable at the selected time",
+            effective_booking_mode=effective_mode,
         )
 
     window_start, window_end = crud.compute_booking_window(
@@ -1054,6 +1155,7 @@ def _run_availability_check(
         available=len(conflicts) == 0,
         conflicts=[c.id for c in conflicts],
         reason=None if not conflicts else "Conflicts with existing events",
+        effective_booking_mode=effective_mode,
     )
 
 
@@ -1883,9 +1985,13 @@ async def create_portal_event(
         from app.api.event_venue import crud as venue_crud
 
         venue = venue_crud.event_venues_crud.get(db, event_in.venue_id)
-        if venue and venue.booking_mode == "approval_required":
-            requires_approval = True
-            approval_reason = "Venue requires admin approval."
+        if venue:
+            effective_mode = _resolve_effective_booking_mode(
+                db, venue, event_in.start_time, event_in.end_time
+            )
+            if effective_mode == "approval_required":
+                requires_approval = True
+                approval_reason = "Venue requires admin approval at the selected time."
         if (
             venue
             and venue.capacity

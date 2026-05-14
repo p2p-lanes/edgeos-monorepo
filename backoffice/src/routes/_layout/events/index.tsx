@@ -6,8 +6,10 @@ import {
 } from "@tanstack/react-query"
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
+import { format } from "date-fns"
 import {
   CalendarDays,
+  CalendarIcon,
   CalendarRange,
   CheckCircle2,
   Eye,
@@ -15,15 +17,20 @@ import {
   Plus,
   Repeat,
   Trash2,
+  Video,
   XCircle,
 } from "lucide-react"
-import { Suspense, useMemo, useState } from "react"
+import { Suspense, useCallback, useMemo, useState } from "react"
 
 import {
   type EventPublic,
   EventSettingsService,
+  type EventStatus,
   EventsService,
+  type EventVenuePublic,
   EventVenuesService,
+  HumansService,
+  PopupsService,
 } from "@/client"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
@@ -31,6 +38,7 @@ import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Calendar } from "@/components/ui/calendar"
 import {
   Dialog,
   DialogClose,
@@ -41,19 +49,71 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { LoadingButton } from "@/components/ui/loading-button"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
 import {
+  type TableSearchParams,
   useTableSearchParams,
   validateTableSearch,
 } from "@/hooks/useTableSearchParams"
 import { createErrorHandler } from "@/utils"
 
+const VALID_EVENT_STATUSES: Set<string> = new Set([
+  "draft",
+  "published",
+  "cancelled",
+  "pending_approval",
+  "rejected",
+])
+
+const EVENT_STATUS_OPTIONS: { value: EventStatus; label: string }[] = [
+  { value: "draft", label: "Draft" },
+  { value: "published", label: "Public" },
+  { value: "pending_approval", label: "Pending approval" },
+  { value: "cancelled", label: "Cancelled" },
+  { value: "rejected", label: "Rejected" },
+]
+
+type EventsSearchParams = TableSearchParams & {
+  status?: EventStatus
+  venueId?: string
+  startDate?: string
+  endDate?: string
+}
+
 export const Route = createFileRoute("/_layout/events/")({
   component: EventsPage,
-  validateSearch: validateTableSearch,
+  validateSearch: (raw: Record<string, unknown>): EventsSearchParams => ({
+    ...validateTableSearch(raw),
+    ...(typeof raw.status === "string" && VALID_EVENT_STATUSES.has(raw.status)
+      ? { status: raw.status as EventStatus }
+      : {}),
+    ...(typeof raw.venueId === "string" && raw.venueId
+      ? { venueId: raw.venueId }
+      : {}),
+    ...(typeof raw.startDate === "string" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(raw.startDate)
+      ? { startDate: raw.startDate }
+      : {}),
+    ...(typeof raw.endDate === "string" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(raw.endDate)
+      ? { endDate: raw.endDate }
+      : {}),
+  }),
   head: () => ({
     meta: [{ title: "Events - EdgeOS" }],
   }),
@@ -307,7 +367,7 @@ function EventActionsMenu({
             </DialogTitle>
             <DialogDescription>
               {decisionOpen === "approve"
-                ? `Approve "${event.title}"? It will become published and the creator will be notified.`
+                ? `Approve "${event.title}"? It will become public and the creator will be notified.`
                 : `Reject "${event.title}"? The creator will be notified. You can leave an optional reason.`}
             </DialogDescription>
           </DialogHeader>
@@ -419,6 +479,36 @@ function EventActionsMenu({
   )
 }
 
+function EventHostCell({ event }: { event: EventPublic }) {
+  const ownerId = event.owner_id
+  const { data: owner } = useQuery({
+    queryKey: ["human", ownerId],
+    queryFn: () => HumansService.getHuman({ humanId: ownerId }),
+    enabled: !!ownerId,
+    staleTime: 5 * 60_000,
+  })
+
+  const displayName = event.host_display_name?.trim() || null
+  const ownerFullName =
+    owner && (owner.first_name || owner.last_name)
+      ? [owner.first_name, owner.last_name].filter(Boolean).join(" ").trim() ||
+        null
+      : null
+  const primary = displayName || ownerFullName
+  const ownerEmail = owner?.email
+
+  return (
+    <div className="flex flex-col leading-tight max-w-[220px]">
+      <span className="text-sm truncate">{primary ?? "—"}</span>
+      {ownerEmail && (
+        <span className="text-xs text-muted-foreground truncate">
+          {ownerEmail}
+        </span>
+      )}
+    </div>
+  )
+}
+
 function buildEventColumns(
   venueNameById: Map<string, string>,
   timezone: string | undefined,
@@ -483,6 +573,12 @@ function buildEventColumns(
       ),
     },
     {
+      id: "host",
+      accessorKey: "host_display_name",
+      header: "Host",
+      cell: ({ row }) => <EventHostCell event={row.original} />,
+    },
+    {
       accessorKey: "start_time",
       header: ({ column }) => <SortableHeader label="Start" column={column} />,
       cell: ({ row }) => (
@@ -512,6 +608,14 @@ function buildEventColumns(
             </span>
           )
         }
+        if (!venueId) {
+          return (
+            <span className="text-muted-foreground/80 inline-flex items-center gap-1.5">
+              <Video className="h-3.5 w-3.5" />
+              Meeting
+            </span>
+          )
+        }
         return <span className="text-muted-foreground">—</span>
       },
     },
@@ -527,14 +631,249 @@ function buildEventColumns(
   ]
 }
 
+function EventStatusFilter({
+  selected,
+  onSelect,
+}: {
+  selected: EventStatus | undefined
+  onSelect: (value: EventStatus | undefined) => void
+}) {
+  return (
+    <Select
+      value={selected ?? "all"}
+      onValueChange={(v) =>
+        onSelect(v === "all" ? undefined : (v as EventStatus))
+      }
+    >
+      <SelectTrigger className="h-9 w-[150px]">
+        <SelectValue placeholder="All statuses" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all">All statuses</SelectItem>
+        {EVENT_STATUS_OPTIONS.map((opt) => (
+          <SelectItem key={opt.value} value={opt.value}>
+            {opt.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
+}
+
+function EventVenueFilter({
+  venues,
+  selected,
+  onSelect,
+}: {
+  venues: EventVenuePublic[]
+  selected: string | undefined
+  onSelect: (value: string | undefined) => void
+}) {
+  return (
+    <Select
+      value={selected ?? "all"}
+      onValueChange={(v) => onSelect(v === "all" ? undefined : v)}
+    >
+      <SelectTrigger className="h-9 w-[170px]">
+        <SelectValue placeholder="All venues" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all">All venues</SelectItem>
+        <SelectItem value="meeting">Meeting (online)</SelectItem>
+        <SelectItem value="custom">Custom location</SelectItem>
+        {venues.map((venue) => (
+          <SelectItem key={venue.id} value={venue.id}>
+            {venue.title}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
+}
+
+function parseYmd(value: string | undefined): Date | undefined {
+  if (!value) return undefined
+  const [y, m, d] = value.split("-").map(Number)
+  if (!y || !m || !d) return undefined
+  return new Date(y, m - 1, d, 12, 0, 0)
+}
+
+function formatYmd(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, "0")
+  const d = String(date.getDate()).padStart(2, "0")
+  return `${y}-${m}-${d}`
+}
+
+function EventDateRangeFilter({
+  startDate,
+  endDate,
+  onStartChange,
+  onEndChange,
+  popupStart,
+  popupEnd,
+}: {
+  startDate: string | undefined
+  endDate: string | undefined
+  onStartChange: (value: string | undefined) => void
+  onEndChange: (value: string | undefined) => void
+  popupStart: string | null | undefined
+  popupEnd: string | null | undefined
+}) {
+  const from = parseYmd(startDate)
+  const to = parseYmd(endDate)
+  // The popup defines the event window — disallow picking days outside it
+  // and anchor the calendar to the popup's first day by default.
+  const minDate = parseYmd(popupStart?.slice(0, 10))
+  const maxDate = parseYmd(popupEnd?.slice(0, 10))
+
+  const label =
+    from && to
+      ? `${format(from, "MMM d")} – ${format(to, "MMM d, yyyy")}`
+      : from
+        ? `From ${format(from, "MMM d, yyyy")}`
+        : to
+          ? `Until ${format(to, "MMM d, yyyy")}`
+          : "Any date"
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          className="h-9 w-[220px] justify-start font-normal"
+        >
+          <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+          <span
+            className={`truncate ${from || to ? "" : "text-muted-foreground"}`}
+          >
+            {label}
+          </span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start">
+        <Calendar
+          mode="range"
+          numberOfMonths={2}
+          defaultMonth={from ?? minDate ?? new Date()}
+          selected={{ from, to }}
+          onSelect={(range) => {
+            onStartChange(range?.from ? formatYmd(range.from) : undefined)
+            onEndChange(range?.to ? formatYmd(range.to) : undefined)
+          }}
+          disabled={(d) => {
+            if (minDate && d < minDate) return true
+            if (maxDate && d > maxDate) return true
+            return false
+          }}
+          startMonth={minDate}
+          endMonth={maxDate}
+          initialFocus
+        />
+        <div className="flex justify-end border-t p-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={!from && !to}
+            onClick={() => {
+              onStartChange(undefined)
+              onEndChange(undefined)
+            }}
+          >
+            Clear
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
 function EventsTableContent() {
   const searchParams = Route.useSearch()
+  const navigate = useNavigate()
   const { selectedPopupId } = useWorkspace()
   const { search, pagination, setSearch, setPagination } = useTableSearchParams(
     searchParams,
     "/events",
   )
-  const [pendingOnly, setPendingOnly] = useState(false)
+  const { status, venueId, startDate, endDate } = searchParams
+
+  const setStatus = useCallback(
+    (value: EventStatus | undefined) => {
+      navigate({
+        to: "/events",
+        search: (prev: Record<string, unknown>) => ({
+          ...prev,
+          status: value,
+          page: 0,
+        }),
+        replace: true,
+      })
+    },
+    [navigate],
+  )
+
+  const setVenueId = useCallback(
+    (value: string | undefined) => {
+      navigate({
+        to: "/events",
+        search: (prev: Record<string, unknown>) => ({
+          ...prev,
+          venueId: value,
+          page: 0,
+        }),
+        replace: true,
+      })
+    },
+    [navigate],
+  )
+
+  const setStartDate = useCallback(
+    (value: string | undefined) => {
+      navigate({
+        to: "/events",
+        search: (prev: Record<string, unknown>) => ({
+          ...prev,
+          startDate: value,
+          page: 0,
+        }),
+        replace: true,
+      })
+    },
+    [navigate],
+  )
+
+  const setEndDate = useCallback(
+    (value: string | undefined) => {
+      navigate({
+        to: "/events",
+        search: (prev: Record<string, unknown>) => ({
+          ...prev,
+          endDate: value,
+          page: 0,
+        }),
+        replace: true,
+      })
+    },
+    [navigate],
+  )
+
+  const clearFilters = useCallback(() => {
+    navigate({
+      to: "/events",
+      search: (prev: Record<string, unknown>) => ({
+        ...prev,
+        status: undefined,
+        venueId: undefined,
+        startDate: undefined,
+        endDate: undefined,
+        page: 0,
+      }),
+      replace: true,
+    })
+  }, [navigate])
+
+  const hasFilters = !!(status || venueId || startDate || endDate)
 
   const { data: events } = useQuery({
     queryKey: [
@@ -544,7 +883,10 @@ function EventsTableContent() {
         page: pagination.pageIndex,
         pageSize: pagination.pageSize,
         search,
-        pendingOnly,
+        status,
+        venueId,
+        startDate,
+        endDate,
       },
     ],
     queryFn: () =>
@@ -553,20 +895,19 @@ function EventsTableContent() {
         search: search || undefined,
         skip: pagination.pageIndex * pagination.pageSize,
         limit: pagination.pageSize,
-        // Backend accepts a single status filter; fetch everything and
-        // narrow client-side for simplicity when the toggle is off.
-        eventStatus: pendingOnly ? "pending_approval" : undefined,
+        eventStatus: status,
+        venueId:
+          venueId && venueId !== "custom" && venueId !== "meeting"
+            ? venueId
+            : undefined,
+        locationKind:
+          venueId === "custom" || venueId === "meeting" ? venueId : undefined,
+        startAfter: startDate ? `${startDate}T00:00:00Z` : undefined,
+        startBefore: endDate ? `${endDate}T23:59:59Z` : undefined,
       }),
     enabled: !!selectedPopupId,
     placeholderData: keepPreviousData,
   })
-
-  const pendingCount = useMemo(
-    () =>
-      events?.results.filter((e) => e.status === "pending_approval").length ??
-      0,
-    [events],
-  )
 
   const { data: venues } = useQuery({
     queryKey: ["event-venues", { popupId: selectedPopupId, limit: 200 }],
@@ -575,6 +916,12 @@ function EventsTableContent() {
         popupId: selectedPopupId!,
         limit: 200,
       }),
+    enabled: !!selectedPopupId,
+  })
+
+  const { data: popup } = useQuery({
+    queryKey: ["popup", selectedPopupId],
+    queryFn: () => PopupsService.getPopup({ popupId: selectedPopupId! }),
     enabled: !!selectedPopupId,
   })
 
@@ -612,28 +959,11 @@ function EventsTableContent() {
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          variant={pendingOnly ? "default" : "outline"}
-          size="sm"
-          onClick={() => setPendingOnly((v) => !v)}
-          aria-pressed={pendingOnly}
-        >
-          <CheckCircle2 className="mr-2 h-4 w-4" />
-          Pending approval
-          {!pendingOnly && pendingCount > 0 && (
-            <Badge variant="secondary" className="ml-2">
-              {pendingCount}
-            </Badge>
-          )}
-        </Button>
-      </div>
-
       <DataTable
         columns={columns}
         data={events.results}
         searchPlaceholder="Search by title..."
-        hiddenOnMobile={["kind", "venue_id", "start_time"]}
+        hiddenOnMobile={["kind", "host", "venue_id", "start_time"]}
         searchValue={search}
         onSearchChange={setSearch}
         serverPagination={{
@@ -641,25 +971,48 @@ function EventsTableContent() {
           pagination: pagination,
           onPaginationChange: setPagination,
         }}
+        filterBar={
+          <div className="flex flex-wrap items-center gap-2">
+            <EventStatusFilter selected={status} onSelect={setStatus} />
+            <EventVenueFilter
+              venues={venues?.results ?? []}
+              selected={venueId}
+              onSelect={setVenueId}
+            />
+            <EventDateRangeFilter
+              startDate={startDate}
+              endDate={endDate}
+              onStartChange={setStartDate}
+              onEndChange={setEndDate}
+              popupStart={popup?.start_date}
+              popupEnd={popup?.end_date}
+            />
+            {hasFilters && (
+              <Button variant="ghost" size="sm" onClick={clearFilters}>
+                Clear
+              </Button>
+            )}
+          </div>
+        }
         emptyState={
-          !search ? (
+          hasFilters ? (
             <EmptyState
               icon={CalendarDays}
-              title={pendingOnly ? "No pending requests" : "No events yet"}
-              description={
-                pendingOnly
-                  ? "Events awaiting venue approval will appear here."
-                  : "Create the first event for this pop-up."
-              }
+              title="No events match these filters"
+              description="Try adjusting or clearing the filters above."
+            />
+          ) : !search ? (
+            <EmptyState
+              icon={CalendarDays}
+              title="No events yet"
+              description="Create the first event for this pop-up."
               action={
-                pendingOnly ? undefined : (
-                  <Button asChild>
-                    <Link to="/events/new">
-                      <Plus className="mr-2 h-4 w-4" />
-                      Create Event
-                    </Link>
-                  </Button>
-                )
+                <Button asChild>
+                  <Link to="/events/new">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create Event
+                  </Link>
+                </Button>
               }
             />
           ) : undefined
