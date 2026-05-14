@@ -2,7 +2,7 @@ import {
   CHECKOUT_MODE,
   type CheckoutMode,
 } from "@/checkout/popupCheckoutPolicy"
-import type { PaymentProductRequest } from "@/client"
+import type { PaymentProductRequest_Input as PaymentProductRequest } from "@/client"
 import type { AttendeePassState } from "@/types/Attendee"
 import type {
   SelectedDynamicItem,
@@ -178,6 +178,7 @@ export function buildPaymentProducts({
         product_id: patron.productId,
         attendee_id: firstAttendeeId,
         quantity: 1,
+        unit_price_override: patron.amount,
       })
     }
 

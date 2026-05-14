@@ -132,6 +132,16 @@ class ProductCreate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     @model_validator(mode="after")
+    def validate_patreon_price(self) -> "ProductCreate":
+        """Patreon products must have price = 0."""
+        if self.category == "patreon" and self.price > 0:
+            raise ValueError(
+                "Patron products must have a price of 0. "
+                "The donation amount is set by the donor at checkout."
+            )
+        return self
+
+    @model_validator(mode="after")
     def validate_ticket_fields(self) -> "ProductCreate":
         """Validate that ticket-specific fields are only set for tickets."""
         if self.category != "ticket":
@@ -190,6 +200,16 @@ class ProductUpdate(BaseModel):
     max_per_order: int | None = Field(default=None, ge=1)
     insurance_eligible: bool | None = None
     requires_check_in: bool | None = None
+
+    @model_validator(mode="after")
+    def validate_patreon_price(self) -> "ProductUpdate":
+        """Reject updates that set category=patreon with a nonzero price."""
+        if self.category == "patreon" and self.price is not None and self.price > 0:
+            raise ValueError(
+                "Patron products must have a price of 0. "
+                "The donation amount is set by the donor at checkout."
+            )
+        return self
 
     @model_validator(mode="after")
     def validate_max_per_order_vs_stock_cap(self) -> "ProductUpdate":

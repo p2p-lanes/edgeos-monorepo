@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest"
 import {
   buildPaymentsQueryConfig,
   buildPaymentsTableState,
+  resolveLineUnitPrice,
 } from "./payments.helpers"
 
 describe("payments.helpers", () => {
@@ -38,6 +39,59 @@ describe("payments.helpers", () => {
         sortOrder: "asc",
       },
     ])
+  })
+
+  it("resolveLineUnitPrice: patron row uses effective_unit_price", () => {
+    expect(
+      resolveLineUnitPrice({
+        effective_unit_price: "5000",
+        product_price: "0",
+      }),
+    ).toBe(5000)
+  })
+
+  it("resolveLineUnitPrice: non-patron row uses product_price when effective_unit_price is null", () => {
+    expect(
+      resolveLineUnitPrice({
+        effective_unit_price: null,
+        product_price: "3000",
+      }),
+    ).toBe(3000)
+  })
+
+  it("resolveLineUnitPrice: non-patron row uses product_price when effective_unit_price is undefined", () => {
+    expect(
+      resolveLineUnitPrice({
+        effective_unit_price: undefined,
+        product_price: "2500",
+      }),
+    ).toBe(2500)
+  })
+
+  it("resolveLineUnitPrice: honours 0-value effective_unit_price (nullish coalescing, not truthy)", () => {
+    // effective_unit_price=0 is a valid (if unusual) value — must NOT fall through to product_price
+    expect(
+      resolveLineUnitPrice({
+        effective_unit_price: "0",
+        product_price: "3000",
+      }),
+    ).toBe(0)
+  })
+
+  it("resolveLineUnitPrice: patron line total = unit_price * quantity", () => {
+    const unitPrice = resolveLineUnitPrice({
+      effective_unit_price: "5000",
+      product_price: "0",
+    })
+    expect(unitPrice * 1).toBe(5000)
+  })
+
+  it("resolveLineUnitPrice: non-patron line total = product_price * quantity", () => {
+    const unitPrice = resolveLineUnitPrice({
+      effective_unit_price: null,
+      product_price: "3000",
+    })
+    expect(unitPrice * 2).toBe(6000)
   })
 
   it("uses server totals and preserves server rows without local filtering", () => {

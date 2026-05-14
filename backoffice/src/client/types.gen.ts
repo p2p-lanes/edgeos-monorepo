@@ -1939,7 +1939,7 @@ export type ParticipantStatus = 'registered' | 'checked_in' | 'cancelled';
 export type PaymentCreate = {
     application_id?: (string | null);
     popup_id?: (string | null);
-    products: Array<PaymentProductRequest>;
+    products: Array<PaymentProductRequest_Input>;
     coupon_code?: (string | null);
     edit_passes?: boolean;
     insurance?: boolean;
@@ -1950,7 +1950,7 @@ export type PaymentCreate = {
  */
 export type PaymentPreview = {
     application_id: string;
-    products: Array<PaymentProductRequest>;
+    products: Array<PaymentProductRequest_Output>;
     original_amount: string;
     amount: string;
     insurance_amount?: string;
@@ -1969,10 +1969,21 @@ export type PaymentPreview = {
 /**
  * Product selection for payment.
  */
-export type PaymentProductRequest = {
+export type PaymentProductRequest_Input = {
     product_id: string;
     attendee_id: string;
     quantity?: number;
+    unit_price_override?: (number | string | null);
+};
+
+/**
+ * Product selection for payment.
+ */
+export type PaymentProductRequest_Output = {
+    product_id: string;
+    attendee_id: string;
+    quantity?: number;
+    unit_price_override?: (string | null);
 };
 
 /**
@@ -1985,6 +1996,7 @@ export type PaymentProductResponse = {
     product_name: string;
     product_description?: (string | null);
     product_price: string;
+    effective_unit_price?: (string | null);
     product_category: string;
     product_currency: string;
     attendee_name?: (string | null);

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import { CHECKOUT_MODE } from "@/checkout/popupCheckoutPolicy"
 import { buildPaymentProducts } from "@/hooks/checkout/buildPaymentProducts"
 import type { AttendeePassState } from "@/types/Attendee"
+import type { SelectedPatronItem } from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
 
 function createProduct(overrides: Partial<ProductsPass>): ProductsPass {
@@ -137,5 +138,143 @@ describe("buildPaymentProducts", () => {
         quantity: 1,
       },
     ])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Patron path — unit_price_override contract
+// ---------------------------------------------------------------------------
+
+function makePatronProduct(id = "patron-prod"): ProductsPass {
+  return createProduct({
+    id,
+    category: "patreon",
+    price: 0,
+    duration_type: undefined,
+  })
+}
+
+function makePatronItem(
+  overrides?: Partial<SelectedPatronItem>,
+): SelectedPatronItem {
+  return {
+    productId: "patron-prod",
+    product: makePatronProduct(),
+    amount: 5000,
+    isCustomAmount: false,
+    ...overrides,
+  }
+}
+
+describe("buildPaymentProducts — patron path", () => {
+  it("emits quantity=1 and unit_price_override=amount for cart.patron", () => {
+    const patron = makePatronItem({ amount: 5000 })
+    const result = buildPaymentProducts({
+      attendeePasses: [],
+      selectedPasses: [
+        {
+          productId: "ticket-1",
+          product: createProduct({ id: "ticket-1" }),
+          attendeeId: "attendee-1",
+          attendee: createAttendee([createProduct({ id: "ticket-1" })]),
+          quantity: 1,
+          price: 100,
+        },
+      ],
+      housing: null,
+      merch: [],
+      patron,
+      dynamicItems: {},
+      isEditing: false,
+      appCredit: 0,
+    })
+
+    const patronLine = result.products.find(
+      (p) => p.product_id === "patron-prod",
+    )
+    expect(patronLine).toBeDefined()
+    expect(patronLine?.quantity).toBe(1)
+    expect(patronLine?.unit_price_override).toBe(5000)
+  })
+
+  it("patron entry is NOT emitted when cart.patron is null", () => {
+    const result = buildPaymentProducts({
+      attendeePasses: [],
+      selectedPasses: [],
+      housing: null,
+      merch: [],
+      patron: null,
+      dynamicItems: {},
+      isEditing: false,
+      appCredit: 0,
+    })
+
+    expect(result.products.some((p) => p.product_id === "patron-prod")).toBe(
+      false,
+    )
+  })
+
+  it("non-patron dynamic items are not affected by patron path", () => {
+    const patron = makePatronItem({ amount: 2500 })
+    const result = buildPaymentProducts({
+      attendeePasses: [],
+      selectedPasses: [
+        {
+          productId: "ticket-1",
+          product: createProduct({ id: "ticket-1" }),
+          attendeeId: "attendee-1",
+          attendee: createAttendee([createProduct({ id: "ticket-1" })]),
+          quantity: 1,
+          price: 100,
+        },
+      ],
+      housing: null,
+      merch: [],
+      patron,
+      dynamicItems: {
+        "merch-step": [
+          {
+            productId: "merch-1",
+            product: createProduct({ id: "merch-1", category: "merch" }),
+            quantity: 2,
+            price: 50,
+            stepType: "merch-step",
+          },
+        ],
+      },
+      isEditing: false,
+      appCredit: 0,
+    })
+
+    const patronLine = result.products.find(
+      (p) => p.product_id === "patron-prod",
+    )
+    const merchLine = result.products.find((p) => p.product_id === "merch-1")
+
+    expect(patronLine?.unit_price_override).toBe(2500)
+    expect(patronLine?.quantity).toBe(1)
+    expect(merchLine?.quantity).toBe(2)
+    // merch line has no unit_price_override
+    expect(merchLine?.unit_price_override).toBeUndefined()
+  })
+
+  it("patron amount travels as unit_price_override even for custom amounts", () => {
+    const patron = makePatronItem({ amount: 7500, isCustomAmount: true })
+    const result = buildPaymentProducts({
+      attendeePasses: [],
+      selectedPasses: [],
+      housing: null,
+      merch: [],
+      patron,
+      dynamicItems: {},
+      isEditing: false,
+      appCredit: 0,
+    })
+
+    const patronLine = result.products.find(
+      (p) => p.product_id === "patron-prod",
+    )
+    expect(patronLine?.unit_price_override).toBe(7500)
+    expect(patronLine?.quantity).toBe(1)
   })
 })
