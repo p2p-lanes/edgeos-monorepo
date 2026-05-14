@@ -3754,6 +3754,7 @@ export type EventsListEventsData = {
      * Maximum number of items to return
      */
     limit?: number;
+    locationKind?: (string | null);
     popupId?: (string | null);
     search?: (string | null);
     /**

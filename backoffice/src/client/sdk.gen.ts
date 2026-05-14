@@ -1093,7 +1093,7 @@ export class AuthService {
     
     /**
      * Scanner Login
-     * Initiate scanner login. Accepts CHECK_IN_CONTROLLER, ADMIN, and SUPERADMIN.
+     * Initiate scanner login. Accepts CHECK_IN_CONTROLLER, OPERATOR, ADMIN, and SUPERADMIN.
      * VIEWER is rejected pre-OTP — must not receive a code they can't redeem.
      * @param data The data for the request.
      * @param data.requestBody
@@ -1115,7 +1115,7 @@ export class AuthService {
     /**
      * Scanner Authenticate
      * Authenticate a scanner operator and return a JWT token.
-     * Only SUPERADMIN, ADMIN, and CHECK_IN_CONTROLLER are accepted.
+     * Only SUPERADMIN, ADMIN, OPERATOR, and CHECK_IN_CONTROLLER are accepted.
      * VIEWER is rejected with 403.
      * @param data The data for the request.
      * @param data.requestBody
@@ -2181,11 +2181,16 @@ export class EventsService {
     /**
      * List Events
      * List events with optional filters (backoffice).
+     *
+     * ``location_kind`` narrows results to events without a ``venue_id``:
+     * - ``"custom"``  → events with a ``custom_location_name`` set.
+     * - ``"meeting"`` → online-only events (no venue, no custom location).
      * @param data The data for the request.
      * @param data.popupId
      * @param data.eventStatus
      * @param data.kind
      * @param data.venueId
+     * @param data.locationKind
      * @param data.trackIds
      * @param data.startAfter
      * @param data.startBefore
@@ -2208,6 +2213,7 @@ export class EventsService {
                 event_status: data.eventStatus,
                 kind: data.kind,
                 venue_id: data.venueId,
+                location_kind: data.locationKind,
                 track_ids: data.trackIds,
                 start_after: data.startAfter,
                 start_before: data.startBefore,

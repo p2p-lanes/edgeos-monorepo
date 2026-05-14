@@ -601,6 +601,7 @@ async def list_events(
     event_status: EventStatus | None = None,
     kind: str | None = None,
     venue_id: uuid.UUID | None = None,
+    location_kind: str | None = None,
     track_ids: list[uuid.UUID] | None = Query(default=None),
     start_after: datetime | None = None,
     start_before: datetime | None = None,
@@ -608,7 +609,12 @@ async def list_events(
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[EventPublic]:
-    """List events with optional filters (backoffice)."""
+    """List events with optional filters (backoffice).
+
+    ``location_kind`` narrows results to events without a ``venue_id``:
+    - ``"custom"``  → events with a ``custom_location_name`` set.
+    - ``"meeting"`` → online-only events (no venue, no custom location).
+    """
     if popup_id:
         events, total = crud.events_crud.find_by_popup(
             db,
@@ -618,6 +624,7 @@ async def list_events(
             event_status=event_status,
             kind=kind,
             venue_id=venue_id,
+            location_kind=location_kind,
             track_ids=track_ids,
             start_after=start_after,
             start_before=start_before,
