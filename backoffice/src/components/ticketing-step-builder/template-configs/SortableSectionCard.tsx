@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
+import { cn } from "@/lib/utils"
 
 export interface ProductSection {
   key: string
@@ -43,11 +44,19 @@ interface AttendeeCategoryOption {
   label: string
 }
 
+export interface SectionProduct {
+  id: string
+  name: string
+  price?: string
+  slug?: string
+  is_active?: boolean
+}
+
 interface SortableSectionCardProps {
   section: ProductSection
   onUpdate: (key: string, updates: Partial<ProductSection>) => void
   onDelete: (key: string) => void
-  products: Array<{ id: string; name: string }>
+  products: SectionProduct[]
   assignLabel?: string
   showMediaFields?: boolean
   showAttendeeCategories?: boolean
@@ -81,7 +90,7 @@ export function SortableSectionCard({
 
   const assignedProducts = section.product_ids
     .map((id) => products.find((p) => p.id === id))
-    .filter(Boolean) as Array<{ id: string; name: string }>
+    .filter(Boolean) as SectionProduct[]
 
   const availableProducts = products.filter(
     (p) => !section.product_ids.includes(p.id),
@@ -212,28 +221,47 @@ export function SortableSectionCard({
           <Separator />
           <div className="px-3 py-2">
             <div className="flex flex-col gap-1">
-              {assignedProducts.map((p) => (
-                <div
-                  key={p.id}
-                  className="flex items-center gap-2 text-xs text-muted-foreground py-0.5"
-                >
-                  <Package className="h-3 w-3 shrink-0" />
-                  <span className="truncate">{p.name}</span>
-                  <button
-                    type="button"
-                    className="ml-auto shrink-0 hover:text-destructive"
-                    onClick={() =>
-                      onUpdate(section.key, {
-                        product_ids: section.product_ids.filter(
-                          (id) => id !== p.id,
-                        ),
-                      })
-                    }
+              {assignedProducts.map((p) => {
+                const inactive = p.is_active === false
+                return (
+                  <div
+                    key={p.id}
+                    className={cn(
+                      "flex items-center gap-2 text-xs text-muted-foreground py-0.5",
+                      inactive && "opacity-50",
+                    )}
                   >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              ))}
+                    <Package className="h-3 w-3 shrink-0" />
+                    <span className="truncate">{p.name}</span>
+                    {inactive && (
+                      <span className="shrink-0 rounded border px-1 py-px text-[10px] uppercase tracking-wide">
+                        Inactive
+                      </span>
+                    )}
+                    {p.price != null && (
+                      <span className="ml-auto shrink-0 font-mono tabular-nums">
+                        ${p.price}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      className={cn(
+                        "shrink-0 hover:text-destructive",
+                        p.price == null && "ml-auto",
+                      )}
+                      onClick={() =>
+                        onUpdate(section.key, {
+                          product_ids: section.product_ids.filter(
+                            (id) => id !== p.id,
+                          ),
+                        })
+                      }
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                )
+              })}
             </div>
           </div>
         </>
@@ -243,22 +271,47 @@ export function SortableSectionCard({
         <div className="px-3 pb-2">
           {showProductPicker ? (
             <div className="flex flex-col gap-1 rounded border p-2 bg-muted/30">
-              {availableProducts.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  className="flex items-center gap-2 text-xs text-left py-1 px-1 rounded hover:bg-accent"
-                  onClick={() => {
-                    onUpdate(section.key, {
-                      product_ids: [...section.product_ids, p.id],
-                    })
-                    setShowProductPicker(false)
-                  }}
-                >
-                  <Package className="h-3 w-3 shrink-0 text-muted-foreground" />
-                  <span className="truncate">{p.name}</span>
-                </button>
-              ))}
+              {availableProducts.map((p) => {
+                const inactive = p.is_active === false
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className={cn(
+                      "flex items-center gap-2 text-xs text-left py-1 px-1 rounded hover:bg-accent",
+                      inactive && "opacity-50",
+                    )}
+                    onClick={() => {
+                      onUpdate(section.key, {
+                        product_ids: [...section.product_ids, p.id],
+                      })
+                      setShowProductPicker(false)
+                    }}
+                  >
+                    <Package className="h-3 w-3 shrink-0 text-muted-foreground" />
+                    <div className="flex-1 min-w-0 flex flex-col">
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate">{p.name}</span>
+                        {inactive && (
+                          <span className="shrink-0 rounded border px-1 py-px text-[10px] uppercase tracking-wide text-muted-foreground">
+                            Inactive
+                          </span>
+                        )}
+                      </div>
+                      {p.slug && (
+                        <span className="truncate font-mono text-[10px] text-muted-foreground/70">
+                          {p.slug}
+                        </span>
+                      )}
+                    </div>
+                    {p.price != null && (
+                      <span className="shrink-0 font-mono tabular-nums text-muted-foreground">
+                        ${p.price}
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
               <Button
                 variant="ghost"
                 size="sm"
