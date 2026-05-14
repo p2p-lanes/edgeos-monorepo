@@ -84,6 +84,7 @@ const AVAILABLE_LANGUAGES = [
   { value: "en", label: "English" },
   { value: "es", label: "Español" },
   { value: "zh", label: "中文" },
+  { value: "is", label: "Íslenska" },
 ] as const
 
 const CURRENCIES = [

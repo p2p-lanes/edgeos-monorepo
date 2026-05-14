@@ -15,6 +15,7 @@ const LANGUAGE_NAMES: Record<string, string> = {
   en: "English",
   es: "Español",
   zh: "中文",
+  is: "Íslenska",
 }
 
 const MULTILINE_FIELDS = new Set([
