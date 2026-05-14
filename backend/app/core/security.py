@@ -50,12 +50,19 @@ _PAT_ROUTE_POLICIES: dict[str, tuple[tuple[str, bool, ApiKeyScope], ...]] = {
     ),
     "POST": (
         ("/api/v1/events/portal/events", True, "events:write"),
+        ("/api/v1/events/portal/events/", False, "events:write"),
         ("/api/v1/event-venues/portal/venues", True, "venues:write"),
         ("/api/v1/event-participants/portal/register/", False, "rsvp:write"),
         ("/api/v1/event-participants/portal/cancel-registration/", False, "rsvp:write"),
     ),
-    "PATCH": (("/api/v1/event-venues/portal/venues/", False, "venues:write"),),
-    "DELETE": (("/api/v1/event-venues/portal/venues/", False, "venues:write"),),
+    "PATCH": (
+        ("/api/v1/event-venues/portal/venues/", False, "venues:write"),
+        ("/api/v1/events/portal/events/", False, "events:write"),
+    ),
+    "DELETE": (
+        ("/api/v1/event-venues/portal/venues/", False, "venues:write"),
+        ("/api/v1/events/portal/events/", False, "events:write"),
+    ),
 }
 
 
