@@ -3327,6 +3327,12 @@ export type AttendeeCategoriesListAttendeeCategoriesData = {
 
 export type AttendeeCategoriesListAttendeeCategoriesResponse = (ListModel_AttendeeCategoryPublic_);
 
+export type AttendeeCategoriesListAttendeeCategoriesPortalData = {
+    popupId: string;
+};
+
+export type AttendeeCategoriesListAttendeeCategoriesPortalResponse = (ListModel_AttendeeCategoryPublic_);
+
 export type AttendeeCategoriesCreateAttendeeCategoryData = {
     requestBody: AttendeeCategoryCreate;
     xTenantId?: (string | null);
