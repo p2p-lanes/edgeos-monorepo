@@ -64,7 +64,8 @@ export function CompanionPasses({ participation }: CompanionPassesProps) {
           <p className="font-medium text-sm">{attendee.name}</p>
         </div>
         <Badge variant="secondary">
-          {(attendee.category ? categoryLabels[attendee.category] : null) ?? attendee.category}
+          {(attendee.category ? categoryLabels[attendee.category] : null) ??
+            attendee.category}
         </Badge>
       </div>
 

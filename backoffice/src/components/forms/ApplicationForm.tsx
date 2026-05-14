@@ -651,7 +651,6 @@ export function ApplicationForm({ onSuccess }: ApplicationFormProps) {
                 )
               }}
             </form.Subscribe>
-
           </div>
         </div>
       </form>
