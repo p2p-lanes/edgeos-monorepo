@@ -212,8 +212,12 @@ def _calculate_amounts(
             continue
 
         if product_model.category == "patreon":
+            # Patron amount lives on the request's unit_price_override (raw popup
+            # currency units, quantity is always 1). product_model.price is 0 for
+            # patreon products and must not be used to derive the donation amount.
+            donation_amount = req_prod.unit_price_override or Decimal("0")
             attendees[attendee_id]["patreon"] = (
-                product_model.price * quantity if not already_patreon else Decimal("0")
+                donation_amount if not already_patreon else Decimal("0")
             )
             attendees[attendee_id]["standard"] = Decimal("0")
             attendees[attendee_id]["supporter"] = Decimal("0")

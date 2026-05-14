@@ -9,6 +9,8 @@ Spec: payments Delta — Requirement: unit_price_override + effective_unit_price
 
 import uuid
 from decimal import Decimal
+from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 from fastapi import HTTPException
@@ -207,10 +209,20 @@ class TestPatronPaymentCreation:
     def test_patron_payment_persists_effective_unit_price(
         self, db: Session, tenant_a, popup_tenant_a: Popups, human_tenant_a
     ) -> None:
-        """Patron payment stores effective_unit_price=5000, quantity=1, product_price=0."""
+        """Patron payment stores effective_unit_price=5000, quantity=1, product_price=0.
+
+        The donation amount comes from PaymentProductRequest.unit_price_override and
+        becomes the preview total so SimpleFi is invoked normally. Without the
+        unit_price_override path the preview would compute 0 and the zero-amount
+        auto-approve branch would skip SimpleFi.
+        """
         product, step, application, attendee = self._setup_scenario(
             db, tenant_a, popup_tenant_a, human_tenant_a
         )
+        original_key = popup_tenant_a.simplefi_api_key
+        popup_tenant_a.simplefi_api_key = "simplefi_test_key"
+        db.add(popup_tenant_a)
+        db.commit()
         try:
             obj = PaymentCreate(
                 application_id=application.id,
@@ -224,9 +236,18 @@ class TestPatronPaymentCreation:
                 ],
             )
 
-            # Patron products have price=0, so preview.amount=0 and the
-            # zero-amount path auto-approves without calling SimpleFI.
-            payment, _ = payments_crud.create_payment(db, obj)
+            # Donation amount drives the preview total; SimpleFi must be called.
+            preview = payments_crud.preview_payment(db, obj)
+            assert preview.amount == Decimal("5000")
+
+            sf_resp = SimpleNamespace(
+                id="sf_patron_test",
+                status="pending",
+                checkout_url="https://sf.test/patron",
+            )
+            with patch("app.services.simplefi.get_simplefi_client") as mock_client:
+                mock_client.return_value.create_payment.return_value = sf_resp
+                payment, _ = payments_crud.create_payment(db, obj)
 
             # Find the PaymentProducts row
             pp = db.exec(
@@ -239,16 +260,20 @@ class TestPatronPaymentCreation:
             assert pp.quantity == 1
             assert pp.product_price == Decimal("0")
             assert pp.effective_unit_price == Decimal("5000")
+            assert payment.amount == Decimal("5000")
         finally:
-            db.exec(  # type: ignore[call-overload]
-                select(PaymentProducts).where(PaymentProducts.payment_id == payment.id)
-            )
-            # Clean up payment_products and payments
-            for pp_row in db.exec(
-                select(PaymentProducts).where(PaymentProducts.payment_id == payment.id)
-            ).all():
-                db.delete(pp_row)
-            db.delete(payment)
+            popup_tenant_a.simplefi_api_key = original_key
+            db.add(popup_tenant_a)
+            try:
+                for pp_row in db.exec(
+                    select(PaymentProducts).where(
+                        PaymentProducts.payment_id == payment.id
+                    )
+                ).all():
+                    db.delete(pp_row)
+                db.delete(payment)
+            except UnboundLocalError:
+                pass
             db.delete(attendee)
             db.delete(application)
             db.delete(step)
