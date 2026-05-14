@@ -1,5 +1,6 @@
 import uuid
 
+from fastapi import HTTPException, status
 from sqlmodel import Session, func, select
 
 from app.api.shared.crud import BaseCRUD
@@ -12,6 +13,30 @@ class TicketingStepsCRUD(
 ):
     def __init__(self) -> None:
         super().__init__(TicketingSteps)
+
+    def _assert_no_active_patron_preset(
+        self,
+        session: Session,
+        popup_id: uuid.UUID,
+        exclude_id: uuid.UUID | None = None,
+    ) -> None:
+        """Raise 422 if an enabled patron-preset step already exists for this popup."""
+        stmt = select(TicketingSteps).where(
+            TicketingSteps.popup_id == popup_id,
+            TicketingSteps.template == "patron-preset",
+            TicketingSteps.is_enabled == True,  # noqa: E712
+        )
+        if exclude_id is not None:
+            stmt = stmt.where(TicketingSteps.id != exclude_id)
+        existing = session.exec(stmt).first()
+        if existing is not None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "This popup already has a Patron step. "
+                    "Only one Patron step is allowed per popup."
+                ),
+            )
 
     def find_by_popup(
         self,
