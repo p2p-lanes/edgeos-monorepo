@@ -21,9 +21,7 @@ def sale_dates_to_persistence(data: dict[str, object]) -> dict[str, object]:
     if "sale_starts_at" in data:
         data["sale_starts_at"] = date_to_utc_instant(data["sale_starts_at"])
     if "sale_ends_at" in data:
-        data["sale_ends_at"] = date_to_utc_instant(
-            data["sale_ends_at"], day_offset=1
-        )
+        data["sale_ends_at"] = date_to_utc_instant(data["sale_ends_at"], day_offset=1)
     return data
 
 
@@ -33,8 +31,31 @@ class ProductsCRUD(BaseCRUD[Products, ProductCreate, ProductUpdate]):
     def __init__(self) -> None:
         super().__init__(Products)
 
+    def _assert_no_active_patreon(
+        self, session: Session, popup_id: uuid.UUID, exclude_id: uuid.UUID | None = None
+    ) -> None:
+        """Raise 422 if an active (non-deleted) patreon product already exists for this popup."""
+        stmt = select(Products).where(
+            Products.popup_id == popup_id,
+            Products.category == "patreon",
+            col(Products.deleted_at).is_(None),
+        )
+        if exclude_id is not None:
+            stmt = stmt.where(Products.id != exclude_id)
+        existing = session.exec(stmt).first()
+        if existing is not None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "This popup already has a Patron product. "
+                    "Only one Patron product is allowed per popup."
+                ),
+            )
+
     def create(self, session: Session, obj_in: ProductCreate) -> Products:
         """Create a product, converting sale window dates to UTC datetimes."""
+        if obj_in.category == "patreon":
+            self._assert_no_active_patreon(session, obj_in.popup_id)
         data = sale_dates_to_persistence(obj_in.model_dump())
         db_obj = Products(**data)
         session.add(db_obj)
@@ -186,9 +207,15 @@ class ProductsCRUD(BaseCRUD[Products, ProductCreate, ProductUpdate]):
         the CHECK constraint `total_stock_remaining <= total_stock_cap` rejects
         any cap reduction below the stale remaining.
         """
-        update_data = sale_dates_to_persistence(
-            obj_in.model_dump(exclude_unset=True)
-        )
+        update_data = sale_dates_to_persistence(obj_in.model_dump(exclude_unset=True))
+
+        # Singleton guard: reject if category is being changed TO patreon and
+        # another non-deleted patreon product already exists for this popup.
+        new_category = update_data.get("category")
+        if new_category == "patreon" and db_obj.category != "patreon":
+            self._assert_no_active_patreon(
+                session, db_obj.popup_id, exclude_id=db_obj.id
+            )
 
         if (
             "total_stock_cap" in update_data

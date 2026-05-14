@@ -220,6 +220,10 @@ async def create_product(
     else:
         tenant_id = current_user.tenant_id
 
+    # Singleton guard: reject if category=patreon and another active one exists
+    if product_in.category == "patreon":
+        crud.products_crud._assert_no_active_patreon(db, product_in.popup_id)
+
     # Create internal schema with tenant_id and generated slug
     from app.api.product.models import Products
 
