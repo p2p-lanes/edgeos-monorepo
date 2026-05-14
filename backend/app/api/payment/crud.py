@@ -46,7 +46,11 @@ MONEY_PRECISION = Decimal("0.01")
 def resolve_patron_template_config(
     session: Session, popup_id: uuid.UUID
 ) -> dict | None:
-    """Return the active patron-preset step's template_config for a popup, or None.
+    """Return the active patron-preset step's template_config for a popup.
+
+    Returns None only when no enabled patron-preset step exists. A step with a
+    NULL or empty template_config is treated as "configured with defaults" and
+    returns an empty dict, so callers can validate amounts permissively.
 
     If somehow multiple steps exist (race before the DB index was enforced),
     picks the one with the lowest order value.
@@ -66,7 +70,7 @@ def resolve_patron_template_config(
     step = session.exec(stmt).first()
     if step is None:
         return None
-    return step.template_config
+    return step.template_config or {}
 
 
 def validate_patron_amount(amount: Decimal, template_config: dict) -> None:

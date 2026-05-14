@@ -192,6 +192,37 @@ class TestResolvePatronTemplateConfig:
             db.delete(popup)
             db.commit()
 
+    def test_returns_empty_dict_when_step_has_null_template_config(
+        self, db: Session, tenant_a, popup_tenant_a: Popups
+    ) -> None:
+        """A patron step with template_config=None resolves to an empty dict.
+
+        Admin may enable a Patron step without configuring presets/minimum. The
+        resolver must distinguish "no step at all" (returns None) from "step
+        configured with defaults" (returns {} so validation runs permissively).
+        """
+        from app.api.ticketing_step.models import TicketingSteps
+
+        step = TicketingSteps(
+            id=uuid.uuid4(),
+            tenant_id=popup_tenant_a.tenant_id,
+            popup_id=popup_tenant_a.id,
+            step_type="patron",
+            title="Patron",
+            order=99,
+            is_enabled=True,
+            template="patron-preset",
+            template_config=None,
+        )
+        db.add(step)
+        db.commit()
+        try:
+            result = resolve_patron_template_config(db, popup_tenant_a.id)
+            assert result == {}
+        finally:
+            db.delete(step)
+            db.commit()
+
 
 class TestPatronPaymentCreation:
     """End-to-end tests for patron payment creation via CRUD."""
