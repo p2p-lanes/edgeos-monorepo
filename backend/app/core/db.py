@@ -212,8 +212,83 @@ def _seed_approval_strategies(session: Session, popup_map: dict, tenant_id) -> N
             logger.info(f"Approval strategy created: auto_accept for {popup_key}")
 
 
-def _seed_products(
+def _seed_attendee_categories(
     session: Session, seed_data: dict, popup_map: dict, tenant_id
+) -> dict[str, dict[str, uuid.UUID]]:
+    """Seed per-popup attendee categories before products/attendees that reference them.
+
+    For each popup, always creates `main` (primary) and additionally creates any
+    category key referenced by the popup's products or attendees in seed_data.
+
+    Returns {popup_key: {cat_key: category_id}}.
+    """
+    from app.api.attendee_category.models import AttendeeCategories
+
+    REQUIRED_FIELDS_BY_KEY: dict[str, list[dict]] = {
+        "spouse": [{"name": "email", "type": "email", "required": True}],
+        "kid": [
+            {
+                "name": "age_group",
+                "type": "select",
+                "required": True,
+                "options": ["baby", "kid", "teen"],
+                "display_as_subtitle": True,
+            }
+        ],
+    }
+    SORT_ORDER_BY_KEY: dict[str, int] = {"main": 0, "spouse": 1, "kid": 2}
+    MAX_PER_APPLICATION_BY_KEY: dict[str, int | None] = {"spouse": 1}
+
+    keys_per_popup: dict[str, set[str]] = {pk: {"main"} for pk in popup_map}
+    for product_data in seed_data.get("products", []):
+        cat_key = product_data.get("attendee_category")
+        if cat_key:
+            keys_per_popup.setdefault(product_data["popup_key"], set()).add(cat_key)
+    for app_data in seed_data.get("applications", []):
+        popup_key = app_data.get("popup_key")
+        if not popup_key:
+            continue
+        for attendee_data in app_data.get("attendees", []):
+            cat_key = attendee_data.get("category")
+            if cat_key:
+                keys_per_popup.setdefault(popup_key, set()).add(cat_key)
+
+    result: dict[str, dict[str, uuid.UUID]] = {}
+    for popup_key, popup in popup_map.items():
+        existing = session.exec(
+            select(AttendeeCategories).where(AttendeeCategories.popup_id == popup.id)
+        ).all()
+        result[popup_key] = {cat.key: cat.id for cat in existing}
+
+        for cat_key in keys_per_popup.get(popup_key, {"main"}):
+            if cat_key in result[popup_key]:
+                continue
+            category = AttendeeCategories(
+                tenant_id=tenant_id,
+                popup_id=popup.id,
+                key=cat_key,
+                is_primary=(cat_key == "main"),
+                sort_order=SORT_ORDER_BY_KEY.get(cat_key, 99),
+                enabled_in_passes_flow=True,
+                max_per_application=MAX_PER_APPLICATION_BY_KEY.get(cat_key),
+                required_fields=REQUIRED_FIELDS_BY_KEY.get(cat_key, []),
+                display_meta={},
+            )
+            session.add(category)
+            session.commit()
+            session.refresh(category)
+            result[popup_key][cat_key] = category.id
+            logger.info(f"Attendee category created: {cat_key} for {popup_key}")
+
+    return result
+
+
+def _seed_products(
+    session: Session,
+    seed_data: dict,
+    popup_map: dict,
+    tenant_id,
+    attendee_category_map: dict[str, dict[str, uuid.UUID]],
 ) -> dict:
     from app.models import Products
 
@@ -240,6 +315,12 @@ def _seed_products(
         if existing_product:
             product_map[map_key] = existing_product
         else:
+            cat_key = product_data.get("attendee_category")
+            attendee_category_id = (
+                attendee_category_map.get(popup_key, {}).get(cat_key)
+                if cat_key
+                else None
+            )
             product = Products(
                 tenant_id=tenant_id,
                 popup_id=popup.id,
@@ -253,6 +334,7 @@ def _seed_products(
                 ),
                 description=product_data.get("description"),
                 category=product_data.get("category", "ticket"),
+                attendee_category_id=attendee_category_id,
                 duration_type=product_data.get("duration_type"),
                 start_date=(
                     parse_datetime(product_data["start_date"])
@@ -820,7 +902,12 @@ def init_db(session: Session) -> None:
     _seed_ticketing_steps(session, popup_map, tenant_id)
     _seed_approval_strategies(session, popup_map, tenant_id)
 
-    product_map = _seed_products(session, seed_data, popup_map, tenant_id)
+    attendee_category_map = _seed_attendee_categories(
+        session, seed_data, popup_map, tenant_id
+    )
+    product_map = _seed_products(
+        session, seed_data, popup_map, tenant_id, attendee_category_map
+    )
     section_map = _seed_form_sections(session, seed_data, popup_map, tenant_id)
     _seed_form_fields(session, seed_data, popup_map, section_map, tenant_id)
 
