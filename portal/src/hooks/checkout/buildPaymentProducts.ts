@@ -178,6 +178,7 @@ export function buildPaymentProducts({
         product_id: patron.productId,
         attendee_id: firstAttendeeId,
         quantity: 1,
+        unit_price_override: patron.amount,
       })
     }
 
