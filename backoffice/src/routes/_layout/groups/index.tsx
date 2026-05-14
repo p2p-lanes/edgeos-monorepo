@@ -1,20 +1,7 @@
-import {
-  keepPreviousData,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query"
-import { createFileRoute, Link } from "@tanstack/react-router"
+import { keepPreviousData, useQuery } from "@tanstack/react-query"
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
-import {
-  EllipsisVertical,
-  ExternalLink,
-  Eye,
-  Pencil,
-  Plus,
-  Trash2,
-  Users,
-} from "lucide-react"
+import { EllipsisVertical, ExternalLink, Plus, Users } from "lucide-react"
 import { Suspense, useState } from "react"
 
 import { type GroupPublic, GroupsService } from "@/client"
@@ -39,18 +26,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { LoadingButton } from "@/components/ui/loading-button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
 import { useCurrentTenant } from "@/hooks/useCurrentTenant"
-import useCustomToast from "@/hooks/useCustomToast"
 import {
   useTableSearchParams,
   validateTableSearch,
 } from "@/hooks/useTableSearchParams"
 import { getGroupPortalUrl, getPortalBaseUrl } from "@/lib/portal-urls"
-import { createErrorHandler } from "@/utils"
 
 function getGroupsQueryOptions(
   popupId: string | null,
@@ -89,9 +73,15 @@ function AddGroupButton() {
   )
 }
 
-function ViewGroupMembers({ group }: { group: GroupPublic }) {
-  const [isOpen, setIsOpen] = useState(false)
-
+function GroupMembersDialog({
+  group,
+  open,
+  onOpenChange,
+}: {
+  group: GroupPublic
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}) {
   const {
     data: groupWithMembers,
     isLoading,
@@ -99,18 +89,11 @@ function ViewGroupMembers({ group }: { group: GroupPublic }) {
   } = useQuery({
     queryKey: ["groups", group.id],
     queryFn: () => GroupsService.getGroup({ groupId: group.id }),
-    enabled: isOpen,
+    enabled: open,
   })
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DropdownMenuItem
-        onSelect={(e) => e.preventDefault()}
-        onClick={() => setIsOpen(true)}
-      >
-        <Users className="mr-2 h-4 w-4" />
-        View Members
-      </DropdownMenuItem>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Group Members: {group.name}</DialogTitle>
@@ -156,110 +139,52 @@ function ViewGroupMembers({ group }: { group: GroupPublic }) {
   )
 }
 
-function DeleteGroup({
-  group,
-  onSuccess,
-}: {
-  group: GroupPublic
-  onSuccess: () => void
-}) {
-  const [isOpen, setIsOpen] = useState(false)
-  const queryClient = useQueryClient()
-  const { showSuccessToast, showErrorToast } = useCustomToast()
-
-  const mutation = useMutation({
-    mutationFn: () => GroupsService.deleteGroup({ groupId: group.id }),
-    onSuccess: () => {
-      showSuccessToast("Group deleted successfully")
-      setIsOpen(false)
-      onSuccess()
-    },
-    onError: createErrorHandler(showErrorToast),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ["groups"] }),
-  })
-
-  return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DropdownMenuItem
-        variant="destructive"
-        onSelect={(e) => e.preventDefault()}
-        onClick={() => setIsOpen(true)}
-      >
-        <Trash2 className="mr-2 h-4 w-4" />
-        Delete
-      </DropdownMenuItem>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Delete Group</DialogTitle>
-          <DialogDescription>
-            Are you sure you want to delete group "{group.name}"? This action
-            cannot be undone.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="outline">Cancel</Button>
-          </DialogClose>
-          <LoadingButton
-            variant="destructive"
-            loading={mutation.isPending}
-            onClick={() => mutation.mutate()}
-          >
-            Delete
-          </LoadingButton>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
 function GroupActionsMenu({ group }: { group: GroupPublic }) {
   const [open, setOpen] = useState(false)
-  const { isOperatorOrAbove } = useAuth()
+  const [membersOpen, setMembersOpen] = useState(false)
   const { data: tenant } = useCurrentTenant()
   const baseUrl = getPortalBaseUrl(tenant)
+  const hasPortalLink = baseUrl && group.slug
 
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="Group actions">
-          <EllipsisVertical className="h-4 w-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem asChild>
-          <Link to="/groups/$id/edit" params={{ id: group.id }}>
-            {isOperatorOrAbove ? (
-              <>
-                <Pencil className="mr-2 h-4 w-4" />
-                Edit
-              </>
-            ) : (
-              <>
-                <Eye className="mr-2 h-4 w-4" />
-                View
-              </>
-            )}
-          </Link>
-        </DropdownMenuItem>
-        <ViewGroupMembers group={group} />
-        {baseUrl && group.slug && (
-          <DropdownMenuItem asChild>
-            <a
-              href={getGroupPortalUrl(baseUrl, group.slug)}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <ExternalLink className="mr-2 h-4 w-4" />
-              Open Portal
-            </a>
+    <>
+      <DropdownMenu open={open} onOpenChange={setOpen}>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" aria-label="Group actions">
+            <EllipsisVertical className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem
+            onSelect={(e) => e.preventDefault()}
+            onClick={() => {
+              setOpen(false)
+              setMembersOpen(true)
+            }}
+          >
+            <Users className="mr-2 h-4 w-4" />
+            View Members
           </DropdownMenuItem>
-        )}
-        {isOperatorOrAbove && (
-          <DeleteGroup group={group} onSuccess={() => setOpen(false)} />
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+          {hasPortalLink && (
+            <DropdownMenuItem asChild>
+              <a
+                href={getGroupPortalUrl(baseUrl, group.slug)}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <ExternalLink className="mr-2 h-4 w-4" />
+                Open Portal
+              </a>
+            </DropdownMenuItem>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <GroupMembersDialog
+        group={group}
+        open={membersOpen}
+        onOpenChange={setMembersOpen}
+      />
+    </>
   )
 }
 
@@ -300,6 +225,7 @@ const columns: ColumnDef<GroupPublic>[] = [
 ]
 
 function GroupsTableContent() {
+  const navigate = useNavigate()
   const { selectedPopupId } = useWorkspace()
   const searchParams = Route.useSearch()
   const { search, pagination, setSearch, setPagination } = useTableSearchParams(
@@ -327,6 +253,9 @@ function GroupsTableContent() {
       hiddenOnMobile={["max_members", "is_ambassador_group"]}
       searchValue={search}
       onSearchChange={setSearch}
+      onRowClick={(group) =>
+        navigate({ to: "/groups/$id/edit", params: { id: group.id } })
+      }
       serverPagination={{
         total: groups.paging.total,
         pagination: pagination,

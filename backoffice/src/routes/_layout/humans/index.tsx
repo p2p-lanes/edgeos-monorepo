@@ -1,15 +1,8 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
-import {
-  AlertCircle,
-  EllipsisVertical,
-  Eye,
-  Pencil,
-  Plus,
-  Users,
-} from "lucide-react"
-import { Suspense, useState } from "react"
+import { AlertCircle, Plus, Users } from "lucide-react"
+import { Suspense } from "react"
 
 import { type HumanPublic, HumansService } from "@/client"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
@@ -19,12 +12,6 @@ import { StatusBadge } from "@/components/Common/StatusBadge"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import {
   Select,
   SelectContent,
@@ -122,38 +109,6 @@ function HumansApplicationFilterSelect({
   )
 }
 
-function HumanActionsMenu({ human }: { human: HumanPublic }) {
-  const [open, setOpen] = useState(false)
-  const { isAdmin } = useAuth()
-
-  return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="Human actions">
-          <EllipsisVertical className="h-4 w-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem asChild>
-          <Link to="/humans/$id/edit" params={{ id: human.id }}>
-            {isAdmin ? (
-              <>
-                <Pencil className="mr-2 h-4 w-4" />
-                Edit
-              </>
-            ) : (
-              <>
-                <Eye className="mr-2 h-4 w-4" />
-                View
-              </>
-            )}
-          </Link>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
-}
-
 const columns: ColumnDef<HumanPublic>[] = [
   {
     id: "name",
@@ -179,15 +134,6 @@ const columns: ColumnDef<HumanPublic>[] = [
     header: "Status",
     cell: ({ row }) => (
       <StatusBadge status={row.original.red_flag ? "flagged" : "active"} />
-    ),
-  },
-  {
-    id: "actions",
-    header: () => <span className="sr-only">Actions</span>,
-    cell: ({ row }) => (
-      <div className="flex justify-end">
-        <HumanActionsMenu human={row.original} />
-      </div>
     ),
   },
 ]
@@ -248,6 +194,9 @@ function HumansTableContent() {
       hiddenOnMobile={["red_flag"]}
       searchValue={search}
       onSearchChange={setSearch}
+      onRowClick={(human) =>
+        navigate({ to: "/humans/$id/edit", params: { id: human.id } })
+      }
       filterBar={
         <HumansApplicationFilterSelect
           value={applicationFilter}

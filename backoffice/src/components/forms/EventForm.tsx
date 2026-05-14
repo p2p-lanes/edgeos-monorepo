@@ -23,6 +23,7 @@ import {
   PopupsService,
   TracksService,
 } from "@/client"
+import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -231,6 +232,18 @@ export function EventForm({
       queryClient.invalidateQueries({ queryKey: ["events"] })
       form.reset()
       onSuccess()
+    },
+    onError: createErrorHandler(showErrorToast),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: () => EventsService.deleteEvent({ eventId: defaultValues!.id }),
+    onSuccess: () => {
+      showSuccessToast("Event deleted successfully")
+      queryClient.invalidateQueries({ queryKey: ["events"] })
+      // Bypass the unsaved-changes blocker — the entity is gone.
+      form.reset()
+      navigate({ to: "/events" })
     },
     onError: createErrorHandler(showErrorToast),
   })
@@ -1701,6 +1714,17 @@ export function EventForm({
           </div>
         )}
       </div>
+
+      {isEdit && !readOnly && defaultValues && (
+        <DangerZone
+          description="Once you delete this event, all RSVPs and invitations associated with it will be removed. This action cannot be undone."
+          onDelete={() => deleteMutation.mutate()}
+          isDeleting={deleteMutation.isPending}
+          confirmText="Delete Event"
+          resourceName={defaultValues.title || "Untitled event"}
+          variant="inline"
+        />
+      )}
       <UnsavedChangesDialog blocker={blocker} />
     </form>
   )

@@ -106,6 +106,13 @@ interface DataTableProps<TData, TValue> {
   hiddenOnMobile?: string[]
   tableId?: string
   renderSubComponent?: (props: { row: Row<TData> }) => ReactNode
+  /**
+   * Called when a row is clicked. Clicks that originate inside buttons,
+   * links, inputs, dialogs, or elements marked with `data-no-row-click`
+   * are ignored, so interactive cells (action menus, checkboxes) keep
+   * working without needing `stopPropagation` everywhere.
+   */
+  onRowClick?: (row: TData) => void
 }
 
 function loadColumnVisibility(tableId: string): VisibilityState {
@@ -168,6 +175,7 @@ export function DataTable<TData, TValue>({
   hiddenOnMobile,
   tableId,
   renderSubComponent,
+  onRowClick,
 }: DataTableProps<TData, TValue>) {
   const [localSorting, setLocalSorting] = useState<SortingState>([])
   const sorting = serverSorting ? serverSorting.sorting : localSorting
@@ -440,38 +448,60 @@ export function DataTable<TData, TValue>({
           </TableHeader>
           <TableBody>
             {table.getRowModel().rows.length ? (
-              table.getRowModel().rows.map((row) => (
-                <Fragment key={row.id}>
-                  <TableRow
-                    {...(renderSubComponent && {
-                      className: "cursor-pointer",
-                      onClick: () => row.toggleExpanded(),
-                    })}
-                  >
-                    {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id}>
-                        {flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext(),
-                        )}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                  {renderSubComponent && row.getIsExpanded() && (
+              table.getRowModel().rows.map((row) => {
+                const expandable = !!renderSubComponent
+                const clickable = expandable || !!onRowClick
+                const handleClick = (
+                  e: React.MouseEvent<HTMLTableRowElement>,
+                ) => {
+                  if (expandable) {
+                    row.toggleExpanded()
+                    return
+                  }
+                  if (!onRowClick) return
+                  const target = e.target as HTMLElement
+                  // Skip when the click came from any interactive descendant
+                  // (action buttons, checkboxes, links, dialog content, etc.).
+                  if (
+                    target.closest(
+                      'button, a, input, select, textarea, [role="menuitem"], [role="dialog"], [data-no-row-click]',
+                    )
+                  ) {
+                    return
+                  }
+                  onRowClick(row.original)
+                }
+                return (
+                  <Fragment key={row.id}>
                     <TableRow
-                      key={`${row.id}-expanded`}
-                      className="hover:bg-transparent"
+                      className={clickable ? "cursor-pointer" : undefined}
+                      onClick={clickable ? handleClick : undefined}
                     >
-                      <TableCell
-                        colSpan={row.getVisibleCells().length}
-                        className="p-0"
-                      >
-                        {renderSubComponent({ row })}
-                      </TableCell>
+                      {row.getVisibleCells().map((cell) => (
+                        <TableCell key={cell.id}>
+                          {flexRender(
+                            cell.column.columnDef.cell,
+                            cell.getContext(),
+                          )}
+                        </TableCell>
+                      ))}
                     </TableRow>
-                  )}
-                </Fragment>
-              ))
+                    {renderSubComponent && row.getIsExpanded() && (
+                      <TableRow
+                        key={`${row.id}-expanded`}
+                        className="hover:bg-transparent"
+                      >
+                        <TableCell
+                          colSpan={row.getVisibleCells().length}
+                          className="p-0"
+                        >
+                          {renderSubComponent({ row })}
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </Fragment>
+                )
+              })
             ) : emptyState ? (
               <TableRow className="hover:bg-transparent">
                 <TableCell colSpan={allColumns.length} className="p-0">

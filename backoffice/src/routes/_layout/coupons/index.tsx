@@ -1,13 +1,8 @@
-import {
-  keepPreviousData,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query"
-import { createFileRoute, Link } from "@tanstack/react-router"
+import { keepPreviousData, useQuery } from "@tanstack/react-query"
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
-import { EllipsisVertical, Eye, Pencil, Plus, Tag, Trash2 } from "lucide-react"
-import { Suspense, useState } from "react"
+import { Plus, Tag } from "lucide-react"
+import { Suspense } from "react"
 
 import { type CouponPublic, CouponsService } from "@/client"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
@@ -16,31 +11,13 @@ import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { StatusBadge } from "@/components/Common/StatusBadge"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { LoadingButton } from "@/components/ui/loading-button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
-import useCustomToast from "@/hooks/useCustomToast"
 import {
   useTableSearchParams,
   validateTableSearch,
 } from "@/hooks/useTableSearchParams"
-import { createErrorHandler } from "@/utils"
 
 function getCouponsQueryOptions(
   popupId: string | null,
@@ -79,98 +56,6 @@ function AddCouponButton() {
   )
 }
 
-function DeleteCoupon({
-  coupon,
-  onSuccess,
-}: {
-  coupon: CouponPublic
-  onSuccess: () => void
-}) {
-  const [isOpen, setIsOpen] = useState(false)
-  const queryClient = useQueryClient()
-  const { showSuccessToast, showErrorToast } = useCustomToast()
-
-  const mutation = useMutation({
-    mutationFn: () => CouponsService.deleteCoupon({ couponId: coupon.id }),
-    onSuccess: () => {
-      showSuccessToast("Coupon deleted successfully")
-      setIsOpen(false)
-      onSuccess()
-    },
-    onError: createErrorHandler(showErrorToast),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ["coupons"] }),
-  })
-
-  return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DropdownMenuItem
-        variant="destructive"
-        onSelect={(e) => e.preventDefault()}
-        onClick={() => setIsOpen(true)}
-      >
-        <Trash2 className="mr-2 h-4 w-4" />
-        Delete
-      </DropdownMenuItem>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Delete Coupon</DialogTitle>
-          <DialogDescription>
-            Are you sure you want to delete coupon "{coupon.code}"? This action
-            cannot be undone.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="outline">Cancel</Button>
-          </DialogClose>
-          <LoadingButton
-            variant="destructive"
-            loading={mutation.isPending}
-            onClick={() => mutation.mutate()}
-          >
-            Delete
-          </LoadingButton>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-function CouponActionsMenu({ coupon }: { coupon: CouponPublic }) {
-  const [open, setOpen] = useState(false)
-  const { isOperatorOrAbove } = useAuth()
-
-  return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="Coupon actions">
-          <EllipsisVertical className="h-4 w-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem asChild>
-          <Link to="/coupons/$id/edit" params={{ id: coupon.id }}>
-            {isOperatorOrAbove ? (
-              <>
-                <Pencil className="mr-2 h-4 w-4" />
-                Edit
-              </>
-            ) : (
-              <>
-                <Eye className="mr-2 h-4 w-4" />
-                View
-              </>
-            )}
-          </Link>
-        </DropdownMenuItem>
-        {isOperatorOrAbove && (
-          <DeleteCoupon coupon={coupon} onSuccess={() => setOpen(false)} />
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
-}
-
 const columns: ColumnDef<CouponPublic>[] = [
   {
     accessorKey: "code",
@@ -201,18 +86,10 @@ const columns: ColumnDef<CouponPublic>[] = [
       <StatusBadge status={row.original.is_active ? "active" : "inactive"} />
     ),
   },
-  {
-    id: "actions",
-    header: () => <span className="sr-only">Actions</span>,
-    cell: ({ row }) => (
-      <div className="flex justify-end">
-        <CouponActionsMenu coupon={row.original} />
-      </div>
-    ),
-  },
 ]
 
 function CouponsTableContent({ popupId }: { popupId: string | null }) {
+  const navigate = useNavigate()
   const searchParams = Route.useSearch()
   const { search, pagination, setSearch, setPagination } = useTableSearchParams(
     searchParams,
@@ -239,6 +116,9 @@ function CouponsTableContent({ popupId }: { popupId: string | null }) {
       hiddenOnMobile={["current_uses", "is_active"]}
       searchValue={search}
       onSearchChange={setSearch}
+      onRowClick={(coupon) =>
+        navigate({ to: "/coupons/$id/edit", params: { id: coupon.id } })
+      }
       serverPagination={{
         total: coupons.paging.total,
         pagination: pagination,
