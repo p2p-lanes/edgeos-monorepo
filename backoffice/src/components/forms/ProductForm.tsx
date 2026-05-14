@@ -116,6 +116,21 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
     enabled: !!popupId,
   })
 
+  const { data: existingProducts } = useQuery({
+    queryKey: ["products", popupId, { page: 0, pageSize: 100 }],
+    queryFn: () =>
+      ProductsService.listProducts({ popupId: popupId!, limit: 100 }),
+    enabled: !!popupId,
+  })
+
+  const hasActivePatreonProduct = (existingProducts?.results ?? []).some(
+    (p) =>
+      p.category === "patreon" &&
+      p.is_active &&
+      // When editing: exclude the current product so the owner can still save
+      p.id !== defaultValues?.id,
+  )
+
   // Merge hardcoded defaults + API categories + locally added ones (deduplicated)
   const allCategories = useMemo(() => {
     const known = PRODUCT_CATEGORIES.map((c) => c.value)
@@ -191,7 +206,10 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
     onSubmit: ({ value }) => {
       if (readOnly) return
 
+      const isPatreon = value.category === "patreon"
       const isTicket = value.category === "ticket"
+      // Defense in depth: backend also enforces price=0 for patreon products
+      const effectivePrice = isPatreon ? "0" : value.price
 
       const totalStockCap = value.total_stock_cap
         ? Number.parseInt(value.total_stock_cap, 10)
@@ -203,7 +221,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
       if (isEdit) {
         updateMutation.mutate({
           name: value.name,
-          price: value.price,
+          price: effectivePrice,
           description: value.description || null,
           image_url: value.image_url || null,
           category: value.category,
@@ -227,7 +245,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
         createMutation.mutate({
           popup_id: selectedPopupId,
           name: value.name,
-          price: value.price,
+          price: effectivePrice,
           description: value.description || undefined,
           image_url: value.image_url || undefined,
           category: value.category,
@@ -315,8 +333,19 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
                       const known = PRODUCT_CATEGORIES.find(
                         (c) => c.value === cat,
                       )
+                      const isDisabled =
+                        cat === "patreon" && hasActivePatreonProduct
                       return (
-                        <SelectItem key={cat} value={cat}>
+                        <SelectItem
+                          key={cat}
+                          value={cat}
+                          disabled={isDisabled}
+                          title={
+                            isDisabled
+                              ? "This popup already has a Patron product"
+                              : undefined
+                          }
+                        >
                           {known?.label ?? cat}
                         </SelectItem>
                       )
@@ -385,36 +414,42 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
 
         {/* Pricing & Inventory */}
         <InlineSection title="Pricing & Inventory">
-          <form.Field
-            name="price"
-            validators={{
-              onBlur: ({ value }) =>
-                !readOnly && !value ? "Price is required" : undefined,
-            }}
-          >
-            {(field) => (
-              <div>
-                <InlineRow
-                  icon={
-                    <DollarSign className="h-4 w-4 text-muted-foreground" />
-                  }
-                  label="Price"
+          <form.Subscribe selector={(state) => state.values.category}>
+            {(category) =>
+              category !== "patreon" && (
+                <form.Field
+                  name="price"
+                  validators={{
+                    onBlur: ({ value }) =>
+                      !readOnly && !value ? "Price is required" : undefined,
+                  }}
                 >
-                  <Input
-                    placeholder="100.00"
-                    type="text"
-                    inputMode="decimal"
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    disabled={readOnly}
-                    className="max-w-32 text-sm"
-                  />
-                </InlineRow>
-                <FieldError errors={field.state.meta.errors} />
-              </div>
-            )}
-          </form.Field>
+                  {(field) => (
+                    <div>
+                      <InlineRow
+                        icon={
+                          <DollarSign className="h-4 w-4 text-muted-foreground" />
+                        }
+                        label="Price"
+                      >
+                        <Input
+                          placeholder="100.00"
+                          type="text"
+                          inputMode="decimal"
+                          value={field.state.value}
+                          onBlur={field.handleBlur}
+                          onChange={(e) => field.handleChange(e.target.value)}
+                          disabled={readOnly}
+                          className="max-w-32 text-sm"
+                        />
+                      </InlineRow>
+                      <FieldError errors={field.state.meta.errors} />
+                    </div>
+                  )}
+                </form.Field>
+              )
+            }
+          </form.Subscribe>
 
           <form.Field
             name="total_stock_cap"
