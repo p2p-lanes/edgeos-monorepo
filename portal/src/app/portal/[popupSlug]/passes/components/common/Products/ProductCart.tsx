@@ -1,5 +1,4 @@
 import type { ProductsPass } from "@/types/Products"
-import { badgeName } from "../../../constants/multiuse"
 
 const ProductCart = ({ product }: { product: ProductsPass }) => {
   const price = product.original_price ? product.original_price : product.price

@@ -29,10 +29,21 @@ interface AttendeeModalProps {
 
 interface RequiredField {
   name: string
+  /** Optional display label override; falls back to humanized name. */
+  label?: string
   type: "email" | "text" | "select" | "number"
   required?: boolean
-  options?: Array<{ value: string; label: string }>
+  /** Options accept plain strings or {value,label} objects for select fields. */
+  options?: Array<string | { value: string; label: string }>
   display_as_subtitle?: boolean
+}
+
+function normalizeOption(opt: string | { value: string; label: string }): {
+  value: string
+  label: string
+} {
+  if (typeof opt === "string") return { value: opt, label: opt }
+  return opt
 }
 
 const defaultFormData = {
@@ -259,12 +270,14 @@ function DynamicField({
   hasError: boolean
   onChange: (val: string) => void
 }) {
-  const labelText = field.name
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase())
+  const labelText =
+    field.label && field.label.trim() !== ""
+      ? field.label
+      : field.name.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
   const errorClass = hasError ? "border-destructive" : ""
 
   if (field.type === "select" && field.options) {
+    const options = field.options.map(normalizeOption)
     return (
       <div className="grid grid-cols-4 items-center gap-4">
         <Label htmlFor={field.name} className="text-right">
@@ -280,7 +293,7 @@ function DynamicField({
             <SelectValue placeholder={`Select ${labelText.toLowerCase()}`} />
           </SelectTrigger>
           <SelectContent>
-            {field.options.map((opt) => (
+            {options.map((opt) => (
               <SelectItem key={opt.value} value={opt.value}>
                 {opt.label}
               </SelectItem>

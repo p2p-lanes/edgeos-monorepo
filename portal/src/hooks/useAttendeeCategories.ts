@@ -7,9 +7,10 @@ export function useAttendeeCategories(popupId: string) {
   const query = useQuery({
     queryKey: queryKeys.attendeeCategories.byPopup(popupId),
     queryFn: async (): Promise<AttendeeCategoryPublic[]> => {
-      const result = await AttendeeCategoriesService.listAttendeeCategories({
-        popupId,
-      })
+      const result =
+        await AttendeeCategoriesService.listAttendeeCategoriesPortal({
+          popupId,
+        })
       return [...(result.results ?? [])].sort(
         (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0),
       )
