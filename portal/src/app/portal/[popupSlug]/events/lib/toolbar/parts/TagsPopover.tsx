@@ -1,6 +1,7 @@
 "use client"
 
 import { Filter } from "lucide-react"
+import { useMemo } from "react"
 import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
 import {
@@ -26,6 +27,13 @@ export function TagsPopover({
   const { t } = useTranslation()
   const count = selectedTags.length
   const active = count > 0
+  const sortedTags = useMemo(
+    () =>
+      [...allowedTags].sort((a, b) =>
+        a.localeCompare(b, undefined, { sensitivity: "base" }),
+      ),
+    [allowedTags],
+  )
 
   return (
     <Popover>
@@ -60,7 +68,7 @@ export function TagsPopover({
           )}
         </div>
         <div className="flex flex-wrap gap-2">
-          {allowedTags.map((tag) => {
+          {sortedTags.map((tag) => {
             const isActive = selectedTags.includes(tag)
             return (
               <button
