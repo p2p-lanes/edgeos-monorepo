@@ -55,8 +55,6 @@ async def list_form_sections(
 
 
 def _section_allowed_by_flags(section: FormSections, popup: Any) -> bool:
-    if section.kind == FormSectionKind.COMPANIONS.value:
-        return bool(popup.allows_spouse or popup.allows_children)
     if section.kind == FormSectionKind.SCHOLARSHIP.value:
         return bool(popup.allows_scholarship)
     return True
@@ -100,16 +98,9 @@ async def create_form_section(
         tenant_id = current_user.tenant_id
 
     # Gate special-kind sections by popup feature flags and uniqueness.
-    if section_in.kind != FormSectionKind.STANDARD.value:
-        if section_in.kind == FormSectionKind.COMPANIONS.value and not (
-            popup.allows_spouse or popup.allows_children
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Popup does not allow companions",
-            )
+    if section_in.kind != FormSectionKind.STANDARD:
         if (
-            section_in.kind == FormSectionKind.SCHOLARSHIP.value
+            section_in.kind == FormSectionKind.SCHOLARSHIP
             and not popup.allows_scholarship
         ):
             raise HTTPException(
@@ -120,13 +111,13 @@ async def create_form_section(
         existing = db.exec(
             select(FormSections).where(
                 FormSections.popup_id == section_in.popup_id,
-                FormSections.kind == section_in.kind,
+                FormSections.kind == section_in.kind.value,
             )
         ).first()
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"A section of kind '{section_in.kind}' already exists for this popup",
+                detail=f"A section of kind '{section_in.kind.value}' already exists for this popup",
             )
 
     section_data = section_in.model_dump()

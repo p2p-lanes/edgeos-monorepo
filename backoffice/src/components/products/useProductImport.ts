@@ -8,7 +8,6 @@ import type { ProductBatchItem, ProductBatchResult } from "@/client"
 import type { CsvColumnConfig } from "@/components/Common/CsvImportDialog"
 
 const VALID_CATEGORIES = ["ticket", "housing", "merch", "other", "patreon"]
-const VALID_ATTENDEE_CATEGORIES = ["main", "spouse", "kid"]
 const VALID_DURATION_TYPES = ["day", "week", "month", "full"]
 
 const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/
@@ -52,18 +51,6 @@ export const productCsvColumns: CsvColumnConfig<ProductBatchItem>[] = [
     header: "Description",
     key: "description",
     parse: (v) => v || undefined,
-  },
-  {
-    header: "Attendee Category",
-    key: "attendee_category",
-    validate: (v) => {
-      if (!v) return null
-      const lower = v.toLowerCase()
-      return VALID_ATTENDEE_CATEGORIES.includes(lower)
-        ? null
-        : `Must be one of: ${VALID_ATTENDEE_CATEGORIES.join(", ")}`
-    },
-    parse: (v) => (v ? v.toLowerCase() : undefined),
   },
   {
     header: "Duration Type",

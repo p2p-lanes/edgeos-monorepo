@@ -13,8 +13,6 @@ from app.api.shared.crud import BaseCRUD
 if TYPE_CHECKING:
     from app.api.popup.models import Popups
 
-SPOUSE_FIELDS = frozenset({"partner", "partner_email"})
-CHILDREN_FIELDS = frozenset({"kids"})
 SCHOLARSHIP_FIELDS = frozenset(
     {"scholarship_request", "scholarship_details", "scholarship_video_url"}
 )
@@ -22,10 +20,6 @@ SCHOLARSHIP_FIELDS = frozenset(
 
 def field_applies_to_popup(field_name: str, popup: "Popups") -> bool:
     """Return True if the given base field is allowed by the popup's flags."""
-    if field_name in SPOUSE_FIELDS and not popup.allows_spouse:
-        return False
-    if field_name in CHILDREN_FIELDS and not popup.allows_children:
-        return False
     if field_name in SCHOLARSHIP_FIELDS and not popup.allows_scholarship:
         return False
     return True

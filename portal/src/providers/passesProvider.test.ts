@@ -14,10 +14,11 @@ import type { ProductsPass } from "@/types/Products"
 function createProduct(overrides: Partial<ProductsPass>): ProductsPass {
   return {
     id: overrides.id ?? "product-1",
+    tenant_id: overrides.tenant_id ?? "tenant-1",
     name: overrides.name ?? "Product",
     slug: overrides.slug ?? "product",
     popup_id: overrides.popup_id ?? "popup-1",
-    attendee_category: overrides.attendee_category ?? "main",
+    attendee_category_id: overrides.attendee_category_id ?? null,
     category: overrides.category ?? "ticket",
     duration_type: overrides.duration_type ?? "week",
     is_active: overrides.is_active ?? true,
@@ -83,13 +84,13 @@ describe("mergeAvailableAndPurchasedProducts — attendee_category filter remova
     const kidProduct = createProduct({
       id: "kid-ticket",
       name: "Kid Ticket",
-      attendee_category: "kid",
+      attendee_category_id: "cat-kid",
       is_active: true,
     })
     const mainProduct = createProduct({
       id: "main-ticket",
       name: "Main Ticket",
-      attendee_category: "main",
+      attendee_category_id: null,
       is_active: true,
     })
 
@@ -108,15 +109,19 @@ describe("mergeAvailableAndPurchasedProducts — attendee_category filter remova
     const products = [
       createProduct({
         id: "p-main",
-        attendee_category: "main",
+        attendee_category_id: null,
         is_active: true,
       }),
       createProduct({
         id: "p-spouse",
-        attendee_category: "spouse",
+        attendee_category_id: "cat-spouse",
         is_active: true,
       }),
-      createProduct({ id: "p-kid", attendee_category: "kid", is_active: true }),
+      createProduct({
+        id: "p-kid",
+        attendee_category_id: "cat-kid",
+        is_active: true,
+      }),
     ]
 
     // Any category should see all 3 active products
@@ -129,12 +134,12 @@ describe("mergeAvailableAndPurchasedProducts — attendee_category filter remova
   it("still excludes inactive products from the active catalog", () => {
     const inactiveProduct = createProduct({
       id: "inactive-kid",
-      attendee_category: "kid",
+      attendee_category_id: "cat-kid",
       is_active: false,
     })
     const activeProduct = createProduct({
       id: "active-main",
-      attendee_category: "main",
+      attendee_category_id: null,
       is_active: true,
     })
 

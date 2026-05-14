@@ -83,12 +83,6 @@ def _seed_application_defaults(db: TenantSession, popup: Popups) -> None:
     for key, section_def in DEFAULT_SECTIONS.items():
         if key == "scholarship" and not popup.allows_scholarship:
             continue
-        if (
-            key == "companions"
-            and not popup.allows_spouse
-            and not popup.allows_children
-        ):
-            continue
 
         existing_section = existing_sections.get(section_def["label"])
         if existing_section is None:
@@ -262,11 +256,6 @@ async def update_popup(
     scholarship_enabling = (
         popup_in.allows_scholarship is True and not popup.allows_scholarship
     )
-    companions_enabling = (
-        not popup.allows_spouse
-        and not popup.allows_children
-        and (popup_in.allows_spouse is True or popup_in.allows_children is True)
-    )
 
     try:
         updated = crud.update(db, popup, popup_in)
@@ -288,7 +277,6 @@ async def update_popup(
     section_map: dict[str, uuid.UUID] = {}
     for key, should_create in [
         ("scholarship", scholarship_enabling),
-        ("companions", companions_enabling),
     ]:
         if not should_create:
             continue

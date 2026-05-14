@@ -46,4 +46,7 @@ export const queryKeys = {
     coupon: (slug: string, code: string) =>
       ["checkout", "coupon", slug, code] as const,
   },
+  attendeeCategories: {
+    byPopup: (popupId: string) => ["attendee-categories", popupId] as const,
+  },
 } as const

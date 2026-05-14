@@ -73,6 +73,29 @@ def _make_application(
     return application
 
 
+def _make_category(
+    db: Session,
+    tenant: Tenants,
+    popup: Popups,
+    key: str = "spouse",
+) -> "uuid.UUID":
+    """Create an attendee category for a popup, return its ID."""
+    from app.api.attendee_category.models import AttendeeCategories
+
+    cat = AttendeeCategories(
+        tenant_id=tenant.id,
+        popup_id=popup.id,
+        key=key,
+        label=key.capitalize(),
+        is_primary=(key == "main"),
+        enabled_in_passes_flow=True,
+    )
+    db.add(cat)
+    db.commit()
+    db.refresh(cat)
+    return cat.id
+
+
 def _make_attendee(
     db: Session,
     tenant: Tenants,
@@ -83,14 +106,39 @@ def _make_attendee(
     human_id: uuid.UUID | None = None,
     email: str | None = None,
 ) -> Attendees:
-    """Create an attendee on an application."""
+    """Create an attendee on an application.
+
+    Looks up the category by key from attendee_categories for the popup.
+    If no matching category exists, seeds one automatically.
+    """
+    from sqlmodel import select
+
+    from app.api.attendee_category.models import AttendeeCategories
+
+    # Find or create the category for this popup
+    cat = db.exec(
+        select(AttendeeCategories).where(
+            AttendeeCategories.popup_id == application.popup_id,
+            AttendeeCategories.key == category,
+        )
+    ).first()
+    if cat is None:
+        cat_id = _make_category(
+            db,
+            tenant,
+            db.get(Popups, application.popup_id),  # type: ignore[arg-type]
+            key=category,
+        )
+    else:
+        cat_id = cat.id
+
     attendee = Attendees(
         tenant_id=tenant.id,
         application_id=application.id,
         popup_id=application.popup_id,
         name=name,
-        category=category,
-        check_in_code=f"P{uuid.uuid4().hex[:5].upper()}",
+        category_id=cat_id,
+        check_in_code=None,
         human_id=human_id,
         email=email,
     )

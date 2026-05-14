@@ -90,7 +90,6 @@ export type ApplicationAdminCreate = {
 } | null);
     status?: ApplicationStatus;
     group_id?: (string | null);
-    companions?: (Array<CompanionCreate> | null);
 };
 
 /**
@@ -116,7 +115,6 @@ export type ApplicationCreate = {
     status?: (UserSettableStatus | null);
     human_id?: (string | null);
     group_id?: (string | null);
-    companions?: (Array<CompanionCreate> | null);
     scholarship_request?: boolean;
     scholarship_details?: (string | null);
     scholarship_video_url?: (string | null);
@@ -181,9 +179,6 @@ export type ApplicationPublic = {
     human?: (HumanPublic | null);
     attendees?: Array<AttendeePublic>;
     red_flag?: boolean;
-    brings_spouse?: boolean;
-    brings_kids?: boolean;
-    kid_count?: number;
     review_decision?: (ReviewDecision | null);
 };
 
@@ -309,7 +304,7 @@ export type ApprovalStrategyUpdate = {
  */
 export type AssociatedAttendee = {
     name: string;
-    category: string;
+    category?: (string | null);
     gender?: (string | null);
     email?: (string | null);
 };
@@ -325,11 +320,73 @@ export type AttachRateItem = {
 };
 
 /**
+ * Schema for creating an attendee category.
+ */
+export type AttendeeCategoryCreate = {
+    popup_id: string;
+    key: string;
+    sort_order?: number;
+    enabled_in_passes_flow?: boolean;
+    max_per_application?: (number | null);
+    required_fields?: Array<{
+        [key: string]: unknown;
+    }>;
+    display_meta?: {
+        [key: string]: unknown;
+    };
+};
+
+/**
+ * Public read model for attendee categories.
+ */
+export type AttendeeCategoryPublic = {
+    id: string;
+    tenant_id: string;
+    popup_id: string;
+    key: string;
+    is_primary?: boolean;
+    sort_order?: number;
+    enabled_in_passes_flow?: boolean;
+    max_per_application?: (number | null);
+    required_fields?: Array<{
+        [key: string]: unknown;
+    }>;
+    display_meta?: {
+        [key: string]: unknown;
+    };
+    created_at?: (string | null);
+    updated_at?: (string | null);
+};
+
+/**
+ * Schema for updating an attendee category.
+ *
+ * key and is_primary are deliberately not updatable — sending them
+ * causes a 422 validation error (extra="forbid").
+ */
+export type AttendeeCategoryUpdate = {
+    sort_order?: (number | null);
+    enabled_in_passes_flow?: (boolean | null);
+    max_per_application?: (number | null);
+    required_fields?: (Array<{
+    [key: string]: unknown;
+}> | null);
+    display_meta?: ({
+    [key: string]: unknown;
+} | null);
+};
+
+/**
  * Attendee schema for creation (by user).
+ *
+ * Accepts category_id (UUID FK) as the primary input. The legacy `category`
+ * string field is kept for backward compatibility but the router now validates
+ * via category_id against the popup's attendee_categories table.
  */
 export type AttendeeCreate = {
     name: string;
-    category: string;
+    category_id?: (string | null);
+    category?: (string | null);
     email?: (string | null);
     gender?: (string | null);
 };
@@ -340,7 +397,7 @@ export type AttendeeCreate = {
 export type AttendeeInfo = {
     id: string;
     name: string;
-    category: string;
+    category?: (string | null);
     check_in_code?: (string | null);
     tickets?: Array<AttendeeTicketInfo>;
 };
@@ -358,12 +415,13 @@ export type AttendeeListItem = {
     popup_id: string;
     human_id?: (string | null);
     name: string;
-    category: string;
+    category_id?: (string | null);
     email?: (string | null);
     gender?: (string | null);
     check_in_code?: (string | null);
     poap_url?: (string | null);
     id: string;
+    category?: (string | null);
     created_at?: (string | null);
     updated_at?: (string | null);
     products?: Array<ProductWithQuantity>;
@@ -404,6 +462,9 @@ export type AttendeeProductPublic = {
  * check_in_code, payment_id, and requires_check_in. The list endpoint
  * (GET /attendees) uses the separate AttendeeListItem schema which keeps
  * the legacy ProductWithQuantity shape for backwards compatibility.
+ *
+ * category is provided as a string (from the Attendees.category @property)
+ * for backward compatibility. The authoritative shape is category_id (UUID FK).
  */
 export type AttendeePublic = {
     tenant_id: string;
@@ -411,12 +472,13 @@ export type AttendeePublic = {
     popup_id: string;
     human_id?: (string | null);
     name: string;
-    category: string;
+    category_id?: (string | null);
     email?: (string | null);
     gender?: (string | null);
     check_in_code?: (string | null);
     poap_url?: (string | null);
     id: string;
+    category?: (string | null);
     created_at?: (string | null);
     updated_at?: (string | null);
     products?: Array<AttendeeProductPublic>;
@@ -447,7 +509,6 @@ export type AttendeesDirectoryEntry = {
     age?: (string | null);
     gender?: (string | null);
     picture_url?: (string | null);
-    brings_kids?: (boolean | string);
     participation?: Array<DirectoryProduct>;
     associated_attendees?: Array<AssociatedAttendee>;
 };
@@ -499,12 +560,13 @@ export type AttendeeWithOriginPublic = {
     popup_id: string;
     human_id?: (string | null);
     name: string;
-    category: string;
+    category_id?: (string | null);
     email?: (string | null);
     gender?: (string | null);
     check_in_code?: (string | null);
     poap_url?: (string | null);
     id: string;
+    category?: (string | null);
     created_at?: (string | null);
     updated_at?: (string | null);
     products?: Array<AttendeeProductPublic>;
@@ -518,7 +580,7 @@ export type AttendeeWithTickets = {
     id: string;
     name: string;
     email: (string | null);
-    category: string;
+    category?: (string | null);
     check_in_code?: (string | null);
     popup_id: string;
     popup_name: string;
@@ -797,19 +859,6 @@ export type CheckoutRuntimeResponse = {
     form_schema?: ({
     [key: string]: unknown;
 } | null);
-};
-
-/**
- * Schema for creating companion attendees (spouse/kids) during application.
- *
- * Used when submitting an application with family members.
- * Category is restricted to spouse/kid (main is auto-created from applicant).
- */
-export type CompanionCreate = {
-    name: string;
-    category: string;
-    email?: (string | null);
-    gender?: (string | null);
 };
 
 /**
@@ -1405,8 +1454,10 @@ export type FormSectionCreate = {
     label: string;
     description?: (string | null);
     order?: number;
-    kind?: string;
+    kind?: FormSectionKind;
 };
+
+export type FormSectionKind = 'standard' | 'scholarship';
 
 export type FormSectionPublic = {
     id: string;
@@ -1717,6 +1768,11 @@ export type ListModel_ApplicationPublic_ = {
 
 export type ListModel_ApplicationReviewPublic_ = {
     results: Array<ApplicationReviewPublic>;
+    paging: Paging;
+};
+
+export type ListModel_AttendeeCategoryPublic_ = {
+    results: Array<AttendeeCategoryPublic>;
     paging: Paging;
 };
 
@@ -2045,8 +2101,6 @@ export type PopupAdmin = {
     status?: PopupStatus;
     sale_type?: SaleType;
     checkout_mode?: CheckoutMode;
-    allows_spouse?: (boolean | null);
-    allows_children?: (boolean | null);
     allows_coupons?: (boolean | null);
     allows_scholarship?: boolean;
     allows_incentive?: boolean;
@@ -2089,8 +2143,6 @@ export type PopupCreate = {
     status?: PopupStatus;
     sale_type?: SaleType;
     checkout_mode?: (CheckoutMode | null);
-    allows_spouse?: (boolean | null);
-    allows_children?: (boolean | null);
     allows_coupons?: (boolean | null);
     allows_scholarship?: (boolean | null);
     allows_incentive?: (boolean | null);
@@ -2141,8 +2193,6 @@ export type PopupPublic = {
     web_url?: (string | null);
     blog_url?: (string | null);
     twitter_url?: (string | null);
-    allows_spouse?: (boolean | null);
-    allows_children?: (boolean | null);
     allows_coupons?: (boolean | null);
     allows_scholarship?: boolean;
     currency?: string;
@@ -2206,8 +2256,6 @@ export type PopupUpdate = {
     checkout_mode?: (CheckoutMode | null);
     start_date?: (string | null);
     end_date?: (string | null);
-    allows_spouse?: (boolean | null);
-    allows_children?: (boolean | null);
     allows_coupons?: (boolean | null);
     allows_scholarship?: (boolean | null);
     allows_incentive?: (boolean | null);
@@ -2304,7 +2352,6 @@ export type ProductBatchItem = {
     description?: (string | null);
     image_url?: (string | null);
     category?: string;
-    attendee_category?: (TicketAttendeeCategory | null);
     duration_type?: (TicketDuration | null);
     sale_starts_at?: (string | null);
     sale_ends_at?: (string | null);
@@ -2330,7 +2377,7 @@ export type ProductBatchResult = {
     description?: (string | null);
     image_url?: (string | null);
     category?: string;
-    attendee_category?: (TicketAttendeeCategory | null);
+    attendee_category_id?: (string | null);
     duration_type?: (TicketDuration | null);
     sale_starts_at?: (string | null);
     sale_ends_at?: (string | null);
@@ -2370,7 +2417,6 @@ export type ProductCreate = {
     description?: (string | null);
     image_url?: (string | null);
     category?: string;
-    attendee_category?: (TicketAttendeeCategory | null);
     duration_type?: (TicketDuration | null);
     sale_starts_at?: (string | null);
     sale_ends_at?: (string | null);
@@ -2409,7 +2455,7 @@ export type ProductPublic = {
     description?: (string | null);
     image_url?: (string | null);
     category?: string;
-    attendee_category?: (TicketAttendeeCategory | null);
+    attendee_category_id?: (string | null);
     duration_type?: (TicketDuration | null);
     sale_starts_at?: (string | null);
     sale_ends_at?: (string | null);
@@ -2434,7 +2480,6 @@ export type ProductUpdate = {
     description?: (string | null);
     image_url?: (string | null);
     category?: (string | null);
-    attendee_category?: (TicketAttendeeCategory | null);
     duration_type?: (TicketDuration | null);
     sale_starts_at?: (string | null);
     sale_ends_at?: (string | null);
@@ -2460,7 +2505,7 @@ export type ProductWithQuantity = {
     description?: (string | null);
     image_url?: (string | null);
     category?: string;
-    attendee_category?: (TicketAttendeeCategory | null);
+    attendee_category_id?: (string | null);
     duration_type?: (TicketDuration | null);
     sale_starts_at?: (string | null);
     sale_ends_at?: (string | null);
@@ -2685,18 +2730,13 @@ export type TenantUpdate = {
 };
 
 /**
- * Attendee categories for ticket products.
- */
-export type TicketAttendeeCategory = 'main' | 'spouse' | 'kid';
-
-/**
  * Minimal attendee data embedded in a TicketPublic response.
  */
 export type TicketAttendeeSnapshot = {
     id: string;
     name: string;
     email?: (string | null);
-    category: string;
+    category?: (string | null);
 };
 
 /**
@@ -3282,6 +3322,41 @@ export type ApprovalStrategiesDeleteApprovalStrategyData = {
 };
 
 export type ApprovalStrategiesDeleteApprovalStrategyResponse = (void);
+
+export type AttendeeCategoriesListAttendeeCategoriesData = {
+    popupId: string;
+    xTenantId?: (string | null);
+};
+
+export type AttendeeCategoriesListAttendeeCategoriesResponse = (ListModel_AttendeeCategoryPublic_);
+
+export type AttendeeCategoriesListAttendeeCategoriesPortalData = {
+    popupId: string;
+};
+
+export type AttendeeCategoriesListAttendeeCategoriesPortalResponse = (ListModel_AttendeeCategoryPublic_);
+
+export type AttendeeCategoriesCreateAttendeeCategoryData = {
+    requestBody: AttendeeCategoryCreate;
+    xTenantId?: (string | null);
+};
+
+export type AttendeeCategoriesCreateAttendeeCategoryResponse = (AttendeeCategoryPublic);
+
+export type AttendeeCategoriesUpdateAttendeeCategoryData = {
+    categoryId: string;
+    requestBody: AttendeeCategoryUpdate;
+    xTenantId?: (string | null);
+};
+
+export type AttendeeCategoriesUpdateAttendeeCategoryResponse = (AttendeeCategoryPublic);
+
+export type AttendeeCategoriesDeleteAttendeeCategoryData = {
+    categoryId: string;
+    xTenantId?: (string | null);
+};
+
+export type AttendeeCategoriesDeleteAttendeeCategoryResponse = (void);
 
 export type AttendeesListMyAttendeesByPopupData = {
     /**

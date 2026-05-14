@@ -21,8 +21,6 @@
       "name": "Tech Summit 2025",
       "slug": "tech-summit-2025",
       "status": "active",
-      "allows_spouse": true,
-      "allows_children": true,
       "allows_coupons": true,
       "start_date": "2026-06-15T09:00:00Z",
       "end_date": "2026-06-20T18:00:00Z"
@@ -32,8 +30,6 @@
       "name": "Community Meetup",
       "slug": "community-meetup",
       "status": "active",
-      "allows_spouse": false,
-      "allows_children": false,
       "allows_coupons": true,
       "start_date": "2026-04-10T18:00:00Z",
       "end_date": "2026-04-10T22:00:00Z"
@@ -43,8 +39,6 @@
       "name": "Annual Retreat 2025",
       "slug": "annual-retreat-2025",
       "status": "draft",
-      "allows_spouse": true,
-      "allows_children": true,
       "allows_coupons": false,
       "start_date": "2026-09-01T08:00:00Z",
       "end_date": "2026-09-07T16:00:00Z"
