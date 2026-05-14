@@ -168,7 +168,11 @@ export function ListBody({
               return (
                 <div
                   key={event.id}
-                  id={`event-card-${event.id}`}
+                  id={
+                    event.occurrence_id
+                      ? `event-card-${event.id}__${event.start_time}`
+                      : `event-card-${event.id}`
+                  }
                   className={cardClass}
                 >
                   <Link
