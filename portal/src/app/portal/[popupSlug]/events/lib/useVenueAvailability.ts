@@ -57,6 +57,14 @@ export interface UseVenueAvailabilityResult {
   availabilityData:
     | Awaited<ReturnType<typeof EventVenuesService.getPortalAvailability>>
     | undefined
+  /**
+   * Booking mode resolved by the backend for the currently-selected
+   * [start, end] window — takes per-slot ``weekly_hours.booking_mode``
+   * overrides into account. ``null`` until the debounced check resolves;
+   * callers should fall back to a conservative venue-wide hint in that
+   * window so the user isn't left without context.
+   */
+  effectiveBookingMode: string | null
 }
 
 /**
@@ -246,10 +254,14 @@ export function useVenueAvailability(
   }, [venueId, startIso, openOnlyIntervals, durationMinutes])
 
   const [availability, setAvailability] = useState<Availability>("idle")
+  const [effectiveBookingMode, setEffectiveBookingMode] = useState<
+    string | null
+  >(null)
 
   useEffect(() => {
     if (!venueId || !startIso || !endIso) {
       setAvailability("idle")
+      setEffectiveBookingMode(null)
       return
     }
     const handle = setTimeout(async () => {
@@ -264,8 +276,10 @@ export function useVenueAvailability(
           },
         })
         setAvailability(res.available ? "ok" : "conflict")
+        setEffectiveBookingMode(res.effective_booking_mode ?? null)
       } catch {
         setAvailability("idle")
+        setEffectiveBookingMode(null)
       }
     }, 500)
     return () => clearTimeout(handle)
@@ -281,5 +295,6 @@ export function useVenueAvailability(
     withinOpenHours,
     availability,
     availabilityData,
+    effectiveBookingMode,
   }
 }

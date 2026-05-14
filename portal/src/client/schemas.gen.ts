@@ -4459,6 +4459,17 @@ export const EventAvailabilityResultSchema = {
                 }
             ],
             title: 'Reason'
+        },
+        effective_booking_mode: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Effective Booking Mode'
         }
     },
     type: 'object',
@@ -15351,6 +15362,16 @@ export const VenueWeeklyHourInputSchema = {
             type: 'boolean',
             title: 'Is Closed',
             default: false
+        },
+        booking_mode: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/VenueBookingMode'
+                },
+                {
+                    type: 'null'
+                }
+            ]
         }
     },
     type: 'object',
@@ -15396,6 +15417,16 @@ export const VenueWeeklyHourRefSchema = {
         is_closed: {
             type: 'boolean',
             title: 'Is Closed'
+        },
+        booking_mode: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/VenueBookingMode'
+                },
+                {
+                    type: 'null'
+                }
+            ]
         }
     },
     type: 'object',

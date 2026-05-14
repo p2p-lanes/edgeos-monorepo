@@ -32,6 +32,11 @@ interface VenueSectionProps {
   onCustomLocationNameChange: (next: string) => void
   customLocationUrl: string
   onCustomLocationUrlChange: (next: string) => void
+  /**
+   * Backend-resolved mode for the current [start, end] window. ``null``
+   * until the debounced availability check resolves.
+   */
+  effectiveBookingMode?: string | null
 }
 
 export function VenueSection({
@@ -45,6 +50,7 @@ export function VenueSection({
   onCustomLocationNameChange,
   customLocationUrl,
   onCustomLocationUrlChange,
+  effectiveBookingMode,
 }: VenueSectionProps) {
   const { t } = useTranslation()
   const [picturesOpen, setPicturesOpen] = useState(false)
@@ -97,12 +103,27 @@ export function VenueSection({
           </div>
         </div>
       )}
-      {selectedVenue?.booking_mode === "approval_required" && (
-        <div className="flex items-start gap-2.5 rounded-md border border-amber-300 bg-amber-50 p-2.5 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-100">
-          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
-          <p>{t("events.form.venue_approval_required")}</p>
-        </div>
-      )}
+      {(() => {
+        let showBanner: boolean
+        if (effectiveBookingMode != null) {
+          showBanner = effectiveBookingMode === "approval_required"
+        } else {
+          const someSlotRequiresApproval =
+            selectedVenue?.weekly_hours?.some(
+              (h) => h.booking_mode === "approval_required",
+            ) ?? false
+          showBanner =
+            selectedVenue?.booking_mode === "approval_required" ||
+            someSlotRequiresApproval
+        }
+        if (!showBanner) return null
+        return (
+          <div className="flex items-start gap-2.5 rounded-md border border-amber-300 bg-amber-50 p-2.5 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-100">
+            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
+            <p>{t("events.form.venue_approval_required")}</p>
+          </div>
+        )
+      })()}
       {selectedVenue && (
         <div className="text-xs text-muted-foreground space-y-2">
           {pictures.length > 0 && (
