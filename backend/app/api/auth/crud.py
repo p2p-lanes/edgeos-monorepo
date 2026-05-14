@@ -137,7 +137,8 @@ async def authenticate_user(
     session: Session,
     email: str,
     code: str,
-    allowed_roles: set[UserRole] | None = None,  # if set, role must be in this set after OTP success
+    allowed_roles: set[UserRole]
+    | None = None,  # if set, role must be in this set after OTP success
 ) -> Users:
     statement = select(Users).where(
         Users.email == email,

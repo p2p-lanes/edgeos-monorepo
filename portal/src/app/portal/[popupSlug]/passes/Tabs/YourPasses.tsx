@@ -50,10 +50,7 @@ const YourPasses = ({ access, onSwitchToBuy }: YourPassesProps) => {
   )
 
   const mainTickets = products.filter(
-    (p) =>
-      p.category === TICKET_CATEGORY &&
-      p.attendee_category === "main" &&
-      p.is_active !== false,
+    (p) => p.category === TICKET_CATEGORY && p.is_active !== false,
   )
   const minPrice =
     mainTickets.length > 0 ? Math.min(...mainTickets.map((p) => p.price)) : null
@@ -84,7 +81,7 @@ const YourPasses = ({ access, onSwitchToBuy }: YourPassesProps) => {
 
         {/* Inline Text Links */}
         <div className="flex flex-wrap items-center gap-3 text-sm mt-2">
-          {canAddCompanions && city?.allows_spouse && (
+          {canAddCompanions && false && city && (
             <>
               <button
                 type="button"
@@ -110,7 +107,7 @@ const YourPasses = ({ access, onSwitchToBuy }: YourPassesProps) => {
               <span className="text-gray-300">|</span>
             </>
           )}
-          {canAddCompanions && city?.allows_children && (
+          {canAddCompanions && false && city && (
             <>
               <button
                 type="button"

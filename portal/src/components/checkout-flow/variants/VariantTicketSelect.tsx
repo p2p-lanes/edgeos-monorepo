@@ -9,7 +9,6 @@ import QuantitySelector, {
   resolveMaxQuantity,
   supportsQuantitySelector,
 } from "@/components/ui/QuantitySelector"
-import { normalizeAttendeeCategory } from "@/lib/attendee-category"
 import { deriveProductState, type ProductSaleState } from "@/lib/product-state"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
@@ -139,8 +138,8 @@ type TicketSelectVariant = "stacked" | "tabs" | "compact" | "accordion"
 
 function sortedAttendees(attendees: AttendeePassState[]): AttendeePassState[] {
   return [...attendees].sort((a, b) => {
-    const ia = CATEGORY_ORDER.indexOf(a.category)
-    const ib = CATEGORY_ORDER.indexOf(b.category)
+    const ia = CATEGORY_ORDER.indexOf(a.category ?? "")
+    const ib = CATEGORY_ORDER.indexOf(b.category ?? "")
     return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib)
   })
 }
@@ -275,7 +274,8 @@ export function buildSectionGroups(
     return buildDurationGroups(attendee)
   }
 
-  const normalisedCategory = normalizeAttendeeCategory(attendee.category)
+  const raw = attendee.category ?? ""
+  const normalisedCategory = raw === "teen" || raw === "baby" ? "kid" : raw
   const visibleSections = sections.filter((s) => {
     if (s.attendee_categories == null) return true
     return s.attendee_categories.includes(normalisedCategory)
@@ -354,7 +354,7 @@ function AttendeeHeader({
   attendee: AttendeePassState
   className?: string
 }) {
-  const meta = getCategoryMeta(attendee.category)
+  const meta = getCategoryMeta(attendee.category ?? "")
   return (
     <div className={cn("px-5 py-3", meta.header, className)}>
       <p className="font-semibold text-sm leading-tight">{attendee.name}</p>
@@ -857,7 +857,7 @@ function CompactAttendeeCard({
   isEditing: boolean
   sections: TemplateSection[]
 }) {
-  const meta = getCategoryMeta(attendee.category)
+  const meta = getCategoryMeta(attendee.category ?? "")
   const groups = buildSectionGroups(attendee, sections)
   const visibleProducts = groups.flatMap((g) => g.products)
 
@@ -1099,7 +1099,7 @@ function TabsLayout({
       {/* Tab bar */}
       <div className="flex border-b border-border bg-muted/50 overflow-x-auto">
         {attendees.map((a, idx) => {
-          const meta = getCategoryMeta(a.category)
+          const meta = getCategoryMeta(a.category ?? "")
           const isActive = idx === activeIdx
           const selected = countSelected(a)
           return (
@@ -1217,7 +1217,7 @@ function AccordionLayout({
   return (
     <div className="space-y-2">
       {attendees.map((attendee) => {
-        const meta = getCategoryMeta(attendee.category)
+        const meta = getCategoryMeta(attendee.category ?? "")
         const isOpen = open.has(attendee.id)
         const selected = countSelected(attendee)
 

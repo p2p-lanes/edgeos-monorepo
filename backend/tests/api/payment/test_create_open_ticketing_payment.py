@@ -25,7 +25,6 @@ from app.api.payment.crud import payments_crud
 from app.api.payment.models import PaymentProducts, Payments
 from app.api.popup.models import Popups
 from app.api.product.models import Products
-from app.api.product.schemas import TicketAttendeeCategory
 from app.api.shared.enums import SaleType
 from app.api.tenant.models import Tenants
 
@@ -52,7 +51,7 @@ def _make_product(
     *,
     name: str,
     price: str,
-    attendee_category: TicketAttendeeCategory | None = None,
+    attendee_category_id: uuid.UUID | None = None,
 ) -> Products:
     product = Products(
         id=uuid.uuid4(),
@@ -62,7 +61,7 @@ def _make_product(
         slug=f"prod-{uuid.uuid4().hex[:6]}",
         price=Decimal(price),
         category="ticket",
-        attendee_category=attendee_category,
+        attendee_category_id=attendee_category_id,
         is_active=True,
     )
     db.add(product)

@@ -3,7 +3,6 @@ import { CSS } from "@dnd-kit/utilities"
 import { GripVertical, Package, Plus, Trash2, X } from "lucide-react"
 import { useState } from "react"
 
-import type { TicketAttendeeCategory } from "@/client"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ImageUpload } from "@/components/ui/image-upload"
@@ -19,7 +18,7 @@ export interface ProductSection {
   product_ids: string[]
   description?: string
   image_url?: string
-  attendee_categories?: TicketAttendeeCategory[] | null
+  attendee_categories?: string[] | null
 }
 
 export function parseConfigSections(config: Record<string, unknown> | null): {
@@ -39,7 +38,7 @@ export function toKey(label: string): string {
 }
 
 const ATTENDEE_CATEGORY_OPTIONS: Array<{
-  value: TicketAttendeeCategory
+  value: string
   label: string
 }> = [
   { value: "main", label: "Main" },
@@ -91,10 +90,7 @@ export function SortableSectionCard({
 
   const [showProductPicker, setShowProductPicker] = useState(false)
 
-  const handleCategoryToggle = (
-    cat: TicketAttendeeCategory,
-    checked: boolean,
-  ) => {
+  const handleCategoryToggle = (cat: string, checked: boolean) => {
     const current = section.attendee_categories ?? []
     const next = checked ? [...current, cat] : current.filter((c) => c !== cat)
     // Collapse rule: empty OR all-3-checked → null (visible to all)

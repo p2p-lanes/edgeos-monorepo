@@ -61,7 +61,7 @@ export function AttendeeModal({
       setFormData({
         name: editingAttendee.name,
         email: editingAttendee.email ?? "",
-        category: editingAttendee.category,
+        category: editingAttendee.category ?? undefined,
         gender: editingAttendee.gender ?? "",
       })
     } else {

@@ -113,8 +113,6 @@ def _seed_popups(session: Session, seed_data: dict, tenant_id) -> dict:
                 name=popup_data["name"],
                 slug=popup_data["slug"],
                 status=popup_data.get("status", "draft"),
-                allows_spouse=popup_data.get("allows_spouse", False),
-                allows_children=popup_data.get("allows_children", False),
                 allows_coupons=popup_data.get("allows_coupons", False),
                 start_date=(
                     parse_datetime(popup_data["start_date"])
@@ -255,7 +253,6 @@ def _seed_products(
                 ),
                 description=product_data.get("description"),
                 category=product_data.get("category", "ticket"),
-                attendee_category=product_data.get("attendee_category"),
                 duration_type=product_data.get("duration_type"),
                 start_date=(
                     parse_datetime(product_data["start_date"])
@@ -270,7 +267,9 @@ def _seed_products(
                 is_active=product_data.get("is_active", True),
                 exclusive=product_data.get("exclusive", False),
                 total_stock_cap=product_data.get("total_stock_cap"),
-                total_stock_remaining=product_data.get("total_stock_cap"),  # init remaining = cap
+                total_stock_remaining=product_data.get(
+                    "total_stock_cap"
+                ),  # init remaining = cap
             )
             session.add(product)
             session.commit()
@@ -621,13 +620,25 @@ def _seed_applications(
         attendees_data = app_data.get("attendees", [])
         created_attendees: list[Attendees] = []
 
+        # Build a key→category_id map for this popup so we can set category_id
+        # on each attendee. The attendees.category string column was dropped in PR 2.
+        from app.api.attendee_category.models import AttendeeCategories  # noqa: PLC0415
+
+        popup_categories = session.exec(
+            select(AttendeeCategories).where(AttendeeCategories.popup_id == popup.id)
+        ).all()
+        category_key_to_id = {cat.key: cat.id for cat in popup_categories}
+
         for attendee_data in attendees_data:
             attendee_human_id = None
+            cat_key = attendee_data.get("category")
             if (
-                attendee_data.get("category") == "main"
+                cat_key == "main"
                 and attendee_data.get("email", "").lower() == human.email.lower()
             ):
                 attendee_human_id = human.id
+
+            category_id = category_key_to_id.get(cat_key) if cat_key else None
 
             attendee = Attendees(
                 tenant_id=tenant_id,
@@ -635,10 +646,10 @@ def _seed_applications(
                 popup_id=popup.id,
                 human_id=attendee_human_id,
                 name=attendee_data["name"],
-                category=attendee_data["category"],
+                category_id=category_id,
                 email=attendee_data.get("email"),
                 gender=attendee_data.get("gender"),
-                check_in_code=_generate_check_in_code(),
+                check_in_code=None,
             )
             session.add(attendee)
             session.commit()
@@ -668,7 +679,7 @@ def _seed_applications(
                         f"Product {product_slug} not found for attendee {attendee.name}"
                     )
 
-            logger.info(f"Attendee created: {attendee.name} ({attendee.category})")
+            logger.info(f"Attendee created: {attendee.name} ({cat_key or 'unknown'})")
 
         attendee_lists[app_key] = created_attendees
 

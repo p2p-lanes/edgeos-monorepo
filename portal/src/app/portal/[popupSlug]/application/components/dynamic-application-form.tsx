@@ -16,10 +16,8 @@ import type {
 } from "@/types/form-schema"
 import { getBoolean, getString } from "../hooks/form-values"
 import { useApplicationForm } from "../hooks/use-application-form"
-import { useCompanionsState } from "../hooks/use-companions-state"
 import { useSubmitApplication } from "../hooks/use-submit-application"
 import { ApplicationFeeNotice } from "./application-fee-notice"
-import { CompanionsSection } from "./companions-section"
 import { DynamicField } from "./fields/dynamic-field"
 import { ProgressBar } from "./progress-bar"
 import SectionWrapper from "./SectionWrapper"
@@ -146,8 +144,6 @@ export function DynamicApplicationForm({
   const { values, errors, handleChange, validate, progress } =
     useApplicationForm(schema, existingApplication, popup.id)
 
-  const [companions, setCompanions] = useCompanionsState(existingApplication)
-
   const {
     handleSubmit,
     handleDraft,
@@ -158,7 +154,6 @@ export function DynamicApplicationForm({
     popup,
     schema,
     values,
-    companions,
     application,
     validate,
   })
@@ -329,18 +324,6 @@ export function DynamicApplicationForm({
 
         {/* Sections in schema order (base + custom fields merged by position) */}
         {visibleSections.map(({ id, title, subtitle, kind, fields }) => {
-          if (kind === "companions") {
-            return (
-              <div key={id}>
-                <CompanionsSection
-                  allowsSpouse={popup.allows_spouse ?? false}
-                  allowsChildren={popup.allows_children ?? false}
-                  companions={companions}
-                  onCompanionsChange={setCompanions}
-                />
-              </div>
-            )
-          }
           if (kind === "scholarship") {
             const scholarshipFields = Object.fromEntries(
               fields.filter((f) => !f.isCustom).map((f) => [f.name, f.field]),

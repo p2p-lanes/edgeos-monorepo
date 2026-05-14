@@ -129,7 +129,7 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         application_id: uuid.UUID,
         popup_id: uuid.UUID,
         name: str,
-        category: str,
+        category: str | None = None,
         email: str | None = None,
         gender: str | None = None,
         human_id: uuid.UUID | None = None,
@@ -143,6 +143,9 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         popup_id is REQUIRED — it's a NOT NULL column on attendees. Callers
         that work with an application should pass application.popup_id.
 
+        category (legacy string) is accepted but ignored — the column was
+        dropped in PR 2. Use category_id (UUID FK) instead.
+
         Attendees.check_in_code is no longer populated — per-ticket codes on
         attendee_products are the source of truth post-`ticket-as-first-class-entity`.
         """
@@ -155,7 +158,6 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
             application_id=application_id,
             popup_id=popup_id,
             name=name,
-            category=category,
             category_id=category_id,
             check_in_code=None,
             email=email,
@@ -204,16 +206,20 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
         Used for popups with sale_type="direct". The attendee is bound to a
         Human and a Popup directly — application_id remains NULL.
 
+        category_id is looked up from the popup's primary (main) category.
         Attendees.check_in_code is no longer populated — per-ticket codes on
         attendee_products are the source of truth post-`ticket-as-first-class-entity`.
         """
+        from app.api.attendee_category.crud import attendee_categories_crud
+
+        main_cat = attendee_categories_crud.get_primary_for_popup(session, popup_id)
         attendee = Attendees(
             tenant_id=tenant_id,
             application_id=None,
             popup_id=popup_id,
             human_id=human_id,
             name=name,
-            category="main",
+            category_id=main_cat.id if main_cat else None,
             check_in_code=None,
             email=email.lower() if email else None,
         )
@@ -245,13 +251,16 @@ class AttendeesCRUD(BaseCRUD[Attendees, AttendeeCreate, AttendeeUpdate]):
             return existing
 
         # Attendees.check_in_code is now nullable — tickets carry their own codes
+        from app.api.attendee_category.crud import attendee_categories_crud
+
+        main_cat = attendee_categories_crud.get_primary_for_popup(session, popup_id)
         attendee = Attendees(
             tenant_id=tenant_id,
             application_id=None,
             popup_id=popup_id,
             human_id=human_id,
             name=name,
-            category="main",
+            category_id=main_cat.id if main_cat else None,
             check_in_code=None,
             email=email.lower() if email else None,
         )

@@ -105,7 +105,9 @@ def _validate_template_config_fk(
                 elif isinstance(cat, uuid.UUID):
                     all_uuids.append(cat)
 
-    if all_uuids and not attendee_categories_crud.exists_in_popup(db, all_uuids, popup_id):
+    if all_uuids and not attendee_categories_crud.exists_in_popup(
+        db, all_uuids, popup_id
+    ):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=[
@@ -180,7 +182,9 @@ async def update_ticketing_step(
 
     # FK existence check for attendee_categories in template_config (Pattern B, ADR-5)
     effective_template = step_in.template or step.template
-    effective_config = step_in.template_config if step_in.template_config is not None else None
+    effective_config = (
+        step_in.template_config if step_in.template_config is not None else None
+    )
     if effective_config is not None:
         _validate_template_config_fk(
             effective_template, effective_config, step.popup_id, db

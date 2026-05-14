@@ -129,9 +129,6 @@ def _build_application_public(
         else None,
         attendees=attendees,
         red_flag=application.red_flag,
-        brings_spouse=application.brings_spouse,
-        brings_kids=application.brings_kids,
-        kid_count=application.kid_count,
         review_decision=review_decision,
     )
     return app_public
@@ -619,8 +616,10 @@ def _build_directory_entry(application) -> AttendeesDirectoryEntry:
     def mask(field: str, value: str | None) -> str | None:
         return "*" if field in info_hidden else value
 
-    # Find main attendee and their products
-    main_attendee = application.get_main_attendee()
+    # Find main attendee and their products — search loaded attendees relationship
+    main_attendee = next(
+        (a for a in application.attendees if a.category == "main"), None
+    )
     products: list[DirectoryProduct] = []
 
     if main_attendee:
@@ -642,9 +641,6 @@ def _build_directory_entry(application) -> AttendeesDirectoryEntry:
                     duration_type=p.duration_type,
                 )
             )
-
-    has_kids = any(a.category == "kid" for a in application.attendees)
-    brings_kids: bool | str = "*" if "brings_kids" in info_hidden else has_kids
 
     associated = [
         AssociatedAttendee(
@@ -672,7 +668,6 @@ def _build_directory_entry(application) -> AttendeesDirectoryEntry:
         age=mask("age", human.age if human else None),
         gender=mask("gender", human.gender if human else None),
         picture_url=human.picture_url if human else None,
-        brings_kids=brings_kids,
         participation=products,
         associated_attendees=associated,
     )
@@ -765,7 +760,6 @@ async def export_attendees_directory_csv(
             "Residence",
             "Age",
             "Gender",
-            "Brings Kids",
         ]
     )
     for e in entries:
@@ -780,7 +774,6 @@ async def export_attendees_directory_csv(
                 e.residence or "",
                 e.age or "",
                 e.gender or "",
-                str(e.brings_kids),
             ]
         )
 
@@ -817,7 +810,7 @@ async def add_my_attendee(
         db,
         application=application,
         name=attendee_in.name,
-        category=attendee_in.category,
+        category_id=attendee_in.category_id,
         email=attendee_in.email,
         gender=attendee_in.gender,
     )

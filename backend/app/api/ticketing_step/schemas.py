@@ -40,7 +40,10 @@ def _validate_sections_in_template_config(
     if not isinstance(sections, list):
         raise ValueError("template_config.sections must be a list")
     validated = [TicketSelectSection.model_validate(s) for s in sections]
-    return {**template_config, "sections": [s.model_dump(mode="json") for s in validated]}
+    return {
+        **template_config,
+        "sections": [s.model_dump(mode="json") for s in validated],
+    }
 
 
 class TicketingStepBase(SQLModel):

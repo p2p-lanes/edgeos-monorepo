@@ -80,8 +80,6 @@ class PopupBase(SQLModel):
         default=CheckoutMode.pass_system,
         sa_column=Column(String, nullable=False, server_default="pass_system"),
     )
-    allows_spouse: bool | None = False
-    allows_children: bool | None = False
     allows_coupons: bool | None = False
     allows_scholarship: bool = Field(
         default=False,
@@ -162,8 +160,6 @@ class PopupCreate(SQLModel):
     status: PopupStatus = PopupStatus.draft
     sale_type: SaleType = SaleType.application
     checkout_mode: CheckoutMode | None = None
-    allows_spouse: bool | None = False
-    allows_children: bool | None = False
     allows_coupons: bool | None = False
     allows_scholarship: bool | None = False
     allows_incentive: bool | None = False
@@ -226,8 +222,6 @@ class PopupUpdate(SQLModel):
     checkout_mode: CheckoutMode | None = None
     start_date: datetime | None = None
     end_date: datetime | None = None
-    allows_spouse: bool | None = None
-    allows_children: bool | None = None
     allows_coupons: bool | None = None
     allows_scholarship: bool | None = None
     allows_incentive: bool | None = None
@@ -302,8 +296,6 @@ class PopupPublic(SQLModel):
     web_url: str | None = None
     blog_url: str | None = None
     twitter_url: str | None = None
-    allows_spouse: bool | None = False
-    allows_children: bool | None = False
     allows_coupons: bool | None = False
     allows_scholarship: bool = False
     currency: str = "USD"

@@ -442,7 +442,6 @@ def run_import(
     from app.api.product.schemas import (
         CATEGORY_PATREON,
         CATEGORY_TICKET,
-        TicketAttendeeCategory,
         TicketDuration,
     )
     from app.api.shared.enums import UserRole
@@ -1279,11 +1278,10 @@ def run_import(
             "local month": TicketDuration.MONTH,
             "full": TicketDuration.FULL,
         }
-        attendee_cat_map = {
-            "main": TicketAttendeeCategory.MAIN,
-            "spouse": TicketAttendeeCategory.SPOUSE,
-            "kid": TicketAttendeeCategory.KID,
-        }
+        # attendee_category (legacy string column) was dropped in PR 2;
+        # attendee_category_id (UUID FK) is now the authoritative field.
+        # This script does not yet populate attendee_category_id — extend
+        # if category lookup is needed for new tenants.
 
         new_products: list[Products] = []
         product_seen_slugs: set[str] = set()
@@ -1306,13 +1304,8 @@ def run_import(
                 duration_map.get(src_category) if category == CATEGORY_TICKET else None
             )
 
-            # Attendee category
-            att_cat_str = parse_optional_str(row.get("attendee_category"))
-            attendee_category = (
-                attendee_cat_map.get(att_cat_str.lower()) if att_cat_str else None
-            )
-
             # Generate unique slug
+            att_cat_str = parse_optional_str(row.get("attendee_category"))
             base_slug = slugify(name)
             slug = f"{base_slug}-{att_cat_str.lower()}" if att_cat_str else base_slug
             counter = 1
@@ -1340,7 +1333,6 @@ def run_import(
                 price=price,
                 description=parse_optional_str(row.get("description")),
                 category=category,
-                attendee_category=attendee_category,
                 duration_type=duration_type,
                 start_date=start_date,
                 end_date=end_date,

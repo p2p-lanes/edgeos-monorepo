@@ -93,9 +93,7 @@ class AttendeeCategoriesCRUD(
         session.refresh(category)
         return category
 
-    def delete_category(
-        self, session: Session, category: AttendeeCategories
-    ) -> None:
+    def delete_category(self, session: Session, category: AttendeeCategories) -> None:
         """Delete a category.
 
         Raises 400 if the category is the primary (main) one.
