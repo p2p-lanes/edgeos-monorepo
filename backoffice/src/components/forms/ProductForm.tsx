@@ -188,6 +188,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
     defaultValues: {
       name: defaultValues?.name ?? "",
       price: defaultValues?.price?.toString() ?? "",
+      compare_price: defaultValues?.compare_price?.toString() ?? "",
       description: defaultValues?.description ?? "",
       image_url: defaultValues?.image_url ?? "",
       category: (defaultValues?.category ?? "ticket") as ProductCategory,
@@ -210,6 +211,8 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
       const isTicket = value.category === "ticket"
       // Defense in depth: backend also enforces price=0 for patreon products
       const effectivePrice = isPatreon ? "0" : value.price
+      const effectiveComparePrice =
+        isPatreon || !value.compare_price ? null : value.compare_price
 
       const totalStockCap = value.total_stock_cap
         ? Number.parseInt(value.total_stock_cap, 10)
@@ -222,6 +225,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
         updateMutation.mutate({
           name: value.name,
           price: effectivePrice,
+          compare_price: effectiveComparePrice,
           description: value.description || null,
           image_url: value.image_url || null,
           category: value.category,
@@ -246,6 +250,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
           popup_id: selectedPopupId,
           name: value.name,
           price: effectivePrice,
+          compare_price: effectiveComparePrice ?? undefined,
           description: value.description || undefined,
           image_url: value.image_url || undefined,
           category: value.category,
@@ -417,36 +422,83 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
           <form.Subscribe selector={(state) => state.values.category}>
             {(category) =>
               category !== "patreon" && (
-                <form.Field
-                  name="price"
-                  validators={{
-                    onBlur: ({ value }) =>
-                      !readOnly && !value ? "Price is required" : undefined,
-                  }}
-                >
-                  {(field) => (
-                    <div>
-                      <InlineRow
-                        icon={
-                          <DollarSign className="h-4 w-4 text-muted-foreground" />
+                <>
+                  <form.Field
+                    name="price"
+                    validators={{
+                      onBlur: ({ value }) =>
+                        !readOnly && !value ? "Price is required" : undefined,
+                    }}
+                  >
+                    {(field) => (
+                      <div>
+                        <InlineRow
+                          icon={
+                            <DollarSign className="h-4 w-4 text-muted-foreground" />
+                          }
+                          label="Price"
+                        >
+                          <Input
+                            placeholder="100.00"
+                            type="text"
+                            inputMode="decimal"
+                            value={field.state.value}
+                            onBlur={field.handleBlur}
+                            onChange={(e) => field.handleChange(e.target.value)}
+                            disabled={readOnly}
+                            className="max-w-32 text-sm"
+                          />
+                        </InlineRow>
+                        <FieldError errors={field.state.meta.errors} />
+                      </div>
+                    )}
+                  </form.Field>
+
+                  <form.Field
+                    name="compare_price"
+                    validators={{
+                      onBlur: ({ value, fieldApi }) => {
+                        if (readOnly || !value) return undefined
+                        const num = Number(value)
+                        if (Number.isNaN(num) || num < 0) {
+                          return "Compare-at price must be a positive number."
                         }
-                        label="Price"
-                      >
-                        <Input
-                          placeholder="100.00"
-                          type="text"
-                          inputMode="decimal"
-                          value={field.state.value}
-                          onBlur={field.handleBlur}
-                          onChange={(e) => field.handleChange(e.target.value)}
-                          disabled={readOnly}
-                          className="max-w-32 text-sm"
-                        />
-                      </InlineRow>
-                      <FieldError errors={field.state.meta.errors} />
-                    </div>
-                  )}
-                </form.Field>
+                        const rawPrice = fieldApi.form.getFieldValue("price")
+                        if (rawPrice) {
+                          const price = Number(rawPrice)
+                          if (!Number.isNaN(price) && num <= price) {
+                            return "Compare-at price must be higher than price."
+                          }
+                        }
+                        return undefined
+                      },
+                    }}
+                  >
+                    {(field) => (
+                      <div>
+                        <InlineRow
+                          icon={
+                            <DollarSign className="h-4 w-4 text-muted-foreground" />
+                          }
+                          label="Compare-at price"
+                          description="Crossed-out original price shown next to the current price. Leave empty for no discount."
+                        >
+                          <Input
+                            placeholder="120.00"
+                            type="text"
+                            inputMode="decimal"
+                            value={field.state.value}
+                            onBlur={field.handleBlur}
+                            onChange={(e) => field.handleChange(e.target.value)}
+                            disabled={readOnly}
+                            className="max-w-32 text-sm"
+                          />
+                        </InlineRow>
+                        <FieldError errors={field.state.meta.errors} />
+                      </div>
+                    )}
+                  </form.Field>
+                </>
               )
             }
           </form.Subscribe>
