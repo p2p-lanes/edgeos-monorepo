@@ -29,7 +29,7 @@ const ParticipationTickets = ({
   )
   const products = passes.filter(
     (product) =>
-      product.duration_type === "week" && product.attendee_category === "main",
+      product.duration_type === "week",
   )
 
   const weeks: (ProductsPass | null)[] = [null, null, null, null]

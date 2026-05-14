@@ -153,7 +153,7 @@ export default function PassSelectionSection() {
   const groupedByCategory = useMemo(() => {
     const map = new Map<string, AttendeePassState[]>()
     for (const a of attendeePasses) {
-      const cat = a.category
+      const cat = a.category ?? ""
       if (!map.has(cat)) map.set(cat, [])
       map.get(cat)!.push(a)
     }

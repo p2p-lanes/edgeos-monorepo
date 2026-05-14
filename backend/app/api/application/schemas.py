@@ -10,7 +10,7 @@ from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlmodel import Column, DateTime, Field, SQLModel
 
 from app.api.application_review.schemas import ReviewDecision
-from app.api.attendee.schemas import AttendeePublic, CompanionCreate
+from app.api.attendee.schemas import AttendeePublic
 from app.api.human.schemas import HumanPublic
 
 
@@ -152,9 +152,6 @@ class ApplicationPublic(BaseModel):
 
     # Computed fields
     red_flag: bool = False
-    brings_spouse: bool = False
-    brings_kids: bool = False
-    kid_count: int = 0
     review_decision: ReviewDecision | None = None
 
     model_config = ConfigDict(from_attributes=True)
@@ -185,9 +182,6 @@ class ApplicationCreate(BaseModel):
     status: UserSettableStatus | None = None
     human_id: uuid.UUID | None = None
     group_id: uuid.UUID | None = None  # Optional group to join
-
-    # Companions (spouse/kids) to create along with application
-    companions: list[CompanionCreate] | None = None
 
     # Scholarship request (human-submittable fields only)
     scholarship_request: bool = False
@@ -255,9 +249,6 @@ class ApplicationAdminCreate(BaseModel):
     custom_fields: dict | None = None
     status: ApplicationStatus = ApplicationStatus.DRAFT
     group_id: uuid.UUID | None = None
-
-    # Companions (spouse/kids) to create along with application
-    companions: list[CompanionCreate] | None = None
 
     @field_validator("email")
     @classmethod
@@ -366,7 +357,7 @@ class AttendeeInfo(BaseModel):
 
     id: uuid.UUID
     name: str
-    category: str
+    category: str | None = None
     # Legacy attendee-level code. Kept for backwards compatibility with old
     # clients that read it directly. New attendees no longer populate it —
     # clients SHOULD prefer `tickets[].check_in_code`.
@@ -437,7 +428,7 @@ class AssociatedAttendee(BaseModel):
     """Non-main attendee summary for directory."""
 
     name: str
-    category: str
+    category: str | None = None
     gender: str | None = None
     email: str | None = None
 
@@ -478,9 +469,6 @@ class AttendeesDirectoryEntry(BaseModel):
     age: str | None = None
     gender: str | None = None
     picture_url: str | None = None
-
-    # Computed from attendees
-    brings_kids: bool | str = False  # str "*" when hidden
 
     # Participation
     participation: list[DirectoryProduct] = []

@@ -76,7 +76,7 @@ export function flattenAttendeesForCsv(
         {
           name: att.name,
           email: att.email,
-          category: att.category,
+          category: att.category ?? "",
           gender: att.gender,
           ticket_check_in_code: "",
           product_id: "",
@@ -86,7 +86,7 @@ export function flattenAttendeesForCsv(
     return products.map((p) => ({
       name: att.name,
       email: att.email,
-      category: att.category,
+      category: att.category ?? "",
       gender: att.gender,
       // ProductWithQuantity from list endpoint does not carry check_in_code;
       // use empty string for CSV — full codes are in the detail view.

@@ -128,7 +128,7 @@ export function CompanionView({ participation }: CompanionViewProps) {
             <p className="font-medium text-sm">{attendee.name}</p>
           </div>
           <Badge variant="secondary">
-            {categoryLabels[attendee.category] ?? attendee.category}
+            {(attendee.category ? categoryLabels[attendee.category] : null) ?? attendee.category}
           </Badge>
         </div>
 

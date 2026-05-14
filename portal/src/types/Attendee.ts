@@ -49,7 +49,6 @@ export interface AttendeeDirectory {
   age: string | null
   gender: string | null
   picture_url: string | null
-  brings_kids: string | boolean
   participation: DirectoryProduct[]
   check_in: string | null
   check_out: string | null

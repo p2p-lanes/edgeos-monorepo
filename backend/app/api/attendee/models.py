@@ -31,10 +31,8 @@ class Attendees(AttendeeBase, table=True):
     """Attendee model - people attending an event via an application."""
 
     __table_args__ = (
-        Index("ix_attendees_application_category", "application_id", "category"),
         Index("ix_attendees_popup_id", "popup_id"),
-        # NOTE: ix_attendees_category_id is created by the migration,
-        # but declared here for ORM awareness
+        # ix_attendees_category_id is created by the migration
     )
 
     id: uuid.UUID = Field(
@@ -74,6 +72,33 @@ class Attendees(AttendeeBase, table=True):
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
     payment_products: list["PaymentProducts"] = Relationship(back_populates="attendee")
+
+    @property
+    def category(self) -> str:
+        """Backwards-compat accessor: return the category key from the FK relationship.
+
+        Reads category_id → AttendeeCategories.key if the relationship is
+        loaded. Falls back to "main" when the relationship is not loaded or
+        the category is missing (direct-sale attendee without a category).
+        """
+        from app.api.attendee_category.models import (
+            AttendeeCategories as ACModel,  # noqa: PLC0415
+        )
+
+        if self.category_id is None:
+            return "main"
+        # If SQLAlchemy has already resolved the relationship, read from it.
+        # This avoids an extra query when the session is not available.
+        # AttendeeCategories is accessed via the FK — note: this is a lazy
+        # lookup that requires a live session. For schemas that need the full
+        # nested object, use the category_id FK directly via relationship.
+        from sqlalchemy.orm import object_session  # noqa: PLC0415
+
+        sess = object_session(self)
+        if sess is None:
+            return "unknown"
+        cat = sess.get(ACModel, self.category_id)
+        return cat.key if cat else "unknown"
 
     @property
     def products(self) -> list["Products"]:

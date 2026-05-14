@@ -414,22 +414,39 @@ class TestCreateMyAttendeeForPopupHttp:
         self, client: TestClient, db: Session, tenant_a: Tenants
     ) -> None:
         """Application popup + accepted application → 200, attendee created, origin=application."""
+        from app.api.attendee_category.models import AttendeeCategories
+
         popup = _make_popup(db, tenant_a, suffix="c-post-ok", sale_type="application")
         human = _make_human(db, tenant_a, suffix="c-post-ok")
         _make_application(
             db, tenant_a, popup, human, status=ApplicationStatus.ACCEPTED.value
         )
 
+        # Seed a "companion" category for this popup so category_id can be used.
+        # (popups created via db.add() bypass popups_crud.create() so no main
+        #  category is auto-seeded — we create one manually here.)
+        companion_cat = AttendeeCategories(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            key="companion",
+            label="Companion",
+            is_primary=False,
+            enabled_in_passes_flow=True,
+        )
+        db.add(companion_cat)
+        db.commit()
+        db.refresh(companion_cat)
+
         response = client.post(
             f"/api/v1/attendees/my/popup/{popup.id}",
             headers=_auth(human),
-            json={"name": "Spouse Person", "category": "spouse"},
+            json={"name": "Companion Person", "category_id": str(companion_cat.id)},
         )
 
         assert response.status_code == 200, response.text
         body = response.json()
-        assert body["name"] == "Spouse Person"
-        assert body["category"] == "spouse"
+        assert body["name"] == "Companion Person"
+        assert body["category"] == "companion"
         assert body["origin"] == "application"
         assert body["popup_id"] == str(popup.id)
 

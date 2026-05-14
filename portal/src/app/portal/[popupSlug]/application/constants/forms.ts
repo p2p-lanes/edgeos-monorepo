@@ -11,7 +11,6 @@ export const shareableInfo = [
   { value: "email", label: "Email address" },
   { value: "telegram", label: "Telegram username" },
   { value: "participation", label: "Participation" },
-  { value: "brings_kids", label: "Whether or not I'm bringing kids" },
   { value: "role", label: "Role" },
   { value: "organization", label: "Organization" },
   { value: "personal_goals", label: "Personal goals" },

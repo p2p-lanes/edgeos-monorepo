@@ -21,9 +21,7 @@ class PopupsCRUD(BaseCRUD[Popups, PopupCreate, PopupUpdate]):
         session.flush()  # Get the popup id without committing
 
         # Seed main category in same transaction
-        attendee_categories_crud.seed_main_for_popup(
-            session, popup.id, popup.tenant_id
-        )
+        attendee_categories_crud.seed_main_for_popup(session, popup.id, popup.tenant_id)
 
         session.commit()
         session.refresh(popup)

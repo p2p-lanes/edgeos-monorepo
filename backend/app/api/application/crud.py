@@ -19,6 +19,7 @@ from app.api.application.schemas import (
 from app.api.application_review.models import ApplicationReviews
 from app.api.attendee.crud import attendees_crud
 from app.api.attendee.models import AttendeeProducts, Attendees
+from app.api.attendee_category.models import AttendeeCategories
 from app.api.human.models import Humans
 from app.api.human.schemas import HumanCreate, HumanUpdate
 from app.api.shared.crud import BaseCRUD
@@ -196,11 +197,13 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             )
         )
 
-        # Main attendee must have at least one product
+        # Primary attendee must have at least one product
+        # Attendees.category column was dropped in PR 2 — filter via category_id FK
         has_products = (
             exists()
             .where(Attendees.application_id == Applications.id)
-            .where(Attendees.category == "main")
+            .where(Attendees.category_id == AttendeeCategories.id)
+            .where(AttendeeCategories.is_primary.is_(True))  # type: ignore[union-attr]
             .where(AttendeeProducts.attendee_id == Attendees.id)
         )
         base_statement = base_statement.where(has_products)
@@ -395,26 +398,26 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             f"{human.first_name or ''} {human.last_name or ''}".strip() or human.email
         )
 
+        # Look up the popup's primary category to set category_id on the main attendee
+        from app.api.attendee_category.crud import (
+            attendee_categories_crud,  # noqa: PLC0415
+        )
+
+        main_cat = attendee_categories_crud.get_primary_for_popup(
+            session, application.popup_id
+        )
+
         attendees_crud.create_internal(
             session,
             tenant_id=tenant_id,
             application_id=application.id,
             popup_id=application.popup_id,
             name=name,
-            category="main",
             email=human.email,
             gender=human.gender,
             human_id=human.id,
+            category_id=main_cat.id if main_cat else None,
         )
-
-        # Create companion attendees (spouse/kids) if provided
-        if app_data.companions:
-            self._create_companions(
-                session,
-                application=application,
-                companions=app_data.companions,
-                tenant_id=tenant_id,
-            )
 
         # Apply approval strategy for non-group applications still in review
         if (
@@ -440,40 +443,6 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         session.commit()
         session.refresh(application)
         return application
-
-    def _create_companions(
-        self,
-        session: Session,
-        application: Applications,
-        companions: list,
-        tenant_id: uuid.UUID,
-    ) -> None:
-        """Create companion attendees (spouse/kids) for an application.
-
-        Validates that only one spouse can exist per application.
-        """
-        spouse_count = 0
-
-        for companion in companions:
-            # Validate single spouse
-            if companion.category == "spouse":
-                spouse_count += 1
-                if spouse_count > 1:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="Only one spouse attendee allowed per application",
-                    )
-
-            attendees_crud.create_internal(
-                session,
-                tenant_id=tenant_id,
-                application_id=application.id,
-                popup_id=application.popup_id,
-                name=companion.name,
-                category=companion.category,
-                email=companion.email,
-                gender=companion.gender,
-            )
 
     def create_admin(
         self,
@@ -620,26 +589,26 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             f"{human.first_name or ''} {human.last_name or ''}".strip() or human.email
         )
 
+        # Look up the popup's primary category to set category_id on the main attendee
+        from app.api.attendee_category.crud import (
+            attendee_categories_crud,  # noqa: PLC0415
+        )
+
+        main_cat = attendee_categories_crud.get_primary_for_popup(
+            session, application.popup_id
+        )
+
         attendees_crud.create_internal(
             session,
             tenant_id=tenant_id,
             application_id=application.id,
             popup_id=application.popup_id,
             name=name,
-            category="main",
             email=human.email,
             gender=human.gender,
             human_id=human.id,
+            category_id=main_cat.id if main_cat else None,
         )
-
-        # Create companion attendees (spouse/kids) if provided
-        if app_data.companions:
-            self._create_companions(
-                session,
-                application=application,
-                companions=app_data.companions,
-                tenant_id=tenant_id,
-            )
 
         # Apply approval strategy if status is IN_REVIEW
         if application.status == ApplicationStatus.IN_REVIEW.value:
@@ -811,19 +780,16 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         session: Session,
         application: Applications,
         name: str,
-        category: str,
+        category_id: uuid.UUID | None = None,
         email: str | None = None,
         gender: str | None = None,
     ):
-        """Add an attendee to an application."""
-        # Validate category doesn't already exist for main/spouse
-        existing_categories = {a.category for a in application.attendees}
-        if category in ["main", "spouse"] and category in existing_categories:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Attendee with category '{category}' already exists",
-            )
+        """Add an attendee to an application.
 
+        category_id (UUID FK) is required for any attendee beyond the primary.
+        The legacy category string is no longer accepted — callers must resolve
+        a category_id against the popup's attendee_categories table.
+        """
         # Check for duplicate emails
         if email:
             existing_emails = [a.email for a in application.attendees if a.email]
@@ -839,9 +805,9 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             application_id=application.id,
             popup_id=application.popup_id,
             name=name,
-            category=category,
             email=email.lower() if email else None,
             gender=gender,
+            category_id=category_id,
         )
 
         session.refresh(application)

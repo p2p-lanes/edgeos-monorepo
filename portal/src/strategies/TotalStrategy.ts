@@ -66,7 +66,7 @@ class MonthlyPriceStrategy extends BasePriceStrategy {
     return {
       total:
         monthPrice -
-        (hasPatreon && monthProduct?.attendee_category !== "main"
+        (hasPatreon && monthProduct?.attendee_category_id != null
           ? 0
           : totalProductsPurchased),
       originalTotal: originalTotal,

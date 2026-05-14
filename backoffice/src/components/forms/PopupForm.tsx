@@ -2,7 +2,6 @@ import { useForm } from "@tanstack/react-form"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import {
-  Baby,
   Building2,
   Calendar,
   CalendarDays,
@@ -10,7 +9,6 @@ import {
   FileText,
   Globe,
   GraduationCap,
-  Heart,
   Image,
   Key,
   Languages,
@@ -194,8 +192,6 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         )) as CheckoutMode,
       start_date: formatDateForInput(defaultValues?.start_date),
       end_date: formatDateForInput(defaultValues?.end_date),
-      allows_spouse: defaultValues?.allows_spouse ?? false,
-      allows_children: defaultValues?.allows_children ?? false,
       allows_coupons: defaultValues?.allows_coupons ?? false,
       allows_scholarship: defaultValues?.allows_scholarship ?? false,
       allows_incentive: defaultValues?.allows_incentive ?? false,
@@ -237,8 +233,6 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         status: value.status as PopupCreate["status"],
         start_date: toUTCDate(value.start_date),
         end_date: toUTCDate(value.end_date),
-        allows_spouse: value.allows_spouse,
-        allows_children: value.allows_children,
         allows_coupons: value.allows_coupons,
         allows_scholarship: value.allows_scholarship,
         allows_incentive: value.allows_incentive,
@@ -621,40 +615,6 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
 
         {/* Event Options */}
         <InlineSection title="Pop-up Options">
-          <form.Field name="allows_spouse">
-            {(field) => (
-              <InlineRow
-                icon={<Heart className="h-4 w-4 text-muted-foreground" />}
-                label="Spouse Registration"
-                description="Attendees can register their spouse"
-              >
-                <Switch
-                  id="allows_spouse"
-                  checked={field.state.value}
-                  onCheckedChange={(checked) => field.handleChange(checked)}
-                  disabled={readOnly}
-                />
-              </InlineRow>
-            )}
-          </form.Field>
-
-          <form.Field name="allows_children">
-            {(field) => (
-              <InlineRow
-                icon={<Baby className="h-4 w-4 text-muted-foreground" />}
-                label="Children Registration"
-                description="Attendees can register their children"
-              >
-                <Switch
-                  id="allows_children"
-                  checked={field.state.value}
-                  onCheckedChange={(checked) => field.handleChange(checked)}
-                  disabled={readOnly}
-                />
-              </InlineRow>
-            )}
-          </form.Field>
-
           <form.Field name="allows_coupons">
             {(field) => (
               <InlineRow

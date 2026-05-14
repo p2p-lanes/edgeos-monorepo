@@ -6,13 +6,12 @@ import {
 import { useForm } from "@tanstack/react-form"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
-import { Mail, Plus, Trash2, User, Users } from "lucide-react"
+import { Mail, User } from "lucide-react"
 import { useState } from "react"
 import {
   type ApplicationAdminCreate,
   type ApplicationStatus,
   ApplicationsService,
-  type CompanionCreate,
   FormFieldsService,
 } from "@/client"
 import { FieldError } from "@/components/Common/FieldError"
@@ -30,13 +29,6 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { LoadingButton } from "@/components/ui/loading-button"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
@@ -54,11 +46,6 @@ interface ApplicationSchema {
   base_fields: Record<string, FormFieldSchema>
   custom_fields: Record<string, FormFieldSchema>
   sections: FormSectionSchema[]
-}
-
-// Type for companion with client-side ID for React key
-interface CompanionWithId extends CompanionCreate {
-  _id: string
 }
 
 interface ApplicationFormProps {
@@ -84,13 +71,8 @@ export function ApplicationForm({ onSuccess }: ApplicationFormProps) {
   const { showSuccessToast, showErrorToast } = useCustomToast()
   const { selectedPopupId, isContextReady } = useWorkspace()
 
-  // State for companions (spouse/kids) with client-side IDs for React keys
-  const [companions, setCompanions] = useState<CompanionWithId[]>([])
   // Track if saving as draft
   const [savingAsDraft, setSavingAsDraft] = useState(false)
-
-  // Check if spouse already added
-  const hasSpouse = companions.some((c) => c.category === "spouse")
 
   // Fetch schema for the selected popup
   const {
@@ -194,10 +176,6 @@ export function ApplicationForm({ onSuccess }: ApplicationFormProps) {
         custom_fields:
           Object.keys(cleanedCustomFields).length > 0
             ? cleanedCustomFields
-            : undefined,
-        companions:
-          companions.length > 0
-            ? companions.map(({ _id, ...rest }) => rest)
             : undefined,
       }
 
@@ -391,152 +369,6 @@ export function ApplicationForm({ onSuccess }: ApplicationFormProps) {
                     </div>
                   </>
                 )}
-              </CardContent>
-            </Card>
-
-            {/* Companions (Spouse/Kids) */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Companions</CardTitle>
-                <CardDescription>
-                  Add spouse or children attending with the applicant
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {companions.map((companion) => (
-                  <div
-                    key={companion._id}
-                    className="flex items-start gap-4 rounded-lg border p-4"
-                  >
-                    <div className="flex-1 space-y-4">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium capitalize text-muted-foreground">
-                          {companion.category === "spouse" ? "Spouse" : "Child"}
-                        </span>
-                      </div>
-                      <div className="grid gap-4 md:grid-cols-3">
-                        <div className="space-y-2">
-                          <Label>Name *</Label>
-                          <Input
-                            value={companion.name}
-                            onChange={(e) => {
-                              setCompanions((prev) =>
-                                prev.map((c) =>
-                                  c._id === companion._id
-                                    ? { ...c, name: e.target.value }
-                                    : c,
-                                ),
-                              )
-                            }}
-                            placeholder="Full name"
-                          />
-                        </div>
-                        {companion.category === "spouse" && (
-                          <div className="space-y-2">
-                            <Label>Email</Label>
-                            <Input
-                              type="email"
-                              value={companion.email || ""}
-                              onChange={(e) => {
-                                setCompanions((prev) =>
-                                  prev.map((c) =>
-                                    c._id === companion._id
-                                      ? { ...c, email: e.target.value || null }
-                                      : c,
-                                  ),
-                                )
-                              }}
-                              placeholder="Optional"
-                            />
-                          </div>
-                        )}
-                        <div className="space-y-2">
-                          <Label>Gender</Label>
-                          <Select
-                            value={companion.gender || ""}
-                            onValueChange={(val: string) => {
-                              setCompanions((prev) =>
-                                prev.map((c) =>
-                                  c._id === companion._id
-                                    ? { ...c, gender: val || null }
-                                    : c,
-                                ),
-                              )
-                            }}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="male">Male</SelectItem>
-                              <SelectItem value="female">Female</SelectItem>
-                              <SelectItem value="other">Other</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label="Remove companion"
-                      className="mt-6"
-                      onClick={() => {
-                        setCompanions((prev) =>
-                          prev.filter((c) => c._id !== companion._id),
-                        )
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-
-                <div className="flex gap-2">
-                  {!hasSpouse && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setCompanions((prev) => [
-                          ...prev,
-                          {
-                            _id: crypto.randomUUID(),
-                            name: "",
-                            category: "spouse",
-                            email: null,
-                            gender: null,
-                          },
-                        ])
-                      }}
-                    >
-                      <Plus className="mr-2 h-4 w-4" />
-                      Add Spouse
-                    </Button>
-                  )}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setCompanions((prev) => [
-                        ...prev,
-                        {
-                          _id: crypto.randomUUID(),
-                          name: "",
-                          category: "kid",
-                          email: null,
-                          gender: null,
-                        },
-                      ])
-                    }}
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Kid
-                  </Button>
-                </div>
               </CardContent>
             </Card>
 
@@ -820,41 +652,6 @@ export function ApplicationForm({ onSuccess }: ApplicationFormProps) {
               }}
             </form.Subscribe>
 
-            {/* Companions Preview */}
-            {companions.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">
-                    <div className="flex items-center gap-2">
-                      <Users className="h-4 w-4" />
-                      Companions ({companions.length})
-                    </div>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {companions.map((companion) => (
-                    <div
-                      key={companion._id}
-                      className="flex items-center justify-between rounded-lg border p-2 text-sm"
-                    >
-                      <div>
-                        <p className="font-medium">
-                          {companion.name || "Unnamed"}
-                        </p>
-                        <p className="text-xs text-muted-foreground capitalize">
-                          {companion.category}
-                        </p>
-                      </div>
-                      {companion.gender && (
-                        <span className="text-xs text-muted-foreground capitalize">
-                          {companion.gender}
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            )}
           </div>
         </div>
       </form>

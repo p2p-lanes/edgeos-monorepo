@@ -109,9 +109,18 @@ def test_attendee_categories_table_has_expected_columns(db: Session) -> None:
     ).all()
     columns = {row[0] for row in result}
     required = {
-        "id", "tenant_id", "popup_id", "key", "is_primary", "sort_order",
-        "enabled_in_passes_flow", "max_per_application", "required_fields",
-        "display_meta", "created_at", "updated_at",
+        "id",
+        "tenant_id",
+        "popup_id",
+        "key",
+        "is_primary",
+        "sort_order",
+        "enabled_in_passes_flow",
+        "max_per_application",
+        "required_fields",
+        "display_meta",
+        "created_at",
+        "updated_at",
     }
     assert required.issubset(columns), f"Missing columns: {required - columns}"
 
