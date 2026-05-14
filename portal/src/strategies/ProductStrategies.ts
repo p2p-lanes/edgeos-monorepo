@@ -18,6 +18,7 @@ interface ProductStrategy {
     attendeeId: string,
     product: ProductsPass,
     discount?: DiscountProps,
+    exclusivityScopeIds?: string[],
   ) => AttendeePassState[]
 }
 
@@ -169,18 +170,20 @@ class WeekProductStrategy implements ProductStrategy {
         monthProduct?.purchased || false,
       )
 
+      const isClearedByMonth = (p: ProductsPass): boolean =>
+        shouldSelectMonth &&
+        !p.purchased &&
+        (p.duration_type === "day" || p.duration_type === "week")
+
       return {
         ...attendee,
         products: updatedProducts.map((p) => ({
           ...p,
-          quantity:
-            p.duration_type === "day" && shouldSelectMonth && !p.purchased
-              ? 0
-              : p.quantity,
+          quantity: isClearedByMonth(p) ? 0 : p.quantity,
           selected:
             p.duration_type === "month"
               ? shouldSelectMonth
-              : p.duration_type === "day" && shouldSelectMonth
+              : isClearedByMonth(p)
                 ? false
                 : p.selected,
           edit: p.duration_type === "month" ? hasEdited : p.edit,
@@ -279,13 +282,25 @@ class ExclusivityGuard implements ProductStrategy {
     attendeeId: string,
     product: ProductsPass,
     discount?: DiscountProps,
+    exclusivityScopeIds?: string[],
   ): AttendeePassState[] {
     const result = this.inner.handleSelection(
       attendees,
       attendeeId,
       product,
       discount,
+      exclusivityScopeIds,
     )
+
+    // Scope: explicit ids from the caller (ticketing-step section) when provided,
+    // otherwise fall back to the same product.category so a ticket exclusive
+    // never clears a housing/merch selection.
+    const inScope = (p: ProductsPass): boolean => {
+      if (exclusivityScopeIds && exclusivityScopeIds.length > 0) {
+        return exclusivityScopeIds.includes(p.id)
+      }
+      return p.category === product.category
+    }
 
     return result.map((attendee) => {
       if (attendee.id !== attendeeId) return attendee
@@ -297,6 +312,7 @@ class ExclusivityGuard implements ProductStrategy {
         ...attendee,
         products: attendee.products.map((p) => {
           if (p.id === updatedTarget.id || p.purchased) return p
+          if (!inScope(p)) return p
 
           if (updatedTarget.exclusive) {
             return this.clearSelection(p)

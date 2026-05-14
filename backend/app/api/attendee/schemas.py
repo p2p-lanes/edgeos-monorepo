@@ -1,20 +1,11 @@
 import uuid
 from datetime import datetime
-from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, field_validator
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlmodel import Column, Field, SQLModel
 
 from app.api.product.schemas import ProductWithQuantity
-
-
-class AttendeeCategory(str, Enum):
-    """Categories for attendees."""
-
-    MAIN = "main"
-    SPOUSE = "spouse"
-    KID = "kid"
 
 
 class AttendeeBase(SQLModel):
@@ -29,7 +20,13 @@ class AttendeeBase(SQLModel):
         default=None, foreign_key="humans.id", index=True, nullable=True
     )
     name: str
-    category: str = Field(index=True)  # main, spouse, kid
+    # FK to attendee_categories (authoritative)
+    category_id: uuid.UUID | None = Field(
+        default=None,
+        foreign_key="attendee_categories.id",
+        index=True,
+        nullable=True,
+    )
     email: str | None = Field(default=None, nullable=True)
     gender: str | None = Field(default=None, nullable=True)
     check_in_code: str | None = Field(default=None, index=True, nullable=True)
@@ -43,9 +40,13 @@ class AttendeePublic(AttendeeBase):
     check_in_code, payment_id, and requires_check_in. The list endpoint
     (GET /attendees) uses the separate AttendeeListItem schema which keeps
     the legacy ProductWithQuantity shape for backwards compatibility.
+
+    category is provided as a string (from the Attendees.category @property)
+    for backward compatibility. The authoritative shape is category_id (UUID FK).
     """
 
     id: uuid.UUID
+    category: str | None = None  # derived from category_id FK via ORM property
     created_at: datetime | None = None
     updated_at: datetime | None = None
     products: list["AttendeeProductPublic"] = []
@@ -55,40 +56,17 @@ class AttendeePublic(AttendeeBase):
 
 
 class AttendeeCreate(BaseModel):
-    """Attendee schema for creation (by user)."""
+    """Attendee schema for creation (by user).
 
-    name: str
-    category: str  # main, spouse, kid
-    email: str | None = None
-    gender: str | None = None
-
-    @field_validator("email")
-    @classmethod
-    def clean_email(cls, v: str | None) -> str | None:
-        if v:
-            return v.lower().strip()
-        return None
-
-    @field_validator("category")
-    @classmethod
-    def validate_category(cls, v: str) -> str:
-        allowed = [c.value for c in AttendeeCategory]
-        if v not in allowed:
-            raise ValueError(f"Category must be one of: {', '.join(allowed)}")
-        return v
-
-    model_config = ConfigDict(str_strip_whitespace=True)
-
-
-class CompanionCreate(BaseModel):
-    """Schema for creating companion attendees (spouse/kids) during application.
-
-    Used when submitting an application with family members.
-    Category is restricted to spouse/kid (main is auto-created from applicant).
+    Accepts category_id (UUID FK) as the primary input. The legacy `category`
+    string field is kept for backward compatibility but the router now validates
+    via category_id against the popup's attendee_categories table.
     """
 
     name: str
-    category: str  # spouse or kid only
+    category_id: uuid.UUID | None = None
+    # Legacy string kept for existing callers; prefer category_id for new code
+    category: str | None = None
     email: str | None = None
     gender: str | None = None
 
@@ -98,14 +76,6 @@ class CompanionCreate(BaseModel):
         if v:
             return v.lower().strip()
         return None
-
-    @field_validator("category")
-    @classmethod
-    def validate_category(cls, v: str) -> str:
-        allowed = [AttendeeCategory.SPOUSE.value, AttendeeCategory.KID.value]
-        if v not in allowed:
-            raise ValueError(f"Category must be one of: {', '.join(allowed)}")
-        return v
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -196,7 +166,7 @@ class TicketAttendeeSnapshot(BaseModel):
     id: uuid.UUID
     name: str
     email: str | None = None
-    category: str
+    category: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -253,7 +223,7 @@ class AttendeeWithTickets(BaseModel):
     id: uuid.UUID
     name: str
     email: str | None
-    category: str
+    category: str | None = None
     check_in_code: str | None = None
     popup_id: uuid.UUID
     popup_name: str
@@ -287,6 +257,7 @@ class AttendeeListItem(AttendeeBase):
     """
 
     id: uuid.UUID
+    category: str | None = None  # derived from category_id FK via ORM property
     created_at: datetime | None = None
     updated_at: datetime | None = None
     products: list[ProductWithQuantity] = []

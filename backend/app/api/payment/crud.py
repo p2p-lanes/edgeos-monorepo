@@ -472,9 +472,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                 success_url = f"{portal_base}/thank-you?payment_id={payment.id}"
                 cancel_url = f"{portal_base}/?cancelled=1"
             else:
-                success_url = (
-                    f"{portal_base}/checkout/{popup.slug}/thank-you?payment_id={payment.id}"
-                )
+                success_url = f"{portal_base}/checkout/{popup.slug}/thank-you?payment_id={payment.id}"
                 cancel_url = f"{portal_base}/checkout/{popup.slug}?cancelled=1"
             reference = {
                 "email": buyer.email,
@@ -1015,7 +1013,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
             product = products_map.get(req.product_id)
             if product is None:
                 continue
-            if product.max_per_order is not None and req.quantity > product.max_per_order:
+            if (
+                product.max_per_order is not None
+                and req.quantity > product.max_per_order
+            ):
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                     detail=(
@@ -1845,7 +1846,8 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         # APPROVED → CANCELLED (refund flow) is explicitly OUT OF SCOPE per design
         # §4.2 — no stock restoration in that path (separate future feature).
         if (
-            new_status in (PaymentStatus.CANCELLED, PaymentStatus.REJECTED, PaymentStatus.EXPIRED)
+            new_status
+            in (PaymentStatus.CANCELLED, PaymentStatus.REJECTED, PaymentStatus.EXPIRED)
             and old_status == PaymentStatus.PENDING.value
         ):
             self._restore_payment_stock(session, payment)

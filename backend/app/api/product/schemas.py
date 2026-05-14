@@ -35,14 +35,6 @@ class TicketDuration(str, Enum):
     FULL = "full"
 
 
-class TicketAttendeeCategory(str, Enum):
-    """Attendee categories for ticket products."""
-
-    MAIN = "main"
-    SPOUSE = "spouse"
-    KID = "kid"
-
-
 class ProductBase(SQLModel):
     """Base product schema with fields shared across all product schemas."""
 
@@ -57,8 +49,11 @@ class ProductBase(SQLModel):
     description: str | None = Field(default=None, nullable=True, sa_type=Text())
     image_url: str | None = Field(default=None, nullable=True)
     category: str = Field(default="ticket", index=True)
-    attendee_category: TicketAttendeeCategory | None = Field(
-        default=None, nullable=True
+    # FK to attendee_categories (authoritative post-migration)
+    attendee_category_id: uuid.UUID | None = Field(
+        default=None,
+        foreign_key="attendee_categories.id",
+        nullable=True,
     )
     duration_type: TicketDuration | None = Field(default=None, nullable=True)
     sale_starts_at: datetime | None = Field(
@@ -123,7 +118,6 @@ class ProductCreate(BaseModel):
     description: str | None = None
     image_url: str | None = None
     category: str = "ticket"
-    attendee_category: TicketAttendeeCategory | None = None
     duration_type: TicketDuration | None = None
     sale_starts_at: date | None = None
     sale_ends_at: date | None = None
@@ -141,10 +135,6 @@ class ProductCreate(BaseModel):
     def validate_ticket_fields(self) -> "ProductCreate":
         """Validate that ticket-specific fields are only set for tickets."""
         if self.category != "ticket":
-            if self.attendee_category is not None:
-                raise ValueError(
-                    "attendee_category can only be set for ticket products"
-                )
             if self.duration_type is not None:
                 raise ValueError("duration_type can only be set for ticket products")
         return self
@@ -176,9 +166,7 @@ class ProductCreate(BaseModel):
         """sale_starts_at must be before sale_ends_at when both are set."""
         if self.sale_starts_at is not None and self.sale_ends_at is not None:
             if self.sale_starts_at > self.sale_ends_at:
-                raise ValueError(
-                    "sale_starts_at must be before sale_ends_at"
-                )
+                raise ValueError("sale_starts_at must be before sale_ends_at")
         return self
 
 
@@ -192,7 +180,6 @@ class ProductUpdate(BaseModel):
     description: str | None = None
     image_url: str | None = None
     category: str | None = None
-    attendee_category: TicketAttendeeCategory | None = None
     duration_type: TicketDuration | None = None
     sale_starts_at: date | None = None
     sale_ends_at: date | None = None
@@ -220,9 +207,7 @@ class ProductUpdate(BaseModel):
         """sale_starts_at must be before sale_ends_at when both are set."""
         if self.sale_starts_at is not None and self.sale_ends_at is not None:
             if self.sale_starts_at > self.sale_ends_at:
-                raise ValueError(
-                    "sale_starts_at must be before sale_ends_at"
-                )
+                raise ValueError("sale_starts_at must be before sale_ends_at")
         return self
 
 
@@ -236,7 +221,6 @@ class ProductBatchItem(BaseModel):
     description: str | None = None
     image_url: str | None = None
     category: str = "ticket"
-    attendee_category: TicketAttendeeCategory | None = None
     duration_type: TicketDuration | None = None
     sale_starts_at: date | None = None
     sale_ends_at: date | None = None
@@ -254,10 +238,6 @@ class ProductBatchItem(BaseModel):
     def validate_ticket_fields(self) -> "ProductBatchItem":
         """Validate that ticket-specific fields are only set for tickets."""
         if self.category != "ticket":
-            if self.attendee_category is not None:
-                raise ValueError(
-                    "attendee_category can only be set for ticket products"
-                )
             if self.duration_type is not None:
                 raise ValueError("duration_type can only be set for ticket products")
         return self

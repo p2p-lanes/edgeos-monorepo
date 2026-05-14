@@ -70,7 +70,6 @@ export function buildCheckoutApplicationMutationPayload({
     payload: splitForCreate({
       values: checkoutValues,
       popupId,
-      companions: [],
       status: "in review",
       schema,
     }),

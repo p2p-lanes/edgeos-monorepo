@@ -9,10 +9,11 @@ import QuantitySelector, {
   resolveMaxQuantity,
   supportsQuantitySelector,
 } from "@/components/ui/QuantitySelector"
-import { normalizeAttendeeCategory } from "@/lib/attendee-category"
+import { useAttendeeCategories } from "@/hooks/useAttendeeCategories"
 import { deriveProductState, type ProductSaleState } from "@/lib/product-state"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
+import { useCityProvider } from "@/providers/cityProvider"
 import { usePassesProvider } from "@/providers/passesProvider"
 import type { AttendeePassState } from "@/types/Attendee"
 import { formatCurrency } from "@/types/checkout"
@@ -31,57 +32,50 @@ interface TemplateSection {
   attendee_categories?: string[] | null
 }
 
-const CATEGORY_ORDER = ["main", "spouse", "kid", "teen", "baby"]
-
-const CATEGORY_META: Record<
-  string,
-  { label: string; header: string; accent: string; badge: string; tab: string }
-> = {
-  main: {
-    label: "Main",
-    header: "bg-gray-900 text-white",
-    accent: "border-l-gray-900",
-    badge: "bg-gray-100 text-gray-800",
-    tab: "text-gray-900 border-gray-900",
-  },
-  spouse: {
-    label: "Spouse",
-    header: "bg-indigo-600 text-white",
-    accent: "border-l-indigo-600",
-    badge: "bg-indigo-50 text-indigo-700",
-    tab: "text-indigo-600 border-indigo-600",
-  },
-  kid: {
-    label: "Kid",
-    header: "bg-amber-500 text-white",
-    accent: "border-l-amber-500",
-    badge: "bg-amber-50 text-amber-700",
-    tab: "text-amber-600 border-amber-500",
-  },
-  teen: {
-    label: "Teen",
-    header: "bg-amber-500 text-white",
-    accent: "border-l-amber-500",
-    badge: "bg-amber-50 text-amber-700",
-    tab: "text-amber-600 border-amber-500",
-  },
-  baby: {
-    label: "Baby",
-    header: "bg-amber-400 text-white",
-    accent: "border-l-amber-400",
-    badge: "bg-amber-50 text-amber-600",
-    tab: "text-amber-500 border-amber-400",
-  },
-}
-
-const getCategoryMeta = (cat: string) =>
-  CATEGORY_META[cat] ?? {
-    label: cat.charAt(0).toUpperCase() + cat.slice(1),
-    header: "bg-gray-700 text-white",
-    accent: "border-l-gray-700",
-    badge: "bg-gray-100 text-gray-700",
-    tab: "text-gray-700 border-gray-700",
+const getCategoryMeta = (cat: string) => {
+  // Fixed palette for well-known legacy category keys; generic fallback for all others
+  const palette: Record<
+    string,
+    {
+      label: string
+      header: string
+      accent: string
+      badge: string
+      tab: string
+    }
+  > = {
+    main: {
+      label: "Main",
+      header: "bg-gray-900 text-white",
+      accent: "border-l-gray-900",
+      badge: "bg-gray-100 text-gray-800",
+      tab: "text-gray-900 border-gray-900",
+    },
+    spouse: {
+      label: "Spouse",
+      header: "bg-indigo-600 text-white",
+      accent: "border-l-indigo-600",
+      badge: "bg-indigo-50 text-indigo-700",
+      tab: "text-indigo-600 border-indigo-600",
+    },
+    kid: {
+      label: "Kid",
+      header: "bg-amber-500 text-white",
+      accent: "border-l-amber-500",
+      badge: "bg-amber-50 text-amber-700",
+      tab: "text-amber-600 border-amber-500",
+    },
   }
+  return (
+    palette[cat] ?? {
+      label: cat.charAt(0).toUpperCase() + cat.slice(1),
+      header: "bg-gray-700 text-white",
+      accent: "border-l-gray-700",
+      badge: "bg-gray-100 text-gray-700",
+      tab: "text-gray-700 border-gray-700",
+    }
+  )
+}
 
 function SaleStateBadge({ state }: { state: ProductSaleState }) {
   if (state === "on_sale") return null
@@ -137,11 +131,23 @@ type TicketSelectVariant = "stacked" | "tabs" | "compact" | "accordion"
 // Helpers
 // ---------------------------------------------------------------------------
 
-function sortedAttendees(attendees: AttendeePassState[]): AttendeePassState[] {
+function sortedAttendees(
+  attendees: AttendeePassState[],
+  categorySortOrderById: Map<string, number>,
+): AttendeePassState[] {
+  // Sort by the category's `sort_order` (configured per popup in backoffice).
+  // Main remains first because admins seed it with sort_order=0 and it can't
+  // be changed via the UI. Attendees without category_id fall to the end.
+  const SENTINEL = Number.MAX_SAFE_INTEGER
   return [...attendees].sort((a, b) => {
-    const ia = CATEGORY_ORDER.indexOf(a.category)
-    const ib = CATEGORY_ORDER.indexOf(b.category)
-    return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib)
+    const aOrder = a.category_id
+      ? (categorySortOrderById.get(a.category_id) ?? SENTINEL)
+      : SENTINEL
+    const bOrder = b.category_id
+      ? (categorySortOrderById.get(b.category_id) ?? SENTINEL)
+      : SENTINEL
+    if (aOrder !== bOrder) return aOrder - bOrder
+    return (a.category ?? "").localeCompare(b.category ?? "")
   })
 }
 
@@ -190,11 +196,23 @@ export default function VariantTicketSelect({
 
   const sections = parseSections(templateConfig)
 
+  // Build category_id → sort_order map for attendee ordering.
+  const { getCity } = useCityProvider()
+  const cityForSort = getCity()
+  const popupIdForSort = cityForSort?.id ? String(cityForSort.id) : ""
+  const { categories: categoriesForSort } =
+    useAttendeeCategories(popupIdForSort)
+  const categorySortOrderById = new Map<string, number>()
+  for (const c of categoriesForSort ?? []) {
+    categorySortOrderById.set(c.id, c.sort_order ?? 0)
+  }
+
   // Filter attendees with no renderable content before dispatching to layouts.
   // This covers all four layout variants in one place (DRY per design §4 ADR-6).
-  const visibleAttendees = sortedAttendees(attendeePasses).filter((a) =>
-    attendeeHasRenderableContent(a, sections),
-  )
+  const visibleAttendees = sortedAttendees(
+    attendeePasses,
+    categorySortOrderById,
+  ).filter((a) => attendeeHasRenderableContent(a, sections))
 
   // If no renderable attendees, fall back to legacy section-based layout.
   if (visibleAttendees.length === 0) {
@@ -222,7 +240,9 @@ export default function VariantTicketSelect({
 
   return (
     <div className="space-y-4">
-      <AddAttendeeButtons onAttendeeAdded={handleAttendeeAdded} />
+      <div className="flex flex-wrap items-center gap-3 text-sm">
+        <AddAttendeeButtons onAttendeeAdded={handleAttendeeAdded} />
+      </div>
       {passesVariant === "stacked" && <StackedLayout {...sharedProps} />}
       {passesVariant === "tabs" && <TabsLayout {...sharedProps} />}
       {passesVariant === "compact" && <CompactLayout {...sharedProps} />}
@@ -237,7 +257,11 @@ export default function VariantTicketSelect({
 
 interface LayoutProps {
   attendees: AttendeePassState[]
-  toggleProduct: (attendeeId: string, product: ProductsPass) => void
+  toggleProduct: (
+    attendeeId: string,
+    product: ProductsPass,
+    exclusivityScopeIds?: string[],
+  ) => void
   isEditing: boolean
   sections: TemplateSection[]
   focusedAttendeeId?: string | null
@@ -275,10 +299,11 @@ export function buildSectionGroups(
     return buildDurationGroups(attendee)
   }
 
-  const normalisedCategory = normalizeAttendeeCategory(attendee.category)
+  const attendeeCategoryId = attendee.category_id ?? null
   const visibleSections = sections.filter((s) => {
     if (s.attendee_categories == null) return true
-    return s.attendee_categories.includes(normalisedCategory)
+    if (!attendeeCategoryId) return false
+    return s.attendee_categories.includes(attendeeCategoryId)
   })
 
   const productMap = new Map(
@@ -354,7 +379,7 @@ function AttendeeHeader({
   attendee: AttendeePassState
   className?: string
 }) {
-  const meta = getCategoryMeta(attendee.category)
+  const meta = getCategoryMeta(attendee.category ?? "")
   return (
     <div className={cn("px-5 py-3", meta.header, className)}>
       <p className="font-semibold text-sm leading-tight">{attendee.name}</p>
@@ -374,7 +399,11 @@ function AttendeePassRows({
   sections,
 }: {
   attendee: AttendeePassState
-  toggleProduct: (id: string, p: ProductsPass) => void
+  toggleProduct: (
+    id: string,
+    p: ProductsPass,
+    exclusivityScopeIds?: string[],
+  ) => void
   isEditing: boolean
   sections: TemplateSection[]
 }) {
@@ -396,33 +425,47 @@ function AttendeePassRows({
 
   return (
     <>
-      {groups.map(({ section, products: sectionProducts }) => (
-        <PassSection key={section.key} label={section.label}>
-          {sectionProducts.map((p) =>
-            p.duration_type === "day" ? (
-              <DayPassRow
-                key={p.id}
-                product={p}
-                onQuantityChange={(qty) =>
-                  toggleProduct(attendee.id, { ...p, quantity: qty })
-                }
-                disabled={hasFullOrMonthSelected}
-                isEditing={isEditing}
-              />
-            ) : (
-              <PassRow
-                key={p.id}
-                product={p}
-                onClick={() => toggleProduct(attendee.id, p)}
-                onQuantityChange={(qty) =>
-                  toggleProduct(attendee.id, { ...p, quantity: qty })
-                }
-                isEditing={isEditing}
-              />
-            ),
-          )}
-        </PassSection>
-      ))}
+      {groups.map(({ section, products: sectionProducts }) => {
+        const scopeIds = sectionProducts.map((sp) => sp.id)
+        return (
+          <PassSection key={section.key} label={section.label}>
+            {sectionProducts.map((p) =>
+              p.duration_type === "day" ? (
+                <DayPassRow
+                  key={p.id}
+                  product={p}
+                  onQuantityChange={(qty) =>
+                    toggleProduct(
+                      attendee.id,
+                      { ...p, quantity: qty },
+                      scopeIds,
+                    )
+                  }
+                  disabled={hasFullOrMonthSelected}
+                  isEditing={isEditing}
+                />
+              ) : (
+                <PassRow
+                  key={p.id}
+                  product={p}
+                  onClick={() => toggleProduct(attendee.id, p, scopeIds)}
+                  onQuantityChange={(qty) =>
+                    toggleProduct(
+                      attendee.id,
+                      { ...p, quantity: qty },
+                      scopeIds,
+                    )
+                  }
+                  disabled={
+                    p.duration_type === "week" && hasFullOrMonthSelected
+                  }
+                  isEditing={isEditing}
+                />
+              ),
+            )}
+          </PassSection>
+        )
+      })}
     </>
   )
 }
@@ -853,13 +896,23 @@ function CompactAttendeeCard({
   sections,
 }: {
   attendee: AttendeePassState
-  toggleProduct: (id: string, p: ProductsPass) => void
+  toggleProduct: (
+    id: string,
+    p: ProductsPass,
+    exclusivityScopeIds?: string[],
+  ) => void
   isEditing: boolean
   sections: TemplateSection[]
 }) {
-  const meta = getCategoryMeta(attendee.category)
+  const meta = getCategoryMeta(attendee.category ?? "")
   const groups = buildSectionGroups(attendee, sections)
   const visibleProducts = groups.flatMap((g) => g.products)
+  // Lookup: product.id → ids of peers in the same section, for exclusivity scope.
+  const scopeIdsByProductId = new Map<string, string[]>()
+  for (const g of groups) {
+    const ids = g.products.map((p) => p.id)
+    for (const p of g.products) scopeIdsByProductId.set(p.id, ids)
+  }
 
   const hasFullOrMonthSelected = attendee.products.some(
     (p) =>
@@ -941,13 +994,25 @@ function CompactAttendeeCard({
                     max={max}
                     disabled={tileDisabled}
                     onIncrement={() =>
-                      toggleProduct(attendee.id, { ...p, quantity: qty + 1 })
+                      toggleProduct(
+                        attendee.id,
+                        { ...p, quantity: qty + 1 },
+                        scopeIdsByProductId.get(p.id),
+                      )
                     }
                     onDecrement={() =>
-                      toggleProduct(attendee.id, { ...p, quantity: qty - 1 })
+                      toggleProduct(
+                        attendee.id,
+                        { ...p, quantity: qty - 1 },
+                        scopeIdsByProductId.get(p.id),
+                      )
                     }
                     onAdd={() =>
-                      toggleProduct(attendee.id, { ...p, quantity: 1 })
+                      toggleProduct(
+                        attendee.id,
+                        { ...p, quantity: 1 },
+                        scopeIdsByProductId.get(p.id),
+                      )
                     }
                   />
                   <Ticket
@@ -995,7 +1060,14 @@ function CompactAttendeeCard({
                 key={p.id}
                 type="button"
                 onClick={
-                  isDisabled ? undefined : () => toggleProduct(attendee.id, p)
+                  isDisabled
+                    ? undefined
+                    : () =>
+                        toggleProduct(
+                          attendee.id,
+                          p,
+                          scopeIdsByProductId.get(p.id),
+                        )
                 }
                 disabled={isDisabled}
                 className={cn(
@@ -1099,7 +1171,7 @@ function TabsLayout({
       {/* Tab bar */}
       <div className="flex border-b border-border bg-muted/50 overflow-x-auto">
         {attendees.map((a, idx) => {
-          const meta = getCategoryMeta(a.category)
+          const meta = getCategoryMeta(a.category ?? "")
           const isActive = idx === activeIdx
           const selected = countSelected(a)
           return (
@@ -1217,7 +1289,7 @@ function AccordionLayout({
   return (
     <div className="space-y-2">
       {attendees.map((attendee) => {
-        const meta = getCategoryMeta(attendee.category)
+        const meta = getCategoryMeta(attendee.category ?? "")
         const isOpen = open.has(attendee.id)
         const selected = countSelected(attendee)
 

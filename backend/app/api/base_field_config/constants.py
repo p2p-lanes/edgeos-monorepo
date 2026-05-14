@@ -12,8 +12,7 @@ from typing import Any
 DEFAULT_SECTIONS: dict[str, dict[str, Any]] = {
     "profile": {"label": "Personal Information", "order": 0, "kind": "standard"},
     "info_not_shared": {"label": "Info not shared", "order": 1, "kind": "standard"},
-    "companions": {"label": "Children and +1s", "order": 2, "kind": "companions"},
-    "scholarship": {"label": "Scholarship", "order": 3, "kind": "scholarship"},
+    "scholarship": {"label": "Scholarship", "order": 2, "kind": "scholarship"},
 }
 
 # Each entry defines:
@@ -110,35 +109,6 @@ BASE_FIELD_DEFINITIONS: dict[str, dict[str, Any]] = {
             "Age",
             "Residence",
         ],
-    },
-    "partner": {
-        "type": "text",
-        "label": "Name of spouse/partner + duration of their stay",
-        "required": False,
-        "target": "application",
-        "default_section_key": "companions",
-        "default_position": 0,
-        "default_placeholder": "Name",
-        "default_help_text": "We will approve your spouse/partner if we approve you. However please have them fill out this form as well so we have their information in our system.",
-    },
-    "partner_email": {
-        "type": "email",
-        "label": "Spouse/partner email",
-        "required": False,
-        "target": "application",
-        "default_section_key": "companions",
-        "default_position": 1,
-        "default_placeholder": "Email",
-        "default_help_text": "Please provide your spouse/partner's email so we can remind them to apply.",
-    },
-    "kids": {
-        "type": "kids",
-        "label": "I'm bringing kids",
-        "required": False,
-        "target": "application",
-        "default_section_key": "companions",
-        "default_position": 2,
-        "default_help_text": "We will approve your kids if we approve you. Your kids do not need to fill out their own version of this form however.",
     },
     "scholarship_request": {
         "type": "boolean",

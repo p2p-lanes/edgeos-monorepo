@@ -29,6 +29,12 @@ vi.mock("@/components/ui/image-upload", () => ({
   ImageUpload: () => null,
 }))
 
+const DEFAULT_CATEGORIES = [
+  { id: "cat-main", key: "main", label: "Main" },
+  { id: "cat-spouse", key: "spouse", label: "Spouse" },
+  { id: "cat-kid", key: "kid", label: "Kid" },
+]
+
 function makeSection(overrides: Partial<ProductSection> = {}): ProductSection {
   return {
     key: "test-section",
@@ -52,19 +58,20 @@ function renderCard(
       products={[]}
       showAttendeeCategories={true}
       showMediaFields={false}
+      attendeeCategories={DEFAULT_CATEGORIES}
     />,
   )
 }
 
 describe("SortableSectionCard — attendee category checkboxes", () => {
-  it("renders 3 checkboxes labelled Main, Spouse, Kid", () => {
+  it("renders checkboxes for each category", () => {
     renderCard(makeSection())
     expect(screen.getByLabelText("Main")).toBeInTheDocument()
     expect(screen.getByLabelText("Spouse")).toBeInTheDocument()
     expect(screen.getByLabelText("Kid")).toBeInTheDocument()
   })
 
-  it("null attendee_categories: all 3 checkboxes unchecked and 'Visible to all attendees' hint shown", () => {
+  it("null attendee_categories: all checkboxes unchecked and 'Visible to all attendees' hint shown", () => {
     renderCard(makeSection({ attendee_categories: null }))
 
     const mainCb = screen.getByLabelText("Main")
@@ -79,7 +86,7 @@ describe("SortableSectionCard — attendee category checkboxes", () => {
     expect(screen.getByText("Visible to all attendees")).toBeInTheDocument()
   })
 
-  it("clicking Main alone calls onUpdate with attendee_categories: ['main']", async () => {
+  it("clicking Main alone calls onUpdate with attendee_categories containing its UUID", async () => {
     const onUpdate = vi.fn()
     const user = userEvent.setup()
     renderCard(makeSection({ attendee_categories: null }), onUpdate)
@@ -87,16 +94,16 @@ describe("SortableSectionCard — attendee category checkboxes", () => {
     await user.click(screen.getByLabelText("Main"))
 
     expect(onUpdate).toHaveBeenCalledWith("test-section", {
-      attendee_categories: ["main"],
+      attendee_categories: ["cat-main"],
     })
   })
 
-  it("checking all 3 calls onUpdate with attendee_categories: null (collapse rule)", async () => {
+  it("checking all categories calls onUpdate with attendee_categories: null (collapse rule)", async () => {
     const onUpdate = vi.fn()
     const user = userEvent.setup()
-    // Start with 2 checked (main, spouse) — checking Kid makes all 3 → collapse
+    // Start with 2 checked (main, spouse) — checking Kid makes all → collapse
     renderCard(
-      makeSection({ attendee_categories: ["main", "spouse"] }),
+      makeSection({ attendee_categories: ["cat-main", "cat-spouse"] }),
       onUpdate,
     )
 
@@ -110,7 +117,7 @@ describe("SortableSectionCard — attendee category checkboxes", () => {
   it("unchecking the only checked box calls onUpdate with attendee_categories: null (empty collapse)", async () => {
     const onUpdate = vi.fn()
     const user = userEvent.setup()
-    renderCard(makeSection({ attendee_categories: ["main"] }), onUpdate)
+    renderCard(makeSection({ attendee_categories: ["cat-main"] }), onUpdate)
 
     await user.click(screen.getByLabelText("Main"))
 
@@ -119,8 +126,8 @@ describe("SortableSectionCard — attendee category checkboxes", () => {
     })
   })
 
-  it("existing ['main','spouse'] renders Main+Spouse checked, Kid unchecked, no hint", () => {
-    renderCard(makeSection({ attendee_categories: ["main", "spouse"] }))
+  it("existing ['cat-main','cat-spouse'] renders Main+Spouse checked, Kid unchecked, no hint", () => {
+    renderCard(makeSection({ attendee_categories: ["cat-main", "cat-spouse"] }))
 
     expect(screen.getByLabelText("Main")).toHaveAttribute(
       "data-state",

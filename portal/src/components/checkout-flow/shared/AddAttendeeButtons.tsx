@@ -3,21 +3,26 @@
 import { Plus } from "lucide-react"
 import { useState } from "react"
 import { AttendeeModal } from "@/app/portal/[popupSlug]/passes/components/AttendeeModal"
+import type { AttendeeCategoryPublic } from "@/client"
 import useAttendee from "@/hooks/useAttendee"
+import { useAttendeeCategories } from "@/hooks/useAttendeeCategories"
 import { cn } from "@/lib/utils"
-import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
-import type { AttendeeCategory, AttendeePassState } from "@/types/Attendee"
+import { usePassesProvider } from "@/providers/passesProvider"
+import type { AttendeePassState } from "@/types/Attendee"
 
 interface AddAttendeeButtonsProps {
-  /** Invoked after a successful add with the new attendee's id so the parent can scroll to it. */
   onAttendeeAdded?: (attendeeId: string) => void
   className?: string
 }
 
-type ModalState = {
-  isOpen: boolean
-  category: AttendeeCategory | null
+function resolveLabel(cat: AttendeeCategoryPublic): string {
+  const meta = cat.display_meta as Record<string, unknown> | undefined
+  const metaLabel = meta?.label
+  if (metaLabel && typeof metaLabel === "string" && metaLabel.trim() !== "") {
+    return metaLabel
+  }
+  return cat.key.charAt(0).toUpperCase() + cat.key.slice(1)
 }
 
 export default function AddAttendeeButtons({
@@ -25,121 +30,76 @@ export default function AddAttendeeButtons({
   className,
 }: AddAttendeeButtonsProps) {
   const { getCity } = useCityProvider()
-  const { getAttendees } = useApplication()
-  const { addAttendee } = useAttendee()
-  const [modal, setModal] = useState<ModalState>({
-    isOpen: false,
-    category: null,
+  const city = getCity()
+  const popupId = city?.id ? String(city.id) : ""
+  const { categories } = useAttendeeCategories(popupId)
+  const { attendeePasses: attendees } = usePassesProvider()
+  const { addAttendee, loading } = useAttendee()
+
+  const [selectedCategory, setSelectedCategory] =
+    useState<AttendeeCategoryPublic | null>(null)
+
+  if (!popupId || !categories || categories.length === 0) return null
+
+  // Count existing attendees per category so we can hide buttons that have
+  // already hit their max_per_application. Backend still enforces the cap;
+  // this just stops users from clicking buttons that are bound to fail.
+  const countByCategoryId = new Map<string, number>()
+  for (const a of attendees) {
+    const id = a.category_id
+    if (!id) continue
+    countByCategoryId.set(id, (countByCategoryId.get(id) ?? 0) + 1)
+  }
+
+  const available = categories.filter((c) => {
+    if (c.is_primary) return false
+    if (c.enabled_in_passes_flow === false) return false
+    const max = c.max_per_application
+    if (max == null) return true
+    const current = countByCategoryId.get(c.id) ?? 0
+    return current < max
   })
 
-  const city = getCity()
-  const attendees = getAttendees()
-  const hasSpouse = attendees.some((a) => a.category === "spouse")
-  const hasMain = attendees.length > 0
+  if (available.length === 0) return null
 
-  const canShowSpouse = !!city?.allows_spouse
-  const canShowKids = !!city?.allows_children
-
-  if (!canShowSpouse && !canShowKids) return null
-
-  const openModal = (category: AttendeeCategory) => {
-    setModal({ isOpen: true, category })
-  }
-
-  const closeModal = () => {
-    setModal({ isOpen: false, category: null })
-  }
-
-  const handleSubmit = async (data: AttendeePassState) => {
-    if (!modal.category) return
-
-    // Capture the attendee IDs before the mutation so we can identify the new one.
-    const before = new Set(getAttendees().map((a) => a.id))
-
-    await addAttendee({
+  const handleSubmit = async (
+    data: AttendeePassState & { category_id?: string },
+  ) => {
+    if (!selectedCategory) return
+    const result = await addAttendee({
       name: data.name ?? "",
       email: data.email ?? "",
-      category: modal.category,
+      category_id: data.category_id ?? selectedCategory.id,
       gender: data.gender ?? "",
     })
-
-    const after = getAttendees()
-    const newAttendee = after.find((a) => !before.has(a.id))
-
-    closeModal()
-
-    if (newAttendee && onAttendeeAdded) {
-      // Defer to next tick so the consumer re-renders with the new card before scrolling.
-      setTimeout(() => onAttendeeAdded(newAttendee.id), 0)
-    }
+    setSelectedCategory(null)
+    if (result?.id && onAttendeeAdded) onAttendeeAdded(result.id)
   }
-
-  const showSpouseLink = canShowSpouse && !hasSpouse
-  const showSeparator = showSpouseLink && canShowKids
 
   return (
     <>
-      <div
-        className={cn(
-          "flex flex-wrap items-center gap-3 text-sm px-1",
-          className,
-        )}
-      >
-        {showSpouseLink && (
-          <button
-            type="button"
-            onClick={() => openModal("spouse")}
-            disabled={!hasMain}
-            className={cn(
-              "flex items-center gap-1.5 transition-colors whitespace-nowrap group",
-              hasMain
-                ? "text-gray-600 hover:text-gray-900"
-                : "text-gray-300 cursor-not-allowed",
-            )}
-          >
-            <div
-              className={cn(
-                "p-0.5 rounded-full transition-colors",
-                hasMain ? "bg-gray-100 group-hover:bg-gray-200" : "bg-gray-100",
-              )}
-            >
-              <Plus className="w-3 h-3" />
-            </div>
-            <span>Add spouse</span>
-          </button>
-        )}
-        {showSeparator && <span className="text-gray-300">|</span>}
-        {canShowKids && (
-          <button
-            type="button"
-            onClick={() => openModal("kid")}
-            disabled={!hasMain}
-            className={cn(
-              "flex items-center gap-1.5 transition-colors whitespace-nowrap group",
-              hasMain
-                ? "text-gray-600 hover:text-gray-900"
-                : "text-gray-300 cursor-not-allowed",
-            )}
-          >
-            <div
-              className={cn(
-                "p-0.5 rounded-full transition-colors",
-                hasMain ? "bg-gray-100 group-hover:bg-gray-200" : "bg-gray-100",
-              )}
-            >
-              <Plus className="w-3 h-3" />
-            </div>
-            <span>Add child</span>
-          </button>
-        )}
-      </div>
+      {available.map((cat) => (
+        <button
+          key={cat.id}
+          type="button"
+          onClick={() => setSelectedCategory(cat)}
+          disabled={loading}
+          className={cn(
+            "flex items-center gap-1.5 text-pass-text hover:text-pass-title transition-colors whitespace-nowrap disabled:opacity-50",
+            className,
+          )}
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span>Add {resolveLabel(cat)}</span>
+        </button>
+      ))}
 
-      {modal.isOpen && modal.category && (
+      {selectedCategory && (
         <AttendeeModal
-          open={modal.isOpen}
-          onClose={closeModal}
+          open={true}
+          onClose={() => setSelectedCategory(null)}
           onSubmit={handleSubmit}
-          category={modal.category}
+          category={selectedCategory}
           editingAttendee={null}
         />
       )}

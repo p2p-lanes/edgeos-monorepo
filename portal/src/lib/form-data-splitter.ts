@@ -1,7 +1,6 @@
 import type {
   ApplicationCreate,
   ApplicationUpdate,
-  CompanionCreate,
   UserSettableStatus,
 } from "@/client"
 import type { ApplicationFormSchema } from "@/types/form-schema"
@@ -20,7 +19,6 @@ function buildTargetMap(
 interface SplitCreateParams {
   values: Record<string, unknown>
   popupId: string
-  companions: CompanionCreate[]
   status: UserSettableStatus
   schema: ApplicationFormSchema
 }
@@ -28,7 +26,6 @@ interface SplitCreateParams {
 export function splitForCreate({
   values,
   popupId,
-  companions,
   status,
   schema,
 }: SplitCreateParams): ApplicationCreate {
@@ -88,7 +85,6 @@ export function splitForCreate({
     custom_fields:
       Object.keys(customFields).length > 0 ? customFields : undefined,
     status,
-    companions: companions.length > 0 ? companions : undefined,
     // Application-target base fields from the schema (scholarship, etc.)
     // Only fields present in the current popup's schema are included —
     // fields from a previous popup that don't exist here are already

@@ -6,10 +6,11 @@ import type { ProductsPass } from "@/types/Products"
 function createProduct(overrides: Partial<ProductsPass>): ProductsPass {
   return {
     id: overrides.id ?? "product-1",
+    tenant_id: overrides.tenant_id ?? "tenant-1",
     name: overrides.name ?? "Product",
     slug: overrides.slug ?? "product",
     popup_id: overrides.popup_id ?? "popup-1",
-    attendee_category: overrides.attendee_category ?? "main",
+    attendee_category_id: overrides.attendee_category_id ?? null,
     category: overrides.category ?? "ticket",
     duration_type: overrides.duration_type ?? "week",
     is_active: overrides.is_active ?? true,

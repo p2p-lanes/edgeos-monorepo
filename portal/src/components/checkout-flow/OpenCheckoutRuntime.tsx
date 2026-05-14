@@ -42,8 +42,6 @@ function toProductsPass(product: CheckoutRuntimeProduct): ProductsPass {
     price: Number(product.price),
     compare_price: product.compare_price ? Number(product.compare_price) : null,
     category: product.category ?? "ticket",
-    attendee_category:
-      (product.attendee_category as ProductPublic["attendee_category"]) ?? null,
     duration_type:
       (product.duration_type as ProductPublic["duration_type"]) ?? null,
   }
