@@ -9,7 +9,13 @@ from app.api.attendee_category.schemas import (
     AttendeeCategoryUpdate,
 )
 from app.api.shared.response import ListModel, Paging
-from app.core.dependencies.users import CurrentUser, CurrentWriter, TenantSession
+from app.core.dependencies.users import (
+    CurrentHuman,
+    CurrentUser,
+    CurrentWriter,
+    HumanTenantSession,
+    TenantSession,
+)
 
 router = APIRouter(tags=["attendee-categories"])
 
@@ -24,6 +30,30 @@ async def list_attendee_categories(
     _: CurrentUser,
 ) -> ListModel[AttendeeCategoryPublic]:
     """List attendee categories for a popup (VIEWER and ADMIN can read)."""
+    categories = attendee_categories_crud.list_by_popup(db, popup_id)
+    results = [AttendeeCategoryPublic.model_validate(c) for c in categories]
+    return ListModel[AttendeeCategoryPublic](
+        results=results,
+        paging=Paging(offset=0, limit=len(results), total=len(results)),
+    )
+
+
+@router.get(
+    "/portal/popups/{popup_id}/attendee-categories",
+    response_model=ListModel[AttendeeCategoryPublic],
+    tags=["portal"],
+)
+async def list_attendee_categories_portal(
+    popup_id: uuid.UUID,
+    db: HumanTenantSession,
+    _: CurrentHuman,
+) -> ListModel[AttendeeCategoryPublic]:
+    """Portal counterpart of list_attendee_categories — accepts Human tokens.
+
+    Used by the passes flow to render `+ Add {category}` buttons. Returns the
+    same shape as the admin endpoint; the portal filters out is_primary and
+    enabled_in_passes_flow=false client-side.
+    """
     categories = attendee_categories_crud.list_by_popup(db, popup_id)
     results = [AttendeeCategoryPublic.model_validate(c) for c in categories]
     return ListModel[AttendeeCategoryPublic](
