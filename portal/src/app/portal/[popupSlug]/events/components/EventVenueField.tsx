@@ -32,6 +32,12 @@ interface EventVenueFieldProps {
   onCustomLocationNameChange: (next: string) => void
   customLocationUrl: string
   onCustomLocationUrlChange: (next: string) => void
+  /**
+   * Booking mode resolved by the backend for the current [start, end]
+   * window. ``null`` when no time is picked yet — in that case the banner
+   * falls back to a conservative venue-wide hint.
+   */
+  effectiveBookingMode?: string | null
 }
 
 export function EventVenueField({
@@ -45,6 +51,7 @@ export function EventVenueField({
   onCustomLocationNameChange,
   customLocationUrl,
   onCustomLocationUrlChange,
+  effectiveBookingMode,
 }: EventVenueFieldProps) {
   const { t } = useTranslation()
   const [picturesOpen, setPicturesOpen] = useState(false)
@@ -100,12 +107,32 @@ export function EventVenueField({
           </div>
         </div>
       )}
-      {selectedVenue?.booking_mode === "approval_required" && (
-        <div className="flex items-start gap-2.5 rounded-md border border-amber-300 bg-amber-50 p-2.5 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-100">
-          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
-          <p>{t("events.form.venue_approval_required")}</p>
-        </div>
-      )}
+      {(() => {
+        // When the backend has resolved a mode for the selected window, that
+        // is the source of truth: only warn when the user's actual pick
+        // requires approval. Until then, fall back to a conservative hint
+        // covering the venue default and any slot override so the user
+        // isn't blindsided after picking a time.
+        let showBanner: boolean
+        if (effectiveBookingMode != null) {
+          showBanner = effectiveBookingMode === "approval_required"
+        } else {
+          const someSlotRequiresApproval =
+            selectedVenue?.weekly_hours?.some(
+              (h) => h.booking_mode === "approval_required",
+            ) ?? false
+          showBanner =
+            selectedVenue?.booking_mode === "approval_required" ||
+            someSlotRequiresApproval
+        }
+        if (!showBanner) return null
+        return (
+          <div className="flex items-start gap-2.5 rounded-md border border-amber-300 bg-amber-50 p-2.5 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-100">
+            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
+            <p>{t("events.form.venue_approval_required")}</p>
+          </div>
+        )
+      })()}
       {selectedVenue && (
         <div className="text-xs text-muted-foreground space-y-2">
           {pictures.length > 0 && (

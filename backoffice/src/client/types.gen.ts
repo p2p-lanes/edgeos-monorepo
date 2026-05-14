@@ -1050,6 +1050,7 @@ export type EventAvailabilityResult = {
     available: boolean;
     conflicts?: Array<(string)>;
     reason?: (string | null);
+    effective_booking_mode?: (string | null);
 };
 
 /**
@@ -3072,6 +3073,7 @@ export type VenueWeeklyHourInput = {
     open_time?: (string | null);
     close_time?: (string | null);
     is_closed?: boolean;
+    booking_mode?: (VenueBookingMode | null);
 };
 
 export type VenueWeeklyHourRef = {
@@ -3080,6 +3082,7 @@ export type VenueWeeklyHourRef = {
     open_time: (string | null);
     close_time: (string | null);
     is_closed: boolean;
+    booking_mode?: (VenueBookingMode | null);
 };
 
 export type VenueWeeklyHoursUpdate = {

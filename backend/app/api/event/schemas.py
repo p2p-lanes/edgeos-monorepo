@@ -382,3 +382,8 @@ class EventAvailabilityResult(BaseModel):
     available: bool
     conflicts: list[uuid.UUID] = []
     reason: str | None = None
+    # Effective booking mode resolved against the requested [start_time,
+    # end_time]. Takes per-slot ``venue_weekly_hours.booking_mode`` overrides
+    # into account so the portal can show a precise warning ("this time
+    # requires approval") instead of a venue-wide hint.
+    effective_booking_mode: str | None = None

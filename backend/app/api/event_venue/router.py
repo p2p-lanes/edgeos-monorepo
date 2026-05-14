@@ -271,10 +271,10 @@ async def set_weekly_hours(
     # Multiple rows per (venue, day_of_week) are allowed so venues can have
     # split schedules (e.g. 09-11 AND 17-21 the same day). We only dedupe
     # exact duplicates to keep the client idempotent.
-    seen: set[tuple[int, object, object, bool]] = set()
+    seen: set[tuple[int, object, object, bool, object]] = set()
     inserted = 0
     for h in payload.hours:
-        key = (h.day_of_week, h.open_time, h.close_time, h.is_closed)
+        key = (h.day_of_week, h.open_time, h.close_time, h.is_closed, h.booking_mode)
         if key in seen:
             continue
         seen.add(key)
@@ -286,6 +286,7 @@ async def set_weekly_hours(
                 open_time=h.open_time,
                 close_time=h.close_time,
                 is_closed=h.is_closed,
+                booking_mode=h.booking_mode,
             )
         )
         inserted += 1

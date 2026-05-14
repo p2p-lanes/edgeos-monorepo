@@ -461,7 +461,7 @@ export function VenueForm({ defaultValues, onSuccess }: VenueFormProps) {
         <InlineSection title="Booking">
           <InlineRow
             label="Booking mode"
-            description="How participants can book this venue"
+            description="Default mode for this venue. Individual weekly-hours slots can override it."
           >
             <form.Field name="booking_mode">
               {(field) => (

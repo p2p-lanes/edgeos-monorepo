@@ -1,8 +1,20 @@
-import { Clock, Plus, X } from "lucide-react"
+import { ChevronDown, ChevronRight, Clock, Plus, X } from "lucide-react"
+import { useState } from "react"
 
-import type { VenueWeeklyHourInput, VenueWeeklyHourRef } from "@/client"
+import type {
+  VenueBookingMode,
+  VenueWeeklyHourInput,
+  VenueWeeklyHourRef,
+} from "@/client"
 import { Button } from "@/components/ui/button"
 import { InlineSection } from "@/components/ui/inline-form"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { TimePicker } from "@/components/ui/time-picker"
 
@@ -15,6 +27,14 @@ const DAYS_OF_WEEK: { value: number; label: string; short: string }[] = [
   { value: 5, label: "Saturday", short: "Sat" },
   { value: 6, label: "Sunday", short: "Sun" },
 ]
+
+const BOOKING_MODE_LABELS: Record<VenueBookingMode, string> = {
+  free: "Permissionless",
+  approval_required: "Requires approval",
+  unbookable: "Unbookable",
+}
+
+const VENUE_DEFAULT_OPTION = "__default__"
 
 /**
  * Hydrate the editor state from the server's weekly-hours snapshot. Each
@@ -32,6 +52,7 @@ export function buildInitialWeeklyHours(
       open_time: null,
       close_time: null,
       is_closed: true,
+      booking_mode: null,
     }))
   }
   return initial.map((h) => ({
@@ -39,6 +60,7 @@ export function buildInitialWeeklyHours(
     open_time: h.open_time ?? null,
     close_time: h.close_time ?? null,
     is_closed: h.is_closed,
+    booking_mode: h.booking_mode ?? null,
   }))
 }
 
@@ -50,6 +72,92 @@ interface WeeklyHoursEditorProps {
 
 function isOpenSlot(h: VenueWeeklyHourInput): boolean {
   return !h.is_closed && h.open_time != null && h.close_time != null
+}
+
+interface SlotRowProps {
+  slot: VenueWeeklyHourInput
+  canRemove: boolean
+  onChange: (patch: Partial<VenueWeeklyHourInput>) => void
+  onRemove: () => void
+}
+
+function SlotRow({ slot, canRemove, onChange, onRemove }: SlotRowProps) {
+  const [expanded, setExpanded] = useState(false)
+  const hasOverride = slot.booking_mode != null
+
+  return (
+    <div className="pl-[7.25rem] space-y-1.5">
+      <div className="flex items-center gap-2">
+        <TimePicker
+          value={slot.open_time ?? ""}
+          onChange={(v) => onChange({ open_time: v })}
+        />
+        <span className="text-sm text-muted-foreground">to</span>
+        <TimePicker
+          value={slot.close_time ?? ""}
+          onChange={(v) => onChange({ close_time: v })}
+        />
+        {hasOverride && slot.booking_mode && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+            {BOOKING_MODE_LABELS[slot.booking_mode]}
+          </span>
+        )}
+        {canRemove && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            aria-label="Remove slot"
+            onClick={onRemove}
+          >
+            <X className="h-3.5 w-3.5" />
+          </Button>
+        )}
+      </div>
+      <button
+        type="button"
+        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+        onClick={() => setExpanded((v) => !v)}
+      >
+        {expanded ? (
+          <ChevronDown className="h-3 w-3" />
+        ) : (
+          <ChevronRight className="h-3 w-3" />
+        )}
+        Advanced
+      </button>
+      {expanded && (
+        <div className="flex items-center gap-2 pt-1">
+          <span className="text-xs text-muted-foreground">Booking mode</span>
+          <Select
+            value={slot.booking_mode ?? VENUE_DEFAULT_OPTION}
+            onValueChange={(v) =>
+              onChange({
+                booking_mode:
+                  v === VENUE_DEFAULT_OPTION ? null : (v as VenueBookingMode),
+              })
+            }
+          >
+            <SelectTrigger className="h-8 w-[220px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={VENUE_DEFAULT_OPTION}>
+                Use venue default
+              </SelectItem>
+              <SelectItem value="free">Permissionless</SelectItem>
+              <SelectItem value="approval_required">
+                Requires approval
+              </SelectItem>
+              <SelectItem value="unbookable">Unbookable</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+    </div>
+  )
 }
 
 export function WeeklyHoursEditor({
@@ -81,6 +189,7 @@ export function WeeklyHoursEditor({
           open_time: "09:00",
           close_time: "17:00",
           is_closed: false,
+          booking_mode: null,
         },
       ])
     } else {
@@ -90,6 +199,7 @@ export function WeeklyHoursEditor({
           open_time: null,
           close_time: null,
           is_closed: true,
+          booking_mode: null,
         },
       ])
     }
@@ -118,6 +228,7 @@ export function WeeklyHoursEditor({
         open_time: newOpen,
         close_time: newClose,
         is_closed: false,
+        booking_mode: null,
       },
     ])
   }
@@ -143,6 +254,7 @@ export function WeeklyHoursEditor({
           open_time: null,
           close_time: null,
           is_closed: true,
+          booking_mode: null,
         },
       ])
     } else {
@@ -195,36 +307,13 @@ export function WeeklyHoursEditor({
               </div>
               {open &&
                 slots.map((slot, idx) => (
-                  <div
+                  <SlotRow
                     key={idx}
-                    className="flex items-center gap-2 pl-[7.25rem]"
-                  >
-                    <TimePicker
-                      value={slot.open_time ?? ""}
-                      onChange={(v) =>
-                        updateSlot(day.value, idx, { open_time: v })
-                      }
-                    />
-                    <span className="text-sm text-muted-foreground">to</span>
-                    <TimePicker
-                      value={slot.close_time ?? ""}
-                      onChange={(v) =>
-                        updateSlot(day.value, idx, { close_time: v })
-                      }
-                    />
-                    {slots.length > 1 && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        aria-label="Remove slot"
-                        onClick={() => removeSlot(day.value, idx)}
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
-                  </div>
+                    slot={slot}
+                    canRemove={slots.length > 1}
+                    onChange={(patch) => updateSlot(day.value, idx, patch)}
+                    onRemove={() => removeSlot(day.value, idx)}
+                  />
                 ))}
             </div>
           )

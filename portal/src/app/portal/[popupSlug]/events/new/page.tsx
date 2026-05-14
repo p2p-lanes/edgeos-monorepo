@@ -153,6 +153,7 @@ export default function NewPortalEventPage() {
     withinOpenHours,
     availability,
     availabilityData,
+    effectiveBookingMode,
   } = useVenueAvailability({
     popupId,
     venueId,
@@ -365,6 +366,7 @@ export default function NewPortalEventPage() {
           onCustomLocationNameChange={setCustomLocationName}
           customLocationUrl={customLocationUrl}
           onCustomLocationUrlChange={setCustomLocationUrl}
+          effectiveBookingMode={effectiveBookingMode}
         />
         {customLocationMissing && (
           <p className="text-xs text-destructive">
