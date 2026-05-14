@@ -8,8 +8,8 @@ export const metadata: Metadata = {
     "Read events and RSVP on a user's behalf with a portal personal access token.",
 }
 
-type Method = "GET" | "POST"
-type Scope = "events:read" | "rsvp:write"
+type Method = "GET" | "POST" | "PATCH" | "DELETE"
+type Scope = "events:read" | "events:write" | "rsvp:write" | "venues:write"
 
 interface EndpointProps {
   method: Method
@@ -23,6 +23,8 @@ interface EndpointProps {
 const methodColor: Record<Method, string> = {
   GET: "bg-emerald-100 text-emerald-700",
   POST: "bg-sky-100 text-sky-700",
+  PATCH: "bg-amber-100 text-amber-700",
+  DELETE: "bg-rose-100 text-rose-700",
 }
 
 function Endpoint({
@@ -108,6 +110,11 @@ const ERRORS: { code: string; meaning: string }[] = [
     code: "404",
     meaning: "Resource is hidden from the caller or doesn't exist.",
   },
+  {
+    code: "409",
+    meaning:
+      "Conflict — resource has dependent records (e.g. venue has events).",
+  },
   { code: "422", meaning: "Body or query failed validation." },
   { code: "429", meaning: "Rate limit exceeded — see Retry-After header." },
 ]
@@ -157,7 +164,11 @@ function ApiDocsBody() {
             <Row label="Scopes available">
               <code className="font-mono text-xs">events:read</code>
               <span className="text-muted-foreground">, </span>
+              <code className="font-mono text-xs">events:write</code>
+              <span className="text-muted-foreground">, </span>
               <code className="font-mono text-xs">rsvp:write</code>
+              <span className="text-muted-foreground">, </span>
+              <code className="font-mono text-xs">venues:write</code>
             </Row>
             <Row label="OpenAPI spec">
               <code className="font-mono text-xs">/api/v1/openapi.json</code>
@@ -277,6 +288,72 @@ function ApiDocsBody() {
             path="/api/v1/event-participants/portal/participants"
             scope="events:read"
             summary="List the caller's own RSVPs across events."
+          />
+        </Section>
+
+        <Section title="Venues" id="venues">
+          <Endpoint
+            method="GET"
+            path="/api/v1/event-venues/portal/venues"
+            scope="events:read"
+            summary="List active venues for a popup."
+            params={[
+              { name: "popup_id", type: "uuid", note: "required" },
+              {
+                name: "search",
+                type: "string",
+                note: "fuzzy title/location match",
+              },
+              { name: "skip", type: "int" },
+              { name: "limit", type: "int", note: "max 100" },
+            ]}
+          />
+
+          <Endpoint
+            method="POST"
+            path="/api/v1/event-venues/portal/venues"
+            scope="venues:write"
+            summary="Create a venue you own. Subject to the popup's humans_can_create_venues setting; may be created in PENDING status when the popup requires approval."
+            body={[
+              { name: "popup_id", type: "uuid" },
+              { name: "title", type: "string" },
+              { name: "description", type: "string" },
+              { name: "location", type: "string" },
+              { name: "formatted_address", type: "string" },
+              { name: "geo_lat", type: "float" },
+              { name: "geo_lng", type: "float" },
+              { name: "capacity", type: "int" },
+              { name: "image_url", type: "string" },
+              { name: "tags", type: "string[]" },
+              {
+                name: "booking_mode",
+                type: "enum",
+                note: "free | approval_required | unbookable",
+              },
+            ]}
+          />
+
+          <Endpoint
+            method="PATCH"
+            path="/api/v1/event-venues/portal/venues/{venue_id}"
+            scope="venues:write"
+            summary="Update a venue you own. The status field is ignored — re-approval lives in the backoffice."
+            body={[
+              { name: "title", type: "string" },
+              { name: "description", type: "string" },
+              { name: "location", type: "string" },
+              { name: "capacity", type: "int" },
+              { name: "image_url", type: "string" },
+              { name: "tags", type: "string[]" },
+              { name: "booking_mode", type: "enum" },
+            ]}
+          />
+
+          <Endpoint
+            method="DELETE"
+            path="/api/v1/event-venues/portal/venues/{venue_id}"
+            scope="venues:write"
+            summary="Delete a venue you own. Returns 409 if the venue still has non-cancelled events; remove or reassign them first."
           />
         </Section>
       </div>

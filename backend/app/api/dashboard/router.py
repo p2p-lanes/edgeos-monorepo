@@ -32,7 +32,7 @@ from app.api.payment.schemas import PaymentStatus, PaymentType
 from app.api.popup.crud import popups_crud
 from app.api.product.models import Products
 from app.api.product.schemas import CATEGORY_HOUSING, CATEGORY_TICKET
-from app.core.dependencies.users import CurrentAdmin, TenantSession
+from app.core.dependencies.users import CurrentOperator, TenantSession
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -40,7 +40,7 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 @router.get("/stats", response_model=DashboardStats)
 async def get_dashboard_stats(
     db: TenantSession,
-    _: CurrentAdmin,
+    _: CurrentOperator,
     popup_id: uuid.UUID = Query(..., description="Popup ID to get stats for"),
 ) -> DashboardStats:
     """Get registration statistics for a popup (legacy endpoint)."""
@@ -54,7 +54,7 @@ async def get_dashboard_stats(
 @router.get("/enriched", response_model=EnrichedDashboardStats)
 async def get_enriched_dashboard(
     db: TenantSession,
-    _: CurrentAdmin,
+    _: CurrentOperator,
     popup_id: uuid.UUID = Query(..., description="Popup ID to get stats for"),
 ) -> EnrichedDashboardStats:
     """Get enriched dashboard with KPIs, trends, breakdowns, and distributions."""

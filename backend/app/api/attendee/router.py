@@ -26,7 +26,7 @@ from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, 
 from app.core.dependencies.users import (
     CurrentCheckInOperator,
     CurrentHuman,
-    CurrentWriter,
+    CurrentOperator,
     HumanTenantSession,
     TenantSession,
 )
@@ -474,7 +474,7 @@ async def update_attendee(
     attendee_id: uuid.UUID,
     attendee_in: AttendeeUpdate,
     db: TenantSession,
-    _current_user: CurrentWriter,
+    _current_user: CurrentOperator,
 ) -> AttendeeWithOriginPublic:
     """Update an attendee (BO only)."""
 
@@ -496,7 +496,7 @@ async def update_attendee(
 async def delete_attendee(
     attendee_id: uuid.UUID,
     db: TenantSession,
-    _current_user: CurrentWriter,
+    _current_user: CurrentOperator,
 ) -> None:
     """Delete an attendee (BO only)."""
 

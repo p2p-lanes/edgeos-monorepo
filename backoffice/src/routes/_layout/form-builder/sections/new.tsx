@@ -16,16 +16,16 @@ export const Route = createFileRoute("/_layout/form-builder/sections/new")({
 
 function NewFormSection() {
   const navigate = useNavigate()
-  const { isAdmin, isUserLoading } = useAuth()
+  const { isOperatorOrAbove, isUserLoading } = useAuth()
   const { isContextReady } = useWorkspace()
 
   useEffect(() => {
-    if (!isUserLoading && !isAdmin) {
+    if (!isUserLoading && !isOperatorOrAbove) {
       navigate({ to: "/form-builder" })
     }
-  }, [isAdmin, isUserLoading, navigate])
+  }, [isOperatorOrAbove, isUserLoading, navigate])
 
-  if (isUserLoading || !isAdmin) {
+  if (isUserLoading || !isOperatorOrAbove) {
     return null
   }
 

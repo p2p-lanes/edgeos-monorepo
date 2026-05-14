@@ -16,8 +16,8 @@ from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, 
 from app.core.dependencies.tenants import PublicTenant
 from app.core.dependencies.users import (
     CurrentHuman,
+    CurrentOperator,
     CurrentUser,
-    CurrentWriter,
     SessionDep,
     TenantSession,
 )
@@ -122,7 +122,7 @@ async def validate_coupon(
 async def create_coupon(
     coupon_in: CouponCreate,
     db: TenantSession,
-    current_user: CurrentWriter,
+    current_user: CurrentOperator,
 ) -> CouponPublic:
     """Create a new coupon (BO only)."""
 
@@ -167,7 +167,7 @@ async def update_coupon(
     coupon_id: uuid.UUID,
     coupon_in: CouponUpdate,
     db: TenantSession,
-    _current_user: CurrentWriter,
+    _current_user: CurrentOperator,
 ) -> CouponPublic:
     """Update a coupon (BO only)."""
 
@@ -196,7 +196,7 @@ async def update_coupon(
 async def delete_coupon(
     coupon_id: uuid.UUID,
     db: TenantSession,
-    _current_user: CurrentWriter,
+    _current_user: CurrentOperator,
 ) -> None:
     """Delete a coupon (BO only)."""
 

@@ -1,6 +1,7 @@
 "use client"
 
 import {
+  CalendarDays,
   CheckCircle,
   Clock,
   Crown,
@@ -18,6 +19,7 @@ import { useTranslation } from "react-i18next"
 
 import type { EventPublic } from "@/client"
 import { Badge } from "@/components/ui/badge"
+import { CoverImage } from "./CoverImage"
 import type { EventsScrollSnapshot } from "./eventsViewState"
 import { summarizeRrule } from "./summarizeRrule"
 
@@ -162,10 +164,15 @@ export function ListBody({
                   })
                 }
               }
+              const thumbUrl = event.cover_url || event.venue_image_url || null
               return (
                 <div
                   key={event.id}
-                  id={`event-card-${event.id}`}
+                  id={
+                    event.occurrence_id
+                      ? `event-card-${event.id}__${event.start_time}`
+                      : `event-card-${event.id}`
+                  }
                   className={cardClass}
                 >
                   <Link
@@ -175,71 +182,89 @@ export function ListBody({
                       isAuthed ? "block p-3 sm:p-4 pb-11" : "block p-3 sm:p-4"
                     }
                   >
-                    <div className="flex items-start justify-between gap-2 mb-1 pr-8">
-                      <h3 className="font-medium text-sm sm:text-base flex items-center gap-1.5">
-                        {isOwner && (
-                          <Crown
-                            className="h-3.5 w-3.5 shrink-0 text-amber-500"
-                            aria-label={t("events.list.owned_title")}
-                          />
-                        )}
-                        <span>{event.title}</span>
-                      </h3>
-                      {isAuthed && (
-                        <Badge
-                          variant="secondary"
-                          className={statusColors[event.status as string] ?? ""}
-                        >
-                          {t(`events.status.${event.status}`)}
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Clock className="h-3 w-3" />
-                      <span>
-                        {formatTime(event.start_time)} –{" "}
-                        {formatTime(event.end_time)}
-                      </span>
-                    </div>
-                    {event.venue_title && (
-                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
-                        <MapPin className="h-3 w-3" />
-                        <span className="truncate">
-                          {event.venue_title}
-                          {event.venue_location
-                            ? ` · ${event.venue_location}`
-                            : ""}
-                        </span>
+                    <div className="flex items-start gap-3">
+                      <div className="h-14 w-14 sm:h-16 sm:w-16 shrink-0 rounded-lg overflow-hidden">
+                        <CoverImage
+                          src={thumbUrl}
+                          alt={event.title}
+                          className="w-full h-full object-cover"
+                          fallback={
+                            <CalendarDays className="h-5 w-5 text-muted-foreground/40" />
+                          }
+                        />
                       </div>
-                    )}
-                    {(event.rrule || event.recurrence_master_id) && (
-                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
-                        <Repeat className="h-3 w-3" />
-                        <span className="truncate">
-                          {summarizeRrule(event.rrule) ??
-                            t("events.list.part_of_recurring_series")}
-                        </span>
-                      </div>
-                    )}
-                    {event.track_title && (
-                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
-                        <Layers className="h-3 w-3" />
-                        <span className="truncate">{event.track_title}</span>
-                      </div>
-                    )}
-                    {event.tags && event.tags.length > 0 && (
-                      <div className="flex items-center gap-1 mt-1.5 flex-wrap">
-                        {event.tags.slice(0, 3).map((tag: string) => (
-                          <span
-                            key={tag}
-                            className="inline-flex items-center gap-0.5 text-[10px] bg-muted px-1.5 py-0.5 rounded"
-                          >
-                            <Tag className="h-2.5 w-2.5" />
-                            {tag}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2 mb-1 pr-8">
+                          <h3 className="font-medium text-sm sm:text-base flex items-center gap-1.5">
+                            {isOwner && (
+                              <Crown
+                                className="h-3.5 w-3.5 shrink-0 text-amber-500"
+                                aria-label={t("events.list.owned_title")}
+                              />
+                            )}
+                            <span>{event.title}</span>
+                          </h3>
+                          {isAuthed && (
+                            <Badge
+                              variant="secondary"
+                              className={
+                                statusColors[event.status as string] ?? ""
+                              }
+                            >
+                              {t(`events.status.${event.status}`)}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <Clock className="h-3 w-3" />
+                          <span>
+                            {formatTime(event.start_time)} –{" "}
+                            {formatTime(event.end_time)}
                           </span>
-                        ))}
+                        </div>
+                        {event.venue_title && (
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                            <MapPin className="h-3 w-3" />
+                            <span className="truncate">
+                              {event.venue_title}
+                              {event.venue_location
+                                ? ` · ${event.venue_location}`
+                                : ""}
+                            </span>
+                          </div>
+                        )}
+                        {(event.rrule || event.recurrence_master_id) && (
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                            <Repeat className="h-3 w-3" />
+                            <span className="truncate">
+                              {summarizeRrule(event.rrule) ??
+                                t("events.list.part_of_recurring_series")}
+                            </span>
+                          </div>
+                        )}
+                        {event.track_title && (
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                            <Layers className="h-3 w-3" />
+                            <span className="truncate">
+                              {event.track_title}
+                            </span>
+                          </div>
+                        )}
+                        {event.tags && event.tags.length > 0 && (
+                          <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+                            {event.tags.slice(0, 3).map((tag: string) => (
+                              <span
+                                key={tag}
+                                className="inline-flex items-center gap-0.5 text-[10px] bg-muted px-1.5 py-0.5 rounded"
+                              >
+                                <Tag className="h-2.5 w-2.5" />
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    )}
+                    </div>
                   </Link>
                   {isAuthed && (
                     <div className="absolute bottom-2 right-2 flex items-center gap-1.5">

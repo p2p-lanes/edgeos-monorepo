@@ -99,7 +99,7 @@ function ProductActionsMenu({ product }: { product: ProductPublic }) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
-  const { isAdmin } = useAuth()
+  const { isOperatorOrAbove } = useAuth()
 
   const deleteMutation = useMutation({
     mutationFn: () => ProductsService.deleteProduct({ productId: product.id }),
@@ -122,7 +122,7 @@ function ProductActionsMenu({ product }: { product: ProductPublic }) {
         <DropdownMenuContent align="end">
           <DropdownMenuItem asChild>
             <Link to="/products/$id/edit" params={{ id: product.id }}>
-              {isAdmin ? (
+              {isOperatorOrAbove ? (
                 <>
                   <Pencil className="mr-2 h-4 w-4" />
                   Edit
@@ -135,7 +135,7 @@ function ProductActionsMenu({ product }: { product: ProductPublic }) {
               )}
             </Link>
           </DropdownMenuItem>
-          {isAdmin && (
+          {isOperatorOrAbove && (
             <DropdownMenuItem
               variant="destructive"
               onClick={() => {
@@ -290,7 +290,7 @@ function ProductsTableContent() {
 }
 
 function Products() {
-  const { isAdmin } = useAuth()
+  const { isOperatorOrAbove } = useAuth()
   const { isContextReady } = useWorkspace()
 
   return (
@@ -304,7 +304,7 @@ function Products() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {isAdmin && isContextReady && <AddProductButton />}
+          {isOperatorOrAbove && isContextReady && <AddProductButton />}
         </div>
       </div>
       {isContextReady && (

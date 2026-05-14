@@ -14,16 +14,16 @@ export const Route = createFileRoute("/_layout/coupons/new")({
 
 function NewCoupon() {
   const navigate = useNavigate()
-  const { isAdmin, isUserLoading } = useAuth()
+  const { isOperatorOrAbove, isUserLoading } = useAuth()
 
   // Redirect viewers to coupons list - they cannot create new coupons
   useEffect(() => {
-    if (!isUserLoading && !isAdmin) {
+    if (!isUserLoading && !isOperatorOrAbove) {
       navigate({ to: "/coupons" })
     }
-  }, [isAdmin, isUserLoading, navigate])
+  }, [isOperatorOrAbove, isUserLoading, navigate])
 
-  if (isUserLoading || !isAdmin) {
+  if (isUserLoading || !isOperatorOrAbove) {
     return null
   }
 

@@ -8,8 +8,8 @@ from app.api.track import crud
 from app.api.track.schemas import TrackCreate, TrackPublic, TrackUpdate
 from app.core.dependencies.users import (
     CurrentHuman,
+    CurrentOperator,
     CurrentUser,
-    CurrentWriter,
     HumanTenantSession,
     TenantSession,
 )
@@ -71,7 +71,7 @@ async def get_track(
 async def create_track(
     track_in: TrackCreate,
     db: TenantSession,
-    current_user: CurrentWriter,
+    current_user: CurrentOperator,
 ) -> TrackPublic:
     from app.api.popup.crud import popups_crud
     from app.api.shared.enums import UserRole
@@ -106,7 +106,7 @@ async def update_track(
     track_id: uuid.UUID,
     track_in: TrackUpdate,
     db: TenantSession,
-    _: CurrentWriter,
+    _: CurrentOperator,
 ) -> TrackPublic:
     track = crud.tracks_crud.get(db, track_id)
     if not track:
@@ -121,7 +121,7 @@ async def update_track(
 async def delete_track(
     track_id: uuid.UUID,
     db: TenantSession,
-    _: CurrentWriter,
+    _: CurrentOperator,
 ) -> None:
     track = crud.tracks_crud.get(db, track_id)
     if not track:

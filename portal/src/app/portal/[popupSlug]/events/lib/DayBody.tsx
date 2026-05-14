@@ -672,7 +672,11 @@ export function DayBody({
                         return (
                           <Link
                             key={event.id}
-                            id={`event-card-${event.id}`}
+                            id={
+                              event.occurrence_id
+                                ? `event-card-${event.id}__${event.start_time}`
+                                : `event-card-${event.id}`
+                            }
                             href={eventHref(event)}
                             onClick={(e) => handleEventClick(event, e)}
                             className={cn(
@@ -908,7 +912,11 @@ export function DayBody({
                         return (
                           <Link
                             key={event.id}
-                            id={`event-card-${event.id}`}
+                            id={
+                              event.occurrence_id
+                                ? `event-card-${event.id}__${event.start_time}`
+                                : `event-card-${event.id}`
+                            }
                             href={eventHref(event)}
                             onClick={(e) => handleEventClick(event, e)}
                             className={cn(

@@ -62,7 +62,7 @@ function TrackActionsMenu({ track }: { track: TrackPublic }) {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
-  const { isAdmin } = useAuth()
+  const { isOperatorOrAbove } = useAuth()
 
   const deleteMutation = useMutation({
     mutationFn: () => TracksService.deleteTrack({ trackId: track.id }),
@@ -89,7 +89,7 @@ function TrackActionsMenu({ track }: { track: TrackPublic }) {
               to="/events/tracks/$trackId/edit"
               params={{ trackId: track.id }}
             >
-              {isAdmin ? (
+              {isOperatorOrAbove ? (
                 <>
                   <Pencil className="mr-2 h-4 w-4" />
                   Edit
@@ -102,7 +102,7 @@ function TrackActionsMenu({ track }: { track: TrackPublic }) {
               )}
             </Link>
           </DropdownMenuItem>
-          {isAdmin && (
+          {isOperatorOrAbove && (
             <DropdownMenuItem
               variant="destructive"
               onSelect={(e) => e.preventDefault()}

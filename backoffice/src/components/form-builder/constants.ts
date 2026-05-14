@@ -10,6 +10,7 @@ import {
   List,
   ListChecks,
   Mail,
+  Phone,
   Type,
 } from "lucide-react"
 import type { FormFieldPublic, FormSectionPublic } from "@/client"
@@ -74,6 +75,7 @@ export const FIELD_TYPES: FieldTypeDefinition[] = [
   },
   { value: "date", label: "Date", icon: Calendar },
   { value: "email", label: "Email", icon: Mail },
+  { value: "phone", label: "Phone", icon: Phone },
   { value: "url", label: "URL", icon: Link },
 ]
 

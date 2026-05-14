@@ -14,16 +14,16 @@ export const Route = createFileRoute("/_layout/products/new")({
 
 function NewProduct() {
   const navigate = useNavigate()
-  const { isAdmin, isUserLoading } = useAuth()
+  const { isOperatorOrAbove, isUserLoading } = useAuth()
 
   // Redirect viewers to products list - they cannot create new products
   useEffect(() => {
-    if (!isUserLoading && !isAdmin) {
+    if (!isUserLoading && !isOperatorOrAbove) {
       navigate({ to: "/products" })
     }
-  }, [isAdmin, isUserLoading, navigate])
+  }, [isOperatorOrAbove, isUserLoading, navigate])
 
-  if (isUserLoading || !isAdmin) {
+  if (isUserLoading || !isOperatorOrAbove) {
     return null
   }
 

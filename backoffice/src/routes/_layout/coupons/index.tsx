@@ -138,7 +138,7 @@ function DeleteCoupon({
 
 function CouponActionsMenu({ coupon }: { coupon: CouponPublic }) {
   const [open, setOpen] = useState(false)
-  const { isAdmin } = useAuth()
+  const { isOperatorOrAbove } = useAuth()
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
@@ -150,7 +150,7 @@ function CouponActionsMenu({ coupon }: { coupon: CouponPublic }) {
       <DropdownMenuContent align="end">
         <DropdownMenuItem asChild>
           <Link to="/coupons/$id/edit" params={{ id: coupon.id }}>
-            {isAdmin ? (
+            {isOperatorOrAbove ? (
               <>
                 <Pencil className="mr-2 h-4 w-4" />
                 Edit
@@ -163,7 +163,7 @@ function CouponActionsMenu({ coupon }: { coupon: CouponPublic }) {
             )}
           </Link>
         </DropdownMenuItem>
-        {isAdmin && (
+        {isOperatorOrAbove && (
           <DeleteCoupon coupon={coupon} onSuccess={() => setOpen(false)} />
         )}
       </DropdownMenuContent>
@@ -266,7 +266,7 @@ function CouponsTableContent({ popupId }: { popupId: string | null }) {
 }
 
 function Coupons() {
-  const { isAdmin } = useAuth()
+  const { isOperatorOrAbove } = useAuth()
   const { selectedPopupId, isContextReady } = useWorkspace()
 
   return (
@@ -278,7 +278,7 @@ function Coupons() {
             Manage discount codes for your popups
           </p>
         </div>
-        {isAdmin && isContextReady && <AddCouponButton />}
+        {isOperatorOrAbove && isContextReady && <AddCouponButton />}
       </div>
       {!isContextReady ? (
         <WorkspaceAlert resource="coupons" />

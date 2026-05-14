@@ -95,9 +95,9 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
   const { selectedPopupId, isContextReady } = useWorkspace()
-  const { isAdmin } = useAuth()
+  const { isOperatorOrAbove } = useAuth()
   const isEdit = !!defaultValues
-  const readOnly = !isAdmin
+  const readOnly = !isOperatorOrAbove
 
   const [addCategoryOpen, setAddCategoryOpen] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState("")

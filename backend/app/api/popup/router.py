@@ -37,7 +37,7 @@ from app.api.translation.service import (
 from app.core.dependencies.users import (
     CurrentCheckInOperator,
     CurrentHuman,
-    CurrentWriter,
+    CurrentOperator,
     HumanTenantSession,
     SessionDep,
     TenantSession,
@@ -167,7 +167,7 @@ async def get_popup(
 async def create_popup(
     popup_in: PopupCreate,
     db: TenantSession,
-    current_user: CurrentWriter,
+    current_user: CurrentOperator,
     x_tenant_id: Annotated[str | None, Header(alias="X-Tenant-Id")] = None,
 ) -> PopupAdmin:
     if current_user.role == UserRole.SUPERADMIN:
@@ -215,7 +215,7 @@ async def update_popup(
     popup_id: uuid.UUID,
     popup_in: PopupUpdate,
     db: TenantSession,
-    _current_user: CurrentWriter,
+    _current_user: CurrentOperator,
 ) -> PopupAdmin:
     popup = crud.get(db, popup_id)
 
@@ -339,7 +339,7 @@ async def update_popup(
 async def delete_popup(
     popup_id: uuid.UUID,
     db: TenantSession,
-    _current_user: CurrentWriter,
+    _current_user: CurrentOperator,
 ) -> None:
     popup = crud.get(db, popup_id)
 

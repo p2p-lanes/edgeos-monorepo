@@ -15,8 +15,8 @@ from app.api.event_participant.schemas import (
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
     CurrentHuman,
+    CurrentOperator,
     CurrentUser,
-    CurrentWriter,
     HumanTenantSession,
     TenantSession,
 )
@@ -87,7 +87,7 @@ async def list_participants(
 async def admin_add_participant(
     participant_in: EventParticipantCreate,
     db: TenantSession,
-    current_user: CurrentWriter,
+    current_user: CurrentOperator,
 ) -> EventParticipantPublic:
     """Admin adds a participant to an event (backoffice)."""
     from app.api.event.crud import events_crud
@@ -135,7 +135,7 @@ async def update_participant(
     participant_id: uuid.UUID,
     participant_in: EventParticipantUpdate,
     db: TenantSession,
-    _: CurrentWriter,
+    _: CurrentOperator,
 ) -> EventParticipantPublic:
     """Update a participant (backoffice)."""
 
@@ -154,7 +154,7 @@ async def update_participant(
 async def delete_participant(
     participant_id: uuid.UUID,
     db: TenantSession,
-    _: CurrentWriter,
+    _: CurrentOperator,
 ) -> None:
     """Delete a participant (backoffice)."""
 

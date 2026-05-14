@@ -7,7 +7,7 @@ from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.api.user import crud
 from app.api.user.schemas import UserCreate, UserPublic, UserUpdate
-from app.core.dependencies.users import CurrentAdmin, CurrentUser, SessionDep
+from app.core.dependencies.users import CurrentOperator, CurrentUser, SessionDep
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -15,11 +15,17 @@ ROLE_HIERARCHY = {
     UserRole.SUPERADMIN: [
         UserRole.SUPERADMIN,
         UserRole.ADMIN,
+        UserRole.OPERATOR,
         UserRole.VIEWER,
         UserRole.CHECK_IN_CONTROLLER,
     ],
     UserRole.ADMIN: [
         UserRole.ADMIN,
+        UserRole.OPERATOR,
+        UserRole.VIEWER,
+        UserRole.CHECK_IN_CONTROLLER,
+    ],
+    UserRole.OPERATOR: [
         UserRole.VIEWER,
         UserRole.CHECK_IN_CONTROLLER,
     ],
@@ -31,19 +37,35 @@ ROLE_HIERARCHY = {
 @router.get("", response_model=ListModel[UserPublic])
 async def list_users(
     db: SessionDep,
-    current_user: CurrentAdmin,
+    current_user: CurrentOperator,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
     tenant_id: uuid.UUID | None = None,
     role: UserRole | None = None,
     search: str | None = None,
 ) -> ListModel[UserPublic]:
-    # Admins can only see users in their tenant
-    if current_user.role == UserRole.ADMIN:
+    # Non-superadmins are scoped to their own tenant
+    if current_user.role != UserRole.SUPERADMIN:
         tenant_id = current_user.tenant_id
 
+    # Operators only see users they're allowed to manage (strictly lower roles)
+    roles_in: list[UserRole] | None = None
+    if current_user.role == UserRole.OPERATOR:
+        roles_in = ROLE_HIERARCHY[UserRole.OPERATOR]
+        if role is not None and role not in roles_in:
+            return ListModel[UserPublic](
+                results=[],
+                paging=Paging(offset=skip, limit=limit, total=0),
+            )
+
     users, total = crud.find_filtered(
-        db, tenant_id=tenant_id, role=role, skip=skip, limit=limit, search=search
+        db,
+        tenant_id=tenant_id,
+        role=role,
+        skip=skip,
+        limit=limit,
+        search=search,
+        roles_in=roles_in,
     )
 
     return ListModel[UserPublic](
@@ -67,7 +89,7 @@ async def get_current_user_info(
 async def get_user(
     user_id: uuid.UUID,
     db: SessionDep,
-    current_user: CurrentAdmin,
+    current_user: CurrentOperator,
 ) -> UserPublic:
     user = crud.get(db, user_id)
 
@@ -77,11 +99,24 @@ async def get_user(
             detail="User not found",
         )
 
-    # Admins can only view users in their tenant
-    if current_user.role == UserRole.ADMIN and user.tenant_id != current_user.tenant_id:
+    # Non-superadmins can only view users in their tenant
+    if (
+        current_user.role != UserRole.SUPERADMIN
+        and user.tenant_id != current_user.tenant_id
+    ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Cannot access users from other tenants",
+        )
+
+    # Operators can only view users whose role is within their hierarchy
+    if (
+        current_user.role == UserRole.OPERATOR
+        and user.role not in ROLE_HIERARCHY[UserRole.OPERATOR]
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot access this user",
         )
 
     return UserPublic.model_validate(user)
@@ -91,7 +126,7 @@ async def get_user(
 async def create_user(
     user_in: UserCreate,
     db: SessionDep,
-    current_user: CurrentAdmin,
+    current_user: CurrentOperator,
 ) -> UserPublic:
     allowed_roles = ROLE_HIERARCHY.get(current_user.role, [])
     if user_in.role not in allowed_roles:
@@ -132,7 +167,7 @@ async def update_user(
     user_id: uuid.UUID,
     user_in: UserUpdate,
     db: SessionDep,
-    current_user: CurrentAdmin,
+    current_user: CurrentOperator,
 ) -> UserPublic:
     user = crud.get(db, user_id)
 
@@ -142,15 +177,28 @@ async def update_user(
             detail="User not found",
         )
 
-    # Admins can only update users in their tenant
-    if current_user.role == UserRole.ADMIN and user.tenant_id != current_user.tenant_id:
+    # Non-superadmins can only update users in their tenant
+    if (
+        current_user.role != UserRole.SUPERADMIN
+        and user.tenant_id != current_user.tenant_id
+    ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Cannot update users from other tenants",
         )
 
-    # Admins cannot change roles to superadmin or promote to a higher level
-    if current_user.role == UserRole.ADMIN and user_in.role:
+    # Operators can only update users whose role is within their hierarchy
+    if (
+        current_user.role == UserRole.OPERATOR
+        and user.role not in ROLE_HIERARCHY[UserRole.OPERATOR]
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot update this user",
+        )
+
+    # Non-superadmins cannot assign roles outside their hierarchy
+    if current_user.role != UserRole.SUPERADMIN and user_in.role:
         allowed_roles = ROLE_HIERARCHY.get(current_user.role, [])
         if user_in.role not in allowed_roles:
             raise HTTPException(
@@ -176,7 +224,7 @@ async def update_user(
 async def delete_user(
     user_id: uuid.UUID,
     db: SessionDep,
-    current_user: CurrentAdmin,
+    current_user: CurrentOperator,
 ) -> None:
     user = crud.get(db, user_id)
 
@@ -186,8 +234,11 @@ async def delete_user(
             detail="User not found",
         )
 
-    # Admins can only delete users in their tenant
-    if current_user.role == UserRole.ADMIN and user.tenant_id != current_user.tenant_id:
+    # Non-superadmins can only delete users in their tenant
+    if (
+        current_user.role != UserRole.SUPERADMIN
+        and user.tenant_id != current_user.tenant_id
+    ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Cannot delete users from other tenants",
@@ -202,6 +253,16 @@ async def delete_user(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Cannot delete other admins",
+        )
+
+    # Operators can only delete users whose role is within their hierarchy
+    if (
+        current_user.role == UserRole.OPERATOR
+        and user.role not in ROLE_HIERARCHY[UserRole.OPERATOR]
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot delete this user",
         )
 
     if user.id == current_user.id:

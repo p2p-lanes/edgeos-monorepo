@@ -85,16 +85,16 @@ export function EditorContent({ templateType }: { templateType: string }) {
 function EditEmailTemplate() {
   const { type } = Route.useParams()
   const { needsTenantSelection } = useWorkspace()
-  const { isAdmin, isUserLoading } = useAuth()
+  const { isOperatorOrAbove, isUserLoading } = useAuth()
   const navigate = useNavigate()
 
   useEffect(() => {
-    if (!isUserLoading && !isAdmin) {
+    if (!isUserLoading && !isOperatorOrAbove) {
       navigate({ to: "/email-templates" })
     }
-  }, [isAdmin, isUserLoading, navigate])
+  }, [isOperatorOrAbove, isUserLoading, navigate])
 
-  if (isUserLoading || !isAdmin) {
+  if (isUserLoading || !isOperatorOrAbove) {
     return null
   }
 

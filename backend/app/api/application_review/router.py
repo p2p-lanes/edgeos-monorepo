@@ -14,7 +14,7 @@ from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.api.user.models import Users
 from app.core.db import engine
-from app.core.dependencies.users import CurrentAdmin, CurrentWriter, TenantSession
+from app.core.dependencies.users import CurrentOperator, TenantSession
 from app.services.email_helpers import send_application_status_email
 
 router = APIRouter(prefix="/applications", tags=["application-reviews"])
@@ -85,7 +85,7 @@ def _reviews_to_public_list(reviews: list) -> list[ApplicationReviewPublic]:
 async def list_reviews(
     application_id: uuid.UUID,
     db: TenantSession,
-    _: CurrentAdmin,
+    _: CurrentOperator,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[ApplicationReviewPublic]:
@@ -114,7 +114,7 @@ async def list_reviews(
 async def get_review_summary(
     application_id: uuid.UUID,
     db: TenantSession,
-    _: CurrentAdmin,
+    _: CurrentOperator,
 ) -> ReviewSummary:
     """Get a summary of reviews for an application."""
     from app.api.application.crud import applications_crud
@@ -166,7 +166,7 @@ async def submit_review(
     application_id: uuid.UUID,
     review_in: ApplicationReviewCreate,
     db: TenantSession,
-    current_user: CurrentWriter,
+    current_user: CurrentOperator,
 ) -> ApplicationReviewPublic:
     """Submit or update a review for an application.
 
@@ -227,7 +227,7 @@ async def submit_review(
 @router.get("/pending-review", response_model=ListModel)
 async def list_pending_reviews(
     db: TenantSession,
-    current_user: CurrentWriter,
+    current_user: CurrentOperator,
     popup_id: uuid.UUID | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
@@ -290,7 +290,7 @@ async def list_pending_reviews(
 @router.get("/my-reviews", response_model=ListModel[ApplicationReviewPublic])
 async def list_my_reviews(
     db: TenantSession,
-    current_user: CurrentWriter,
+    current_user: CurrentOperator,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[ApplicationReviewPublic]:

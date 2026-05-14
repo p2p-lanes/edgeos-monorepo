@@ -99,7 +99,7 @@ export const ApiKeyCreateSchema = {
         scopes: {
             items: {
                 type: 'string',
-                enum: ['events:read', 'events:write', 'rsvp:write']
+                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:write']
             },
             type: 'array',
             title: 'Scopes'
@@ -129,7 +129,7 @@ export const ApiKeyCreatedSchema = {
         scopes: {
             items: {
                 type: 'string',
-                enum: ['events:read', 'events:write', 'rsvp:write']
+                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:write']
             },
             type: 'array',
             title: 'Scopes'
@@ -205,7 +205,7 @@ export const ApiKeyPublicSchema = {
         scopes: {
             items: {
                 type: 'string',
-                enum: ['events:read', 'events:write', 'rsvp:write']
+                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:write']
             },
             type: 'array',
             title: 'Scopes'
@@ -14807,7 +14807,7 @@ export const UserPublicSchema = {
 
 export const UserRoleSchema = {
     type: 'string',
-    enum: ['superadmin', 'admin', 'viewer', 'check_in_controller'],
+    enum: ['superadmin', 'admin', 'operator', 'viewer', 'check_in_controller'],
     title: 'UserRole'
 } as const;
 

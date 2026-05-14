@@ -55,6 +55,11 @@ const SCOPE_OPTIONS: Array<{
     label: "RSVP to events",
     description: "Register or cancel attendance for events.",
   },
+  {
+    value: "venues:write",
+    label: "Manage own venues",
+    description: "Create, edit, and delete venues you own.",
+  },
 ]
 
 export default function ApiKeysPage() {
@@ -93,7 +98,9 @@ export default function ApiKeysPage() {
   const onCreate = async () => {
     const name = newKeyName.trim()
     if (!name) return
-    const requiresExpiry = selectedScopes.includes("events:write")
+    const requiresExpiry =
+      selectedScopes.includes("events:write") ||
+      selectedScopes.includes("venues:write")
     const expiresAt = requiresExpiry
       ? new Date(
           Date.now() + WRITE_SCOPE_LIFETIME_DAYS * 24 * 60 * 60 * 1000,

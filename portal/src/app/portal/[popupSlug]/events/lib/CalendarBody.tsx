@@ -359,7 +359,11 @@ export function CalendarBody({
                   return (
                     <div
                       key={event.id}
-                      id={`event-card-${event.id}`}
+                      id={
+                        event.occurrence_id
+                          ? `event-card-${event.id}__${event.start_time}`
+                          : `event-card-${event.id}`
+                      }
                       className={cn(
                         "relative rounded-xl border bg-card hover:shadow-md transition-shadow overflow-hidden",
                         isHighlighted &&

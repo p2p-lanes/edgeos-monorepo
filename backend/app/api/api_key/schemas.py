@@ -5,7 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from app.core.security import ApiKeyScope
 
-ALLOWED_API_KEY_SCOPES = {"events:read", "events:write", "rsvp:write"}
+ALLOWED_API_KEY_SCOPES = {"events:read", "events:write", "rsvp:write", "venues:write"}
 DEFAULT_API_KEY_SCOPES: list[ApiKeyScope] = ["events:read"]
 MAX_WRITE_SCOPE_LIFETIME_DAYS = 30
 
@@ -49,7 +49,8 @@ class ApiKeyCreate(BaseModel):
 
     @model_validator(mode="after")
     def require_expiry_for_write_scope(self) -> "ApiKeyCreate":
-        if "events:write" in self.scopes and self.expires_at is None:
+        write_scopes = {"events:write", "venues:write"}
+        if write_scopes & set(self.scopes) and self.expires_at is None:
             raise ValueError("Write-capable API keys require an expiry date")
         return self
 

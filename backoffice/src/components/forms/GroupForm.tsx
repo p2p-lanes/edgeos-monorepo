@@ -42,9 +42,9 @@ export function GroupForm({ defaultValues, onSuccess }: GroupFormProps) {
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
   const { selectedPopupId, isContextReady } = useWorkspace()
-  const { isAdmin } = useAuth()
+  const { isOperatorOrAbove } = useAuth()
   const isEdit = !!defaultValues
-  const readOnly = !isAdmin
+  const readOnly = !isOperatorOrAbove
 
   const { data: popupData } = useQuery({
     queryKey: ["popups", defaultValues?.popup_id ?? selectedPopupId],

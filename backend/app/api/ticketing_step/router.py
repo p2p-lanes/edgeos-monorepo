@@ -12,8 +12,8 @@ from app.api.ticketing_step.schemas import (
 )
 from app.core.dependencies.users import (
     CurrentHuman,
+    CurrentOperator,
     CurrentUser,
-    CurrentWriter,
     HumanTenantSession,
     TenantSession,
 )
@@ -125,7 +125,7 @@ def _validate_template_config_fk(
 async def create_ticketing_step(
     step_in: TicketingStepCreate,
     db: TenantSession,
-    current_user: CurrentWriter,
+    current_user: CurrentOperator,
 ) -> TicketingStepPublic:
     if current_user.role == UserRole.SUPERADMIN:
         from app.api.popup.crud import popups_crud
@@ -163,7 +163,7 @@ async def update_ticketing_step(
     step_id: uuid.UUID,
     step_in: TicketingStepUpdate,
     db: TenantSession,
-    _current_user: CurrentWriter,
+    _current_user: CurrentOperator,
 ) -> TicketingStepPublic:
     step = crud.ticketing_steps_crud.get(db, step_id)
 
@@ -198,7 +198,7 @@ async def update_ticketing_step(
 async def delete_ticketing_step(
     step_id: uuid.UUID,
     db: TenantSession,
-    _current_user: CurrentWriter,
+    _current_user: CurrentOperator,
 ) -> None:
     step = crud.ticketing_steps_crud.get(db, step_id)
 

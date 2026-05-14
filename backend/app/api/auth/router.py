@@ -33,7 +33,12 @@ async def user_login(
     email, expiration_minutes = await login_user(
         session=session,
         email=request.email,
-        allowed_roles={UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.VIEWER},
+        allowed_roles={
+            UserRole.SUPERADMIN,
+            UserRole.ADMIN,
+            UserRole.OPERATOR,
+            UserRole.VIEWER,
+        },
     )
 
     return AuthCodeSentResponse(
@@ -56,7 +61,12 @@ async def user_authenticate(
         session=session,
         email=request.email,
         code=request.code,
-        allowed_roles={UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.VIEWER},
+        allowed_roles={
+            UserRole.SUPERADMIN,
+            UserRole.ADMIN,
+            UserRole.OPERATOR,
+            UserRole.VIEWER,
+        },
     )
 
     access_token = create_access_token(subject=user.id, token_type="user")
@@ -71,7 +81,7 @@ async def scanner_login(
     session: SessionDep,
 ) -> AuthCodeSentResponse:
     """
-    Initiate scanner login. Accepts CHECK_IN_CONTROLLER, ADMIN, and SUPERADMIN.
+    Initiate scanner login. Accepts CHECK_IN_CONTROLLER, OPERATOR, ADMIN, and SUPERADMIN.
     VIEWER is rejected pre-OTP — must not receive a code they can't redeem.
     """
     email, expiration_minutes = await login_user(
@@ -80,6 +90,7 @@ async def scanner_login(
         allowed_roles={
             UserRole.SUPERADMIN,
             UserRole.ADMIN,
+            UserRole.OPERATOR,
             UserRole.CHECK_IN_CONTROLLER,
         },
     )
@@ -98,7 +109,7 @@ async def scanner_authenticate(
 ) -> Token:
     """
     Authenticate a scanner operator and return a JWT token.
-    Only SUPERADMIN, ADMIN, and CHECK_IN_CONTROLLER are accepted.
+    Only SUPERADMIN, ADMIN, OPERATOR, and CHECK_IN_CONTROLLER are accepted.
     VIEWER is rejected with 403.
     """
     user = await authenticate_user(
@@ -108,6 +119,7 @@ async def scanner_authenticate(
         allowed_roles={
             UserRole.SUPERADMIN,
             UserRole.ADMIN,
+            UserRole.OPERATOR,
             UserRole.CHECK_IN_CONTROLLER,
         },
     )

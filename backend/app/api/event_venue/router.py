@@ -735,6 +735,42 @@ async def update_portal_venue(
     return EventVenuePublic.model_validate(venue)
 
 
+@router.delete(
+    "/portal/venues/{venue_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_portal_venue(
+    venue_id: uuid.UUID,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+) -> None:
+    """Let a human delete a venue they created. Blocked if the venue still
+    has linked events — those must be removed/reassigned first."""
+    from app.api.event.models import Events
+    from app.api.event.schemas import EventStatus
+
+    venue = _get_venue_or_404(db, venue_id)
+    if venue.owner_id != current_human.id:
+        raise HTTPException(
+            status_code=403,
+            detail="Only the venue's owner can delete it from the portal",
+        )
+
+    active_event = db.exec(
+        select(Events)
+        .where(Events.venue_id == venue.id)
+        .where(Events.status.notin_([EventStatus.CANCELLED, EventStatus.REJECTED]))
+        .limit(1)
+    ).first()
+    if active_event:
+        raise HTTPException(
+            status_code=409,
+            detail="Venue has linked events; remove or reassign them before deleting.",
+        )
+
+    crud.event_venues_crud.delete(db, venue)
+
+
 @router.post(
     "/portal/venues",
     response_model=EventVenuePublic,

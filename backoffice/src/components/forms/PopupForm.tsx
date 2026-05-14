@@ -128,9 +128,9 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
-  const { isAdmin } = useAuth()
+  const { isOperatorOrAbove } = useAuth()
   const isEdit = !!defaultValues
-  const readOnly = !isAdmin
+  const readOnly = !isOperatorOrAbove
 
   const createMutation = useMutation({
     mutationFn: (data: PopupCreate) =>

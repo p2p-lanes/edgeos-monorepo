@@ -76,15 +76,20 @@ export default function EventDetailPage() {
   // it from the URL, so it survives a refresh on this detail page but
   // never sticks around on the list once used.
   const fromSearch = searchParams.get("from") ?? ""
-  const focusQs = `focus=${encodeURIComponent(params.eventId)}`
-  const backHref = fromSearch
-    ? `/portal/${city?.slug}/events?${fromSearch}&${focusQs}`
-    : `/portal/${city?.slug}/events?${focusQs}`
   // For an expanded recurring instance, the calendar passes the occurrence's
   // ISO start time via ?occ=. We render that in place of the master's
   // start_time (and shift end_time by the same offset) so the user sees the
   // specific instance they clicked, not the series' first occurrence.
   const occParam = searchParams.get("occ")
+  // Stamp focusOcc alongside focus so the list can scroll to the *specific*
+  // occurrence card on return — without it, all occurrences of a recurring
+  // series share the same event id and the list lands on the first one.
+  const focusQs = occParam
+    ? `focus=${encodeURIComponent(params.eventId)}&focusOcc=${encodeURIComponent(occParam)}`
+    : `focus=${encodeURIComponent(params.eventId)}`
+  const backHref = fromSearch
+    ? `/portal/${city?.slug}/events?${fromSearch}&${focusQs}`
+    : `/portal/${city?.slug}/events?${focusQs}`
   const queryClient = useQueryClient()
   const { timezone, formatTime, formatDateFull } = useEventTimezone(city?.id)
 

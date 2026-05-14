@@ -25,7 +25,7 @@ export type AITranslateRequest = {
 export type ApiKeyCreate = {
     name: string;
     expires_at?: (string | null);
-    scopes?: Array<('events:read' | 'events:write' | 'rsvp:write')>;
+    scopes?: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:write')>;
 };
 
 /**
@@ -36,7 +36,7 @@ export type ApiKeyCreated = {
     id: string;
     name: string;
     prefix: string;
-    scopes: Array<('events:read' | 'events:write' | 'rsvp:write')>;
+    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:write')>;
     created_at: string;
     last_used_at?: (string | null);
     expires_at?: (string | null);
@@ -51,7 +51,7 @@ export type ApiKeyPublic = {
     id: string;
     name: string;
     prefix: string;
-    scopes: Array<('events:read' | 'events:write' | 'rsvp:write')>;
+    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:write')>;
     created_at: string;
     last_used_at?: (string | null);
     expires_at?: (string | null);
@@ -2927,7 +2927,7 @@ export type UserPublic = {
     id: string;
 };
 
-export type UserRole = 'superadmin' | 'admin' | 'viewer' | 'check_in_controller';
+export type UserRole = 'superadmin' | 'admin' | 'operator' | 'viewer' | 'check_in_controller';
 
 /**
  * Statuses that users can set (subset of ApplicationStatus).
@@ -3829,6 +3829,7 @@ export type EventsListEventsData = {
      * Maximum number of items to return
      */
     limit?: number;
+    locationKind?: (string | null);
     popupId?: (string | null);
     search?: (string | null);
     /**
@@ -4253,6 +4254,12 @@ export type EventVenuesUpdatePortalVenueData = {
 };
 
 export type EventVenuesUpdatePortalVenueResponse = (EventVenuePublic);
+
+export type EventVenuesDeletePortalVenueData = {
+    venueId: string;
+};
+
+export type EventVenuesDeletePortalVenueResponse = (void);
 
 export type FormFieldsListFormFieldsData = {
     /**

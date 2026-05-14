@@ -109,8 +109,8 @@ export function TrackForm({ defaultValues, onSuccess }: TrackFormProps) {
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
   const { selectedPopupId } = useWorkspace()
-  const { isAdmin } = useAuth()
-  const readOnly = !isAdmin
+  const { isOperatorOrAbove } = useAuth()
+  const readOnly = !isOperatorOrAbove
   const isEdit = !!defaultValues
 
   const createMutation = useMutation({

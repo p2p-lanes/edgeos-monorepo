@@ -34,6 +34,7 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
         start_after: datetime | None = None,
         start_before: datetime | None = None,
         venue_id: uuid.UUID | None = None,
+        location_kind: str | None = None,
         track_ids: list[uuid.UUID] | None = None,
         tags: list[str] | None = None,
         search: str | None = None,
@@ -60,6 +61,14 @@ class EventsCRUD(BaseCRUD[Events, EventCreate, EventUpdate]):
             statement = statement.where(Events.kind == kind)
         if venue_id is not None:
             statement = statement.where(Events.venue_id == venue_id)
+        if location_kind == "custom":
+            # No venue + a custom_location_name (e.g. a Google Maps link).
+            statement = statement.where(Events.venue_id.is_(None))  # type: ignore[union-attr]
+            statement = statement.where(Events.custom_location_name.is_not(None))  # type: ignore[union-attr]
+        elif location_kind == "meeting":
+            # Online-only meetings: no venue and no custom location.
+            statement = statement.where(Events.venue_id.is_(None))  # type: ignore[union-attr]
+            statement = statement.where(Events.custom_location_name.is_(None))  # type: ignore[union-attr]
         if track_ids:
             statement = statement.where(col(Events.track_id).in_(track_ids))
         if tags:
