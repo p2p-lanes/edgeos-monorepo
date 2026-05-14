@@ -37,9 +37,13 @@ interface DialogState {
   enabledInPassesFlow: boolean
   /** Empty string = unlimited (null on the server). */
   maxPerApplication: string
-  /** Raw JSON text the admin edits; parsed on save. */
-  requiredFieldsJson: string
-  requiredFieldsError: string | null
+  // High-level form fields the admin toggles. We serialize/deserialize these
+  // to/from the underlying `required_fields` JSONB so the dialog stays simple
+  // for the two cases we actually have: spouse (email+gender), kid (age+gender).
+  requireEmail: boolean
+  requireGender: boolean
+  askAge: boolean
+  maxAge: string
 }
 
 const EMPTY_DIALOG: DialogState = {
@@ -50,8 +54,113 @@ const EMPTY_DIALOG: DialogState = {
   sortOrder: "",
   enabledInPassesFlow: true,
   maxPerApplication: "",
-  requiredFieldsJson: "[]",
-  requiredFieldsError: null,
+  requireEmail: true,
+  requireGender: false,
+  askAge: false,
+  maxAge: "12",
+}
+
+interface RequiredFieldOption {
+  value: string
+  label: string
+}
+
+interface RequiredFieldEntry {
+  name: string
+  label?: string
+  type: "text" | "email" | "number" | "select"
+  required?: boolean
+  options?: Array<string | RequiredFieldOption>
+  display_as_subtitle?: boolean
+}
+
+function buildAgeOptions(maxAge: number): RequiredFieldOption[] {
+  const options: RequiredFieldOption[] = [
+    { value: "lt1", label: "< 1 year old" },
+  ]
+  for (let i = 1; i <= maxAge; i++) {
+    options.push({
+      value: String(i),
+      label: i === 1 ? "1 year old" : `${i} years old`,
+    })
+  }
+  return options
+}
+
+function serializeRequiredFields(
+  state: Pick<
+    DialogState,
+    "requireEmail" | "requireGender" | "askAge" | "maxAge"
+  >,
+): RequiredFieldEntry[] {
+  const fields: RequiredFieldEntry[] = []
+  if (state.requireEmail) {
+    fields.push({
+      name: "email",
+      label: "Email",
+      type: "email",
+      required: true,
+    })
+  }
+  if (state.requireGender) {
+    fields.push({
+      name: "gender",
+      label: "Gender",
+      type: "select",
+      required: true,
+      options: [
+        { value: "male", label: "Male" },
+        { value: "female", label: "Female" },
+        { value: "non_binary", label: "Non-binary" },
+        { value: "prefer_not_to_say", label: "Prefer not to say" },
+      ],
+    })
+  }
+  if (state.askAge) {
+    const max = Number(state.maxAge)
+    const maxAge =
+      Number.isFinite(max) && max > 0 && Number.isInteger(max) ? max : 12
+    fields.push({
+      name: "age",
+      label: "Age",
+      type: "select",
+      required: true,
+      options: buildAgeOptions(maxAge),
+      display_as_subtitle: true,
+    })
+  }
+  return fields
+}
+
+function deserializeRequiredFields(
+  raw: unknown,
+): Pick<DialogState, "requireEmail" | "requireGender" | "askAge" | "maxAge"> {
+  const fields: RequiredFieldEntry[] = Array.isArray(raw)
+    ? (raw as RequiredFieldEntry[])
+    : []
+  const hasEmail = fields.some((f) => f?.name === "email")
+  const hasGender = fields.some((f) => f?.name === "gender")
+  const ageField = fields.find((f) => f?.name === "age")
+  let maxAge = "12"
+  if (ageField?.options && Array.isArray(ageField.options)) {
+    // Largest numeric value across {value,label} pairs or string options.
+    const numericValues = ageField.options
+      .map((opt) =>
+        typeof opt === "string"
+          ? Number(opt)
+          : Number(opt?.value ?? Number.NaN),
+      )
+      .filter((n) => Number.isFinite(n))
+    if (numericValues.length > 0) {
+      maxAge = String(Math.max(...numericValues))
+    }
+  }
+  return {
+    requireEmail: hasEmail,
+    requireGender: hasGender,
+    askAge: !!ageField,
+    maxAge,
+  }
 }
 
 function resolveCategoryLabel(category: AttendeeCategoryPublic): string {
@@ -92,25 +201,9 @@ export function AttendeeCategoriesEditor({
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey })
 
-  // Parse the JSON the admin typed; null on parse error or non-array.
-  const parseRequiredFields = (): Array<Record<string, unknown>> | null => {
-    try {
-      const trimmed = state.requiredFieldsJson.trim()
-      if (trimmed === "") return []
-      const parsed = JSON.parse(trimmed)
-      if (!Array.isArray(parsed)) return null
-      // Coerce: every entry must be a plain object — schema is `[{...}]` only.
-      return parsed.every((it) => it && typeof it === "object")
-        ? (parsed as Array<Record<string, unknown>>)
-        : null
-    } catch {
-      return null
-    }
-  }
-
   const createMutation = useMutation({
     mutationFn: () => {
-      const fields = parseRequiredFields()
+      const fields = serializeRequiredFields(state)
       return AttendeeCategoriesService.createAttendeeCategory({
         requestBody: {
           popup_id: popupId,
@@ -122,7 +215,9 @@ export function AttendeeCategoriesEditor({
             state.maxPerApplication !== ""
               ? Number(state.maxPerApplication)
               : undefined,
-          required_fields: fields ?? undefined,
+          required_fields: fields as unknown as Array<{
+            [key: string]: unknown
+          }>,
           display_meta:
             state.label.trim() !== ""
               ? { label: state.label.trim() }
@@ -140,7 +235,7 @@ export function AttendeeCategoriesEditor({
 
   const updateMutation = useMutation({
     mutationFn: () => {
-      const fields = parseRequiredFields()
+      const fields = serializeRequiredFields(state)
       return AttendeeCategoriesService.updateAttendeeCategory({
         categoryId: state.editing!.id,
         requestBody: {
@@ -150,7 +245,9 @@ export function AttendeeCategoriesEditor({
             state.maxPerApplication !== ""
               ? Number(state.maxPerApplication)
               : null,
-          required_fields: fields ?? undefined,
+          required_fields: fields as unknown as Array<{
+            [key: string]: unknown
+          }>,
           display_meta: { label: state.label.trim() || state.editing!.key },
         },
       })
@@ -177,7 +274,7 @@ export function AttendeeCategoriesEditor({
 
   const openEdit = (cat: AttendeeCategoryPublic) => {
     const meta = cat.display_meta as Record<string, unknown> | undefined
-    const fields = Array.isArray(cat.required_fields) ? cat.required_fields : []
+    const fieldsState = deserializeRequiredFields(cat.required_fields)
     setState({
       open: true,
       editing: cat,
@@ -187,8 +284,7 @@ export function AttendeeCategoriesEditor({
       enabledInPassesFlow: cat.enabled_in_passes_flow ?? true,
       maxPerApplication:
         cat.max_per_application != null ? String(cat.max_per_application) : "",
-      requiredFieldsJson: JSON.stringify(fields, null, 2),
-      requiredFieldsError: null,
+      ...fieldsState,
     })
   }
 
@@ -197,24 +293,19 @@ export function AttendeeCategoriesEditor({
       showErrorToast("Key is required")
       return
     }
-    // Validate required_fields JSON before firing the mutation so the admin
-    // gets an inline error instead of a confusing 422 from the server.
-    if (state.requiredFieldsJson.trim() !== "") {
-      const fields = parseRequiredFields()
-      if (fields === null) {
-        setState((prev) => ({
-          ...prev,
-          requiredFieldsError: "Invalid JSON — must be an array",
-        }))
-        return
-      }
-    }
     if (
       state.maxPerApplication !== "" &&
       (!Number.isInteger(Number(state.maxPerApplication)) ||
         Number(state.maxPerApplication) < 1)
     ) {
       showErrorToast("Max per application must be a positive integer or empty")
+      return
+    }
+    if (
+      state.askAge &&
+      (!Number.isInteger(Number(state.maxAge)) || Number(state.maxAge) < 1)
+    ) {
+      showErrorToast("Max age must be a positive integer")
       return
     }
     if (state.editing) {
@@ -393,34 +484,67 @@ export function AttendeeCategoriesEditor({
               </p>
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="cat-required-fields">
-                Required fields (JSON)
-              </Label>
-              <textarea
-                id="cat-required-fields"
-                className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                value={state.requiredFieldsJson}
-                spellCheck={false}
-                placeholder='[{"name":"age","label":"Age","type":"select","required":true,"options":[{"value":"1","label":"1 year old"},{"value":"2","label":"2 years old"}]}]'
-                onChange={(e) =>
-                  setState((prev) => ({
-                    ...prev,
-                    requiredFieldsJson: e.target.value,
-                    requiredFieldsError: null,
-                  }))
-                }
-              />
-              {state.requiredFieldsError && (
-                <p className="text-xs text-destructive">
-                  {state.requiredFieldsError}
-                </p>
-              )}
+            <div className="space-y-2 rounded-md border p-3">
+              <p className="text-sm font-medium">Required fields</p>
               <p className="text-xs text-muted-foreground">
-                Schema for extra fields shown in the portal modal. Each item:{" "}
-                {`{name, label?, type, required?, options?, display_as_subtitle?}`}
-                . Options accept strings or {`{value,label}`} pairs.
+                Extra fields shown when adding this attendee in the portal. Name
+                is always required.
               </p>
+
+              <div className="flex items-center justify-between pt-2">
+                <Label htmlFor="cat-require-email">Require email</Label>
+                <Switch
+                  id="cat-require-email"
+                  checked={state.requireEmail}
+                  onCheckedChange={(checked) =>
+                    setState((prev) => ({ ...prev, requireEmail: checked }))
+                  }
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <Label htmlFor="cat-require-gender">Require gender</Label>
+                <Switch
+                  id="cat-require-gender"
+                  checked={state.requireGender}
+                  onCheckedChange={(checked) =>
+                    setState((prev) => ({ ...prev, requireGender: checked }))
+                  }
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <Label htmlFor="cat-ask-age">Ask for age</Label>
+                <Switch
+                  id="cat-ask-age"
+                  checked={state.askAge}
+                  onCheckedChange={(checked) =>
+                    setState((prev) => ({ ...prev, askAge: checked }))
+                  }
+                />
+              </div>
+
+              {state.askAge && (
+                <div className="space-y-1.5 pl-2">
+                  <Label htmlFor="cat-max-age">Max age</Label>
+                  <Input
+                    id="cat-max-age"
+                    type="number"
+                    min="1"
+                    value={state.maxAge}
+                    placeholder="12"
+                    onChange={(e) =>
+                      setState((prev) => ({
+                        ...prev,
+                        maxAge: e.target.value,
+                      }))
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Dropdown shows "{`< 1 year old`}" up to this number.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 

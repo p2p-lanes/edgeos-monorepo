@@ -110,10 +110,6 @@ export function AttendeeModal({
       newErrors.name = true
     }
 
-    if (!formData.gender) {
-      newErrors.gender = true
-    }
-
     // Validate dynamic required fields
     for (const field of requiredFields) {
       if (field.required && !formData[field.name]?.trim()) {
@@ -208,7 +204,7 @@ export function AttendeeModal({
             />
           </div>
 
-          {/* Dynamic fields from required_fields schema */}
+          {/* Dynamic fields from required_fields schema (email, gender, age, ...) */}
           {requiredFields.map((field) => (
             <DynamicField
               key={field.name}
@@ -220,34 +216,6 @@ export function AttendeeModal({
               }
             />
           ))}
-
-          {/* Gender — always required */}
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="gender" className="text-right">
-              Gender <span className="text-destructive">*</span>
-            </Label>
-            <Select
-              value={formData.gender}
-              onValueChange={(value) =>
-                setFormData((prev) => ({ ...prev, gender: value }))
-              }
-              required
-            >
-              <SelectTrigger
-                className={`col-span-3 ${errors.gender ? "border-destructive" : ""}`}
-              >
-                <SelectValue placeholder="Select gender" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="male">Male</SelectItem>
-                <SelectItem value="female">Female</SelectItem>
-                <SelectItem value="prefer not to say">
-                  Prefer not to say
-                </SelectItem>
-                <SelectItem value="other">Other</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
         </div>
         <DialogFooter>
           <ButtonAnimated loading={loading} type="submit">
