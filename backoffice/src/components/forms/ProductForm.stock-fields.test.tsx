@@ -65,6 +65,7 @@ const mockListProductCategories = vi.mocked(
   ProductsService.listProductCategories,
 )
 const mockCreateProduct = vi.mocked(ProductsService.createProduct)
+const mockListProducts = vi.mocked(ProductsService.listProducts)
 
 const POPUP_NO_TIER = {
   id: "popup-1",
@@ -99,6 +100,11 @@ describe("ProductForm — two-field stock layout (6.5)", () => {
       "housing",
       "merch",
     ] as Awaited<ReturnType<typeof ProductsService.listProductCategories>>)
+
+    mockListProducts.mockResolvedValue({
+      results: [],
+      paging: { total: 0 },
+    } as Awaited<ReturnType<typeof ProductsService.listProducts>>)
 
     mockCreateProduct.mockResolvedValue({
       id: "product-new",

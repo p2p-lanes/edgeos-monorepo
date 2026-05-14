@@ -58,6 +58,7 @@ const mockGetPopup = vi.mocked(PopupsService.getPopup)
 const mockListProductCategories = vi.mocked(
   ProductsService.listProductCategories,
 )
+const mockListProducts = vi.mocked(ProductsService.listProducts)
 
 const POPUP_NO_TIER = {
   id: "popup-1",
@@ -97,6 +98,10 @@ describe("ProductForm — requires_check_in for all categories", () => {
       "merch",
       "housing",
     ] as Awaited<ReturnType<typeof ProductsService.listProductCategories>>)
+    mockListProducts.mockResolvedValue({
+      results: [],
+      paging: { total: 0 },
+    } as Awaited<ReturnType<typeof ProductsService.listProducts>>)
   })
 
   it("(a) renders Requires Check-in toggle for category=ticket (default)", async () => {
