@@ -49,7 +49,6 @@ export interface AttendeeDirectory {
   age: string | null
   gender: string | null
   picture_url: string | null
-  brings_kids: string | boolean
   participation: DirectoryProduct[]
   check_in: string | null
   check_out: string | null
@@ -59,6 +58,9 @@ export interface AttendeeDirectory {
 export interface CreateAttendee {
   name: string
   email: string
-  category: AttendeeCategory
+  /** @deprecated Use category_id instead — kept for backward compat with edit flows */
+  category?: AttendeeCategory
+  /** UUID of the attendee category row */
+  category_id?: string
   gender: string
 }

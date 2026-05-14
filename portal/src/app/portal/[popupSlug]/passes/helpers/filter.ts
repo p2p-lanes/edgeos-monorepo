@@ -57,7 +57,7 @@ export const filterProductsToPurchase = (
         p.duration_type === "month" &&
         (p.selected || p.purchased) &&
         !p.edit &&
-        p.attendee_category === product.attendee_category,
+        p.attendee_category_id === product.attendee_category_id,
     )
 
     if (

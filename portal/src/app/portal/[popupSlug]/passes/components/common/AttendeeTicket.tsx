@@ -108,8 +108,6 @@ const AttendeeTicket = ({
         await editAttendee(attendee.id ?? "", {
           name: data.name ?? "",
           email: data.email ?? "",
-          category: (data.category ??
-            "main") as import("@/types/Attendee").AttendeeCategory,
           gender: data.gender ?? "",
         })
       }
@@ -411,14 +409,16 @@ const AttendeeTicket = ({
         </div>
       </div>
 
-      <AttendeeModal
-        open={modal.isOpen}
-        onClose={handleCloseModal}
-        onSubmit={handleSubmit}
-        category={modal.category!}
-        editingAttendee={modal.editingAttendee}
-        isDelete={modal.isDelete}
-      />
+      {modal.isOpen && modal.category && (
+        <AttendeeModal
+          open={modal.isOpen}
+          onClose={handleCloseModal}
+          onSubmit={handleSubmit}
+          category={modal.category}
+          editingAttendee={modal.editingAttendee}
+          isDelete={modal.isDelete}
+        />
+      )}
     </div>
   )
 }

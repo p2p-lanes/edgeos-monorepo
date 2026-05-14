@@ -127,44 +127,6 @@ class Applications(ApplicationBase, table=True):
         """
         return self.human.red_flag if self.human else False
 
-    @property
-    def brings_spouse(self) -> bool:
-        """Check if application includes a spouse attendee.
-
-        Note: Accesses the `attendees` relationship. Ensure the application
-        is loaded with `selectinload(Applications.attendees)` to avoid N+1 queries.
-        """
-        return any(a.category == "spouse" for a in self.attendees)
-
-    @property
-    def brings_kids(self) -> bool:
-        """Check if application includes kid attendees.
-
-        Note: Accesses the `attendees` relationship. Ensure the application
-        is loaded with `selectinload(Applications.attendees)` to avoid N+1 queries.
-        """
-        return any(a.category == "kid" for a in self.attendees)
-
-    @property
-    def kid_count(self) -> int:
-        """Count number of kid attendees.
-
-        Note: Accesses the `attendees` relationship. Ensure the application
-        is loaded with `selectinload(Applications.attendees)` to avoid N+1 queries.
-        """
-        return sum(1 for a in self.attendees if a.category == "kid")
-
-    def get_main_attendee(self) -> "Attendees | None":
-        """Get the main attendee for this application.
-
-        Note: Accesses the `attendees` relationship. Ensure the application
-        is loaded with `selectinload(Applications.attendees)` to avoid N+1 queries.
-        """
-        for attendee in self.attendees:
-            if attendee.category == "main":
-                return attendee
-        return None
-
     def get_all_products(self) -> list:
         """Get all products from all attendees.
 

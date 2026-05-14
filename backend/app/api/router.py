@@ -6,6 +6,7 @@ from app.api import (
     application_review,
     approval_strategy,
     attendee,
+    attendee_category,
     auth,
     base_field_config,
     cart,
@@ -44,6 +45,7 @@ api_router.include_router(tenant.router)
 api_router.include_router(human.router)
 api_router.include_router(api_key.router)
 api_router.include_router(popup.router)
+api_router.include_router(attendee_category.router)
 
 # Popup-related resources
 api_router.include_router(product.router)

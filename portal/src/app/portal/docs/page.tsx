@@ -259,6 +259,80 @@ function ApiDocsBody() {
               },
             ]}
           />
+
+          <Endpoint
+            method="PATCH"
+            path="/api/v1/events/portal/events/{event_id}"
+            scope="events:write"
+            summary="Update an event you own. Calendar-affecting changes (time, venue, title) bump the sequence and dispatch an iTIP UPDATE."
+            body={[
+              { name: "title", type: "string" },
+              { name: "content", type: "string" },
+              { name: "start_time", type: "ISO datetime" },
+              { name: "end_time", type: "ISO datetime" },
+              { name: "timezone", type: "string" },
+              {
+                name: "venue_id",
+                type: "uuid",
+                note: "clears custom_location_*",
+              },
+              {
+                name: "custom_location_name",
+                type: "string",
+                note: "clears venue_id",
+              },
+              { name: "custom_location_url", type: "string" },
+              { name: "cover_url", type: "string" },
+              { name: "meeting_url", type: "string" },
+              { name: "max_participant", type: "int" },
+              { name: "tags", type: "string[]" },
+              { name: "track_id", type: "uuid" },
+              {
+                name: "visibility",
+                type: "enum",
+                note: "public | private | unlisted",
+              },
+              { name: "status", type: "enum" },
+              { name: "host_display_name", type: "string" },
+            ]}
+          />
+
+          <Endpoint
+            method="POST"
+            path="/api/v1/events/portal/events/{event_id}/cancel"
+            scope="events:write"
+            summary="Soft-cancel an event you own. Sets status to CANCELLED and dispatches an iTIP CANCEL to attendees. There is no hard-delete."
+          />
+        </Section>
+
+        <Section title="Invitations" id="invitations">
+          <Endpoint
+            method="GET"
+            path="/api/v1/events/portal/events/{event_id}/invitations"
+            scope="events:read"
+            summary="List invitations for an event you own."
+          />
+
+          <Endpoint
+            method="POST"
+            path="/api/v1/events/portal/events/{event_id}/invitations"
+            scope="events:write"
+            summary="Bulk-invite humans by email. Emails must match existing humans in the tenant; unknown addresses come back under not_found. Owner-only."
+            body={[
+              {
+                name: "emails",
+                type: "string[]",
+                note: "1–1000 entries, case-insensitive",
+              },
+            ]}
+          />
+
+          <Endpoint
+            method="DELETE"
+            path="/api/v1/events/portal/events/{event_id}/invitations/{invitation_id}"
+            scope="events:write"
+            summary="Revoke a single invitation. Owner-only."
+          />
         </Section>
 
         <Section title="RSVP" id="rsvp">

@@ -1,14 +1,14 @@
-import { ArrowRight, FileText, Plus, Sparkles, Ticket } from "lucide-react"
+import { ArrowRight, FileText, Sparkles, Ticket } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { TICKET_CATEGORY } from "@/checkout/popupCheckoutPolicy"
+import AddAttendeeButtons from "@/components/checkout-flow/shared/AddAttendeeButtons"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import useAttendee from "@/hooks/useAttendee"
 import type { HumanPopupAccess } from "@/hooks/useHumanPopupAccess"
-import { cn } from "@/lib/utils"
 import { useCityProvider } from "@/providers/cityProvider"
 import { usePassesProvider } from "@/providers/passesProvider"
 import type { AttendeePassState } from "@/types/Attendee"
@@ -24,7 +24,7 @@ interface YourPassesProps {
   onSwitchToBuy: () => void
 }
 
-const YourPasses = ({ access, onSwitchToBuy }: YourPassesProps) => {
+const YourPasses = ({ access: _access, onSwitchToBuy }: YourPassesProps) => {
   const { t } = useTranslation()
   const { attendeePasses: attendees, products } = usePassesProvider()
   const mainAttendee = attendees.find((a) => a.category === "main")
@@ -35,13 +35,7 @@ const YourPasses = ({ access, onSwitchToBuy }: YourPassesProps) => {
   const isDayCheckout = searchParams.has("day-passes")
   const { getCity } = useCityProvider()
   const city = getCity()
-  // Add Spouse / Add Children are only available to Humans who accessed via
-  // an accepted application (CAP-L). Festival/direct-sale humans whose source
-  // is "attendee", "payment", or "companion" must not see these buttons.
-  const canAddCompanions =
-    access.source === "application" && access.applicationStatus === "accepted"
-  const hasSpouse = attendees.some((a) => a.category === "spouse")
-  const { handleOpenModal, handleCloseModal, modal } = useModal()
+  const { handleCloseModal, modal } = useModal()
   const { addAttendee } = useAttendee()
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false)
 
@@ -50,10 +44,7 @@ const YourPasses = ({ access, onSwitchToBuy }: YourPassesProps) => {
   )
 
   const mainTickets = products.filter(
-    (p) =>
-      p.category === TICKET_CATEGORY &&
-      p.attendee_category === "main" &&
-      p.is_active !== false,
+    (p) => p.category === TICKET_CATEGORY && p.is_active !== false,
   )
   const minPrice =
     mainTickets.length > 0 ? Math.min(...mainTickets.map((p) => p.price)) : null
@@ -63,7 +54,7 @@ const YourPasses = ({ access, onSwitchToBuy }: YourPassesProps) => {
       await addAttendee({
         name: data.name ?? "",
         email: data.email ?? "",
-        category: modal.category,
+        category_id: modal.category.id,
         gender: data.gender ?? "",
       })
     }
@@ -84,47 +75,7 @@ const YourPasses = ({ access, onSwitchToBuy }: YourPassesProps) => {
 
         {/* Inline Text Links */}
         <div className="flex flex-wrap items-center gap-3 text-sm mt-2">
-          {canAddCompanions && city?.allows_spouse && (
-            <>
-              <button
-                type="button"
-                className={cn(
-                  "flex items-center gap-1.5 transition-colors whitespace-nowrap group",
-                  hasSpouse
-                    ? "text-gray-300 cursor-not-allowed"
-                    : "text-pass-text hover:text-pass-title",
-                )}
-                onClick={() => !hasSpouse && handleOpenModal("spouse")}
-                disabled={hasSpouse}
-              >
-                <div
-                  className={cn(
-                    "p-0.5 rounded-full transition-colors",
-                    hasSpouse ? "bg-muted" : "bg-muted group-hover:bg-muted",
-                  )}
-                >
-                  <Plus className="w-3 h-3" />
-                </div>
-                <span>{t("passes.add_spouse")}</span>
-              </button>
-              <span className="text-gray-300">|</span>
-            </>
-          )}
-          {canAddCompanions && city?.allows_children && (
-            <>
-              <button
-                type="button"
-                className="flex items-center gap-1.5 text-pass-text hover:text-pass-title transition-colors whitespace-nowrap group"
-                onClick={() => handleOpenModal("kid")}
-              >
-                <div className="bg-muted p-0.5 rounded-full group-hover:bg-muted transition-colors">
-                  <Plus className="w-3 h-3" />
-                </div>
-                <span>{t("passes.add_children")}</span>
-              </button>
-              <span className="text-gray-300">|</span>
-            </>
-          )}
+          <AddAttendeeButtons />
           {city?.invoice_company_name && (
             <button
               type="button"
@@ -289,12 +240,12 @@ const YourPasses = ({ access, onSwitchToBuy }: YourPassesProps) => {
       </div>
 
       {/* Modals */}
-      {modal.isOpen && (
+      {modal.isOpen && modal.category && (
         <AttendeeModal
           open={modal.isOpen}
           onClose={handleCloseModal}
           onSubmit={handleSubmit}
-          category={modal.category!}
+          category={modal.category}
           editingAttendee={modal.editingAttendee}
         />
       )}

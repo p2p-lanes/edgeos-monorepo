@@ -5,7 +5,7 @@ unique indexes that enforce one patreon product per popup and one patron-preset
 ticketing step per popup.
 
 Revision ID: fb7da98c8d72
-Revises: 0d62c955bfdf
+Revises: 42de2a61e52f
 Create Date: 2026-05-14
 
 """
@@ -15,7 +15,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "fb7da98c8d72"
-down_revision = "0d62c955bfdf"
+down_revision = "42de2a61e52f"
 branch_labels = None
 depends_on = None
 

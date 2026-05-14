@@ -8,7 +8,7 @@ from sqlmodel import select
 from app.api.application.models import Applications
 from app.api.application.schemas import ApplicationStatus
 from app.api.attendee.models import Attendees
-from app.api.attendee.schemas import AttendeeCategory
+from app.api.attendee_category.models import AttendeeCategories
 from app.api.dashboard.schemas import (
     ApplicationFunnel,
     ApplicationStats,
@@ -115,22 +115,27 @@ def _get_application_stats(db: TenantSession, popup_id: uuid.UUID) -> Applicatio
 
 
 def _get_attendee_stats(db: TenantSession, popup_id: uuid.UUID) -> AttendeeStats:
-    """Get attendee statistics for a popup."""
+    """Get attendee statistics for a popup.
+
+    Groups by AttendeeCategories.key (via category_id FK) since the legacy
+    attendees.category string column was dropped in PR 2.
+    """
     category_counts = db.exec(
-        select(Attendees.category, func.count(Attendees.id))
+        select(AttendeeCategories.key, func.count(Attendees.id))
         .join(Applications, Attendees.application_id == Applications.id)
+        .outerjoin(AttendeeCategories, Attendees.category_id == AttendeeCategories.id)
         .where(Applications.popup_id == popup_id)
-        .group_by(Attendees.category)
+        .group_by(AttendeeCategories.key)
     ).all()
 
     stats = AttendeeStats()
-    for category_value, count in category_counts:
+    for category_key, count in category_counts:
         stats.total += count
-        if category_value == AttendeeCategory.MAIN.value:
+        if category_key == "main":
             stats.main = count
-        elif category_value == AttendeeCategory.SPOUSE.value:
+        elif category_key == "spouse":
             stats.spouse = count
-        elif category_value == AttendeeCategory.KID.value:
+        elif category_key == "kid":
             stats.kid = count
 
     return stats
@@ -424,22 +429,28 @@ def _get_distribution(db: TenantSession, popup_id: uuid.UUID) -> Distribution:
         for dur, qty in duration_rows
     ]
 
-    # Tickets by attendee type
+    # Tickets by attendee type (grouped by AttendeeCategories.key via FK)
+    # Products.attendee_category column was dropped in PR 2; use attendee_category_id FK.
     attendee_type_rows = db.exec(
         select(
-            Products.attendee_category,
+            AttendeeCategories.key,
             func.sum(PaymentProducts.quantity),
         )
+        .select_from(Products)
         .join(PaymentProducts, Products.id == PaymentProducts.product_id)
         .join(Payments, PaymentProducts.payment_id == Payments.id)
         .join(Applications, Payments.application_id == Applications.id)
+        .outerjoin(
+            AttendeeCategories,
+            Products.attendee_category_id == AttendeeCategories.id,
+        )
         .where(
             Applications.popup_id == popup_id,
             Payments.status == PaymentStatus.APPROVED.value,
             Payments.payment_type == PaymentType.PASS_PURCHASE.value,
             Products.category == CATEGORY_TICKET,
         )
-        .group_by(Products.attendee_category)
+        .group_by(AttendeeCategories.key)
     ).all()
 
     attendee_labels = {
@@ -452,7 +463,7 @@ def _get_distribution(db: TenantSession, popup_id: uuid.UUID) -> Distribution:
     total_att_tickets = sum((qty or 0) for _, qty in attendee_type_rows)
     tickets_by_attendee_type = [
         DistributionItem(
-            label=attendee_labels.get(cat, str(cat)),
+            label=attendee_labels.get(cat, str(cat) if cat else "General"),
             value=qty or 0,
             percentage=(
                 (Decimal(qty or 0) / Decimal(total_att_tickets) * 100).quantize(

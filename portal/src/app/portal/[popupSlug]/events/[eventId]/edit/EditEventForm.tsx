@@ -146,6 +146,7 @@ export function EditEventForm({
     withinOpenHours,
     availability,
     availabilityData,
+    effectiveBookingMode,
   } = useVenueAvailability({
     popupId,
     venueId: form.venueId,
@@ -232,6 +233,7 @@ export function EditEventForm({
           onCustomLocationNameChange={form.setCustomLocationName}
           customLocationUrl={form.customLocationUrl}
           onCustomLocationUrlChange={form.setCustomLocationUrl}
+          effectiveBookingMode={effectiveBookingMode}
         />
         {customLocationMissing && (
           <p className="text-xs text-destructive">

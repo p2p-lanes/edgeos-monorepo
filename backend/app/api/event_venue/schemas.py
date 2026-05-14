@@ -93,6 +93,7 @@ class VenueWeeklyHourRef(BaseModel):
     open_time: time | None
     close_time: time | None
     is_closed: bool
+    booking_mode: VenueBookingMode | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -173,6 +174,7 @@ class VenueWeeklyHourInput(BaseModel):
     open_time: time | None = None
     close_time: time | None = None
     is_closed: bool = False
+    booking_mode: VenueBookingMode | None = None
 
 
 class VenueWeeklyHoursUpdate(BaseModel):

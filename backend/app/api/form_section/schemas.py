@@ -7,7 +7,6 @@ from sqlmodel import Field, SQLModel
 
 class FormSectionKind(str, Enum):
     STANDARD = "standard"
-    COMPANIONS = "companions"
     SCHOLARSHIP = "scholarship"
 
 
@@ -39,7 +38,7 @@ class FormSectionCreate(BaseModel):
     label: str
     description: str | None = None
     order: int = 0
-    kind: str = FormSectionKind.STANDARD.value
+    kind: FormSectionKind = FormSectionKind.STANDARD
 
 
 class FormSectionUpdate(BaseModel):
