@@ -716,6 +716,39 @@ export function ApplicationDetail({
     sectioned: sectionedCustomFields,
   } = getCustomFieldsBySection()
 
+  const renderCustomField = (key: string, value: unknown) => {
+    const fieldDef = schema?.custom_fields?.[key]
+    if (fieldDef?.type === "signature") {
+      const sig = (value ?? {}) as { signature?: string; signed_at?: string }
+      return (
+        <div key={key} className="sm:col-span-2">
+          {sig.signature ? (
+            <div className="space-y-1">
+              <img
+                src={sig.signature}
+                alt="Signature"
+                className="h-16 rounded-md border bg-white object-contain"
+              />
+              {sig.signed_at && (
+                <p className="text-xs text-muted-foreground">
+                  Signed on {new Date(sig.signed_at).toLocaleDateString()}
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">—</p>
+          )}
+        </div>
+      )
+    }
+    return (
+      <div key={key}>
+        <p className="text-xs text-muted-foreground">{getFieldLabel(key)}</p>
+        <p className="text-sm">{formatFieldValue(key, value)}</p>
+      </div>
+    )
+  }
+
   const votingPanel = isWeightedVoting ? (
     <WeightedVoting application={application} onSuccess={handleReviewSuccess} />
   ) : (
@@ -824,14 +857,9 @@ export function ApplicationDetail({
         <>
           <Separator />
           <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
-            {unsectionedCustomFields.map(([key, value]) => (
-              <div key={key}>
-                <p className="text-xs text-muted-foreground">
-                  {getFieldLabel(key)}
-                </p>
-                <p className="text-sm">{formatFieldValue(key, value)}</p>
-              </div>
-            ))}
+            {unsectionedCustomFields.map(([key, value]) =>
+              renderCustomField(key, value),
+            )}
           </div>
         </>
       )}
@@ -843,14 +871,7 @@ export function ApplicationDetail({
             <Separator />
             <InlineSection title={sectionLabel} className="capitalize pt-4">
               <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2 py-3">
-                {fields.map(([key, value]) => (
-                  <div key={key}>
-                    <p className="text-xs text-muted-foreground">
-                      {getFieldLabel(key)}
-                    </p>
-                    <p className="text-sm">{formatFieldValue(key, value)}</p>
-                  </div>
-                ))}
+                {fields.map(([key, value]) => renderCustomField(key, value))}
               </div>
             </InlineSection>
           </div>
