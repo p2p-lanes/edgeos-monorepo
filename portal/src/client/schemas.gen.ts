@@ -2881,6 +2881,17 @@ export const BaseFieldConfigPublicSchema = {
                 }
             ],
             title: 'Options'
+        },
+        field_type: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Field Type'
         }
     },
     type: 'object',
@@ -2970,6 +2981,17 @@ export const BaseFieldConfigUpdateSchema = {
                 }
             ],
             title: 'Options'
+        },
+        field_type: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Field Type'
         }
     },
     type: 'object',
@@ -6944,7 +6966,7 @@ export const FormFieldCreateSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    enum: ['full', 'half']
+                    enum: ['full', 'half', 'half_row']
                 },
                 {
                     type: 'null'
@@ -7094,7 +7116,7 @@ export const FormFieldPublicSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    enum: ['full', 'half']
+                    enum: ['full', 'half', 'half_row']
                 },
                 {
                     type: 'null'
@@ -7122,6 +7144,20 @@ export const FormFieldPublicSchema = {
                 }
             ],
             title: 'Target'
+        },
+        allowed_field_types: {
+            anyOf: [
+                {
+                    items: {
+                        type: 'string'
+                    },
+                    type: 'array'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Allowed Field Types'
         }
     },
     type: 'object',
@@ -7261,7 +7297,7 @@ export const FormFieldUpdateSchema = {
             anyOf: [
                 {
                     type: 'string',
-                    enum: ['full', 'half']
+                    enum: ['full', 'half', 'half_row']
                 },
                 {
                     type: 'null'

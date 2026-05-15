@@ -21,9 +21,15 @@ const FULL_WIDTH_TYPES = new Set([
 export function resolveFieldWidth(field: {
   type?: string
   field_type?: string
-  width?: "full" | "half" | null
-}): "full" | "half" {
-  if (field.width === "full" || field.width === "half") return field.width
+  width?: "full" | "half" | "half_row" | null
+}): "full" | "half" | "half_row" {
+  if (
+    field.width === "full" ||
+    field.width === "half" ||
+    field.width === "half_row"
+  ) {
+    return field.width
+  }
   const t = field.field_type ?? field.type
   return t && FULL_WIDTH_TYPES.has(t) ? "full" : "half"
 }

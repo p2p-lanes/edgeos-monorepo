@@ -28,7 +28,13 @@ const markdownClass =
   "[&>ol]:my-1 [&>ol]:list-decimal [&>ol]:pl-5 " +
   "[&_strong]:font-semibold [&_em]:italic"
 
-function Markdown({ source }: { source: string }) {
+function Markdown({
+  source,
+  stopAnchorPropagation,
+}: {
+  source: string
+  stopAnchorPropagation?: boolean
+}) {
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
@@ -39,6 +45,11 @@ function Markdown({ source }: { source: string }) {
             target="_blank"
             rel="noopener noreferrer"
             className="text-primary underline"
+            // Prevent the surrounding <label> from toggling the checkbox when
+            // the user actually intends to follow the link.
+            onClick={
+              stopAnchorPropagation ? (e) => e.stopPropagation() : undefined
+            }
           >
             {children}
           </a>
@@ -77,12 +88,18 @@ export function RichTextForm({
             required={isRequired}
             className="mt-0.5 shrink-0 mr-2"
           />
-          {/* Plain div (not <label>) so anchor clicks open the link instead of
-              toggling the checkbox. ml-2.5 (10px) over gap-x — gap-x has
+          {/* <label htmlFor> so clicking anywhere on the text toggles the
+              checkbox. Anchor clicks call stopPropagation in <Markdown> so they
+              still open the link. ml-2.5 (10px) over gap-x — gap-x has
               occasionally compressed inside narrow flex parents. */}
-          <div className={`${markdownClass} ml-2.5 flex-1 min-w-0`}>
-            <Markdown source={content} />
-          </div>
+          <label
+            htmlFor={id}
+            className={`${markdownClass} ml-2.5 flex-1 min-w-0 ${
+              disabled ? "cursor-not-allowed" : "cursor-pointer"
+            }`}
+          >
+            <Markdown source={content} stopAnchorPropagation />
+          </label>
         </div>
         {error && <p className="text-red-500 text-sm">{error}</p>}
       </FormInputWrapper>

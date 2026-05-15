@@ -87,11 +87,15 @@ export function ImageUploadForm({
 
   return (
     <FormInputWrapper>
-      {label && <LabelRequired isRequired={isRequired}>{label}</LabelRequired>}
-      {subtitle && (
-        <LabelMuted className="text-sm text-muted-foreground">
-          {subtitle}
-        </LabelMuted>
+      {(label || subtitle) && (
+        <div className="flex flex-col gap-2">
+          {label && <LabelRequired isRequired={isRequired}>{label}</LabelRequired>}
+          {subtitle && (
+            <LabelMuted className="text-sm text-muted-foreground">
+              {subtitle}
+            </LabelMuted>
+          )}
+        </div>
       )}
 
       {value ? (

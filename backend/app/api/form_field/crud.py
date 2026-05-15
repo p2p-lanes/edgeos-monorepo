@@ -137,8 +137,13 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
         session: Session,
         popup_id: uuid.UUID,
         custom_fields: dict[str, Any] | None,
+        skip_required: bool = False,
     ) -> tuple[bool, list[str]]:
         """Validate custom_fields against form field definitions.
+
+        When ``skip_required`` is True, presence/emptiness checks on required
+        fields are bypassed (used for draft saves), but type and constraint
+        validation still runs on whatever values were provided.
 
         Returns tuple of (is_valid, list_of_errors).
         """
@@ -161,11 +166,12 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
         errors: list[str] = []
 
         # Check required fields
-        for field in fields:
-            if field.section_id and field.section_id in hidden_section_ids:
-                continue
-            if field.required and field.name not in custom_fields:
-                errors.append(f"Required field '{field.label}' is missing")
+        if not skip_required:
+            for field in fields:
+                if field.section_id and field.section_id in hidden_section_ids:
+                    continue
+                if field.required and field.name not in custom_fields:
+                    errors.append(f"Required field '{field.label}' is missing")
 
         # Validate provided values
         for field_name, value in custom_fields.items():
@@ -177,7 +183,7 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
 
             # Skip validation for None/empty values on non-required fields
             if value is None or value == "":
-                if field.required:
+                if field.required and not skip_required:
                     errors.append(f"Required field '{field.label}' cannot be empty")
                 continue
 
@@ -327,7 +333,7 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
             if config.section_id and config.section_id in hidden_section_ids:
                 continue
             entry: dict[str, Any] = {
-                "type": definition["type"],
+                "type": config.field_type or definition["type"],
                 "target": definition["target"],
                 "label": config.label or "",
                 "required": config.required,

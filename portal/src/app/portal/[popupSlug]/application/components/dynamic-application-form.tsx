@@ -106,8 +106,25 @@ const BaseField = memo(function BaseField({
     )
   }
 
+  const resolved = resolveFieldWidth(field)
+  if (resolved === "half_row") {
+    return (
+      <div className="md:col-span-2 md:grid md:grid-cols-2 md:gap-4">
+        <div>
+          <DynamicField
+            name={name}
+            field={field}
+            value={value}
+            error={error}
+            onChange={onChange}
+            hideLabelAndSubtitle={name === "info_not_shared"}
+          />
+        </div>
+      </div>
+    )
+  }
   return (
-    <div className={resolveFieldWidth(field) === "full" ? "md:col-span-2" : ""}>
+    <div className={resolved === "full" ? "md:col-span-2" : ""}>
       <DynamicField
         name={name}
         field={field}
@@ -352,15 +369,49 @@ export function DynamicApplicationForm({
             <div key={id}>
               <SectionWrapper title={title} subtitle={subtitle}>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  {fields.map(({ name, field, isCustom }) =>
-                    isCustom ? (
+                  {fields.map(({ name, field, isCustom }) => {
+                    if (!isCustom) {
+                      return (
+                        <BaseField
+                          key={name}
+                          name={name}
+                          field={field}
+                          value={values[name]}
+                          error={errors[name]}
+                          onChange={handleChange}
+                          displayGender={displayGender}
+                          handleGenderChange={handleGenderChange}
+                          genderSpecifyValue={getString(
+                            values,
+                            "gender_specify",
+                          )}
+                          genderSpecifyError={errors.gender_specify}
+                        />
+                      )
+                    }
+                    const resolved = resolveFieldWidth(field)
+                    if (resolved === "half_row") {
+                      return (
+                        <div
+                          key={name}
+                          className="md:col-span-2 md:grid md:grid-cols-2 md:gap-4"
+                        >
+                          <div>
+                            <DynamicField
+                              name={name}
+                              field={field}
+                              value={values[name]}
+                              error={errors[name]}
+                              onChange={handleChange}
+                            />
+                          </div>
+                        </div>
+                      )
+                    }
+                    return (
                       <div
                         key={name}
-                        className={
-                          resolveFieldWidth(field) === "full"
-                            ? "md:col-span-2"
-                            : ""
-                        }
+                        className={resolved === "full" ? "md:col-span-2" : ""}
                       >
                         <DynamicField
                           name={name}
@@ -370,21 +421,8 @@ export function DynamicApplicationForm({
                           onChange={handleChange}
                         />
                       </div>
-                    ) : (
-                      <BaseField
-                        key={name}
-                        name={name}
-                        field={field}
-                        value={values[name]}
-                        error={errors[name]}
-                        onChange={handleChange}
-                        displayGender={displayGender}
-                        handleGenderChange={handleGenderChange}
-                        genderSpecifyValue={getString(values, "gender_specify")}
-                        genderSpecifyError={errors.gender_specify}
-                      />
-                    ),
-                  )}
+                    )
+                  })}
                 </div>
               </SectionWrapper>
               <SectionSeparator />

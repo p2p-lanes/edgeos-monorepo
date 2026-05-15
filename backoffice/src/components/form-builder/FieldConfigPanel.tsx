@@ -27,7 +27,7 @@ import useCustomToast from "@/hooks/useCustomToast"
 import { createErrorHandler } from "@/utils"
 import { canRemoveField, FIELD_TYPES, isSpecialField } from "./constants"
 
-type FieldWidth = "full" | "half" | null
+type FieldWidth = "full" | "half" | "half_row" | null
 
 interface FieldConfigPanelProps {
   field: FormFieldPublic
@@ -116,6 +116,13 @@ export function FieldConfigPanel({
 
   const isProtected = isSpecialField(field)
   const isElemental = isProtected && !canRemoveField(field)
+  const allowedFieldTypes = field.allowed_field_types ?? null
+  const hasAllowedFieldTypes =
+    !!allowedFieldTypes && allowedFieldTypes.length > 0
+  const typeSelectDisabled = isProtected && !hasAllowedFieldTypes
+  const visibleFieldTypes = hasAllowedFieldTypes
+    ? FIELD_TYPES.filter((t) => allowedFieldTypes?.includes(t.value))
+    : FIELD_TYPES
 
   const handleSave = () => {
     const optionsArray = localValues.options
@@ -136,8 +143,9 @@ export function FieldConfigPanel({
       requestBody.required = localValues.required
     }
 
-    // Protected (base) fields have a fixed type defined by the catalog.
-    if (!isProtected) {
+    // Protected (base) fields have a fixed type defined by the catalog, unless
+    // the catalog whitelists alternatives via `allowed_field_types`.
+    if (!isProtected || hasAllowedFieldTypes) {
       requestBody.field_type = localValues.field_type || undefined
     }
 
@@ -209,11 +217,11 @@ export function FieldConfigPanel({
           value={localValues.field_type}
           onValueChange={(val) => handleChange("field_type", val)}
         >
-          <SelectTrigger disabled={isProtected}>
+          <SelectTrigger disabled={typeSelectDisabled}>
             <SelectValue placeholder="Select type" />
           </SelectTrigger>
           <SelectContent>
-            {FIELD_TYPES.map((type) => (
+            {visibleFieldTypes.map((type) => (
               <SelectItem key={type.value} value={type.value}>
                 {type.label}
               </SelectItem>
@@ -435,6 +443,7 @@ export function FieldConfigPanel({
           <SelectContent>
             <SelectItem value="auto">Auto (by type)</SelectItem>
             <SelectItem value="half">Half (one column)</SelectItem>
+            <SelectItem value="half_row">Half (alone in row)</SelectItem>
             <SelectItem value="full">Full (both columns)</SelectItem>
           </SelectContent>
         </Select>

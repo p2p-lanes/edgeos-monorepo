@@ -609,6 +609,7 @@ export type BaseFieldConfigPublic = {
     placeholder?: (string | null);
     help_text?: (string | null);
     options?: (Array<(string)> | null);
+    field_type?: (string | null);
 };
 
 export type BaseFieldConfigUpdate = {
@@ -619,6 +620,7 @@ export type BaseFieldConfigUpdate = {
     placeholder?: (string | null);
     help_text?: (string | null);
     options?: (Array<(string)> | null);
+    field_type?: (string | null);
 };
 
 /**
@@ -1416,7 +1418,7 @@ export type FormFieldCreate = {
     config?: ({
     [key: string]: unknown;
 } | null);
-    width?: ('full' | 'half' | null);
+    width?: ('full' | 'half' | 'half_row' | null);
 };
 
 export type FormFieldPublic = {
@@ -1438,10 +1440,11 @@ export type FormFieldPublic = {
     config?: ({
     [key: string]: unknown;
 } | null);
-    width?: ('full' | 'half' | null);
+    width?: ('full' | 'half' | 'half_row' | null);
     protected?: boolean;
     removable?: boolean;
     target?: (string | null);
+    allowed_field_types?: (Array<(string)> | null);
 };
 
 export type FormFieldUpdate = {
@@ -1458,7 +1461,7 @@ export type FormFieldUpdate = {
     config?: ({
     [key: string]: unknown;
 } | null);
-    width?: ('full' | 'half' | null);
+    width?: ('full' | 'half' | 'half_row' | null);
 };
 
 export type FormSectionCreate = {

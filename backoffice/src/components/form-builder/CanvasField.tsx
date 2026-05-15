@@ -65,7 +65,12 @@ export function CanvasField({
     transition,
   }
 
-  const isFullWidth = resolveFieldWidth(field) === "full"
+  const resolvedWidth = resolveFieldWidth(field)
+  const isFullWidth = resolvedWidth === "full"
+  // half_row is handled one level up (SectionDropZone renders an empty
+  // sibling cell next to a half_row field so the next field gets pushed to
+  // the next row). At this level it renders like a regular half-width field.
+  const outerClassName = isFullWidth ? "md:col-span-2" : ""
 
   const handleClick = () => {
     onSelect(field.id)
@@ -85,22 +90,14 @@ export function CanvasField({
 
   if (isDragging) {
     return (
-      <div
-        ref={setNodeRef}
-        style={style}
-        className={`${isFullWidth ? "md:col-span-2" : ""}`}
-      >
+      <div ref={setNodeRef} style={style} className={outerClassName}>
         <div className="rounded-md border-2 border-dashed border-primary/30 bg-primary/5 min-h-[72px]" />
       </div>
     )
   }
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={`${isFullWidth ? "md:col-span-2" : ""}`}
-    >
+    <div ref={setNodeRef} style={style} className={outerClassName}>
       <button
         type="button"
         onClick={handleClick}

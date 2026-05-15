@@ -1,7 +1,7 @@
 import { useDroppable } from "@dnd-kit/core"
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { Check, Eye, EyeOff, Pencil, Trash2, X } from "lucide-react"
-import { useRef, useState } from "react"
+import { Fragment, useRef, useState } from "react"
 import type {
   FormFieldPublic,
   FormSectionPublic,
@@ -13,7 +13,11 @@ import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
 import { CanvasField } from "./CanvasField"
-import { isSpecialField, isSpecialSection } from "./constants"
+import {
+  isSpecialField,
+  isSpecialSection,
+  resolveFieldWidth,
+} from "./constants"
 
 interface SectionDropZoneProps {
   sectionKey: string
@@ -306,17 +310,24 @@ export function SectionDropZone({
                 {isOver ? "Drop here" : "Drag and drop fields here"}
               </div>
             )}
-            {fields.map((field) => (
-              <CanvasField
-                key={field.id}
-                field={field}
-                sectionKey={sectionKey}
-                isSelected={selectedFieldId === field.id}
-                isSpecial={isSpecialField(field)}
-                onSelect={onSelectField}
-                onDelete={onDeleteField}
-              />
-            ))}
+            {fields.map((field) => {
+              const isHalfRow = resolveFieldWidth(field) === "half_row"
+              return (
+                <Fragment key={field.id}>
+                  <CanvasField
+                    field={field}
+                    sectionKey={sectionKey}
+                    isSelected={selectedFieldId === field.id}
+                    isSpecial={isSpecialField(field)}
+                    onSelect={onSelectField}
+                    onDelete={onDeleteField}
+                  />
+                  {isHalfRow && (
+                    <div className="hidden md:block" aria-hidden="true" />
+                  )}
+                </Fragment>
+              )
+            })}
           </div>
         </SortableContext>
       </div>

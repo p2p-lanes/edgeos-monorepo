@@ -28,6 +28,17 @@ if TYPE_CHECKING:
     from app.api.human.models import Humans
 
 
+def _is_draft_status(status_value: object) -> bool:
+    """True when an application is being created/saved as a draft.
+
+    Treats a missing status as draft because the DB column defaults to draft
+    when no value is provided.
+    """
+    if status_value is None:
+        return True
+    return getattr(status_value, "value", status_value) == ApplicationStatus.DRAFT.value
+
+
 class RedFlaggedHumanError(Exception):
     """Raised when attempting to accept an application from a red-flagged human."""
 
@@ -267,10 +278,17 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 detail="Popup not found",
             )
 
+        # Drafts are partial saves: skip "required field is missing" checks but
+        # still validate types/constraints on any values the user did provide.
+        is_draft = _is_draft_status(getattr(app_data, "status", None))
+
         # Validate custom_fields against form field definitions
         if validate_custom_fields and app_data.custom_fields:
             is_valid, errors = form_fields_crud.validate_custom_fields(
-                session, app_data.popup_id, app_data.custom_fields
+                session,
+                app_data.popup_id,
+                app_data.custom_fields,
+                skip_required=is_draft,
             )
             if not is_valid:
                 raise HTTPException(
@@ -287,7 +305,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             )
 
         # Validate required base fields against BaseFieldConfigs
-        if validate_custom_fields:
+        if validate_custom_fields and not is_draft:
             is_valid, errors = form_fields_crud.validate_base_fields(
                 session, app_data.popup_id, app_data.model_dump(), human
             )
@@ -489,10 +507,17 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 detail="Popup not found",
             )
 
+        # Drafts are partial saves: skip "required field is missing" checks but
+        # still validate types/constraints on any values the user did provide.
+        is_draft = _is_draft_status(getattr(app_data, "status", None))
+
         # Validate custom_fields against form field definitions
         if validate_custom_fields and app_data.custom_fields:
             is_valid, errors = form_fields_crud.validate_custom_fields(
-                session, app_data.popup_id, app_data.custom_fields
+                session,
+                app_data.popup_id,
+                app_data.custom_fields,
+                skip_required=is_draft,
             )
             if not is_valid:
                 raise HTTPException(
@@ -525,7 +550,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             )
 
         # Validate required base fields against BaseFieldConfigs
-        if validate_custom_fields:
+        if validate_custom_fields and not is_draft:
             is_valid, errors = form_fields_crud.validate_base_fields(
                 session, app_data.popup_id, app_data.model_dump(), human
             )

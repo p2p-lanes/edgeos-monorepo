@@ -62,6 +62,7 @@ BASE_FIELD_DEFINITIONS: dict[str, dict[str, Any]] = {
         "default_position": 3,
         "default_placeholder": "City, State/Region, Country",
         "default_help_text": "Please format it like [City, State/Region, Country].",
+        "allowed_field_types": ["text", "country_select"],
     },
     "gender": {
         "type": "select",
