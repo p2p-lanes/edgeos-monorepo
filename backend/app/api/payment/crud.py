@@ -161,12 +161,26 @@ def _get_credit(application: Applications, discount_value: Decimal) -> Decimal:
     Each AttendeeProducts row represents one ticket (quantity=1). Patron rows
     are donations, not refundable ticket purchases — they contribute nothing to
     credit. Tickets purchased alongside a patron donation do contribute.
+
+    Only week and day passes convert into credit. Month/full passes already
+    purchased never grant credit toward a new purchase (you cannot "upgrade"
+    out of a longer duration into something larger). Mirrors the portal-side
+    filter in useCreditCalculation.
+
+    Gated by popup.credits_enabled: returns 0 when the popup has credits
+    disabled (default for new/un-migrated popups).
     """
+    if not application.popup or not application.popup.credits_enabled:
+        return Decimal("0")
+
     total = Decimal("0")
     for attendee in application.attendees:
         for ap in attendee.attendee_products:
-            if ap.product.category != "patreon":
-                total += ap.product.price
+            if ap.product.category == "patreon":
+                continue
+            if ap.product.duration_type not in ("week", "day"):
+                continue
+            total += ap.product.price
 
     credit = Decimal(str(application.credit)) if application.credit else Decimal("0")
     return _get_discounted_price(total, discount_value) + credit
@@ -1394,8 +1408,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         # Handle zero or negative amount (credit covers cost)
         if preview.amount <= 0:
             if preview.amount < 0:
-                # Store remaining credit
-                application.credit = -preview.amount
+                # Store remaining credit only when the popup has credits enabled.
+                # Otherwise, clamp to zero — we neither charge nor accumulate.
+                if application.popup and application.popup.credits_enabled:
+                    application.credit = -preview.amount
                 preview.amount = Decimal("0")
             else:
                 application.credit = Decimal("0")

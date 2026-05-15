@@ -1,6 +1,7 @@
 import { PencilIcon, XIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
+import { useCityProvider } from "@/providers/cityProvider"
 import { usePassesProvider } from "@/providers/passesProvider"
 
 interface EditPassesButtonProps {
@@ -10,11 +11,16 @@ interface EditPassesButtonProps {
 const EditPassesButton = ({ onSwitchToBuy }: EditPassesButtonProps) => {
   const { t } = useTranslation()
   const { toggleEditing, isEditing, attendeePasses } = usePassesProvider()
+  const { getCity } = useCityProvider()
+  const creditsEnabled = getCity()?.credits_enabled ?? false
 
   const somePurchased = attendeePasses.some((attendee) =>
     attendee.products.some((product) => product.purchased),
   )
 
+  // Edit mode exists to let users swap purchased passes for credit.
+  // Without credits, there is nothing to do here.
+  if (!creditsEnabled) return null
   if (!somePurchased) return null
 
   const handleEditClick = () => {

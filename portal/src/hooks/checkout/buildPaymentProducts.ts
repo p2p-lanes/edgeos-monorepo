@@ -22,6 +22,7 @@ interface BuildPaymentProductsParams {
   isEditing: boolean
   appCredit: string | number | null | undefined
   checkoutMode?: CheckoutMode
+  creditsEnabled?: boolean
 }
 
 interface BuildPaymentProductsResult {
@@ -76,8 +77,10 @@ export function buildPaymentProducts({
   isEditing,
   appCredit,
   checkoutMode = CHECKOUT_MODE.PASS_SYSTEM,
+  creditsEnabled = false,
 }: BuildPaymentProductsParams): BuildPaymentProductsResult {
   const isMonthUpgrade =
+    creditsEnabled &&
     checkoutMode === CHECKOUT_MODE.PASS_SYSTEM &&
     detectMonthUpgrade(attendeePasses)
   const products: PaymentProductRequest[] = []

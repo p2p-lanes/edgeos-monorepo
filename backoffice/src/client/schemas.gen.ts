@@ -10713,6 +10713,11 @@ export const PopupAdminSchema = {
             title: 'Show Attendee Directory',
             default: false
         },
+        credits_enabled: {
+            type: 'boolean',
+            title: 'Credits Enabled',
+            default: false
+        },
         id: {
             type: 'string',
             format: 'uuid',
@@ -11059,6 +11064,11 @@ export const PopupCreateSchema = {
             type: 'boolean',
             title: 'Show Attendee Directory',
             default: false
+        },
+        credits_enabled: {
+            type: 'boolean',
+            title: 'Credits Enabled',
+            default: false
         }
     },
     type: 'object',
@@ -11320,6 +11330,11 @@ export const PopupPublicSchema = {
         show_attendee_directory: {
             type: 'boolean',
             title: 'Show Attendee Directory',
+            default: false
+        },
+        credits_enabled: {
+            type: 'boolean',
+            title: 'Credits Enabled',
             default: false
         }
     },
@@ -11857,6 +11872,17 @@ export const PopupUpdateSchema = {
                 }
             ],
             title: 'Show Attendee Directory'
+        },
+        credits_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Credits Enabled'
         }
     },
     additionalProperties: false,
