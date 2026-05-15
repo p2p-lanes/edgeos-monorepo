@@ -103,6 +103,11 @@ class Applications(ApplicationBase, table=True):
     tenant: "Tenants" = Relationship(back_populates="applications")
     popup: "Popups" = Relationship(back_populates="applications")
     human: "Humans" = Relationship(back_populates="applications")
+    # Historical link: records the group through which this application was
+    # created (invite link / referral). It is NOT a vigente membership signal —
+    # use GroupMembers (Groups.members) for that. group_id is preserved when a
+    # member is removed from the junction, so an application can outlive its
+    # membership.
     group: Optional["Groups"] = Relationship(back_populates="applications")
     attendees: list["Attendees"] = Relationship(
         back_populates="application",
