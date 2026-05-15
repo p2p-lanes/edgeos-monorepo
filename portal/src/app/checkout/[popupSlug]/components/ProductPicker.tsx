@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next"
 import type { CheckoutRuntimeProduct } from "@/client"
 import { Button } from "@/components/ui/button"
 import { resolveMaxQuantity } from "@/components/ui/QuantitySelector"
-import { formatCurrency } from "@/types/checkout"
+import { formatPrice } from "@/types/checkout"
 
 interface ProductPickerProps {
   products: CheckoutRuntimeProduct[]
@@ -51,7 +51,11 @@ export function ProductPicker({
                   </p>
                 ) : null}
                 <p className="text-sm font-medium">
-                  {formatCurrency(Number(product.price), product.currency)}
+                  {formatPrice(
+                    Number(product.price),
+                    t("common.free"),
+                    product.currency,
+                  )}
                 </p>
               </div>
 
