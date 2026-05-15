@@ -1,5 +1,6 @@
 "use client"
 
+import { FileUploadProvider } from "@edgeos/shared-form-ui"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
@@ -9,6 +10,7 @@ import { Loader } from "@/components/ui/Loader"
 import { useApplicationSchema } from "@/hooks/useApplicationSchema"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
+import { useFileUpload } from "../events/lib/useFileUpload"
 import { DynamicApplicationForm } from "./components/dynamic-application-form"
 import { ExistingApplicationCard } from "./components/existing-application-card"
 import { FeePaymentBanner } from "./components/fee-payment-banner"
@@ -110,6 +112,8 @@ export default function FormPage() {
     }
   }, [city, router])
 
+  const { uploadFile } = useFileUpload()
+
   const handleImport = () => {
     if (importSource) {
       setImportedData(importSource)
@@ -132,8 +136,8 @@ export default function FormPage() {
 
   if (isError || !schema) {
     return (
-      <main className="container py-6 md:py-12 mb-8">
-        <div className="text-center space-y-4 px-8">
+      <main className="container py-6 md:py-12 mb-8 px-8 md:px-12">
+        <div className="text-center space-y-4">
           <h2 className="text-2xl font-bold">{t("application.unavailable")}</h2>
           <p className="text-heading-secondary">
             {t("application.unavailable_description")}
@@ -149,7 +153,7 @@ export default function FormPage() {
   const prefillData = existingApp ?? importedData
 
   return (
-    <main className="container py-6 md:py-12 mb-8">
+    <main className="container py-6 md:py-12 mb-8 px-8 md:px-12">
       {showImport && importSource && (
         <ExistingApplicationCard
           onImport={handleImport}
@@ -157,7 +161,7 @@ export default function FormPage() {
           data={importSource}
         />
       )}
-      <div className="space-y-8 px-8 md:px-12">
+      <div className="space-y-8">
         <FormHeader />
         <SectionSeparator />
       </div>
@@ -167,12 +171,14 @@ export default function FormPage() {
           isReturnFromCheckout={isReturnFromCheckout}
         />
       )}
-      <DynamicApplicationForm
-        key={existingApp?.id ?? importedData?.id ?? "new"}
-        schema={schema}
-        existingApplication={prefillData}
-        popup={city}
-      />
+      <FileUploadProvider value={uploadFile}>
+        <DynamicApplicationForm
+          key={existingApp?.id ?? importedData?.id ?? "new"}
+          schema={schema}
+          existingApplication={prefillData}
+          popup={city}
+        />
+      </FileUploadProvider>
     </main>
   )
 }

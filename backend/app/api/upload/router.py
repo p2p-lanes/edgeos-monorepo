@@ -12,23 +12,26 @@ from app.services.storage import storage_service
 
 router = APIRouter(prefix="/uploads", tags=["uploads"])
 
-ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
+ALLOWED_BACKOFFICE_TYPES = ALLOWED_IMAGE_TYPES | {"application/pdf"}
+ALLOWED_PORTAL_TYPES = ALLOWED_IMAGE_TYPES
 
 
 def _build_presigned_url(
     filename: str,
     content_type: str,
     tenant_id: uuid.UUID | str | None,
+    allowed_types: set[str],
 ) -> PresignedUrlResponse:
     if not settings.storage_enabled:
         raise HTTPException(
             status_code=503,
             detail="Storage is not configured",
         )
-    if content_type not in ALLOWED_CONTENT_TYPES:
+    if content_type not in allowed_types:
         raise HTTPException(
             status_code=400,
-            detail=f"Content type must be one of: {', '.join(sorted(ALLOWED_CONTENT_TYPES))}",
+            detail=f"Content type must be one of: {', '.join(sorted(allowed_types))}",
         )
 
     extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else "bin"
@@ -36,7 +39,8 @@ def _build_presigned_url(
         extension = "bin"
 
     key_tenant = str(tenant_id) if tenant_id else "superadmin"
-    key = f"{key_tenant}/images/{uuid4()}.{extension}"
+    folder = "documents" if content_type == "application/pdf" else "images"
+    key = f"{key_tenant}/{folder}/{uuid4()}.{extension}"
 
     storage = storage_service()
     upload_url = storage.generate_upload_url(
@@ -56,7 +60,10 @@ async def get_presigned_upload_url(
 ) -> PresignedUrlResponse:
     """Generate a presigned URL for direct upload (backoffice staff)."""
     return _build_presigned_url(
-        request.filename, request.content_type, current_user.tenant_id
+        request.filename,
+        request.content_type,
+        current_user.tenant_id,
+        ALLOWED_BACKOFFICE_TYPES,
     )
 
 
@@ -67,5 +74,8 @@ async def get_presigned_upload_url_portal(
 ) -> PresignedUrlResponse:
     """Generate a presigned URL for direct upload (portal humans)."""
     return _build_presigned_url(
-        request.filename, request.content_type, current_human.tenant_id
+        request.filename,
+        request.content_type,
+        current_human.tenant_id,
+        ALLOWED_PORTAL_TYPES,
     )

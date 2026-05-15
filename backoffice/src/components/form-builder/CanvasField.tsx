@@ -7,9 +7,9 @@ import { Badge } from "@/components/ui/badge"
 import {
   canRemoveField,
   FIELD_TYPES,
-  FULL_WIDTH_TYPES,
   formFieldPublicToFormFieldSchema,
   getPreviewValueForFieldType,
+  resolveFieldWidth,
 } from "./constants"
 
 interface CanvasFieldProps {
@@ -30,7 +30,7 @@ function FieldPreview({ field }: { field: FormFieldPublic }) {
       field={schemaField}
       value={previewValue}
       onChange={() => {}}
-      // readOnly
+      readOnly
       hideLabelAndSubtitle
     />
   )
@@ -65,7 +65,7 @@ export function CanvasField({
     transition,
   }
 
-  const isFullWidth = FULL_WIDTH_TYPES.has(field.field_type)
+  const isFullWidth = resolveFieldWidth(field) === "full"
 
   const handleClick = () => {
     onSelect(field.id)
@@ -127,41 +127,56 @@ export function CanvasField({
         </button>
 
         {/* Field content */}
-        <div className="flex-1 py-2 pr-2">
-          {/* Delete button — shows on group hover */}
-          <div className="flex items-start justify-between mb-1.5">
-            <div className="space-y-1">
-              <span className="text-sm font-semibold text-foreground">
-                {field.label}
-                {field.required && (
-                  <span className="text-destructive ml-0.5">*</span>
+        <div className="relative flex-1 py-2 pr-2">
+          {/* rich_text is a content block — its label/help_text are admin-only
+              metadata and never reach the portal, so don't repeat them above
+              the preview here either. */}
+          {field.field_type !== "rich_text" && (
+            <div className="flex items-start justify-between mb-1.5">
+              <div className="space-y-1">
+                <span className="text-sm font-semibold text-foreground">
+                  {field.label}
+                  {field.required && (
+                    <span className="text-destructive ml-0.5">*</span>
+                  )}
+                  {isSpecial && (
+                    <Badge
+                      variant="secondary"
+                      className="ml-1.5 text-[10px] px-1.5 py-0"
+                    >
+                      Protected
+                    </Badge>
+                  )}
+                </span>
+                {field.help_text && (
+                  <p className="text-xs text-muted-foreground leading-snug">
+                    {field.help_text}
+                  </p>
                 )}
-                {isSpecial && (
-                  <Badge
-                    variant="secondary"
-                    className="ml-1.5 text-[10px] px-1.5 py-0"
-                  >
-                    Protected
-                  </Badge>
-                )}
-              </span>
-              {field.help_text && (
-                <p className="text-xs text-muted-foreground leading-snug">
-                  {field.help_text}
-                </p>
+              </div>
+              {canRemoveField(field) && (
+                <button
+                  type="button"
+                  className="ml-2 mt-0.5 h-6 w-6 shrink-0 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                  onClick={handleDelete}
+                  aria-label={`Delete ${field.label}`}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
               )}
             </div>
-            {canRemoveField(field) && (
-              <button
-                type="button"
-                className="ml-2 mt-0.5 h-6 w-6 shrink-0 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                onClick={handleDelete}
-                aria-label={`Delete ${field.label}`}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
+          )}
+
+          {field.field_type === "rich_text" && canRemoveField(field) && (
+            <button
+              type="button"
+              className="absolute top-1 right-1 h-6 w-6 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive hover:bg-destructive/10 bg-background/80 backdrop-blur-sm"
+              onClick={handleDelete}
+              aria-label={`Delete ${field.label}`}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          )}
 
           {/* Input preview */}
           <FieldPreview field={field} />

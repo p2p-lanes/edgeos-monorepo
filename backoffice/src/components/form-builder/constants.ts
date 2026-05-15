@@ -1,15 +1,22 @@
 import type { FormFieldSchema } from "@edgeos/shared-form-ui"
+import { resolveFieldWidth as resolveFieldWidthShared } from "@edgeos/shared-form-ui"
 import type { LucideIcon } from "lucide-react"
 import {
   AlignLeft,
   Calendar,
   CheckSquare,
+  Circle,
+  FileText,
+  Globe,
   Hash,
+  Image,
   LayoutGrid,
   Link,
   List,
   ListChecks,
+  ListFilter,
   Mail,
+  PenLine,
   Phone,
   Type,
 } from "lucide-react"
@@ -31,7 +38,22 @@ export function formFieldPublicToFormFieldSchema(
     target: (f.target as "human" | "application") ?? undefined,
     min_date: f.min_date ?? null,
     max_date: f.max_date ?? null,
+    config: f.config ?? undefined,
+    width: f.width ?? null,
   }
+}
+
+/** Resolve the canvas column width for a FormFieldPublic. Delegates to the
+ * shared helper so the backoffice canvas matches the portal exactly. */
+export function resolveFieldWidth(
+  field: FormFieldPublic | FormFieldSchema,
+): "full" | "half" {
+  const t = "field_type" in field ? field.field_type : field.type
+  const w =
+    "width" in field
+      ? (field.width as "full" | "half" | null | undefined)
+      : null
+  return resolveFieldWidthShared({ type: t, field_type: t, width: w ?? null })
 }
 
 /** Preview value for a field type (for form builder canvas). */
@@ -41,10 +63,17 @@ export function getPreviewValueForFieldType(
   switch (field.field_type) {
     case "boolean":
       return false
+    case "rich_text":
+      // Checkbox mode treats value as bool; display-only ignores value.
+      return false
     case "multiselect":
+      return (field.options ?? []).slice(0, 2)
+    case "multiselect_detailed":
       return (field.options ?? []).slice(0, 2)
     case "select_cards":
     case "select":
+      return (field.options ?? [])[0] ?? ""
+    case "radio":
       return (field.options ?? [])[0] ?? ""
     default:
       return ""
@@ -73,17 +102,33 @@ export const FIELD_TYPES: FieldTypeDefinition[] = [
     label: "Pills (multiple selections)",
     icon: ListChecks,
   },
+  { value: "radio", label: "Radio list", icon: Circle },
+  {
+    value: "multiselect_detailed",
+    label: "Multi-select (detailed)",
+    icon: ListFilter,
+  },
   { value: "date", label: "Date", icon: Calendar },
   { value: "email", label: "Email", icon: Mail },
   { value: "phone", label: "Phone", icon: Phone },
   { value: "url", label: "URL", icon: Link },
+  { value: "rich_text", label: "Text with link", icon: FileText },
+  { value: "image_upload", label: "Image upload", icon: Image },
+  { value: "country_select", label: "Country", icon: Globe },
+  { value: "signature", label: "Signature", icon: PenLine },
 ]
 
 export const FULL_WIDTH_TYPES = new Set([
   "textarea",
   "multiselect",
+  "multiselect_detailed",
+  "radio",
   "url",
   "select_cards",
+  "rich_text",
+  "image_upload",
+  "country_select",
+  "signature",
 ])
 
 export const PALETTE_ITEM_PREFIX = "palette-"

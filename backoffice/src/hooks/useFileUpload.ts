@@ -20,23 +20,38 @@ export interface UploadResult {
 }
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MB
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"]
+const DEFAULT_ALLOWED_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+]
 
-export function useFileUpload() {
+export interface UseFileUploadOptions {
+  acceptedTypes?: string[]
+  maxSize?: number
+}
+
+export function useFileUpload(options: UseFileUploadOptions = {}) {
+  const acceptedTypes = options.acceptedTypes ?? DEFAULT_ALLOWED_TYPES
+  const maxSize = options.maxSize ?? MAX_FILE_SIZE
   const [uploadProgress, setUploadProgress] = useState<UploadProgress>({
     status: "idle",
     progress: 0,
   })
 
-  const validateFile = useCallback((file: File): string | null => {
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      return `Invalid file type. Allowed: ${ALLOWED_TYPES.join(", ")}`
-    }
-    if (file.size > MAX_FILE_SIZE) {
-      return `File too large. Maximum size: ${MAX_FILE_SIZE / 1024 / 1024} MB`
-    }
-    return null
-  }, [])
+  const validateFile = useCallback(
+    (file: File): string | null => {
+      if (!acceptedTypes.includes(file.type)) {
+        return `Invalid file type. Allowed: ${acceptedTypes.join(", ")}`
+      }
+      if (file.size > maxSize) {
+        return `File too large. Maximum size: ${maxSize / 1024 / 1024} MB`
+      }
+      return null
+    },
+    [acceptedTypes, maxSize],
+  )
 
   const uploadFile = useCallback(
     async (file: File): Promise<UploadResult> => {

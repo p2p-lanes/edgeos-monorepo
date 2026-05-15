@@ -17,6 +17,7 @@ class FormSectionBase(SQLModel):
     description: str | None = Field(default=None, nullable=True)
     order: int = Field(default=0)
     protected: bool = Field(default=False)
+    hidden: bool = Field(default=False)
     kind: str = Field(default=FormSectionKind.STANDARD.value)
 
 
@@ -28,6 +29,7 @@ class FormSectionPublic(BaseModel):
     description: str | None = None
     order: int = 0
     protected: bool = False
+    hidden: bool = False
     kind: str = FormSectionKind.STANDARD.value
 
     model_config = ConfigDict(from_attributes=True)
@@ -45,3 +47,4 @@ class FormSectionUpdate(BaseModel):
     label: str | None = None
     description: str | None = None
     order: int | None = None
+    hidden: bool | None = None

@@ -16,6 +16,7 @@ export interface SelectFormProps {
   isRequired?: boolean
   placeholder?: string
   options: { value: string; label: string }[]
+  disabled?: boolean
 }
 
 export const SelectForm = ({
@@ -27,6 +28,7 @@ export const SelectForm = ({
   isRequired = false,
   placeholder,
   options,
+  disabled = false,
 }: SelectFormProps) => {
   return (
     <FormInputWrapper>
@@ -36,8 +38,12 @@ export const SelectForm = ({
             {label}
           </LabelRequired>
         )}
-        <Select onValueChange={onChange} value={value}>
-          <SelectTrigger id={id} className={error ? "border-red-500" : ""}>
+        <Select onValueChange={onChange} value={value} disabled={disabled}>
+          <SelectTrigger
+            id={id}
+            className={error ? "border-red-500" : ""}
+            disabled={disabled}
+          >
             <span className="flex-1 truncate text-left text-sm">
               {value ? (
                 (options.find((o) => o.value === value)?.label ?? value)

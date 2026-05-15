@@ -1,14 +1,8 @@
+import { resolveFieldWidth } from "@edgeos/shared-form-ui"
 import type { FormFieldSchema } from "@/types/form-schema"
 import { DynamicField } from "./fields/dynamic-field"
 import SectionWrapper from "./SectionWrapper"
 import { SectionSeparator } from "./section-separator"
-
-const FULL_WIDTH_TYPES = new Set([
-  "textarea",
-  "multiselect",
-  "url",
-  "select_cards",
-])
 
 interface FormSectionProps {
   title: string
@@ -41,7 +35,7 @@ export function FormSection({
             <div
               key={name}
               className={
-                FULL_WIDTH_TYPES.has(field.type) ? "md:col-span-2" : ""
+                resolveFieldWidth(field) === "full" ? "md:col-span-2" : ""
               }
             >
               <DynamicField

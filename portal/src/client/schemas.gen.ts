@@ -6927,6 +6927,30 @@ export const FormFieldCreateSchema = {
                 }
             ],
             title: 'Max Date'
+        },
+        config: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Config'
+        },
+        width: {
+            anyOf: [
+                {
+                    type: 'string',
+                    enum: ['full', 'half']
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Width'
         }
     },
     type: 'object',
@@ -7053,6 +7077,30 @@ export const FormFieldPublicSchema = {
                 }
             ],
             title: 'Max Date'
+        },
+        config: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Config'
+        },
+        width: {
+            anyOf: [
+                {
+                    type: 'string',
+                    enum: ['full', 'half']
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Width'
         },
         protected: {
             type: 'boolean',
@@ -7196,6 +7244,30 @@ export const FormFieldUpdateSchema = {
                 }
             ],
             title: 'Max Date'
+        },
+        config: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Config'
+        },
+        width: {
+            anyOf: [
+                {
+                    type: 'string',
+                    enum: ['full', 'half']
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Width'
         }
     },
     type: 'object',
@@ -7287,6 +7359,11 @@ export const FormSectionPublicSchema = {
             title: 'Protected',
             default: false
         },
+        hidden: {
+            type: 'boolean',
+            title: 'Hidden',
+            default: false
+        },
         kind: {
             type: 'string',
             title: 'Kind',
@@ -7332,6 +7409,17 @@ export const FormSectionUpdateSchema = {
                 }
             ],
             title: 'Order'
+        },
+        hidden: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Hidden'
         }
     },
     type: 'object',
