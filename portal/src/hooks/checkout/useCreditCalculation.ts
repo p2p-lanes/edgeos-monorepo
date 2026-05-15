@@ -4,13 +4,16 @@ import type { AttendeePassState } from "@/types/Attendee"
 interface UseCreditCalculationParams {
   attendeePasses: AttendeePassState[]
   isEditing: boolean
+  creditsEnabled: boolean
 }
 
 export function useCreditCalculation({
   attendeePasses,
   isEditing,
+  creditsEnabled,
 }: UseCreditCalculationParams) {
   const editCredit = useMemo(() => {
+    if (!creditsEnabled) return 0
     if (!isEditing) return 0
     return attendeePasses.reduce((total, attendee) => {
       return (
@@ -20,9 +23,10 @@ export function useCreditCalculation({
           .reduce((sum, p) => sum + p.price * (p.quantity ?? 1), 0)
       )
     }, 0)
-  }, [attendeePasses, isEditing])
+  }, [attendeePasses, isEditing, creditsEnabled])
 
   const monthUpgradeCredit = useMemo(() => {
+    if (!creditsEnabled) return 0
     if (isEditing) return 0
 
     const hasPatreonSelected = attendeePasses.some((a) =>
@@ -39,20 +43,25 @@ export function useCreditCalculation({
       )
       if (!hasFullOrMonthSelected) return total
 
-      const hasPurchasedWeekOrDay = attendee.products.some(
-        (p) =>
-          (p.duration_type === "week" || p.duration_type === "day") &&
-          p.purchased,
-      )
-      if (!hasPurchasedWeekOrDay) return total
-
+      // Only week/day purchases convert into credit toward the month/full
+      // upgrade. The old behavior summed every non-patreon purchased product,
+      // which inflated credit by including unrelated purchases (e.g. a
+      // previously bought month from a different attendee group).
       const purchasedCredit = attendee.products
-        .filter((p) => p.category !== "patreon" && p.purchased)
-        .reduce((sum, p) => sum + p.price * (p.quantity ?? 1), 0)
+        .filter(
+          (p) =>
+            p.purchased &&
+            p.category !== "patreon" &&
+            (p.duration_type === "week" || p.duration_type === "day"),
+        )
+        .reduce(
+          (sum, p) => sum + (p.original_price ?? p.price) * (p.quantity ?? 1),
+          0,
+        )
 
       return total + purchasedCredit
     }, 0)
-  }, [attendeePasses, isEditing])
+  }, [attendeePasses, isEditing, creditsEnabled])
 
   return { editCredit, monthUpgradeCredit }
 }

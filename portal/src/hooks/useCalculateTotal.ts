@@ -13,10 +13,12 @@ export function useCalculateTotal() {
   const { getRelevantApplication } = useApplication()
   const application = getRelevantApplication()
   const { getCity } = useCityProvider()
+  const city = getCity()
   const { attendeePasses } = usePassesProvider()
   const { discountApplied } = useDiscount()
   const { data: groups = [] } = useGroupsQuery()
-  const checkoutPolicy = resolvePopupCheckoutPolicy(getCity())
+  const checkoutPolicy = resolvePopupCheckoutPolicy(city)
+  const creditsEnabled = city?.credits_enabled ?? false
 
   return useMemo(() => {
     let groupDiscountValue = 0
@@ -30,7 +32,10 @@ export function useCalculateTotal() {
       }
     }
 
-    const calculator = new TotalCalculator(checkoutPolicy.checkoutMode)
+    const calculator = new TotalCalculator(
+      checkoutPolicy.checkoutMode,
+      creditsEnabled,
+    )
     const result = calculator.calculate(
       attendeePasses,
       discountApplied,
@@ -50,6 +55,7 @@ export function useCalculateTotal() {
     application,
     attendeePasses,
     checkoutPolicy.checkoutMode,
+    creditsEnabled,
     discountApplied,
     groups,
   ])

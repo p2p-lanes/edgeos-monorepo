@@ -217,6 +217,7 @@ class SimpleQuantityPriceStrategy extends BasePriceStrategy {
 export class TotalCalculator {
   constructor(
     private readonly checkoutMode: CheckoutMode = CHECKOUT_MODE.PASS_SYSTEM,
+    private readonly creditsEnabled: boolean = false,
   ) {}
 
   calculate(
@@ -292,8 +293,30 @@ export class TotalCalculator {
     )
 
     if (hasPatreon) return new PatreonPriceStrategy()
+    // When credits are disabled, fall back to a straight pricing strategy that
+    // does not subtract purchased products from the new selection. The
+    // upgrade/downgrade math only makes sense as a credit, which is gated.
+    if (!this.creditsEnabled) {
+      return new NoCreditPriceStrategy()
+    }
     if (hasMonthly) return new MonthlyPriceStrategy()
     if (hasMonthPurchased) return new MonthlyPurchasedPriceStrategy()
     return new WeeklyPriceStrategy()
+  }
+}
+
+class NoCreditPriceStrategy extends BasePriceStrategy {
+  calculate(products: ProductsPass[], discount: DiscountProps): TotalResult {
+    const total = products
+      .filter((p) => p.selected && !p.purchased)
+      .reduce(
+        (sum, product) => sum + product.price * (product.quantity ?? 1),
+        0,
+      )
+    const originalTotal = this.calculateOriginalTotal(products)
+    const discountAmount = discount.discount_value
+      ? originalTotal * (discount.discount_value / 100)
+      : 0
+    return { total, originalTotal, discountAmount }
   }
 }

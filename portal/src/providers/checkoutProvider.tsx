@@ -112,6 +112,7 @@ interface CheckoutContextValue {
   setBuyerField: (fieldName: string, value: unknown) => void
   isBuyerInfoComplete: boolean
   cartUiEnabled: boolean
+  creditsEnabled: boolean
 }
 
 const CheckoutContext = createContext<CheckoutContextValue | null>(null)
@@ -156,8 +157,11 @@ export function CheckoutProvider({
   const products = productsOverride ?? queriedProducts
   const isAuthenticated = useIsAuthenticated()
   const application = getRelevantApplication()
-  const appCredit = accountCreditOverride ?? application?.credit
   const city = getCity()
+  const creditsEnabled = city?.credits_enabled ?? false
+  const appCredit = creditsEnabled
+    ? (accountCreditOverride ?? application?.credit)
+    : 0
   const checkoutPolicy = resolvePopupCheckoutPolicy(city)
   const cityId = city?.id ? String(city.id) : null
 
@@ -435,10 +439,11 @@ export function CheckoutProvider({
     scheduleSave,
   ])
 
-  // Credit calculations
+  // Credit calculations — gated by popup.credits_enabled
   const { editCredit, monthUpgradeCredit } = useCreditCalculation({
     attendeePasses,
     isEditing,
+    creditsEnabled,
   })
 
   // Insurance calculations
@@ -720,6 +725,7 @@ export function CheckoutProvider({
     setPromoError,
     paymentCompleteRef,
     submitMode,
+    creditsEnabled,
     buyerData:
       submitMode === "open-ticketing"
         ? {
@@ -804,6 +810,7 @@ export function CheckoutProvider({
     },
     isBuyerInfoComplete,
     cartUiEnabled,
+    creditsEnabled,
   }
 
   return (

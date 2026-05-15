@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/collapsible"
 import { useCalculateTotal } from "@/hooks/useCalculateTotal"
 import { cn } from "@/lib/utils"
+import { useCityProvider } from "@/providers/cityProvider"
 import type { AttendeePassState } from "@/types/Attendee"
 import type { DiscountProps } from "@/types/discounts"
 import type { ProductsPass } from "@/types/Products"
@@ -26,6 +27,8 @@ const TotalPurchase = ({
 }) => {
   const { t } = useTranslation()
   const { discountApplied } = useDiscountCode()
+  const { getCity } = useCityProvider()
+  const creditsEnabled = getCity()?.credits_enabled ?? false
   const {
     originalTotal,
     total,
@@ -106,10 +109,12 @@ const TotalPurchase = ({
 
             {/* <DiscountMonth attendees={attendees} total={total}/> */}
 
-            <DiscountWeekPurchased
-              attendees={attendees}
-              hasMonthSelected={hasMonthSelected}
-            />
+            {creditsEnabled && (
+              <DiscountWeekPurchased
+                attendees={attendees}
+                hasMonthSelected={hasMonthSelected}
+              />
+            )}
 
             {groupDiscountPercentage >= discountApplied.discount_value ? (
               <GroupDiscountDisplay

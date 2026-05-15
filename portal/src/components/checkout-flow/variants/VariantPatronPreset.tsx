@@ -142,6 +142,34 @@ interface PatronLayoutProps {
   onSkip?: () => void
 }
 
+function ProductDescription({
+  description,
+  className,
+  gap = "space-y-3",
+}: {
+  description: string
+  className: string
+  gap?: string
+}) {
+  const paragraphs = description
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+  return (
+    <div className={gap}>
+      {paragraphs.map((para, idx) => (
+        <p
+          // biome-ignore lint/suspicious/noArrayIndexKey: stable paragraph order
+          key={idx}
+          className={cn(className, "whitespace-pre-line")}
+        >
+          {para}
+        </p>
+      ))}
+    </div>
+  )
+}
+
 function PatronDefault({
   product,
   presets,
@@ -158,9 +186,12 @@ function PatronDefault({
     <div className="space-y-4">
       <div className="bg-checkout-card-bg rounded-2xl shadow-sm border border-border overflow-hidden p-5">
         {product.description && (
-          <p className="text-sm text-muted-foreground mb-4">
-            {product.description}
-          </p>
+          <div className="mb-4">
+            <ProductDescription
+              description={product.description}
+              className="text-sm text-muted-foreground leading-relaxed"
+            />
+          </div>
         )}
 
         <div className="flex gap-2 mb-3">
@@ -246,9 +277,13 @@ function PatronCompact({
     <div className="space-y-3">
       <div className="bg-checkout-card-bg rounded-xl border border-border p-3">
         {product.description && (
-          <p className="text-xs text-muted-foreground mb-3">
-            {product.description}
-          </p>
+          <div className="mb-3">
+            <ProductDescription
+              description={product.description}
+              className="text-xs text-muted-foreground leading-relaxed"
+              gap="space-y-2"
+            />
+          </div>
         )}
 
         <div className="flex gap-1.5 mb-2">
@@ -329,7 +364,10 @@ function PatronGrid({
   return (
     <div className="space-y-4">
       {product.description && (
-        <p className="text-sm text-muted-foreground">{product.description}</p>
+        <ProductDescription
+          description={product.description}
+          className="text-sm text-muted-foreground leading-relaxed"
+        />
       )}
 
       <div className="grid grid-cols-2 gap-3">
