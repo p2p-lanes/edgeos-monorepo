@@ -2,7 +2,7 @@
 
 import { Check, ChevronDown, Plus, ShoppingBag, Ticket } from "lucide-react"
 import Image from "next/image"
-import { useEffect, useState } from "react"
+import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import AddAttendeeButtons from "@/components/checkout-flow/shared/AddAttendeeButtons"
 import ExpandableDescription from "@/components/ui/ExpandableDescription"
@@ -519,6 +519,9 @@ function PassRow({
   const effectiveDisabled = disabled || stateBlocked
   const isClickable = !effectiveDisabled && (!purchased || isEditing)
   const [summaryOpen, setSummaryOpen] = useState(false)
+  const descriptionRef = useRef<HTMLParagraphElement>(null)
+  const [isDescriptionOverflowing, setIsDescriptionOverflowing] =
+    useState(false)
   // Multi-unit stepper mode — editing of purchased multi-unit passes is out
   // of scope (plan decision), so we only show the stepper for non-purchased rows.
   const showStepper =
@@ -706,6 +709,28 @@ function PassRow({
 
   const hasDescription = !!product.description
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-measure on description and collapse state changes
+  useLayoutEffect(() => {
+    if (summaryOpen) return
+    const el = descriptionRef.current
+    if (!el) return
+    setIsDescriptionOverflowing(el.scrollWidth > el.clientWidth + 1)
+  }, [product.description, summaryOpen])
+
+  useEffect(() => {
+    if (typeof ResizeObserver === "undefined") return
+    if (summaryOpen) return
+    const el = descriptionRef.current
+    if (!el) return
+    const observer = new ResizeObserver(() => {
+      const node = descriptionRef.current
+      if (!node) return
+      setIsDescriptionOverflowing(node.scrollWidth > node.clientWidth + 1)
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [summaryOpen])
+
   if (hasDescription) {
     return (
       <div>
@@ -719,23 +744,28 @@ function PassRow({
                 onClick={() => setSummaryOpen(false)}
                 className="inline-flex items-center gap-0.5 font-medium text-primary underline underline-offset-2 hover:opacity-80 align-baseline"
               >
-                Ver menos
+                {t("common.see_less")}
                 <ChevronDown className="w-3 h-3 rotate-180" />
               </button>
             </p>
           ) : (
             <div className="flex items-baseline gap-1.5">
-              <p className="text-xs text-muted-foreground truncate flex-1 min-w-0">
+              <p
+                ref={descriptionRef}
+                className="text-xs text-muted-foreground truncate flex-1 min-w-0"
+              >
                 {product.description}
               </p>
-              <button
-                type="button"
-                onClick={() => setSummaryOpen(true)}
-                className="inline-flex items-center gap-0.5 text-xs font-medium text-primary underline underline-offset-2 hover:opacity-80 shrink-0"
-              >
-                Ver más
-                <ChevronDown className="w-3 h-3" />
-              </button>
+              {isDescriptionOverflowing && (
+                <button
+                  type="button"
+                  onClick={() => setSummaryOpen(true)}
+                  className="inline-flex items-center gap-0.5 text-xs font-medium text-primary underline underline-offset-2 hover:opacity-80 shrink-0"
+                >
+                  {t("common.see_more")}
+                  <ChevronDown className="w-3 h-3" />
+                </button>
+              )}
             </div>
           )}
         </div>
