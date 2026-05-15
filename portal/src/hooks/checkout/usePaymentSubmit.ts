@@ -1,6 +1,7 @@
 "use client"
 
 import { useQueryClient } from "@tanstack/react-query"
+import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useState } from "react"
 import { toast } from "sonner"
 import type { CheckoutMode } from "@/checkout/popupCheckoutPolicy"
@@ -77,6 +78,7 @@ export function usePaymentSubmit({
   buyerData,
 }: UsePaymentSubmitParams) {
   const queryClient = useQueryClient()
+  const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Reset isSubmitting when page is restored from bfcache
@@ -212,7 +214,19 @@ export function usePaymentSubmit({
               })
             : Promise.resolve(),
         ])
-        setCurrentStep("success")
+        if (popupSlug) {
+          if (submitMode === "open-ticketing") {
+            const paymentId = data.id ?? data.payment_id
+            const qs = paymentId ? `?payment_id=${paymentId}` : ""
+            router.replace(`/checkout/${popupSlug}/thank-you${qs}`)
+          } else {
+            router.replace(`/portal/${popupSlug}/passes`)
+          }
+        } else {
+          // Fallback when slug is unavailable: keep the legacy success step
+          // so the success state is at least visible.
+          setCurrentStep("success")
+        }
         setIsSubmitting(false)
         return { success: true }
       }
@@ -252,6 +266,7 @@ export function usePaymentSubmit({
     popupId,
     popupSlug,
     submitMode,
+    router,
   ])
 
   return { submitPayment, isSubmitting }
