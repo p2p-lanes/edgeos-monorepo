@@ -128,9 +128,58 @@ describe("buildPaymentProducts", () => {
       isEditing: false,
       appCredit: 0,
       checkoutMode: CHECKOUT_MODE.PASS_SYSTEM,
+      creditsEnabled: true,
     })
 
     expect(result.isMonthUpgrade).toBe(true)
+    expect(result.products).toEqual([
+      {
+        product_id: "month-new",
+        attendee_id: "attendee-1",
+        quantity: 1,
+      },
+    ])
+  })
+
+  it("disables month upgrade detection when credits_enabled is false", () => {
+    const purchasedWeek = createProduct({
+      id: "week-owned",
+      duration_type: "week",
+      purchased: true,
+      quantity: 1,
+    })
+    const selectedMonth = createProduct({
+      id: "month-new",
+      duration_type: "month",
+      selected: true,
+      quantity: 1,
+    })
+    const attendeePasses = [createAttendee([purchasedWeek, selectedMonth])]
+
+    const result = buildPaymentProducts({
+      attendeePasses,
+      selectedPasses: [
+        {
+          productId: selectedMonth.id,
+          product: selectedMonth,
+          attendeeId: "attendee-1",
+          attendee: attendeePasses[0],
+          quantity: 1,
+          price: 100,
+        },
+      ],
+      housing: null,
+      merch: [],
+      patron: null,
+      dynamicItems: {},
+      isEditing: false,
+      appCredit: 0,
+      checkoutMode: CHECKOUT_MODE.PASS_SYSTEM,
+      creditsEnabled: false,
+    })
+
+    expect(result.isMonthUpgrade).toBe(false)
+    // Only the newly selected month is sent — no purchased week injected.
     expect(result.products).toEqual([
       {
         product_id: "month-new",

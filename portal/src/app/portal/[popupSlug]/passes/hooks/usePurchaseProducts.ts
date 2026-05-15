@@ -22,15 +22,22 @@ const usePurchaseProducts = () => {
       const application = getRelevantApplication()
       if (!application) throw new Error("No application found")
 
-      const monthSelectedWithWeekOrDay = attendeePasses.some(
-        (p) =>
-          p.products.some((p) => p.duration_type === "month" && p.selected) &&
-          (p.products.some((p) => p.duration_type === "week" && p.purchased) ||
-            p.products.some((p) => p.duration_type === "day" && p.purchased)),
-      )
+      const creditsEnabled = getCity()?.credits_enabled ?? false
+
+      const monthSelectedWithWeekOrDay =
+        creditsEnabled &&
+        attendeePasses.some(
+          (p) =>
+            p.products.some((p) => p.duration_type === "month" && p.selected) &&
+            (p.products.some(
+              (p) => p.duration_type === "week" && p.purchased,
+            ) ||
+              p.products.some((p) => p.duration_type === "day" && p.purchased)),
+        )
 
       // LEGACY: application.credit removed from API
       const editableMode =
+        creditsEnabled &&
         (isEditing || monthSelectedWithWeekOrDay) &&
         !attendeePasses.some((p) =>
           p.products.some((p) => p.category === "patreon" && p.selected),

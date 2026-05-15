@@ -2179,6 +2179,7 @@ export type PopupAdmin = {
     events_enabled?: boolean;
     self_check_in_enabled?: boolean;
     show_attendee_directory?: boolean;
+    credits_enabled?: boolean;
     id: string;
 };
 
@@ -2221,6 +2222,7 @@ export type PopupCreate = {
     events_enabled?: boolean;
     self_check_in_enabled?: boolean;
     show_attendee_directory?: boolean;
+    credits_enabled?: boolean;
 };
 
 /**
@@ -2260,6 +2262,7 @@ export type PopupPublic = {
     application_layout?: ApplicationLayout;
     events_enabled?: boolean;
     show_attendee_directory?: boolean;
+    credits_enabled?: boolean;
 };
 
 /**
@@ -2334,6 +2337,7 @@ export type PopupUpdate = {
     events_enabled?: (boolean | null);
     self_check_in_enabled?: (boolean | null);
     show_attendee_directory?: (boolean | null);
+    credits_enabled?: (boolean | null);
 };
 
 /**

@@ -46,6 +46,7 @@ interface UsePaymentSubmitParams {
     lastName: string
     formData: Record<string, unknown>
   } | null
+  creditsEnabled: boolean
 }
 
 interface PaymentSubmitResult {
@@ -76,6 +77,7 @@ export function usePaymentSubmit({
   paymentCompleteRef,
   submitMode,
   buyerData,
+  creditsEnabled,
 }: UsePaymentSubmitParams) {
   const queryClient = useQueryClient()
   const router = useRouter()
@@ -126,6 +128,7 @@ export function usePaymentSubmit({
           isEditing,
           appCredit,
           checkoutMode,
+          creditsEnabled,
         },
       )
 
@@ -267,6 +270,7 @@ export function usePaymentSubmit({
     popupSlug,
     submitMode,
     router,
+    creditsEnabled,
   ])
 
   return { submitPayment, isSubmitting }
