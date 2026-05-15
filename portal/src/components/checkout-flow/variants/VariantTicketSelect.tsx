@@ -531,6 +531,28 @@ function PassRow({
   const currentQuantity = product.quantity ?? 0
   const maxQuantity = resolveMaxQuantity(product)
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-measure on description and collapse state changes
+  useLayoutEffect(() => {
+    if (summaryOpen) return
+    const el = descriptionRef.current
+    if (!el) return
+    setIsDescriptionOverflowing(el.scrollWidth > el.clientWidth + 1)
+  }, [product.description, summaryOpen])
+
+  useEffect(() => {
+    if (typeof ResizeObserver === "undefined") return
+    if (summaryOpen) return
+    const el = descriptionRef.current
+    if (!el) return
+    const observer = new ResizeObserver(() => {
+      const node = descriptionRef.current
+      if (!node) return
+      setIsDescriptionOverflowing(node.scrollWidth > node.clientWidth + 1)
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [summaryOpen])
+
   if (purchased && !isEditing) {
     return (
       <div
@@ -708,28 +730,6 @@ function PassRow({
   )
 
   const hasDescription = !!product.description
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: re-measure on description and collapse state changes
-  useLayoutEffect(() => {
-    if (summaryOpen) return
-    const el = descriptionRef.current
-    if (!el) return
-    setIsDescriptionOverflowing(el.scrollWidth > el.clientWidth + 1)
-  }, [product.description, summaryOpen])
-
-  useEffect(() => {
-    if (typeof ResizeObserver === "undefined") return
-    if (summaryOpen) return
-    const el = descriptionRef.current
-    if (!el) return
-    const observer = new ResizeObserver(() => {
-      const node = descriptionRef.current
-      if (!node) return
-      setIsDescriptionOverflowing(node.scrollWidth > node.clientWidth + 1)
-    })
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [summaryOpen])
 
   if (hasDescription) {
     return (

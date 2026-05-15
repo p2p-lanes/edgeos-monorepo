@@ -58,8 +58,7 @@ const useResources = () => {
   }
 
   if (isCompanion) {
-    const companionEventsVisible =
-      companionApplicationAccepted && eventsEnabled
+    const companionEventsVisible = companionApplicationAccepted && eventsEnabled
     const resources: Resource[] = [
       {
         name: t("sidebar.companion"),
