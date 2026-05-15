@@ -81,6 +81,7 @@ export function buildPaymentProducts({
     checkoutMode === CHECKOUT_MODE.PASS_SYSTEM &&
     detectMonthUpgrade(attendeePasses)
   const products: PaymentProductRequest[] = []
+  const fallbackAttendeeId = attendeePasses[0]?.id ?? ""
 
   if (isEditing) {
     // Editing mode: send kept + new products
@@ -109,6 +110,7 @@ export function buildPaymentProducts({
     }
   } else {
     const hasAccountCredit = appCredit ? Number(appCredit) > 0 : false
+    const firstAttendeeId = selectedPasses[0]?.attendeeId ?? fallbackAttendeeId
 
     // When there's account credit or month upgrade, include purchased products
     // so the backend can recalculate totals with credits applied
@@ -152,7 +154,6 @@ export function buildPaymentProducts({
 
     // Add merch
     for (const item of merch) {
-      const firstAttendeeId = selectedPasses[0]?.attendeeId ?? ""
       products.push({
         product_id: item.productId,
         attendee_id: firstAttendeeId,
@@ -162,7 +163,6 @@ export function buildPaymentProducts({
 
     // Add housing
     if (housing) {
-      const firstAttendeeId = selectedPasses[0]?.attendeeId ?? ""
       const baseQty = housing.pricePerDay ? housing.nights : 1
       products.push({
         product_id: housing.productId,
@@ -173,7 +173,6 @@ export function buildPaymentProducts({
 
     // Add patron
     if (patron) {
-      const firstAttendeeId = selectedPasses[0]?.attendeeId ?? ""
       products.push({
         product_id: patron.productId,
         attendee_id: firstAttendeeId,
@@ -183,7 +182,6 @@ export function buildPaymentProducts({
     }
 
     // Add dynamic step items
-    const firstAttendeeId = selectedPasses[0]?.attendeeId ?? ""
     for (const items of Object.values(dynamicItems)) {
       for (const item of items) {
         if (item.quantity > 0) {

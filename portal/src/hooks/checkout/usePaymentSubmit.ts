@@ -100,7 +100,17 @@ export function usePaymentSubmit({
       return { success: false, error: "Buyer information not available" }
     }
 
-    if (selectedPasses.length === 0) {
+    const hasDynamicItems = Object.values(dynamicItems).some((items) =>
+      items.some((item) => item.quantity > 0),
+    )
+    const hasCheckoutItems =
+      selectedPasses.length > 0 ||
+      !!housing ||
+      merch.length > 0 ||
+      !!patron ||
+      hasDynamicItems
+
+    if (!hasCheckoutItems) {
       return {
         success: false,
         error: isEditing

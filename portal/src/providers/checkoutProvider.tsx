@@ -149,7 +149,7 @@ export function CheckoutProvider({
   const { attendeePasses, toggleProduct, isEditing, toggleEditing } =
     usePassesProvider()
   const { discountApplied, setDiscount, resetDiscount } = useDiscount()
-  const { getRelevantApplication } = useApplication()
+  const { getRelevantApplication, participation } = useApplication()
   const { getCity } = useCityProvider()
   const { products: queriedProducts, loading: isLoadingProducts } =
     useGetPassesData()
@@ -697,9 +697,14 @@ export function CheckoutProvider({
     setDynamicItems({})
   }, [clearPersistedCart, clearHousing, setMerch, clearPatron, clearPromoCode])
 
+  const participationApplicationId =
+    participation?.type === "applicant"
+      ? participation.application_id
+      : undefined
+
   // Submit payment (consolidated via usePaymentSubmit)
   const { submitPayment, isSubmitting } = usePaymentSubmit({
-    applicationId: application?.id,
+    applicationId: application?.id ?? participationApplicationId,
     popupId: cityId,
     popupSlug: submitPopupSlug,
     appCredit,

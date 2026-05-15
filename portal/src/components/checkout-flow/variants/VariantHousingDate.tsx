@@ -2,6 +2,7 @@
 
 import { Building2, Calendar, Check, Home } from "lucide-react"
 import Image from "next/image"
+import type { KeyboardEvent } from "react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import ExpandableDescription from "@/components/ui/ExpandableDescription"
@@ -76,6 +77,13 @@ function formatDateInput(date: Date): string {
 function parseDate(dateStr: string): Date {
   const ymd = dateStr.split("T")[0]
   return new Date(`${ymd}T00:00:00`)
+}
+
+function handleCardKeyDown(event: KeyboardEvent, onSelect: () => void) {
+  if (event.target !== event.currentTarget) return
+  if (event.key !== "Enter" && event.key !== " ") return
+  event.preventDefault()
+  onSelect()
 }
 
 /* ── Shared date picker section ───────────────────────────── */
@@ -232,8 +240,10 @@ function CompactCard({
   const maxQty = resolveMaxQuantity(product)
 
   return (
-    <button
-      type="button"
+    // biome-ignore lint/a11y/useSemanticElements: cannot use a button because quantity controls inside the card are also buttons.
+    <div
+      role="button"
+      tabIndex={0}
       onClick={() => {
         if (supportsQty && quantity === 0) {
           onIncrement()
@@ -241,8 +251,17 @@ function CompactCard({
           onSelect()
         }
       }}
+      onKeyDown={(event) =>
+        handleCardKeyDown(event, () => {
+          if (supportsQty && quantity === 0) {
+            onIncrement()
+          } else {
+            onSelect()
+          }
+        })
+      }
       className={cn(
-        "w-full flex items-center gap-3 rounded-xl border-l-4 px-3 py-3 text-left transition-all",
+        "w-full flex items-center gap-3 rounded-xl border-l-4 px-3 py-3 text-left transition-all cursor-pointer",
         isSelected
           ? "border-l-primary bg-primary/10"
           : "border-l-border bg-checkout-card-bg hover:bg-muted",
@@ -314,7 +333,7 @@ function CompactCard({
           {formatCurrency(totalPrice)}
         </p>
       </div>
-    </button>
+    </div>
   )
 }
 
@@ -349,8 +368,10 @@ function GridCard({
   const maxQty = resolveMaxQuantity(product)
 
   return (
-    <button
-      type="button"
+    // biome-ignore lint/a11y/useSemanticElements: cannot use a button because quantity controls inside the card are also buttons.
+    <div
+      role="button"
+      tabIndex={0}
       onClick={() => {
         if (supportsQty && quantity === 0) {
           onIncrement()
@@ -358,8 +379,17 @@ function GridCard({
           onSelect()
         }
       }}
+      onKeyDown={(event) =>
+        handleCardKeyDown(event, () => {
+          if (supportsQty && quantity === 0) {
+            onIncrement()
+          } else {
+            onSelect()
+          }
+        })
+      }
       className={cn(
-        "relative flex flex-col rounded-2xl border overflow-hidden text-left transition-all bg-checkout-card-bg",
+        "relative flex flex-col rounded-2xl border overflow-hidden text-left transition-all bg-checkout-card-bg cursor-pointer",
         isSelected
           ? "border-primary ring-2 ring-primary/20"
           : "border-border hover:border-muted-foreground/30",
@@ -447,7 +477,7 @@ function GridCard({
           </span>
         </div>
       </div>
-    </button>
+    </div>
   )
 }
 
@@ -526,9 +556,11 @@ function DefaultSectionCard({
           const quantity = getQuantity(product.id)
 
           return (
-            <button
+            // biome-ignore lint/a11y/useSemanticElements: cannot use a button because quantity controls inside the card are also buttons.
+            <div
               key={product.id}
-              type="button"
+              role="button"
+              tabIndex={0}
               onClick={() => {
                 if (supportsQty && quantity === 0) {
                   onIncrement(product.id)
@@ -536,8 +568,17 @@ function DefaultSectionCard({
                   onProductSelect(product.id)
                 }
               }}
+              onKeyDown={(event) =>
+                handleCardKeyDown(event, () => {
+                  if (supportsQty && quantity === 0) {
+                    onIncrement(product.id)
+                  } else {
+                    onProductSelect(product.id)
+                  }
+                })
+              }
               className={cn(
-                "w-full flex items-center justify-between p-3 rounded-xl border-2 transition-all text-left",
+                "w-full flex items-center justify-between p-3 rounded-xl border-2 transition-all text-left cursor-pointer",
                 isSelected
                   ? "border-primary bg-primary/10"
                   : "border-border bg-muted hover:border-muted-foreground/30",
@@ -596,7 +637,7 @@ function DefaultSectionCard({
                   {formatCurrency(totalPrice)}
                 </p>
               </div>
-            </button>
+            </div>
           )
         })}
       </div>

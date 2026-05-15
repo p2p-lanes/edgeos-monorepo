@@ -139,6 +139,41 @@ describe("buildPaymentProducts", () => {
       },
     ])
   })
+
+  it("assigns dynamic checkout items to the attendee when no pass item exists", () => {
+    const attendeePasses = [createAttendee([])]
+    const dynamicProduct = createProduct({ id: "general-admission" })
+
+    const result = buildPaymentProducts({
+      attendeePasses,
+      selectedPasses: [],
+      housing: null,
+      merch: [],
+      patron: null,
+      dynamicItems: {
+        tickets: [
+          {
+            productId: dynamicProduct.id,
+            product: dynamicProduct,
+            quantity: 1,
+            price: dynamicProduct.price,
+            stepType: "tickets",
+          },
+        ],
+      },
+      isEditing: false,
+      appCredit: 0,
+      checkoutMode: CHECKOUT_MODE.SIMPLE_QUANTITY,
+    })
+
+    expect(result.products).toEqual([
+      {
+        product_id: "general-admission",
+        attendee_id: "attendee-1",
+        quantity: 1,
+      },
+    ])
+  })
 })
 
 // ---------------------------------------------------------------------------
