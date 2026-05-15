@@ -1,11 +1,9 @@
 "use client"
 
-import { useParams, useSearchParams } from "next/navigation"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
 import type { ReactNode } from "react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { usePaymentVerification } from "@/hooks/checkout"
 import { readAndClearPendingPaymentRedirectState } from "@/hooks/usePaymentRedirect"
-import { useApplication } from "@/providers/applicationProvider"
 import { useCheckout } from "@/providers/checkoutProvider"
 import DynamicProductStep from "./DynamicProductStep"
 import { shouldUseDynamicStep } from "./registries/stepRegistry"
@@ -18,7 +16,6 @@ import SnapSection from "./SnapSection"
 import ConfirmStep from "./steps/ConfirmStep"
 import OpenCheckoutBuyerStep from "./steps/OpenCheckoutBuyerStep"
 import PassSelectionSection from "./steps/PassSelectionSection"
-import SuccessStep from "./steps/SuccessStep"
 
 interface ScrollyCheckoutFlowProps {
   onPaymentComplete?: () => void
@@ -43,37 +40,17 @@ function ScrollyCheckoutFlowInner({
 
   const searchParams = useSearchParams()
   const params = useParams<{ popupSlug: string }>()
-  const { getRelevantApplication } = useApplication()
-  const application = getRelevantApplication()
-  const [restoredPaymentId, setRestoredPaymentId] = useState<string | null>(
-    null,
-  )
-  const [redirectStateRestored, setRedirectStateRestored] = useState(false)
+  const router = useRouter()
 
   const isSimpleFIReturn = searchParams.get("checkout") === "success"
 
   useEffect(() => {
-    if (!isSimpleFIReturn) {
-      setRestoredPaymentId(null)
-      setRedirectStateRestored(true)
-      return
-    }
-
-    const redirectState = readAndClearPendingPaymentRedirectState()
-    const paymentId =
-      redirectState?.popupSlug === params.popupSlug
-        ? redirectState.paymentId
-        : null
-
-    setRestoredPaymentId(paymentId)
-    setRedirectStateRestored(true)
-  }, [isSimpleFIReturn, params.popupSlug])
-
-  const { paymentStatus } = usePaymentVerification({
-    applicationId: application?.id,
-    paymentId: restoredPaymentId ?? undefined,
-    enabled: redirectStateRestored && isSimpleFIReturn,
-  })
+    if (!isSimpleFIReturn) return
+    // Discard any persisted redirect state from a prior session so it does
+    // not leak into the next purchase.
+    readAndClearPendingPaymentRedirectState()
+    router.replace(`/portal/${params.popupSlug}/passes`)
+  }, [isSimpleFIReturn, params.popupSlug, router])
 
   const handlePayment = async () => {
     const result = await submitPayment()
@@ -298,10 +275,8 @@ function ScrollyCheckoutFlowInner({
 
   if (isSimpleFIReturn) {
     return (
-      <div className="min-h-screen">
-        <SuccessStep
-          paymentStatus={redirectStateRestored ? paymentStatus : "verifying"}
-        />
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-current opacity-60" />
       </div>
     )
   }

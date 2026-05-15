@@ -1,5 +1,6 @@
 import { Check, Crown, Info, Plus } from "lucide-react"
 import type React from "react"
+import { useTranslation } from "react-i18next"
 import ExpandableDescription from "@/components/ui/ExpandableDescription"
 import {
   Tooltip,
@@ -7,7 +8,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
-import { formatCurrency } from "@/types/checkout"
+import { formatPrice } from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
 
 // HOC para manejar la l├│gica de presentaci├│n
@@ -61,17 +62,20 @@ interface ProductPriceProps {
   disabled: boolean
 }
 
-const ProductPrice = ({ product, selected, disabled }: ProductPriceProps) => (
-  <span
-    className={cn(
-      "font-medium",
-      selected && "text-[#005F3A]",
-      disabled && "text-neutral-300",
-    )}
-  >
-    {formatCurrency(product.price)}
-  </span>
-)
+const ProductPrice = ({ product, selected, disabled }: ProductPriceProps) => {
+  const { t } = useTranslation()
+  return (
+    <span
+      className={cn(
+        "font-medium",
+        selected && "text-[#005F3A]",
+        disabled && "text-neutral-300",
+      )}
+    >
+      {formatPrice(product.price, t("common.free"))}
+    </span>
+  )
+}
 
 const TooltipPatreon = ({ purchased }: { purchased?: boolean }) => (
   <Tooltip>

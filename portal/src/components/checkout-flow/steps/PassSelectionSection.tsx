@@ -12,6 +12,7 @@ import {
   User,
 } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { badgeName } from "@/app/portal/[popupSlug]/passes/constants/multiuse"
 import {
   getPassSelectionLayout,
@@ -33,7 +34,7 @@ import { useCheckout } from "@/providers/checkoutProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import { usePassesProvider } from "@/providers/passesProvider"
 import type { AttendeeCategory, AttendeePassState } from "@/types/Attendee"
-import { formatCurrency } from "@/types/checkout"
+import { formatCurrency, formatPrice } from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
 
 /** Smooth-scroll to an attendee card. Defers one frame so layout settles first. */
@@ -663,6 +664,7 @@ function PassOption({
   disabledReason,
   isEditing,
 }: PassOptionProps) {
+  const { t } = useTranslation()
   const { purchased, selected } = product
   const isEditedForCredit = purchased && product.edit
   const comparePrice = product.compare_price ?? product.original_price
@@ -825,7 +827,7 @@ function PassOption({
             isSelected ? "font-bold" : "font-semibold",
           )}
         >
-          {formatCurrency(product.price)}
+          {formatPrice(product.price, t("common.free"))}
         </p>
       </div>
     </button>
@@ -851,6 +853,7 @@ function QuantityPassOption({
   disabledReason,
   isEditing,
 }: DayPassOptionProps) {
+  const { t } = useTranslation()
   const { purchased } = product
   const isEditedForCredit = purchased && product.edit
   const quantity = product.quantity ?? 0
@@ -1027,7 +1030,7 @@ function QuantityPassOption({
             hasQuantity ? "font-bold" : "font-semibold",
           )}
         >
-          {formatCurrency(product.price)}
+          {formatPrice(product.price, t("common.free"))}
         </p>
       </div>
     </div>
@@ -1041,6 +1044,7 @@ function DayPassOption({
   disabledReason,
   isEditing,
 }: DayPassOptionProps) {
+  const { t } = useTranslation()
   const { purchased } = product
   const isEditedForCredit = purchased && product.edit
   const quantity = product.quantity ?? 0
@@ -1219,7 +1223,7 @@ function DayPassOption({
             hasQuantity ? "font-bold" : "font-semibold",
           )}
         >
-          {formatCurrency(product.price)}
+          {formatPrice(product.price, t("common.free"))}
         </p>
       </div>
     </div>

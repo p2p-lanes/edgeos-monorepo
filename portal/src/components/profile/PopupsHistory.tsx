@@ -1,34 +1,68 @@
 import { Calendar, Clock, MapPin } from "lucide-react"
 import Image from "next/image"
 import { useTranslation } from "react-i18next"
-import type { PopupPublic } from "@/client"
+import type { HumanProfileStatsPopup, PopupPublic } from "@/client"
+import { cn } from "@/lib/utils"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import { Card } from "../ui/card"
 
-// LEGACY: CitizenProfilePopup removed from API – popups history endpoint no longer exists
-type LegacyProfilePopup = {
+function PopupThumb({
+  imageUrl,
+  name,
+  className,
+}: {
+  imageUrl?: string | null
+  name: string
+  className?: string
+}) {
+  if (imageUrl) {
+    return (
+      <div className={cn("relative overflow-hidden", className)}>
+        <Image
+          src={imageUrl}
+          alt={name}
+          fill
+          sizes="(max-width: 768px) 100vw, 33vw"
+          className="object-cover"
+        />
+      </div>
+    )
+  }
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-center bg-gradient-to-br from-neutral-200 to-neutral-300",
+        className,
+      )}
+    >
+      <span className="text-3xl font-bold text-neutral-400">
+        {name?.charAt(0).toUpperCase() ?? "?"}
+      </span>
+    </div>
+  )
+}
+
+type ApplicationStatus = "draft" | "in review" | "accepted" | "rejected"
+
+interface PopupWithApplicationStatus {
   popup_name: string
   start_date: string
   end_date: string
   total_days: number
   location?: string | null
   image_url?: string | null
-}
-
-type ApplicationStatus = "draft" | "in review" | "accepted" | "rejected"
-
-interface PopupWithApplicationStatus extends LegacyProfilePopup {
   application_status?: ApplicationStatus
 }
 
-const PopupsHistory = ({ popups }: { popups: LegacyProfilePopup[] }) => {
+const PopupsHistory = ({ popups }: { popups: HumanProfileStatsPopup[] }) => {
   const { t } = useTranslation()
   const { applications } = useApplication()
   const { getPopups } = useCityProvider()
   const allPopups = getPopups()
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) return ""
     return new Date(dateString).toLocaleDateString("en-US", {
       year: "numeric",
       month: "short",
@@ -118,14 +152,15 @@ const PopupsHistory = ({ popups }: { popups: LegacyProfilePopup[] }) => {
     ) // Sort by most recent first
 
   const pastPopups = popups
-    .filter((popup) => new Date(popup.end_date) < new Date())
+    .filter((popup) => popup.end_date && new Date(popup.end_date) < new Date())
     .filter(
       (popup, index, self) =>
         index === self.findIndex((t) => t.popup_name === popup.popup_name),
     )
     .sort(
       (a, b) =>
-        new Date(a.start_date).getTime() - new Date(b.start_date).getTime(),
+        new Date(a.start_date ?? 0).getTime() -
+        new Date(b.start_date ?? 0).getTime(),
     )
 
   return (
@@ -163,12 +198,10 @@ const PopupsHistory = ({ popups }: { popups: LegacyProfilePopup[] }) => {
                 key={popup.popup_name}
                 className="flex items-center gap-4 p-4 border border-[#e2e8f0] rounded-lg"
               >
-                <Image
-                  src={popup.image_url || "/placeholder.svg"}
-                  alt={popup.popup_name}
-                  width={70}
-                  height={70}
-                  className="object-cover aspect-square rounded-lg"
+                <PopupThumb
+                  imageUrl={popup.image_url}
+                  name={popup.popup_name}
+                  className="w-[70px] h-[70px] rounded-lg"
                 />
                 <div className="flex-1">
                   <h5 className="text-xl font-semibold text-foreground mb-2">
@@ -219,18 +252,13 @@ const PopupsHistory = ({ popups }: { popups: LegacyProfilePopup[] }) => {
                 </div>
               )}
               {pastPopups.map((popup) => (
-                <Card key={popup.popup_name} className="p-4">
+                <Card key={popup.popup_id} className="p-4">
                   <div className="relative mb-3">
-                    <Image
-                      src={popup.image_url || "/placeholder.svg"}
-                      alt={popup.popup_name}
-                      width={160}
-                      height={160}
-                      className="w-full h-auto max-h-[140px] object-cover rounded-lg aspect-auto object-top"
+                    <PopupThumb
+                      imageUrl={popup.image_url}
+                      name={popup.popup_name}
+                      className="w-full max-h-[140px] aspect-video rounded-lg"
                     />
-                    {/* <div className="absolute top-2 left-2 bg-[#dcfce7] text-[#166534] px-2 py-1 rounded text-xs font-medium">
-                      Completed
-                    </div> */}
                   </div>
                   <div>
                     <h5 className="text-lg font-semibold text-foreground mb-2">

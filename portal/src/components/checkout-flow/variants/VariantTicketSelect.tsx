@@ -3,6 +3,7 @@
 import { Check, ChevronDown, Plus, ShoppingBag, Ticket } from "lucide-react"
 import Image from "next/image"
 import { useEffect, useState } from "react"
+import { useTranslation } from "react-i18next"
 import AddAttendeeButtons from "@/components/checkout-flow/shared/AddAttendeeButtons"
 import ExpandableDescription from "@/components/ui/ExpandableDescription"
 import QuantitySelector, {
@@ -16,7 +17,7 @@ import { useCheckout } from "@/providers/checkoutProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import { usePassesProvider } from "@/providers/passesProvider"
 import type { AttendeePassState } from "@/types/Attendee"
-import { formatCurrency } from "@/types/checkout"
+import { formatCurrency, formatPrice } from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
 import type { VariantProps } from "../registries/variantRegistry"
 
@@ -507,6 +508,7 @@ function PassRow({
   disabled?: boolean
   isEditing: boolean
 }) {
+  const { t } = useTranslation()
   const { purchased, selected } = product
   const isEditedForCredit = purchased && product.edit
   const comparePrice = product.compare_price ?? product.original_price
@@ -696,7 +698,7 @@ function PassRow({
             rowIsActive ? "font-bold" : "font-semibold",
           )}
         >
-          {formatCurrency(product.price)}
+          {formatPrice(product.price, t("common.free"))}
         </p>
       </div>
     </button>
@@ -759,6 +761,7 @@ function DayPassRow({
   disabled?: boolean
   isEditing: boolean
 }) {
+  const { t } = useTranslation()
   const { purchased } = product
   const isEditedForCredit = purchased && product.edit
   const quantity = product.quantity ?? 0
@@ -878,7 +881,7 @@ function DayPassRow({
             hasQuantity ? "text-primary" : "text-foreground",
           )}
         >
-          {formatCurrency(product.price)}
+          {formatPrice(product.price, t("common.free"))}
         </p>
       </div>
     </div>
@@ -904,6 +907,7 @@ function CompactAttendeeCard({
   isEditing: boolean
   sections: TemplateSection[]
 }) {
+  const { t } = useTranslation()
   const meta = getCategoryMeta(attendee.category ?? "")
   const groups = buildSectionGroups(attendee, sections)
   const visibleProducts = groups.flatMap((g) => g.products)
@@ -1035,7 +1039,7 @@ function CompactAttendeeCard({
                       qty > 0 ? "text-primary" : "text-muted-foreground",
                     )}
                   >
-                    {formatCurrency(p.price)}
+                    {formatPrice(p.price, t("common.free"))}
                   </span>
                 </div>
               )
@@ -1091,7 +1095,7 @@ function CompactAttendeeCard({
                     isSelected ? "opacity-80" : "",
                   )}
                 >
-                  {formatCurrency(p.price)}
+                  {formatPrice(p.price, t("common.free"))}
                 </span>
                 {p.purchased && !isEditing && (
                   <span className="text-[10px] uppercase tracking-wide opacity-60">
@@ -1391,6 +1395,7 @@ function LegacySectionLayout({
   stepType: string
   onSkip?: () => void
 }) {
+  const { t } = useTranslation()
   const { cart, addDynamicItem, removeDynamicItem, updateDynamicQuantity } =
     useCheckout()
   const items = cart.dynamicItems[stepType] ?? []
@@ -1522,7 +1527,7 @@ function LegacySectionLayout({
                 isAdded ? "text-primary" : "text-foreground",
               )}
             >
-              {formatCurrency(total)}
+              {formatPrice(total, t("common.free"))}
             </span>
           </div>
         </div>

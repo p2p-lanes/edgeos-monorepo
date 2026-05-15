@@ -37,6 +37,7 @@ export const queryKeys = {
   },
   profile: {
     current: ["profile", "current"] as const,
+    stats: ["profile", "stats"] as const,
   },
   formSchema: {
     portal: (popupId: string) => ["form-schema", "portal", popupId] as const,

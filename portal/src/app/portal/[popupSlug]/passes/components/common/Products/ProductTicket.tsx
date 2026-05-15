@@ -1,4 +1,5 @@
 import { Ticket } from "lucide-react"
+import { useTranslation } from "react-i18next"
 import ExpandableDescription from "@/components/ui/ExpandableDescription"
 import QuantitySelector, {
   resolveMaxQuantity,
@@ -6,7 +7,7 @@ import QuantitySelector, {
 } from "@/components/ui/QuantitySelector"
 import { cn } from "@/lib/utils"
 import { usePassesProvider } from "@/providers/passesProvider"
-import { formatCurrency } from "@/types/checkout"
+import { formatCurrency, formatPrice } from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
 import ProductDay from "./ProductDay"
 
@@ -41,6 +42,7 @@ const Product = ({
   defaultDisabled?: boolean
   hasMonthPurchased?: boolean
 }) => {
+  const { t } = useTranslation()
   const disabled = product.disabled || defaultDisabled
   const originalPrice = product.original_price ?? product.price
   const { purchased, selected } = product
@@ -154,7 +156,9 @@ const Product = ({
                   disabled && "text-neutral-300",
                 )}
               >
-                {product.price != null ? formatCurrency(product.price) : ""}
+                {product.price != null
+                  ? formatPrice(product.price, t("common.free"))
+                  : ""}
               </p>
             </>
           )}
