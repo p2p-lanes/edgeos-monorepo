@@ -21,6 +21,39 @@ def _slugify(text: str) -> str:
     return text[:80] or "field"
 
 
+# Mirrors the portal `CHECKOUT_BASE_FIELD_KEYS` set in
+# portal/src/app/checkout/types.ts. The /groups Express Checkout renders only
+# base fields in this set OR whose target is "human", plus custom fields that
+# share a section with those base fields. Required validation must use the
+# same subset so backend doesn't reject what the form never asked for.
+EXPRESS_CHECKOUT_BASE_FIELD_NAMES = frozenset(
+    {
+        "email",
+        "first_name",
+        "last_name",
+        "telegram",
+        "gender",
+        "age",
+        "residence",
+    }
+)
+
+
+def _is_express_checkout_base_field(
+    field_name: str, definition: dict[str, Any]
+) -> bool:
+    if field_name in EXPRESS_CHECKOUT_BASE_FIELD_NAMES:
+        return True
+    return definition.get("target") == "human"
+
+
+_EXPRESS_UNSECTIONED_KEY = "__express_unsectioned__"
+
+
+def _section_key(section_id: uuid.UUID | None) -> str:
+    return str(section_id) if section_id else _EXPRESS_UNSECTIONED_KEY
+
+
 class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
     def __init__(self) -> None:
         super().__init__(FormFields)
@@ -85,6 +118,7 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
         popup_id: uuid.UUID,
         app_data: dict[str, Any],
         human: Any,
+        is_express_checkout: bool = False,
     ) -> tuple[bool, list[str]]:
         """Validate required base fields are present.
 
@@ -94,6 +128,10 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
 
         Elementals (first_name, last_name) are skipped here because Pydantic
         enforces them at the ApplicationCreate layer.
+
+        When ``is_express_checkout`` is True, required checks are limited to
+        the reduced subset rendered by the portal /groups Express Checkout
+        (mirrors ``isCheckoutBaseField`` in portal/src/app/checkout/types.ts).
         """
         from app.api.base_field_config.constants import BASE_FIELD_DEFINITIONS
         from app.api.base_field_config.crud import base_field_configs_crud
@@ -115,6 +153,10 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
             if not definition.get("removable", True):
                 continue
             if config.section_id and config.section_id in hidden_section_ids:
+                continue
+            if is_express_checkout and not _is_express_checkout_base_field(
+                config.field_name, definition
+            ):
                 continue
 
             field_name = config.field_name
@@ -138,12 +180,17 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
         popup_id: uuid.UUID,
         custom_fields: dict[str, Any] | None,
         skip_required: bool = False,
+        is_express_checkout: bool = False,
     ) -> tuple[bool, list[str]]:
         """Validate custom_fields against form field definitions.
 
         When ``skip_required`` is True, presence/emptiness checks on required
         fields are bypassed (used for draft saves), but type and constraint
         validation still runs on whatever values were provided.
+
+        When ``is_express_checkout`` is True, required checks are limited to
+        custom fields whose section also contains an Express Checkout base
+        field (mirrors ``getCheckoutMiniFormSchema`` in the portal).
 
         Returns tuple of (is_valid, list_of_errors).
         """
@@ -163,12 +210,33 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
         )
         hidden_section_ids = {s.id for s in sections if s.hidden}
 
+        # When the request comes from the /groups Express Checkout, only
+        # custom fields sharing a section with an Express Checkout base field
+        # were rendered — restrict required validation to that subset.
+        express_section_keys: set[str] = set()
+        if is_express_checkout:
+            from app.api.base_field_config.constants import BASE_FIELD_DEFINITIONS
+            from app.api.base_field_config.crud import base_field_configs_crud
+
+            base_configs = base_field_configs_crud.find_by_popup(session, popup_id)
+            for config in base_configs:
+                definition = BASE_FIELD_DEFINITIONS.get(config.field_name)
+                if not definition:
+                    continue
+                if _is_express_checkout_base_field(config.field_name, definition):
+                    express_section_keys.add(_section_key(config.section_id))
+
         errors: list[str] = []
 
         # Check required fields
         if not skip_required:
             for field in fields:
                 if field.section_id and field.section_id in hidden_section_ids:
+                    continue
+                if (
+                    is_express_checkout
+                    and _section_key(field.section_id) not in express_section_keys
+                ):
                     continue
                 if field.required and field.name not in custom_fields:
                     errors.append(f"Required field '{field.label}' is missing")
