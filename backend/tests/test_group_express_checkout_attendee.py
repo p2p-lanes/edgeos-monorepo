@@ -5,7 +5,6 @@ import uuid
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
-from app.api.application.models import Applications
 from app.api.application.schemas import ApplicationStatus
 from app.api.attendee.models import Attendees
 from app.api.attendee_category.crud import attendee_categories_crud
