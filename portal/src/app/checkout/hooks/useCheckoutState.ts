@@ -170,6 +170,12 @@ const useCheckoutState = ({
         queryKey: queryKeys.profile.current,
         refetchType: "active",
       })
+      // The application create endpoint also creates the main attendee. Refetch
+      // the human's attendees so the passes step sees it (otherwise attendee_id
+      // resolves to "" and the payment POST fails with a UUID parse error).
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.attendees.byHumanPopup(popupId),
+      })
       setCheckoutState("passes")
       setErrorMessage(null)
     },
