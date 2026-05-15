@@ -30,6 +30,9 @@ const useResources = () => {
   const isCompanion = participation?.type === "companion"
   const canSeeAttendees = application?.status === "accepted"
   const companionCanSeePasses = isCompanion
+  const companionApplicationAccepted =
+    participation?.type === "companion" &&
+    participation?.application_status === "accepted"
 
   // Direct-sale popups have no application and no reviewer-controlled
   // attendees — just an event overview that links to checkout, plus a
@@ -55,6 +58,8 @@ const useResources = () => {
   }
 
   if (isCompanion) {
+    const companionEventsVisible =
+      companionApplicationAccepted && eventsEnabled
     const resources: Resource[] = [
       {
         name: t("sidebar.companion"),
@@ -74,6 +79,32 @@ const useResources = () => {
         icon: Ticket,
         status: companionCanSeePasses ? "active" : "hidden",
         path: `/portal/${city?.slug}/passes`,
+      },
+      {
+        name: t("sidebar.events"),
+        icon: CalendarDays,
+        status: companionEventsVisible ? "active" : "hidden",
+        path: `/portal/${city?.slug}/events`,
+        children: [
+          {
+            name: t("sidebar.venues"),
+            icon: MapPin,
+            status: companionEventsVisible ? "active" : "hidden",
+            path: `/portal/${city?.slug}/events/venues`,
+          },
+          {
+            name: t("sidebar.api_keys", { defaultValue: "API Keys" }),
+            icon: Key,
+            status: companionEventsVisible ? "active" : "hidden",
+            path: "/portal/api-keys",
+          },
+          {
+            name: t("sidebar.api_docs", { defaultValue: "API Docs" }),
+            icon: BookOpen,
+            status: companionEventsVisible ? "active" : "hidden",
+            path: "/portal/docs",
+          },
+        ],
       },
     ]
 
