@@ -34,6 +34,8 @@ interface ThemeColors {
   accent_color?: string
   checkout_navbar_bg?: string
   checkout_subtitle_color?: string
+  checkout_bottom_bar_bg_color?: string
+  checkout_bottom_bar_text_color?: string
 }
 
 interface ThemeConfig {
@@ -95,6 +97,12 @@ function computeThemeVars(
   if (colors.checkout_subtitle_color) {
     vars["--checkout-subtitle"] = colors.checkout_subtitle_color
   }
+  if (colors.checkout_bottom_bar_bg_color) {
+    vars["--checkout-bottom-bar-bg"] = colors.checkout_bottom_bar_bg_color
+  }
+  if (colors.checkout_bottom_bar_text_color) {
+    vars["--checkout-bottom-bar-text"] = colors.checkout_bottom_bar_text_color
+  }
 
   // If no mode/primary is set, stop here — rest of the palette stays on the
   // globals.css defaults.
@@ -146,9 +154,12 @@ function computeThemeVars(
       colors.checkout_navbar_bg || mix(palette.background, "transparent", 85),
     "--checkout-footer-bg": mix(palette.background, "transparent", 85),
     "--checkout-card-bg": palette.card,
-    "--checkout-bottom-bar-bg": palette.sidebar,
-    "--checkout-bottom-bar-text": palette.foreground,
   })
+
+  // --checkout-bottom-bar-bg / -text are deliberately NOT derived from the
+  // palette. Keeping them on the globals.css defaults (or the per-surface
+  // override above) avoids blending the floating footer into the page bg
+  // when the admin has only chosen mode/primary.
 
   // Brand-dependent tokens only fill in once the admin picked a primary —
   // otherwise we'd overwrite the nice shadcn default with nothing usable.

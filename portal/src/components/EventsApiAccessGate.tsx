@@ -7,11 +7,12 @@ import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 
 // Mirrors the sidebar's exposure rule for API Keys / API Docs in
-// useResources.ts: shown only on the standard (application-based) flow,
-// for accepted attendees, when the events module is enabled at the popup
-// level. Direct-sale and companion flows never expose these subsections,
-// so navigating to /portal/api-keys or /portal/docs by URL must fall
-// through to the unavailable state instead of rendering the page.
+// useResources.ts: shown on application-based flows (applicant or
+// companion) once the application is accepted and the events module is
+// enabled at the popup level. Direct-sale flows never expose these
+// subsections, so navigating to /portal/api-keys or /portal/docs by URL
+// must fall through to the unavailable state instead of rendering the
+// page.
 export function useEventsApiAccess(): { allowed: boolean } {
   const { getCity } = useCityProvider()
   const { getRelevantApplication, participation } = useApplication()
@@ -21,10 +22,12 @@ export function useEventsApiAccess(): { allowed: boolean } {
   const isDirectSale = city?.sale_type === "direct"
   const isCompanion = participation?.type === "companion"
   const eventsEnabled = city?.events_enabled ?? true
-  const canSeeAttendees = application?.status === "accepted"
+  const applicationAccepted = isCompanion
+    ? participation?.application_status === "accepted"
+    : application?.status === "accepted"
 
   return {
-    allowed: !isDirectSale && !isCompanion && eventsEnabled && canSeeAttendees,
+    allowed: !isDirectSale && eventsEnabled && applicationAccepted,
   }
 }
 

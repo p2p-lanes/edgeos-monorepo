@@ -282,6 +282,12 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         # still validate types/constraints on any values the user did provide.
         is_draft = _is_draft_status(getattr(app_data, "status", None))
 
+        # Applications submitted through a group come from the portal's
+        # Express Checkout, which renders a reduced personal-info form. Scope
+        # required validation to that subset so users aren't blocked on fields
+        # the form never asked for.
+        is_express_checkout = bool(getattr(app_data, "group_id", None))
+
         # Validate custom_fields against form field definitions
         if validate_custom_fields and app_data.custom_fields:
             is_valid, errors = form_fields_crud.validate_custom_fields(
@@ -289,6 +295,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 app_data.popup_id,
                 app_data.custom_fields,
                 skip_required=is_draft,
+                is_express_checkout=is_express_checkout,
             )
             if not is_valid:
                 raise HTTPException(
@@ -307,7 +314,11 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         # Validate required base fields against BaseFieldConfigs
         if validate_custom_fields and not is_draft:
             is_valid, errors = form_fields_crud.validate_base_fields(
-                session, app_data.popup_id, app_data.model_dump(), human
+                session,
+                app_data.popup_id,
+                app_data.model_dump(),
+                human,
+                is_express_checkout=is_express_checkout,
             )
             if not is_valid:
                 raise HTTPException(
@@ -511,6 +522,10 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         # still validate types/constraints on any values the user did provide.
         is_draft = _is_draft_status(getattr(app_data, "status", None))
 
+        # Group applications use the Express Checkout reduced form on the
+        # portal; mirror that scope here when the admin creates one too.
+        is_express_checkout = bool(getattr(app_data, "group_id", None))
+
         # Validate custom_fields against form field definitions
         if validate_custom_fields and app_data.custom_fields:
             is_valid, errors = form_fields_crud.validate_custom_fields(
@@ -518,6 +533,7 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
                 app_data.popup_id,
                 app_data.custom_fields,
                 skip_required=is_draft,
+                is_express_checkout=is_express_checkout,
             )
             if not is_valid:
                 raise HTTPException(
@@ -552,7 +568,11 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
         # Validate required base fields against BaseFieldConfigs
         if validate_custom_fields and not is_draft:
             is_valid, errors = form_fields_crud.validate_base_fields(
-                session, app_data.popup_id, app_data.model_dump(), human
+                session,
+                app_data.popup_id,
+                app_data.model_dump(),
+                human,
+                is_express_checkout=is_express_checkout,
             )
             if not is_valid:
                 raise HTTPException(
