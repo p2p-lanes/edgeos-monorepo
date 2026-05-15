@@ -1,34 +1,31 @@
 import { Calendar, Clock, MapPin } from "lucide-react"
 import Image from "next/image"
 import { useTranslation } from "react-i18next"
-import type { PopupPublic } from "@/client"
+import type { HumanProfileStatsPopup, PopupPublic } from "@/client"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import { Card } from "../ui/card"
 
-// LEGACY: CitizenProfilePopup removed from API – popups history endpoint no longer exists
-type LegacyProfilePopup = {
+type ApplicationStatus = "draft" | "in review" | "accepted" | "rejected"
+
+interface PopupWithApplicationStatus {
   popup_name: string
   start_date: string
   end_date: string
   total_days: number
   location?: string | null
   image_url?: string | null
-}
-
-type ApplicationStatus = "draft" | "in review" | "accepted" | "rejected"
-
-interface PopupWithApplicationStatus extends LegacyProfilePopup {
   application_status?: ApplicationStatus
 }
 
-const PopupsHistory = ({ popups }: { popups: LegacyProfilePopup[] }) => {
+const PopupsHistory = ({ popups }: { popups: HumanProfileStatsPopup[] }) => {
   const { t } = useTranslation()
   const { applications } = useApplication()
   const { getPopups } = useCityProvider()
   const allPopups = getPopups()
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) return ""
     return new Date(dateString).toLocaleDateString("en-US", {
       year: "numeric",
       month: "short",
@@ -118,14 +115,15 @@ const PopupsHistory = ({ popups }: { popups: LegacyProfilePopup[] }) => {
     ) // Sort by most recent first
 
   const pastPopups = popups
-    .filter((popup) => new Date(popup.end_date) < new Date())
+    .filter((popup) => popup.end_date && new Date(popup.end_date) < new Date())
     .filter(
       (popup, index, self) =>
         index === self.findIndex((t) => t.popup_name === popup.popup_name),
     )
     .sort(
       (a, b) =>
-        new Date(a.start_date).getTime() - new Date(b.start_date).getTime(),
+        new Date(a.start_date ?? 0).getTime() -
+        new Date(b.start_date ?? 0).getTime(),
     )
 
   return (
@@ -219,7 +217,7 @@ const PopupsHistory = ({ popups }: { popups: LegacyProfilePopup[] }) => {
                 </div>
               )}
               {pastPopups.map((popup) => (
-                <Card key={popup.popup_name} className="p-4">
+                <Card key={popup.popup_id} className="p-4">
                   <div className="relative mb-3">
                     <Image
                       src={popup.image_url || "/placeholder.svg"}

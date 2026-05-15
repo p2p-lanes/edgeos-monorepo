@@ -8408,6 +8408,94 @@ callers can already see other humans' names in event participant lists,
 so name + avatar is the same privacy bar without leaking emails.`
 } as const;
 
+export const HumanProfileStatsSchema = {
+    properties: {
+        popups: {
+            items: {
+                '$ref': '#/components/schemas/HumanProfileStatsPopup'
+            },
+            type: 'array',
+            title: 'Popups'
+        },
+        total_days: {
+            type: 'integer',
+            title: 'Total Days'
+        }
+    },
+    type: 'object',
+    required: ['popups', 'total_days'],
+    title: 'HumanProfileStats',
+    description: "Aggregate stats for the current human's profile page."
+} as const;
+
+export const HumanProfileStatsPopupSchema = {
+    properties: {
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        popup_name: {
+            type: 'string',
+            title: 'Popup Name'
+        },
+        start_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Start Date'
+        },
+        end_date: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'End Date'
+        },
+        location: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Location'
+        },
+        image_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Image Url'
+        },
+        total_days: {
+            type: 'integer',
+            title: 'Total Days'
+        }
+    },
+    type: 'object',
+    required: ['popup_id', 'popup_name', 'total_days'],
+    title: 'HumanProfileStatsPopup',
+    description: "Single popup entry in a human's profile stats."
+} as const;
+
 export const HumanProfileUpdateSchema = {
     properties: {
         first_name: {
