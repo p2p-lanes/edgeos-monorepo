@@ -1,8 +1,10 @@
+import { useQuery } from "@tanstack/react-query"
 import { ArrowRight, FileText, Sparkles, Ticket } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { TICKET_CATEGORY } from "@/checkout/popupCheckoutPolicy"
+import { TicketingStepsService } from "@/client"
 import AddAttendeeButtons from "@/components/checkout-flow/shared/AddAttendeeButtons"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -17,6 +19,11 @@ import { AttendeeModal } from "../components/AttendeeModal"
 import AttendeeTicket from "../components/common/AttendeeTicket"
 import InvoiceModal from "../components/common/InvoiceModal"
 import useModal from "../hooks/useModal"
+
+interface TicketSelectSectionConfig {
+  product_ids?: string[]
+  attendee_categories?: string[] | null
+}
 
 interface YourPassesProps {
   access: Extract<HumanPopupAccess, { state: "allowed" }>
@@ -40,13 +47,49 @@ const YourPasses = ({ access: _access, onSwitchToBuy }: YourPassesProps) => {
     a.products.some((p) => p.purchased),
   )
 
-  const mainTickets = products.filter(
-    (p) =>
-      p.category === TICKET_CATEGORY &&
-      p.is_active !== false &&
-      (p.attendee_category_id == null ||
-        p.attendee_category_id === primaryCategoryId),
-  )
+  // Product → main-attendee mapping lives in ticketing-step template_config
+  // sections (see VariantTicketSelect.buildSectionGroups). Mirror that logic
+  // here so the "Starting at" price reflects only what the main attendee can
+  // actually buy. Products.attendee_category_id is not populated for popups
+  // configured under the post-migration ticket-as-first-class-entity model,
+  // so we don't fall back to it — that's what produced the $0 bug.
+  const popupId = city?.id ? String(city.id) : null
+  const { data: ticketingStepsData } = useQuery({
+    queryKey: ["ticketing-steps-portal", popupId],
+    queryFn: () =>
+      TicketingStepsService.listPortalTicketingSteps({ popupId: popupId! }),
+    enabled: !!popupId,
+  })
+
+  const mainProductIds: Set<string> | null = (() => {
+    if (!ticketingStepsData || primaryCategoryId == null) return null
+
+    const ticketSelectStep = (ticketingStepsData.results ?? []).find(
+      (s) => s.template === "ticket-select",
+    )
+    const sections = (ticketSelectStep?.template_config?.sections ??
+      []) as TicketSelectSectionConfig[]
+    if (sections.length === 0) return null
+
+    const ids = new Set<string>()
+    for (const section of sections) {
+      const visibleToMain =
+        section.attendee_categories == null ||
+        section.attendee_categories.includes(primaryCategoryId)
+      if (!visibleToMain) continue
+      for (const pid of section.product_ids ?? []) ids.add(pid)
+    }
+    return ids
+  })()
+
+  const mainTickets = mainProductIds
+    ? products.filter(
+        (p) =>
+          p.category === TICKET_CATEGORY &&
+          p.is_active !== false &&
+          mainProductIds.has(p.id),
+      )
+    : []
   const minPrice =
     mainTickets.length > 0 ? Math.min(...mainTickets.map((p) => p.price)) : null
 
