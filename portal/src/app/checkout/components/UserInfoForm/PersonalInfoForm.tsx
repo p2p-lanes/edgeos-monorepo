@@ -200,8 +200,18 @@ const PersonalInfoForm = ({
           <div className="grid gap-4 md:grid-cols-2">
             {section.fields.map(({ name, field }) => {
               if (name === "gender" && genderField) {
+                const showSpecify = displayGender === "Specify"
+                const genderSpansFullRow =
+                  Boolean(genderField.help_text) || showSpecify
                 return (
-                  <div key={name} className="space-y-4 md:col-span-2">
+                  <div
+                    key={name}
+                    className={
+                      genderSpansFullRow
+                        ? "space-y-4 md:col-span-2"
+                        : "space-y-4"
+                    }
+                  >
                     <SelectForm
                       label={genderField.label}
                       id="gender"
@@ -215,7 +225,7 @@ const PersonalInfoForm = ({
                       }))}
                     />
 
-                    {displayGender === "Specify" && (
+                    {showSpecify && (
                       <InputForm
                         label={t("form.gender_specify")}
                         id="gender_specify"
@@ -232,15 +242,13 @@ const PersonalInfoForm = ({
                 )
               }
 
+              const spansFullRow =
+                field.type === "textarea" ||
+                field.type === "multiselect" ||
+                Boolean(field.help_text)
+
               return (
-                <div
-                  key={name}
-                  className={
-                    field.type === "textarea" || field.type === "multiselect"
-                      ? "md:col-span-2"
-                      : ""
-                  }
-                >
+                <div key={name} className={spansFullRow ? "md:col-span-2" : ""}>
                   <DynamicField
                     name={name}
                     field={field}
