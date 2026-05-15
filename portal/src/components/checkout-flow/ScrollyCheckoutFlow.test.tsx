@@ -4,26 +4,17 @@ import ScrollyCheckoutFlow from "./ScrollyCheckoutFlow"
 
 const mockUseSearchParams = vi.fn()
 const mockReadAndClearPendingPaymentRedirectState = vi.fn()
-const mockUsePaymentVerification = vi.fn()
+const mockRouterReplace = vi.fn()
 
 vi.mock("next/navigation", () => ({
   useParams: () => ({ popupSlug: "popup-a" }),
   useSearchParams: () => mockUseSearchParams(),
+  useRouter: () => ({ replace: mockRouterReplace }),
 }))
 
 vi.mock("@/hooks/usePaymentRedirect", () => ({
   readAndClearPendingPaymentRedirectState: () =>
     mockReadAndClearPendingPaymentRedirectState(),
-}))
-
-vi.mock("@/hooks/checkout", () => ({
-  usePaymentVerification: (args: unknown) => mockUsePaymentVerification(args),
-}))
-
-vi.mock("@/providers/applicationProvider", () => ({
-  useApplication: () => ({
-    getRelevantApplication: () => null,
-  }),
 }))
 
 vi.mock("@/providers/checkoutProvider", () => ({
@@ -32,12 +23,6 @@ vi.mock("@/providers/checkoutProvider", () => ({
     submitPayment: vi.fn().mockResolvedValue({ success: true }),
     stepConfigs: [],
   }),
-}))
-
-vi.mock("./steps/SuccessStep", () => ({
-  default: ({ paymentStatus }: { paymentStatus: string }) => (
-    <div>{paymentStatus}</div>
-  ),
 }))
 
 vi.mock("./DynamicProductStep", () => ({
@@ -76,32 +61,25 @@ vi.mock("./registries/stepRegistry", () => ({
 
 describe("ScrollyCheckoutFlow", () => {
   beforeEach(() => {
-    mockUsePaymentVerification.mockReturnValue({ paymentStatus: "pending" })
     mockReadAndClearPendingPaymentRedirectState.mockReset()
     mockUseSearchParams.mockReset()
+    mockRouterReplace.mockReset()
   })
 
-  it("restores the saved payment id for checkout-success returns", async () => {
+  it("redirects to /passes when returning from SimpleFI", async () => {
     mockUseSearchParams.mockReturnValue({
       get: (key: string) => (key === "checkout" ? "success" : null),
-    })
-    mockReadAndClearPendingPaymentRedirectState.mockReturnValue({
-      paymentId: "payment-123",
-      popupSlug: "popup-a",
     })
 
     render(<ScrollyCheckoutFlow />)
 
     await waitFor(() => {
-      expect(mockUsePaymentVerification).toHaveBeenLastCalledWith({
-        applicationId: undefined,
-        paymentId: "payment-123",
-        enabled: true,
-      })
+      expect(mockReadAndClearPendingPaymentRedirectState).toHaveBeenCalled()
+      expect(mockRouterReplace).toHaveBeenCalledWith("/portal/popup-a/passes")
     })
   })
 
-  it("ignores redirect state when the return is not checkout-success", async () => {
+  it("does not redirect when the return is not checkout-success", async () => {
     mockUseSearchParams.mockReturnValue({
       get: () => null,
     })
@@ -110,11 +88,7 @@ describe("ScrollyCheckoutFlow", () => {
 
     await waitFor(() => {
       expect(mockReadAndClearPendingPaymentRedirectState).not.toHaveBeenCalled()
-      expect(mockUsePaymentVerification).toHaveBeenLastCalledWith({
-        applicationId: undefined,
-        paymentId: undefined,
-        enabled: false,
-      })
+      expect(mockRouterReplace).not.toHaveBeenCalled()
     })
   })
 })

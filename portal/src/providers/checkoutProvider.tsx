@@ -701,7 +701,7 @@ export function CheckoutProvider({
   const { submitPayment, isSubmitting } = usePaymentSubmit({
     applicationId: application?.id,
     popupId: cityId,
-    popupSlug: submitPopupSlug,
+    popupSlug: submitPopupSlug ?? city?.slug ?? null,
     appCredit,
     checkoutMode: checkoutPolicy.checkoutMode,
     attendeePasses,
