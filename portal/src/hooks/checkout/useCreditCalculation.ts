@@ -55,8 +55,7 @@ export function useCreditCalculation({
             (p.duration_type === "week" || p.duration_type === "day"),
         )
         .reduce(
-          (sum, p) =>
-            sum + (p.original_price ?? p.price) * (p.quantity ?? 1),
+          (sum, p) => sum + (p.original_price ?? p.price) * (p.quantity ?? 1),
           0,
         )
 
