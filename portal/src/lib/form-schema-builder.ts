@@ -12,6 +12,15 @@ function fieldToZod(field: FormFieldSchema): z.ZodType {
       return z.array(z.string())
     case "number":
       return z.string()
+    case "rich_text":
+      // Checkbox-mode rich_text stores a bool; display-only stores nothing
+      // meaningful but we keep the field in state to roundtrip cleanly.
+      return field.config?.is_checkbox ? z.boolean() : z.unknown()
+    case "signature":
+      return z.object({
+        signature: z.string().optional(),
+        signed_at: z.string().optional(),
+      })
     default:
       return z.string()
   }
@@ -55,6 +64,20 @@ function makeOptional(zodType: z.ZodType): z.ZodType {
 }
 
 function makeRequired(zodType: z.ZodType, field: FormFieldSchema): z.ZodType {
+  if (field.type === "signature") {
+    const requireDate = !!field.config?.require_date
+    return z.object({
+      signature: z.string().min(1, `${field.label} is required`),
+      signed_at: requireDate
+        ? z.string().min(1, "Date is required")
+        : z.string().optional(),
+    })
+  }
+  if (field.type === "rich_text" && field.config?.is_checkbox) {
+    return z
+      .boolean()
+      .refine((v) => v === true, { message: `${field.label} is required` })
+  }
   if (zodType instanceof z.ZodString) {
     return zodType.min(1, `${field.label} is required`)
   }

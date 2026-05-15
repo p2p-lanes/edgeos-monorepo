@@ -1,5 +1,6 @@
 "use client"
 
+import { resolveFieldWidth } from "@edgeos/shared-form-ui"
 import { AnimatePresence, motion } from "framer-motion"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import { memo, useCallback, useMemo, useState } from "react"
@@ -30,13 +31,6 @@ const animationProps = {
   exit: { opacity: 0, height: 0 },
   transition: { duration: 0.3, ease: "easeInOut" },
 }
-
-const FULL_WIDTH_TYPES = new Set([
-  "textarea",
-  "multiselect",
-  "url",
-  "select_cards",
-])
 
 function mapOptions(options?: string[]) {
   return (options ?? []).map((opt) => ({ value: opt, label: opt }))
@@ -113,7 +107,7 @@ const BaseField = memo(function BaseField({
   }
 
   return (
-    <div className={FULL_WIDTH_TYPES.has(field.type) ? "md:col-span-2" : ""}>
+    <div className={resolveFieldWidth(field) === "full" ? "md:col-span-2" : ""}>
       <DynamicField
         name={name}
         field={field}
@@ -363,7 +357,7 @@ export function DynamicApplicationForm({
                       <div
                         key={name}
                         className={
-                          FULL_WIDTH_TYPES.has(field.type)
+                          resolveFieldWidth(field) === "full"
                             ? "md:col-span-2"
                             : ""
                         }

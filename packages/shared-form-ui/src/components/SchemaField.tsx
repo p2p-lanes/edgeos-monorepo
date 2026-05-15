@@ -1,9 +1,22 @@
-import type { FormFieldSchema } from "../types"
+import type {
+  FormFieldSchema,
+  ImageUploadConfig,
+  MultiSelectDetailedConfig,
+  RichTextConfig,
+  SignatureConfig,
+  SignatureValue,
+} from "../types"
 import { cn } from "../utils"
 import { CheckboxForm } from "./Form/CheckboxForm"
+import { CountrySelectForm } from "./Form/CountrySelectForm"
+import { ImageUploadForm } from "./Form/ImageUploadForm"
 import { InputForm } from "./Form/InputForm"
+import { MultiSelectDetailedForm } from "./Form/MultiSelectDetailedForm"
 import { PhoneInputForm } from "./Form/PhoneInputForm"
+import { RadioListForm } from "./Form/RadioListForm"
+import { RichTextForm } from "./Form/RichTextForm"
 import { SelectForm } from "./Form/SelectForm"
+import { SignatureForm } from "./Form/SignatureForm"
 import { TextAreaForm } from "./Form/TextAreaForm"
 import { FormInputWrapper } from "./FormInputWrapper"
 import { LabelRequired } from "./Label"
@@ -85,6 +98,8 @@ export function SchemaField({
           isRequired={showRequiredIndicator}
           subtitle={displayHelpText}
           placeholder={field.placeholder}
+          disabled={isDisabled}
+          readOnly={readOnly}
         />
       )
 
@@ -148,6 +163,7 @@ export function SchemaField({
           error={error}
           isRequired={showRequiredIndicator}
           placeholder={field.placeholder ?? "Select an option"}
+          disabled={isDisabled}
         />
       )
 
@@ -248,6 +264,38 @@ export function SchemaField({
         </FormInputWrapper>
       )
 
+    case "radio":
+      return (
+        <RadioListForm
+          label={displayLabel}
+          id={name}
+          value={(value as string) ?? ""}
+          onChange={(v) => handleChange(name, v)}
+          options={field.options ?? []}
+          error={error}
+          isRequired={showRequiredIndicator}
+          subtitle={displayHelpText}
+          disabled={isDisabled}
+        />
+      )
+
+    case "multiselect_detailed":
+      return (
+        <MultiSelectDetailedForm
+          label={displayLabel}
+          id={name}
+          value={(value as string[]) ?? []}
+          onChange={(v) => handleChange(name, v)}
+          options={field.options ?? []}
+          config={field.config as MultiSelectDetailedConfig | undefined}
+          error={error}
+          isRequired={showRequiredIndicator}
+          subtitle={displayHelpText}
+          placeholder={field.placeholder}
+          disabled={isDisabled}
+        />
+      )
+
     case "phone":
       return (
         <PhoneInputForm
@@ -260,6 +308,66 @@ export function SchemaField({
           subtitle={displayHelpText}
           placeholder={field.placeholder}
           disabled={isDisabled}
+        />
+      )
+
+    case "rich_text":
+      return (
+        <RichTextForm
+          id={name}
+          label={displayLabel}
+          config={field.config as RichTextConfig | undefined}
+          value={value as boolean | undefined}
+          onChange={(v) => handleChange(name, v)}
+          error={error}
+          isRequired={showRequiredIndicator}
+          disabled={isDisabled}
+        />
+      )
+
+    case "image_upload":
+      return (
+        <ImageUploadForm
+          id={name}
+          label={displayLabel}
+          subtitle={displayHelpText}
+          config={field.config as ImageUploadConfig | undefined}
+          value={(value as string) ?? ""}
+          onChange={(v) => handleChange(name, v)}
+          error={error}
+          isRequired={showRequiredIndicator}
+          disabled={isDisabled}
+          readOnly={readOnly}
+        />
+      )
+
+    case "country_select":
+      return (
+        <CountrySelectForm
+          label={displayLabel}
+          id={name}
+          value={(value as string) ?? ""}
+          onChange={(v) => handleChange(name, v)}
+          error={error}
+          isRequired={showRequiredIndicator}
+          placeholder={field.placeholder}
+          disabled={isDisabled}
+        />
+      )
+
+    case "signature":
+      return (
+        <SignatureForm
+          id={name}
+          label={displayLabel}
+          subtitle={displayHelpText}
+          config={field.config as SignatureConfig | undefined}
+          value={(value as SignatureValue | undefined) ?? {}}
+          onChange={(v) => handleChange(name, v)}
+          error={error}
+          isRequired={showRequiredIndicator}
+          disabled={isDisabled}
+          readOnly={readOnly}
         />
       )
 

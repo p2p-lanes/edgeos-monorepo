@@ -1,6 +1,6 @@
 import { useDroppable } from "@dnd-kit/core"
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
-import { Check, Pencil, Trash2, X } from "lucide-react"
+import { Check, Eye, EyeOff, Pencil, Trash2, X } from "lucide-react"
 import { useRef, useState } from "react"
 import type {
   FormFieldPublic,
@@ -49,6 +49,7 @@ export function SectionDropZone({
   const sectionDescription = section?.description ?? null
   const isApiSection = section !== null
   const isSpecial = isApiSection && isSpecialSection(section)
+  const isHidden = !!section?.hidden
 
   const { setNodeRef, isOver } = useDroppable({
     id: `section-${sectionKey}`,
@@ -124,7 +125,9 @@ export function SectionDropZone({
           isOver
             ? "bg-primary/5 ring-2 ring-primary/40 ring-offset-2 ring-offset-background"
             : ""
-        } ${isSpecial ? "opacity-90 bg-muted/20" : ""}`}
+        } ${isSpecial ? "opacity-90 bg-muted/20" : ""} ${
+          isHidden ? "opacity-60" : ""
+        }`}
       >
         {/* Left: section header */}
         <div className="space-y-1 group/section">
@@ -165,6 +168,11 @@ export function SectionDropZone({
                 <h2 className="text-xl font-semibold tracking-tight flex-1">
                   {sectionLabel}
                 </h2>
+                {isHidden && (
+                  <Badge variant="outline" className="text-xs shrink-0">
+                    Hidden
+                  </Badge>
+                )}
                 {isSpecial && (
                   <Badge variant="secondary" className="text-xs shrink-0">
                     Protected
@@ -172,6 +180,30 @@ export function SectionDropZone({
                 )}
                 {isApiSection && (
                   <div className="flex gap-0.5 opacity-0 group-hover/section:opacity-100 transition-opacity">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                      onClick={() =>
+                        onUpdateSection(section!.id, { hidden: !isHidden })
+                      }
+                      aria-label={
+                        isHidden
+                          ? `Show section ${sectionLabel} on the portal`
+                          : `Hide section ${sectionLabel} on the portal`
+                      }
+                      title={
+                        isHidden
+                          ? "Section is hidden from the portal — click to show"
+                          : "Hide this section from the portal"
+                      }
+                    >
+                      {isHidden ? (
+                        <EyeOff className="h-3 w-3" />
+                      ) : (
+                        <Eye className="h-3 w-3" />
+                      )}
+                    </Button>
                     <Button
                       variant="ghost"
                       size="icon"

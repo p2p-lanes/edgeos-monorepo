@@ -1413,6 +1413,10 @@ export type FormFieldCreate = {
     help_text?: (string | null);
     min_date?: (string | null);
     max_date?: (string | null);
+    config?: ({
+    [key: string]: unknown;
+} | null);
+    width?: ('full' | 'half' | null);
 };
 
 export type FormFieldPublic = {
@@ -1431,6 +1435,10 @@ export type FormFieldPublic = {
     help_text?: (string | null);
     min_date?: (string | null);
     max_date?: (string | null);
+    config?: ({
+    [key: string]: unknown;
+} | null);
+    width?: ('full' | 'half' | null);
     protected?: boolean;
     removable?: boolean;
     target?: (string | null);
@@ -1447,6 +1455,10 @@ export type FormFieldUpdate = {
     help_text?: (string | null);
     min_date?: (string | null);
     max_date?: (string | null);
+    config?: ({
+    [key: string]: unknown;
+} | null);
+    width?: ('full' | 'half' | null);
 };
 
 export type FormSectionCreate = {
@@ -1467,6 +1479,7 @@ export type FormSectionPublic = {
     description?: (string | null);
     order?: number;
     protected?: boolean;
+    hidden?: boolean;
     kind?: string;
 };
 
@@ -1474,6 +1487,7 @@ export type FormSectionUpdate = {
     label?: (string | null);
     description?: (string | null);
     order?: (number | null);
+    hidden?: (boolean | null);
 };
 
 /**

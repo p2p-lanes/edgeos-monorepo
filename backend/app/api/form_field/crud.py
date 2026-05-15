@@ -97,8 +97,13 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
         """
         from app.api.base_field_config.constants import BASE_FIELD_DEFINITIONS
         from app.api.base_field_config.crud import base_field_configs_crud
+        from app.api.form_section.crud import form_sections_crud
 
         configs = base_field_configs_crud.find_by_popup(session, popup_id)
+        sections, _ = form_sections_crud.find_by_popup(
+            session, popup_id, skip=0, limit=1000
+        )
+        hidden_section_ids = {s.id for s in sections if s.hidden}
         errors: list[str] = []
 
         for config in configs:
@@ -108,6 +113,8 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
             if not definition:
                 continue
             if not definition.get("removable", True):
+                continue
+            if config.section_id and config.section_id in hidden_section_ids:
                 continue
 
             field_name = config.field_name
@@ -142,10 +149,21 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
         fields, _ = self.find_by_popup(session, popup_id, skip=0, limit=1000)
         field_map = {f.name: f for f in fields}
 
+        # Hidden sections aren't asked on the portal, so skip required-field
+        # validation for fields belonging to them.
+        from app.api.form_section.crud import form_sections_crud
+
+        sections, _ = form_sections_crud.find_by_popup(
+            session, popup_id, skip=0, limit=1000
+        )
+        hidden_section_ids = {s.id for s in sections if s.hidden}
+
         errors: list[str] = []
 
         # Check required fields
         for field in fields:
+            if field.section_id and field.section_id in hidden_section_ids:
+                continue
             if field.required and field.name not in custom_fields:
                 errors.append(f"Required field '{field.label}' is missing")
 
@@ -199,6 +217,34 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
                             f"Field '{field.label}' contains invalid options: {', '.join(invalid)}"
                         )
 
+            elif field_type == FormFieldType.RADIO.value:
+                if field.options and value not in field.options:
+                    errors.append(
+                        f"Field '{field.label}' must be one of: {', '.join(field.options)}"
+                    )
+
+            elif field_type == FormFieldType.MULTISELECT_DETAILED.value:
+                if not isinstance(value, list):
+                    errors.append(f"Field '{field.label}' must be a list")
+                else:
+                    if field.options:
+                        invalid = [v for v in value if v not in field.options]
+                        if invalid:
+                            errors.append(
+                                f"Field '{field.label}' contains invalid options: {', '.join(invalid)}"
+                            )
+                    cfg = field.config or {}
+                    min_sel = cfg.get("min_selections")
+                    max_sel = cfg.get("max_selections")
+                    if isinstance(min_sel, int) and len(value) < min_sel:
+                        errors.append(
+                            f"Field '{field.label}' requires at least {min_sel} selection(s)"
+                        )
+                    if isinstance(max_sel, int) and len(value) > max_sel:
+                        errors.append(
+                            f"Field '{field.label}' allows at most {max_sel} selection(s)"
+                        )
+
             elif field_type == FormFieldType.EMAIL.value:
                 if isinstance(value, str) and "@" not in value:
                     errors.append(f"Field '{field.label}' must be a valid email")
@@ -249,6 +295,12 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
             session, popup_id, skip=0, limit=100
         )
 
+        # Hidden sections are dropped from the schema entirely (and so are
+        # their fields). The data + section row stay in the DB so the admin
+        # can switch them back on without losing configuration.
+        hidden_section_ids = {s.id for s in db_sections if s.hidden}
+        visible_sections = [s for s in db_sections if not s.hidden]
+
         # Base fields are driven 100% by BaseFieldConfigs rows: if a config
         # exists for this popup, the field is asked. The catalog is only
         # consulted for non-configurable code-level properties (type, target).
@@ -272,6 +324,8 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
             # (it drops sections with no base/custom fields).
             if popup and not field_applies_to_popup(config.field_name, popup):
                 continue
+            if config.section_id and config.section_id in hidden_section_ids:
+                continue
             entry: dict[str, Any] = {
                 "type": definition["type"],
                 "target": definition["target"],
@@ -293,6 +347,8 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
         # Build custom fields schema
         custom_fields = {}
         for field in fields:
+            if field.section_id and field.section_id in hidden_section_ids:
+                continue
             custom_entry: dict[str, Any] = {
                 "type": field.field_type,
                 "label": field.label,
@@ -308,9 +364,14 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
                 custom_entry["placeholder"] = field.placeholder
             if field.help_text:
                 custom_entry["help_text"] = field.help_text
+            if field.config:
+                custom_entry["config"] = field.config
+            if field.width:
+                custom_entry["width"] = field.width
             custom_fields[field.name] = custom_entry
 
-        # Build sections list from DB
+        # Build sections list from DB (visible only — hidden sections are
+        # not surfaced to the consumer).
         sections = [
             {
                 "id": str(s.id),
@@ -319,7 +380,7 @@ class FormFieldsCRUD(BaseCRUD[FormFields, FormFieldCreate, FormFieldUpdate]):
                 "order": s.order,
                 "kind": s.kind,
             }
-            for s in db_sections
+            for s in visible_sections
         ]
 
         return {

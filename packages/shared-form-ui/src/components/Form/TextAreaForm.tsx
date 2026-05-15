@@ -11,6 +11,8 @@ export interface TextAreaFormProps {
   isRequired?: boolean
   subtitle?: string
   placeholder?: string
+  disabled?: boolean
+  readOnly?: boolean
 }
 
 export const TextAreaForm = ({
@@ -22,6 +24,8 @@ export const TextAreaForm = ({
   isRequired,
   subtitle,
   placeholder,
+  disabled,
+  readOnly,
 }: TextAreaFormProps) => {
   return (
     <FormInputWrapper>
@@ -45,6 +49,8 @@ export const TextAreaForm = ({
         value={value}
         onChange={(e) => handleChange(e.target.value)}
         placeholder={placeholder}
+        disabled={disabled}
+        readOnly={readOnly}
       />
       {error && <p className="text-red-500 text-sm">{error}</p>}
     </FormInputWrapper>

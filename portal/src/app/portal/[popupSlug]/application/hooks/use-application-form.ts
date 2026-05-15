@@ -54,6 +54,10 @@ function formReducer(state: FormState, action: FormAction): FormState {
 function getDefaultValue(field: FormFieldSchema): unknown {
   if (field.type === "boolean") return false
   if (field.type === "multiselect") return []
+  if (field.type === "signature") return {}
+  if (field.type === "rich_text") {
+    return field.config?.is_checkbox ? false : ""
+  }
   return ""
 }
 
@@ -239,6 +243,11 @@ export function useApplicationForm(
         if (val === true) filled++
       } else if (field.type === "multiselect") {
         if (Array.isArray(val) && val.length > 0) filled++
+      } else if (field.type === "signature") {
+        const sig = (val as { signature?: string } | null)?.signature
+        if (sig) filled++
+      } else if (field.type === "rich_text" && field.config?.is_checkbox) {
+        if (val === true) filled++
       } else if (val && String(val).trim()) {
         filled++
       }
