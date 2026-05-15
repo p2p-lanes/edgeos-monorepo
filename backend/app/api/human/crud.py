@@ -3,10 +3,17 @@ import uuid
 from loguru import logger
 from sqlalchemy import exists, or_
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import selectinload
 from sqlmodel import Session, col, func, select
 
 from app.api.human.models import Humans
-from app.api.human.schemas import HumanCreate, HumanUpdate
+from app.api.human.schemas import (
+    HumanCreate,
+    HumanProfileStats,
+    HumanProfileStatsPopup,
+    HumanUpdate,
+)
+from app.api.product.schemas import CATEGORY_TICKET, TicketDuration
 from app.api.shared.crud import BaseCRUD
 
 
@@ -135,6 +142,110 @@ class HumansCRUD(BaseCRUD[Humans, HumanCreate, HumanUpdate]):
 
         results = list(session.exec(statement.offset(skip).limit(limit)).all())
         return results, total
+
+    def get_profile_stats(
+        self, session: Session, human_id: uuid.UUID
+    ) -> HumanProfileStats:
+        """Aggregate popups history + total_days for a human's profile page.
+
+        A popup counts as "attended" when the human is either the application
+        owner (Applications.human_id) or a direct-sale attendee
+        (Attendees.human_id with no application). Per-popup days are derived
+        from purchased tickets (AttendeeProducts.payment_id IS NOT NULL) on
+        the main attendee — FULL tickets snap to the popup duration, MONTH
+        adds 30, WEEK adds 7, DAY counts each row as 1, all capped at popup
+        duration when known.
+        """
+        from app.api.application.models import Applications
+        from app.api.attendee.models import AttendeeProducts, Attendees
+        from app.api.popup.models import Popups
+
+        main_attendees = list(
+            session.exec(
+                select(Attendees)
+                .join(Applications, Attendees.application_id == Applications.id)  # type: ignore[arg-type]
+                .where(Applications.human_id == human_id)
+                .options(
+                    selectinload(Attendees.popup),  # type: ignore[arg-type]
+                    selectinload(Attendees.attendee_products).selectinload(  # type: ignore[arg-type]
+                        AttendeeProducts.product  # ty: ignore[invalid-argument-type]
+                    ),
+                )
+            ).all()
+        )
+
+        direct_attendees = list(
+            session.exec(
+                select(Attendees)
+                .where(
+                    Attendees.human_id == human_id,
+                    Attendees.application_id.is_(None),  # type: ignore[union-attr]
+                )
+                .options(
+                    selectinload(Attendees.popup),  # type: ignore[arg-type]
+                    selectinload(Attendees.attendee_products).selectinload(  # type: ignore[arg-type]
+                        AttendeeProducts.product  # ty: ignore[invalid-argument-type]
+                    ),
+                )
+            ).all()
+        )
+
+        per_popup: dict[uuid.UUID, HumanProfileStatsPopup] = {}
+        for attendee in [*main_attendees, *direct_attendees]:
+            popup: Popups | None = attendee.popup
+            if popup is None:
+                continue
+            popup_days = _popup_duration_days(popup)
+            days = _days_for_attendee(attendee, popup_days)
+            existing = per_popup.get(popup.id)
+            if existing is None or days > existing.total_days:
+                per_popup[popup.id] = HumanProfileStatsPopup(
+                    popup_id=popup.id,
+                    popup_name=popup.name,
+                    start_date=popup.start_date,
+                    end_date=popup.end_date,
+                    location=popup.location,
+                    image_url=popup.image_url,
+                    total_days=days,
+                )
+
+        popups = list(per_popup.values())
+        total_days = sum(p.total_days for p in popups)
+        return HumanProfileStats(popups=popups, total_days=total_days)
+
+
+def _popup_duration_days(popup) -> int | None:  # noqa: ANN001
+    if popup.start_date is None or popup.end_date is None:
+        return None
+    delta = popup.end_date - popup.start_date
+    return max(delta.days + 1, 0)
+
+
+def _days_for_attendee(attendee, popup_days: int | None) -> int:  # noqa: ANN001
+    """Sum days from purchased tickets, capped at popup duration when known."""
+    total = 0
+    has_full = False
+    for ap in attendee.attendee_products:
+        if ap.payment_id is None:
+            continue
+        product = ap.product
+        if product is None or product.category != CATEGORY_TICKET:
+            continue
+        duration = product.duration_type
+        if duration == TicketDuration.FULL:
+            has_full = True
+            break
+        if duration == TicketDuration.MONTH:
+            total += 30
+        elif duration == TicketDuration.WEEK:
+            total += 7
+        elif duration == TicketDuration.DAY:
+            total += 1
+    if has_full and popup_days is not None:
+        return popup_days
+    if popup_days is not None:
+        return min(total, popup_days)
+    return total
 
 
 humans_crud = HumansCRUD()

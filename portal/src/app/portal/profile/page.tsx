@@ -10,6 +10,7 @@ import StatsCards from "@/components/profile/StatsCards"
 import { Card } from "@/components/ui/card"
 import { Loader } from "@/components/ui/Loader"
 import useGetProfile from "@/hooks/useGetProfile"
+import useGetProfileStats from "@/hooks/useGetProfileStats"
 
 export default function ProfileContent() {
   const { t } = useTranslation()
@@ -22,6 +23,7 @@ export default function ProfileContent() {
     updateError: _updateError,
     refresh,
   } = useGetProfile()
+  const { stats, isLoading: isStatsLoading } = useGetProfileStats()
   const [userData, setUserData] = useState(profile)
   const [isEditing, setIsEditing] = useState(false)
   const [editForm, setEditForm] = useState({
@@ -125,13 +127,12 @@ export default function ProfileContent() {
             setEditForm={setEditForm}
           />
 
-          <StatsCards userData={userData} />
+          <StatsCards stats={stats} isLoading={isStatsLoading} />
 
           {/* LEGACY: referral_count removed from API – review for deletion */}
           <ReferralLinks referralCount={0} />
 
-          {/* LEGACY: popups history removed from API – review for deletion */}
-          <PopupsHistory popups={[]} />
+          <PopupsHistory popups={stats?.popups ?? []} />
         </div>
       </div>
     </div>

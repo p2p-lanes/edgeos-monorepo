@@ -9,6 +9,7 @@ from app.api.human import crud
 from app.api.human.schemas import (
     HumanCreate,
     HumanPortalPublic,
+    HumanProfileStats,
     HumanProfileUpdate,
     HumanPublic,
     HumanUpdate,
@@ -113,6 +114,15 @@ async def get_current_human_info(
     current_user: CurrentHuman,
 ) -> HumanPublic:
     return HumanPublic.model_validate(current_user)
+
+
+@router.get("/me/profile-stats", response_model=HumanProfileStats)
+async def get_current_human_profile_stats(
+    current_human: CurrentHuman,
+    db: HumanTenantSession,
+) -> HumanProfileStats:
+    """Aggregate popup history and total days attended for the profile page."""
+    return crud.get_profile_stats(db, current_human.id)
 
 
 @router.patch("/me", response_model=HumanPublic)

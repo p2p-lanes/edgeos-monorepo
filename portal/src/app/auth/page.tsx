@@ -19,7 +19,7 @@ function AuthContent() {
 
   useEffect(() => {
     if (loggedIn) {
-      router.replace(getSafeReturnTo(searchParams.get("returnTo")) ?? "/portal")
+      router.replace(getSafeReturnTo(searchParams.get("redirect")) ?? "/portal")
     }
   }, [loggedIn, router, searchParams])
 

@@ -88,7 +88,7 @@ export default function AuthForm() {
         timerRef.current = null
       }
       queryClient.invalidateQueries({ queryKey: queryKeys.profile.current })
-      router.replace(getSafeReturnTo(searchParams.get("returnTo")) ?? "/portal")
+      router.replace(getSafeReturnTo(searchParams.get("redirect")) ?? "/portal")
     },
     onError: (err) => {
       if (err instanceof ApiError) {

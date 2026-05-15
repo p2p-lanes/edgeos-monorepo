@@ -1677,6 +1677,27 @@ export type HumanPortalPublic = {
 };
 
 /**
+ * Aggregate stats for the current human's profile page.
+ */
+export type HumanProfileStats = {
+    popups: Array<HumanProfileStatsPopup>;
+    total_days: number;
+};
+
+/**
+ * Single popup entry in a human's profile stats.
+ */
+export type HumanProfileStatsPopup = {
+    popup_id: string;
+    popup_name: string;
+    start_date?: (string | null);
+    end_date?: (string | null);
+    location?: (string | null);
+    image_url?: (string | null);
+    total_days: number;
+};
+
+/**
  * Schema for humans updating their own profile.
  */
 export type HumanProfileUpdate = {
@@ -4535,6 +4556,8 @@ export type HumansUpdateCurrentHumanData = {
 };
 
 export type HumansUpdateCurrentHumanResponse = (HumanPublic);
+
+export type HumansGetCurrentHumanProfileStatsResponse = (HumanProfileStats);
 
 export type HumansSearchHumansPortalData = {
     /**

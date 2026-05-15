@@ -29,6 +29,10 @@ function makeQueryClient() {
     defaultOptions: {
       queries: {
         staleTime: 30_000,
+        retry: (failureCount, error) => {
+          if (error instanceof ApiError && error.status === 401) return false
+          return failureCount < 3
+        },
       },
     },
     queryCache: new QueryCache({ onError: handleApiError }),

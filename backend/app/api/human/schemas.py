@@ -130,3 +130,24 @@ class HumanUpdate(BaseModel):
         if v is not None:
             return v.strip() or None
         return v
+
+
+class HumanProfileStatsPopup(BaseModel):
+    """Single popup entry in a human's profile stats."""
+
+    popup_id: uuid.UUID
+    popup_name: str
+    start_date: datetime | None = None
+    end_date: datetime | None = None
+    location: str | None = None
+    image_url: str | None = None
+    total_days: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class HumanProfileStats(BaseModel):
+    """Aggregate stats for the current human's profile page."""
+
+    popups: list[HumanProfileStatsPopup]
+    total_days: int

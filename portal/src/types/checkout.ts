@@ -185,6 +185,15 @@ export function formatCurrency(amount: number, currency?: string): string {
   }).format(amount)
 }
 
+export function formatPrice(
+  amount: number,
+  freeLabel: string,
+  currency?: string,
+): string {
+  if (amount === 0) return freeLabel
+  return formatCurrency(amount, currency)
+}
+
 export function formatCheckoutDate(date: string | Date): string {
   const d = typeof date === "string" ? new Date(date) : date
   return d.toLocaleDateString("en-US", {
