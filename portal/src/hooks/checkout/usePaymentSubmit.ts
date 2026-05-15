@@ -104,7 +104,21 @@ export function usePaymentSubmit({
       return { success: false, error: "Buyer information not available" }
     }
 
-    if (selectedPasses.length === 0) {
+    // Mirror CartFooter.canContinue: any cart selection counts as "has something
+    // to buy", not just selectedPasses. Tickets selected via DynamicProductStep
+    // land in dynamicItems (not selectedPasses), so a passes-only guard would
+    // block dynamic-tickets flows entirely.
+    const hasDynamicItems = Object.values(dynamicItems).some((items) =>
+      items.some((i) => i.quantity > 0),
+    )
+    const hasAnyCartSelection =
+      selectedPasses.length > 0 ||
+      !!housing ||
+      merch.length > 0 ||
+      !!patron ||
+      hasDynamicItems
+
+    if (!hasAnyCartSelection) {
       return {
         success: false,
         error: isEditing

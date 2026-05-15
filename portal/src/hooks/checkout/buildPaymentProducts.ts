@@ -153,9 +153,13 @@ export function buildPaymentProducts({
       })
     }
 
+    // When no pass is in selectedPasses (e.g., tickets selected via DynamicProductStep),
+    // attach side-products to the application's first existing attendee instead of "".
+    const firstAttendeeId =
+      selectedPasses[0]?.attendeeId ?? attendeePasses[0]?.id ?? ""
+
     // Add merch
     for (const item of merch) {
-      const firstAttendeeId = selectedPasses[0]?.attendeeId ?? ""
       products.push({
         product_id: item.productId,
         attendee_id: firstAttendeeId,
@@ -165,7 +169,6 @@ export function buildPaymentProducts({
 
     // Add housing
     if (housing) {
-      const firstAttendeeId = selectedPasses[0]?.attendeeId ?? ""
       const baseQty = housing.pricePerDay ? housing.nights : 1
       products.push({
         product_id: housing.productId,
@@ -176,7 +179,6 @@ export function buildPaymentProducts({
 
     // Add patron
     if (patron) {
-      const firstAttendeeId = selectedPasses[0]?.attendeeId ?? ""
       products.push({
         product_id: patron.productId,
         attendee_id: firstAttendeeId,
@@ -186,7 +188,6 @@ export function buildPaymentProducts({
     }
 
     // Add dynamic step items
-    const firstAttendeeId = selectedPasses[0]?.attendeeId ?? ""
     for (const items of Object.values(dynamicItems)) {
       for (const item of items) {
         if (item.quantity > 0) {
