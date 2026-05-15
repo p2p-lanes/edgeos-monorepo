@@ -21,6 +21,9 @@ class BaseFieldConfigBase(SQLModel):
     options: list[str] | None = Field(
         default=None, sa_column=Column(ARRAY(String), nullable=True)
     )
+    # NULL = fall back to the catalog's hardcoded type. Only meaningful when the
+    # catalog entry declares `allowed_field_types` (validated at PATCH time).
+    field_type: str | None = Field(default=None, nullable=True)
 
 
 class BaseFieldConfigPublic(BaseModel):
@@ -35,6 +38,7 @@ class BaseFieldConfigPublic(BaseModel):
     placeholder: str | None = None
     help_text: str | None = None
     options: list[str] | None = None
+    field_type: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -47,6 +51,7 @@ class BaseFieldConfigUpdate(BaseModel):
     placeholder: str | None = None
     help_text: str | None = None
     options: list[str] | None = None
+    field_type: str | None = None
 
 
 class CatalogField(BaseModel):

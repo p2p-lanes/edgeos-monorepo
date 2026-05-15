@@ -143,10 +143,14 @@ export function MultiSelectDetailedForm({
           </button>
         </PopoverTrigger>
         <PopoverContent
-          className="w-[--radix-popover-trigger-width] p-0"
+          className="flex w-[--radix-popover-trigger-width] flex-col overflow-hidden p-0"
+          style={{
+            maxHeight:
+              "min(var(--radix-popover-content-available-height), 20rem)",
+          }}
           align="start"
         >
-          <div className="flex items-center gap-2 border-b px-3 py-2">
+          <div className="flex shrink-0 items-center gap-2 border-b px-3 py-2">
             <Search className="h-4 w-4 text-muted-foreground" aria-hidden />
             <input
               type="text"
@@ -157,7 +161,7 @@ export function MultiSelectDetailedForm({
               aria-label="Search options"
             />
           </div>
-          <div className="max-h-80 overflow-y-auto p-1">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-1">
             {filtered.length === 0 && (
               <div className="px-3 py-2 text-sm text-muted-foreground">
                 No options found

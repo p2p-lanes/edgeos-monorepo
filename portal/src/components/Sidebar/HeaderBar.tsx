@@ -29,6 +29,16 @@ function useHideOnScroll() {
     const onScroll = (event: Event) => {
       const target = event.target
       if (!target) return
+      // Ignore scrolls inside floating UI (popovers, dropdowns, dialogs,
+      // toasts). They are local overflow containers, not page-level scroll.
+      if (
+        target instanceof HTMLElement &&
+        target.closest(
+          "[data-radix-popper-content-wrapper],[role='dialog'],[data-sonner-toaster]",
+        )
+      ) {
+        return
+      }
       const el =
         target instanceof Document
           ? (document.scrollingElement ?? document.documentElement)

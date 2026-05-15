@@ -30,7 +30,7 @@ export interface FormFieldSchema {
   max_date?: string | null
   config?: Record<string, unknown>
   /** Layout override. When undefined/null, falls back to a type-based heuristic. */
-  width?: "full" | "half" | null
+  width?: "full" | "half" | "half_row" | null
 }
 
 export type FormSectionKind = "standard" | "companions" | "scholarship"

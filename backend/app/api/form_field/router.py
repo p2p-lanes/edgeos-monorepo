@@ -49,7 +49,7 @@ def _base_config_to_public(config: BaseFieldConfigs) -> FormFieldPublic:
         popup_id=config.popup_id,
         name=config.field_name,
         label=config.label or "",
-        field_type=definition["type"],
+        field_type=config.field_type or definition["type"],
         section_id=config.section_id,
         section_label=section_label,
         position=config.position,
@@ -60,6 +60,7 @@ def _base_config_to_public(config: BaseFieldConfigs) -> FormFieldPublic:
         protected=True,
         removable=definition.get("removable", True),
         target=definition["target"],
+        allowed_field_types=definition.get("allowed_field_types"),
     )
 
 
@@ -367,6 +368,26 @@ async def update_form_field(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Field '{base_config.field_name}' is required and cannot be made optional",
             )
+
+        # `field_type` is only writeable on base configs whose catalog entry
+        # whitelists alternatives — and only to a value inside that whitelist.
+        allowed_field_types = definition.get("allowed_field_types")
+        if "field_type" in field_in.model_fields_set:
+            if not allowed_field_types:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Field '{base_config.field_name}' does not allow type overrides",
+                )
+            new_type = field_in.field_type
+            if new_type is not None and new_type not in allowed_field_types:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=(
+                        f"Field type '{new_type}' is not allowed for "
+                        f"'{base_config.field_name}'"
+                    ),
+                )
+            update_data["field_type"] = new_type
 
         config_update = BaseFieldConfigUpdate(**update_data)
         updated_config = base_field_configs_crud.update(db, base_config, config_update)

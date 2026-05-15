@@ -39,7 +39,7 @@ export function formFieldPublicToFormFieldSchema(
     min_date: f.min_date ?? null,
     max_date: f.max_date ?? null,
     config: f.config ?? undefined,
-    width: f.width ?? null,
+    width: (f.width as "full" | "half" | "half_row" | null | undefined) ?? null,
   }
 }
 
@@ -47,11 +47,11 @@ export function formFieldPublicToFormFieldSchema(
  * shared helper so the backoffice canvas matches the portal exactly. */
 export function resolveFieldWidth(
   field: FormFieldPublic | FormFieldSchema,
-): "full" | "half" {
+): "full" | "half" | "half_row" {
   const t = "field_type" in field ? field.field_type : field.type
   const w =
     "width" in field
-      ? (field.width as "full" | "half" | null | undefined)
+      ? (field.width as "full" | "half" | "half_row" | null | undefined)
       : null
   return resolveFieldWidthShared({ type: t, field_type: t, width: w ?? null })
 }

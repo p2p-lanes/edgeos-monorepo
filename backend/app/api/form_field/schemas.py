@@ -42,8 +42,9 @@ class FormFieldBase(SQLModel):
                               max_selections?: int }
 
     `width` overrides the frontend's type-based heuristic when set
-    ("full" spans both columns, "half" stays single-column). NULL falls back
-    to the heuristic.
+    ("full" spans both columns, "half" stays single-column, "half_row" is
+    half-width but consumes a full row so no field renders alongside it).
+    NULL falls back to the heuristic.
     """
 
     tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
@@ -92,10 +93,13 @@ class FormFieldPublic(BaseModel):
     min_date: str | None = None
     max_date: str | None = None
     config: dict[str, Any] | None = None
-    width: Literal["full", "half"] | None = None
+    width: Literal["full", "half", "half_row"] | None = None
     protected: bool = False
     removable: bool = True
     target: str | None = None
+    # Populated only for base fields whose catalog entry declares
+    # `allowed_field_types` — signals the UI to render a restricted type picker.
+    allowed_field_types: list[str] | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -113,7 +117,7 @@ class FormFieldCreate(BaseModel):
     min_date: str | None = None
     max_date: str | None = None
     config: dict[str, Any] | None = None
-    width: Literal["full", "half"] | None = None
+    width: Literal["full", "half", "half_row"] | None = None
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -130,4 +134,4 @@ class FormFieldUpdate(BaseModel):
     min_date: str | None = None
     max_date: str | None = None
     config: dict[str, Any] | None = None
-    width: Literal["full", "half"] | None = None
+    width: Literal["full", "half", "half_row"] | None = None
