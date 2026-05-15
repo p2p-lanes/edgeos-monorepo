@@ -2,6 +2,7 @@ import { z } from "zod/v4"
 import type {
   ApplicationFormSchema,
   FormFieldSchema,
+  MultiSelectDetailedConfig,
 } from "@/types/form-schema"
 
 function fieldToZod(field: FormFieldSchema): z.ZodType {
@@ -9,6 +10,7 @@ function fieldToZod(field: FormFieldSchema): z.ZodType {
     case "boolean":
       return z.boolean()
     case "multiselect":
+    case "multiselect_detailed":
       return z.array(z.string())
     case "number":
       return z.string()
@@ -82,6 +84,24 @@ function makeRequired(zodType: z.ZodType, field: FormFieldSchema): z.ZodType {
     return zodType.min(1, `${field.label} is required`)
   }
   if (zodType instanceof z.ZodArray) {
+    if (field.type === "multiselect_detailed") {
+      const config = field.config as MultiSelectDetailedConfig | undefined
+      const minSel = config?.min_selections
+      const maxSel = config?.max_selections
+      let arr = zodType.min(
+        typeof minSel === "number" && minSel > 0 ? minSel : 1,
+        typeof minSel === "number" && minSel > 1
+          ? `${field.label} requires at least ${minSel} selections`
+          : `${field.label} is required`,
+      )
+      if (typeof maxSel === "number" && maxSel > 0) {
+        arr = arr.max(
+          maxSel,
+          `${field.label} allows at most ${maxSel} selections`,
+        )
+      }
+      return arr
+    }
     return zodType.min(1, `${field.label} is required`)
   }
   // boolean required means must be true

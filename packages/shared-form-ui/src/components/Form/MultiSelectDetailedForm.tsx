@@ -190,10 +190,12 @@ export function MultiSelectDetailedForm({
                     aria-hidden
                     className="mt-0.5 pointer-events-none"
                   />
-                  <div className="flex flex-col">
-                    <span className="font-semibold leading-tight">{option}</span>
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    <span className="font-semibold leading-tight break-words">
+                      {option}
+                    </span>
                     {subtitles[option] && (
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-xs text-muted-foreground break-words">
                         {subtitles[option]}
                       </span>
                     )}

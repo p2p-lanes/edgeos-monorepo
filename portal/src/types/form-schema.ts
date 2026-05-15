@@ -3,4 +3,5 @@ export type {
   FormFieldSchema,
   FormSectionKind,
   FormSectionSchema,
+  MultiSelectDetailedConfig,
 } from "@edgeos/shared-form-ui"
