@@ -5,9 +5,9 @@ import { useTranslation } from "react-i18next"
 import { TICKET_CATEGORY } from "@/checkout/popupCheckoutPolicy"
 import AddAttendeeButtons from "@/components/checkout-flow/shared/AddAttendeeButtons"
 import { Button } from "@/components/ui/button"
-import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import useAttendee from "@/hooks/useAttendee"
+import { useAttendeeCategories } from "@/hooks/useAttendeeCategories"
 import type { HumanPopupAccess } from "@/hooks/useHumanPopupAccess"
 import { useCityProvider } from "@/providers/cityProvider"
 import { usePassesProvider } from "@/providers/passesProvider"
@@ -16,7 +16,6 @@ import { formatCurrency } from "@/types/checkout"
 import { AttendeeModal } from "../components/AttendeeModal"
 import AttendeeTicket from "../components/common/AttendeeTicket"
 import InvoiceModal from "../components/common/InvoiceModal"
-import Special from "../components/common/Products/Special"
 import useModal from "../hooks/useModal"
 
 interface YourPassesProps {
@@ -27,14 +26,12 @@ interface YourPassesProps {
 const YourPasses = ({ access: _access, onSwitchToBuy }: YourPassesProps) => {
   const { t } = useTranslation()
   const { attendeePasses: attendees, products } = usePassesProvider()
-  const mainAttendee = attendees.find((a) => a.category === "main")
-  const specialProduct = mainAttendee?.products.find(
-    (p) => p.category === "patreon",
-  )
   const searchParams = useSearchParams()
   const isDayCheckout = searchParams.has("day-passes")
   const { getCity } = useCityProvider()
   const city = getCity()
+  const { categories } = useAttendeeCategories(city?.id ? String(city.id) : "")
+  const primaryCategoryId = categories?.find((c) => c.is_primary)?.id ?? null
   const { handleCloseModal, modal } = useModal()
   const { addAttendee } = useAttendee()
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false)
@@ -48,7 +45,7 @@ const YourPasses = ({ access: _access, onSwitchToBuy }: YourPassesProps) => {
       p.category === TICKET_CATEGORY &&
       p.is_active !== false &&
       (p.attendee_category_id == null ||
-        p.attendee_category_id === mainAttendee?.category_id),
+        p.attendee_category_id === primaryCategoryId),
   )
   const minPrice =
     mainTickets.length > 0 ? Math.min(...mainTickets.map((p) => p.price)) : null
@@ -92,13 +89,6 @@ const YourPasses = ({ access: _access, onSwitchToBuy }: YourPassesProps) => {
           )}
         </div>
       </div>
-
-      {specialProduct && (
-        <div className="p-0 w-full">
-          <Special product={specialProduct} disabled />
-          <Separator className="my-4" />
-        </div>
-      )}
 
       <div className="flex flex-col gap-4">
         {attendees.length === 0 ? (
