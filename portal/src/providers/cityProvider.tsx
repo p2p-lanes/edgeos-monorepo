@@ -1,6 +1,11 @@
 "use client"
 
-import { useParams } from "next/navigation"
+import {
+  useParams,
+  usePathname,
+  useRouter,
+  useSearchParams,
+} from "next/navigation"
 import {
   createContext,
   type ReactNode,
@@ -38,12 +43,17 @@ const CityProvider = ({
   const [cityPreselected, setCityPreselected] = useState<string | null>(null)
   const [lastValidCity, setLastValidCity] = useState<PopupPublic | null>(null)
   const params = useParams()
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const rawSlug = params.popupSlug
+  const currentSlug = Array.isArray(rawSlug) ? rawSlug[0] : rawSlug
 
   const popupsLoaded = isFetched
 
   const getValidCity = useCallback((): PopupPublic | null => {
-    return popups.find((popup) => popup.slug === params.popupSlug) ?? null
-  }, [popups, params.popupSlug])
+    return popups.find((popup) => popup.slug === currentSlug) ?? null
+  }, [popups, currentSlug])
 
   const cityFromUrl = getValidCity()
 
@@ -52,6 +62,29 @@ const CityProvider = ({
       setLastValidCity(cityFromUrl)
     }
   }, [cityFromUrl])
+
+  useEffect(() => {
+    if (!popupsLoaded) return
+    if (!currentSlug) return
+    if (cityFromUrl) return
+    const fallback = lastValidCity ?? popups[0]
+    if (!fallback?.slug) return
+    const segments = pathname.split("/")
+    const slugIndex = segments.indexOf(currentSlug)
+    if (slugIndex === -1) return
+    segments[slugIndex] = fallback.slug
+    const query = searchParams.toString()
+    router.replace(`${segments.join("/")}${query ? `?${query}` : ""}`)
+  }, [
+    popupsLoaded,
+    currentSlug,
+    cityFromUrl,
+    lastValidCity,
+    popups,
+    pathname,
+    router,
+    searchParams,
+  ])
 
   const activePopup = cityFromUrl ?? lastValidCity ?? popups[0] ?? null
   setActiveCurrency(activePopup?.currency ?? "USD")
