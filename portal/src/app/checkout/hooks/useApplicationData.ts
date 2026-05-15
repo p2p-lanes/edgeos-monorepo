@@ -49,6 +49,12 @@ export function hydrateCheckoutApplicationValues({
   values.gender_specify = ""
   values.email_verified = Boolean(human?.email)
 
+  // Email is part of the auth flow, not the form schema, so the loops below
+  // (which iterate schema.base_fields) never set it. Seed it explicitly so the
+  // Express Checkout read-only field renders for already-authenticated users.
+  const resolvedEmail = application?.human?.email ?? human?.email
+  if (resolvedEmail) values.email = resolvedEmail
+
   const isCurrentPopupApplication = application?.popup_id === popupId
 
   for (const [name, field] of Object.entries(checkoutSchema.base_fields)) {

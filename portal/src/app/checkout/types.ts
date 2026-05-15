@@ -149,6 +149,7 @@ export function filterCheckoutApplicationValues(
     ...Object.keys(miniFormSchema.custom_fields).map(
       (name) => `custom_${name}`,
     ),
+    "email",
     "gender_specify",
     "email_verified",
   ])

@@ -6,6 +6,7 @@ import {
 } from "@edgeos/shared-form-ui"
 import { useTranslation } from "react-i18next"
 import { DynamicField } from "@/app/portal/[popupSlug]/application/components/fields/dynamic-field"
+import { Button } from "@/components/ui/button"
 import type { ApplicationFormSchema } from "@/types/form-schema"
 import {
   type CheckoutApplicationValues,
@@ -95,13 +96,14 @@ const PersonalInfoForm = ({
           </div>
 
           {handleChangeEmail && (
-            <button
+            <Button
               type="button"
-              className="mt-[21px] text-sm underline"
+              variant="link"
+              size="default"
               onClick={handleChangeEmail}
             >
               {t("form.change_email")}
-            </button>
+            </Button>
           )}
         </div>
 
@@ -157,6 +159,31 @@ const PersonalInfoForm = ({
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
+      <div className="flex items-end justify-between gap-4">
+        <div className="flex-1 space-y-2">
+          <LabelRequired isRequired={false}>{t("common.email")}</LabelRequired>
+          <Input
+            id="checkout-email"
+            type="email"
+            value={String(formData.email ?? "")}
+            onChange={() => {}}
+            disabled
+            className="w-full"
+          />
+        </div>
+
+        {handleChangeEmail && (
+          <Button
+            type="button"
+            variant="link"
+            size="default"
+            onClick={handleChangeEmail}
+          >
+            {t("form.change_email")}
+          </Button>
+        )}
+      </div>
+
       {sections.map((section, index) => (
         <section key={section.id} className="space-y-4">
           {shouldRenderSectionHeader(section.id, section.title, index) && (
@@ -172,43 +199,6 @@ const PersonalInfoForm = ({
 
           <div className="grid gap-4 md:grid-cols-2">
             {section.fields.map(({ name, field }) => {
-              if (name === "email") {
-                return (
-                  <div key={name} className="space-y-2 md:col-span-2">
-                    <div className="flex items-end justify-between gap-4">
-                      <div className="flex-1 space-y-2">
-                        <LabelRequired isRequired={field.required}>
-                          {field.label}
-                        </LabelRequired>
-                        {field.help_text && (
-                          <p className="text-sm text-muted-foreground">
-                            {field.help_text}
-                          </p>
-                        )}
-                        <Input
-                          id="checkout-email"
-                          type="email"
-                          value={String(formData.email ?? "")}
-                          onChange={() => {}}
-                          disabled
-                          className="w-full"
-                        />
-                      </div>
-
-                      {handleChangeEmail && (
-                        <button
-                          type="button"
-                          className="text-sm underline"
-                          onClick={handleChangeEmail}
-                        >
-                          {t("form.change_email")}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )
-              }
-
               if (name === "gender" && genderField) {
                 return (
                   <div key={name} className="space-y-4 md:col-span-2">
