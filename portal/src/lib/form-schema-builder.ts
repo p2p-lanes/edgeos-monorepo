@@ -78,7 +78,7 @@ function makeRequired(zodType: z.ZodType, field: FormFieldSchema): z.ZodType {
   if (field.type === "rich_text" && field.config?.is_checkbox) {
     return z
       .boolean()
-      .refine((v) => v === true, { message: `${field.label} is required` })
+      .refine((v) => v === true, { message: "This field is required" })
   }
   if (zodType instanceof z.ZodString) {
     return zodType.min(1, `${field.label} is required`)
