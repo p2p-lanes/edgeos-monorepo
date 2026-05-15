@@ -2,6 +2,7 @@
 
 import {
   type MouseEvent,
+  useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -34,20 +35,31 @@ const ExpandableDescription = ({
   const [isOverflowing, setIsOverflowing] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
 
-  // text/clamp are not referenced directly in the effect body but they change
-  // the rendered DOM height, so we need to re-measure when they change.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: re-measure on text/clamp changes
+  const measureOverflow = useCallback(
+    (el: HTMLElement): boolean => {
+      const style = window.getComputedStyle(el)
+      const lineHeightPx = Number.parseFloat(style.lineHeight)
+      if (Number.isFinite(lineHeightPx) && lineHeightPx > 0) {
+        const lineCount = Math.round(el.scrollHeight / lineHeightPx)
+        return lineCount > clamp
+      }
+      return el.scrollHeight > el.clientHeight + 1
+    },
+    [clamp],
+  )
+
+  // text is not referenced directly in the effect body but it changes the
+  // rendered DOM height, so we need to re-measure when it changes.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-measure on text changes
   useLayoutEffect(() => {
     const el = paragraphRef.current
     if (!el) return
-    // When expanded the clamp is removed and scrollHeight === clientHeight,
-    // so keep the button visible by short-circuiting the measurement.
     if (isExpanded) {
       setIsOverflowing(true)
       return
     }
-    setIsOverflowing(el.scrollHeight > el.clientHeight + 1)
-  }, [text, clamp, isExpanded])
+    setIsOverflowing(measureOverflow(el))
+  }, [text, isExpanded, measureOverflow])
 
   useEffect(() => {
     if (typeof ResizeObserver === "undefined") return
@@ -60,11 +72,11 @@ const ExpandableDescription = ({
         setIsOverflowing(true)
         return
       }
-      setIsOverflowing(node.scrollHeight > node.clientHeight + 1)
+      setIsOverflowing(measureOverflow(node))
     })
     observer.observe(el)
     return () => observer.disconnect()
-  }, [isExpanded])
+  }, [isExpanded, measureOverflow])
 
   const handleToggle = (e: MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation()
