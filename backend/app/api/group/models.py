@@ -104,6 +104,9 @@ class Groups(GroupBase, table=True):
     # Relationships
     tenant: "Tenants" = Relationship(back_populates="groups")
     popup: "Popups" = Relationship(back_populates="groups")
+    # Historical: every application ever created through this group's invite
+    # link, including humans no longer in `members`. For vigente membership
+    # always use `members` (GroupMembers junction).
     applications: list["Applications"] = Relationship(back_populates="group")
 
     # Many-to-many with humans for leaders
@@ -112,7 +115,10 @@ class Groups(GroupBase, table=True):
         link_model=GroupLeaders,
     )
 
-    # Many-to-many with humans for members
+    # Vigente members: who currently counts against max_members and is eligible
+    # for the group discount on future purchases. Kept in sync with new
+    # applications via application/crud.create_internal; removable via the
+    # leader/admin endpoint without touching Application.group_id.
     members: list["Humans"] = Relationship(
         back_populates="groups_as_member",
         link_model=GroupMembers,

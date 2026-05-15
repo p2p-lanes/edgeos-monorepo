@@ -440,6 +440,27 @@ class ApplicationsCRUD(BaseCRUD[Applications, ApplicationCreate, ApplicationUpda
             )
             self.create_snapshot(session, application, event)
 
+        # Sync membership junction: Application.group_id records origin (historical),
+        # GroupMembers records currently-active membership. Keep them aligned on creation
+        # so max_members validation and is_member() reflect the new application.
+        if data.get("group_id") and not human.red_flag:
+            from app.api.group.models import GroupMembers  # noqa: PLC0415
+
+            existing_member = session.exec(
+                select(GroupMembers).where(
+                    GroupMembers.group_id == data["group_id"],
+                    GroupMembers.human_id == human_id,
+                )
+            ).first()
+            if not existing_member:
+                session.add(
+                    GroupMembers(
+                        tenant_id=tenant_id,
+                        group_id=data["group_id"],
+                        human_id=human_id,
+                    )
+                )
+
         session.commit()
         session.refresh(application)
         return application

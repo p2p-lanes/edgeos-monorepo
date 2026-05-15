@@ -40,6 +40,48 @@ def _check_leader_permission(group: Groups, human_id: uuid.UUID) -> None:
         )
 
 
+def _build_members(group: Groups) -> list[GroupMemberPublic]:
+    """Build the vigente members list of a group.
+
+    Source of truth is the GroupMembers junction (group.members). Products and
+    profile data are hydrated from each member's application in this popup, if
+    one exists (it should, given the sync in application creation).
+    """
+    apps_by_human = {app.human_id: app for app in group.applications}
+
+    members: list[GroupMemberPublic] = []
+    for human in group.members:
+        application = apps_by_human.get(human.id)
+        products = []
+        if application:
+            # Each AttendeeProducts row is one ticket — dedupe by product_id so
+            # the member's product list shows each product once.
+            seen_pids: set[uuid.UUID] = set()
+            for attendee in application.attendees:
+                for ap in attendee.attendee_products:
+                    if ap.product_id in seen_pids:
+                        continue
+                    seen_pids.add(ap.product_id)
+                    products.append(ap.product)
+
+        custom = (application.custom_fields if application else None) or {}
+        members.append(
+            GroupMemberPublic(
+                id=human.id,
+                first_name=human.first_name or "",
+                last_name=human.last_name or "",
+                email=human.email,
+                telegram=human.telegram,
+                organization=custom.get("organization"),
+                role=custom.get("role"),
+                gender=human.gender,
+                local_resident=None,
+                products=products,
+            )
+        )
+    return members
+
+
 @router.get("", response_model=ListModel[GroupPublic])
 async def list_groups(
     db: TenantSession,
@@ -80,39 +122,9 @@ async def get_group(
             detail="Group not found",
         )
 
-    # Build members list from applications (relationships already eager loaded)
-    members = []
-    for application in group.applications:
-        # Each AttendeeProducts row is one ticket — dedupe by product_id so
-        # the member's product list shows each product once.
-        products = []
-        seen_pids: set[uuid.UUID] = set()
-        for attendee in application.attendees:
-            for ap in attendee.attendee_products:
-                if ap.product_id in seen_pids:
-                    continue
-                seen_pids.add(ap.product_id)
-                products.append(ap.product)
-
-        human = application.human
-        custom = application.custom_fields or {}
-        member = GroupMemberPublic(
-            id=application.human_id,
-            first_name=human.first_name or "",
-            last_name=human.last_name or "",
-            email=human.email,
-            telegram=human.telegram,
-            organization=custom.get("organization"),
-            role=custom.get("role"),
-            gender=human.gender,
-            local_resident=None,
-            products=products,
-        )
-        members.append(member)
-
     return GroupWithMembers(
         **GroupPublic.model_validate(group).model_dump(),
-        members=members,
+        members=_build_members(group),
     )
 
 
@@ -249,39 +261,9 @@ async def get_my_group(
 
     _check_leader_permission(group, current_human.id)
 
-    # Build members list (relationships already eager loaded)
-    members = []
-    for application in group.applications:
-        # Each AttendeeProducts row is one ticket — dedupe by product_id so
-        # the member's product list shows each product once.
-        products = []
-        seen_pids: set[uuid.UUID] = set()
-        for attendee in application.attendees:
-            for ap in attendee.attendee_products:
-                if ap.product_id in seen_pids:
-                    continue
-                seen_pids.add(ap.product_id)
-                products.append(ap.product)
-
-        human = application.human
-        custom = application.custom_fields or {}
-        member = GroupMemberPublic(
-            id=application.human_id,
-            first_name=human.first_name or "",
-            last_name=human.last_name or "",
-            email=human.email,
-            telegram=human.telegram,
-            organization=custom.get("organization"),
-            role=custom.get("role"),
-            gender=human.gender,
-            local_resident=None,
-            products=products,
-        )
-        members.append(member)
-
     return GroupWithMembers(
         **GroupPublic.model_validate(group).model_dump(),
-        members=members,
+        members=_build_members(group),
     )
 
 
@@ -605,10 +587,11 @@ async def remove_group_member(
             detail="Member not found in group",
         )
 
-    # Get application
+    # Block removal if the member already purchased — their products are tied
+    # to the application and removing the discount eligibility post-purchase is
+    # meaningless (price is already consolidated in payment).
     application = applications_crud.get_by_human_popup(db, human_id, group.popup_id)
     if application:
-        # Check if member has products
         for attendee in application.attendees:
             if attendee.products:
                 raise HTTPException(
@@ -616,12 +599,8 @@ async def remove_group_member(
                     detail="Cannot remove member with purchased products",
                 )
 
-        # Remove group association (don't delete application)
-        # Note: created_by_leader tracking not implemented on model
-        application.group_id = None
-        db.add(application)
-
-    # Remove from group members
+    # Remove from vigente membership only. Application.group_id is preserved as
+    # historical record of where this application originated.
     crud.groups_crud.remove_member(db, group.id, human_id)
     db.commit()
 

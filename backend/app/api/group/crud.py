@@ -37,10 +37,12 @@ class GroupsCRUD(BaseCRUD[Groups, GroupCreate, GroupUpdate]):
         return session.exec(statement).first()
 
     def get_with_members(self, session: Session, group_id: uuid.UUID) -> Groups | None:
-        """Get a group with eager loaded applications, attendees, and products.
+        """Get a group with eager loaded vigente members and their applications.
 
-        Use this when you need to access group.applications and their nested
-        attendees/products to avoid N+1 queries.
+        Members are sourced from the GroupMembers junction (vigente membership).
+        Applications are eager-loaded to hydrate each member's products. Note that
+        Application.group_id is historical: an application can keep pointing to this
+        group after the human is removed from the junction.
         """
         from app.api.application.models import Applications
         from app.api.attendee.models import AttendeeProducts, Attendees
@@ -49,6 +51,7 @@ class GroupsCRUD(BaseCRUD[Groups, GroupCreate, GroupUpdate]):
             select(Groups)
             .where(Groups.id == group_id)
             .options(
+                selectinload(Groups.members),  # type: ignore[arg-type]
                 selectinload(Groups.applications)  # type: ignore[arg-type]
                 .selectinload(Applications.attendees)  # ty: ignore[invalid-argument-type]
                 .selectinload(Attendees.attendee_products)  # ty: ignore[invalid-argument-type]
