@@ -202,6 +202,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
       application_fee_amount: defaultValues?.application_fee_amount ?? "",
       image_url: defaultValues?.image_url ?? "",
       icon_url: defaultValues?.icon_url ?? "",
+      favicon_url: defaultValues?.favicon_url ?? "",
       express_checkout_background:
         defaultValues?.express_checkout_background ?? "",
       currency: defaultValues?.currency ?? "USD",
@@ -244,6 +245,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
           : null,
         image_url: value.image_url || null,
         icon_url: value.icon_url || null,
+        favicon_url: value.favicon_url || null,
         express_checkout_background: value.express_checkout_background || null,
         currency: value.currency,
         web_url: value.web_url || null,
@@ -783,6 +785,30 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                     <p className="text-sm font-medium">Icon</p>
                     <p className="text-xs text-muted-foreground">
                       Small icon shown in the portal sidebar popup menu
+                    </p>
+                  </div>
+                </div>
+                <ImageUpload
+                  value={field.state.value || null}
+                  onChange={(url) => field.handleChange(url ?? "")}
+                  disabled={readOnly}
+                />
+              </div>
+            )}
+          </form.Field>
+
+          <form.Field name="favicon_url">
+            {(field) => (
+              <div className="space-y-2 py-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+                    <Image className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Favicon</p>
+                    <p className="text-xs text-muted-foreground">
+                      Browser tab icon shown on the public checkout for this
+                      popup. Overrides the tenant default.
                     </p>
                   </div>
                 </div>
