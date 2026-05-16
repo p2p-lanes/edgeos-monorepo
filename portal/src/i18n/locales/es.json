@@ -168,6 +168,15 @@
     "express_title": "Checkout Express",
     "buyer_step_title": "Tu información",
     "buyer_step_description": "Completá tus datos antes del pago.",
+    "buyer_hero_title": "¡Estás a un paso!",
+    "buyer_hero_subtitle": "Necesitamos un par de datos para reservar tu lugar.",
+    "buyer_hero_trust": "Tu privacidad nos es importante. No compartimos tus datos con terceros.",
+    "email_invalid": "Esto no parece un email válido",
+    "field_required": "Este campo es obligatorio",
+    "toast_dismiss_aria": "Cerrar aviso",
+    "toast_buyer_incomplete_continue": "Hay datos incompletos en Tu información. Revisalos para continuar.",
+    "toast_buyer_incomplete_pay": "Antes de pagar, completá los campos de Tu información.",
+    "toast_cart_empty": "Necesitás agregar al menos un item antes de continuar.",
     "loading_info": "Cargando tu información",
     "processing": "Procesando tu registro",
     "processing_subtitle": "Esto puede tardar unos momentos",
@@ -221,6 +230,7 @@
       "housing": "Alojamiento",
       "merch": "Merch",
       "patron": "Patrono",
+      "buyer": "Tu información",
       "confirm": "Revisar y Confirmar"
     }
   },
