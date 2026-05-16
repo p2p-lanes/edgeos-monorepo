@@ -164,12 +164,9 @@ function ScrollyCheckoutFlowInner({
     // intermediate section as they pass under the viewport.
     let scrollTargetId: string | null = null
     let scrollTargetTimeout: number | null = null
-    // Whether to clear the pending snap-restore timeout when releasing.
-    // Observer-driven release (target reached during animation) must NOT
-    // clear it, otherwise snap-type stays "none" forever after a scroll.
-    const releaseScrollTarget = (clearTimer = false) => {
+    const releaseScrollTarget = () => {
       scrollTargetId = null
-      if (clearTimer && scrollTargetTimeout !== null) {
+      if (scrollTargetTimeout !== null) {
         window.clearTimeout(scrollTargetTimeout)
         scrollTargetTimeout = null
       }
@@ -207,23 +204,20 @@ function ScrollyCheckoutFlowInner({
       if (scrollTargetTimeout !== null) {
         window.clearTimeout(scrollTargetTimeout)
       }
-      // Why: mandatory snap pinned to a section makes Chrome ignore
-      // programmatic scrolls. Disable snap during the animation; the
-      // timeout below restores it once the destination is reached.
-      mainEl.style.scrollSnapType = "none"
-      scrollTargetTimeout = window.setTimeout(() => {
-        mainEl.style.scrollSnapType = "y mandatory"
-        releaseScrollTarget()
-      }, 1500)
-      const targetTop = el.offsetTop
-      // Why: when the click originates inside a `position: fixed` element
-      // (e.g. the footer button), Chrome silently swallows scrollTo issued
-      // in the same tick. Deferring to the next macrotask lets the browser
-      // finish its focus/tap handling first, then the scroll runs.
+      // Safety net: if the IntersectionObserver doesn't fire (e.g. target
+      // already in view), free up scrollTargetId so future scrolls work.
+      scrollTargetTimeout = window.setTimeout(releaseScrollTarget, 1500)
+      // Why scrollIntoView over scrollTo + manual snap toggling: keeping
+      // scroll-snap-type: y mandatory during the animation lets the browser
+      // land precisely on the snap point without the post-animation "settle"
+      // jump that happened when snap was re-enabled after the scrollTo.
+      // Why the deferred setTimeout: when the click originates inside a
+      // position: fixed element (e.g. footer button), Chrome can swallow a
+      // scroll issued in the same tick.
       window.setTimeout(() => {
-        mainEl.scrollTo({
-          top: targetTop,
+        el.scrollIntoView({
           behavior: reduceMotion ? "auto" : "smooth",
+          block: "start",
         })
       }, 0)
       setActiveSection(targetId)
@@ -241,7 +235,7 @@ function ScrollyCheckoutFlowInner({
       observer.disconnect()
       ro.disconnect()
       navRo.disconnect()
-      releaseScrollTarget(true)
+      releaseScrollTarget()
       scrollToIndexRef.current = null
     }
   }, [allSections, isInitialLoading])

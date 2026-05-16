@@ -272,6 +272,137 @@ describe("getProductStrategy — category-scoped selection", () => {
   })
 })
 
+describe("WeekProductStrategy — attendeeVisibleProductIds (wide scope)", () => {
+  // Reproduces the Sonoma layout: Month sits in one section, Weeks in another.
+  // Strict scope alone wouldn't promote (Month not in week scope), but the
+  // attendee-wide visible set crosses sections, so 4 weeks → Month locals.
+  it("promotes Month in a different section when both share the attendee-visible set", () => {
+    const w1 = createProduct({
+      id: "w1-locals",
+      category: "ticket",
+      selected: true,
+      duration_type: "week",
+      max_per_order: 1,
+    })
+    const w2 = createProduct({
+      id: "w2-locals",
+      category: "ticket",
+      selected: true,
+      duration_type: "week",
+      max_per_order: 1,
+    })
+    const w3 = createProduct({
+      id: "w3-locals",
+      category: "ticket",
+      selected: true,
+      duration_type: "week",
+      max_per_order: 1,
+    })
+    const w4 = createProduct({
+      id: "w4-locals",
+      category: "ticket",
+      selected: false,
+      duration_type: "week",
+      max_per_order: 1,
+    })
+    const monthLocals = createProduct({
+      id: "month-locals",
+      category: "ticket",
+      selected: false,
+      duration_type: "month",
+      max_per_order: 1,
+    })
+    // Decoy: a Month from the OTHER tier (regular). Must NOT be promoted.
+    const monthRegular = createProduct({
+      id: "month-regular",
+      category: "ticket",
+      selected: false,
+      duration_type: "month",
+      max_per_order: 1,
+    })
+    const attendees = [
+      createAttendee([w1, w2, w3, w4, monthLocals, monthRegular]),
+    ]
+    const strategy = getProductStrategy(w4, false, CHECKOUT_MODE.PASS_SYSTEM)
+
+    // Strict scope = "WEEKLY PASSES (Locals)" section (only weeks).
+    // Wide scope = visible products across both sections (weeks + month locals).
+    const strictScope = ["w1-locals", "w2-locals", "w3-locals", "w4-locals"]
+    const wideScope = [
+      "w1-locals",
+      "w2-locals",
+      "w3-locals",
+      "w4-locals",
+      "month-locals",
+    ]
+
+    const result = strategy.handleSelection(
+      attendees,
+      "attendee-1",
+      w4,
+      undefined,
+      strictScope,
+      wideScope,
+    )
+
+    const monthL = result[0]?.products.find((p) => p.id === "month-locals")
+    const monthR = result[0]?.products.find((p) => p.id === "month-regular")
+    expect(monthL?.selected).toBe(true)
+    // Regular month was outside the wide scope — never touched.
+    expect(monthR?.selected).toBe(false)
+    // The 4 weeks should be cleared (promoted to month).
+    for (const id of strictScope) {
+      expect(result[0]?.products.find((p) => p.id === id)?.selected).toBe(false)
+    }
+  })
+
+  it("falls back to legacy (no scope) when neither scope is provided", () => {
+    // Sanity: existing legacy test in this file passes with no scope arg.
+    // This test re-asserts that wide scope is optional and not required.
+    const t1 = createProduct({
+      id: "t1",
+      category: "ticket",
+      selected: true,
+      duration_type: "week",
+      max_per_order: 1,
+    })
+    const t2 = createProduct({
+      id: "t2",
+      category: "ticket",
+      selected: true,
+      duration_type: "week",
+      max_per_order: 1,
+    })
+    const t3 = createProduct({
+      id: "t3",
+      category: "ticket",
+      selected: true,
+      duration_type: "week",
+      max_per_order: 1,
+    })
+    const t4 = createProduct({
+      id: "t4",
+      category: "ticket",
+      selected: false,
+      duration_type: "week",
+      max_per_order: 1,
+    })
+    const month = createProduct({
+      id: "t-month",
+      category: "ticket",
+      selected: false,
+      duration_type: "month",
+      max_per_order: 1,
+    })
+    const attendees = [createAttendee([t1, t2, t3, t4, month])]
+    const strategy = getProductStrategy(t4, false, CHECKOUT_MODE.PASS_SYSTEM)
+    const result = strategy.handleSelection(attendees, "attendee-1", t4)
+    expect(result[0]?.products.find((p) => p.id === "t-month")?.selected).toBe(
+      true,
+    )
+  })
+})
+
 describe("ExclusivityGuard — section scope (tech-summit reproduction)", () => {
   // Reproduces: GA + VIP both exclusive, multi-unit (max_per_order=null), duration_type=full.
   // Pre-state: GA quantity=1 selected, VIP quantity=0 not selected.

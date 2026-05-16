@@ -147,8 +147,13 @@ export function CheckoutProvider({
   cartUiEnabled = true,
 }: CheckoutProviderProps) {
   const { t } = useTranslation()
-  const { attendeePasses, toggleProduct, isEditing, toggleEditing } =
-    usePassesProvider()
+  const {
+    attendeePasses,
+    toggleProduct,
+    isEditing,
+    toggleEditing,
+    clearSelections,
+  } = usePassesProvider()
   const { discountApplied, setDiscount, resetDiscount } = useDiscount()
   const { getRelevantApplication } = useApplication()
   const { getCity } = useCityProvider()
@@ -694,13 +699,21 @@ export function CheckoutProvider({
   // Cart management
   const clearCart = useCallback(() => {
     clearPersistedCart()
+    clearSelections()
     clearHousing()
     setMerch([])
     clearPatron()
     clearPromoCode()
     setInsurance(false)
     setDynamicItems({})
-  }, [clearPersistedCart, clearHousing, setMerch, clearPatron, clearPromoCode])
+  }, [
+    clearPersistedCart,
+    clearSelections,
+    clearHousing,
+    setMerch,
+    clearPatron,
+    clearPromoCode,
+  ])
 
   // Submit payment (consolidated via usePaymentSubmit)
   const { submitPayment, isSubmitting } = usePaymentSubmit({

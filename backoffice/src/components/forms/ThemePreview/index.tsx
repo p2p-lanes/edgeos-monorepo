@@ -38,7 +38,11 @@ import { HomeView } from "./tabs/HomeView"
 import type { ThemePreviewProps } from "./types"
 import { useCssVars } from "./useCssVars"
 
-export type { PreviewEvent, PreviewTab } from "./types"
+export type {
+  CheckoutBackgroundContext,
+  PreviewEvent,
+  PreviewTab,
+} from "./types"
 
 export function ThemePreview({
   colors,

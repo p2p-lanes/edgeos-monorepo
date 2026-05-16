@@ -38,7 +38,7 @@ const GroupCheckoutPage = () => {
     )
   }
 
-  const background = getBackgroundProps(popup)
+  const background = getBackgroundProps(popup, "groups")
 
   return (
     <PopupCheckoutContent

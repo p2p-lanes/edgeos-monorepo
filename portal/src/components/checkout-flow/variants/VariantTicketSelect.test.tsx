@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest"
 import type { AttendeePassState } from "@/types/Attendee"
 import type { ProductsPass } from "@/types/Products"
-import { buildSectionGroups } from "./VariantTicketSelect"
+import {
+  buildSectionGroups,
+  isSectionVisibleForApp,
+} from "./VariantTicketSelect"
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -162,6 +165,20 @@ describe("buildSectionGroups — attendee_categories filtering", () => {
     }
   })
 
+  it("section without visible_if passes through pre-filter regardless of customFields", () => {
+    // Pre-filter consumers (`VariantTicketSelect`, `LegacySectionLayout`) call
+    // isSectionVisibleForApp first. Sections without a condition are always kept.
+    const section = {
+      key: "no-cond",
+      label: "Always",
+      order: 0,
+      product_ids: [],
+    }
+    expect(isSectionVisibleForApp(section, null)).toBe(true)
+    expect(isSectionVisibleForApp(section, {})).toBe(true)
+    expect(isSectionVisibleForApp(section, { foo: "bar" })).toBe(true)
+  })
+
   it("all four layouts share the filter via buildSectionGroups as single chokepoint", () => {
     // This test verifies the structural assumption: buildSectionGroups is the
     // single filter chokepoint. All four layout variants (stacked, tabs, compact,
@@ -190,5 +207,66 @@ describe("buildSectionGroups — attendee_categories filtering", () => {
     // main attendee sees only the ungated section
     expect(result).toHaveLength(1)
     expect(result[0].section.key).toBe("all")
+  })
+})
+
+describe("isSectionVisibleForApp — visible_if gating", () => {
+  const baseSection = {
+    key: "locals",
+    label: "Locals",
+    order: 0,
+    product_ids: ["p1"],
+  }
+
+  it("matches single string value", () => {
+    const section = {
+      ...baseSection,
+      visible_if: { field_id: "local_resident", value: "Yes" },
+    }
+    expect(isSectionVisibleForApp(section, { local_resident: "Yes" })).toBe(
+      true,
+    )
+    expect(isSectionVisibleForApp(section, { local_resident: "No" })).toBe(
+      false,
+    )
+  })
+
+  it("matches when answer is in an array of accepted values", () => {
+    const section = {
+      ...baseSection,
+      visible_if: { field_id: "tier", value: ["Yes", "Maybe"] },
+    }
+    expect(isSectionVisibleForApp(section, { tier: "Yes" })).toBe(true)
+    expect(isSectionVisibleForApp(section, { tier: "Maybe" })).toBe(true)
+    expect(isSectionVisibleForApp(section, { tier: "No" })).toBe(false)
+  })
+
+  it("hides section when the field has no answer for the application", () => {
+    const section = {
+      ...baseSection,
+      visible_if: { field_id: "local_resident", value: "Yes" },
+    }
+    expect(isSectionVisibleForApp(section, { unrelated: "x" })).toBe(false)
+  })
+
+  it("treats missing custom_fields as no-gate (open-ticketing fallback)", () => {
+    // Before the application form is filled (open-ticketing flow), the gate
+    // is short-circuited so sections still render.
+    const section = {
+      ...baseSection,
+      visible_if: { field_id: "local_resident", value: "Yes" },
+    }
+    expect(isSectionVisibleForApp(section, null)).toBe(true)
+    expect(isSectionVisibleForApp(section, undefined)).toBe(true)
+  })
+
+  it("ignores malformed visible_if (no field_id) and shows section", () => {
+    const section = {
+      ...baseSection,
+      visible_if: { field_id: "", value: "Yes" },
+    }
+    expect(isSectionVisibleForApp(section, { local_resident: "Yes" })).toBe(
+      true,
+    )
   })
 })
