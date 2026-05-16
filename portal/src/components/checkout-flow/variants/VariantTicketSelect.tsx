@@ -13,6 +13,7 @@ import QuantitySelector, {
 import { useAttendeeCategories } from "@/hooks/useAttendeeCategories"
 import { deriveProductState, type ProductSaleState } from "@/lib/product-state"
 import { cn } from "@/lib/utils"
+import { useApplication } from "@/providers/applicationProvider"
 import { useCheckout } from "@/providers/checkoutProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import { usePassesProvider } from "@/providers/passesProvider"
@@ -25,12 +26,33 @@ import type { VariantProps } from "../registries/variantRegistry"
 // Types & constants
 // ---------------------------------------------------------------------------
 
+interface SectionVisibilityCondition {
+  field_id: string
+  value: string | string[]
+}
+
 interface TemplateSection {
   key: string
   label: string
   order: number
   product_ids: string[]
   attendee_categories?: string[] | null
+  visible_if?: SectionVisibilityCondition | null
+}
+
+/** True when the section's visible_if matches the application's form answers.
+ *  No visible_if → always visible. Missing custom_fields → visible (open-ticketing
+ *  fallback: the form hasn't been answered yet, treat as no-gate). */
+export function isSectionVisibleForApp(
+  section: TemplateSection,
+  customFields: Record<string, unknown> | null | undefined,
+): boolean {
+  const cond = section.visible_if
+  if (!cond?.field_id) return true
+  if (!customFields) return true
+  const answer = customFields[cond.field_id]
+  const expected = Array.isArray(cond.value) ? cond.value : [cond.value]
+  return expected.includes(answer as string)
 }
 
 const getCategoryMeta = (cat: string) => {
@@ -195,7 +217,14 @@ export default function VariantTicketSelect({
     null,
   )
 
-  const sections = parseSections(templateConfig)
+  // Apply per-application visibility (visible_if) once: it depends on the
+  // application's form answers, not on individual attendees. Layouts and
+  // helpers downstream consume the already-filtered list.
+  const { getRelevantApplication } = useApplication()
+  const customFields = getRelevantApplication()?.custom_fields ?? null
+  const sections = parseSections(templateConfig).filter((s) =>
+    isSectionVisibleForApp(s, customFields),
+  )
 
   // Build category_id → sort_order map for attendee ordering.
   const { getCity } = useCityProvider()
@@ -290,7 +319,10 @@ function parseSections(
 
 /** Returns groups of products for an attendee based on configured sections.
  *  Products not in any section are excluded.
- *  Sections gated by attendee_categories are filtered to the current attendee. */
+ *  Sections gated by attendee_categories are filtered to the current attendee.
+ *  Note: visible_if (per-application gating) is evaluated upstream in the
+ *  main component, so by the time sections reach this function they are
+ *  already filtered by form responses. */
 export function buildSectionGroups(
   attendee: AttendeePassState,
   sections: TemplateSection[],
@@ -1477,9 +1509,16 @@ function LegacySectionLayout({
     updateDynamicQuantity(stepType, p.id, qty)
   }
 
-  const sections = (templateConfig?.sections ?? null) as
+  // Open-ticketing fallback path: no authenticated application, so visible_if
+  // can't be resolved against form answers. Treat as no-gate (return true).
+  const { getRelevantApplication } = useApplication()
+  const customFields = getRelevantApplication()?.custom_fields ?? null
+  const rawSections = (templateConfig?.sections ?? null) as
     | TemplateSection[]
     | null
+  const sections = rawSections
+    ? rawSections.filter((s) => isSectionVisibleForApp(s, customFields))
+    : null
   const hasSections = Array.isArray(sections) && sections.length > 0
   const groups = hasSections ? groupBySection(products, sections) : null
 
