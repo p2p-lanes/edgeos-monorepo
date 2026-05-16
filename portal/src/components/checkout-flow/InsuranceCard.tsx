@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion"
 import { Check, Umbrella } from "lucide-react"
+import { stepCardSurfaceStyle } from "@/lib/stepCardSurface"
 import { cn } from "@/lib/utils"
 import { formatCurrency, INSURANCE_BENEFITS } from "@/types/checkout"
 
@@ -32,7 +33,8 @@ export default function InsuranceCard({
     <motion.div
       whileHover={{ y: -1 }}
       transition={{ type: "spring", stiffness: 400, damping: 25 }}
-      className="bg-white rounded-2xl border border-gray-100 border-l-4 border-l-amber-400 p-5 shadow-sm"
+      className="rounded-2xl border border-border border-l-4 border-l-amber-400 p-5 shadow-sm"
+      style={stepCardSurfaceStyle()}
     >
       <div className="flex items-start gap-3">
         <motion.div
@@ -45,8 +47,8 @@ export default function InsuranceCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h3 className="font-semibold text-gray-900">{title}</h3>
-              <p className="text-sm text-gray-500 mt-0.5">
+              <h3 className="font-semibold text-foreground">{title}</h3>
+              <p className="text-sm text-muted-foreground mt-0.5">
                 {formatCurrency(price)} · {subtitle}
               </p>
             </div>
@@ -72,7 +74,7 @@ export default function InsuranceCard({
             </button>
           </div>
 
-          <ul className="text-xs text-gray-500 mt-3 space-y-1">
+          <ul className="text-xs text-muted-foreground mt-3 space-y-1">
             {benefits.map((b) => (
               <li key={b} className="flex items-center gap-2">
                 <AnimatePresence mode="wait" initial={false}>
