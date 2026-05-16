@@ -5,6 +5,7 @@ import type { ReactNode } from "react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { readAndClearPendingPaymentRedirectState } from "@/hooks/usePaymentRedirect"
 import { useCheckout } from "@/providers/checkoutProvider"
+import CheckoutToast from "./CheckoutToast"
 import DynamicProductStep from "./DynamicProductStep"
 import { shouldUseDynamicStep } from "./registries/stepRegistry"
 import type { WatermarkStyle } from "./ScrollySectionNav"
@@ -21,15 +22,27 @@ interface ScrollyCheckoutFlowProps {
   onPaymentComplete?: () => void
   onBack?: () => void
   navExtraContent?: ReactNode
+  /** Tenant logo shown on the left side of the checkout nav. Usually
+   *  `popup.icon_url` with a tenant fallback. */
+  brandLogoUrl?: string | null
+  /** Tenant/popup name for alt text on the logo. */
+  brandLabel?: string
 }
 
 function ScrollyCheckoutFlowInner({
   onPaymentComplete,
   onBack,
   navExtraContent,
+  brandLogoUrl,
+  brandLabel,
 }: ScrollyCheckoutFlowProps) {
-  const { availableSteps, submitPayment, stepConfigs, isInitialLoading } =
-    useCheckout()
+  const {
+    availableSteps,
+    submitPayment,
+    stepConfigs,
+    isInitialLoading,
+    markStepVisited,
+  } = useCheckout()
 
   const getStepConfig = (stepType: string) =>
     stepConfigs.find(
@@ -59,7 +72,13 @@ function ScrollyCheckoutFlowInner({
     }
   }
 
-  const [activeSection, setActiveSection] = useState<string>("passes")
+  // Initial activeSection: first available step from the runtime,
+  // falling back to "passes" only when nothing has loaded yet. Hardcoding
+  // "passes" caused the cart footer to misdetect the first step when the
+  // popup placed buyer or a hero step at order 0.
+  const [activeSection, setActiveSection] = useState<string>(
+    availableSteps[0] ?? "passes",
+  )
   const scrollToIndexRef = useRef<((index: number) => void) | null>(null)
 
   const footerDesign = "pill" as const
@@ -86,9 +105,20 @@ function ScrollyCheckoutFlowInner({
           id: step,
           label: config?.title ?? defaultLabels[step] ?? step,
           template: config?.template ?? null,
+          emoji: config?.emoji ?? null,
+          showInNavbar: config?.show_in_navbar ?? true,
         }
       })
   }, [availableSteps, stepConfigs])
+
+  // Sections rendered in the top nav chrome. Subset of allSections — the
+  // IntersectionObserver still tracks the full set so scroll behaviour
+  // is unchanged, but informational steps (FAQs, Gallery, etc.) can be
+  // hidden from the nav per-tenant via `show_in_navbar`.
+  const navSections = useMemo(
+    () => allSections.filter((s) => s.showInNavbar !== false),
+    [allSections],
+  )
 
   const goToConfirm = useCallback(() => {
     const idx = allSections.findIndex((s) => s.id === "confirm")
@@ -101,6 +131,24 @@ function ScrollyCheckoutFlowInner({
       scrollToIndexRef.current?.(idx + 1)
     }
   }, [allSections, activeSection])
+
+  const goToPreviousSection = useCallback(() => {
+    const idx = allSections.findIndex((s) => s.id === activeSection)
+    if (idx > 0) {
+      scrollToIndexRef.current?.(idx - 1)
+    }
+  }, [allSections, activeSection])
+
+  // Public escape-hatch: jump to a specific step by id. Used by the
+  // validation flow when Continuar/Pagar bounces the user back to a
+  // failing step (toast → click chip → scrolls to buyer step).
+  const scrollToStep = useCallback(
+    (stepId: string) => {
+      const idx = allSections.findIndex((s) => s.id === stepId)
+      if (idx >= 0) scrollToIndexRef.current?.(idx)
+    },
+    [allSections],
+  )
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: isInitialLoading must trigger a re-run when sections mount in the DOM, even though it's not read inside.
   useEffect(() => {
@@ -177,6 +225,11 @@ function ScrollyCheckoutFlowInner({
         for (const entry of entries) {
           if (entry.isIntersecting && entry.intersectionRatio >= 0.3) {
             const id = entry.target.id
+            // Any section that crosses the 30% visibility threshold
+            // counts as "visited" for the wayfinding nav. Triggered for
+            // both natural scroll and programmatic scroll, so the user
+            // gets credited for visits they actively chose.
+            markStepVisited(id)
             if (scrollTargetId !== null) {
               if (id === scrollTargetId) {
                 releaseScrollTarget()
@@ -238,7 +291,7 @@ function ScrollyCheckoutFlowInner({
       releaseScrollTarget()
       scrollToIndexRef.current = null
     }
-  }, [allSections, isInitialLoading])
+  }, [allSections, isInitialLoading, markStepVisited])
 
   const renderSectionContent = (stepId: string) => {
     // Buyer and confirm are structural steps — wired explicitly, not via DynamicProductStep.
@@ -288,14 +341,17 @@ function ScrollyCheckoutFlowInner({
   return (
     <div className="relative font-sans">
       <ScrollySectionNav
-        sections={allSections}
+        sections={navSections}
         activeSection={activeSection}
         onSectionClick={(sectionId) => {
           const idx = allSections.findIndex((s) => s.id === sectionId)
           if (idx >= 0) scrollToIndexRef.current?.(idx)
         }}
         extraContent={navExtraContent}
+        brandLogoUrl={brandLogoUrl}
+        brandLabel={brandLabel}
       />
+      <CheckoutToast onChipClick={scrollToStep} />
       {allSections.map((section) => {
         const config = getStepConfig(section.id)
         return (
@@ -342,6 +398,8 @@ function ScrollyCheckoutFlowInner({
         sections={allSections}
         onGoToConfirm={goToConfirm}
         onGoToNextSection={goToNextSection}
+        onGoToPreviousSection={goToPreviousSection}
+        onScrollToStep={scrollToStep}
       />
     </div>
   )
@@ -350,3 +408,5 @@ function ScrollyCheckoutFlowInner({
 export default function ScrollyCheckoutFlow(props: ScrollyCheckoutFlowProps) {
   return <ScrollyCheckoutFlowInner {...props} />
 }
+
+export type { ScrollyCheckoutFlowProps }
