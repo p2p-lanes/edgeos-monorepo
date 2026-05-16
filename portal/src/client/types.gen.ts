@@ -2171,6 +2171,7 @@ export type PopupAdmin = {
     theme_config?: ({
     [key: string]: unknown;
 } | null);
+    favicon_url?: (string | null);
     default_language?: string;
     supported_languages?: Array<(string)>;
     insurance_enabled?: boolean;
@@ -2214,6 +2215,7 @@ export type PopupCreate = {
     theme_config?: ({
     [key: string]: unknown;
 } | null);
+    favicon_url?: (string | null);
     default_language?: string;
     supported_languages?: Array<(string)>;
     insurance_enabled?: boolean;
@@ -2255,6 +2257,7 @@ export type PopupPublic = {
     theme_config?: ({
     [key: string]: unknown;
 } | null);
+    favicon_url?: (string | null);
     default_language?: string;
     supported_languages?: Array<(string)>;
     insurance_enabled?: boolean;
@@ -2329,6 +2332,7 @@ export type PopupUpdate = {
     theme_config?: ({
     [key: string]: unknown;
 } | null);
+    favicon_url?: (string | null);
     default_language?: (string | null);
     supported_languages?: (Array<(string)> | null);
     insurance_enabled?: (boolean | null);
@@ -2813,6 +2817,8 @@ export type TicketingStepCreate = {
     watermark?: (string | null);
     show_title?: boolean;
     show_watermark?: boolean;
+    show_in_navbar?: boolean;
+    emoji?: (string | null);
 };
 
 export type TicketingStepPublic = {
@@ -2833,6 +2839,8 @@ export type TicketingStepPublic = {
     watermark?: (string | null);
     show_title?: boolean;
     show_watermark?: boolean;
+    show_in_navbar?: boolean;
+    emoji?: (string | null);
 };
 
 export type TicketingStepUpdate = {
@@ -2848,6 +2856,8 @@ export type TicketingStepUpdate = {
     watermark?: (string | null);
     show_title?: (boolean | null);
     show_watermark?: (boolean | null);
+    show_in_navbar?: (boolean | null);
+    emoji?: (string | null);
 };
 
 /**

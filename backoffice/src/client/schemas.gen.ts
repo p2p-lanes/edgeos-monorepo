@@ -10664,6 +10664,17 @@ export const PopupAdminSchema = {
             ],
             title: 'Theme Config'
         },
+        favicon_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Favicon Url'
+        },
         default_language: {
             type: 'string',
             title: 'Default Language',
@@ -11013,6 +11024,17 @@ export const PopupCreateSchema = {
             ],
             title: 'Theme Config'
         },
+        favicon_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Favicon Url'
+        },
         default_language: {
             type: 'string',
             title: 'Default Language',
@@ -11287,6 +11309,17 @@ export const PopupPublicSchema = {
                 }
             ],
             title: 'Theme Config'
+        },
+        favicon_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Favicon Url'
         },
         default_language: {
             type: 'string',
@@ -11778,6 +11811,17 @@ export const PopupUpdateSchema = {
                 }
             ],
             title: 'Theme Config'
+        },
+        favicon_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Favicon Url'
         },
         default_language: {
             anyOf: [
@@ -14446,6 +14490,22 @@ export const TicketingStepCreateSchema = {
             type: 'boolean',
             title: 'Show Watermark',
             default: true
+        },
+        show_in_navbar: {
+            type: 'boolean',
+            title: 'Show In Navbar',
+            default: true
+        },
+        emoji: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Emoji'
         }
     },
     type: 'object',
@@ -14558,6 +14618,22 @@ export const TicketingStepPublicSchema = {
             type: 'boolean',
             title: 'Show Watermark',
             default: true
+        },
+        show_in_navbar: {
+            type: 'boolean',
+            title: 'Show In Navbar',
+            default: true
+        },
+        emoji: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Emoji'
         }
     },
     type: 'object',
@@ -14677,6 +14753,28 @@ export const TicketingStepUpdateSchema = {
                 }
             ],
             title: 'Show Watermark'
+        },
+        show_in_navbar: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Show In Navbar'
+        },
+        emoji: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Emoji'
         }
     },
     type: 'object',
