@@ -65,12 +65,28 @@ DEFAULT_TICKETING_STEPS = [
         "protected": False,
         "product_category": "patreon",
     },
+    # Buyer step is direct-sale only — see seed_ticketing_steps_for_popup
+    # below for the sale_type gate. We keep it in the canonical list so the
+    # row sits between patron and confirm whenever a direct-sale popup is
+    # seeded; application-mode popups skip it.
+    {
+        "step_type": "buyer",
+        "title": "Your information",
+        "description": "Complete your information before payment.",
+        "watermark": "Your info",
+        "template": "buyer-form",
+        "template_config": None,
+        "order": 4,
+        "is_enabled": True,
+        "protected": True,
+        "_direct_sale_only": True,
+    },
     {
         "step_type": "confirm",
         "title": "Review & Confirm",
         "description": "Review your order before payment",
         "watermark": "Confirm",
-        "order": 4,
+        "order": 5,
         "is_enabled": True,
         "protected": True,
         "template_config": {
@@ -93,10 +109,20 @@ def seed_ticketing_steps_for_popup(
     db: Session,
     popup_id: uuid.UUID,
     tenant_id: uuid.UUID,
+    sale_type: str | None = None,
 ) -> None:
+    """Seed the default ticketing-step set for a popup.
+
+    Steps flagged with ``_direct_sale_only`` (e.g. the buyer step) only get
+    inserted when ``sale_type='direct'``. Application popups collect buyer
+    info via the application form earlier in the funnel, so the open-
+    ticketing buyer step is irrelevant there.
+    """
     from app.api.ticketing_step.models import TicketingSteps
 
     for step_def in DEFAULT_TICKETING_STEPS:
+        if step_def.get("_direct_sale_only") and sale_type != "direct":
+            continue
         step = TicketingSteps(
             tenant_id=tenant_id,
             popup_id=popup_id,
