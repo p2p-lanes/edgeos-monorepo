@@ -454,7 +454,8 @@ const PassesProvider = ({
             return { ...p, selected: false, edit: false, disabled: false }
           }
           const isMultiUnit =
-            p.duration_type !== "day" && supportsQuantitySelector(p.max_per_order)
+            p.duration_type !== "day" &&
+            supportsQuantitySelector(p.max_per_order)
           const initialQuantity =
             p.duration_type === "day"
               ? (p.original_quantity ?? 0)

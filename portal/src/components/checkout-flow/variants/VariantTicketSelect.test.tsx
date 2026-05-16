@@ -223,12 +223,12 @@ describe("isSectionVisibleForApp — visible_if gating", () => {
       ...baseSection,
       visible_if: { field_id: "local_resident", value: "Yes" },
     }
-    expect(
-      isSectionVisibleForApp(section, { local_resident: "Yes" }),
-    ).toBe(true)
-    expect(
-      isSectionVisibleForApp(section, { local_resident: "No" }),
-    ).toBe(false)
+    expect(isSectionVisibleForApp(section, { local_resident: "Yes" })).toBe(
+      true,
+    )
+    expect(isSectionVisibleForApp(section, { local_resident: "No" })).toBe(
+      false,
+    )
   })
 
   it("matches when answer is in an array of accepted values", () => {

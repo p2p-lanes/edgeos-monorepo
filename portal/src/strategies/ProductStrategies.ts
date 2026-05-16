@@ -136,8 +136,7 @@ class WeekProductStrategy implements ProductStrategy {
     scopeIds: string[] | undefined,
   ): boolean {
     return products.some(
-      (p) =>
-        p.duration_type === "week" && p.edit && this.inScope(p, scopeIds),
+      (p) => p.duration_type === "week" && p.edit && this.inScope(p, scopeIds),
     )
   }
 
@@ -231,10 +230,7 @@ class WeekProductStrategy implements ProductStrategy {
         updatedProducts,
         promotionScope,
       )
-      const activeWeeks = this.countActiveWeeks(
-        updatedProducts,
-        promotionScope,
-      )
+      const activeWeeks = this.countActiveWeeks(updatedProducts, promotionScope)
       const hasEdited = this.hasEditedWeeks(updatedProducts, promotionScope)
       const weeksThreshold = this.weeksInScopeCount(
         updatedProducts,
@@ -251,7 +247,8 @@ class WeekProductStrategy implements ProductStrategy {
       const isClearedByMonth = (p: ProductsPass): boolean => {
         if (!shouldSelectMonth) return false
         if (p.purchased) return false
-        if (p.duration_type !== "day" && p.duration_type !== "week") return false
+        if (p.duration_type !== "day" && p.duration_type !== "week")
+          return false
         // Use the same scope used to decide the promotion so we only clear
         // products that belong to the same "visible set". Without scope hints,
         // legacy behaviour clears all week/day products of the attendee.
