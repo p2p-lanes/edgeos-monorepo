@@ -13,7 +13,7 @@ export default function BuyPassesContent() {
   const router = useRouter()
   const { attendeePasses: attendees, products } = usePassesProvider()
   const { getCity } = useCityProvider()
-  const background = getBackgroundProps(getCity())
+  const background = getBackgroundProps(getCity(), "passes")
 
   const handleBack = () => {
     router.push(`/portal/${params.popupSlug}/passes`)

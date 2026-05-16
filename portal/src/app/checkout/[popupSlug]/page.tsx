@@ -48,7 +48,7 @@ export default function OpenTicketingCheckoutPage() {
     )
   }
 
-  const background = getBackgroundProps(runtime.popup)
+  const background = getBackgroundProps(runtime.popup, "checkout")
 
   return (
     <SidebarProvider
