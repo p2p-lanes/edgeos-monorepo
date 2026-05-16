@@ -36,7 +36,7 @@ describe("buildFormZodSchema — email validation", () => {
     // gate on the field name in the default branch.
     const schema = buildSchema({
       email: {
-        type: "string",
+        type: "text",
         label: "Email",
         required: true,
       } as ApplicationFormSchema["base_fields"][string],
@@ -52,7 +52,7 @@ describe("buildFormZodSchema — email validation", () => {
   it("accepts a syntactically valid email", () => {
     const schema = buildSchema({
       email: {
-        type: "string",
+        type: "text",
         label: "Email",
         required: true,
       } as ApplicationFormSchema["base_fields"][string],
@@ -68,7 +68,7 @@ describe("buildFormZodSchema — email validation", () => {
   it("allows empty email when the field is not required", () => {
     const schema = buildSchema({
       email: {
-        type: "string",
+        type: "text",
         label: "Email",
         required: false,
       } as ApplicationFormSchema["base_fields"][string],
@@ -86,7 +86,7 @@ describe("buildFormZodSchema — email validation", () => {
       base_fields: {},
       custom_fields: {
         email: {
-          type: "string",
+          type: "text",
           label: "Custom email",
           required: true,
         },
