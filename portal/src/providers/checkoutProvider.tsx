@@ -111,8 +111,53 @@ interface CheckoutContextValue {
   buyerGeneralError: string | null
   setBuyerField: (fieldName: string, value: unknown) => void
   isBuyerInfoComplete: boolean
+  /** Names of buyer-form fields that fail the current Zod schema. Empty
+   *  when the form is complete or no schema is configured. Source of
+   *  truth for "where did the user miss something?" — the CartFooter's
+   *  enable-and-validate flow uses it to mark fields touched and
+   *  decide which step to scroll back to. */
+  getBuyerInvalidFields: () => string[]
+  /** Returns the step_type of the first step (in funnel order) with
+   *  unmet required input. Today only buyer is gated; returns `null`
+   *  when nothing's missing. */
+  findFirstIncompleteStep: () => string | null
+  /** Returns the step_type of the first product-bearing step the user
+   *  should be sent to when the cart is empty. Prefers visited steps,
+   *  else falls back to the first product step in funnel order. */
+  findFirstProductStep: (visited?: Set<string>) => string | null
+  /** True when at least one cartable item is present (regardless of price). */
+  hasAnyCartItems: boolean
+  /** Step types the user has scrolled into during this session. Updated
+   *  by the funnel's IntersectionObserver. Used by the nav to paint a
+   *  step amber (visited but incomplete) vs leave it neutral. */
+  visitedSteps: Set<string>
+  markStepVisited: (stepType: string) => void
+  /** Buyer-form fields that should render their error regardless of
+   *  whether the user has actually focused them. Triggered when the
+   *  user presses Continuar/Pagar with incomplete data; cleared when
+   *  the user edits again. */
+  forcedBuyerFieldsTouched: Set<string>
+  markBuyerFieldsTouched: (fieldNames: string[]) => void
+  clearForcedBuyerFieldsTouched: () => void
+  /** Persistent banner the funnel raises when a Continuar/Pagar attempt
+   *  fails validation. Persistent until dismissed so the user doesn't
+   *  lose context mid-correction. */
+  checkoutToast: CheckoutToastState | null
+  triggerCheckoutToast: (state: Omit<CheckoutToastState, "id">) => void
+  dismissCheckoutToast: () => void
   cartUiEnabled: boolean
   creditsEnabled: boolean
+}
+
+export interface CheckoutToastChip {
+  label: string
+  stepId: string
+}
+
+export interface CheckoutToastState {
+  id: string
+  message: string
+  chips?: CheckoutToastChip[]
 }
 
 const CheckoutContext = createContext<CheckoutContextValue | null>(null)
@@ -241,6 +286,25 @@ export function CheckoutProvider({
     !buyerFormSchema ||
     buildFormZodSchema(buyerFormSchema, false).safeParse(buyerValues).success
 
+  // Returns the names of buyer-form fields that fail the current schema.
+  // Returns [] when complete or when no schema is configured.
+  const getBuyerInvalidFields = useCallback((): string[] => {
+    if (!buyerFormSchema) return []
+    const result = buildFormZodSchema(buyerFormSchema, false).safeParse(
+      buyerValues,
+    )
+    if (result.success) return []
+    const seen = new Set<string>()
+    for (const issue of result.error.issues) {
+      const fieldName =
+        Array.isArray(issue.path) && issue.path.length > 0
+          ? String(issue.path[0])
+          : null
+      if (fieldName) seen.add(fieldName)
+    }
+    return Array.from(seen)
+  }, [buyerFormSchema, buyerValues])
+
   // True while step configs or products are still loading on first render.
   // Why: when both queries are pending, availableSteps falls back to
   // ["passes", "confirm"] with default labels and the cart total reads $0,
@@ -295,6 +359,57 @@ export function CheckoutProvider({
   const [dynamicItems, setDynamicItems] = useState<
     Record<string, SelectedDynamicItem[]>
   >({})
+  // Steps the user has scrolled into during this session. Session-only —
+  // no localStorage. Used purely for nav UX (paint amber when started
+  // but not completed).
+  const [visitedSteps, setVisitedSteps] = useState<Set<string>>(
+    () => new Set<string>(),
+  )
+  const markStepVisited = useCallback((stepType: string) => {
+    setVisitedSteps((prev) => {
+      if (prev.has(stepType)) return prev
+      const next = new Set(prev)
+      next.add(stepType)
+      return next
+    })
+  }, [])
+  const [forcedBuyerFieldsTouched, setForcedBuyerFieldsTouched] = useState<
+    Set<string>
+  >(() => new Set<string>())
+  const markBuyerFieldsTouched = useCallback((fieldNames: string[]) => {
+    if (fieldNames.length === 0) return
+    setForcedBuyerFieldsTouched((prev) => {
+      let changed = false
+      const next = new Set(prev)
+      for (const name of fieldNames) {
+        if (!next.has(name)) {
+          next.add(name)
+          changed = true
+        }
+      }
+      return changed ? next : prev
+    })
+  }, [])
+  const clearForcedBuyerFieldsTouched = useCallback(() => {
+    setForcedBuyerFieldsTouched((prev) =>
+      prev.size === 0 ? prev : new Set<string>(),
+    )
+  }, [])
+  const [checkoutToast, setCheckoutToast] = useState<CheckoutToastState | null>(
+    null,
+  )
+  const triggerCheckoutToast = useCallback(
+    (state: Omit<CheckoutToastState, "id">) => {
+      // Fresh id forces re-render even when the same message fires twice
+      // (e.g. user re-clicks Pay with the same missing data); useful for
+      // chip animations downstream.
+      setCheckoutToast({ ...state, id: String(Date.now()) })
+    },
+    [],
+  )
+  const dismissCheckoutToast = useCallback(() => {
+    setCheckoutToast(null)
+  }, [])
 
   // Build selected passes from attendeePasses
   const selectedPasses = useMemo<SelectedPassItem[]>(() => {
@@ -591,6 +706,51 @@ export function CheckoutProvider({
     ],
   )
 
+  // Validation helpers — used by CartFooter's enable-and-validate flow.
+  // findFirstIncompleteStep: today only the buyer step has formal field
+  // validation. Returns its step_type when its Zod schema isn't satisfied
+  // and the step exists in availableSteps; otherwise null. The helper is
+  // shaped so additional gated steps can join later without breaking the
+  // caller (e.g. a future "require at least one ticket" rule).
+  const findFirstIncompleteStep = useCallback((): string | null => {
+    if (
+      !isBuyerInfoComplete &&
+      (availableSteps as string[]).includes("buyer")
+    ) {
+      return "buyer"
+    }
+    return null
+  }, [availableSteps, isBuyerInfoComplete])
+
+  // findFirstProductStep: pick a step to bounce the user back to when
+  // the cart is empty at confirm time. Visited steps win (the buyer was
+  // actually there), else the first product-bearing step in funnel order.
+  const findFirstProductStep = useCallback(
+    (visited?: Set<string>): string | null => {
+      const productSteps = (availableSteps as string[]).filter(
+        (s) => s !== "buyer" && s !== "confirm" && s !== "success",
+      )
+      if (productSteps.length === 0) return null
+      if (visited && visited.size > 0) {
+        const visitedProduct = productSteps.find((s) => visited.has(s))
+        if (visitedProduct) return visitedProduct
+      }
+      return productSteps[0]
+    },
+    [availableSteps],
+  )
+
+  // hasAnyCartItems: mirrors CartFooter's old `canContinue` cart check,
+  // surfaced on the context so CartFooter (and any future surface that
+  // needs the same predicate) can read it directly instead of replicating
+  // the OR-chain locally.
+  const hasAnyCartItems =
+    selectedPasses.length > 0 ||
+    !!housing ||
+    merch.length > 0 ||
+    !!patron ||
+    Object.values(dynamicItems).some((items) => items.length > 0)
+
   // Dynamic item actions
   const addDynamicItem = useCallback(
     (stepType: string, item: SelectedDynamicItem) => {
@@ -822,6 +982,18 @@ export function CheckoutProvider({
       setBuyerGeneralError(null)
     },
     isBuyerInfoComplete,
+    getBuyerInvalidFields,
+    findFirstIncompleteStep,
+    findFirstProductStep,
+    hasAnyCartItems,
+    visitedSteps,
+    markStepVisited,
+    forcedBuyerFieldsTouched,
+    markBuyerFieldsTouched,
+    clearForcedBuyerFieldsTouched,
+    checkoutToast,
+    triggerCheckoutToast,
+    dismissCheckoutToast,
     cartUiEnabled,
     creditsEnabled,
   }
