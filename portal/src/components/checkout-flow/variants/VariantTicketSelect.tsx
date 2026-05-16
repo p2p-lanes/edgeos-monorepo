@@ -404,11 +404,19 @@ function AttendeePassRows({
     id: string,
     p: ProductsPass,
     exclusivityScopeIds?: string[],
+    attendeeVisibleProductIds?: string[],
   ) => void
   isEditing: boolean
   sections: TemplateSection[]
 }) {
   const groups = buildSectionGroups(attendee, sections)
+
+  // Wide scope passed to the strategy: every product id visible to this
+  // attendee across ALL rendered sections. Enables cross-section auto-promote
+  // (Week → Month) while keeping the cart honest about what the user can see.
+  const attendeeVisibleProductIds = groups.flatMap((g) =>
+    g.products.map((p) => p.id),
+  )
 
   const hasFullOrMonthSelected = attendee.products.some(
     (p) =>
@@ -440,6 +448,7 @@ function AttendeePassRows({
                       attendee.id,
                       { ...p, quantity: qty },
                       scopeIds,
+                      attendeeVisibleProductIds,
                     )
                   }
                   disabled={hasFullOrMonthSelected}
@@ -449,12 +458,20 @@ function AttendeePassRows({
                 <PassRow
                   key={p.id}
                   product={p}
-                  onClick={() => toggleProduct(attendee.id, p, scopeIds)}
+                  onClick={() =>
+                    toggleProduct(
+                      attendee.id,
+                      p,
+                      scopeIds,
+                      attendeeVisibleProductIds,
+                    )
+                  }
                   onQuantityChange={(qty) =>
                     toggleProduct(
                       attendee.id,
                       { ...p, quantity: qty },
                       scopeIds,
+                      attendeeVisibleProductIds,
                     )
                   }
                   disabled={
@@ -933,6 +950,7 @@ function CompactAttendeeCard({
     id: string,
     p: ProductsPass,
     exclusivityScopeIds?: string[],
+    attendeeVisibleProductIds?: string[],
   ) => void
   isEditing: boolean
   sections: TemplateSection[]
@@ -941,6 +959,7 @@ function CompactAttendeeCard({
   const meta = getCategoryMeta(attendee.category ?? "")
   const groups = buildSectionGroups(attendee, sections)
   const visibleProducts = groups.flatMap((g) => g.products)
+  const attendeeVisibleProductIds = visibleProducts.map((p) => p.id)
   // Lookup: product.id → ids of peers in the same section, for exclusivity scope.
   const scopeIdsByProductId = new Map<string, string[]>()
   for (const g of groups) {
@@ -1032,6 +1051,7 @@ function CompactAttendeeCard({
                         attendee.id,
                         { ...p, quantity: qty + 1 },
                         scopeIdsByProductId.get(p.id),
+                        attendeeVisibleProductIds,
                       )
                     }
                     onDecrement={() =>
@@ -1039,6 +1059,7 @@ function CompactAttendeeCard({
                         attendee.id,
                         { ...p, quantity: qty - 1 },
                         scopeIdsByProductId.get(p.id),
+                        attendeeVisibleProductIds,
                       )
                     }
                     onAdd={() =>
@@ -1046,6 +1067,7 @@ function CompactAttendeeCard({
                         attendee.id,
                         { ...p, quantity: 1 },
                         scopeIdsByProductId.get(p.id),
+                        attendeeVisibleProductIds,
                       )
                     }
                   />
@@ -1101,6 +1123,7 @@ function CompactAttendeeCard({
                           attendee.id,
                           p,
                           scopeIdsByProductId.get(p.id),
+                          attendeeVisibleProductIds,
                         )
                 }
                 disabled={isDisabled}

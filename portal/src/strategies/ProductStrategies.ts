@@ -18,7 +18,14 @@ interface ProductStrategy {
     attendeeId: string,
     product: ProductsPass,
     discount?: DiscountProps,
+    // Strict scope: products in the SAME visual section as the clicked one.
+    // Drives exclusivity (e.g. clicking a VIP clears a GA in the same section).
     exclusivityScopeIds?: string[],
+    // Wide scope: every product visible to this attendee across ALL sections
+    // currently rendered (post visible_if + attendee_categories filtering).
+    // Drives auto-promotion (week → month) without leaking into products the
+    // user can't see (e.g. Caregiver vs Nanny, opposite-tier locals).
+    attendeeVisibleProductIds?: string[],
   ) => AttendeePassState[]
 }
 
@@ -107,33 +114,94 @@ class MonthProductStrategy implements ProductStrategy {
 }
 
 class WeekProductStrategy implements ProductStrategy {
-  protected countActiveWeeks(products: ProductsPass[]): number {
+  protected inScope(p: ProductsPass, scopeIds: string[] | undefined): boolean {
+    if (!scopeIds || scopeIds.length === 0) return true
+    return scopeIds.includes(p.id)
+  }
+
+  protected countActiveWeeks(
+    products: ProductsPass[],
+    scopeIds: string[] | undefined,
+  ): number {
     return products.filter(
-      (p) => p.duration_type === "week" && (p.purchased || p.selected),
+      (p) =>
+        p.duration_type === "week" &&
+        (p.purchased || p.selected) &&
+        this.inScope(p, scopeIds),
     ).length
   }
 
-  protected hasEditedWeeks(products: ProductsPass[]): boolean {
-    return products.some((p) => p.duration_type === "week" && p.edit)
+  protected hasEditedWeeks(
+    products: ProductsPass[],
+    scopeIds: string[] | undefined,
+  ): boolean {
+    return products.some(
+      (p) =>
+        p.duration_type === "week" && p.edit && this.inScope(p, scopeIds),
+    )
+  }
+
+  // The Month target to auto-promote. With a section scope the target MUST
+  // live inside the same section as the weeks — otherwise we'd promote a Month
+  // the user can't see (e.g. Month Locals when only regular weeks are visible).
+  // Without scope, fall back to the first Month in the attendee (legacy).
+  protected resolveMonthTarget(
+    products: ProductsPass[],
+    scopeIds: string[] | undefined,
+  ): ProductsPass | undefined {
+    if (scopeIds && scopeIds.length > 0) {
+      return products.find(
+        (p) => p.duration_type === "month" && scopeIds.includes(p.id),
+      )
+    }
+    return products.find((p) => p.duration_type === "month")
+  }
+
+  // Threshold: with scope, all weeks in that scope; without, legacy "4 weeks".
+  protected weeksInScopeCount(
+    products: ProductsPass[],
+    scopeIds: string[] | undefined,
+  ): number {
+    if (scopeIds && scopeIds.length > 0) {
+      return products.filter(
+        (p) => p.duration_type === "week" && scopeIds.includes(p.id),
+      ).length
+    }
+    return 4
   }
 
   protected shouldSelectMonth(
     activeWeeks: number,
+    weeksThreshold: number,
     hasEditedWeeks: boolean,
+    monthTargetExists: boolean,
     monthPurchased: boolean,
   ): boolean {
-    if (monthPurchased) {
-      return false
-    }
-    return activeWeeks >= 4 && !hasEditedWeeks
+    if (!monthTargetExists) return false
+    if (monthPurchased) return false
+    if (weeksThreshold === 0) return false
+    return activeWeeks >= weeksThreshold && !hasEditedWeeks
   }
 
   handleSelection(
     attendees: AttendeePassState[],
     attendeeId: string,
     product: ProductsPass,
+    _discount?: DiscountProps,
+    exclusivityScopeIds?: string[],
+    attendeeVisibleProductIds?: string[],
   ): AttendeePassState[] {
     const isMultiUnit = supportsQuantitySelector(product.max_per_order)
+
+    // Promotion scope: prefer the WIDE scope (all attendee-visible products
+    // across sections) so a week-in-section-A can promote a month-in-section-B
+    // when both belong to the same coherent set the user actually sees.
+    // Fall back to the strict section scope to keep behaviour stable for
+    // configs that don't provide visibility hints.
+    const promotionScope =
+      attendeeVisibleProductIds && attendeeVisibleProductIds.length > 0
+        ? attendeeVisibleProductIds
+        : exclusivityScopeIds
 
     return attendees.map((attendee) => {
       if (attendee.id !== attendeeId) return attendee
@@ -141,9 +209,6 @@ class WeekProductStrategy implements ProductStrategy {
       const willBeSelected = isMultiUnit
         ? (product.quantity ?? 0) > 0
         : !product.selected
-      const monthProduct = attendee.products.find(
-        (p) => p.duration_type === "month",
-      )
 
       const updatedProducts = attendee.products.map((p) => {
         if (p.id !== product.id) return p
@@ -162,32 +227,52 @@ class WeekProductStrategy implements ProductStrategy {
         }
       })
 
-      const activeWeeks = this.countActiveWeeks(updatedProducts)
-      const hasEdited = this.hasEditedWeeks(updatedProducts)
+      const monthTarget = this.resolveMonthTarget(
+        updatedProducts,
+        promotionScope,
+      )
+      const activeWeeks = this.countActiveWeeks(
+        updatedProducts,
+        promotionScope,
+      )
+      const hasEdited = this.hasEditedWeeks(updatedProducts, promotionScope)
+      const weeksThreshold = this.weeksInScopeCount(
+        updatedProducts,
+        promotionScope,
+      )
       const shouldSelectMonth = this.shouldSelectMonth(
         activeWeeks,
+        weeksThreshold,
         hasEdited,
-        monthProduct?.purchased || false,
+        !!monthTarget,
+        monthTarget?.purchased || false,
       )
 
-      const isClearedByMonth = (p: ProductsPass): boolean =>
-        shouldSelectMonth &&
-        !p.purchased &&
-        (p.duration_type === "day" || p.duration_type === "week")
+      const isClearedByMonth = (p: ProductsPass): boolean => {
+        if (!shouldSelectMonth) return false
+        if (p.purchased) return false
+        if (p.duration_type !== "day" && p.duration_type !== "week") return false
+        // Use the same scope used to decide the promotion so we only clear
+        // products that belong to the same "visible set". Without scope hints,
+        // legacy behaviour clears all week/day products of the attendee.
+        return this.inScope(p, promotionScope)
+      }
 
       return {
         ...attendee,
-        products: updatedProducts.map((p) => ({
-          ...p,
-          quantity: isClearedByMonth(p) ? 0 : p.quantity,
-          selected:
-            p.duration_type === "month"
+        products: updatedProducts.map((p) => {
+          const isTargetMonth = !!monthTarget && p.id === monthTarget.id
+          return {
+            ...p,
+            quantity: isClearedByMonth(p) ? 0 : p.quantity,
+            selected: isTargetMonth
               ? shouldSelectMonth
               : isClearedByMonth(p)
                 ? false
                 : p.selected,
-          edit: p.duration_type === "month" ? hasEdited : p.edit,
-        })),
+            edit: isTargetMonth ? hasEdited : p.edit,
+          }
+        }),
       }
     })
   }
@@ -283,6 +368,7 @@ class ExclusivityGuard implements ProductStrategy {
     product: ProductsPass,
     discount?: DiscountProps,
     exclusivityScopeIds?: string[],
+    attendeeVisibleProductIds?: string[],
   ): AttendeePassState[] {
     const result = this.inner.handleSelection(
       attendees,
@@ -290,6 +376,7 @@ class ExclusivityGuard implements ProductStrategy {
       product,
       discount,
       exclusivityScopeIds,
+      attendeeVisibleProductIds,
     )
 
     // Scope: explicit ids from the caller (ticketing-step section) when provided,

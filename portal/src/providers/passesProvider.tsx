@@ -32,10 +32,12 @@ interface PassesContext_interface {
     attendeeId: string,
     product: ProductsPass,
     exclusivityScopeIds?: string[],
+    attendeeVisibleProductIds?: string[],
   ) => void
   products: ProductsPass[]
   isEditing: boolean
   toggleEditing: (editing?: boolean) => void
+  clearSelections: () => void
 }
 
 export const PassesContext = createContext<PassesContext_interface | null>(null)
@@ -296,6 +298,7 @@ const PassesProvider = ({
       attendeeId: string,
       product: ProductsPass,
       exclusivityScopeIds?: string[],
+      attendeeVisibleProductIds?: string[],
     ) => {
       if (!product) return
       const strategy = getProductStrategy(
@@ -310,6 +313,7 @@ const PassesProvider = ({
           product,
           discountRef.current,
           exclusivityScopeIds,
+          attendeeVisibleProductIds,
         ),
       )
     },
@@ -437,6 +441,38 @@ const PassesProvider = ({
     setIsEditing((prev) => (editing !== undefined ? editing : !prev))
   }, [])
 
+  // Reset every product's selection state without rebuilding the structure.
+  // Purchased rows keep their server-side quantity (e.g. day passes already
+  // owned). New selections drop back to their initial quantity per
+  // `buildBaseAttendeePasses`: 0 for multi-unit non-day, 1 otherwise.
+  const clearSelections = useCallback(() => {
+    setAttendeePasses((current) =>
+      current.map((attendee) => ({
+        ...attendee,
+        products: attendee.products.map((p) => {
+          if (p.purchased) {
+            return { ...p, selected: false, edit: false, disabled: false }
+          }
+          const isMultiUnit =
+            p.duration_type !== "day" && supportsQuantitySelector(p.max_per_order)
+          const initialQuantity =
+            p.duration_type === "day"
+              ? (p.original_quantity ?? 0)
+              : isMultiUnit
+                ? 0
+                : 1
+          return {
+            ...p,
+            selected: false,
+            edit: false,
+            disabled: false,
+            quantity: initialQuantity,
+          }
+        }),
+      })),
+    )
+  }, [])
+
   const contextValue = useMemo(
     () => ({
       attendeePasses,
@@ -444,8 +480,16 @@ const PassesProvider = ({
       products,
       isEditing,
       toggleEditing,
+      clearSelections,
     }),
-    [attendeePasses, toggleProduct, products, isEditing, toggleEditing],
+    [
+      attendeePasses,
+      toggleProduct,
+      products,
+      isEditing,
+      toggleEditing,
+      clearSelections,
+    ],
   )
 
   return (
