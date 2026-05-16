@@ -191,58 +191,18 @@ function ProductRow({
     rowDisabled && "cursor-not-allowed opacity-50",
   )
 
-  // Row click = primary "add" affordance. Toggle products (max_per_order=1)
-  // flip in/out of the cart; multi-quantity products increment up to `max`.
-  // The stepper and Add button take priority via stopPropagation so users
-  // can decrement without the row double-firing.
-  const handleRowActivate = () => {
-    if (rowDisabled) return
-    if (showStepper) {
-      if (quantity >= max) return
-      handleQuantityChange(quantity + 1)
-      return
-    }
-    handleQuantityChange(isAdded ? 0 : 1)
-  }
-
-  const stepperAtMax = showStepper && quantity >= max
-  const rowClickable = !rowDisabled && !stepperAtMax
-
+  // Row presentation: interactive controls (stepper, CTA button) are the
+  // ONLY click targets — the row wrapper stays a plain <div> so we don't
+  // nest <button>s (HTML invalid + hydration warning). Buyers tap the
+  // stepper "+" or the Add pill explicitly; that's the standard e-commerce
+  // pattern and keeps the markup a11y-clean without div role="button"
+  // workarounds.
   return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: row contains inner +/- buttons (QuantitySelector); it can't itself be a <button> — div role="button" with full keyboard handlers is the supported workaround.
-    // biome-ignore lint/a11y/useAriaPropsSupportedByRole: aria-label resolves to undefined when role is undefined (rowClickable=false); biome flags it on the static decl regardless.
     <div
-      role={rowClickable ? "button" : undefined}
-      tabIndex={rowClickable ? 0 : undefined}
-      aria-disabled={rowDisabled || undefined}
-      aria-label={
-        rowClickable
-          ? isAdded && !showStepper
-            ? t("checkout.actions.remove_aria", {
-                defaultValue: "Remove from cart",
-              })
-            : t("checkout.actions.add_aria", {
-                defaultValue: "Add to cart",
-              })
-          : undefined
-      }
-      onClick={rowClickable ? handleRowActivate : undefined}
-      onKeyDown={
-        rowClickable
-          ? (e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault()
-                handleRowActivate()
-              }
-            }
-          : undefined
-      }
       className={cn(
-        "px-4 py-3 transition-colors outline-none",
+        "px-4 py-3 transition-colors",
         isAdded && "bg-[color:var(--accent,theme(colors.muted))]/10",
-        rowDisabled && "opacity-40 cursor-not-allowed",
-        rowClickable &&
-          "cursor-pointer hover:bg-[color:var(--accent,theme(colors.muted))]/15 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[color:var(--accent,theme(colors.foreground))]/40",
+        rowDisabled && "opacity-40",
       )}
     >
       <div className="flex items-center gap-3">
