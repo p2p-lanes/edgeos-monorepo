@@ -5,8 +5,6 @@ import VariantHousingDate from "../variants/VariantHousingDate"
 import VariantImageGallery from "../variants/VariantImageGallery"
 import VariantMerchImage from "../variants/VariantMerchImage"
 import VariantPatronPreset from "../variants/VariantPatronPreset"
-import VariantRichText from "../variants/VariantRichText"
-import VariantTicketCard from "../variants/VariantTicketCard"
 import VariantTicketSelect from "../variants/VariantTicketSelect"
 import VariantYouTubeVideo from "../variants/VariantYouTubeVideo"
 
@@ -19,19 +17,16 @@ export interface VariantProps {
 
 export const VARIANT_REGISTRY: Record<string, ComponentType<VariantProps>> = {
   "ticket-select": VariantTicketSelect,
-  "ticket-card": VariantTicketCard,
   "patron-preset": VariantPatronPreset,
   "housing-date": VariantHousingDate,
   "merch-image": VariantMerchImage,
   "youtube-video": VariantYouTubeVideo,
   "image-gallery": VariantImageGallery,
   faqs: VariantFaqs,
-  "rich-text": VariantRichText,
 }
 
 export const CONTENT_ONLY_TEMPLATES = new Set([
   "youtube-video",
   "image-gallery",
   "faqs",
-  "rich-text",
 ])

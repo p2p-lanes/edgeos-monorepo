@@ -4,8 +4,6 @@ import { HousingDateConfig } from "./HousingDateConfig"
 import { ImageGalleryConfig } from "./ImageGalleryConfig"
 import { MerchImageConfig } from "./MerchImageConfig"
 import { PatronPresetConfig } from "./PatronPresetConfig"
-import { RichTextConfig } from "./RichTextConfig"
-import { TicketCardConfig } from "./TicketCardConfig"
 import { TicketSelectConfig } from "./TicketSelectConfig"
 import type { TemplateConfigProps } from "./types"
 import { YouTubeVideoConfig } from "./YouTubeVideoConfig"
@@ -17,12 +15,10 @@ export const TEMPLATE_CONFIG_REGISTRY: Record<
   ComponentType<TemplateConfigProps>
 > = {
   "ticket-select": TicketSelectConfig,
-  "ticket-card": TicketCardConfig,
   "patron-preset": PatronPresetConfig,
   "housing-date": HousingDateConfig,
   "merch-image": MerchImageConfig,
   "youtube-video": YouTubeVideoConfig,
   "image-gallery": ImageGalleryConfig,
   faqs: FaqsConfig,
-  "rich-text": RichTextConfig,
 }
