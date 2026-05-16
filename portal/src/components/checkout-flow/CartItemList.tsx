@@ -2,6 +2,7 @@
 
 import { Heart, Home, Shield, ShoppingBag, Tag, Ticket, X } from "lucide-react"
 import { useTranslation } from "react-i18next"
+import { resolveStepIcon } from "@/lib/checkoutStepIcons"
 import { useCheckout } from "@/providers/checkoutProvider"
 import { formatCurrency } from "@/types/checkout"
 
@@ -19,11 +20,30 @@ export default function CartItemList() {
     clearPromoCode,
     removeDynamicItem,
     isEditing,
+    stepConfigs,
   } = useCheckout()
 
-  const hasDynamicItems = Object.values(cart.dynamicItems).some(
-    (items) => items.length > 0,
-  )
+  // Group dynamic items by their originating step so the drawer renders one
+  // section per step type ("Housing", "Parking", …) with the matching icon,
+  // instead of dumping every dynamic item under a single "Tickets" heading.
+  const dynamicGroups = Object.entries(cart.dynamicItems)
+    .filter(([, items]) => items.length > 0)
+    .map(([stepType, items]) => {
+      const stepConfig = stepConfigs.find((s) => s.step_type === stepType)
+      const Icon = resolveStepIcon({
+        stepType,
+        template: stepConfig?.template,
+        emoji: stepConfig?.emoji,
+      })
+      return {
+        stepType,
+        label: stepConfig?.title ?? stepType,
+        Icon,
+        items,
+      }
+    })
+
+  const hasDynamicItems = dynamicGroups.length > 0
   const hasEditChanges =
     isEditing && attendees.some((a) => a.products.some((p) => p.edit))
   const hasItems =
@@ -205,52 +225,51 @@ export default function CartItemList() {
         </div>
       )}
 
-      {/* Dynamic Items */}
-      {hasDynamicItems && (
-        <div className="mb-4">
-          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-            Tickets
+      {/* Dynamic Items — one group per step (Housing, Parking, …) */}
+      {dynamicGroups.map(({ stepType, label, Icon, items }) => (
+        <div key={stepType} className="mb-4">
+          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <Icon className="w-3.5 h-3.5" />
+            <span>{label}</span>
           </h4>
           <div className="space-y-2">
-            {Object.values(cart.dynamicItems)
-              .flat()
-              .map((item) => (
-                <div
-                  key={item.productId}
-                  className="flex items-center justify-between py-2 border-b border-border last:border-0"
-                >
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <Ticket className="w-4 h-4 text-muted-foreground shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-checkout-title truncate">
-                        {item.quantity > 1 && (
-                          <span className="text-muted-foreground">
-                            {item.quantity} ×{" "}
-                          </span>
-                        )}
-                        {item.product.name}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-checkout-title">
-                      {formatCurrency(item.price)}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        removeDynamicItem(item.stepType, item.productId)
-                      }
-                      className="p-1 text-muted-foreground hover:text-destructive transition-colors"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
+            {items.map((item) => (
+              <div
+                key={item.productId}
+                className="flex items-center justify-between py-2 border-b border-border last:border-0"
+              >
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <Icon className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-checkout-title truncate">
+                      {item.quantity > 1 && (
+                        <span className="text-muted-foreground">
+                          {item.quantity} ×{" "}
+                        </span>
+                      )}
+                      {item.product.name}
+                    </p>
                   </div>
                 </div>
-              ))}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-checkout-title">
+                    {formatCurrency(item.price)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      removeDynamicItem(item.stepType, item.productId)
+                    }
+                    className="p-1 text-muted-foreground hover:text-destructive transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
-      )}
+      ))}
 
       {/* Insurance */}
       {cart.insurance && summary.insuranceSubtotal > 0 && (
