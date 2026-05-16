@@ -1,17 +1,8 @@
 "use client"
 
-import {
-  Check,
-  Heart,
-  HelpCircle,
-  Home,
-  ImageIcon,
-  Play,
-  Shield,
-  ShoppingBag,
-  Ticket,
-} from "lucide-react"
+import { Check } from "lucide-react"
 import type { ReactNode } from "react"
+import { resolveStepIcon } from "@/lib/checkoutStepIcons"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
 import type { CheckoutStep } from "@/types/checkout"
@@ -19,30 +10,11 @@ import type { CheckoutStep } from "@/types/checkout"
 export type FooterDesign = "pill" | "stripe" | "dock"
 export type WatermarkStyle = "none" | "ghost" | "stroke" | "bold"
 
-const SECTION_ICONS: Record<string, typeof Ticket> = {
-  passes: Ticket,
-  housing: Home,
-  merch: ShoppingBag,
-  patron: Heart,
-  confirm: Shield,
-}
-
-const TEMPLATE_ICONS: Record<string, typeof Ticket> = {
-  "ticket-select": Ticket,
-  "patron-preset": Heart,
-  "housing-date": Home,
-  "merch-image": ShoppingBag,
-  "youtube-video": Play,
-  "image-gallery": ImageIcon,
-  faqs: HelpCircle,
-}
-
-function resolveIcon(section: { id: string; template?: string | null }) {
-  if (section.template && TEMPLATE_ICONS[section.template]) {
-    return TEMPLATE_ICONS[section.template]
-  }
-  return SECTION_ICONS[section.id] ?? Ticket
-}
+// Icon resolution lives in `@/lib/checkoutStepIcons` so the cart drawer
+// (and other surfaces) can render the same registry without duplicating
+// the step-type / template lookup tables.
+const resolveIcon = (section: { id: string; template?: string | null }) =>
+  resolveStepIcon({ stepType: section.id, template: section.template })
 
 interface NavSection {
   id: string
