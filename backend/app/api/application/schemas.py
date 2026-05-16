@@ -217,6 +217,7 @@ class ApplicationUpdate(BaseModel):
     info_not_shared: list[str] | None = None
     custom_fields: dict | None = None
     status: UserSettableStatus | None = None
+    group_id: uuid.UUID | None = None
 
     # Scholarship human-editable fields (admin-only decision fields excluded)
     scholarship_request: bool | None = None
