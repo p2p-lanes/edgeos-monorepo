@@ -1,6 +1,7 @@
 "use client"
 
 import { useParams, useRouter } from "next/navigation"
+import { useEffect } from "react"
 import ScrollyCheckoutFlow from "@/components/checkout-flow/ScrollyCheckoutFlow"
 import { Loader } from "@/components/ui/Loader"
 import { getBackgroundProps } from "@/lib/background-image"
@@ -14,6 +15,18 @@ export default function BuyPassesContent() {
   const { attendeePasses: attendees, products } = usePassesProvider()
   const { getCity } = useCityProvider()
   const background = getBackgroundProps(getCity(), "passes")
+
+  // The portal layout owns the scroll container (<main id="portal-scroll">),
+  // and the SnapDotNav indicator sits on the right edge of the viewport. The
+  // native scrollbar overlaps it, so hide the scrollbar only while this view
+  // is mounted.
+  useEffect(() => {
+    const main = document.getElementById("portal-scroll")
+    main?.classList.add("no-scrollbar")
+    return () => {
+      main?.classList.remove("no-scrollbar")
+    }
+  }, [])
 
   const handleBack = () => {
     router.push(`/portal/${params.popupSlug}/passes`)

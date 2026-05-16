@@ -150,6 +150,8 @@ const stripedStyle = {
 
 type TicketSelectVariant = "stacked" | "tabs" | "compact" | "accordion"
 
+const SELECTED_ROW_CLASSES = "bg-primary/10 border-l-primary"
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -718,7 +720,7 @@ function PassRow({
         effectiveDisabled
           ? "opacity-40 cursor-not-allowed bg-muted border-l-transparent"
           : rowIsActive
-            ? "bg-gradient-to-r from-primary/25 via-primary/[0.08] to-transparent border-l-primary"
+            ? SELECTED_ROW_CLASSES
             : "hover:bg-muted border-l-transparent",
       )}
     >
@@ -758,6 +760,14 @@ function PassRow({
             </span>
             <SaleStateBadge state={saleState} />
           </div>
+          {product.description && (
+            <p
+              ref={descriptionRef}
+              className="text-xs text-muted-foreground truncate mt-0.5"
+            >
+              {product.description}
+            </p>
+          )}
         </div>
       </div>
       <div className="text-right shrink-0">
@@ -779,12 +789,14 @@ function PassRow({
   )
 
   const hasDescription = !!product.description
+  const showExpandControls =
+    hasDescription && (summaryOpen || isDescriptionOverflowing)
 
-  if (hasDescription) {
+  if (showExpandControls) {
     return (
       <div>
         {mainButton}
-        <div className="px-5 pb-3 pt-2">
+        <div className="px-5 pb-2 pt-0">
           {summaryOpen ? (
             <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-line">
               {product.description}{" "}
@@ -798,23 +810,15 @@ function PassRow({
               </button>
             </p>
           ) : (
-            <div className="flex items-baseline gap-1.5">
-              <p
-                ref={descriptionRef}
-                className="text-xs text-muted-foreground truncate flex-1 min-w-0"
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => setSummaryOpen(true)}
+                className="inline-flex items-center gap-0.5 text-xs font-medium text-primary underline underline-offset-2 hover:opacity-80"
               >
-                {product.description}
-              </p>
-              {isDescriptionOverflowing && (
-                <button
-                  type="button"
-                  onClick={() => setSummaryOpen(true)}
-                  className="inline-flex items-center gap-0.5 text-xs font-medium text-primary underline underline-offset-2 hover:opacity-80 shrink-0"
-                >
-                  {t("common.see_more")}
-                  <ChevronDown className="w-3 h-3" />
-                </button>
-              )}
+                {t("common.see_more")}
+                <ChevronDown className="w-3 h-3" />
+              </button>
             </div>
           )}
         </div>
@@ -915,7 +919,7 @@ function DayPassRow({
         effectiveDisabled
           ? "opacity-40 border-l-transparent"
           : hasQuantity
-            ? "bg-gradient-to-r from-primary/25 via-primary/[0.08] to-transparent border-l-primary"
+            ? SELECTED_ROW_CLASSES
             : "border-l-transparent",
       )}
     >

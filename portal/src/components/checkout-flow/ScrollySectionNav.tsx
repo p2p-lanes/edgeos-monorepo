@@ -98,10 +98,10 @@ export default function ScrollySectionNav({
                     onClick={() => onSectionClick(section.id)}
                     aria-current={isActive ? "step" : undefined}
                     className={cn(
-                      "relative z-10 flex h-7 min-w-0 items-center justify-center gap-1 px-1.5 text-xs font-semibold transition-colors duration-200",
+                      "relative z-10 flex h-7 min-w-0 items-center justify-center gap-1 px-1.5 text-xs font-semibold transition-[color,opacity] duration-200",
                       isActive
                         ? "text-checkout-badge-title"
-                        : "text-checkout-badge-title-disabled hover:text-checkout-badge-title/80",
+                        : "text-checkout-badge-title-disabled hover:opacity-70",
                     )}
                   >
                     <Icon className="size-3.5 shrink-0" />

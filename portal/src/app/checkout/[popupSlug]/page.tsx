@@ -62,7 +62,7 @@ export default function OpenTicketingCheckoutPage() {
       }
     >
       <main
-        className={`h-svh overflow-y-auto ${background.className}`.trim()}
+        className={`h-svh overflow-y-auto no-scrollbar ${background.className}`.trim()}
         style={background.style}
       >
         <OpenCheckoutRuntime
