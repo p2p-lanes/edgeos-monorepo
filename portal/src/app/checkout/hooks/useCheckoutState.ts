@@ -141,7 +141,10 @@ const useCheckoutState = ({
       if (mutationPayload.kind === "update") {
         application = await ApplicationsService.updateMyApplication({
           popupId,
-          requestBody: mutationPayload.payload,
+          requestBody: {
+            ...mutationPayload.payload,
+            group_id: groupId ?? undefined,
+          },
         })
       } else {
         application = await ApplicationsService.createMyApplication({

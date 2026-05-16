@@ -242,6 +242,7 @@ export type ApplicationUpdate = {
     [key: string]: unknown;
 } | null);
     status?: (UserSettableStatus | null);
+    group_id?: (string | null);
     scholarship_request?: (boolean | null);
     scholarship_details?: (string | null);
     scholarship_video_url?: (string | null);
