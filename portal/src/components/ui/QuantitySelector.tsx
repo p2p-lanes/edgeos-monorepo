@@ -46,6 +46,16 @@ interface QuantitySelectorProps {
   onAdd?: () => void
   size?: "sm" | "md"
   className?: string
+  /**
+   * Colour treatment for the empty-slot "+" tile.
+   *  - `default` (legacy) — faint primary tile, primary icon.
+   *  - `accent` — solid PRIMARY tile with the icon painted in the ACCENT
+   *    colour at stroke-3. High-contrast CTA pop for use on light card
+   *    surfaces where the legacy faint-primary tile gets lost.
+   *
+   * Adjustment buttons (+/-) are unchanged across both tones.
+   */
+  tone?: "default" | "accent"
 }
 
 const BUTTON_SIZES: Record<
@@ -102,6 +112,7 @@ const QuantitySelector = ({
   onAdd,
   size = "md",
   className,
+  tone = "default",
 }: QuantitySelectorProps) => {
   const stopPropagation = (e: MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation()
@@ -113,6 +124,16 @@ const QuantitySelector = ({
   // Empty-slot state: single "+" add button — filled tile CTA, sized larger
   // than the +/- adjustment buttons so it reads as the primary action.
   if (value === 0 && onAdd && !disabled) {
+    const isAccent = tone === "accent"
+    const addClasses = cn(
+      "transition-all duration-200 ease-out transform hover:scale-110 active:scale-95 flex items-center justify-center rounded-full shadow-sm",
+      isAccent
+        ? // Solid PRIMARY tile + ACCENT icon. Falls back to foreground/background
+          // if the popup didn't set a primary/accent so the button still renders.
+          "bg-[color:var(--primary,theme(colors.foreground))] text-[color:var(--accent,theme(colors.background))] hover:brightness-110"
+        : "hover:bg-primary/30 bg-primary/20 text-primary",
+      ADD_BUTTON_SIZES[size],
+    )
     return (
       <div className={cn("flex items-center", className)}>
         <button
@@ -121,14 +142,16 @@ const QuantitySelector = ({
             stopPropagation(e)
             onAdd()
           }}
-          className={cn(
-            "transition-all duration-200 ease-out transform hover:scale-110 active:scale-95 hover:bg-primary/30 flex items-center justify-center rounded-full bg-primary/20 text-primary shadow-sm",
-            ADD_BUTTON_SIZES[size],
-          )}
+          className={addClasses}
           aria-label="Add item"
           tabIndex={0}
         >
-          <Plus className={cn(ADD_ICON_SIZES[size], "stroke-[2.5]")} />
+          <Plus
+            className={cn(
+              ADD_ICON_SIZES[size],
+              isAccent ? "stroke-[3]" : "stroke-[2.5]",
+            )}
+          />
         </button>
       </div>
     )
