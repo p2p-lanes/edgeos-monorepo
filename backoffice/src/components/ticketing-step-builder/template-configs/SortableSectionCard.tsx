@@ -8,9 +8,21 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { ImageUpload } from "@/components/ui/image-upload"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
+
+export interface SectionVisibilityCondition {
+  field_id: string
+  value: string | string[]
+}
 
 export interface ProductSection {
   key: string
@@ -20,6 +32,16 @@ export interface ProductSection {
   description?: string
   image_url?: string
   attendee_categories?: string[] | null
+  visible_if?: SectionVisibilityCondition | null
+}
+
+export interface VisibilityFormFieldOption {
+  /** FormField.name — stable key persisted in custom_fields */
+  name: string
+  /** Human-readable label for the dropdown */
+  label: string
+  /** Discrete options to choose from */
+  options: string[]
 }
 
 export function parseConfigSections(config: Record<string, unknown> | null): {
@@ -61,6 +83,9 @@ interface SortableSectionCardProps {
   showMediaFields?: boolean
   showAttendeeCategories?: boolean
   attendeeCategories?: AttendeeCategoryOption[]
+  /** When provided and non-empty, renders the "Visibility condition" picker
+   *  so admins can gate the section against a form answer. */
+  visibilityFormFields?: VisibilityFormFieldOption[]
 }
 
 export function SortableSectionCard({
@@ -72,6 +97,7 @@ export function SortableSectionCard({
   showMediaFields = true,
   showAttendeeCategories = false,
   attendeeCategories = [],
+  visibilityFormFields = [],
 }: SortableSectionCardProps) {
   const {
     attributes,
@@ -109,6 +135,40 @@ export function SortableSectionCard({
         ? null
         : next
     onUpdate(section.key, { attendee_categories: resolved })
+  }
+
+  const NO_FIELD = "__no_field__"
+  const visibilityField = section.visible_if?.field_id
+    ? visibilityFormFields.find((f) => f.name === section.visible_if?.field_id)
+    : undefined
+  // Stored value can be string or string[]; the picker only handles a single
+  // value today. Array form is preserved untouched on read but the dropdown
+  // shows the first match if present.
+  const visibilityValue =
+    typeof section.visible_if?.value === "string"
+      ? section.visible_if?.value
+      : Array.isArray(section.visible_if?.value)
+        ? section.visible_if?.value[0]
+        : undefined
+
+  const handleVisibilityFieldChange = (nextFieldName: string) => {
+    if (nextFieldName === NO_FIELD) {
+      onUpdate(section.key, { visible_if: null })
+      return
+    }
+    const field = visibilityFormFields.find((f) => f.name === nextFieldName)
+    if (!field) return
+    // Reset value when the field changes — options differ between fields.
+    onUpdate(section.key, {
+      visible_if: { field_id: field.name, value: field.options[0] ?? "" },
+    })
+  }
+
+  const handleVisibilityValueChange = (nextValue: string) => {
+    if (!section.visible_if?.field_id) return
+    onUpdate(section.key, {
+      visible_if: { field_id: section.visible_if.field_id, value: nextValue },
+    })
   }
 
   return (
@@ -210,6 +270,59 @@ export function SortableSectionCard({
             {section.attendee_categories == null && (
               <span className="text-xs text-muted-foreground">
                 Visible to all attendees
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {visibilityFormFields.length > 0 && (
+        <div className="px-3 pb-3">
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs font-medium text-muted-foreground">
+              Visibility condition
+            </Label>
+            <div className="flex flex-wrap items-center gap-2">
+              <Select
+                value={section.visible_if?.field_id ?? NO_FIELD}
+                onValueChange={handleVisibilityFieldChange}
+              >
+                <SelectTrigger className="h-7 text-xs w-[200px]">
+                  <SelectValue placeholder="No condition" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_FIELD}>No condition</SelectItem>
+                  {visibilityFormFields.map((f) => (
+                    <SelectItem key={f.name} value={f.name}>
+                      {f.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {visibilityField && visibilityField.options.length > 0 && (
+                <>
+                  <span className="text-xs text-muted-foreground">equals</span>
+                  <Select
+                    value={visibilityValue ?? ""}
+                    onValueChange={handleVisibilityValueChange}
+                  >
+                    <SelectTrigger className="h-7 text-xs w-[140px]">
+                      <SelectValue placeholder="Select value" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {visibilityField.options.map((opt) => (
+                        <SelectItem key={opt} value={opt}>
+                          {opt}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </>
+              )}
+            </div>
+            {!section.visible_if?.field_id && (
+              <span className="text-xs text-muted-foreground">
+                Always visible
               </span>
             )}
           </div>

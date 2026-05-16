@@ -14,7 +14,11 @@ import {
 import { useQuery } from "@tanstack/react-query"
 import { Check, Plus } from "lucide-react"
 
-import { AttendeeCategoriesService, ProductsService } from "@/client"
+import {
+  AttendeeCategoriesService,
+  FormFieldsService,
+  ProductsService,
+} from "@/client"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
@@ -24,8 +28,13 @@ import {
   parseConfigSections,
   SortableSectionCard,
   toKey,
+  type VisibilityFormFieldOption,
 } from "./SortableSectionCard"
 import type { TemplateConfigProps } from "./types"
+
+// Only fields with a fixed set of answers can drive section visibility.
+// Free-text or date fields don't yield a stable dropdown of values.
+const DISCRETE_FIELD_TYPES = new Set(["select", "checkbox", "radio"])
 
 const TICKET_SELECT_VARIANTS = [
   {
@@ -159,6 +168,12 @@ export function TicketSelectConfig({
     refetchOnMount: "always",
   })
 
+  const { data: formFieldsData } = useQuery({
+    queryKey: ["form-fields", popupId],
+    queryFn: () => FormFieldsService.listFormFields({ popupId, limit: 200 }),
+    enabled: !!popupId,
+  })
+
   const productsResults = Array.isArray(productsData?.results)
     ? productsData.results
     : []
@@ -169,6 +184,22 @@ export function TicketSelectConfig({
     slug: p.slug,
     is_active: p.is_active,
   }))
+
+  const formFieldsResults = Array.isArray(formFieldsData?.results)
+    ? formFieldsData.results
+    : []
+  const visibilityFormFields: VisibilityFormFieldOption[] = formFieldsResults
+    .filter(
+      (f) =>
+        DISCRETE_FIELD_TYPES.has(f.field_type) &&
+        Array.isArray(f.options) &&
+        f.options.length > 0,
+    )
+    .map((f) => ({
+      name: f.name,
+      label: f.label || f.name,
+      options: f.options ?? [],
+    }))
 
   const categoriesResults = Array.isArray(categoriesData?.results)
     ? categoriesData.results
@@ -332,6 +363,7 @@ export function TicketSelectConfig({
                     showMediaFields={false}
                     showAttendeeCategories={true}
                     attendeeCategories={attendeeCategories}
+                    visibilityFormFields={visibilityFormFields}
                   />
                 ))}
             </div>

@@ -336,8 +336,6 @@ async def add_group_member(
     # Check for existing application
     application = applications_crud.get_by_human_popup(db, human.id, group.popup_id)
 
-    existing_app_status: str | None = application.status if application else None
-
     if not application:
         # Create new application with ACCEPTED status
         # Note: local_resident and created_by_leader are not on ApplicationAdminCreate
@@ -382,29 +380,6 @@ async def add_group_member(
     db.commit()
     db.refresh(application)
     db.refresh(human)
-
-    # Send accepted email if an existing application just got accepted via group
-    if (
-        existing_app_status is not None
-        and existing_app_status != ApplicationStatus.ACCEPTED.value
-        and application.popup
-    ):
-        from app.services.email import ApplicationAcceptedContext, get_email_service
-
-        email_service = get_email_service()
-        await email_service.send_application_accepted(
-            to=human.email,
-            subject=f"Application Accepted for {application.popup.name}",
-            context=ApplicationAcceptedContext(
-                first_name=human.first_name or "",
-                last_name=human.last_name or "",
-                popup_name=application.popup.name,
-            ),
-            from_address=application.popup.tenant.sender_email,
-            from_name=application.popup.tenant.sender_name,
-            popup_id=application.popup_id,
-            db_session=db,
-        )
 
     # Get products
     products = []

@@ -13,6 +13,7 @@ import QuantitySelector, {
 import { useAttendeeCategories } from "@/hooks/useAttendeeCategories"
 import { deriveProductState, type ProductSaleState } from "@/lib/product-state"
 import { cn } from "@/lib/utils"
+import { useApplication } from "@/providers/applicationProvider"
 import { useCheckout } from "@/providers/checkoutProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import { usePassesProvider } from "@/providers/passesProvider"
@@ -25,12 +26,33 @@ import type { VariantProps } from "../registries/variantRegistry"
 // Types & constants
 // ---------------------------------------------------------------------------
 
+interface SectionVisibilityCondition {
+  field_id: string
+  value: string | string[]
+}
+
 interface TemplateSection {
   key: string
   label: string
   order: number
   product_ids: string[]
   attendee_categories?: string[] | null
+  visible_if?: SectionVisibilityCondition | null
+}
+
+/** True when the section's visible_if matches the application's form answers.
+ *  No visible_if → always visible. Missing custom_fields → visible (open-ticketing
+ *  fallback: the form hasn't been answered yet, treat as no-gate). */
+export function isSectionVisibleForApp(
+  section: TemplateSection,
+  customFields: Record<string, unknown> | null | undefined,
+): boolean {
+  const cond = section.visible_if
+  if (!cond?.field_id) return true
+  if (!customFields) return true
+  const answer = customFields[cond.field_id]
+  const expected = Array.isArray(cond.value) ? cond.value : [cond.value]
+  return expected.includes(answer as string)
 }
 
 const getCategoryMeta = (cat: string) => {
@@ -128,6 +150,8 @@ const stripedStyle = {
 
 type TicketSelectVariant = "stacked" | "tabs" | "compact" | "accordion"
 
+const SELECTED_ROW_CLASSES = "bg-primary/10 border-l-primary"
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -195,7 +219,14 @@ export default function VariantTicketSelect({
     null,
   )
 
-  const sections = parseSections(templateConfig)
+  // Apply per-application visibility (visible_if) once: it depends on the
+  // application's form answers, not on individual attendees. Layouts and
+  // helpers downstream consume the already-filtered list.
+  const { getRelevantApplication } = useApplication()
+  const customFields = getRelevantApplication()?.custom_fields ?? null
+  const sections = parseSections(templateConfig).filter((s) =>
+    isSectionVisibleForApp(s, customFields),
+  )
 
   // Build category_id → sort_order map for attendee ordering.
   const { getCity } = useCityProvider()
@@ -290,7 +321,10 @@ function parseSections(
 
 /** Returns groups of products for an attendee based on configured sections.
  *  Products not in any section are excluded.
- *  Sections gated by attendee_categories are filtered to the current attendee. */
+ *  Sections gated by attendee_categories are filtered to the current attendee.
+ *  Note: visible_if (per-application gating) is evaluated upstream in the
+ *  main component, so by the time sections reach this function they are
+ *  already filtered by form responses. */
 export function buildSectionGroups(
   attendee: AttendeePassState,
   sections: TemplateSection[],
@@ -404,11 +438,19 @@ function AttendeePassRows({
     id: string,
     p: ProductsPass,
     exclusivityScopeIds?: string[],
+    attendeeVisibleProductIds?: string[],
   ) => void
   isEditing: boolean
   sections: TemplateSection[]
 }) {
   const groups = buildSectionGroups(attendee, sections)
+
+  // Wide scope passed to the strategy: every product id visible to this
+  // attendee across ALL rendered sections. Enables cross-section auto-promote
+  // (Week → Month) while keeping the cart honest about what the user can see.
+  const attendeeVisibleProductIds = groups.flatMap((g) =>
+    g.products.map((p) => p.id),
+  )
 
   const hasFullOrMonthSelected = attendee.products.some(
     (p) =>
@@ -440,6 +482,7 @@ function AttendeePassRows({
                       attendee.id,
                       { ...p, quantity: qty },
                       scopeIds,
+                      attendeeVisibleProductIds,
                     )
                   }
                   disabled={hasFullOrMonthSelected}
@@ -449,12 +492,20 @@ function AttendeePassRows({
                 <PassRow
                   key={p.id}
                   product={p}
-                  onClick={() => toggleProduct(attendee.id, p, scopeIds)}
+                  onClick={() =>
+                    toggleProduct(
+                      attendee.id,
+                      p,
+                      scopeIds,
+                      attendeeVisibleProductIds,
+                    )
+                  }
                   onQuantityChange={(qty) =>
                     toggleProduct(
                       attendee.id,
                       { ...p, quantity: qty },
                       scopeIds,
+                      attendeeVisibleProductIds,
                     )
                   }
                   disabled={
@@ -669,7 +720,7 @@ function PassRow({
         effectiveDisabled
           ? "opacity-40 cursor-not-allowed bg-muted border-l-transparent"
           : rowIsActive
-            ? "bg-gradient-to-r from-primary/25 via-primary/[0.08] to-transparent border-l-primary"
+            ? SELECTED_ROW_CLASSES
             : "hover:bg-muted border-l-transparent",
       )}
     >
@@ -709,6 +760,14 @@ function PassRow({
             </span>
             <SaleStateBadge state={saleState} />
           </div>
+          {product.description && (
+            <p
+              ref={descriptionRef}
+              className="text-xs text-muted-foreground truncate mt-0.5"
+            >
+              {product.description}
+            </p>
+          )}
         </div>
       </div>
       <div className="text-right shrink-0">
@@ -730,12 +789,14 @@ function PassRow({
   )
 
   const hasDescription = !!product.description
+  const showExpandControls =
+    hasDescription && (summaryOpen || isDescriptionOverflowing)
 
-  if (hasDescription) {
+  if (showExpandControls) {
     return (
       <div>
         {mainButton}
-        <div className="px-5 pb-3 pt-2">
+        <div className="px-5 pb-2 pt-0">
           {summaryOpen ? (
             <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-line">
               {product.description}{" "}
@@ -749,23 +810,15 @@ function PassRow({
               </button>
             </p>
           ) : (
-            <div className="flex items-baseline gap-1.5">
-              <p
-                ref={descriptionRef}
-                className="text-xs text-muted-foreground truncate flex-1 min-w-0"
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => setSummaryOpen(true)}
+                className="inline-flex items-center gap-0.5 text-xs font-medium text-primary underline underline-offset-2 hover:opacity-80"
               >
-                {product.description}
-              </p>
-              {isDescriptionOverflowing && (
-                <button
-                  type="button"
-                  onClick={() => setSummaryOpen(true)}
-                  className="inline-flex items-center gap-0.5 text-xs font-medium text-primary underline underline-offset-2 hover:opacity-80 shrink-0"
-                >
-                  {t("common.see_more")}
-                  <ChevronDown className="w-3 h-3" />
-                </button>
-              )}
+                {t("common.see_more")}
+                <ChevronDown className="w-3 h-3" />
+              </button>
             </div>
           )}
         </div>
@@ -866,7 +919,7 @@ function DayPassRow({
         effectiveDisabled
           ? "opacity-40 border-l-transparent"
           : hasQuantity
-            ? "bg-gradient-to-r from-primary/25 via-primary/[0.08] to-transparent border-l-primary"
+            ? SELECTED_ROW_CLASSES
             : "border-l-transparent",
       )}
     >
@@ -933,6 +986,7 @@ function CompactAttendeeCard({
     id: string,
     p: ProductsPass,
     exclusivityScopeIds?: string[],
+    attendeeVisibleProductIds?: string[],
   ) => void
   isEditing: boolean
   sections: TemplateSection[]
@@ -941,6 +995,7 @@ function CompactAttendeeCard({
   const meta = getCategoryMeta(attendee.category ?? "")
   const groups = buildSectionGroups(attendee, sections)
   const visibleProducts = groups.flatMap((g) => g.products)
+  const attendeeVisibleProductIds = visibleProducts.map((p) => p.id)
   // Lookup: product.id → ids of peers in the same section, for exclusivity scope.
   const scopeIdsByProductId = new Map<string, string[]>()
   for (const g of groups) {
@@ -1032,6 +1087,7 @@ function CompactAttendeeCard({
                         attendee.id,
                         { ...p, quantity: qty + 1 },
                         scopeIdsByProductId.get(p.id),
+                        attendeeVisibleProductIds,
                       )
                     }
                     onDecrement={() =>
@@ -1039,6 +1095,7 @@ function CompactAttendeeCard({
                         attendee.id,
                         { ...p, quantity: qty - 1 },
                         scopeIdsByProductId.get(p.id),
+                        attendeeVisibleProductIds,
                       )
                     }
                     onAdd={() =>
@@ -1046,6 +1103,7 @@ function CompactAttendeeCard({
                         attendee.id,
                         { ...p, quantity: 1 },
                         scopeIdsByProductId.get(p.id),
+                        attendeeVisibleProductIds,
                       )
                     }
                   />
@@ -1101,6 +1159,7 @@ function CompactAttendeeCard({
                           attendee.id,
                           p,
                           scopeIdsByProductId.get(p.id),
+                          attendeeVisibleProductIds,
                         )
                 }
                 disabled={isDisabled}
@@ -1454,9 +1513,16 @@ function LegacySectionLayout({
     updateDynamicQuantity(stepType, p.id, qty)
   }
 
-  const sections = (templateConfig?.sections ?? null) as
+  // Open-ticketing fallback path: no authenticated application, so visible_if
+  // can't be resolved against form answers. Treat as no-gate (return true).
+  const { getRelevantApplication } = useApplication()
+  const customFields = getRelevantApplication()?.custom_fields ?? null
+  const rawSections = (templateConfig?.sections ?? null) as
     | TemplateSection[]
     | null
+  const sections = rawSections
+    ? rawSections.filter((s) => isSectionVisibleForApp(s, customFields))
+    : null
   const hasSections = Array.isArray(sections) && sections.length > 0
   const groups = hasSections ? groupBySection(products, sections) : null
 

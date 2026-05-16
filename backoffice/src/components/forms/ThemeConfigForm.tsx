@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from "react"
 import { RgbaColorPicker } from "react-colorful"
 import { PopupsService, type PopupUpdate } from "@/client"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { InlineSection } from "@/components/ui/inline-form"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -23,6 +24,7 @@ import useCustomToast from "@/hooks/useCustomToast"
 import { cn } from "@/lib/utils"
 import { createErrorHandler } from "@/utils"
 import {
+  type CheckoutBackgroundContext,
   type PreviewEvent,
   type PreviewTab,
   ThemePreview,
@@ -37,6 +39,37 @@ interface ThemeConfig {
   }
   radius?: string
   border_radius?: string
+  checkout_background_contexts?: CheckoutBackgroundContext[]
+}
+
+const BACKGROUND_CONTEXT_OPTIONS: {
+  value: CheckoutBackgroundContext
+  label: string
+  description: string
+}[] = [
+  {
+    value: "checkout",
+    label: "Checkout",
+    description: "Open checkout flow (/checkout/[slug]).",
+  },
+  {
+    value: "groups",
+    label: "Groups",
+    description: "Group checkout pages (/groups/[slug]).",
+  },
+  {
+    value: "passes",
+    label: "Passes",
+    description: "Buy passes flow inside the portal (/portal/.../passes/buy).",
+  },
+]
+
+function sanitizeContexts(
+  values: readonly string[] | undefined,
+): CheckoutBackgroundContext[] {
+  if (!values) return []
+  const order: CheckoutBackgroundContext[] = ["checkout", "groups", "passes"]
+  return order.filter((c) => values.includes(c))
 }
 
 interface ThemeConfigFormProps {
@@ -53,6 +86,7 @@ const EMPTY_PREVIEW_EVENT: PreviewEvent = {
   start_date: null,
   end_date: null,
   express_checkout_background: null,
+  checkout_background_contexts: [],
 }
 
 export function ThemeConfigForm({
@@ -76,6 +110,9 @@ export function ThemeConfigForm({
   const [borderRadius, setBorderRadius] = useState(
     themeConfig?.border_radius ?? "",
   )
+  const [backgroundContexts, setBackgroundContexts] = useState<
+    CheckoutBackgroundContext[]
+  >(() => sanitizeContexts(themeConfig?.checkout_background_contexts))
   const [typographyExpanded, setTypographyExpanded] = useState(false)
   const [highlightedKeys, setHighlightedKeys] = useState<Set<string>>(
     () => new Set(),
@@ -112,12 +149,28 @@ export function ThemeConfigForm({
     setHighlightedKeys(keys ? new Set(keys) : new Set())
   }, [])
 
+  const toggleBackgroundContext = useCallback(
+    (context: CheckoutBackgroundContext, enabled: boolean) => {
+      setBackgroundContexts((prev) => {
+        const set = new Set(prev)
+        if (enabled) {
+          set.add(context)
+        } else {
+          set.delete(context)
+        }
+        return sanitizeContexts([...set])
+      })
+    },
+    [],
+  )
+
   const handleResetAll = () => {
     setColors({})
     setFontBaseSize("")
     setFontHeadingScale("")
     setRadius("")
     setBorderRadius("")
+    setBackgroundContexts([])
   }
 
   const handleSave = () => {
@@ -125,9 +178,14 @@ export function ThemeConfigForm({
     const hasTypography = fontBaseSize || fontHeadingScale
     const hasRadius = !!radius
     const hasBorderRadius = !!borderRadius
+    const hasBackgroundContexts = backgroundContexts.length > 0
 
     const config: ThemeConfig | null =
-      hasColors || hasTypography || hasRadius || hasBorderRadius
+      hasColors ||
+      hasTypography ||
+      hasRadius ||
+      hasBorderRadius ||
+      hasBackgroundContexts
         ? {
             ...(hasColors && { colors }),
             ...(hasTypography && {
@@ -140,6 +198,9 @@ export function ThemeConfigForm({
             }),
             ...(hasRadius && { radius }),
             ...(hasBorderRadius && { border_radius: borderRadius }),
+            ...(hasBackgroundContexts && {
+              checkout_background_contexts: backgroundContexts,
+            }),
           }
         : null
 
@@ -148,13 +209,19 @@ export function ThemeConfigForm({
     })
   }
 
+  const savedContexts = useMemo(
+    () => sanitizeContexts(themeConfig?.checkout_background_contexts),
+    [themeConfig?.checkout_background_contexts],
+  )
+
   const hasChanges =
     JSON.stringify(colors) !== JSON.stringify(themeConfig?.colors ?? {}) ||
     fontBaseSize !== (themeConfig?.typography?.font_base_size ?? "") ||
     fontHeadingScale !==
       (themeConfig?.typography?.font_heading_scale?.toString() ?? "") ||
     radius !== (themeConfig?.radius ?? "") ||
-    borderRadius !== (themeConfig?.border_radius ?? "")
+    borderRadius !== (themeConfig?.border_radius ?? "") ||
+    JSON.stringify(backgroundContexts) !== JSON.stringify(savedContexts)
 
   // Effective values = user override OR default.
   const effectiveColors = useMemo(() => {
@@ -303,6 +370,13 @@ export function ThemeConfigForm({
             disabled={readOnly}
           />
 
+          {/* Checkout background visibility */}
+          <BackgroundContextsSection
+            value={backgroundContexts}
+            onToggle={toggleBackgroundContext}
+            disabled={readOnly}
+          />
+
           <Separator />
 
           {!readOnly && (
@@ -341,12 +415,68 @@ export function ThemeConfigForm({
               highlightedKeys={highlightedKeys}
               activeTab={previewTab}
               onTabChange={setPreviewTab}
-              previewEvent={previewEvent ?? EMPTY_PREVIEW_EVENT}
+              previewEvent={{
+                ...(previewEvent ?? EMPTY_PREVIEW_EVENT),
+                checkout_background_contexts: backgroundContexts,
+              }}
             />
           </div>
         </div>
       </div>
     </InlineSection>
+  )
+}
+
+interface BackgroundContextsSectionProps {
+  value: CheckoutBackgroundContext[]
+  onToggle: (context: CheckoutBackgroundContext, enabled: boolean) => void
+  disabled?: boolean
+}
+
+function BackgroundContextsSection({
+  value,
+  onToggle,
+  disabled,
+}: BackgroundContextsSectionProps) {
+  return (
+    <div className="rounded-lg border bg-background">
+      <div className="flex items-center gap-2 px-3 py-2.5">
+        <div className="flex flex-col">
+          <span className="text-sm font-medium">
+            Checkout background visibility
+          </span>
+          <span className="text-[11px] text-muted-foreground">
+            Choose where the checkout background image is shown. If none are
+            selected, the image is hidden everywhere.
+          </span>
+        </div>
+      </div>
+      <div className="space-y-2 border-t px-3 pb-3 pt-3">
+        {BACKGROUND_CONTEXT_OPTIONS.map((option) => {
+          const id = `checkout-bg-${option.value}`
+          const checked = value.includes(option.value)
+          return (
+            <div key={option.value} className="flex items-start gap-2">
+              <Checkbox
+                id={id}
+                checked={checked}
+                disabled={disabled}
+                onCheckedChange={(state) => onToggle(option.value, !!state)}
+                className="mt-0.5"
+              />
+              <div className="flex flex-col">
+                <Label htmlFor={id} className="text-xs font-medium">
+                  {option.label}
+                </Label>
+                <span className="text-[11px] text-muted-foreground">
+                  {option.description}
+                </span>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 

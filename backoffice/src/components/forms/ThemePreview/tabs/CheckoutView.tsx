@@ -19,9 +19,12 @@ export function CheckoutView() {
   const display = useDisplayEvent()
   const isHl = makeIsHl(highlightedKeys)
 
-  const backgroundImage = event.express_checkout_background
-    ? `url(${event.express_checkout_background})`
-    : FALLBACK_BG
+  const checkoutEnabled =
+    event.checkout_background_contexts?.includes("checkout") ?? false
+  const backgroundImage =
+    checkoutEnabled && event.express_checkout_background
+      ? `url(${event.express_checkout_background})`
+      : FALLBACK_BG
 
   return (
     <div
