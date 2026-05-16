@@ -543,6 +543,32 @@ async def update_my_application(
     if profile_update:
         humans_crud.update(db, application.human, HumanUpdate(**profile_update))
 
+    # Detect group-flow update (existing applicant clicking an invite link).
+    # Validation mirrors create_internal so an arbitrary group_id can't be
+    # injected to suppress acceptance emails or bypass whitelisting.
+    is_group_join = app_update.get("group_id") is not None
+    if is_group_join:
+        from app.api.group.crud import groups_crud
+
+        group = groups_crud.get(db, app_update["group_id"])
+        if not group:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Group not found",
+            )
+        if group.popup_id != popup_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Group does not belong to this popup",
+            )
+        if not group.is_open and not group.has_whitelisted_email(
+            current_human.email
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your email is not whitelisted for this group",
+            )
+
     # Handle status change to IN_REVIEW
     if "status" in app_update:
         if hasattr(app_update["status"], "value"):
@@ -565,11 +591,47 @@ async def update_my_application(
     # Capture status before approval strategy may change it
     status_before_str = application.status
 
-    # Apply approval strategy when transitioning draft → IN_REVIEW
-    if (
+    if is_group_join:
+        # Group invite links bypass the popup's approval strategy and force
+        # accept/reject — same behavior as create_internal so a brand-new
+        # signup and an existing in-review user both end up able to buy.
+        from sqlmodel import select
+
+        from app.api.group.models import GroupMembers
+
+        if current_human.red_flag:
+            application.status = ApplicationStatus.REJECTED.value
+            crud.applications_crud.create_snapshot(
+                db, application, "auto_rejected"
+            )
+        else:
+            application.status = ApplicationStatus.ACCEPTED.value
+            application.accepted_at = datetime.now(UTC)
+            crud.applications_crud.create_snapshot(
+                db, application, "auto_accepted"
+            )
+            # Sync GroupMembers junction (vigente membership). Application.group_id
+            # was set via setattr above; the junction is the authoritative source
+            # for "currently in this group" — see commit 756f55a.
+            existing_member = db.exec(
+                select(GroupMembers).where(
+                    GroupMembers.group_id == app_update["group_id"],
+                    GroupMembers.human_id == current_human.id,
+                )
+            ).first()
+            if not existing_member:
+                db.add(
+                    GroupMembers(
+                        tenant_id=current_human.tenant_id,
+                        group_id=app_update["group_id"],
+                        human_id=current_human.id,
+                    )
+                )
+    elif (
         app_update.get("status") == ApplicationStatus.IN_REVIEW.value
         and application.human
     ):
+        # Apply approval strategy when transitioning draft → IN_REVIEW
         # Intercept: if popup requires application fee AND not already paid
         from app.api.popup.crud import popups_crud
 

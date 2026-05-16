@@ -178,6 +178,12 @@ async def send_application_status_email(
             db_session=db,
         )
     elif current_status == ApplicationStatus.ACCEPTED.value:
+        # Group-flow applications (invite link / referral) are auto-accepted
+        # so the recipient can buy tickets immediately. They never went through
+        # an apply step, so the "accepted" email would be confusing.
+        if application.group_id is not None:
+            return
+
         template_type, context = _get_scholarship_email_variant(application, popup)
 
         if template_type == EmailTemplateType.APPLICATION_ACCEPTED:
