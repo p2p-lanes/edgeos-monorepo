@@ -280,6 +280,7 @@ export function OpenTicketingBuyerForm({
                               })
                             : undefined)
                         }
+                        errorTone="warning"
                         isRequired={genderField.required}
                         options={(genderField.options ?? []).map((option) => ({
                           value: option,
@@ -296,6 +297,7 @@ export function OpenTicketingBuyerForm({
                             onChange("gender_specify", value)
                           }
                           error={errors.gender_specify}
+                          errorTone="warning"
                           isRequired
                           placeholder={t("form.gender_specify_placeholder")}
                         />
@@ -334,6 +336,7 @@ export function OpenTicketingBuyerForm({
                       field={field}
                       value={values[name]}
                       error={inlineError}
+                      errorTone="warning"
                       onChange={onChange}
                     />
                   </div>
