@@ -871,7 +871,21 @@ export type CompanionParticipation = {
     type?: "companion";
     attendee: AttendeeInfo;
     application_status: string;
+    owner_email?: (string | null);
 };
+
+/**
+ * Request body for POST /applications/my/detach-companion.
+ */
+export type DetachCompanionRequest = {
+    popup_id: string;
+};
+
+export type ApplicationsDetachCompanionData = {
+    requestBody: DetachCompanionRequest;
+};
+
+export type ApplicationsDetachCompanionResponse = void;
 
 /**
  * Coupon schema for creation.
