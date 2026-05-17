@@ -1,6 +1,11 @@
 import { FormInputWrapper } from "../FormInputWrapper"
-import { Input } from "../Input"
+import { type ErrorTone, Input } from "../Input"
 import { LabelMuted, LabelRequired } from "../Label"
+
+const ERROR_TEXT_CLASS: Record<ErrorTone, string> = {
+  destructive: "text-red-500",
+  warning: "text-amber-600",
+}
 
 export interface InputFormProps {
   label: string
@@ -8,6 +13,10 @@ export interface InputFormProps {
   value?: string
   onChange: (value: string) => void
   error?: string
+  /** Visual tone for the error state. Default `destructive` (red); opt
+   *  in to `warning` (amber) for surfaces where validation reads as
+   *  "needs attention" rather than a hard failure. */
+  errorTone?: ErrorTone
   isRequired?: boolean
   subtitle?: string
   placeholder?: string
@@ -26,6 +35,7 @@ export const InputForm = ({
   value,
   onChange,
   error,
+  errorTone = "destructive",
   subtitle,
   isRequired = false,
   type = "text",
@@ -55,11 +65,14 @@ export const InputForm = ({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         error={error}
+        errorTone={errorTone}
         maxLength={maxLength}
         readOnly={readOnly}
         {...rest}
       />
-      {error && <p className="text-red-500 text-sm">{error}</p>}
+      {error && (
+        <p className={`${ERROR_TEXT_CLASS[errorTone]} text-sm`}>{error}</p>
+      )}
     </FormInputWrapper>
   )
 }

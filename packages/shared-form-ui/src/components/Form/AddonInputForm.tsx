@@ -1,6 +1,16 @@
 import { AddonInput } from "../AddonInput"
 import { FormInputWrapper } from "../FormInputWrapper"
+import type { ErrorTone } from "../Input"
 import { LabelMuted, LabelRequired } from "../Label"
+
+const ERROR_BORDER_CLASS: Record<ErrorTone, string> = {
+  destructive: "border-red-500",
+  warning: "border-amber-500",
+}
+const ERROR_TEXT_CLASS: Record<ErrorTone, string> = {
+  destructive: "text-red-500",
+  warning: "text-amber-600",
+}
 
 export interface AddonInputFormProps {
   label: string
@@ -8,6 +18,9 @@ export interface AddonInputFormProps {
   value?: string
   onChange: (value: string) => void
   error?: string
+  /** Visual tone for the error state. Default `destructive` (red); opt
+   *  in to `warning` (amber). */
+  errorTone?: ErrorTone
   isRequired?: boolean
   subtitle?: string
   addon?: string
@@ -20,6 +33,7 @@ export const AddonInputForm = ({
   value,
   onChange,
   error,
+  errorTone = "destructive",
   isRequired = false,
   subtitle,
   addon,
@@ -43,9 +57,11 @@ export const AddonInputForm = ({
         placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={error ? "border-red-500" : ""}
+        className={error ? ERROR_BORDER_CLASS[errorTone] : ""}
       />
-      {error && <p className="text-red-500 text-sm">{error}</p>}
+      {error && (
+        <p className={`${ERROR_TEXT_CLASS[errorTone]} text-sm`}>{error}</p>
+      )}
     </FormInputWrapper>
   )
 }
