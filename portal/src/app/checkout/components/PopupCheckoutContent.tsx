@@ -1,12 +1,12 @@
 "use client"
 
-import { useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { AnimatePresence, motion } from "framer-motion"
 import { UserRound } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { type CSSProperties, useEffect, useRef } from "react"
+import { type CSSProperties, useEffect, useRef, useState } from "react"
 import { resolvePopupCheckoutPolicy } from "@/checkout/popupCheckoutPolicy"
-import type { PopupPublic } from "@/client"
+import { ApiError, ApplicationsService, type PopupPublic } from "@/client"
 import ScrollyCheckoutFlow from "@/components/checkout-flow/ScrollyCheckoutFlow"
 import { SidebarProvider } from "@/components/Sidebar/SidebarComponents"
 import { Button } from "@/components/ui/button"
@@ -34,6 +34,10 @@ import type {
   DefaultCheckoutFormData,
 } from "../types"
 import CheckoutLoginGate from "./CheckoutLoginGate"
+import {
+  type CompanionSwitchMode,
+  CompanionSwitchPrompt,
+} from "./CompanionSwitchPrompt"
 import TransitionScreen from "./TransitionScreen"
 import UserInfoForm from "./UserInfoForm"
 
@@ -74,6 +78,91 @@ export const PopupCheckoutContent = ({
   const hasSkippedForm = useRef(false)
   const attendees = useResolvedAttendees()
   const existingApplication = getRelevantApplication()
+
+  // Companion-on-someone-else's-application detection. Only active when the
+  // user arrived via a group invite link (groupId set) and is authenticated;
+  // the participation endpoint is portal-only and would 401 otherwise.
+  const isGroupFlow = !!groupId && policy.saleType === "application"
+  const { data: participation } = useQuery({
+    queryKey: queryKeys.participation.byPopup(popup.id),
+    queryFn: () =>
+      ApplicationsService.getMyParticipation({ popupId: popup.id }),
+    enabled: isGroupFlow && isAuthenticated,
+  })
+  // Dialog open-state is DERIVED from participation, not stored. Storing the
+  // mode in state caused a re-open race: when onSuccess set state to null,
+  // useEffect re-fired before participation refetched — so the dialog
+  // immediately re-opened from stale companion data. Derived avoids the race.
+  //
+  // We pick prompt vs blocked-paid up-front based on whether the companion's
+  // attendee row already has paid tickets — no need to make the user click
+  // Continue Here and discover the 409. paidBlockOverride is a defensive
+  // fallback for the (rare) case where participation cache is stale and a
+  // ticket got purchased in the meantime, so the mutation 409s.
+  const [paidBlockOverride, setPaidBlockOverride] = useState(false)
+  const isCompanion = participation?.type === "companion"
+  const companionHasPaidTickets =
+    participation?.type === "companion" &&
+    (participation.attendee?.tickets?.length ?? 0) > 0
+  const companionDialogMode: CompanionSwitchMode | null =
+    paidBlockOverride || (isCompanion && companionHasPaidTickets)
+      ? "blocked-paid"
+      : isCompanion
+        ? "prompt"
+        : null
+  const ownerEmail =
+    participation?.type === "companion"
+      ? (participation.owner_email ?? null)
+      : null
+  const companionCategory =
+    participation?.type === "companion"
+      ? (participation.attendee?.category ?? null)
+      : null
+
+  const detachMutation = useMutation({
+    mutationFn: () =>
+      ApplicationsService.detachCompanion({
+        requestBody: { popup_id: popup.id },
+      }),
+    onSuccess: () => {
+      // Don't mutate any dialog state — the refetched participation will
+      // become "none" or "applicant" and the derived mode closes the dialog.
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.participation.byPopup(popup.id),
+      })
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.attendees.byHumanPopup(popup.id),
+      })
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.applications.mine(),
+      })
+    },
+    onError: (err) => {
+      if (err instanceof ApiError && err.status === 409) {
+        const body = err.body as { detail?: { code?: string } } | undefined
+        if (body?.detail?.code === "tickets_already_purchased") {
+          setPaidBlockOverride(true)
+          return
+        }
+      }
+      // unknown error — keep the prompt open so the user can retry or cancel
+    },
+  })
+
+  const handleCompanionCancel = () => {
+    // Per spec: cancel == log out + return portal to email-entry state.
+    setPaidBlockOverride(false)
+    localStorage.removeItem("token")
+    dispatchAuthChange()
+    queryClient.removeQueries({ queryKey: queryKeys.profile.current })
+    queryClient.removeQueries({ queryKey: queryKeys.applications.mine() })
+    queryClient.removeQueries({
+      queryKey: queryKeys.participation.byPopup(popup.id),
+    })
+    queryClient.removeQueries({
+      queryKey: queryKeys.attendees.byHumanPopup(popup.id),
+    })
+  }
 
   useEffect(() => {
     setCityPreselected(popup.id)
@@ -207,6 +296,28 @@ export const PopupCheckoutContent = ({
     (isLoadingApplicationSchema || !applicationSchema)
   ) {
     return <Loader />
+  }
+
+  // Companion-switch dialog takes over the page when active — render it
+  // without the underlying form so the user isn't distracted by it bleeding
+  // through the overlay.
+  if (companionDialogMode !== null && isAuthenticated && isGroupFlow) {
+    return (
+      <div
+        className={`min-h-screen w-full ${background.className}`}
+        style={background.style}
+      >
+        <CompanionSwitchPrompt
+          open
+          mode={companionDialogMode}
+          ownerEmail={ownerEmail}
+          companionCategory={companionCategory}
+          isSwitching={detachMutation.isPending}
+          onSwitch={() => detachMutation.mutate()}
+          onCancel={handleCompanionCancel}
+        />
+      </div>
+    )
   }
 
   if (checkoutState === "passes") {

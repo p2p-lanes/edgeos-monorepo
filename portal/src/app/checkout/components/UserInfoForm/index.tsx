@@ -11,6 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { dispatchAuthChange } from "@/hooks/useIsAuthenticated"
 import type { ApplicationFormSchema } from "@/types/form-schema"
 import { useApplicationData } from "../../hooks/useApplicationData"
 import { useEmailVerification } from "../../hooks/useEmailVerification"
@@ -101,6 +102,10 @@ const UserInfoForm = ({
     resetForm()
     setIsAutoFilled(false)
     window?.localStorage?.removeItem("token")
+    // Notify useIsAuthenticated subscribers so the checkout shell re-evaluates
+    // immediately. Without this, the token-removed state only propagates after
+    // the next unrelated re-render — making the user click "Change email" twice.
+    dispatchAuthChange()
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
