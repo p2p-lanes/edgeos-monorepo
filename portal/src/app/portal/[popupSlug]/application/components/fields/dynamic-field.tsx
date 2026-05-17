@@ -1,4 +1,4 @@
-import { SchemaField } from "@edgeos/shared-form-ui"
+import { type ErrorTone, SchemaField } from "@edgeos/shared-form-ui"
 import type { FormFieldSchema } from "@/types/form-schema"
 
 interface DynamicFieldProps {
@@ -8,6 +8,10 @@ interface DynamicFieldProps {
   error?: string
   onChange: (name: string, value: unknown) => void
   hideLabelAndSubtitle?: boolean
+  /** Visual tone for the inline error state. Default `destructive`
+   *  (red); the open-ticketing buyer step opts into `warning` (amber)
+   *  to match the CheckoutToast banner palette. */
+  errorTone?: ErrorTone
 }
 
 export function DynamicField({
@@ -17,6 +21,7 @@ export function DynamicField({
   error,
   onChange,
   hideLabelAndSubtitle = false,
+  errorTone,
 }: DynamicFieldProps) {
   return (
     <SchemaField
@@ -26,6 +31,7 @@ export function DynamicField({
       error={error}
       onChange={onChange}
       hideLabelAndSubtitle={hideLabelAndSubtitle}
+      errorTone={errorTone}
     />
   )
 }
