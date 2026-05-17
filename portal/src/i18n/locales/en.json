@@ -168,6 +168,15 @@
     "express_title": "Express Checkout",
     "buyer_step_title": "Your information",
     "buyer_step_description": "Complete your information before payment.",
+    "buyer_hero_title": "You're one step away!",
+    "buyer_hero_subtitle": "We need a couple of details to reserve your spot.",
+    "buyer_hero_trust": "Your privacy matters. We don't share your data with third parties.",
+    "email_invalid": "This doesn't look like a valid email",
+    "field_required": "This field is required",
+    "toast_dismiss_aria": "Dismiss notice",
+    "toast_buyer_incomplete_continue": "Your information has missing fields. Review them to continue.",
+    "toast_buyer_incomplete_pay": "Complete the Your information fields before paying.",
+    "toast_cart_empty": "Add at least one item before continuing.",
     "loading_info": "Loading your information",
     "processing": "Processing your registration",
     "processing_subtitle": "This might take a few moments",
@@ -221,6 +230,7 @@
       "housing": "Housing",
       "merch": "Merch",
       "patron": "Patron",
+      "buyer": "Your information",
       "confirm": "Review & Confirm"
     }
   },

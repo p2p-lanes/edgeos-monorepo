@@ -202,6 +202,8 @@ export default function SnapFooter({
   sections,
   onGoToConfirm,
   onGoToNextSection,
+  onGoToPreviousSection,
+  onScrollToStep,
 }: {
   footerDesign: FooterDesign
   onPay?: () => void
@@ -210,6 +212,13 @@ export default function SnapFooter({
   sections?: SnapFooterSection[]
   onGoToConfirm?: () => void
   onGoToNextSection?: () => void
+  /** Scroll back one section. CartFooter prefers this over the
+   *  provider's goToPreviousStep because in scrolly mode the provider
+   *  one only updates internal state without moving the page. */
+  onGoToPreviousSection?: () => void
+  /** Jump to a specific step by id — used by the validation flow when
+   *  Continuar/Pagar bounces the user back to a failing step. */
+  onScrollToStep?: (stepId: string) => void
 }) {
   const { t } = useTranslation()
   const isMobile = useIsMobile()
@@ -256,6 +265,8 @@ export default function SnapFooter({
         onBack={onBack}
         nextSectionLabel={nextSectionLabel}
         onContinue={onGoToNextSection}
+        onPrevious={onGoToPreviousSection}
+        onScrollToStep={onScrollToStep}
         isLastSection={isOnConfirm}
         activeSectionId={activeSection}
       />
