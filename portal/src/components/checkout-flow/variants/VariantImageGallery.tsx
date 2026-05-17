@@ -40,6 +40,109 @@ function Caption({ text }: { text?: string }) {
 }
 
 // ---------------------------------------------------------------------------
+// Shared lightbox overlay — full-screen image preview with prev/next +
+// keyboard nav. Both Masonry and Lightbox layouts mount this on click so
+// the masonry visual stays intact while gaining click-to-expand. Parent
+// controls open/close by mounting/unmounting; passing a fresh `key` lets
+// the parent jump to a different image without going through close first.
+// ---------------------------------------------------------------------------
+
+function LightboxOverlay({
+  images,
+  initialIndex,
+  onClose,
+}: {
+  images: GalleryImage[]
+  initialIndex: number
+  onClose: () => void
+}) {
+  const [index, setIndex] = useState(initialIndex)
+
+  const prev = useCallback(
+    () => setIndex((i) => (i > 0 ? i - 1 : images.length - 1)),
+    [images.length],
+  )
+  const next = useCallback(
+    () => setIndex((i) => (i < images.length - 1 ? i + 1 : 0)),
+    [images.length],
+  )
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose()
+      if (e.key === "ArrowLeft") prev()
+      if (e.key === "ArrowRight") next()
+    }
+    window.addEventListener("keydown", handler)
+    return () => window.removeEventListener("keydown", handler)
+  }, [onClose, prev, next])
+
+  const current = images[index]
+  if (!current) return null
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
+      onKeyDown={() => {}}
+      role="dialog"
+      aria-modal="true"
+      aria-label={current.caption || `Image ${index + 1} of ${images.length}`}
+    >
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Close"
+        className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors z-10"
+      >
+        <X className="w-5 h-5" />
+      </button>
+
+      {images.length > 1 && (
+        <>
+          <button
+            type="button"
+            onClick={prev}
+            aria-label="Previous image"
+            className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors z-10"
+          >
+            <ChevronLeft className="w-6 h-6" />
+          </button>
+          <button
+            type="button"
+            onClick={next}
+            aria-label="Next image"
+            className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors z-10"
+          >
+            <ChevronRight className="w-6 h-6" />
+          </button>
+        </>
+      )}
+
+      <div className="max-w-4xl max-h-[80vh] w-full mx-4 relative">
+        <Image
+          src={current.url}
+          alt={current.caption || ""}
+          width={1200}
+          height={800}
+          className="w-full h-auto max-h-[80vh] object-contain rounded-lg"
+        />
+        {current.caption && (
+          <p className="text-white/80 text-sm text-center mt-3">
+            {current.caption}
+          </p>
+        )}
+        <p className="text-white/50 text-xs text-center mt-1">
+          {index + 1} / {images.length}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Carousel
 // ---------------------------------------------------------------------------
 
@@ -128,7 +231,7 @@ function CarouselGallery({
 }
 
 // ---------------------------------------------------------------------------
-// Masonry
+// Masonry — staggered grid with full-screen preview on click
 // ---------------------------------------------------------------------------
 
 function MasonryGallery({
@@ -137,17 +240,25 @@ function MasonryGallery({
   images: GalleryImage[]
   onSkip?: () => void
 }) {
+  const [selected, setSelected] = useState<number | null>(null)
+
   return (
     <div className="space-y-4">
       <div className="columns-2 sm:columns-3 gap-3 space-y-3">
-        {images.map((img) => (
-          <div key={img.id} className="break-inside-avoid">
-            <div className="rounded-xl overflow-hidden shadow-sm border border-border">
+        {images.map((img, i) => (
+          <button
+            key={img.id}
+            type="button"
+            onClick={() => setSelected(i)}
+            className="break-inside-avoid w-full block cursor-zoom-in"
+            aria-label={img.caption || `View image ${i + 1}`}
+          >
+            <div className="rounded-xl overflow-hidden shadow-sm border border-border group">
               {/* biome-ignore lint: masonry items use native img for natural height */}
               <img
                 src={img.url}
                 alt={img.caption || ""}
-                className="w-full h-auto block"
+                className="w-full h-auto block transition-transform duration-200 group-hover:scale-[1.02]"
                 loading="lazy"
               />
               {img.caption && (
@@ -156,15 +267,27 @@ function MasonryGallery({
                 </div>
               )}
             </div>
-          </div>
+          </button>
         ))}
       </div>
+
+      {selected !== null && (
+        <LightboxOverlay
+          // `key` forces a fresh mount whenever the parent opens with a
+          // different starting image, so the overlay's internal index
+          // initializes to that thumbnail instead of carrying the old one.
+          key={selected}
+          images={images}
+          initialIndex={selected}
+          onClose={() => setSelected(null)}
+        />
+      )}
     </div>
   )
 }
 
 // ---------------------------------------------------------------------------
-// Lightbox
+// Lightbox — square thumbnail grid with full-screen preview on click
 // ---------------------------------------------------------------------------
 
 function LightboxGallery({
@@ -175,33 +298,6 @@ function LightboxGallery({
 }) {
   const [selected, setSelected] = useState<number | null>(null)
 
-  const close = useCallback(() => setSelected(null), [])
-  const prev = useCallback(
-    () =>
-      setSelected((i) =>
-        i !== null ? (i > 0 ? i - 1 : images.length - 1) : null,
-      ),
-    [images.length],
-  )
-  const next = useCallback(
-    () =>
-      setSelected((i) =>
-        i !== null ? (i < images.length - 1 ? i + 1 : 0) : null,
-      ),
-    [images.length],
-  )
-
-  useEffect(() => {
-    if (selected === null) return
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close()
-      if (e.key === "ArrowLeft") prev()
-      if (e.key === "ArrowRight") next()
-    }
-    window.addEventListener("keydown", handler)
-    return () => window.removeEventListener("keydown", handler)
-  }, [selected, close, prev, next])
-
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -210,7 +306,8 @@ function LightboxGallery({
             key={img.id}
             type="button"
             onClick={() => setSelected(i)}
-            className="relative aspect-square rounded-xl overflow-hidden bg-muted group"
+            className="relative aspect-square rounded-xl overflow-hidden bg-muted group cursor-zoom-in"
+            aria-label={img.caption || `View image ${i + 1}`}
           >
             <Image
               src={img.url}
@@ -223,59 +320,12 @@ function LightboxGallery({
       </div>
 
       {selected !== null && (
-        <div
-          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) close()
-          }}
-          onKeyDown={() => {}}
-          role="dialog"
-        >
-          <button
-            type="button"
-            onClick={close}
-            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors z-10"
-          >
-            <X className="w-5 h-5" />
-          </button>
-
-          {images.length > 1 && (
-            <>
-              <button
-                type="button"
-                onClick={prev}
-                className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors z-10"
-              >
-                <ChevronLeft className="w-6 h-6" />
-              </button>
-              <button
-                type="button"
-                onClick={next}
-                className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors z-10"
-              >
-                <ChevronRight className="w-6 h-6" />
-              </button>
-            </>
-          )}
-
-          <div className="max-w-4xl max-h-[80vh] w-full mx-4 relative">
-            <Image
-              src={images[selected].url}
-              alt={images[selected].caption || ""}
-              width={1200}
-              height={800}
-              className="w-full h-auto max-h-[80vh] object-contain rounded-lg"
-            />
-            {images[selected].caption && (
-              <p className="text-white/80 text-sm text-center mt-3">
-                {images[selected].caption}
-              </p>
-            )}
-            <p className="text-white/50 text-xs text-center mt-1">
-              {selected + 1} / {images.length}
-            </p>
-          </div>
-        </div>
+        <LightboxOverlay
+          key={selected}
+          images={images}
+          initialIndex={selected}
+          onClose={() => setSelected(null)}
+        />
       )}
     </div>
   )
