@@ -58,14 +58,13 @@ function CopyButton({ value }: { value: string }) {
 }
 
 function buildReadonlyConnectionString(
-  tenantId: string,
+  _tenantId: string,
   cred: CredentialInfo,
   db: { db_host: string; db_port: number; db_name: string },
 ) {
   const user = encodeURIComponent(cred.db_username)
   const password = encodeURIComponent(cred.db_password)
-  const options = encodeURIComponent(`-c app.tenant_id=${tenantId}`)
-  return `postgresql://${user}:${password}@${db.db_host}:${db.db_port}/${db.db_name}?options=${options}`
+  return `postgresql://${user}:${password}@${db.db_host}:${db.db_port}/${db.db_name}`
 }
 
 function CopyConnectionStringButton({ value }: { value: string }) {
@@ -235,13 +234,11 @@ export function TenantCredentialsSection({
                       )}
                     />
                     <p className="text-xs text-muted-foreground">
-                      PostgreSQL URL with{" "}
+                      Read-only PostgreSQL URL scoped to this tenant. Scope is
+                      enforced by the database - the holder of this URL cannot
+                      read other tenants' data. Append{" "}
                       <code className="rounded bg-muted px-1 py-0.5 text-[10px] font-mono">
-                        app.tenant_id
-                      </code>{" "}
-                      scoped to this tenant. Append{" "}
-                      <code className="rounded bg-muted px-1 py-0.5 text-[10px] font-mono">
-                        &amp;sslmode=require
+                        ?sslmode=require
                       </code>{" "}
                       if your environment requires TLS.
                     </p>
