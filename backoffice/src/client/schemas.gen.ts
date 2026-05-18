@@ -1177,6 +1177,18 @@ export const ApplicationUpdateSchema = {
                 }
             ]
         },
+        group_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Group Id'
+        },
         scholarship_request: {
             anyOf: [
                 {
@@ -3967,6 +3979,17 @@ export const CompanionParticipationSchema = {
         application_status: {
             type: 'string',
             title: 'Application Status'
+        },
+        owner_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Owner Email'
         }
     },
     type: 'object',
@@ -4316,6 +4339,20 @@ export const DashboardStatsSchema = {
     required: ['applications', 'attendees', 'payments'],
     title: 'DashboardStats',
     description: 'Complete dashboard statistics.'
+} as const;
+
+export const DetachCompanionRequestSchema = {
+    properties: {
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        }
+    },
+    type: 'object',
+    required: ['popup_id'],
+    title: 'DetachCompanionRequest',
+    description: 'Request body for POST /applications/my/detach-companion.'
 } as const;
 
 export const DirectoryProductSchema = {
@@ -6603,6 +6640,11 @@ export const EventVenuePublicSchema = {
             maxLength: 20,
             default: 'active'
         },
+        display_order: {
+            type: 'integer',
+            title: 'Display Order',
+            default: 0
+        },
         created_at: {
             type: 'string',
             format: 'date-time',
@@ -6826,6 +6868,17 @@ export const EventVenueUpdateSchema = {
                     type: 'null'
                 }
             ]
+        },
+        display_order: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Display Order'
         },
         property_type_ids: {
             anyOf: [
@@ -15849,6 +15902,27 @@ export const VenuePropertyTypeUpdateSchema = {
     },
     type: 'object',
     title: 'VenuePropertyTypeUpdate'
+} as const;
+
+export const VenueReorderPayloadSchema = {
+    properties: {
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        venue_ids: {
+            items: {
+                type: 'string',
+                format: 'uuid'
+            },
+            type: 'array',
+            title: 'Venue Ids'
+        }
+    },
+    type: 'object',
+    required: ['popup_id', 'venue_ids'],
+    title: 'VenueReorderPayload'
 } as const;
 
 export const VenueStatusSchema = {

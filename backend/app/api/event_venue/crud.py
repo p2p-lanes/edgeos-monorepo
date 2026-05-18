@@ -33,7 +33,7 @@ class EventVenuesCRUD(BaseCRUD[EventVenues, EventVenueCreate, EventVenueUpdate])
         count_statement = select(func.count()).select_from(statement.subquery())
         total = session.exec(count_statement).one()
 
-        statement = statement.order_by(EventVenues.title)
+        statement = statement.order_by(EventVenues.display_order, EventVenues.title)
         statement = statement.offset(skip).limit(limit)
         results = list(session.exec(statement).all())
 

@@ -242,6 +242,7 @@ export type ApplicationUpdate = {
     [key: string]: unknown;
 } | null);
     status?: (UserSettableStatus | null);
+    group_id?: (string | null);
     scholarship_request?: (boolean | null);
     scholarship_details?: (string | null);
     scholarship_video_url?: (string | null);
@@ -870,6 +871,7 @@ export type CompanionParticipation = {
     type?: "companion";
     attendee: AttendeeInfo;
     application_status: string;
+    owner_email?: (string | null);
 };
 
 /**
@@ -962,6 +964,13 @@ export type DashboardStats = {
     applications: ApplicationStats;
     attendees: AttendeeStats;
     payments: PaymentStats;
+};
+
+/**
+ * Request body for POST /applications/my/detach-companion.
+ */
+export type DetachCompanionRequest = {
+    popup_id: string;
 };
 
 /**
@@ -1370,6 +1379,7 @@ export type EventVenuePublic = {
     setup_time_minutes?: number;
     teardown_time_minutes?: number;
     status?: VenueStatus;
+    display_order?: number;
     created_at?: string;
     updated_at?: string;
     id: string;
@@ -1398,6 +1408,7 @@ export type EventVenueUpdate = {
     setup_time_minutes?: (number | null);
     teardown_time_minutes?: (number | null);
     status?: (VenueStatus | null);
+    display_order?: (number | null);
     property_type_ids?: (Array<(string)> | null);
 };
 
@@ -3130,6 +3141,11 @@ export type VenuePropertyTypeUpdate = {
     icon?: (string | null);
 };
 
+export type VenueReorderPayload = {
+    popup_id: string;
+    venue_ids: Array<(string)>;
+};
+
 export type VenueStatus = 'pending' | 'active';
 
 export type VenueWeeklyHourInput = {
@@ -3298,6 +3314,12 @@ export type ApplicationsUpdateMyApplicationData = {
 };
 
 export type ApplicationsUpdateMyApplicationResponse = (ApplicationPublic);
+
+export type ApplicationsDetachCompanionData = {
+    requestBody: DetachCompanionRequest;
+};
+
+export type ApplicationsDetachCompanionResponse = (void);
 
 export type ApplicationsCreateMyApplicationData = {
     requestBody: ApplicationCreate;
@@ -4178,6 +4200,13 @@ export type EventVenuesCreateVenueData = {
 };
 
 export type EventVenuesCreateVenueResponse = (EventVenuePublic);
+
+export type EventVenuesReorderVenuesData = {
+    requestBody: VenueReorderPayload;
+    xTenantId?: (string | null);
+};
+
+export type EventVenuesReorderVenuesResponse = (void);
 
 export type EventVenuesGetVenueData = {
     venueId: string;

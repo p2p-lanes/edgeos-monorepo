@@ -43,6 +43,7 @@ class EventVenueBase(SQLModel):
     setup_time_minutes: int = Field(default=0)
     teardown_time_minutes: int = Field(default=0)
     status: VenueStatus = Field(default=VenueStatus.ACTIVE, max_length=20)
+    display_order: int = Field(default=0, index=True)
     created_at: datetime = Field(
         default_factory=datetime.utcnow, sa_type=DateTime(timezone=True)
     )
@@ -161,7 +162,13 @@ class EventVenueUpdate(BaseModel):
     setup_time_minutes: int | None = None
     teardown_time_minutes: int | None = None
     status: VenueStatus | None = None
+    display_order: int | None = None
     property_type_ids: list[uuid.UUID] | None = None
+
+
+class VenueReorderPayload(BaseModel):
+    popup_id: uuid.UUID
+    venue_ids: list[uuid.UUID]
 
 
 # ---------------------------------------------------------------------------
