@@ -98,7 +98,7 @@ const columns: ColumnDef<ProductPublic>[] = [
       const description = row.original.description
       if (!description) return null
       return (
-        <span className="line-clamp-2 block max-w-[180px] whitespace-normal text-sm leading-snug text-muted-foreground">
+        <span className="line-clamp-2 max-w-xs text-sm leading-snug text-muted-foreground">
           {description}
         </span>
       )
