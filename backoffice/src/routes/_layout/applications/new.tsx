@@ -15,9 +15,7 @@ export const Route = createFileRoute("/_layout/applications/new")({
 
 function NewApplication() {
   const navigate = useNavigate()
-  const goBack = useGoBack(() =>
-    navigate({ to: "/applications", search: {} }),
-  )
+  const goBack = useGoBack(() => navigate({ to: "/applications", search: {} }))
   const { isSuperadmin, isUserLoading } = useAuth()
 
   // Only superadmins can create applications via backoffice (for testing)
