@@ -4,6 +4,7 @@ import { useEffect } from "react"
 import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import { CouponForm } from "@/components/forms/CouponForm"
 import useAuth from "@/hooks/useAuth"
+import { useGoBack } from "@/hooks/useGoBack"
 
 export const Route = createFileRoute("/_layout/coupons/new")({
   component: NewCoupon,
@@ -14,6 +15,7 @@ export const Route = createFileRoute("/_layout/coupons/new")({
 
 function NewCoupon() {
   const navigate = useNavigate()
+  const goBack = useGoBack({ to: "/coupons" })
   const { isOperatorOrAbove, isUserLoading } = useAuth()
 
   // Redirect viewers to coupons list - they cannot create new coupons
@@ -33,7 +35,7 @@ function NewCoupon() {
       description="Add a new discount coupon for the event"
       backTo="/coupons"
     >
-      <CouponForm onSuccess={() => navigate({ to: "/coupons" })} />
+      <CouponForm onSuccess={goBack} />
     </FormPageLayout>
   )
 }

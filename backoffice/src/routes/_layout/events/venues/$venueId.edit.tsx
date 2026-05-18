@@ -1,5 +1,5 @@
 import { useSuspenseQuery } from "@tanstack/react-query"
-import { createFileRoute, useNavigate } from "@tanstack/react-router"
+import { createFileRoute } from "@tanstack/react-router"
 import { Suspense } from "react"
 
 import { EventVenuesService } from "@/client"
@@ -7,6 +7,7 @@ import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { VenueForm } from "@/components/forms/VenueForm"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useGoBack } from "@/hooks/useGoBack"
 
 export const Route = createFileRoute("/_layout/events/venues/$venueId/edit")({
   component: EditVenuePage,
@@ -16,18 +17,13 @@ export const Route = createFileRoute("/_layout/events/venues/$venueId/edit")({
 })
 
 function EditVenueContent({ venueId }: { venueId: string }) {
-  const navigate = useNavigate()
+  const goBack = useGoBack({ to: "/events/venues" })
   const { data: venue } = useSuspenseQuery({
     queryKey: ["event-venues", venueId],
     queryFn: () => EventVenuesService.getVenue({ venueId }),
   })
 
-  return (
-    <VenueForm
-      defaultValues={venue}
-      onSuccess={() => navigate({ to: "/events/venues" })}
-    />
-  )
+  return <VenueForm defaultValues={venue} onSuccess={goBack} />
 }
 
 function EditVenuePage() {
