@@ -1,5 +1,5 @@
 import { useSuspenseQuery } from "@tanstack/react-query"
-import { createFileRoute } from "@tanstack/react-router"
+import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { Suspense } from "react"
 
 import { HumansService } from "@/client"
@@ -25,14 +25,16 @@ function getHumanQueryOptions(humanId: string) {
 }
 
 function EditHumanContent({ humanId }: { humanId: string }) {
-  const goBack = useGoBack(getHumansNavigationTarget())
+  const navigate = useNavigate()
+  const goBack = useGoBack(() => navigate(getHumansNavigationTarget()))
   const { data: human } = useSuspenseQuery(getHumanQueryOptions(humanId))
 
   return <HumanForm defaultValues={human} onSuccess={goBack} />
 }
 
 function EditHumanPage() {
-  const goBack = useGoBack(getHumansNavigationTarget())
+  const navigate = useNavigate()
+  const goBack = useGoBack(() => navigate(getHumansNavigationTarget()))
   const { id } = Route.useParams()
 
   return (

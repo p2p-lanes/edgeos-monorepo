@@ -16,7 +16,7 @@ export const Route = createFileRoute("/_layout/humans/new")({
 
 function NewHuman() {
   const navigate = useNavigate()
-  const goBack = useGoBack(getHumansNavigationTarget())
+  const goBack = useGoBack(() => navigate(getHumansNavigationTarget()))
   const { isSuperadmin, isUserLoading } = useAuth()
 
   // Only superadmins can create humans via backoffice (for testing)
