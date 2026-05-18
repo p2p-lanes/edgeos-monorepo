@@ -44,6 +44,7 @@ import { LoadingButton } from "@/components/ui/loading-button"
 import { Separator } from "@/components/ui/separator"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
+import { cn } from "@/lib/utils"
 import { createErrorHandler } from "@/utils"
 
 // ========================
@@ -791,10 +792,17 @@ export function ApplicationDetail({
         </div>
       )
     }
+    const formatted = formatFieldValue(key, value)
+    const hasUnbreakableWord = formatted
+      .split(/\s+/)
+      .some((word) => word.length > 24)
+    const fullRow = hasUnbreakableWord
     return (
-      <div key={key}>
-        <p className="text-xs text-muted-foreground">{getFieldLabel(key)}</p>
-        <p className="text-sm">{formatFieldValue(key, value)}</p>
+      <div key={key} className={cn("min-w-0", fullRow && "sm:col-span-2")}>
+        <p className="text-xs text-muted-foreground break-words">
+          {getFieldLabel(key)}
+        </p>
+        <p className="text-sm break-words">{formatted}</p>
       </div>
     )
   }
