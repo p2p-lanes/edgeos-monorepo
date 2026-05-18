@@ -17,6 +17,7 @@ import {
   AttendeesService,
   type AttendeeWithOriginPublic,
 } from "@/client"
+import { ProductsCell } from "@/components/Attendees/ProductsCell"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
@@ -296,6 +297,12 @@ const columns: ColumnDef<AttendeeListItem>[] = [
     accessorKey: "category",
     header: "Category",
     cell: ({ row }) => <Badge variant="outline">{row.original.category}</Badge>,
+  },
+  {
+    id: "products",
+    header: "Tickets",
+    meta: { label: "Tickets" },
+    cell: ({ row }) => <ProductsCell products={row.original.products} />,
   },
   {
     accessorKey: "gender",
