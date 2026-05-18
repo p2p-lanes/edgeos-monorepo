@@ -98,7 +98,7 @@ const columns: ColumnDef<ProductPublic>[] = [
       const description = row.original.description
       if (!description) return null
       return (
-        <span className="line-clamp-2 max-w-xs text-sm text-muted-foreground">
+        <span className="line-clamp-2 block max-w-[180px] whitespace-normal text-sm leading-snug text-muted-foreground">
           {description}
         </span>
       )
@@ -107,17 +107,16 @@ const columns: ColumnDef<ProductPublic>[] = [
   {
     accessorKey: "price",
     header: ({ column }) => <SortableHeader label="Price" column={column} />,
-    cell: ({ row }) => <span className="font-mono">${row.original.price}</span>,
-  },
-  {
-    accessorKey: "compare_price",
-    header: "Compare At",
-    cell: ({ row }) =>
-      row.original.compare_price ? (
-        <span className="font-mono text-muted-foreground line-through">
-          ${row.original.compare_price}
-        </span>
-      ) : null,
+    cell: ({ row }) => (
+      <div className="flex flex-col leading-tight">
+        {row.original.compare_price ? (
+          <span className="font-mono text-xs text-muted-foreground line-through">
+            ${row.original.compare_price}
+          </span>
+        ) : null}
+        <span className="font-mono">${row.original.price}</span>
+      </div>
+    ),
   },
   {
     accessorKey: "attendee_category",
@@ -221,7 +220,6 @@ function ProductsTableContent() {
       searchPlaceholder="Search by name..."
       hiddenOnMobile={[
         "description",
-        "compare_price",
         "attendee_category",
         "duration_type",
         "exclusive",
