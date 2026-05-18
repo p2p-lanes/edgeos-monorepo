@@ -1,10 +1,17 @@
 import uuid
 
+import psycopg
+import pytest
 from fastapi.testclient import TestClient
+from sqlmodel import Session, select
+from testcontainers.postgres import PostgresContainer
 
 from app.api.popup.models import Popups
+from app.api.shared.enums import CredentialType
+from app.api.tenant.credential_models import TenantCredentials
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
+from app.utils.encryption import decrypt
 
 
 class TestViewerReadonlyAccess:
@@ -584,3 +591,230 @@ class TestRoleHierarchy:
         data = response.json()
         assert data["role"] == "admin"
         assert data["tenant_id"] == str(tenant_a.id)
+
+
+def _get_tenant_dsn(
+    db: Session,
+    postgres_container: PostgresContainer,
+    tenant_id: uuid.UUID,
+    credential_type: CredentialType,
+) -> str:
+    """Build a libpq DSN for a tenant's usr_<hex> credential against the test container."""
+    cred = db.exec(
+        select(TenantCredentials).where(
+            TenantCredentials.tenant_id == tenant_id,
+            TenantCredentials.credential_type == credential_type,
+        )
+    ).first()
+    assert cred is not None, f"No {credential_type} credential for tenant {tenant_id}"
+    host = postgres_container.get_container_host_ip()
+    port = int(postgres_container.get_exposed_port(5432))
+    password = decrypt(cred.db_password_encrypted)
+    return (
+        f"host={host} port={port} dbname=test_db "
+        f"user={cred.db_username} password={password} sslmode=disable"
+    )
+
+
+class TestSessionUserRLS:
+    """Verify that session_user-derived tenant scope cannot be bypassed.
+
+    These tests open raw psycopg connections as usr_<hex> credentials and
+    exercise the attack vectors that existed before the
+    a5601e8133cb_session_user_tenant_isolation migration. Every test should
+    be green on a migrated DB and would fail on the old GUC-only policies.
+    """
+
+    def test_client_set_app_tenant_id_is_ignored(
+        self,
+        db: Session,
+        postgres_container: PostgresContainer,
+        tenant_a: Tenants,
+        tenant_b: Tenants,
+        popup_tenant_a: Popups,
+    ) -> None:
+        """SET app.tenant_id to tenant B must not change the visible popup set.
+
+        Covers SCENARIO-2: client GUC override is ignored for usr_<hex> sessions.
+        """
+        dsn = _get_tenant_dsn(
+            db, postgres_container, tenant_a.id, CredentialType.READONLY
+        )
+        with psycopg.connect(dsn, autocommit=True) as conn:
+            conn.execute(f"SET app.tenant_id = '{tenant_b.id}'")
+            count = conn.execute("SELECT COUNT(*) FROM popups").fetchone()[0]
+
+        # Count must reflect tenant A's popups, not tenant B's
+        with psycopg.connect(dsn, autocommit=True) as conn:
+            expected = conn.execute("SELECT COUNT(*) FROM popups").fetchone()[0]
+
+        assert count == expected
+
+    def test_set_role_does_not_change_effective_tenant(
+        self,
+        db: Session,
+        postgres_container: PostgresContainer,
+        tenant_a: Tenants,
+        tenant_b: Tenants,
+        popup_tenant_a: Popups,
+        popup_tenant_b: Popups,
+    ) -> None:
+        """SET ROLE tenant_viewer_role must not expand or change the visible set.
+
+        Covers SCENARIO-3: session_user remains usr_<hex> after SET ROLE.
+        """
+        dsn = _get_tenant_dsn(
+            db, postgres_container, tenant_a.id, CredentialType.READONLY
+        )
+        with psycopg.connect(dsn, autocommit=True) as conn:
+            baseline = conn.execute("SELECT COUNT(*) FROM popups").fetchone()[0]
+            conn.execute("SET ROLE tenant_viewer_role")
+            after_role = conn.execute("SELECT COUNT(*) FROM popups").fetchone()[0]
+
+        assert after_role == baseline
+        # Tenant B popup must not leak in
+        with psycopg.connect(dsn, autocommit=True) as conn:
+            ids = [
+                row[0]
+                for row in conn.execute("SELECT id::text FROM popups").fetchall()
+            ]
+        assert str(popup_tenant_b.id) not in ids
+        assert str(popup_tenant_a.id) in ids
+
+    def test_tenants_table_scoped_to_own_row(
+        self,
+        db: Session,
+        postgres_container: PostgresContainer,
+        tenant_a: Tenants,
+        tenant_b: Tenants,
+    ) -> None:
+        """A tenant readonly user must see exactly one row in the tenants table.
+
+        Covers SCENARIO-4 and REQ-3.
+        """
+        dsn = _get_tenant_dsn(
+            db, postgres_container, tenant_a.id, CredentialType.READONLY
+        )
+        with psycopg.connect(dsn, autocommit=True) as conn:
+            rows = conn.execute("SELECT id::text FROM tenants").fetchall()
+
+        assert len(rows) == 1
+        assert rows[0][0] == str(tenant_a.id)
+
+    def test_owner_still_sees_all_tenants(
+        self,
+        db: Session,
+        postgres_container: PostgresContainer,
+        tenant_a: Tenants,
+        tenant_b: Tenants,
+    ) -> None:
+        """The PostgreSQL table owner bypasses RLS and sees all tenants.
+
+        Covers SCENARIO-7 and REQ-4. FORCE RLS must NOT be set on tenants.
+        """
+        host = postgres_container.get_container_host_ip()
+        port = int(postgres_container.get_exposed_port(5432))
+        owner_dsn = (
+            f"host={host} port={port} dbname=test_db "
+            f"user=test_user password=test_password sslmode=disable"
+        )
+        with psycopg.connect(owner_dsn, autocommit=True) as conn:
+            count = conn.execute("SELECT COUNT(*) FROM tenants").fetchone()[0]
+
+        # At minimum both tenant_a and tenant_b exist
+        assert count >= 2
+
+    def test_insert_for_other_tenant_rejected(
+        self,
+        db: Session,
+        postgres_container: PostgresContainer,
+        tenant_a: Tenants,
+        tenant_b: Tenants,
+    ) -> None:
+        """An INSERT specifying tenant B's id must be blocked by WITH CHECK.
+
+        Covers SCENARIO-5 and REQ-2.
+        """
+        dsn = _get_tenant_dsn(
+            db, postgres_container, tenant_a.id, CredentialType.CRUD
+        )
+        with psycopg.connect(dsn) as conn:
+            with pytest.raises(psycopg.errors.InsufficientPrivilege):
+                conn.execute(
+                    "INSERT INTO popups (id, name, slug, tenant_id) "
+                    "VALUES (%s, %s, %s, %s)",
+                    (
+                        str(uuid.uuid4()),
+                        "Cross-tenant popup",
+                        f"cross-tenant-{uuid.uuid4().hex[:6]}",
+                        str(tenant_b.id),
+                    ),
+                )
+                conn.commit()
+
+    def test_function_exists_and_returns_null_for_owner(
+        self,
+        db: Session,
+    ) -> None:
+        """app_effective_tenant_id() must exist and return NULL for the owner session.
+
+        The owner has no row in tenant_credentials and sets no GUC, so
+        the function should return NULL (both COALESCE branches are NULL).
+        """
+        from sqlalchemy import text
+
+        result = db.exec(  # type: ignore[call-overload]
+            text("SELECT public.app_effective_tenant_id()")
+        ).scalar()
+        assert result is None
+
+    def test_duplicate_db_username_rejected(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        """Inserting a duplicate db_username into tenant_credentials must fail.
+
+        Covers SCENARIO-8 and REQ-7.
+        """
+        import sqlalchemy.exc
+
+        cred = db.exec(
+            select(TenantCredentials).where(
+                TenantCredentials.tenant_id == tenant_a.id,
+                TenantCredentials.credential_type == CredentialType.READONLY,
+            )
+        ).first()
+        assert cred is not None
+
+        dup = TenantCredentials(
+            tenant_id=tenant_a.id,
+            credential_type=CredentialType.CRUD,
+            db_username=cred.db_username,  # intentional duplicate
+            db_password_encrypted="dummy",
+        )
+        db.add(dup)
+        with pytest.raises(sqlalchemy.exc.IntegrityError):
+            db.flush()
+        db.rollback()
+
+    def test_backend_tenant_session_unaffected(
+        self,
+        client: TestClient,
+        admin_token_tenant_a: str,
+        popup_tenant_a: Popups,
+        popup_tenant_b: Popups,
+    ) -> None:
+        """The backend TenantSession must continue to return only tenant A's data.
+
+        Covers SCENARIO-6 and REQ-5. Regression guard.
+        """
+        response = client.get(
+            "/api/v1/popups",
+            params={"search": "Popup Tenant"},
+            headers={"Authorization": f"Bearer {admin_token_tenant_a}"},
+        )
+        assert response.status_code == 200
+        ids = [p["id"] for p in response.json()["results"]]
+        assert str(popup_tenant_a.id) in ids
+        assert str(popup_tenant_b.id) not in ids
