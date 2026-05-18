@@ -7,11 +7,22 @@ import type { AttendeePassState } from "@/types/Attendee"
 import type { DiscountProps } from "@/types/discounts"
 import type { ProductsPass } from "@/types/Products"
 
+export type AppliedDiscount =
+  | { type: "none" }
+  | { type: "coupon"; percentage: number; code: string | null }
+  | { type: "group"; percentage: number }
+  | { type: "scholarship"; percentage: number }
+
 interface TotalResult {
   total: number
   originalTotal: number
   discountAmount: number
 }
+
+interface FinalTotalResult extends TotalResult {
+  appliedDiscount: AppliedDiscount
+}
+
 interface PriceCalculationStrategy {
   calculate(products: ProductsPass[], discount: DiscountProps): TotalResult
 }
@@ -224,7 +235,8 @@ export class TotalCalculator {
     attendees: AttendeePassState[],
     discount: DiscountProps,
     groupDiscountPercentage?: number,
-  ): TotalResult {
+    scholarshipDiscountPercentage?: number,
+  ): FinalTotalResult {
     const baseResult = attendees.reduce(
       (total, attendee) => {
         const ticketProducts = attendee.products.filter(
@@ -260,21 +272,57 @@ export class TotalCalculator {
       { total: 0, originalTotal: 0, discountAmount: 0 },
     )
 
-    if (groupDiscountPercentage && groupDiscountPercentage > 0) {
-      const groupDiscountAmount =
-        baseResult.originalTotal * (groupDiscountPercentage / 100)
-      const individualDiscountAmount = baseResult.discountAmount
+    const couponAmount = baseResult.discountAmount
+    const couponPercentage = discount.discount_value ?? 0
+    const groupAmount =
+      groupDiscountPercentage && groupDiscountPercentage > 0
+        ? baseResult.originalTotal * (groupDiscountPercentage / 100)
+        : 0
+    const scholarshipAmount =
+      scholarshipDiscountPercentage && scholarshipDiscountPercentage > 0
+        ? baseResult.originalTotal * (scholarshipDiscountPercentage / 100)
+        : 0
 
-      if (groupDiscountAmount > individualDiscountAmount) {
-        return {
-          total: baseResult.originalTotal - groupDiscountAmount,
-          originalTotal: baseResult.originalTotal,
-          discountAmount: groupDiscountAmount,
-        }
+    // Priority on ties mirrors backend: scholarship >= coupon >= group > none.
+    let appliedDiscount: AppliedDiscount = { type: "none" }
+    let winningAmount = 0
+
+    if (groupAmount > winningAmount) {
+      appliedDiscount = {
+        type: "group",
+        percentage: groupDiscountPercentage ?? 0,
       }
+      winningAmount = groupAmount
+    }
+    if (couponAmount >= winningAmount && couponAmount > 0) {
+      appliedDiscount = {
+        type: "coupon",
+        percentage: couponPercentage,
+        code: discount.discount_code ?? null,
+      }
+      winningAmount = couponAmount
+    }
+    if (scholarshipAmount >= winningAmount && scholarshipAmount > 0) {
+      appliedDiscount = {
+        type: "scholarship",
+        percentage: scholarshipDiscountPercentage ?? 0,
+      }
+      winningAmount = scholarshipAmount
     }
 
-    return baseResult
+    if (
+      appliedDiscount.type === "coupon" ||
+      appliedDiscount.type === "none"
+    ) {
+      return { ...baseResult, appliedDiscount }
+    }
+
+    return {
+      total: baseResult.originalTotal - winningAmount,
+      originalTotal: baseResult.originalTotal,
+      discountAmount: winningAmount,
+      appliedDiscount,
+    }
   }
 
   private getStrategy(products: ProductsPass[]): PriceCalculationStrategy {

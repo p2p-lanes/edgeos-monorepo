@@ -312,7 +312,8 @@
       "group_named": "{{name}} hópur ({{percent}}% AFSLÁTTUR)",
       "group_generic": "Hópafsláttur ({{percent}}% AFSLÁTTUR)",
       "code": "{{code}} ({{percent}}% AFSLÁTTUR)",
-      "generic": "Afsláttur {{percent}}% AFSLÁTTUR"
+      "generic": "Afsláttur {{percent}}% AFSLÁTTUR",
+      "scholarship": "Námsstyrkur ({{percent}}% AFSLÁTTUR)"
     }
   },
   "attendees": {

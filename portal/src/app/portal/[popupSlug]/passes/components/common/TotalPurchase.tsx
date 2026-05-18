@@ -8,10 +8,8 @@ import {
 import { useCalculateTotal } from "@/hooks/useCalculateTotal"
 import { cn } from "@/lib/utils"
 import { useCityProvider } from "@/providers/cityProvider"
+import type { AppliedDiscount } from "@/strategies/TotalStrategy"
 import type { AttendeePassState } from "@/types/Attendee"
-import type { DiscountProps } from "@/types/discounts"
-import type { ProductsPass } from "@/types/Products"
-import useDiscountCode from "../../hooks/useDiscountCode"
 import ProductCart from "./Products/ProductCart"
 
 const TotalPurchase = ({
@@ -26,14 +24,13 @@ const TotalPurchase = ({
   setIsOpen: (prev: boolean) => void
 }) => {
   const { t } = useTranslation()
-  const { discountApplied } = useDiscountCode()
   const { getCity } = useCityProvider()
   const creditsEnabled = getCity()?.credits_enabled ?? false
   const {
     originalTotal,
     total,
     discountAmount,
-    groupDiscountPercentage,
+    appliedDiscount,
     groupName,
   } = useCalculateTotal()
 
@@ -116,19 +113,12 @@ const TotalPurchase = ({
               />
             )}
 
-            {groupDiscountPercentage >= discountApplied.discount_value ? (
-              <GroupDiscountDisplay
-                groupDiscountPercentage={groupDiscountPercentage}
-                groupName={groupName}
-              />
-            ) : (
-              <DiscountCouponTotal
-                products={productsCart}
-                discountAmount={discountAmount}
-                discountApplied={discountApplied}
-                patreonSelected={patreonSelected}
-              />
-            )}
+            <AppliedDiscountDisplay
+              appliedDiscount={appliedDiscount}
+              discountAmount={discountAmount}
+              groupName={groupName}
+              patreonSelected={patreonSelected}
+            />
 
             {/* LEGACY: application.credit was removed from API */}
           </div>
@@ -142,53 +132,79 @@ const TotalPurchase = ({
   )
 }
 
-const DiscountCouponTotal = ({
+const AppliedDiscountDisplay = ({
+  appliedDiscount,
   discountAmount,
-  discountApplied,
+  groupName,
   patreonSelected,
-  products: _products,
 }: {
+  appliedDiscount: AppliedDiscount
   discountAmount: number
-  discountApplied: DiscountProps
+  groupName: string | null
   patreonSelected: boolean
-  products: ProductsPass[]
 }) => {
   const { t } = useTranslation()
-  if (!discountApplied.discount_value || discountAmount === 0) return null
 
-  const getLabelDiscount = () => {
-    if (patreonSelected) {
-      return t("passes.discounts.patron_free")
-    }
-    if (discountApplied.discount_code) {
-      return t("passes.discounts.code", {
-        code: discountApplied.discount_code,
-        percent: discountApplied.discount_value,
-      })
-    }
-    return t("passes.discounts.generic", {
-      percent: discountApplied.discount_value,
-    })
-  }
+  if (appliedDiscount.type === "none") return null
 
-  if (discountAmount > 0) {
+  if (appliedDiscount.type === "group") {
+    if (!appliedDiscount.percentage) return null
     return (
       <div className="flex justify-between text-sm text-muted-foreground">
         <div className="flex items-center gap-2">
           <Tag className="w-4 h-4" />
           <span className="text-sm text-muted-foreground">
-            {getLabelDiscount()}
+            {groupName
+              ? t("passes.discounts.group_named", {
+                  name: groupName,
+                  percent: appliedDiscount.percentage,
+                })
+              : t("passes.discounts.group_generic", {
+                  percent: appliedDiscount.percentage,
+                })}
           </span>
         </div>
-        <span data-discount-amount={discountAmount.toFixed(0)}>
-          {" "}
-          - ${discountAmount.toFixed(0)}
+        <span className="text-green-600 font-medium">
+          {t("passes.discounts.applied")}
         </span>
       </div>
     )
   }
 
-  return null
+  if (discountAmount <= 0) return null
+
+  const getLabel = () => {
+    if (appliedDiscount.type === "scholarship") {
+      return t("passes.discounts.scholarship", {
+        percent: appliedDiscount.percentage,
+      })
+    }
+    if (patreonSelected) {
+      return t("passes.discounts.patron_free")
+    }
+    if (appliedDiscount.code) {
+      return t("passes.discounts.code", {
+        code: appliedDiscount.code,
+        percent: appliedDiscount.percentage,
+      })
+    }
+    return t("passes.discounts.generic", {
+      percent: appliedDiscount.percentage,
+    })
+  }
+
+  return (
+    <div className="flex justify-between text-sm text-muted-foreground">
+      <div className="flex items-center gap-2">
+        <Tag className="w-4 h-4" />
+        <span className="text-sm text-muted-foreground">{getLabel()}</span>
+      </div>
+      <span data-discount-amount={discountAmount.toFixed(0)}>
+        {" "}
+        - ${discountAmount.toFixed(0)}
+      </span>
+    </div>
+  )
 }
 
 const _DiscountMonth = ({
@@ -284,38 +300,6 @@ const DiscountWeekPurchased = ({
       <span data-week-discount={weekDiscount.toFixed(0)}>
         {" "}
         - ${weekDiscount.toFixed(0)}
-      </span>
-    </div>
-  )
-}
-
-const GroupDiscountDisplay = ({
-  groupDiscountPercentage,
-  groupName,
-}: {
-  groupDiscountPercentage: number
-  groupName: string | null
-}) => {
-  const { t } = useTranslation()
-  if (!groupDiscountPercentage || groupDiscountPercentage === 0) return null
-
-  return (
-    <div className="flex justify-between text-sm text-muted-foreground">
-      <div className="flex items-center gap-2">
-        <Tag className="w-4 h-4" />
-        <span className="text-sm text-muted-foreground">
-          {groupName
-            ? t("passes.discounts.group_named", {
-                name: groupName,
-                percent: groupDiscountPercentage,
-              })
-            : t("passes.discounts.group_generic", {
-                percent: groupDiscountPercentage,
-              })}
-        </span>
-      </div>
-      <span className="text-green-600 font-medium">
-        {t("passes.discounts.applied")}
       </span>
     </div>
   )

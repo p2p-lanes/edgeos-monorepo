@@ -322,7 +322,8 @@
       "group_named": "{{name}} Group ({{percent}}% OFF)",
       "group_generic": "Group Discount ({{percent}}% OFF)",
       "code": "{{code}} ({{percent}}% OFF)",
-      "generic": "Discount {{percent}}% OFF"
+      "generic": "Discount {{percent}}% OFF",
+      "scholarship": "Scholarship ({{percent}}% OFF)"
     }
   },
   "attendees": {
