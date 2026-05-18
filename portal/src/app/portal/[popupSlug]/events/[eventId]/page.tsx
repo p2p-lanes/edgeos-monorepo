@@ -139,12 +139,12 @@ export default function EventDetailPage() {
   const isOwner =
     !!event && !!currentHuman && event.owner_id === currentHuman.id
 
-  const myParticipation = participants.find((p: EventParticipantPublic) =>
-    currentHuman ? p.profile_id === currentHuman.id : false,
-  )
-
-  const myParticipationActive =
-    myParticipation && myParticipation.status !== "cancelled"
+  // RSVP state is sourced from the event's own `my_rsvp_status` field so
+  // this page agrees with the list/day/calendar views (which read the
+  // same field). The participants list above is still used for the
+  // attendee roster / count, not for deciding the caller's own status.
+  const myRsvpStatus = event?.my_rsvp_status ?? null
+  const isRsvped = !!myRsvpStatus && myRsvpStatus !== "cancelled"
 
   // Recurring events require occurrence_start so the RSVP targets a single
   // instance; one-off events must not send it (the backend rejects mixing
@@ -508,15 +508,15 @@ export default function EventDetailPage() {
       <div className="relative rounded-xl border bg-card p-4 space-y-3">
         {event.status === "published" && (
           <div className="absolute top-3 right-3 flex flex-col items-end gap-1.5">
-            {myParticipationActive ? (
+            {isRsvped ? (
               <>
                 <div className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-950/40 dark:text-emerald-300">
                   <CheckCircle className="h-4 w-4" />
-                  {myParticipation?.status === "checked_in"
+                  {myRsvpStatus === "checked_in"
                     ? t("events.rsvp.checked_in")
-                    : t("events.rsvp.registered")}
+                    : t("events.rsvp.going")}
                 </div>
-                {myParticipation?.status === "registered" && eventStarted && (
+                {myRsvpStatus === "registered" && eventStarted && (
                   <Button
                     size="sm"
                     onClick={() => checkInMutation.mutate()}
@@ -761,29 +761,27 @@ export default function EventDetailPage() {
 
       {/* Below-card RSVP utilities: hint on the left, Cancel RSVP on the right.
           Separated by justify-between so they don't visually crowd each other. */}
-      {event.status === "published" &&
-        myParticipationActive &&
-        myParticipation?.status === "registered" && (
-          <div className="flex items-center justify-between gap-4">
-            {!eventStarted ? (
-              <span className="text-xs text-muted-foreground">
-                {t("events.rsvp.check_in_opens_at_start")}
-              </span>
-            ) : (
-              <span />
-            )}
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => cancelMutation.mutate()}
-              disabled={isPending}
-              className="border-destructive/30 bg-destructive/10 text-destructive shadow-none hover:border-destructive/50 hover:bg-destructive/20 hover:text-destructive dark:border-destructive/40 dark:bg-destructive/20 dark:hover:bg-destructive/30"
-            >
-              <X className="h-3.5 w-3.5" />
-              {t("events.rsvp.cancel")}
-            </Button>
-          </div>
-        )}
+      {event.status === "published" && myRsvpStatus === "registered" && (
+        <div className="flex items-center justify-between gap-4">
+          {!eventStarted ? (
+            <span className="text-xs text-muted-foreground">
+              {t("events.rsvp.check_in_opens_at_start")}
+            </span>
+          ) : (
+            <span />
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => cancelMutation.mutate()}
+            disabled={isPending}
+            className="border-destructive/30 bg-destructive/10 text-destructive shadow-none hover:border-destructive/50 hover:bg-destructive/20 hover:text-destructive dark:border-destructive/40 dark:bg-destructive/20 dark:hover:bg-destructive/30"
+          >
+            <X className="h-3.5 w-3.5" />
+            {t("events.rsvp.cancel")}
+          </Button>
+        </div>
+      )}
 
       {/* Owner-only: Paste attendees to invite */}
       {isOwner && (
