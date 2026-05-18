@@ -1,9 +1,10 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router"
+import { createFileRoute } from "@tanstack/react-router"
 
 import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { EventForm } from "@/components/forms/EventForm"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
+import { useGoBack } from "@/hooks/useGoBack"
 
 interface NewEventSearch {
   venueId?: string
@@ -23,7 +24,7 @@ export const Route = createFileRoute("/_layout/events/new")({
 })
 
 function NewEventPage() {
-  const navigate = useNavigate()
+  const goBack = useGoBack({ to: "/events" })
   const { selectedPopupId } = useWorkspace()
   const { venueId, startTime } = Route.useSearch()
 
@@ -37,7 +38,7 @@ function NewEventPage() {
         <EventForm
           initialVenueId={venueId}
           initialStartIso={startTime}
-          onSuccess={() => navigate({ to: "/events" })}
+          onSuccess={goBack}
         />
       ) : (
         <WorkspaceAlert resource="event" action="create" />

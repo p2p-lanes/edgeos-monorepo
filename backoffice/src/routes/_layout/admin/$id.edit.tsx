@@ -1,5 +1,5 @@
 import { useSuspenseQuery } from "@tanstack/react-query"
-import { createFileRoute, useNavigate } from "@tanstack/react-router"
+import { createFileRoute } from "@tanstack/react-router"
 import { Suspense } from "react"
 
 import { UsersService } from "@/client"
@@ -7,6 +7,7 @@ import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { UserForm } from "@/components/forms/UserForm"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useGoBack } from "@/hooks/useGoBack"
 
 export const Route = createFileRoute("/_layout/admin/$id/edit")({
   component: EditUserPage,
@@ -23,15 +24,10 @@ function getUserQueryOptions(userId: string) {
 }
 
 function EditUserContent({ userId }: { userId: string }) {
-  const navigate = useNavigate()
+  const goBack = useGoBack({ to: "/admin" })
   const { data: user } = useSuspenseQuery(getUserQueryOptions(userId))
 
-  return (
-    <UserForm
-      defaultValues={user}
-      onSuccess={() => navigate({ to: "/admin" })}
-    />
-  )
+  return <UserForm defaultValues={user} onSuccess={goBack} />
 }
 
 function EditUserPage() {

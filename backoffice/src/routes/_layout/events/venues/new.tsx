@@ -1,9 +1,10 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router"
+import { createFileRoute } from "@tanstack/react-router"
 
 import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { VenueForm } from "@/components/forms/VenueForm"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
+import { useGoBack } from "@/hooks/useGoBack"
 
 export const Route = createFileRoute("/_layout/events/venues/new")({
   component: NewVenuePage,
@@ -13,7 +14,7 @@ export const Route = createFileRoute("/_layout/events/venues/new")({
 })
 
 function NewVenuePage() {
-  const navigate = useNavigate()
+  const goBack = useGoBack({ to: "/events/venues" })
   const { selectedPopupId } = useWorkspace()
 
   return (
@@ -23,7 +24,7 @@ function NewVenuePage() {
       backTo="/events/venues"
     >
       {selectedPopupId ? (
-        <VenueForm onSuccess={() => navigate({ to: "/events/venues" })} />
+        <VenueForm onSuccess={goBack} />
       ) : (
         <WorkspaceAlert resource="venue" action="create" />
       )}

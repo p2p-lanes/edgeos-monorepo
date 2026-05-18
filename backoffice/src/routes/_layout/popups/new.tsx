@@ -4,6 +4,7 @@ import { useEffect } from "react"
 import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import { PopupForm } from "@/components/forms/PopupForm"
 import useAuth from "@/hooks/useAuth"
+import { useGoBack } from "@/hooks/useGoBack"
 
 export const Route = createFileRoute("/_layout/popups/new")({
   component: NewPopup,
@@ -14,6 +15,7 @@ export const Route = createFileRoute("/_layout/popups/new")({
 
 function NewPopup() {
   const navigate = useNavigate()
+  const goBack = useGoBack({ to: "/popups" })
   const { isOperatorOrAbove, isUserLoading } = useAuth()
 
   // Redirect viewers to popups list - they cannot create new popups
@@ -33,7 +35,7 @@ function NewPopup() {
       description="Add a new pop-up to manage"
       backTo="/popups"
     >
-      <PopupForm onSuccess={() => navigate({ to: "/popups" })} />
+      <PopupForm onSuccess={goBack} />
     </FormPageLayout>
   )
 }

@@ -7,6 +7,7 @@ import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { HumanForm } from "@/components/forms/HumanForm"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useGoBack } from "@/hooks/useGoBack"
 import { getHumansNavigationTarget } from "@/routes/_layout/humans/navigation"
 
 export const Route = createFileRoute("/_layout/humans/$id/edit")({
@@ -25,18 +26,15 @@ function getHumanQueryOptions(humanId: string) {
 
 function EditHumanContent({ humanId }: { humanId: string }) {
   const navigate = useNavigate()
+  const goBack = useGoBack(() => navigate(getHumansNavigationTarget()))
   const { data: human } = useSuspenseQuery(getHumanQueryOptions(humanId))
 
-  return (
-    <HumanForm
-      defaultValues={human}
-      onSuccess={() => navigate(getHumansNavigationTarget())}
-    />
-  )
+  return <HumanForm defaultValues={human} onSuccess={goBack} />
 }
 
 function EditHumanPage() {
   const navigate = useNavigate()
+  const goBack = useGoBack(() => navigate(getHumansNavigationTarget()))
   const { id } = Route.useParams()
 
   return (
@@ -44,7 +42,7 @@ function EditHumanPage() {
       title="Edit Human"
       description="Update human profile information"
       backTo="/humans"
-      onBack={() => navigate(getHumansNavigationTarget())}
+      onBack={goBack}
     >
       <QueryErrorBoundary>
         <Suspense fallback={<Skeleton className="h-96 w-full" />}>

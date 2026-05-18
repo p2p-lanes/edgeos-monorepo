@@ -4,7 +4,7 @@ import {
   useQueryClient,
   useSuspenseQuery,
 } from "@tanstack/react-query"
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
+import { createFileRoute, Link } from "@tanstack/react-router"
 import { Check, Info, Trash2 } from "lucide-react"
 import { Suspense, useEffect, useRef, useState } from "react"
 
@@ -45,6 +45,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import useCustomToast from "@/hooks/useCustomToast"
+import { useGoBack } from "@/hooks/useGoBack"
 import {
   UnsavedChangesDialog,
   useDirtyBlocker,
@@ -86,7 +87,7 @@ function StepConfigPage() {
 
 function StepConfigContent({ stepId }: { stepId: string }) {
   const queryClient = useQueryClient()
-  const navigate = useNavigate()
+  const goBack = useGoBack({ to: "/ticketing-steps" })
   const { showSuccessToast, showErrorToast } = useCustomToast()
   const { data: step } = useSuspenseQuery(getStepQueryOptions(stepId))
   const isSubmittingRef = useRef(false)
@@ -203,7 +204,7 @@ function StepConfigContent({ stepId }: { stepId: string }) {
     onSuccess: () => {
       showSuccessToast("Step updated")
       queryClient.invalidateQueries({ queryKey: ["ticketing-steps"] })
-      navigate({ to: "/ticketing-steps" })
+      goBack()
     },
     onError: (error: Error) => {
       isSubmittingRef.current = false
@@ -221,7 +222,7 @@ function StepConfigContent({ stepId }: { stepId: string }) {
     onSuccess: () => {
       showSuccessToast("Step deleted")
       queryClient.invalidateQueries({ queryKey: ["ticketing-steps"] })
-      navigate({ to: "/ticketing-steps" })
+      goBack()
     },
     onError: (error: Error) => {
       isSubmittingRef.current = false
@@ -623,10 +624,7 @@ function StepConfigContent({ stepId }: { stepId: string }) {
           </LoadingButton>
         )}
         <div className="flex-1" />
-        <Button
-          variant="outline"
-          onClick={() => navigate({ to: "/ticketing-steps" })}
-        >
+        <Button variant="outline" onClick={goBack}>
           Cancel
         </Button>
         <LoadingButton
