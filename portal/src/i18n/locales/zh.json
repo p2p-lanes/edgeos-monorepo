@@ -322,7 +322,8 @@
       "group_named": "{{name}} 团体 ({{percent}}% 折扣)",
       "group_generic": "团体折扣 ({{percent}}% 折扣)",
       "code": "{{code}} ({{percent}}% 折扣)",
-      "generic": "折扣 {{percent}}% OFF"
+      "generic": "折扣 {{percent}}% OFF",
+      "scholarship": "奖学金 ({{percent}}% 折扣)"
     }
   },
   "attendees": {

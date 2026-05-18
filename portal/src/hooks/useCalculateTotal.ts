@@ -32,6 +32,17 @@ export function useCalculateTotal() {
       }
     }
 
+    let scholarshipDiscountValue = 0
+    if (
+      application?.scholarship_status === "approved" &&
+      application.discount_percentage != null
+    ) {
+      const parsed = Number(application.discount_percentage)
+      if (!Number.isNaN(parsed) && parsed > 0) {
+        scholarshipDiscountValue = parsed
+      }
+    }
+
     const calculator = new TotalCalculator(
       checkoutPolicy.checkoutMode,
       creditsEnabled,
@@ -40,6 +51,7 @@ export function useCalculateTotal() {
       attendeePasses,
       discountApplied,
       groupDiscountValue,
+      scholarshipDiscountValue,
     )
     const balance = result.total
 
@@ -48,8 +60,10 @@ export function useCalculateTotal() {
       originalTotal: result.originalTotal,
       discountAmount: result.discountAmount,
       balance,
+      appliedDiscount: result.appliedDiscount,
       groupDiscountPercentage: groupDiscountValue,
       groupName: groupNameValue,
+      scholarshipDiscountPercentage: scholarshipDiscountValue,
     }
   }, [
     application,

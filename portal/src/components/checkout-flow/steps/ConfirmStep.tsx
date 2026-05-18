@@ -385,72 +385,76 @@ export default function ConfirmStep() {
         )}
 
         {/* Promo Code Section */}
-        <div className="border-t border-border" />
-        <div className="px-4 sm:px-5 py-4">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <input
-              type="text"
-              value={promoInput}
-              onChange={(e) => {
-                setPromoInput(e.target.value.toUpperCase())
-                setPromoError("")
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault()
-                  handleApplyPromo()
-                }
-              }}
-              placeholder="Promo code"
-              disabled={cart.promoCodeValid}
-              className={cn(
-                "flex-1 px-3 py-2 border rounded-lg text-sm transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent",
-                promoError
-                  ? "border-destructive bg-destructive/10"
-                  : cart.promoCodeValid
-                    ? "border-green-300 bg-green-50"
-                    : "border-border",
-              )}
-            />
-            {cart.promoCodeValid ? (
-              <button
-                type="button"
-                onClick={handleClearPromo}
-                aria-label="Remove promo code"
-                className="px-3 py-2 rounded-lg text-sm font-medium bg-slate-100 text-muted-foreground hover:bg-destructive/20 hover:text-destructive transition-colors duration-200 shrink-0"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={handleApplyPromo}
-                disabled={promoLoading || isLoading || !promoInput.trim()}
-                className={cn(
-                  "px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors shrink-0",
-                  !promoInput.trim()
-                    ? "bg-muted text-muted-foreground cursor-not-allowed"
-                    : "bg-foreground text-background hover:bg-foreground/90",
-                )}
-              >
-                {promoLoading || isLoading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+        {popup?.allows_coupons && (
+          <>
+            <div className="border-t border-border" />
+            <div className="px-4 sm:px-5 py-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <input
+                  type="text"
+                  value={promoInput}
+                  onChange={(e) => {
+                    setPromoInput(e.target.value.toUpperCase())
+                    setPromoError("")
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault()
+                      handleApplyPromo()
+                    }
+                  }}
+                  placeholder="Promo code"
+                  disabled={cart.promoCodeValid}
+                  className={cn(
+                    "flex-1 px-3 py-2 border rounded-lg text-sm transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent",
+                    promoError
+                      ? "border-destructive bg-destructive/10"
+                      : cart.promoCodeValid
+                        ? "border-green-300 bg-green-50"
+                        : "border-border",
+                  )}
+                />
+                {cart.promoCodeValid ? (
+                  <button
+                    type="button"
+                    onClick={handleClearPromo}
+                    aria-label="Remove promo code"
+                    className="px-3 py-2 rounded-lg text-sm font-medium bg-slate-100 text-muted-foreground hover:bg-destructive/20 hover:text-destructive transition-colors duration-200 shrink-0"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
                 ) : (
-                  "Apply"
+                  <button
+                    type="button"
+                    onClick={handleApplyPromo}
+                    disabled={promoLoading || isLoading || !promoInput.trim()}
+                    className={cn(
+                      "px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors shrink-0",
+                      !promoInput.trim()
+                        ? "bg-muted text-muted-foreground cursor-not-allowed"
+                        : "bg-foreground text-background hover:bg-foreground/90",
+                    )}
+                  >
+                    {promoLoading || isLoading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      "Apply"
+                    )}
+                  </button>
                 )}
-              </button>
-            )}
-          </div>
-          {promoError && (
-            <div className="flex items-center gap-1.5 text-destructive text-xs mt-2">
-              <AlertCircle className="w-3 h-3" />
-              <span>{promoError}</span>
+              </div>
+              {promoError && (
+                <div className="flex items-center gap-1.5 text-destructive text-xs mt-2">
+                  <AlertCircle className="w-3 h-3" />
+                  <span>{promoError}</span>
+                </div>
+              )}
+              {cart.promoCodeValid && (
+                <p className="text-green-600 text-xs mt-2">Code applied!</p>
+              )}
             </div>
-          )}
-          {cart.promoCodeValid && (
-            <p className="text-green-600 text-xs mt-2">Code applied!</p>
-          )}
-        </div>
+          </>
+        )}
 
         {/* Terms and Conditions */}
         {popup?.terms_and_conditions_url && (
