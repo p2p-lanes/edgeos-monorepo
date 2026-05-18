@@ -9,7 +9,11 @@ import type { ColumnDef } from "@tanstack/react-table"
 import { CalendarRange, Check, CheckCircle2, MapPin, Plus } from "lucide-react"
 import { Suspense, useMemo, useState } from "react"
 
-import { type EventVenuePublic, EventVenuesService } from "@/client"
+import {
+  type EventVenuePublic,
+  EventVenuesService,
+  type VenueBookingMode,
+} from "@/client"
 import { DataTable, SortableHeader } from "@/components/Common/DataTable"
 import { EmptyState } from "@/components/Common/EmptyState"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
@@ -26,6 +30,12 @@ import {
   validateTableSearch,
 } from "@/hooks/useTableSearchParams"
 import { createErrorHandler } from "@/utils"
+
+const BOOKING_MODE_LABELS: Record<VenueBookingMode, string> = {
+  free: "Permissionless",
+  approval_required: "Approval required",
+  unbookable: "Unbookable",
+}
 
 export const Route = createFileRoute("/_layout/events/venues/")({
   component: VenuesPage,
@@ -71,6 +81,15 @@ const columns: ColumnDef<EventVenuePublic>[] = [
         {row.original.capacity ?? "—"}
       </span>
     ),
+  },
+  {
+    accessorKey: "booking_mode",
+    header: "Booking",
+    cell: ({ row }) => {
+      const mode = row.original.booking_mode
+      if (!mode) return <span className="text-muted-foreground">—</span>
+      return <Badge variant="outline">{BOOKING_MODE_LABELS[mode]}</Badge>
+    },
   },
   {
     id: "actions",
