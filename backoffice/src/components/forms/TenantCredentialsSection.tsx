@@ -235,7 +235,7 @@ export function TenantCredentialsSection({
                     />
                     <p className="text-xs text-muted-foreground">
                       Read-only PostgreSQL URL scoped to this tenant. Scope is
-                      enforced by the database - the holder of this URL cannot
+                      enforced by the database, so the holder of this URL cannot
                       read other tenants' data. Append{" "}
                       <code className="rounded bg-muted px-1 py-0.5 text-[10px] font-mono">
                         ?sslmode=require
