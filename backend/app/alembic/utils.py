@@ -37,9 +37,13 @@ def add_tenant_table_permissions(table_name: str) -> None:
     # Enable Row Level Security
     op.execute(f"ALTER TABLE {table_name} ENABLE ROW LEVEL SECURITY")
 
-    # Create RLS policy for tenant isolation
-    # IMPORTANT: Wrapping current_setting in SELECT caches the value (called once)
-    # instead of evaluating per-row, which is 100x+ faster on large tables
+    # Create RLS policy for tenant isolation.
+    # Uses app_effective_tenant_id() when available (after the
+    # a5601e8133cb_session_user_tenant_isolation migration), and falls back to
+    # current_setting('app.tenant_id', true) for databases where that migration
+    # has not yet been applied (e.g. fresh test containers running old migrations).
+    # IMPORTANT: Wrapping in SELECT caches the value (called once per query,
+    # not per row — 100x+ faster on large tables).
     policy_name = f"tenant_isolation_policy_{table_name}"
     op.execute(
         f"""
@@ -51,9 +55,20 @@ def add_tenant_table_permissions(table_name: str) -> None:
                 AND tablename = '{table_name}'
                 AND policyname = '{policy_name}'
             ) THEN
-                CREATE POLICY {policy_name} ON {table_name}
-                USING (tenant_id = (SELECT current_setting('app.tenant_id', true)::uuid))
-                WITH CHECK (tenant_id = (SELECT current_setting('app.tenant_id', true)::uuid));
+                IF EXISTS (
+                    SELECT 1 FROM pg_proc p
+                    JOIN pg_namespace n ON p.pronamespace = n.oid
+                    WHERE n.nspname = 'public'
+                    AND p.proname = 'app_effective_tenant_id'
+                ) THEN
+                    CREATE POLICY {policy_name} ON {table_name}
+                    USING (tenant_id = (SELECT public.app_effective_tenant_id()))
+                    WITH CHECK (tenant_id = (SELECT public.app_effective_tenant_id()));
+                ELSE
+                    CREATE POLICY {policy_name} ON {table_name}
+                    USING (tenant_id = (SELECT current_setting('app.tenant_id', true)::uuid))
+                    WITH CHECK (tenant_id = (SELECT current_setting('app.tenant_id', true)::uuid));
+                END IF;
             END IF;
         END $$;
         """
