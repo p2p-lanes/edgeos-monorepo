@@ -310,10 +310,7 @@ export class TotalCalculator {
       winningAmount = scholarshipAmount
     }
 
-    if (
-      appliedDiscount.type === "coupon" ||
-      appliedDiscount.type === "none"
-    ) {
+    if (appliedDiscount.type === "coupon" || appliedDiscount.type === "none") {
       return { ...baseResult, appliedDiscount }
     }
 

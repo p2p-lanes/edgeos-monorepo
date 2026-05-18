@@ -26,13 +26,8 @@ const TotalPurchase = ({
   const { t } = useTranslation()
   const { getCity } = useCityProvider()
   const creditsEnabled = getCity()?.credits_enabled ?? false
-  const {
-    originalTotal,
-    total,
-    discountAmount,
-    appliedDiscount,
-    groupName,
-  } = useCalculateTotal()
+  const { originalTotal, total, discountAmount, appliedDiscount, groupName } =
+    useCalculateTotal()
 
   // Detectar si hay productos month seleccionados
   const hasMonthSelected = attendees.some((attendee) =>
