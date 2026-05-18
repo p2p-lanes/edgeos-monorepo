@@ -57,6 +57,40 @@ function CopyButton({ value }: { value: string }) {
   )
 }
 
+function buildReadonlyConnectionString(
+  tenantId: string,
+  cred: CredentialInfo,
+  db: { db_host: string; db_port: number; db_name: string },
+) {
+  const user = encodeURIComponent(cred.db_username)
+  const password = encodeURIComponent(cred.db_password)
+  const options = encodeURIComponent(`-c app.tenant_id=${tenantId}`)
+  return `postgresql://${user}:${password}@${db.db_host}:${db.db_port}/${db.db_name}?options=${options}`
+}
+
+function CopyConnectionStringButton({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false)
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      onClick={() => {
+        navigator.clipboard.writeText(value)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 1500)
+      }}
+    >
+      {copied ? (
+        <Check className="mr-2 h-4 w-4" />
+      ) : (
+        <Copy className="mr-2 h-4 w-4" />
+      )}
+      {copied ? "Copied" : "Copy MCP connection string"}
+    </Button>
+  )
+}
+
 function ReadOnlyField({ value }: { value: string }) {
   return (
     <div className="flex items-center gap-1">
@@ -191,6 +225,28 @@ export function TenantCredentialsSection({
                     <SecretField value={cred.db_password} />
                   </div>
                 </div>
+                {cred.credential_type === "readonly" && (
+                  <div className="space-y-1 pl-11">
+                    <CopyConnectionStringButton
+                      value={buildReadonlyConnectionString(
+                        tenantId,
+                        cred,
+                        data,
+                      )}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      PostgreSQL URL with{" "}
+                      <code className="rounded bg-muted px-1 py-0.5 text-[10px] font-mono">
+                        app.tenant_id
+                      </code>{" "}
+                      scoped to this tenant. Append{" "}
+                      <code className="rounded bg-muted px-1 py-0.5 text-[10px] font-mono">
+                        &amp;sslmode=require
+                      </code>{" "}
+                      if your environment requires TLS.
+                    </p>
+                  </div>
+                )}
               </div>
             )
           })}
