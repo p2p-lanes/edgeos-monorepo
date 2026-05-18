@@ -11,7 +11,7 @@ class CouponBase(SQLModel):
     tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
     popup_id: uuid.UUID = Field(foreign_key="popups.id", index=True)
     code: str = Field(index=True)
-    discount_value: int = Field(default=0)  # Percentage: 0, 10, 20, ..., 100
+    discount_value: int = Field(default=0)  # Percentage: 0–100
     max_uses: int | None = Field(default=None, nullable=True)
     current_uses: int = Field(default=0)
     start_date: datetime | None = Field(
@@ -45,9 +45,9 @@ class CouponCreate(BaseModel):
     @field_validator("discount_value")
     @classmethod
     def validate_discount_value(cls, v: int) -> int:
-        """Discount must be 0, 10, 20, ..., 90, or 100."""
-        if v < 0 or v > 100 or v % 10 != 0:
-            raise ValueError("discount_value must be 0, 10, 20, ..., 90, or 100")
+        """Discount must be an integer between 0 and 100."""
+        if v < 0 or v > 100:
+            raise ValueError("discount_value must be between 0 and 100")
         return v
 
     @field_validator("code")
@@ -72,9 +72,9 @@ class CouponUpdate(BaseModel):
     @field_validator("discount_value")
     @classmethod
     def validate_discount_value(cls, v: int | None) -> int | None:
-        """Discount must be 0, 10, 20, ..., 90, or 100."""
-        if v is not None and (v < 0 or v > 100 or v % 10 != 0):
-            raise ValueError("discount_value must be 0, 10, 20, ..., 90, or 100")
+        """Discount must be an integer between 0 and 100."""
+        if v is not None and (v < 0 or v > 100):
+            raise ValueError("discount_value must be between 0 and 100")
         return v
 
 
