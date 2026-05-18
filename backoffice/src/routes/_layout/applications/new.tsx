@@ -4,6 +4,7 @@ import { useEffect } from "react"
 import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import { ApplicationForm } from "@/components/forms/ApplicationForm"
 import useAuth from "@/hooks/useAuth"
+import { useGoBack } from "@/hooks/useGoBack"
 
 export const Route = createFileRoute("/_layout/applications/new")({
   component: NewApplication,
@@ -14,6 +15,7 @@ export const Route = createFileRoute("/_layout/applications/new")({
 
 function NewApplication() {
   const navigate = useNavigate()
+  const goBack = useGoBack(() => navigate({ to: "/applications", search: {} }))
   const { isSuperadmin, isUserLoading } = useAuth()
 
   // Only superadmins can create applications via backoffice (for testing)
@@ -33,9 +35,7 @@ function NewApplication() {
       description="Create a test application with custom fields (Superadmin only)"
       backTo="/applications"
     >
-      <ApplicationForm
-        onSuccess={() => navigate({ to: "/applications", search: {} })}
-      />
+      <ApplicationForm onSuccess={goBack} />
     </FormPageLayout>
   )
 }

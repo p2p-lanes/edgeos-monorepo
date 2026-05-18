@@ -6,6 +6,7 @@ import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { FormFieldForm } from "@/components/forms/FormFieldForm"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
+import { useGoBack } from "@/hooks/useGoBack"
 
 export const Route = createFileRoute("/_layout/form-builder/new")({
   component: NewFormField,
@@ -16,6 +17,7 @@ export const Route = createFileRoute("/_layout/form-builder/new")({
 
 function NewFormField() {
   const navigate = useNavigate()
+  const goBack = useGoBack({ to: "/form-builder" })
   const { isOperatorOrAbove, isUserLoading } = useAuth()
   const { isContextReady } = useWorkspace()
 
@@ -49,7 +51,7 @@ function NewFormField() {
       description="Add a custom field to application forms"
       backTo="/form-builder"
     >
-      <FormFieldForm onSuccess={() => navigate({ to: "/form-builder" })} />
+      <FormFieldForm onSuccess={goBack} />
     </FormPageLayout>
   )
 }

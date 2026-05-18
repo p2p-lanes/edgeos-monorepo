@@ -1,7 +1,8 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router"
+import { createFileRoute } from "@tanstack/react-router"
 
 import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import { UserForm } from "@/components/forms/UserForm"
+import { useGoBack } from "@/hooks/useGoBack"
 
 export const Route = createFileRoute("/_layout/admin/new")({
   component: NewUser,
@@ -11,7 +12,7 @@ export const Route = createFileRoute("/_layout/admin/new")({
 })
 
 function NewUser() {
-  const navigate = useNavigate()
+  const goBack = useGoBack({ to: "/admin" })
 
   return (
     <FormPageLayout
@@ -19,7 +20,7 @@ function NewUser() {
       description="Create a new user account"
       backTo="/admin"
     >
-      <UserForm onSuccess={() => navigate({ to: "/admin" })} />
+      <UserForm onSuccess={goBack} />
     </FormPageLayout>
   )
 }

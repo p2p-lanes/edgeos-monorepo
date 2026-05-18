@@ -1,5 +1,5 @@
 import { useSuspenseQuery } from "@tanstack/react-query"
-import { createFileRoute, useNavigate } from "@tanstack/react-router"
+import { createFileRoute } from "@tanstack/react-router"
 import { Suspense } from "react"
 
 import { TenantsService } from "@/client"
@@ -8,6 +8,7 @@ import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { TenantForm } from "@/components/forms/TenantForm"
 import { Skeleton } from "@/components/ui/skeleton"
 import useAuth from "@/hooks/useAuth"
+import { useGoBack } from "@/hooks/useGoBack"
 
 export const Route = createFileRoute("/_layout/organizations/$id/edit")({
   component: EditTenantPage,
@@ -24,19 +25,11 @@ function getTenantQueryOptions(tenantId: string) {
 }
 
 function EditTenantContent({ tenantId }: { tenantId: string }) {
-  const navigate = useNavigate()
   const { isSuperadmin } = useAuth()
+  const goBack = useGoBack({ to: isSuperadmin ? "/organizations" : "/" })
   const { data: tenant } = useSuspenseQuery(getTenantQueryOptions(tenantId))
 
-  const handleSuccess = () => {
-    if (isSuperadmin) {
-      navigate({ to: "/organizations" })
-    } else {
-      navigate({ to: "/" })
-    }
-  }
-
-  return <TenantForm defaultValues={tenant} onSuccess={handleSuccess} />
+  return <TenantForm defaultValues={tenant} onSuccess={goBack} />
 }
 
 function EditTenantPage() {

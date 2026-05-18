@@ -1,5 +1,5 @@
 import { useSuspenseQuery } from "@tanstack/react-query"
-import { createFileRoute, useNavigate } from "@tanstack/react-router"
+import { createFileRoute } from "@tanstack/react-router"
 import { Suspense } from "react"
 
 import { ProductsService } from "@/client"
@@ -7,6 +7,7 @@ import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { ProductForm } from "@/components/forms/ProductForm"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useGoBack } from "@/hooks/useGoBack"
 
 export const Route = createFileRoute("/_layout/products/$id/edit")({
   component: EditProductPage,
@@ -23,15 +24,10 @@ function getProductQueryOptions(productId: string) {
 }
 
 function EditProductContent({ productId }: { productId: string }) {
-  const navigate = useNavigate()
+  const goBack = useGoBack({ to: "/products" })
   const { data: product } = useSuspenseQuery(getProductQueryOptions(productId))
 
-  return (
-    <ProductForm
-      defaultValues={product}
-      onSuccess={() => navigate({ to: "/products" })}
-    />
-  )
+  return <ProductForm defaultValues={product} onSuccess={goBack} />
 }
 
 function EditProductPage() {

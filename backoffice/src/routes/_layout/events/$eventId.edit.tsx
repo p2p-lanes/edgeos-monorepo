@@ -1,5 +1,5 @@
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query"
-import { createFileRoute, useNavigate } from "@tanstack/react-router"
+import { createFileRoute } from "@tanstack/react-router"
 import { CalendarClock } from "lucide-react"
 import { Suspense } from "react"
 
@@ -10,6 +10,7 @@ import { EventForm } from "@/components/forms/EventForm"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Skeleton } from "@/components/ui/skeleton"
 import useAuth from "@/hooks/useAuth"
+import { useGoBack } from "@/hooks/useGoBack"
 
 function getInitials(
   firstName: string | null | undefined,
@@ -98,7 +99,7 @@ export const Route = createFileRoute("/_layout/events/$eventId/edit")({
 })
 
 function EditEventContent({ eventId }: { eventId: string }) {
-  const navigate = useNavigate()
+  const goBack = useGoBack({ to: "/events" })
   const { data: event } = useSuspenseQuery({
     queryKey: ["events", eventId],
     queryFn: () => EventsService.getEvent({ eventId }),
@@ -107,10 +108,7 @@ function EditEventContent({ eventId }: { eventId: string }) {
   return (
     <div className="space-y-4">
       <CreatedByCard event={event} />
-      <EventForm
-        defaultValues={event}
-        onSuccess={() => navigate({ to: "/events" })}
-      />
+      <EventForm defaultValues={event} onSuccess={goBack} />
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { useSuspenseQuery } from "@tanstack/react-query"
-import { createFileRoute, useNavigate } from "@tanstack/react-router"
+import { createFileRoute } from "@tanstack/react-router"
 import { Suspense } from "react"
 
 import { CouponsService } from "@/client"
@@ -7,6 +7,7 @@ import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import { QueryErrorBoundary } from "@/components/Common/QueryErrorBoundary"
 import { CouponForm } from "@/components/forms/CouponForm"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useGoBack } from "@/hooks/useGoBack"
 
 export const Route = createFileRoute("/_layout/coupons/$id/edit")({
   component: EditCouponPage,
@@ -23,15 +24,10 @@ function getCouponQueryOptions(couponId: string) {
 }
 
 function EditCouponContent({ couponId }: { couponId: string }) {
-  const navigate = useNavigate()
+  const goBack = useGoBack({ to: "/coupons" })
   const { data: coupon } = useSuspenseQuery(getCouponQueryOptions(couponId))
 
-  return (
-    <CouponForm
-      defaultValues={coupon}
-      onSuccess={() => navigate({ to: "/coupons" })}
-    />
-  )
+  return <CouponForm defaultValues={coupon} onSuccess={goBack} />
 }
 
 function EditCouponPage() {
