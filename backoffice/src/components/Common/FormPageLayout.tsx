@@ -1,7 +1,7 @@
-import { useNavigate } from "@tanstack/react-router"
 import { ArrowLeft } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { useGoBack } from "@/hooks/useGoBack"
 
 interface FormPageLayoutProps {
   title: string
@@ -18,7 +18,7 @@ export function FormPageLayout({
   onBack,
   children,
 }: FormPageLayoutProps) {
-  const navigate = useNavigate()
+  const goBack = useGoBack({ to: backTo })
 
   return (
     <div className="flex flex-col gap-6">
@@ -27,7 +27,7 @@ export function FormPageLayout({
           variant="ghost"
           size="icon"
           aria-label="Go back"
-          onClick={onBack ?? (() => navigate({ to: backTo }))}
+          onClick={onBack ?? goBack}
         >
           <ArrowLeft className="h-4 w-4" />
         </Button>

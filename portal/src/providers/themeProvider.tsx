@@ -36,6 +36,31 @@ interface ThemeColors {
   checkout_subtitle_color?: string
   checkout_bottom_bar_bg_color?: string
   checkout_bottom_bar_text_color?: string
+  /** Optional override for the watermark (giant section-name text behind
+   *  the snap header). Defaults to a 92% bg-mix of the foreground so it
+   *  sits quietly behind the title, but on dark hero photos that becomes
+   *  invisible — tenants that want it visible can set e.g. an rgba white. */
+  checkout_watermark_color?: string
+  /** Optional override for the step-nav text + icon colour. Required when
+   *  the admin picks a `checkout_navbar_bg` that doesn't match the chosen
+   *  `mode` (e.g. dark-teal navbar in a light-mode popup): without this
+   *  the nav labels default to muted-foreground and disappear against the
+   *  dark fill. Applied to both active and inactive nav items. */
+  checkout_nav_text_color?: string
+  /** When true, native emojis in the nav are forced to a single tone via
+   *  CSS `filter` (the default chain inverts to white, which works on dark
+   *  navbars). Pass a custom filter string to override the default. Useful
+   *  when the admin wants the emoji palette to feel "monochrome iconography"
+   *  rather than OS-coloured pictographs. */
+  checkout_nav_monochrome_emoji?: boolean | string
+  /** Override the universal step-card surface for the whole popup.
+   *  Drives `--step-card-bg` and `--step-card-fg`, consumed by every
+   *  card-like surface in the checkout (ticket sections, buyer form,
+   *  confirm summary, FAQ items, cart drawer, insurance card). Use when
+   *  the popup theme mode and the card surface need to disagree — e.g.
+   *  a dark popup with cream-on-teal cards. */
+  card_background_color?: string
+  card_foreground_color?: string
 }
 
 interface ThemeConfig {
@@ -103,6 +128,36 @@ function computeThemeVars(
   if (colors.checkout_bottom_bar_text_color) {
     vars["--checkout-bottom-bar-text"] = colors.checkout_bottom_bar_text_color
   }
+  if (colors.checkout_nav_text_color) {
+    // Force nav text/icon colour for both active and inactive states. The
+    // disabled token uses a slight opacity so the inactive labels still
+    // recede visually without becoming unreadable.
+    vars["--checkout-badge-title"] = colors.checkout_nav_text_color
+    vars["--checkout-nav-text"] = colors.checkout_nav_text_color
+    vars["--checkout-badge-title-disabled"] =
+      `color-mix(in srgb, ${colors.checkout_nav_text_color} 70%, transparent)`
+  }
+  if (colors.checkout_nav_monochrome_emoji) {
+    // Native emojis ignore CSS `color`, so we use `filter` to force them
+    // to a single tone. Default chain inverts to white (works on dark
+    // navbars); a custom filter string is plumbed through as-is.
+    vars["--checkout-nav-emoji-filter"] =
+      typeof colors.checkout_nav_monochrome_emoji === "string"
+        ? colors.checkout_nav_monochrome_emoji
+        : "brightness(0) saturate(0) invert(1)"
+  }
+  // Universal step-card surface — written outside the `hasTheme` guard so
+  // tenants can opt into card colours without committing to a full
+  // mode/primary theme. Consumed by every card surface in the checkout
+  // via `stepCardSurfaceStyle()` (see `portal/src/lib/stepCardSurface.ts`),
+  // which reads `var(--step-card-bg, …)` and re-binds `--card`,
+  // `--foreground`, `--muted-foreground`, `--border` for its subtree.
+  if (colors.card_background_color) {
+    vars["--step-card-bg"] = colors.card_background_color
+  }
+  if (colors.card_foreground_color) {
+    vars["--step-card-fg"] = colors.card_foreground_color
+  }
 
   // If no mode/primary is set, stop here — rest of the palette stays on the
   // globals.css defaults.
@@ -147,7 +202,9 @@ function computeThemeVars(
     "--checkout-title": palette.foreground,
     "--checkout-subtitle":
       colors.checkout_subtitle_color || palette.foregroundSecondary,
-    "--checkout-watermark": mix(palette.background, palette.foreground, 92),
+    "--checkout-watermark":
+      colors.checkout_watermark_color ||
+      mix(palette.background, palette.foreground, 92),
     "--checkout-navbar-bg":
       colors.checkout_navbar_bg || mix(palette.background, "transparent", 85),
     "--checkout-nav-bg":

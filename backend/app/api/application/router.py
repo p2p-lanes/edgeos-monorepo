@@ -19,6 +19,7 @@ from app.api.application.schemas import (
     AttendeeInfo,
     AttendeesDirectoryEntry,
     CompanionParticipation,
+    DetachCompanionRequest,
     DirectoryProduct,
     NoParticipation,
     ParticipationResponse,
@@ -361,6 +362,7 @@ async def get_my_participation(
     if attendee:
         from app.api.application.schemas import AttendeeTicketInfo
 
+        host_human = attendee.application.human if attendee.application else None
         return CompanionParticipation(
             attendee=AttendeeInfo(
                 id=attendee.id,
@@ -373,6 +375,7 @@ async def get_my_participation(
                 ],
             ),
             application_status=attendee.application.status,
+            owner_email=host_human.email if host_human else None,
         )
 
     # 3. No participation
@@ -434,6 +437,67 @@ async def get_my_application(
         )
 
     return _build_application_public(application)
+
+
+@router.post(
+    "/my/detach-companion",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={
+        409: {
+            "description": (
+                "Tickets have already been purchased for this attendee on the "
+                "host application. Detach blocked; route to support."
+            ),
+        },
+    },
+)
+async def detach_companion(
+    body: DetachCompanionRequest,
+    db: HumanTenantSession,
+    current_human: CurrentHuman,
+) -> None:
+    """Remove the current human from being a companion on another applicant's
+    application for the given popup.
+
+    Used by the portal when a human arrives at a group invite link but is
+    already an attendee on someone else's application — they choose to switch
+    to their own application via the group invite.
+
+    Idempotent: returns 204 when the human is not actually a companion.
+    Returns 409 when tickets have already been purchased for this attendee
+    (money decisions handled by support, not by a checkout button).
+    """
+    from app.api.attendee.crud import attendees_crud
+
+    companion = attendees_crud.find_companion_for_popup(
+        db, human_id=current_human.id, popup_id=body.popup_id
+    )
+    if not companion:
+        return  # idempotent no-op
+
+    if companion.attendee_products:
+        host_human = (
+            companion.application.human if companion.application else None
+        )
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "tickets_already_purchased",
+                "owner_email": host_human.email if host_human else None,
+                "message": (
+                    "Tickets have already been purchased for you on this "
+                    "application. Contact support to resolve."
+                ),
+            },
+        )
+
+    host_application = companion.application
+    db.delete(companion)
+    if host_application:
+        crud.applications_crud.create_snapshot(
+            db, host_application, "companion_detached"
+        )
+    db.commit()
 
 
 @router.post(

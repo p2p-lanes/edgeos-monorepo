@@ -1,7 +1,8 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router"
+import { createFileRoute } from "@tanstack/react-router"
 
 import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import { TenantForm } from "@/components/forms/TenantForm"
+import { useGoBack } from "@/hooks/useGoBack"
 
 export const Route = createFileRoute("/_layout/organizations/new")({
   component: NewTenant,
@@ -11,7 +12,7 @@ export const Route = createFileRoute("/_layout/organizations/new")({
 })
 
 function NewTenant() {
-  const navigate = useNavigate()
+  const goBack = useGoBack({ to: "/organizations" })
 
   return (
     <FormPageLayout
@@ -19,7 +20,7 @@ function NewTenant() {
       description="Add a new organization to the platform"
       backTo="/organizations"
     >
-      <TenantForm onSuccess={() => navigate({ to: "/organizations" })} />
+      <TenantForm onSuccess={goBack} />
     </FormPageLayout>
   )
 }

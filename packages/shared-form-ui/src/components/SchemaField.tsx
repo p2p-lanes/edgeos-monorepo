@@ -19,9 +19,15 @@ import { SelectForm } from "./Form/SelectForm"
 import { SignatureForm } from "./Form/SignatureForm"
 import { TextAreaForm } from "./Form/TextAreaForm"
 import { FormInputWrapper } from "./FormInputWrapper"
+import type { ErrorTone } from "./Input"
 import { LabelRequired } from "./Label"
 import { MultiSelect } from "./MultiSelect"
 import { RadioGroup, RadioGroupItem } from "./RadioGroup"
+
+const ERROR_TEXT_CLASS: Record<ErrorTone, string> = {
+  destructive: "text-red-500",
+  warning: "text-amber-600",
+}
 
 function mapOptions(options?: string[], currentValue?: string) {
   const values = [...(options ?? [])]
@@ -43,6 +49,11 @@ export interface SchemaFieldProps {
   /** When true, field is read-only (e.g. for form builder preview) */
   readOnly?: boolean
   disabled?: boolean
+  /** Visual tone for the error state. Default `destructive` (red); opt
+   *  in to `warning` (amber) at the call site. Forwarded to the
+   *  per-type Form components that have the prop. Types that don't
+   *  (RichTextForm, PhoneInputForm, etc.) keep their built-in tone. */
+  errorTone?: ErrorTone
 }
 
 export function SchemaField({
@@ -54,6 +65,7 @@ export function SchemaField({
   hideLabelAndSubtitle = false,
   readOnly = false,
   disabled = false,
+  errorTone = "destructive",
 }: SchemaFieldProps) {
   const displayLabel = hideLabelAndSubtitle ? "" : field.label
   const displayHelpText = hideLabelAndSubtitle ? undefined : field.help_text
@@ -79,6 +91,7 @@ export function SchemaField({
           value={(value as string) ?? ""}
           onChange={(v) => handleChange(name, v)}
           error={error}
+          errorTone={errorTone}
           isRequired={showRequiredIndicator}
           subtitle={displayHelpText}
           placeholder={field.placeholder}
@@ -95,6 +108,7 @@ export function SchemaField({
           value={(value as string) ?? ""}
           handleChange={(v) => handleChange(name, v)}
           error={error ?? ""}
+          errorTone={errorTone}
           isRequired={showRequiredIndicator}
           subtitle={displayHelpText}
           placeholder={field.placeholder}
@@ -112,6 +126,7 @@ export function SchemaField({
           value={(value as string) ?? ""}
           onChange={(v) => handleChange(name, v)}
           error={error}
+          errorTone={errorTone}
           isRequired={showRequiredIndicator}
           subtitle={displayHelpText}
           placeholder={field.placeholder}
@@ -129,6 +144,7 @@ export function SchemaField({
           value={(value as string) ?? ""}
           onChange={(v) => handleChange(name, v)}
           error={error}
+          errorTone={errorTone}
           isRequired={showRequiredIndicator}
           subtitle={displayHelpText}
           disabled={isDisabled}
@@ -148,6 +164,7 @@ export function SchemaField({
           onCheckedChange={(v) => handleChange(name, v)}
           required={showRequiredIndicator}
           error={error}
+          errorTone={errorTone}
           disabled={isDisabled}
         />
       )
@@ -161,6 +178,7 @@ export function SchemaField({
           onChange={(v) => handleChange(name, v)}
           options={mapOptions(field.options, (value as string) ?? "")}
           error={error}
+          errorTone={errorTone}
           isRequired={showRequiredIndicator}
           placeholder={field.placeholder ?? "Select an option"}
           disabled={isDisabled}
@@ -227,7 +245,10 @@ export function SchemaField({
             })}
           </RadioGroup>
           {error && (
-            <p className="mt-1 text-sm text-red-500" role="alert">
+            <p
+              className={`mt-1 text-sm ${ERROR_TEXT_CLASS[errorTone]}`}
+              role="alert"
+            >
               {error}
             </p>
           )}
@@ -259,7 +280,7 @@ export function SchemaField({
             disabled={isDisabled}
           />
           {error && (
-            <p className="text-red-500 text-sm">{error}</p>
+            <p className={`${ERROR_TEXT_CLASS[errorTone]} text-sm`}>{error}</p>
           )}
         </FormInputWrapper>
       )

@@ -6,6 +6,7 @@ import { WorkspaceAlert } from "@/components/Common/WorkspaceAlert"
 import { FormSectionForm } from "@/components/forms/FormSectionForm"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
 import useAuth from "@/hooks/useAuth"
+import { useGoBack } from "@/hooks/useGoBack"
 
 export const Route = createFileRoute("/_layout/form-builder/sections/new")({
   component: NewFormSection,
@@ -16,6 +17,7 @@ export const Route = createFileRoute("/_layout/form-builder/sections/new")({
 
 function NewFormSection() {
   const navigate = useNavigate()
+  const goBack = useGoBack({ to: "/form-builder" })
   const { isOperatorOrAbove, isUserLoading } = useAuth()
   const { isContextReady } = useWorkspace()
 
@@ -47,7 +49,7 @@ function NewFormSection() {
       description="Add a section to group form fields"
       backTo="/form-builder"
     >
-      <FormSectionForm onSuccess={() => navigate({ to: "/form-builder" })} />
+      <FormSectionForm onSuccess={goBack} />
     </FormPageLayout>
   )
 }

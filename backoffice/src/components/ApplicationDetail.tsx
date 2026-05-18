@@ -44,6 +44,7 @@ import { LoadingButton } from "@/components/ui/loading-button"
 import { Separator } from "@/components/ui/separator"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
+import { cn } from "@/lib/utils"
 import { createErrorHandler } from "@/utils"
 
 // ========================
@@ -343,6 +344,7 @@ function ScholarshipPanel({
   const { showSuccessToast, showErrorToast } = useCustomToast()
   const queryClient = useQueryClient()
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
   const [discountPct, setDiscountPct] = useState("")
   const [incentiveAmount, setIncentiveAmount] = useState("")
   const [incentiveCurrency, setIncentiveCurrency] = useState("USD")
@@ -350,6 +352,8 @@ function ScholarshipPanel({
   const scholarshipStatus = application.scholarship_status ?? null
   const isPending =
     scholarshipStatus === null || scholarshipStatus === "pending"
+  const isApproved = scholarshipStatus === "approved"
+  const showForm = isPending || isEditing
 
   const mutation = useMutation({
     mutationFn: (payload: ScholarshipDecisionRequest) =>
@@ -360,6 +364,7 @@ function ScholarshipPanel({
     onSuccess: () => {
       showSuccessToast("Scholarship decision saved")
       setRejectDialogOpen(false)
+      setIsEditing(false)
       queryClient.invalidateQueries({
         queryKey: ["applications", application.id],
       })
@@ -408,6 +413,28 @@ function ScholarshipPanel({
     mutation.mutate({ scholarship_status: "rejected" })
   }
 
+  const handleEnterEdit = () => {
+    setDiscountPct(
+      application.discount_percentage != null
+        ? String(application.discount_percentage)
+        : "",
+    )
+    setIncentiveAmount(
+      application.incentive_amount != null
+        ? String(application.incentive_amount)
+        : "",
+    )
+    setIncentiveCurrency(application.incentive_currency || "USD")
+    setIsEditing(true)
+  }
+
+  const handleCancelEdit = () => {
+    setIsEditing(false)
+    setDiscountPct("")
+    setIncentiveAmount("")
+    setIncentiveCurrency("USD")
+  }
+
   const discountValue = application.discount_percentage
     ? Number(application.discount_percentage)
     : null
@@ -428,14 +455,15 @@ function ScholarshipPanel({
         </InlineRow>
 
         {/* Approved details */}
-        {scholarshipStatus === "approved" && discountValue !== null && (
+        {isApproved && !isEditing && discountValue !== null && (
           <InlineRow label="Discount">
             <span className="font-mono text-sm font-medium">
               {discountValue}%
             </span>
           </InlineRow>
         )}
-        {scholarshipStatus === "approved" &&
+        {isApproved &&
+          !isEditing &&
           popup.allows_incentive &&
           incentiveValue !== null &&
           incentiveValue > 0 && (
@@ -445,6 +473,18 @@ function ScholarshipPanel({
               </span>
             </InlineRow>
           )}
+        {isApproved && !isEditing && (
+          <div className="py-3">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleEnterEdit}
+              disabled={mutation.isPending}
+            >
+              Edit Discount
+            </Button>
+          </div>
+        )}
 
         {/* Details text */}
         {application.scholarship_details && (
@@ -473,12 +513,12 @@ function ScholarshipPanel({
           </InlineRow>
         )}
 
-        {/* Admin controls — only when pending */}
-        {isPending && (
+        {/* Admin controls — when pending or editing an approved scholarship */}
+        {showForm && (
           <div className="space-y-4 py-3">
             <div className="space-y-3">
               <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Approve Scholarship
+                {isEditing ? "Edit Scholarship" : "Approve Scholarship"}
               </p>
               <div className="space-y-2">
                 <Label htmlFor="discount_pct" className="text-sm">
@@ -538,16 +578,27 @@ function ScholarshipPanel({
                   loading={mutation.isPending}
                   onClick={handleApprove}
                 >
-                  Approve Scholarship
+                  {isEditing ? "Save Changes" : "Approve Scholarship"}
                 </LoadingButton>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  onClick={() => setRejectDialogOpen(true)}
-                  disabled={mutation.isPending}
-                >
-                  Reject Scholarship
-                </Button>
+                {isEditing ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleCancelEdit}
+                    disabled={mutation.isPending}
+                  >
+                    Cancel
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => setRejectDialogOpen(true)}
+                    disabled={mutation.isPending}
+                  >
+                    Reject Scholarship
+                  </Button>
+                )}
               </div>
             </div>
           </div>
@@ -741,10 +792,17 @@ export function ApplicationDetail({
         </div>
       )
     }
+    const formatted = formatFieldValue(key, value)
+    const hasUnbreakableWord = formatted
+      .split(/\s+/)
+      .some((word) => word.length > 24)
+    const fullRow = hasUnbreakableWord
     return (
-      <div key={key}>
-        <p className="text-xs text-muted-foreground">{getFieldLabel(key)}</p>
-        <p className="text-sm">{formatFieldValue(key, value)}</p>
+      <div key={key} className={cn("min-w-0", fullRow && "sm:col-span-2")}>
+        <p className="text-xs text-muted-foreground break-words">
+          {getFieldLabel(key)}
+        </p>
+        <p className="text-sm break-words">{formatted}</p>
       </div>
     )
   }

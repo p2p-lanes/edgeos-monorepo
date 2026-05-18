@@ -1,7 +1,7 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import type { ColumnDef } from "@tanstack/react-table"
-import { Package, Plus } from "lucide-react"
+import { Package, Plus, QrCode, ShieldCheck } from "lucide-react"
 import { Suspense } from "react"
 
 import { type ProductPublic, ProductsService } from "@/client"
@@ -18,6 +18,14 @@ import {
   useTableSearchParams,
   validateTableSearch,
 } from "@/hooks/useTableSearchParams"
+import { cn } from "@/lib/utils"
+
+const DURATION_LABELS: Record<string, string> = {
+  day: "Day Pass",
+  week: "Week Pass",
+  month: "Month Pass",
+  full: "Full Event",
+}
 
 function getProductsQueryOptions(
   popupId: string | null,
@@ -68,12 +76,47 @@ const columns: ColumnDef<ProductPublic>[] = [
   {
     accessorKey: "name",
     header: ({ column }) => <SortableHeader label="Name" column={column} />,
-    cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
+    cell: ({ row }) => (
+      <div className="flex items-center gap-2">
+        <span
+          role="img"
+          aria-label={row.original.is_active ? "Active" : "Inactive"}
+          title={row.original.is_active ? "Active" : "Inactive"}
+          className={cn(
+            "size-2 shrink-0 rounded-full",
+            row.original.is_active ? "bg-green-500" : "bg-red-500",
+          )}
+        />
+        <span className="font-medium">{row.original.name}</span>
+      </div>
+    ),
+  },
+  {
+    accessorKey: "description",
+    header: "Description",
+    cell: ({ row }) => {
+      const description = row.original.description
+      if (!description) return null
+      return (
+        <span className="line-clamp-2 max-w-xs text-sm leading-snug text-muted-foreground">
+          {description}
+        </span>
+      )
+    },
   },
   {
     accessorKey: "price",
     header: ({ column }) => <SortableHeader label="Price" column={column} />,
-    cell: ({ row }) => <span className="font-mono">${row.original.price}</span>,
+    cell: ({ row }) => (
+      <div className="flex flex-col leading-tight">
+        {row.original.compare_price ? (
+          <span className="font-mono text-xs text-muted-foreground line-through">
+            ${row.original.compare_price}
+          </span>
+        ) : null}
+        <span className="font-mono">${row.original.price}</span>
+      </div>
+    ),
   },
   {
     accessorKey: "attendee_category",
@@ -81,21 +124,62 @@ const columns: ColumnDef<ProductPublic>[] = [
     cell: ({ row }) => <StatusBadge status={row.original.category || "N/A"} />,
   },
   {
-    accessorKey: "insurance_eligible",
-    header: "Insurance",
+    accessorKey: "duration_type",
+    header: "Duration",
     cell: ({ row }) => {
-      return row.original.insurance_eligible ? (
-        <StatusBadge status="active" />
-      ) : (
-        <span className="text-muted-foreground">—</span>
+      const duration = row.original.duration_type
+      if (!duration) return null
+      return (
+        <span className="text-sm">{DURATION_LABELS[duration] ?? duration}</span>
       )
     },
   },
   {
-    accessorKey: "is_active",
-    header: "Status",
+    accessorKey: "exclusive",
+    header: "Exclusive",
+    cell: ({ row }) =>
+      row.original.exclusive ? <StatusBadge status="active" /> : null,
+  },
+  {
+    accessorKey: "insurance_eligible",
+    header: () => (
+      <div
+        title="Insurance Eligible"
+        className="flex items-center justify-center"
+      >
+        <ShieldCheck
+          className="h-4 w-4 text-muted-foreground"
+          aria-label="Insurance Eligible"
+        />
+      </div>
+    ),
     cell: ({ row }) => (
-      <StatusBadge status={row.original.is_active ? "active" : "inactive"} />
+      <div className="flex items-center justify-center">
+        {row.original.insurance_eligible ? (
+          <StatusBadge status="active" />
+        ) : null}
+      </div>
+    ),
+  },
+  {
+    accessorKey: "requires_check_in",
+    header: () => (
+      <div
+        title="Requires Check-in"
+        className="flex items-center justify-center"
+      >
+        <QrCode
+          className="h-4 w-4 text-muted-foreground"
+          aria-label="Requires Check-in"
+        />
+      </div>
+    ),
+    cell: ({ row }) => (
+      <div className="flex items-center justify-center">
+        {row.original.requires_check_in ? (
+          <StatusBadge status="active" />
+        ) : null}
+      </div>
     ),
   },
 ]
@@ -134,7 +218,14 @@ function ProductsTableContent() {
       columns={columns}
       data={products.results}
       searchPlaceholder="Search by name..."
-      hiddenOnMobile={["attendee_category", "insurance_eligible", "is_active"]}
+      hiddenOnMobile={[
+        "description",
+        "attendee_category",
+        "duration_type",
+        "exclusive",
+        "insurance_eligible",
+        "requires_check_in",
+      ]}
       searchValue={search}
       onSearchChange={setSearch}
       onRowClick={(product) =>

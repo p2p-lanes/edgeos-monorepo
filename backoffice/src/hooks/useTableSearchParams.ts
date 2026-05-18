@@ -12,7 +12,7 @@ export interface TableSearchParams {
 
 export const defaultTableSearch: Required<TableSearchParams> = {
   page: 0,
-  pageSize: 25,
+  pageSize: 50,
   search: "",
   sortBy: "",
   sortOrder: "desc",
@@ -27,7 +27,7 @@ export function validateTableSearch(
       typeof raw.pageSize === "number" &&
       [10, 25, 50, 100].includes(raw.pageSize)
         ? raw.pageSize
-        : 25,
+        : 50,
     search: typeof raw.search === "string" ? raw.search : "",
     sortBy: typeof raw.sortBy === "string" ? raw.sortBy : "",
     sortOrder:
@@ -41,7 +41,7 @@ export function useTableSearchParams(params: TableSearchParams, from: string) {
   const navigate = useNavigate()
 
   const page = params.page ?? 0
-  const pageSize = params.pageSize ?? 25
+  const pageSize = params.pageSize ?? 50
   const search = params.search ?? ""
   const sortBy = params.sortBy ?? ""
   const sortOrder = params.sortOrder ?? "desc"
@@ -75,7 +75,7 @@ export function useTableSearchParams(params: TableSearchParams, from: string) {
         search: (prev: TableSearchParams) => ({
           ...prev,
           page: pag.pageIndex || undefined,
-          pageSize: pag.pageSize === 25 ? undefined : pag.pageSize,
+          pageSize: pag.pageSize === 50 ? undefined : pag.pageSize,
         }),
         replace: true,
       })

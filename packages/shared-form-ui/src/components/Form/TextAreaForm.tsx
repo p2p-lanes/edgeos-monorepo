@@ -1,6 +1,16 @@
 import { FormInputWrapper } from "../FormInputWrapper"
+import type { ErrorTone } from "../Input"
 import { LabelMuted, LabelRequired } from "../Label"
 import { Textarea } from "../Textarea"
+
+const ERROR_BORDER_CLASS: Record<ErrorTone, string> = {
+  destructive: "border-red-500",
+  warning: "border-amber-500",
+}
+const ERROR_TEXT_CLASS: Record<ErrorTone, string> = {
+  destructive: "text-red-500",
+  warning: "text-amber-600",
+}
 
 export interface TextAreaFormProps {
   label: string
@@ -8,6 +18,9 @@ export interface TextAreaFormProps {
   value: string
   handleChange: (value: string) => void
   error: string
+  /** Visual tone for the error state. Default `destructive` (red); opt
+   *  in to `warning` (amber). */
+  errorTone?: ErrorTone
   isRequired?: boolean
   subtitle?: string
   placeholder?: string
@@ -20,6 +33,7 @@ export const TextAreaForm = ({
   id,
   value,
   error,
+  errorTone = "destructive",
   handleChange,
   isRequired,
   subtitle,
@@ -45,14 +59,16 @@ export const TextAreaForm = ({
       )}
       <Textarea
         id={id}
-        className={`min-h-[72px] mt-2 ${error ? "border-red-500" : ""}`}
+        className={`min-h-[72px] mt-2 ${error ? ERROR_BORDER_CLASS[errorTone] : ""}`}
         value={value}
         onChange={(e) => handleChange(e.target.value)}
         placeholder={placeholder}
         disabled={disabled}
         readOnly={readOnly}
       />
-      {error && <p className="text-red-500 text-sm">{error}</p>}
+      {error && (
+        <p className={`${ERROR_TEXT_CLASS[errorTone]} text-sm`}>{error}</p>
+      )}
     </FormInputWrapper>
   )
 }

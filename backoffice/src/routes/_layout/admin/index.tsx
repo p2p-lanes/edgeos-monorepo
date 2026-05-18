@@ -20,7 +20,7 @@ import {
   validateTableSearch,
 } from "@/hooks/useTableSearchParams"
 
-const PAGE_SIZE = 25
+const PAGE_SIZE = 50
 
 function getTenantUsersQueryOptions(
   tenantId: string | null,

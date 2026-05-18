@@ -1,5 +1,5 @@
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query"
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
+import { createFileRoute, Link } from "@tanstack/react-router"
 import { CalendarDays } from "lucide-react"
 import { Suspense } from "react"
 
@@ -11,6 +11,7 @@ import { TrackForm } from "@/components/forms/TrackForm"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWorkspace } from "@/contexts/WorkspaceContext"
+import { useGoBack } from "@/hooks/useGoBack"
 
 export const Route = createFileRoute("/_layout/events/tracks/$trackId/edit")({
   component: EditTrackPage,
@@ -158,7 +159,7 @@ function TrackEventsList({ trackId }: { trackId: string }) {
 }
 
 function EditTrackContent({ trackId }: { trackId: string }) {
-  const navigate = useNavigate()
+  const goBack = useGoBack({ to: "/events/tracks" })
   const { data: track } = useSuspenseQuery({
     queryKey: ["tracks", trackId],
     queryFn: () => TracksService.getTrack({ trackId }),
@@ -166,10 +167,7 @@ function EditTrackContent({ trackId }: { trackId: string }) {
 
   return (
     <div className="space-y-10">
-      <TrackForm
-        defaultValues={track}
-        onSuccess={() => navigate({ to: "/events/tracks" })}
-      />
+      <TrackForm defaultValues={track} onSuccess={goBack} />
       <section className="space-y-3">
         <div>
           <h2 className="text-lg font-semibold tracking-tight">

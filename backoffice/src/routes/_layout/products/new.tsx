@@ -4,6 +4,7 @@ import { useEffect } from "react"
 import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import { ProductForm } from "@/components/forms/ProductForm"
 import useAuth from "@/hooks/useAuth"
+import { useGoBack } from "@/hooks/useGoBack"
 
 export const Route = createFileRoute("/_layout/products/new")({
   component: NewProduct,
@@ -14,6 +15,7 @@ export const Route = createFileRoute("/_layout/products/new")({
 
 function NewProduct() {
   const navigate = useNavigate()
+  const goBack = useGoBack({ to: "/products" })
   const { isOperatorOrAbove, isUserLoading } = useAuth()
 
   // Redirect viewers to products list - they cannot create new products
@@ -33,7 +35,7 @@ function NewProduct() {
       description="Add a new product or ticket type"
       backTo="/products"
     >
-      <ProductForm onSuccess={() => navigate({ to: "/products" })} />
+      <ProductForm onSuccess={goBack} />
     </FormPageLayout>
   )
 }

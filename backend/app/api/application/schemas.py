@@ -280,6 +280,12 @@ class ScholarshipDecisionRequest(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
 
+class DetachCompanionRequest(BaseModel):
+    """Request body for POST /applications/my/detach-companion."""
+
+    popup_id: uuid.UUID
+
+
 class ApplicationSnapshotBase(SQLModel):
     """Base schema for application snapshots.
 
@@ -380,6 +386,7 @@ class CompanionParticipation(BaseModel):
     type: Literal["companion"] = "companion"
     attendee: AttendeeInfo
     application_status: str  # Parent application status
+    owner_email: str | None = None  # Email of the application owner (for UX copy)
 
 
 class NoParticipation(BaseModel):

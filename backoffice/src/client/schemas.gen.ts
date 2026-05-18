@@ -1177,6 +1177,18 @@ export const ApplicationUpdateSchema = {
                 }
             ]
         },
+        group_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Group Id'
+        },
         scholarship_request: {
             anyOf: [
                 {
@@ -3967,6 +3979,17 @@ export const CompanionParticipationSchema = {
         application_status: {
             type: 'string',
             title: 'Application Status'
+        },
+        owner_email: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Owner Email'
         }
     },
     type: 'object',
@@ -4316,6 +4339,20 @@ export const DashboardStatsSchema = {
     required: ['applications', 'attendees', 'payments'],
     title: 'DashboardStats',
     description: 'Complete dashboard statistics.'
+} as const;
+
+export const DetachCompanionRequestSchema = {
+    properties: {
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        }
+    },
+    type: 'object',
+    required: ['popup_id'],
+    title: 'DetachCompanionRequest',
+    description: 'Request body for POST /applications/my/detach-companion.'
 } as const;
 
 export const DirectoryProductSchema = {
@@ -6603,6 +6640,11 @@ export const EventVenuePublicSchema = {
             maxLength: 20,
             default: 'active'
         },
+        display_order: {
+            type: 'integer',
+            title: 'Display Order',
+            default: 0
+        },
         created_at: {
             type: 'string',
             format: 'date-time',
@@ -6826,6 +6868,17 @@ export const EventVenueUpdateSchema = {
                     type: 'null'
                 }
             ]
+        },
+        display_order: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Display Order'
         },
         property_type_ids: {
             anyOf: [
@@ -10664,6 +10717,17 @@ export const PopupAdminSchema = {
             ],
             title: 'Theme Config'
         },
+        favicon_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Favicon Url'
+        },
         default_language: {
             type: 'string',
             title: 'Default Language',
@@ -11013,6 +11077,17 @@ export const PopupCreateSchema = {
             ],
             title: 'Theme Config'
         },
+        favicon_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Favicon Url'
+        },
         default_language: {
             type: 'string',
             title: 'Default Language',
@@ -11287,6 +11362,17 @@ export const PopupPublicSchema = {
                 }
             ],
             title: 'Theme Config'
+        },
+        favicon_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Favicon Url'
         },
         default_language: {
             type: 'string',
@@ -11778,6 +11864,17 @@ export const PopupUpdateSchema = {
                 }
             ],
             title: 'Theme Config'
+        },
+        favicon_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Favicon Url'
         },
         default_language: {
             anyOf: [
@@ -14446,6 +14543,22 @@ export const TicketingStepCreateSchema = {
             type: 'boolean',
             title: 'Show Watermark',
             default: true
+        },
+        show_in_navbar: {
+            type: 'boolean',
+            title: 'Show In Navbar',
+            default: true
+        },
+        emoji: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Emoji'
         }
     },
     type: 'object',
@@ -14558,6 +14671,22 @@ export const TicketingStepPublicSchema = {
             type: 'boolean',
             title: 'Show Watermark',
             default: true
+        },
+        show_in_navbar: {
+            type: 'boolean',
+            title: 'Show In Navbar',
+            default: true
+        },
+        emoji: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Emoji'
         }
     },
     type: 'object',
@@ -14677,6 +14806,28 @@ export const TicketingStepUpdateSchema = {
                 }
             ],
             title: 'Show Watermark'
+        },
+        show_in_navbar: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Show In Navbar'
+        },
+        emoji: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Emoji'
         }
     },
     type: 'object',
@@ -15751,6 +15902,27 @@ export const VenuePropertyTypeUpdateSchema = {
     },
     type: 'object',
     title: 'VenuePropertyTypeUpdate'
+} as const;
+
+export const VenueReorderPayloadSchema = {
+    properties: {
+        popup_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Popup Id'
+        },
+        venue_ids: {
+            items: {
+                type: 'string',
+                format: 'uuid'
+            },
+            type: 'array',
+            title: 'Venue Ids'
+        }
+    },
+    type: 'object',
+    required: ['popup_id', 'venue_ids'],
+    title: 'VenueReorderPayload'
 } as const;
 
 export const VenueStatusSchema = {

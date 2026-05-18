@@ -189,7 +189,12 @@ def _seed_ticketing_steps(session: Session, popup_map: dict, tenant_id) -> None:
         if existing:
             continue
 
-        seed_ticketing_steps_for_popup(session, popup_id=popup.id, tenant_id=tenant_id)
+        seed_ticketing_steps_for_popup(
+            session,
+            popup_id=popup.id,
+            tenant_id=tenant_id,
+            sale_type=str(popup.sale_type) if popup.sale_type else None,
+        )
         logger.info(f"Ticketing steps seeded for {popup_key}")
 
 

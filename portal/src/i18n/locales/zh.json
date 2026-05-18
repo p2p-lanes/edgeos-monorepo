@@ -168,6 +168,15 @@
     "express_title": "快速结账",
     "buyer_step_title": "您的信息",
     "buyer_step_description": "请在付款前填写您的信息。",
+    "buyer_hero_title": "就差一步！",
+    "buyer_hero_subtitle": "我们需要几条信息来保留您的位置。",
+    "buyer_hero_trust": "您的隐私很重要。我们不会与第三方共享您的数据。",
+    "email_invalid": "这看起来不是有效的电子邮件",
+    "field_required": "此字段为必填",
+    "toast_dismiss_aria": "关闭提示",
+    "toast_buyer_incomplete_continue": "您的信息中有未完成的字段，请检查后继续。",
+    "toast_buyer_incomplete_pay": "支付前请填写「您的信息」中的字段。",
+    "toast_cart_empty": "继续前请至少添加一个商品。",
     "loading_info": "正在加载您的信息",
     "processing": "正在处理您的注册",
     "processing_subtitle": "这可能需要一些时间",
@@ -221,6 +230,7 @@
       "housing": "住宿",
       "merch": "周边",
       "patron": "赞助人",
+      "buyer": "您的信息",
       "confirm": "审核并确认"
     }
   },
@@ -312,7 +322,8 @@
       "group_named": "{{name}} 团体 ({{percent}}% 折扣)",
       "group_generic": "团体折扣 ({{percent}}% 折扣)",
       "code": "{{code}} ({{percent}}% 折扣)",
-      "generic": "折扣 {{percent}}% OFF"
+      "generic": "折扣 {{percent}}% OFF",
+      "scholarship": "奖学金 ({{percent}}% 折扣)"
     }
   },
   "attendees": {

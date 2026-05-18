@@ -31,6 +31,7 @@ from app.api.event_venue.schemas import (
     VenuePropertyTypeCreate,
     VenuePropertyTypePublic,
     VenuePropertyTypeUpdate,
+    VenueReorderPayload,
     VenueStatus,
     VenueWeeklyHoursUpdate,
 )
@@ -171,6 +172,54 @@ async def list_venues(
         results=[EventVenuePublic.model_validate(v) for v in venues],
         paging=Paging(offset=skip, limit=limit, total=total),
     )
+
+
+@router.patch("/reorder", status_code=status.HTTP_204_NO_CONTENT)
+async def reorder_venues(
+    payload: VenueReorderPayload,
+    db: TenantSession,
+    _: CurrentWriter,
+) -> None:
+    """Persist a manual venue ordering for a popup.
+
+    ``venue_ids`` defines the new order; venues not included keep their
+    relative order and are pushed to the tail. RLS on ``TenantSession``
+    already restricts the popup scope to the active tenant.
+
+    Registered before ``/{venue_id}`` so ``reorder`` isn't parsed as a
+    UUID path parameter.
+    """
+    venues = list(
+        db.exec(
+            select(EventVenues).where(EventVenues.popup_id == payload.popup_id)
+        ).all()
+    )
+    by_id = {v.id: v for v in venues}
+
+    unknown = [vid for vid in payload.venue_ids if vid not in by_id]
+    if unknown:
+        raise HTTPException(
+            status_code=400,
+            detail="Some venues do not belong to this popup",
+        )
+
+    seen: set[uuid.UUID] = set()
+    for idx, vid in enumerate(payload.venue_ids):
+        if vid in seen:
+            continue
+        seen.add(vid)
+        by_id[vid].display_order = idx
+
+    next_idx = len(seen)
+    remaining = sorted(
+        (v for v in venues if v.id not in seen),
+        key=lambda x: (x.display_order, x.title),
+    )
+    for v in remaining:
+        v.display_order = next_idx
+        next_idx += 1
+
+    db.commit()
 
 
 @router.get("/{venue_id}", response_model=EventVenuePublic)

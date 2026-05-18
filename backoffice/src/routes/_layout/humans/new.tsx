@@ -4,6 +4,7 @@ import { useEffect } from "react"
 import { FormPageLayout } from "@/components/Common/FormPageLayout"
 import { HumanForm } from "@/components/forms/HumanForm"
 import useAuth from "@/hooks/useAuth"
+import { useGoBack } from "@/hooks/useGoBack"
 import { getHumansNavigationTarget } from "@/routes/_layout/humans/navigation"
 
 export const Route = createFileRoute("/_layout/humans/new")({
@@ -15,6 +16,7 @@ export const Route = createFileRoute("/_layout/humans/new")({
 
 function NewHuman() {
   const navigate = useNavigate()
+  const goBack = useGoBack(() => navigate(getHumansNavigationTarget()))
   const { isSuperadmin, isUserLoading } = useAuth()
 
   // Only superadmins can create humans via backoffice (for testing)
@@ -33,9 +35,9 @@ function NewHuman() {
       title="Create Human"
       description="Create a test human (Superadmin only)"
       backTo="/humans"
-      onBack={() => navigate(getHumansNavigationTarget())}
+      onBack={goBack}
     >
-      <HumanForm onSuccess={() => navigate(getHumansNavigationTarget())} />
+      <HumanForm onSuccess={goBack} />
     </FormPageLayout>
   )
 }

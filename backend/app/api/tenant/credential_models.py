@@ -18,6 +18,9 @@ class TenantCredentials(SQLModel, table=True):
         UniqueConstraint(
             "tenant_id", "credential_type", name="uq_tenant_credentials_type"
         ),
+        UniqueConstraint(
+            "db_username", name="uq_tenant_credentials_db_username"
+        ),
     )
 
     id: uuid.UUID = Field(
