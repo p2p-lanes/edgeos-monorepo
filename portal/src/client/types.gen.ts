@@ -835,6 +835,7 @@ export type CheckoutRuntimeProduct = {
     price: string;
     compare_price?: (string | null);
     image_url?: (string | null);
+    images?: Array<(string)>;
     category?: string;
     currency?: string;
     attendee_category?: (string | null);
@@ -2457,6 +2458,7 @@ export type ProductBatchItem = {
     compare_price?: (number | string | null);
     description?: (string | null);
     image_url?: (string | null);
+    images?: Array<(string)>;
     category?: string;
     duration_type?: (TicketDuration | null);
     sale_starts_at?: (string | null);
@@ -2482,6 +2484,7 @@ export type ProductBatchResult = {
     compare_price?: (string | null);
     description?: (string | null);
     image_url?: (string | null);
+    images?: Array<(string)>;
     category?: string;
     attendee_category_id?: (string | null);
     duration_type?: (TicketDuration | null);
@@ -2522,6 +2525,7 @@ export type ProductCreate = {
     compare_price?: (number | string | null);
     description?: (string | null);
     image_url?: (string | null);
+    images?: Array<(string)>;
     category?: string;
     duration_type?: (TicketDuration | null);
     sale_starts_at?: (string | null);
@@ -2560,7 +2564,7 @@ export type ProductPublic = {
     compare_price?: (string | null);
     description?: (string | null);
     image_url?: (string | null);
-    images?: Array<string>;
+    images?: Array<(string)>;
     category?: string;
     attendee_category_id?: (string | null);
     duration_type?: (TicketDuration | null);
@@ -2586,6 +2590,7 @@ export type ProductUpdate = {
     compare_price?: (number | string | null);
     description?: (string | null);
     image_url?: (string | null);
+    images?: (Array<(string)> | null);
     category?: (string | null);
     duration_type?: (TicketDuration | null);
     sale_starts_at?: (string | null);
@@ -2611,6 +2616,7 @@ export type ProductWithQuantity = {
     compare_price?: (string | null);
     description?: (string | null);
     image_url?: (string | null);
+    images?: Array<(string)>;
     category?: string;
     attendee_category_id?: (string | null);
     duration_type?: (TicketDuration | null);

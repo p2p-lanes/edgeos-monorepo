@@ -3791,6 +3791,14 @@ export const CheckoutRuntimeProductSchema = {
             ],
             title: 'Image Url'
         },
+        images: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Images',
+            default: []
+        },
         category: {
             type: 'string',
             title: 'Category',
@@ -12338,6 +12346,13 @@ export const ProductBatchItemSchema = {
             ],
             title: 'Image Url'
         },
+        images: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Images'
+        },
         category: {
             type: 'string',
             title: 'Category',
@@ -12498,6 +12513,13 @@ export const ProductBatchResultSchema = {
                 }
             ],
             title: 'Image Url'
+        },
+        images: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Images'
         },
         category: {
             type: 'string',
@@ -12739,6 +12761,13 @@ export const ProductCreateSchema = {
             ],
             title: 'Image Url'
         },
+        images: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Images'
+        },
         category: {
             type: 'string',
             title: 'Category',
@@ -12919,6 +12948,13 @@ export const ProductPublicSchema = {
                 }
             ],
             title: 'Image Url'
+        },
+        images: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Images'
         },
         category: {
             type: 'string',
@@ -13119,6 +13155,20 @@ export const ProductUpdateSchema = {
             ],
             title: 'Image Url'
         },
+        images: {
+            anyOf: [
+                {
+                    items: {
+                        type: 'string'
+                    },
+                    type: 'array'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Images'
+        },
         category: {
             anyOf: [
                 {
@@ -13308,6 +13358,13 @@ export const ProductWithQuantitySchema = {
                 }
             ],
             title: 'Image Url'
+        },
+        images: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Images'
         },
         category: {
             type: 'string',
