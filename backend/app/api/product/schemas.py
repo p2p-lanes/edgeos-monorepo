@@ -5,6 +5,7 @@ from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 from sqlalchemy import Boolean, Numeric, Text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Column, DateTime, Field, SQLModel
 
 from app.api.product.sale_window import datetime_to_inclusive_date
@@ -48,6 +49,12 @@ class ProductBase(SQLModel):
     )
     description: str | None = Field(default=None, nullable=True, sa_type=Text())
     image_url: str | None = Field(default=None, nullable=True)
+    # Additional images shown after `image_url` (the cover) in the housing
+    # grid/showcase carousel. Empty for single-image products.
+    images: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(JSONB, nullable=False, server_default="'[]'::jsonb"),
+    )
     category: str = Field(default="ticket", index=True)
     # FK to attendee_categories (authoritative post-migration)
     attendee_category_id: uuid.UUID | None = Field(
@@ -117,6 +124,7 @@ class ProductCreate(BaseModel):
     compare_price: Decimal | None = Field(default=None, ge=0)
     description: str | None = None
     image_url: str | None = None
+    images: list[str] = Field(default_factory=list)
     category: str = "ticket"
     duration_type: TicketDuration | None = None
     sale_starts_at: date | None = None
@@ -189,6 +197,7 @@ class ProductUpdate(BaseModel):
     compare_price: Decimal | None = Field(default=None, ge=0)
     description: str | None = None
     image_url: str | None = None
+    images: list[str] | None = None
     category: str | None = None
     duration_type: TicketDuration | None = None
     sale_starts_at: date | None = None
@@ -240,6 +249,7 @@ class ProductBatchItem(BaseModel):
     compare_price: Decimal | None = Field(default=None, ge=0)
     description: str | None = None
     image_url: str | None = None
+    images: list[str] = Field(default_factory=list)
     category: str = "ticket"
     duration_type: TicketDuration | None = None
     sale_starts_at: date | None = None

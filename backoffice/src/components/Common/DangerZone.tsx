@@ -35,6 +35,7 @@ export function DangerZone({
 
   const trigger = (
     <Button
+      type="button"
       variant="destructive"
       size="sm"
       className="shrink-0"

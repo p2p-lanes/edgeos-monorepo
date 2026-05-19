@@ -182,7 +182,10 @@ export function EventForm({
   })
 
   const [repeat, setRepeat] = useState<RepeatState>(() =>
-    parseRruleToState(defaultValues?.rrule ?? null),
+    parseRruleToState(
+      defaultValues?.rrule ?? null,
+      defaultValues?.timezone ?? "UTC",
+    ),
   )
 
   const { data: tracks } = useQuery({
@@ -195,12 +198,21 @@ export function EventForm({
     enabled: !!selectedPopupId,
   })
 
+  // Survives across renders so we can fully bypass the unsaved-changes
+  // blocker once a mutation has succeeded. `form.reset()` clears `isDirty`,
+  // but downstream effects (venue/date auto-init) re-dirty the form on the
+  // very next render — racing the async navigation and tripping the
+  // "Stay on page / Discard changes" dialog. The ref lets `shouldBlockFn`
+  // short-circuit regardless of what `isDirty` does after submit.
+  const skipBlockerRef = useRef(false)
+
   const createMutation = useMutation({
     mutationFn: (data: EventCreate) =>
       EventsService.createEvent({ requestBody: data }),
     onSuccess: () => {
       showSuccessToast("Event created successfully")
       queryClient.invalidateQueries({ queryKey: ["events"] })
+      skipBlockerRef.current = true
       form.reset()
       onSuccess()
     },
@@ -214,11 +226,20 @@ export function EventForm({
         requestBody: data,
       })
       // Sync recurrence changes separately (EventUpdate doesn't carry it).
-      const currentRule = buildRecurrence(repeat)
-      const previousRule = parseRruleToState(defaultValues?.rrule ?? null)
+      // Build with the form's current timezone; parse the stored rrule with
+      // the timezone it was originally saved against so the round-trip stays
+      // symmetric and doesn't spuriously detect a change when the user has
+      // not edited the recurrence.
+      const currentTz = form.state.values.timezone || "UTC"
+      const previousTz = defaultValues?.timezone ?? "UTC"
+      const currentRule = buildRecurrence(repeat, currentTz)
+      const previousRule = parseRruleToState(
+        defaultValues?.rrule ?? null,
+        previousTz,
+      )
       const ruleChanged =
         JSON.stringify(currentRule) !==
-        JSON.stringify(buildRecurrence(previousRule))
+        JSON.stringify(buildRecurrence(previousRule, previousTz))
       if (ruleChanged) {
         await EventsService.setRecurrence({
           eventId: defaultValues!.id,
@@ -230,6 +251,7 @@ export function EventForm({
     onSuccess: () => {
       showSuccessToast("Event updated successfully")
       queryClient.invalidateQueries({ queryKey: ["events"] })
+      skipBlockerRef.current = true
       form.reset()
       onSuccess()
     },
@@ -242,6 +264,7 @@ export function EventForm({
       showSuccessToast("Event deleted successfully")
       queryClient.invalidateQueries({ queryKey: ["events"] })
       // Bypass the unsaved-changes blocker — the entity is gone.
+      skipBlockerRef.current = true
       form.reset()
       navigate({ to: "/events" })
     },
@@ -417,7 +440,7 @@ export function EventForm({
           highlighted: value.highlighted,
           status: value.status,
           tags,
-          recurrence: buildRecurrence(repeat),
+          recurrence: buildRecurrence(repeat, value.timezone || "UTC"),
         }
         createMutation.mutate(payload)
       }
@@ -527,13 +550,52 @@ export function EventForm({
       setAvailability({ status: "idle" })
       return
     }
-    const key = `${venueIdValue}|${startUtc.toISOString()}|${endTimeIso}|${defaultValues?.id ?? ""}`
+    const recurrence = buildRecurrence(repeat, timezoneValue || "UTC")
+    // Include the rrule in the dedupe key so toggling recurrence retriggers
+    // the check even when the start window stays put.
+    const recurrenceKey = recurrence
+      ? `${recurrence.freq}|${recurrence.interval}|${(recurrence.by_day ?? []).join(",")}|${recurrence.count ?? ""}|${recurrence.until ?? ""}`
+      : "none"
+    const key = `${venueIdValue}|${startUtc.toISOString()}|${endTimeIso}|${defaultValues?.id ?? ""}|${recurrenceKey}`
     if (lastCheckKey.current === key) return
 
     setAvailability({ status: "checking" })
     const handle = window.setTimeout(async () => {
       lastCheckKey.current = key
       try {
+        if (recurrence) {
+          const result = await EventsService.checkRecurringAvailability({
+            requestBody: {
+              venue_id: venueIdValue,
+              start_time: startUtc!.toISOString(),
+              end_time: endTimeIso,
+              timezone: timezoneValue || "UTC",
+              recurrence,
+              exdates: defaultValues?.recurrence_exdates ?? [],
+              exclude_event_id: defaultValues?.id ?? null,
+            },
+          })
+          if (result.available) {
+            setAvailability({ status: "available" })
+          } else if (result.conflicts && result.conflicts.length > 0) {
+            const first = result.conflicts[0]
+            setAvailability({
+              status: "partially-unavailable",
+              conflictCount: result.conflicts.length,
+              firstConflict: {
+                localLabel: first.local_label,
+                titles: first.conflicting_titles ?? [],
+              },
+              truncated: result.truncated ?? false,
+            })
+          } else {
+            setAvailability({
+              status: "unavailable",
+              reason: "Slot unavailable",
+            })
+          }
+          return
+        }
         const result = await EventsService.checkAvailability({
           requestBody: {
             venue_id: venueIdValue,
@@ -559,7 +621,15 @@ export function EventForm({
     }, 500)
 
     return () => window.clearTimeout(handle)
-  }, [venueIdValue, startUtc, endTimeIso, defaultValues?.id])
+  }, [
+    venueIdValue,
+    startUtc,
+    endTimeIso,
+    defaultValues?.id,
+    defaultValues?.recurrence_exdates,
+    repeat,
+    timezoneValue,
+  ])
 
   // --- Day-based slot picker (date + start/end Selects) -------------------
   // Derived from the form's local-datetime strings.
@@ -891,10 +961,39 @@ export function EventForm({
     bulkInviteMutation.mutate(emails)
   }
 
+  // --- Modified instances (overrides of this recurring series) ----------
+  // Only relevant in edit mode for a series master: detached children
+  // appear as standalone rows pointing at this event via
+  // recurrence_master_id. Without surfacing them, users hit opaque
+  // "Venue already booked" errors when a new recurrence overlaps a
+  // forgotten override.
+  const overridesEnabled =
+    isEdit &&
+    !!defaultValues?.id &&
+    !defaultValues?.recurrence_master_id &&
+    !!defaultValues?.rrule
+  const { data: overrides } = useQuery({
+    queryKey: ["event-overrides", defaultValues?.id],
+    queryFn: () => EventsService.listOverrides({ eventId: defaultValues!.id }),
+    enabled: overridesEnabled,
+  })
+
+  const deleteOverrideMutation = useMutation({
+    mutationFn: (overrideId: string) =>
+      EventsService.deleteEvent({ eventId: overrideId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["event-overrides", defaultValues?.id],
+      })
+      queryClient.invalidateQueries({ queryKey: ["events"] })
+    },
+    onError: createErrorHandler(showErrorToast),
+  })
+
   // --- Track options -------------------------------------------------------
   const trackOptions = useMemo(() => tracks?.results ?? [], [tracks])
 
-  const blocker = useUnsavedChanges(form)
+  const blocker = useUnsavedChanges(form, skipBlockerRef)
 
   return (
     <form
@@ -906,6 +1005,12 @@ export function EventForm({
           showErrorToast(
             effectiveAvailability.reason ||
               "Selected time is not available at this venue.",
+          )
+          return
+        }
+        if (effectiveAvailability.status === "partially-unavailable") {
+          showErrorToast(
+            "Some occurrences of this recurring event conflict with existing bookings.",
           )
           return
         }
@@ -1314,6 +1419,7 @@ export function EventForm({
               value={repeat}
               onChange={setRepeat}
               disabled={readOnly}
+              minDate={dateStr || undefined}
             />
             {recurrenceWarning && (
               <p className="max-w-xs text-right text-xs text-destructive">
@@ -1689,6 +1795,63 @@ export function EventForm({
         </InlineSection>
       )}
 
+      {/* ------------------------------------------------------------------
+           MODIFIED INSTANCES (edit mode + series master with overrides)
+         ------------------------------------------------------------------ */}
+      {overridesEnabled && overrides && overrides.length > 0 && (
+        <InlineSection title={`Modified instances (${overrides.length})`}>
+          <div className="py-3">
+            <p className="mb-2 text-xs text-muted-foreground">
+              Occurrences detached from this series — edit or delete them
+              individually. Detached instances live as their own rows and can
+              clash with new recurring events on the same venue.
+            </p>
+            <ul className="divide-y divide-border rounded-md border">
+              {overrides.map((o) => {
+                const localStart = utcToLocalTzNaive(
+                  o.start_time,
+                  o.timezone || "UTC",
+                )
+                return (
+                  <li
+                    key={o.id}
+                    className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate">{o.title}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {localStart.replace("T", " ")} ({o.timezone || "UTC"})
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Link
+                        to="/events/$eventId/edit"
+                        params={{ eventId: o.id }}
+                        className="text-xs underline"
+                      >
+                        Edit
+                      </Link>
+                      {!readOnly && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={`Delete override at ${localStart}`}
+                          disabled={deleteOverrideMutation.isPending}
+                          onClick={() => deleteOverrideMutation.mutate(o.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        </InlineSection>
+      )}
+
       <div className="flex gap-4">
         <Button
           type="button"
@@ -1702,13 +1865,21 @@ export function EventForm({
             <LoadingButton
               type="submit"
               loading={isPending}
-              disabled={effectiveAvailability.status === "unavailable"}
+              disabled={
+                effectiveAvailability.status === "unavailable" ||
+                effectiveAvailability.status === "partially-unavailable"
+              }
             >
               {isEdit ? "Save Changes" : "Create Event"}
             </LoadingButton>
             {effectiveAvailability.status === "unavailable" && (
               <p className="text-xs text-destructive">
                 Pick a time the venue is open and free before submitting.
+              </p>
+            )}
+            {effectiveAvailability.status === "partially-unavailable" && (
+              <p className="text-xs text-destructive">
+                Resolve the conflicting occurrences before submitting.
               </p>
             )}
           </div>

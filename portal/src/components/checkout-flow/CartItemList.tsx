@@ -83,17 +83,17 @@ export default function CartItemList() {
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <Ticket className="w-4 h-4 text-muted-foreground shrink-0" />
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-checkout-title truncate">
+                    <p className="text-sm font-medium text-foreground truncate">
                       {getAttendeeName(pass.attendeeId)}
                     </p>
-                    <p className="text-xs text-checkout-subtitle">
+                    <p className="text-xs text-muted-foreground">
                       {pass.quantity > 1 && <span>{pass.quantity} × </span>}
                       {pass.product.name}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-checkout-title">
+                  <span className="text-sm font-medium text-foreground">
                     {formatCurrency(pass.originalPrice ?? pass.price)}
                   </span>
                   <button
@@ -122,7 +122,7 @@ export default function CartItemList() {
             <div className="flex items-center gap-3 flex-1 min-w-0">
               <Home className="w-4 h-4 text-muted-foreground shrink-0" />
               <div className="min-w-0">
-                <p className="text-sm font-medium text-checkout-title truncate">
+                <p className="text-sm font-medium text-foreground truncate">
                   {cart.housing.quantity > 1 && (
                     <span className="text-muted-foreground">
                       {cart.housing.quantity} ×{" "}
@@ -130,7 +130,7 @@ export default function CartItemList() {
                   )}
                   {cart.housing.product.name}
                 </p>
-                <p className="text-xs text-checkout-subtitle">
+                <p className="text-xs text-muted-foreground">
                   {cart.housing.pricePerDay !== false
                     ? `${cart.housing.nights} night${cart.housing.nights !== 1 ? "s" : ""}`
                     : "Full stay"}
@@ -138,7 +138,7 @@ export default function CartItemList() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-checkout-title">
+              <span className="text-sm font-medium text-foreground">
                 {formatCurrency(cart.housing.totalPrice)}
               </span>
               <button
@@ -168,7 +168,7 @@ export default function CartItemList() {
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <ShoppingBag className="w-4 h-4 text-muted-foreground shrink-0" />
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-checkout-title truncate">
+                    <p className="text-sm font-medium text-foreground truncate">
                       {item.quantity > 1 && (
                         <span className="text-muted-foreground">
                           {item.quantity} ×{" "}
@@ -179,7 +179,7 @@ export default function CartItemList() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-checkout-title">
+                  <span className="text-sm font-medium text-foreground">
                     {formatCurrency(item.totalPrice)}
                   </span>
                   <button
@@ -205,12 +205,12 @@ export default function CartItemList() {
           <div className="flex items-center justify-between py-2">
             <div className="flex items-center gap-3">
               <Heart className="w-4 h-4 text-muted-foreground shrink-0" />
-              <span className="text-sm font-medium text-checkout-title">
+              <span className="text-sm font-medium text-foreground">
                 Community Support
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-checkout-title">
+              <span className="text-sm font-medium text-foreground">
                 {formatCurrency(cart.patron.amount)}
               </span>
               <button
@@ -241,7 +241,7 @@ export default function CartItemList() {
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <Icon className="w-4 h-4 text-muted-foreground shrink-0" />
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-checkout-title truncate">
+                    <p className="text-sm font-medium text-foreground truncate">
                       {item.quantity > 1 && (
                         <span className="text-muted-foreground">
                           {item.quantity} ×{" "}
@@ -252,8 +252,8 @@ export default function CartItemList() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-checkout-title">
-                    {formatCurrency(item.price)}
+                  <span className="text-sm font-medium text-foreground">
+                    {formatCurrency(item.price * item.quantity)}
                   </span>
                   <button
                     type="button"
@@ -280,11 +280,11 @@ export default function CartItemList() {
           <div className="flex items-center justify-between py-2">
             <div className="flex items-center gap-3">
               <Shield className="w-4 h-4 text-muted-foreground shrink-0" />
-              <span className="text-sm font-medium text-checkout-title">
+              <span className="text-sm font-medium text-foreground">
                 Coverage for all passes
               </span>
             </div>
-            <span className="text-sm font-medium text-checkout-title">
+            <span className="text-sm font-medium text-foreground">
               {formatCurrency(summary.insuranceSubtotal)}
             </span>
           </div>

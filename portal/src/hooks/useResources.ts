@@ -8,6 +8,7 @@ import {
   Users,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
+import { OpenClaw } from "@/components/Icons/OpenClaw"
 import useAuth from "@/hooks/useAuth"
 import { useApplication } from "@/providers/applicationProvider"
 import { useCityProvider } from "@/providers/cityProvider"
@@ -91,6 +92,14 @@ const useResources = () => {
             status: companionEventsVisible ? "active" : "hidden",
             path: `/portal/${city?.slug}/events/venues`,
           },
+        ],
+      },
+      {
+        name: t("sidebar.agentic_access", { defaultValue: "Agentic access" }),
+        icon: OpenClaw,
+        status: companionEventsVisible ? "active" : "hidden",
+        path: "/portal/api-keys",
+        children: [
           {
             name: t("sidebar.api_keys", { defaultValue: "API Keys" }),
             icon: Key,
@@ -148,6 +157,14 @@ const useResources = () => {
           status: canSeeAttendees && eventsEnabled ? "active" : "hidden",
           path: `/portal/${city?.slug}/events/venues`,
         },
+      ],
+    },
+    {
+      name: t("sidebar.agentic_access", { defaultValue: "Agentic access" }),
+      icon: OpenClaw,
+      status: canSeeAttendees && eventsEnabled ? "active" : "hidden",
+      path: "/portal/api-keys",
+      children: [
         {
           name: t("sidebar.api_keys", { defaultValue: "API Keys" }),
           icon: Key,

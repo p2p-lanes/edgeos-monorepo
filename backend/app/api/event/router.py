@@ -26,9 +26,12 @@ from app.api.event.schemas import (
     EventPublic,
     EventPublicCalendarItem,
     EventPublicCalendarResponse,
+    EventRecurringAvailabilityCheck,
+    EventRecurringAvailabilityResult,
     EventStatus,
     EventUpdate,
     EventVisibility,
+    OccurrenceConflict,
     OccurrenceRef,
     RecurrenceUpdate,
 )
@@ -82,22 +85,20 @@ async def _send_event_invitation_emails(
 # ---------------------------------------------------------------------------
 
 
-def _check_venue_open_hours(
+def _find_venue_open_hours_issue(
     db,
     venue,
     start_time: datetime,
     end_time: datetime,
-) -> None:
-    """Raise 400 if [start_time, end_time] falls outside the venue's open
-    hours for the relevant day in the popup's timezone.
+) -> tuple[int, str] | None:
+    """Return ``(400, message)`` if [start_time, end_time] falls outside
+    the venue's open hours in the popup's timezone, else ``None``.
 
     Mirrors ``_compute_availability``'s "no weekly_hours = always open"
     convention so venues without a configured schedule keep working as
-    they did before. When weekly_hours exists but doesn't cover the
-    requested window (closed day, partial overlap, before opening, after
-    closing), the request is rejected — the frontend's local check is the
-    primary gate, this is the safety net for direct API callers / stale
-    clients.
+    they did before. The non-raising variant of
+    :func:`_check_venue_open_hours`; recurring callers need to attach the
+    occurrence label before raising.
     """
     from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -121,7 +122,7 @@ def _check_venue_open_hours(
         ).all()
     )
     if not weekly_rows and not open_exceptions:
-        return  # no schedule configured = always open (matches availability)
+        return None  # no schedule configured = always open
 
     tz_name = _resolve_popup_timezone(db, venue.popup_id)
     try:
@@ -145,12 +146,22 @@ def _check_venue_open_hours(
         candidate_ranges.append((_aware(exc.start_datetime), _aware(exc.end_datetime)))
 
     if any(r_s <= s and e <= r_e for r_s, r_e in candidate_ranges):
-        return
+        return None
 
-    raise HTTPException(
-        status_code=400,
-        detail="Selected time falls outside the venue's open hours.",
-    )
+    return (400, "Selected time falls outside the venue's open hours.")
+
+
+def _check_venue_open_hours(
+    db,
+    venue,
+    start_time: datetime,
+    end_time: datetime,
+) -> None:
+    """Raise 400 if [start_time, end_time] falls outside the venue's open
+    hours. Thin wrapper around :func:`_find_venue_open_hours_issue`."""
+    issue = _find_venue_open_hours_issue(db, venue, start_time, end_time)
+    if issue is not None:
+        raise HTTPException(status_code=issue[0], detail=issue[1])
 
 
 def _expand_weekly_slots(weekly_rows, tz, aware_start, aware_end):
@@ -254,28 +265,35 @@ def _resolve_effective_booking_mode(
     return max(overlapping_modes, key=lambda m: precedence.get(m, 0))
 
 
-def _check_venue_availability(
+def _find_venue_availability_issue(
     db,
     venue_id: uuid.UUID,
     start_time: datetime,
     end_time: datetime,
     exclude_event_id: uuid.UUID | None = None,
-) -> None:
-    """Raise 400/409 if the window is outside open hours or collides with
-    an existing booking."""
+) -> tuple[int, str] | None:
+    """Same gates as :func:`_check_venue_availability`, but returns
+    ``(status_code, detail)`` instead of raising.
+
+    Callers compose the ``HTTPException`` (or projection into a result
+    schema) — the recurring caller in particular prefixes the detail with
+    the offending occurrence's local label so a 409 says *which* day in
+    the series clashed instead of just "Venue already booked". Returns
+    ``None`` when the window is clean.
+    """
     from app.api.event_venue.models import EventVenues
     from app.api.event_venue.schemas import VenueBookingMode
 
     venue = db.get(EventVenues, venue_id)
     if not venue:
-        raise HTTPException(status_code=404, detail="Venue not found")
+        return (404, "Venue not found")
     effective_mode = _resolve_effective_booking_mode(db, venue, start_time, end_time)
     if effective_mode == VenueBookingMode.UNBOOKABLE.value:
-        raise HTTPException(
-            status_code=409, detail="Venue is not bookable at the selected time"
-        )
+        return (409, "Venue is not bookable at the selected time")
 
-    _check_venue_open_hours(db, venue, start_time, end_time)
+    open_hours_issue = _find_venue_open_hours_issue(db, venue, start_time, end_time)
+    if open_hours_issue is not None:
+        return open_hours_issue
 
     window_start, window_end = crud.compute_booking_window(
         start_time,
@@ -292,10 +310,28 @@ def _check_venue_availability(
     )
     if conflicts:
         titles = ", ".join(e.title for e in conflicts[:3])
-        raise HTTPException(
-            status_code=409,
-            detail=f"Venue already booked (conflicts: {titles})",
-        )
+        return (409, f"Venue already booked (conflicts: {titles})")
+    return None
+
+
+def _check_venue_availability(
+    db,
+    venue_id: uuid.UUID,
+    start_time: datetime,
+    end_time: datetime,
+    exclude_event_id: uuid.UUID | None = None,
+) -> None:
+    """Raise 400/409 if the window is outside open hours or collides with
+    an existing booking."""
+    issue = _find_venue_availability_issue(
+        db,
+        venue_id=venue_id,
+        start_time=start_time,
+        end_time=end_time,
+        exclude_event_id=exclude_event_id,
+    )
+    if issue is not None:
+        raise HTTPException(status_code=issue[0], detail=issue[1])
 
 
 VenueInfo = tuple[str | None, str | None, str | None]  # (title, location, image)
@@ -414,6 +450,62 @@ def _check_event_within_popup_window(
         )
 
 
+def _format_occurrence_label(occ_start: datetime, timezone: str) -> str:
+    """Render an occurrence start as ``"Mon Jun 8 09:00 PDT"`` in the
+    event's local tz.
+
+    Avoids ``%a``/``%b`` ``strftime`` (locale-dependent on Windows) so the
+    output is stable across hosts. Naive datetimes are treated as UTC;
+    unknown IANA names fall back to UTC.
+    """
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+    if occ_start.tzinfo is None:
+        occ_start = occ_start.replace(tzinfo=UTC)
+    try:
+        tz = ZoneInfo(timezone or "UTC")
+    except ZoneInfoNotFoundError:
+        tz = UTC
+    local = occ_start.astimezone(tz)
+    weekday = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")[local.weekday()]
+    month = (
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
+    )[local.month - 1]
+    abbr = local.tzname() or ""
+    return f"{weekday} {month} {local.day} {local.strftime('%H:%M')} {abbr}".rstrip()
+
+
+def _decorate_recurrence_detail(code: int, detail: str, label: str) -> str:
+    """Prefix a per-occurrence error detail with its local label.
+
+    For the common 409 booking-conflict case we splice the label *inside*
+    the existing message so it reads
+    ``"Venue already booked on <label> (conflicts: …)"`` rather than
+    burying the date in a leading sentence. Other 4xx variants get a
+    leading ``"On <label>: …"`` (with lowercase first letter).
+    """
+    if not detail:
+        return detail
+    if code == 409 and detail.startswith("Venue already booked ("):
+        return detail.replace(
+            "Venue already booked",
+            f"Venue already booked on {label}",
+            1,
+        )
+    return f"On {label}: " + detail[0].lower() + detail[1:]
+
+
 def _check_recurrence_conflicts(
     db,
     *,
@@ -423,6 +515,7 @@ def _check_recurrence_conflicts(
     rrule_str: str | None,
     exdates: list | None,
     exclude_event_id: uuid.UUID | None = None,
+    timezone: str = "UTC",
 ) -> None:
     """For recurring events, expand each instance and run the anti-overlap
     venue check. Bails out on first conflict with 409.
@@ -462,6 +555,7 @@ def _check_recurrence_conflicts(
         rule=rule,
         exdates=list(exdates or []),
         max_occurrences=DEFAULT_MAX_OCCURRENCES,
+        timezone=timezone,
     )
     if not occurrences:
         raise HTTPException(
@@ -469,12 +563,20 @@ def _check_recurrence_conflicts(
             detail="Recurrence expands to zero occurrences",
         )
     for occ_start in occurrences:
-        _check_venue_availability(
+        issue = _find_venue_availability_issue(
             db,
             venue_id=venue_id,
             start_time=occ_start,
             end_time=occ_start + duration,
             exclude_event_id=exclude_event_id,
+        )
+        if issue is None:
+            continue
+        code, detail = issue
+        label = _format_occurrence_label(occ_start, timezone)
+        raise HTTPException(
+            status_code=code,
+            detail=_decorate_recurrence_detail(code, detail, label),
         )
 
 
@@ -770,6 +872,7 @@ async def create_event(
             end_time=event_in.end_time,
             rrule_str=rrule_str,
             exdates=None,
+            timezone=event_in.timezone,
         )
 
     tenant_id = (
@@ -839,6 +942,7 @@ async def update_event(
             rrule_str=event.rrule,
             exdates=list(event.recurrence_exdates or []),
             exclude_event_id=event.id,
+            timezone=event_in.timezone or event.timezone,
         )
 
     # Transition: switching to a venue clears any prior custom location, and
@@ -953,6 +1057,7 @@ async def set_recurrence(
             rrule_str=new_rrule,
             exdates=None,
             exclude_event_id=event.id,
+            timezone=event.timezone,
         )
 
     event.rrule = new_rrule
@@ -969,6 +1074,34 @@ async def set_recurrence(
     if old_rrule != new_rrule:
         await _bump_and_dispatch_itip_update(db, event)
     return _to_public(event)
+
+
+@router.get("/{event_id}/overrides", response_model=list[EventPublic])
+async def list_overrides(
+    event_id: uuid.UUID,
+    db: TenantSession,
+    _: CurrentOperator,
+) -> list[EventPublic]:
+    """Detached override children of a recurring series master.
+
+    Returns rows that point at ``event_id`` via ``recurrence_master_id``.
+    Surfaces instances that were edited/moved in isolation so users can
+    discover them in the UI without hitting opaque "Venue already booked"
+    conflicts on overlapping master schedules.
+    """
+    master = crud.events_crud.get(db, event_id)
+    if not master:
+        raise HTTPException(status_code=404, detail="Event not found")
+    children, _total = crud.events_crud.find(
+        db,
+        recurrence_master_id=event_id,
+        sort_by="start_time",
+        sort_order="asc",
+        limit=500,
+    )
+    venue_map = _venue_map_for_events(db, children)
+    track_map = _track_map_for_events(db, children)
+    return [_to_public(c, venue_map, track_map) for c in children]
 
 
 @router.post("/{event_id}/detach-occurrence", response_model=EventPublic)
@@ -1181,6 +1314,194 @@ async def check_availability_portal(
 ) -> EventAvailabilityResult:
     """Portal-facing variant of /check-availability authenticated as a human."""
     return _run_availability_check(db, payload)
+
+
+# Cap on how many conflicting occurrences we report up-front to the
+# frontend. Most series are short and this is enough to surface the first
+# few problems without unbounded payloads on pathological inputs.
+_MAX_REPORTED_OCCURRENCE_CONFLICTS = 20
+
+
+def _conflicting_event_summary(
+    db,
+    venue_id: uuid.UUID,
+    start_time: datetime,
+    end_time: datetime,
+    exclude_event_id: uuid.UUID | None = None,
+) -> tuple[list[uuid.UUID], list[str]]:
+    """Return the ids + first three titles of events colliding with the
+    given window on ``venue_id``. Used to populate ``OccurrenceConflict``
+    without re-running the full open-hours / booking-mode gates."""
+    from app.api.event_venue.models import EventVenues
+
+    venue = db.get(EventVenues, venue_id)
+    if not venue:
+        return [], []
+    window_start, window_end = crud.compute_booking_window(
+        start_time,
+        end_time,
+        venue.setup_time_minutes,
+        venue.teardown_time_minutes,
+    )
+    conflicts = crud.events_crud.find_venue_conflicts(
+        db,
+        venue_id=venue_id,
+        window_start=window_start,
+        window_end=window_end,
+        exclude_event_id=exclude_event_id,
+    )
+    return [c.id for c in conflicts], [c.title for c in conflicts[:3]]
+
+
+@router.post(
+    "/check-recurring-availability",
+    response_model=EventRecurringAvailabilityResult,
+)
+async def check_recurring_availability(
+    payload: EventRecurringAvailabilityCheck,
+    db: TenantSession,
+    _: CurrentOperator,
+) -> EventRecurringAvailabilityResult:
+    """Server-side preflight for a (possibly recurring) event.
+
+    Mirrors what ``POST /events`` runs via ``_check_recurrence_conflicts``,
+    but returns a structured per-occurrence list instead of raising on the
+    first clash — so the form indicator can show every conflict up front
+    instead of revealing them one 409 at a time.
+
+    Non-recurring inputs fall back to the single-window check and project
+    the result into the same ``OccurrenceConflict`` shape so the frontend
+    only has one branch to handle.
+    """
+    from app.api.event_venue.models import EventVenues
+
+    # No venue → nothing to check. Treat as available so the indicator
+    # doesn't fire on online-only / custom-location events.
+    if payload.venue_id is None:
+        return EventRecurringAvailabilityResult(
+            available=True, total_occurrences=0, checked_occurrences=0
+        )
+
+    venue = db.get(EventVenues, payload.venue_id)
+    if not venue:
+        raise HTTPException(status_code=404, detail="Venue not found")
+
+    # Compose the rrule string up front so a malformed rule fails fast
+    # with the same 400 the create path would raise.
+    rrule_str = format_rrule(payload.recurrence) if payload.recurrence else None
+
+    duration = payload.end_time - payload.start_time
+
+    # Non-recurring fast-path: reuse the single-window result and project
+    # it into the recurring result schema.
+    if not rrule_str:
+        single = _run_availability_check(
+            db,
+            EventAvailabilityCheck(
+                venue_id=payload.venue_id,
+                start_time=payload.start_time,
+                end_time=payload.end_time,
+                exclude_event_id=payload.exclude_event_id,
+            ),
+        )
+        if single.available:
+            return EventRecurringAvailabilityResult(
+                available=True,
+                total_occurrences=1,
+                checked_occurrences=1,
+            )
+        _ids, titles = _conflicting_event_summary(
+            db,
+            venue_id=payload.venue_id,
+            start_time=payload.start_time,
+            end_time=payload.end_time,
+            exclude_event_id=payload.exclude_event_id,
+        )
+        return EventRecurringAvailabilityResult(
+            available=False,
+            total_occurrences=1,
+            checked_occurrences=1,
+            conflicts=[
+                OccurrenceConflict(
+                    occurrence_start=payload.start_time,
+                    local_label=_format_occurrence_label(
+                        payload.start_time, payload.timezone
+                    ),
+                    reason=single.reason or "Slot unavailable",
+                    conflicting_event_ids=single.conflicts,
+                    conflicting_titles=titles,
+                    effective_booking_mode=single.effective_booking_mode,
+                )
+            ],
+        )
+
+    try:
+        rule = parse_rrule(rrule_str)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid RRULE: {exc}")
+    if rule is None:
+        # Defensive — format_rrule -> parse_rrule should always round-trip.
+        return EventRecurringAvailabilityResult(
+            available=True, total_occurrences=0, checked_occurrences=0
+        )
+
+    occurrences = expand(
+        dtstart=payload.start_time,
+        rule=rule,
+        exdates=list(payload.exdates or []),
+        max_occurrences=DEFAULT_MAX_OCCURRENCES,
+        timezone=payload.timezone,
+    )
+    total = len(occurrences)
+    conflicts: list[OccurrenceConflict] = []
+    truncated = False
+    checked = 0
+
+    for occ_start in occurrences:
+        checked += 1
+        issue = _find_venue_availability_issue(
+            db,
+            venue_id=payload.venue_id,
+            start_time=occ_start,
+            end_time=occ_start + duration,
+            exclude_event_id=payload.exclude_event_id,
+        )
+        if issue is None:
+            continue
+        code, detail = issue
+        # For 409 booking clashes also surface the conflicting titles/ids
+        # so the indicator can name the offending event without an extra
+        # round-trip.
+        ids: list[uuid.UUID] = []
+        titles: list[str] = []
+        if code == 409 and detail.startswith("Venue already booked ("):
+            ids, titles = _conflicting_event_summary(
+                db,
+                venue_id=payload.venue_id,
+                start_time=occ_start,
+                end_time=occ_start + duration,
+                exclude_event_id=payload.exclude_event_id,
+            )
+        conflicts.append(
+            OccurrenceConflict(
+                occurrence_start=occ_start,
+                local_label=_format_occurrence_label(occ_start, payload.timezone),
+                reason=detail,
+                conflicting_event_ids=ids,
+                conflicting_titles=titles,
+            )
+        )
+        if len(conflicts) >= _MAX_REPORTED_OCCURRENCE_CONFLICTS:
+            truncated = True
+            break
+
+    return EventRecurringAvailabilityResult(
+        available=len(conflicts) == 0,
+        total_occurrences=total,
+        checked_occurrences=checked,
+        conflicts=conflicts,
+        truncated=truncated,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1953,6 +2274,7 @@ async def create_portal_event(
             end_time=event_in.end_time,
             rrule_str=rrule_str,
             exdates=None,
+            timezone=event_in.timezone,
         )
 
     event_data = event_in.model_dump()
@@ -2068,6 +2390,7 @@ async def update_portal_event(
             rrule_str=event.rrule,
             exdates=list(event.recurrence_exdates or []),
             exclude_event_id=event.id,
+            timezone=event_in.timezone or event.timezone,
         )
 
     # Transition: switching to a venue clears any prior custom location, and

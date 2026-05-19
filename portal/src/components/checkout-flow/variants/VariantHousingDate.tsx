@@ -1,8 +1,16 @@
 "use client"
 
-import { Building2, Calendar, Check, Home } from "lucide-react"
+import {
+  Building2,
+  Calendar,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Home,
+} from "lucide-react"
 import Image from "next/image"
 import { useEffect, useMemo, useRef, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
 import ExpandableDescription from "@/components/ui/ExpandableDescription"
 import QuantitySelector, {
@@ -19,6 +27,7 @@ import {
 } from "@/types/checkout"
 import type { ProductsPass } from "@/types/Products"
 import type { VariantProps } from "../registries/variantRegistry"
+import { LightboxOverlay } from "./VariantImageGallery"
 
 /* ── Section types & helpers ─────────────────────────────── */
 
@@ -318,6 +327,142 @@ function CompactCard({
   )
 }
 
+/* ── Product image carousel (grid + showcase only) ───────── */
+
+// Cover + additional images for a housing product. Single-image products
+// render unchanged (no chevrons, no overlay click). Multi-image products
+// get in-place chevrons and tap-to-lightbox using the gallery step's
+// LightboxOverlay. Tap, prev, next stop propagation so the parent card's
+// select-on-tap stays scoped to the non-image regions.
+function ProductImageCarousel({
+  images,
+  alt,
+  aspectClass = "aspect-[4/3]",
+  showChevrons = true,
+  className,
+}: {
+  images: string[]
+  alt: string
+  aspectClass?: string
+  showChevrons?: boolean
+  className?: string
+}) {
+  const { t } = useTranslation()
+  const [idx, setIdx] = useState(0)
+  const [lightboxOpen, setLightboxOpen] = useState(false)
+  const hasMany = images.length > 1
+
+  const safeIdx = idx < images.length ? idx : 0
+
+  const next = (e: React.MouseEvent | React.KeyboardEvent) => {
+    e.stopPropagation()
+    setIdx((i) => (i + 1) % images.length)
+  }
+  const prev = (e: React.MouseEvent | React.KeyboardEvent) => {
+    e.stopPropagation()
+    setIdx((i) => (i - 1 + images.length) % images.length)
+  }
+  const openLightbox = (e: React.MouseEvent | React.KeyboardEvent) => {
+    e.stopPropagation()
+    setLightboxOpen(true)
+  }
+
+  if (images.length === 0) {
+    return (
+      <div
+        className={cn(
+          "w-full bg-gradient-to-br from-muted to-muted/60 flex items-center justify-center",
+          aspectClass,
+          className,
+        )}
+      >
+        <Home className="w-8 h-8 text-muted-foreground/50" />
+      </div>
+    )
+  }
+
+  // Single-image products keep the parent's tap-to-select UX — bubble all
+  // clicks. Multi-image products take over the image tap to open lightbox.
+  const imageClickProps = hasMany
+    ? {
+        onClick: openLightbox,
+        onKeyDown: (e: React.KeyboardEvent) => {
+          if (e.key === "Enter" || e.key === " ") {
+            if (e.key === " ") e.preventDefault()
+            openLightbox(e)
+          }
+        },
+        role: "button" as const,
+        tabIndex: 0,
+        "aria-label": t("checkout.housing.carousel.enlarge_aria", {
+          name: alt,
+        }),
+        className: cn(
+          "relative w-full bg-muted overflow-hidden cursor-zoom-in",
+          aspectClass,
+          className,
+        ),
+      }
+    : {
+        className: cn(
+          "relative w-full bg-muted overflow-hidden",
+          aspectClass,
+          className,
+        ),
+      }
+
+  return (
+    <>
+      <div {...imageClickProps}>
+        <Image src={images[safeIdx]} alt={alt} fill className="object-cover" />
+        {hasMany && showChevrons && (
+          <>
+            <button
+              type="button"
+              onClick={prev}
+              className="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/40 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/60 transition"
+              aria-label={t("checkout.housing.carousel.previous_image_aria")}
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={next}
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/40 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/60 transition"
+              aria-label={t("checkout.housing.carousel.next_image_aria")}
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/40 backdrop-blur-sm text-white text-[10px] font-medium px-2 py-0.5 leading-none">
+              {safeIdx + 1}/{images.length}
+            </div>
+          </>
+        )}
+        {hasMany && !showChevrons && (
+          <div className="absolute bottom-1 right-1 rounded bg-black/50 backdrop-blur-sm text-white text-[10px] font-medium px-1.5 py-0.5 leading-none">
+            {images.length}
+          </div>
+        )}
+      </div>
+      {lightboxOpen && (
+        <LightboxOverlay
+          images={images.map((url, i) => ({ id: `${url}-${i}`, url }))}
+          initialIndex={safeIdx}
+          onClose={() => setLightboxOpen(false)}
+        />
+      )}
+    </>
+  )
+}
+
+// Build the carousel list for a product: cover first, then additional images.
+function productImages(product: ProductsPass): string[] {
+  const extra = Array.isArray(product.images) ? product.images : []
+  return [product.image_url, ...extra].filter(
+    (u): u is string => typeof u === "string" && u.length > 0,
+  )
+}
+
 /* ── Grid card (single product) ──────────────────────────── */
 
 function GridCard({
@@ -365,20 +510,11 @@ function GridCard({
           : "border-border hover:border-muted-foreground/30",
       )}
     >
-      {product.image_url ? (
-        <div className="relative w-full aspect-[4/3] bg-muted">
-          <Image
-            src={product.image_url}
-            alt={product.name}
-            fill
-            className="object-cover"
-          />
-        </div>
-      ) : (
-        <div className="w-full aspect-[4/3] bg-gradient-to-br from-muted to-muted/60 flex items-center justify-center">
-          <Home className="w-8 h-8 text-muted-foreground/50" />
-        </div>
-      )}
+      <ProductImageCarousel
+        images={productImages(product)}
+        alt={product.name}
+        aspectClass="aspect-[4/3]"
+      />
 
       {supportsQty ? (
         <div className="absolute top-2 right-2 rounded-full bg-background/90 backdrop-blur-sm shadow-sm px-1.5 py-0.5">
@@ -739,13 +875,13 @@ function ShowcaseSectionCard({
                     : "bg-muted hover:bg-muted/80 ring-1 ring-border",
                 )}
               >
-                {product.image_url && (
+                {productImages(product).length > 0 && (
                   <div className="w-16 h-16 rounded-lg overflow-hidden bg-muted shrink-0 relative">
-                    <Image
-                      src={product.image_url}
+                    <ProductImageCarousel
+                      images={productImages(product)}
                       alt={product.name}
-                      fill
-                      className="object-cover"
+                      aspectClass="aspect-square"
+                      showChevrons={false}
                     />
                   </div>
                 )}
