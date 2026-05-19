@@ -310,7 +310,6 @@ class TestRevokeAdminApiKey:
         admin_api_key_factory,
     ) -> None:
         """ADMIN revokes their own key. revoked_at is set; response is 204."""
-        from sqlmodel import select
 
         row, _ = admin_api_key_factory(scopes=["events:read"])
 
@@ -410,7 +409,7 @@ class TestAdminApiKeyCannotMintAnotherKey:
         row, raw = admin_api_key_factory(scopes=["events:read"])
 
         with patch("app.core.security.engine", db.get_bind()):
-            payload = _resolve_api_key(raw)
+            _resolve_api_key(raw)
 
         # Build an api-key style token to send as Bearer
         from app.core.security import create_access_token
