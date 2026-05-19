@@ -240,8 +240,14 @@ export function CheckoutProvider({
       return configuredSteps
     }
 
-    // Inherit show_title/show_watermark from confirm: buyer sits adjacent to it
-    // and admins typically want consistent display between the two.
+    // Post-migration, every direct-sale popup carries a real `buyer` row whose
+    // position the admin controls from the backoffice — use it as-is.
+    if (configuredSteps.some((step) => step.step_type === "buyer")) {
+      return configuredSteps
+    }
+
+    // Legacy fallback: popup hasn't been migrated yet. Synthesize a buyer
+    // step and slot it just before confirm so checkout still works.
     const confirmStep = configuredSteps.find(
       (step) => step.step_type === "confirm",
     )
@@ -264,21 +270,18 @@ export function CheckoutProvider({
       show_watermark: confirmStep?.show_watermark ?? true,
     }
 
-    const withoutBuyer = configuredSteps.filter(
-      (step) => step.step_type !== "buyer",
-    )
-    const confirmIndex = withoutBuyer.findIndex(
+    const confirmIndex = configuredSteps.findIndex(
       (step) => step.step_type === "confirm",
     )
 
     if (confirmIndex === -1) {
-      return [...withoutBuyer, buyerStep]
+      return [...configuredSteps, buyerStep]
     }
 
     return [
-      ...withoutBuyer.slice(0, confirmIndex),
+      ...configuredSteps.slice(0, confirmIndex),
       buyerStep,
-      ...withoutBuyer.slice(confirmIndex),
+      ...configuredSteps.slice(confirmIndex),
     ]
   }, [buyerFormSchema, cityId, configuredSteps, submitMode, t])
 
