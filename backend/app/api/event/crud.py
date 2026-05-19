@@ -267,6 +267,7 @@ def _expand_rows_in_window(
             window_end=window_end,
             exdates=list(ev.recurrence_exdates or []),
             max_occurrences=DEFAULT_MAX_OCCURRENCES,
+            timezone=ev.timezone,
         )
         for occ_start in occurrences:
             # Skip the master's own first-instance (returned as the real row).
@@ -333,6 +334,7 @@ def _series_overlaps(
         window_start=padded_start,
         window_end=window_end,
         exdates=list(master.recurrence_exdates or []),
+        timezone=master.timezone,
     )
     for occ in occurrences:
         if occ < window_end and (occ + duration) > window_start:

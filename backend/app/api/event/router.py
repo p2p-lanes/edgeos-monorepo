@@ -423,6 +423,7 @@ def _check_recurrence_conflicts(
     rrule_str: str | None,
     exdates: list | None,
     exclude_event_id: uuid.UUID | None = None,
+    timezone: str = "UTC",
 ) -> None:
     """For recurring events, expand each instance and run the anti-overlap
     venue check. Bails out on first conflict with 409.
@@ -462,6 +463,7 @@ def _check_recurrence_conflicts(
         rule=rule,
         exdates=list(exdates or []),
         max_occurrences=DEFAULT_MAX_OCCURRENCES,
+        timezone=timezone,
     )
     if not occurrences:
         raise HTTPException(
@@ -770,6 +772,7 @@ async def create_event(
             end_time=event_in.end_time,
             rrule_str=rrule_str,
             exdates=None,
+            timezone=event_in.timezone,
         )
 
     tenant_id = (
@@ -839,6 +842,7 @@ async def update_event(
             rrule_str=event.rrule,
             exdates=list(event.recurrence_exdates or []),
             exclude_event_id=event.id,
+            timezone=event_in.timezone or event.timezone,
         )
 
     # Transition: switching to a venue clears any prior custom location, and
@@ -953,6 +957,7 @@ async def set_recurrence(
             rrule_str=new_rrule,
             exdates=None,
             exclude_event_id=event.id,
+            timezone=event.timezone,
         )
 
     event.rrule = new_rrule
@@ -1953,6 +1958,7 @@ async def create_portal_event(
             end_time=event_in.end_time,
             rrule_str=rrule_str,
             exdates=None,
+            timezone=event_in.timezone,
         )
 
     event_data = event_in.model_dump()
@@ -2068,6 +2074,7 @@ async def update_portal_event(
             rrule_str=event.rrule,
             exdates=list(event.recurrence_exdates or []),
             exclude_event_id=event.id,
+            timezone=event_in.timezone or event.timezone,
         )
 
     # Transition: switching to a venue clears any prior custom location, and

@@ -8,7 +8,8 @@ Covers:
 - Synthetic occurrence id packing/unpacking
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -172,6 +173,53 @@ def test_window_past_dtstart_weekly_byday() -> None:
         "2026-05-06",  # Wed
         "2026-05-11",  # Mon
         "2026-05-13",  # Wed
+    ]
+
+
+def test_weekly_byday_respects_event_timezone_west() -> None:
+    # 2026-06-02 20:00 America/Los_Angeles == 2026-06-03 03:00Z (Wed in UTC,
+    # Tue in local). Anchoring BYDAY against UTC would shift cards by -1 day
+    # (Mon/Wed instead of the picked Tue/Thu).
+    dtstart = datetime(2026, 6, 3, 3, 0, tzinfo=UTC)
+    rule = RecurrenceRule(freq="WEEKLY", by_day=["TU", "TH"], count=4)
+    out = expand(dtstart=dtstart, rule=rule, timezone="America/Los_Angeles")
+    la = ZoneInfo("America/Los_Angeles")
+    local = [o.astimezone(la).strftime("%a %Y-%m-%d") for o in out]
+    assert local == [
+        "Tue 2026-06-02",
+        "Thu 2026-06-04",
+        "Tue 2026-06-09",
+        "Thu 2026-06-11",
+    ]
+
+
+def test_weekly_byday_respects_event_timezone_east() -> None:
+    # 2026-06-02 02:00 Asia/Tokyo == 2026-06-01 17:00Z (Mon in UTC, Tue in
+    # local). Anchoring BYDAY against UTC would shift cards by +1 day.
+    tokyo = ZoneInfo("Asia/Tokyo")
+    dtstart = datetime(2026, 6, 2, 2, 0, tzinfo=tokyo).astimezone(UTC)
+    rule = RecurrenceRule(freq="WEEKLY", by_day=["TU", "TH"], count=4)
+    out = expand(dtstart=dtstart, rule=rule, timezone="Asia/Tokyo")
+    local = [o.astimezone(tokyo).strftime("%a %Y-%m-%d %H:%M") for o in out]
+    assert local == [
+        "Tue 2026-06-02 02:00",
+        "Thu 2026-06-04 02:00",
+        "Tue 2026-06-09 02:00",
+        "Thu 2026-06-11 02:00",
+    ]
+
+
+def test_weekly_byday_utc_unchanged_when_tz_matches() -> None:
+    # Sanity: when dtstart already lines up with the event's local zone the
+    # fix is a no-op — same result as the legacy naive-datetime path.
+    dtstart = datetime(2026, 4, 14, 18, 0, tzinfo=UTC)  # Tue in UTC
+    rule = RecurrenceRule(freq="WEEKLY", by_day=["TU", "TH"], count=4)
+    out = expand(dtstart=dtstart, rule=rule, timezone="UTC")
+    assert [o.strftime("%a %Y-%m-%d") for o in out] == [
+        "Tue 2026-04-14",
+        "Thu 2026-04-16",
+        "Tue 2026-04-21",
+        "Thu 2026-04-23",
     ]
 
 
