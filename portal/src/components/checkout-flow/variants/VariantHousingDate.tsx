@@ -10,6 +10,7 @@ import {
 } from "lucide-react"
 import Image from "next/image"
 import { useEffect, useMemo, useRef, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
 import ExpandableDescription from "@/components/ui/ExpandableDescription"
 import QuantitySelector, {
@@ -346,6 +347,7 @@ function ProductImageCarousel({
   showChevrons?: boolean
   className?: string
 }) {
+  const { t } = useTranslation()
   const [idx, setIdx] = useState(0)
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const hasMany = images.length > 1
@@ -386,7 +388,9 @@ function ProductImageCarousel({
         onClick: openLightbox,
         role: "button" as const,
         tabIndex: 0,
-        "aria-label": `Enlarge ${alt}`,
+        "aria-label": t("checkout.housing.carousel.enlarge_aria", {
+          name: alt,
+        }),
         className: cn(
           "relative w-full bg-muted overflow-hidden cursor-zoom-in",
           aspectClass,
@@ -411,7 +415,7 @@ function ProductImageCarousel({
               type="button"
               onClick={prev}
               className="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/40 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/60 transition"
-              aria-label="Previous image"
+              aria-label={t("checkout.housing.carousel.previous_image_aria")}
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
@@ -419,7 +423,7 @@ function ProductImageCarousel({
               type="button"
               onClick={next}
               className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/40 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/60 transition"
-              aria-label="Next image"
+              aria-label={t("checkout.housing.carousel.next_image_aria")}
             >
               <ChevronRight className="w-4 h-4" />
             </button>
