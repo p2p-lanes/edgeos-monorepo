@@ -1,5 +1,6 @@
 "use client"
 
+import { useReducedMotion } from "framer-motion"
 import { Pause, Play, Volume2, VolumeX } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
@@ -8,25 +9,42 @@ import { cn } from "@/lib/utils"
 interface CheckoutBackgroundVideoProps {
   url: string
   className?: string
+  // TODO: thread a popup-level poster field through when one exists on the
+  // popup schema. For now callers can pass a static frame URL explicitly.
+  poster?: string
+  preload?: "none" | "metadata" | "auto"
 }
 
 // Full-bleed `<video>` rendered behind the checkout. Tries autoplay with
 // sound; browsers block that without a prior user gesture, so on
 // NotAllowedError we restart muted and surface a "Tap for sound" overlay
 // the user can click to satisfy the gesture requirement.
+//
+// Honors `prefers-reduced-motion`: when set, the video does NOT autoplay —
+// we render the poster (or first frame) and let the user opt in via the
+// play button. This avoids motion-triggered discomfort on entry.
 export function CheckoutBackgroundVideo({
   url,
   className,
+  poster,
+  preload = "metadata",
 }: CheckoutBackgroundVideoProps) {
   const { t } = useTranslation()
+  const prefersReducedMotion = useReducedMotion()
   const videoRef = useRef<HTMLVideoElement>(null)
   const [muted, setMuted] = useState(false)
-  const [paused, setPaused] = useState(false)
+  const [paused, setPaused] = useState(prefersReducedMotion ?? false)
   const [autoplayBlocked, setAutoplayBlocked] = useState(false)
 
   useEffect(() => {
     const el = videoRef.current
     if (!el) return
+    if (prefersReducedMotion) {
+      // Reduced motion: do not autoplay; user can press play.
+      el.pause()
+      setPaused(true)
+      return
+    }
     el.muted = false
     el.play().catch(() => {
       el.muted = true
@@ -38,7 +56,7 @@ export function CheckoutBackgroundVideo({
         setPaused(true)
       })
     })
-  }, [])
+  }, [prefersReducedMotion])
 
   const enableSound = () => {
     const el = videoRef.current
@@ -75,14 +93,15 @@ export function CheckoutBackgroundVideo({
       <video
         ref={videoRef}
         src={url}
+        poster={poster}
         className={cn(
           "fixed inset-0 w-full h-full object-cover -z-10",
           className,
         )}
-        autoPlay
+        autoPlay={!prefersReducedMotion}
         loop
         playsInline
-        preload="auto"
+        preload={preload}
       />
       <div className="fixed bottom-4 right-4 z-40 flex items-center gap-2 pointer-events-none">
         {autoplayBlocked && (
