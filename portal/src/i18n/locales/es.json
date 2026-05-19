@@ -232,6 +232,13 @@
       "patron": "Patrono",
       "buyer": "Tu información",
       "confirm": "Revisar y Confirmar"
+    },
+    "video": {
+      "tap_for_sound": "Tocá para activar el sonido",
+      "play_aria": "Reproducir video de fondo",
+      "pause_aria": "Pausar video de fondo",
+      "mute_aria": "Silenciar video de fondo",
+      "unmute_aria": "Activar sonido del video de fondo"
     }
   },
   "openCheckout": {

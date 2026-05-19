@@ -232,6 +232,13 @@
       "patron": "赞助人",
       "buyer": "您的信息",
       "confirm": "审核并确认"
+    },
+    "video": {
+      "tap_for_sound": "点击开启声音",
+      "play_aria": "播放背景视频",
+      "pause_aria": "暂停背景视频",
+      "mute_aria": "静音背景视频",
+      "unmute_aria": "取消静音背景视频"
     }
   },
   "openCheckout": {

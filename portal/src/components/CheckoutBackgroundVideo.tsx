@@ -2,6 +2,7 @@
 
 import { Pause, Play, Volume2, VolumeX } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { cn } from "@/lib/utils"
 
 interface CheckoutBackgroundVideoProps {
@@ -17,6 +18,7 @@ export function CheckoutBackgroundVideo({
   url,
   className,
 }: CheckoutBackgroundVideoProps) {
+  const { t } = useTranslation()
   const videoRef = useRef<HTMLVideoElement>(null)
   const [muted, setMuted] = useState(false)
   const [paused, setPaused] = useState(false)
@@ -90,14 +92,16 @@ export function CheckoutBackgroundVideo({
             className="pointer-events-auto rounded-full bg-black/70 backdrop-blur-sm text-white text-xs font-medium px-3 py-1.5 flex items-center gap-1.5 shadow-md hover:bg-black/80 transition"
           >
             <Volume2 className="w-3.5 h-3.5" />
-            Tap for sound
+            {t("checkout.video.tap_for_sound")}
           </button>
         )}
         <button
           type="button"
           onClick={togglePlay}
           aria-label={
-            paused ? "Play background video" : "Pause background video"
+            paused
+              ? t("checkout.video.play_aria")
+              : t("checkout.video.pause_aria")
           }
           className="pointer-events-auto w-8 h-8 rounded-full bg-black/50 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/70 transition"
         >
@@ -111,7 +115,9 @@ export function CheckoutBackgroundVideo({
           type="button"
           onClick={toggleMute}
           aria-label={
-            muted ? "Unmute background video" : "Mute background video"
+            muted
+              ? t("checkout.video.unmute_aria")
+              : t("checkout.video.mute_aria")
           }
           className="pointer-events-auto w-8 h-8 rounded-full bg-black/50 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/70 transition"
         >
