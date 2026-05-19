@@ -13,7 +13,10 @@ from app.services.storage import storage_service
 router = APIRouter(prefix="/uploads", tags=["uploads"])
 
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
-ALLOWED_BACKOFFICE_TYPES = ALLOWED_IMAGE_TYPES | {"application/pdf"}
+ALLOWED_VIDEO_TYPES = {"video/mp4"}
+ALLOWED_BACKOFFICE_TYPES = ALLOWED_IMAGE_TYPES | ALLOWED_VIDEO_TYPES | {
+    "application/pdf"
+}
 ALLOWED_PORTAL_TYPES = ALLOWED_IMAGE_TYPES
 
 
@@ -39,7 +42,12 @@ def _build_presigned_url(
         extension = "bin"
 
     key_tenant = str(tenant_id) if tenant_id else "superadmin"
-    folder = "documents" if content_type == "application/pdf" else "images"
+    if content_type == "application/pdf":
+        folder = "documents"
+    elif content_type.startswith("video/"):
+        folder = "videos"
+    else:
+        folder = "images"
     key = f"{key_tenant}/{folder}/{uuid4()}.{extension}"
 
     storage = storage_service()

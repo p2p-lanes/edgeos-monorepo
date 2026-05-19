@@ -832,7 +832,8 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                     <p className="text-sm font-medium">Checkout Background</p>
                     <p className="text-xs text-muted-foreground">
                       Full-screen background for checkout, invite, and success
-                      pages. Falls back to Cover Image, then tenant background.
+                      pages. Image or MP4 video (autoplay + audio toggle). Falls
+                      back to Cover Image, then tenant background.
                     </p>
                   </div>
                 </div>
@@ -840,6 +841,7 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                   value={field.state.value || null}
                   onChange={(url) => field.handleChange(url ?? "")}
                   disabled={readOnly}
+                  accept="image+video"
                 />
               </div>
             )}
