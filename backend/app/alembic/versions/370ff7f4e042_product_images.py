@@ -8,7 +8,7 @@ Default is `[]` so existing single-image products keep their current
 look (the cover-only render path doesn't read `images`).
 
 Revision ID: 370ff7f4e042
-Revises: 0050_venue_display_order
+Revises: a5601e8133cb
 """
 
 from collections.abc import Sequence
@@ -18,7 +18,7 @@ from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision: str = "370ff7f4e042"
-down_revision: str | Sequence[str] | None = "0050_venue_display_order"
+down_revision: str | Sequence[str] | None = "a5601e8133cb"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
