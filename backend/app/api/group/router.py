@@ -20,11 +20,12 @@ from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.api.translation.service import delete_translations_for_entity
 from app.core.dependencies.users import (
+    AdminOrApiKey_GroupsRead,
+    AdminOrApiKey_GroupsWrite,
+    AdminOrApiKeySession_GroupsRead,
+    AdminOrApiKeySession_GroupsWrite,
     CurrentHuman,
-    CurrentOperator,
-    CurrentUser,
     SessionDep,
-    TenantSession,
 )
 from app.utils.utils import slugify
 
@@ -84,8 +85,8 @@ def _build_members(group: Groups) -> list[GroupMemberPublic]:
 
 @router.get("", response_model=ListModel[GroupPublic])
 async def list_groups(
-    db: TenantSession,
-    _: CurrentUser,
+    db: AdminOrApiKeySession_GroupsRead,
+    _: AdminOrApiKey_GroupsRead,
     popup_id: uuid.UUID | None = None,
     search: str | None = None,
     skip: PaginationSkip = 0,
@@ -110,8 +111,8 @@ async def list_groups(
 @router.get("/{group_id}", response_model=GroupWithMembers)
 async def get_group(
     group_id: uuid.UUID,
-    db: TenantSession,
-    _: CurrentUser,
+    db: AdminOrApiKeySession_GroupsRead,
+    _: AdminOrApiKey_GroupsRead,
 ) -> GroupWithMembers:
     """Get a single group with members (BO only)."""
     group = crud.groups_crud.get_with_members(db, group_id)
@@ -131,8 +132,8 @@ async def get_group(
 @router.post("", response_model=GroupPublic, status_code=status.HTTP_201_CREATED)
 async def create_group(
     group_in: GroupCreate,
-    db: TenantSession,
-    current_user: CurrentOperator,
+    db: AdminOrApiKeySession_GroupsWrite,
+    current_user: AdminOrApiKey_GroupsWrite,
 ) -> GroupPublic:
     """Create a new group (BO only)."""
 
@@ -173,8 +174,8 @@ async def create_group(
 async def update_group(
     group_id: uuid.UUID,
     group_in: GroupAdminUpdate,
-    db: TenantSession,
-    _current_user: CurrentOperator,
+    db: AdminOrApiKeySession_GroupsWrite,
+    _current_user: AdminOrApiKey_GroupsWrite,
 ) -> GroupPublic:
     """Update a group (BO only - full admin access)."""
 
@@ -201,8 +202,8 @@ async def update_group(
 @router.delete("/{group_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_group(
     group_id: uuid.UUID,
-    db: TenantSession,
-    _current_user: CurrentOperator,
+    db: AdminOrApiKeySession_GroupsWrite,
+    _current_user: AdminOrApiKey_GroupsWrite,
 ) -> None:
     """Delete a group (BO only)."""
 
