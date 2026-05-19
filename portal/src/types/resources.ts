@@ -1,10 +1,11 @@
 import type { LucideIcon } from "lucide-react"
+import type { ComponentType, SVGProps } from "react"
 
 type ResourceStatus = "soon" | "active" | "inactive" | "disabled" | "hidden"
 
 export interface Resource {
   name: string
-  icon?: LucideIcon
+  icon?: LucideIcon | ComponentType<SVGProps<SVGSVGElement>>
   status: ResourceStatus
   path?: string
   children?: Resource[]
