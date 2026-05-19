@@ -21,6 +21,8 @@ from app.core.dependencies.users import (
     CurrentSuperadmin,
     CurrentWriter,
     HumanTenantSession,
+    RequireHumanScopeDirectoryRead,
+    RequireHumanScopeSelfRead,
     TenantSession,
 )
 from app.services.email_helpers import send_application_status_email
@@ -112,6 +114,7 @@ async def create_human(
 @router.get("/me", response_model=HumanPublic)
 async def get_current_human_info(
     current_user: CurrentHuman,
+    _scope: RequireHumanScopeSelfRead,
 ) -> HumanPublic:
     return HumanPublic.model_validate(current_user)
 
@@ -120,6 +123,7 @@ async def get_current_human_info(
 async def get_current_human_profile_stats(
     current_human: CurrentHuman,
     db: HumanTenantSession,
+    _scope: RequireHumanScopeSelfRead,
 ) -> HumanProfileStats:
     """Aggregate popup history and total days attended for the profile page."""
     return crud.get_profile_stats(db, current_human.id)
@@ -130,6 +134,7 @@ async def update_current_human(
     human_in: HumanProfileUpdate,
     current_human: CurrentHuman,
     db: HumanTenantSession,
+    _scope: RequireHumanScopeSelfRead,
 ) -> HumanPublic:
     """Update the current authenticated human's profile."""
     human = crud.get(db, current_human.id)
@@ -148,6 +153,7 @@ async def update_current_human(
 async def search_humans_portal(
     db: HumanTenantSession,
     _: CurrentHuman,
+    _scope: RequireHumanScopeDirectoryRead,
     search: str | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 20,

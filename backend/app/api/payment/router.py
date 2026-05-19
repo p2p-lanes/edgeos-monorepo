@@ -26,6 +26,7 @@ from app.core.dependencies.users import (
     CurrentOperator,
     CurrentUser,
     HumanTenantSession,
+    RequireHumanScopeSelfRead,
     SessionDep,
     TenantSession,
 )
@@ -498,6 +499,7 @@ async def create_my_application_fee(
     fee_in: ApplicationFeeCreate,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    _scope: RequireHumanScopeSelfRead,
 ) -> PaymentPublic:
     """Create an application fee payment for current human's application (Portal).
 
@@ -523,6 +525,7 @@ async def list_my_payments_by_popup(
     popup_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    _scope: RequireHumanScopeSelfRead,
     skip: Annotated[int, Query(ge=0, description="Number of payments to skip")] = 0,
     limit: Annotated[
         int, Query(ge=1, le=100, description="Max payments to return (max 100)")
@@ -551,6 +554,7 @@ async def get_my_latest_payment(
     application_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    _scope: RequireHumanScopeSelfRead,
 ) -> PaymentStatusCheck:
     """Get the latest payment status for an application owned by current human (Portal)."""
     from app.api.application.crud import applications_crud
@@ -581,6 +585,7 @@ async def get_my_payment_status(
     payment_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    _scope: RequireHumanScopeSelfRead,
 ) -> PaymentStatusCheck:
     """Get the current status for an owned payment (Portal)."""
     payment = _get_portal_owned_payment_or_404(db, payment_id, current_human)
@@ -596,6 +601,7 @@ async def list_my_payments(
     application_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    _scope: RequireHumanScopeSelfRead,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[PaymentPublic]:
@@ -625,6 +631,7 @@ async def get_my_invoice(
     payment_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    _scope: RequireHumanScopeSelfRead,
 ) -> Response:
     """Download invoice PDF for a payment owned by current human (Portal).
 
@@ -677,6 +684,7 @@ async def preview_my_payment(
     payment_in: PaymentCreate,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    _scope: RequireHumanScopeSelfRead,
 ) -> PaymentPreview:
     """
     Preview a payment calculation without creating it (Portal).
@@ -709,6 +717,7 @@ async def create_my_payment(
     payment_in: PaymentCreate,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    _scope: RequireHumanScopeSelfRead,
 ) -> PaymentPublic:
     """
     Create a payment for current human's application (Portal).
