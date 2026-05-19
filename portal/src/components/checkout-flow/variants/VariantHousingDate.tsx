@@ -6,9 +6,10 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import ExpandableDescription from "@/components/ui/ExpandableDescription"
 import QuantitySelector, {
-  resolveMaxQuantity,
   supportsQuantitySelector,
 } from "@/components/ui/QuantitySelector"
+import SoldOutBadge from "@/components/ui/SoldOutBadge"
+import { getProductAvailability } from "@/lib/product-availability"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
 import { useCityProvider } from "@/providers/cityProvider"
@@ -229,12 +230,19 @@ function CompactCard({
       : product.compare_price
     : null
   const supportsQty = supportsQuantitySelector(product.max_per_order)
-  const maxQty = resolveMaxQuantity(product)
+  const {
+    state,
+    canSelect,
+    maxAllowedQuantity: maxQty,
+  } = getProductAvailability(product)
+  const soldOut = state === "sold_out"
 
   return (
     <button
       type="button"
+      disabled={!canSelect}
       onClick={() => {
+        if (!canSelect) return
         if (supportsQty && quantity === 0) {
           onIncrement()
         } else {
@@ -246,9 +254,14 @@ function CompactCard({
         isSelected
           ? "border-l-primary bg-primary/10"
           : "border-l-border bg-checkout-card-bg hover:bg-muted",
+        !canSelect && "opacity-60 cursor-not-allowed hover:bg-checkout-card-bg",
       )}
     >
-      {supportsQty ? (
+      {!canSelect ? (
+        soldOut ? (
+          <SoldOutBadge />
+        ) : null
+      ) : supportsQty ? (
         <QuantitySelector
           value={quantity}
           max={maxQty}
@@ -346,12 +359,19 @@ function GridCard({
       : product.compare_price
     : null
   const supportsQty = supportsQuantitySelector(product.max_per_order)
-  const maxQty = resolveMaxQuantity(product)
+  const {
+    state,
+    canSelect,
+    maxAllowedQuantity: maxQty,
+  } = getProductAvailability(product)
+  const soldOut = state === "sold_out"
 
   return (
     <button
       type="button"
+      disabled={!canSelect}
       onClick={() => {
+        if (!canSelect) return
         if (supportsQty && quantity === 0) {
           onIncrement()
         } else {
@@ -363,6 +383,7 @@ function GridCard({
         isSelected
           ? "border-primary ring-2 ring-primary/20"
           : "border-border hover:border-muted-foreground/30",
+        !canSelect && "opacity-60 cursor-not-allowed hover:border-border",
       )}
     >
       {product.image_url ? (
@@ -380,7 +401,13 @@ function GridCard({
         </div>
       )}
 
-      {supportsQty ? (
+      {!canSelect ? (
+        soldOut && (
+          <div className="absolute top-2 right-2">
+            <SoldOutBadge />
+          </div>
+        )
+      ) : supportsQty ? (
         <div className="absolute top-2 right-2 rounded-full bg-background/90 backdrop-blur-sm shadow-sm px-1.5 py-0.5">
           <QuantitySelector
             value={quantity}
@@ -522,14 +549,21 @@ function DefaultSectionCard({
               : product.compare_price
             : null
           const supportsQty = supportsQuantitySelector(product.max_per_order)
-          const maxQty = resolveMaxQuantity(product)
+          const {
+            state,
+            canSelect,
+            maxAllowedQuantity: maxQty,
+          } = getProductAvailability(product)
+          const soldOut = state === "sold_out"
           const quantity = getQuantity(product.id)
 
           return (
             <button
               key={product.id}
               type="button"
+              disabled={!canSelect}
               onClick={() => {
+                if (!canSelect) return
                 if (supportsQty && quantity === 0) {
                   onIncrement(product.id)
                 } else {
@@ -541,10 +575,16 @@ function DefaultSectionCard({
                 isSelected
                   ? "border-primary bg-primary/10"
                   : "border-border bg-muted hover:border-muted-foreground/30",
+                !canSelect &&
+                  "opacity-60 cursor-not-allowed hover:border-border",
               )}
             >
               <div className="flex items-center gap-3 min-w-0">
-                {supportsQty ? (
+                {!canSelect ? (
+                  soldOut ? (
+                    <SoldOutBadge />
+                  ) : null
+                ) : supportsQty ? (
                   <QuantitySelector
                     value={quantity}
                     max={maxQty}
@@ -718,14 +758,21 @@ function ShowcaseSectionCard({
                 : product.compare_price
               : null
             const supportsQty = supportsQuantitySelector(product.max_per_order)
-            const maxQty = resolveMaxQuantity(product)
+            const {
+              state,
+              canSelect,
+              maxAllowedQuantity: maxQty,
+            } = getProductAvailability(product)
+            const soldOut = state === "sold_out"
             const quantity = getQuantity(product.id)
 
             return (
               <button
                 key={product.id}
                 type="button"
+                disabled={!canSelect}
                 onClick={() => {
+                  if (!canSelect) return
                   if (supportsQty && quantity === 0) {
                     onIncrement(product.id)
                   } else {
@@ -737,6 +784,7 @@ function ShowcaseSectionCard({
                   isSelected
                     ? "bg-primary/10 ring-2 ring-primary"
                     : "bg-muted hover:bg-muted/80 ring-1 ring-border",
+                  !canSelect && "opacity-60 cursor-not-allowed hover:bg-muted",
                 )}
               >
                 {product.image_url && (
@@ -786,7 +834,11 @@ function ShowcaseSectionCard({
                   </p>
                 </div>
 
-                {supportsQty ? (
+                {!canSelect ? (
+                  soldOut ? (
+                    <SoldOutBadge />
+                  ) : null
+                ) : supportsQty ? (
                   <QuantitySelector
                     value={quantity}
                     max={maxQty}
