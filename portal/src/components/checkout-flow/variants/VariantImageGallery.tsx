@@ -18,7 +18,7 @@ import type { VariantProps } from "../registries/variantRegistry"
 // Types & helpers
 // ---------------------------------------------------------------------------
 
-interface GalleryImage {
+export interface GalleryImage {
   id: string
   url: string
   caption?: string
@@ -47,7 +47,7 @@ function Caption({ text }: { text?: string }) {
 // the parent jump to a different image without going through close first.
 // ---------------------------------------------------------------------------
 
-function LightboxOverlay({
+export function LightboxOverlay({
   images,
   initialIndex,
   onClose,
