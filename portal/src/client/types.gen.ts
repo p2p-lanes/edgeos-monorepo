@@ -2560,6 +2560,7 @@ export type ProductPublic = {
     compare_price?: (string | null);
     description?: (string | null);
     image_url?: (string | null);
+    images?: Array<string>;
     category?: string;
     attendee_category_id?: (string | null);
     duration_type?: (TicketDuration | null);

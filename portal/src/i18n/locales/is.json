@@ -229,6 +229,13 @@
       "pause_aria": "Stöðva bakgrunnsmyndband",
       "mute_aria": "Slökkva á hljóði bakgrunnsmyndbands",
       "unmute_aria": "Kveikja á hljóði bakgrunnsmyndbands"
+    },
+    "housing": {
+      "carousel": {
+        "enlarge_aria": "Stækka {{name}}",
+        "previous_image_aria": "Fyrri mynd",
+        "next_image_aria": "Næsta mynd"
+      }
     }
   },
   "openCheckout": {

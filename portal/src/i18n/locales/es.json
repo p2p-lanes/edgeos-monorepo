@@ -239,6 +239,13 @@
       "pause_aria": "Pausar video de fondo",
       "mute_aria": "Silenciar video de fondo",
       "unmute_aria": "Activar sonido del video de fondo"
+    },
+    "housing": {
+      "carousel": {
+        "enlarge_aria": "Ampliar {{name}}",
+        "previous_image_aria": "Imagen anterior",
+        "next_image_aria": "Siguiente imagen"
+      }
     }
   },
   "openCheckout": {
