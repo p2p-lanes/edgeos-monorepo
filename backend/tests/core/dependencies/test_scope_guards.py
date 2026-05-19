@@ -16,10 +16,7 @@ Tests are expected to FAIL until app/core/dependencies/users.py is updated.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Generator
 from datetime import UTC, datetime, timedelta
-from typing import Annotated
-from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import HTTPException
@@ -29,7 +26,6 @@ from app.core.security import (
     create_access_token,
     decode_access_token,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers

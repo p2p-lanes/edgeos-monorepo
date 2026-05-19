@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import uuid
 
-import pytest
 from sqlmodel import Session
 
 from app.api.api_key import crud as api_key_crud
@@ -59,8 +58,6 @@ class TestResolveApiKeyOwnership:
         db.refresh(row)
 
         # Patch the engine used inside _resolve_api_key to our test engine.
-        from app.core.db import engine as real_engine
-        from sqlmodel import create_engine
 
         with patch("app.core.security.engine", db.get_bind()):
             payload = _resolve_api_key(raw)
