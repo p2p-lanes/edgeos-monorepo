@@ -1,10 +1,10 @@
 import secrets
 import uuid
 
-import bcrypt
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 
+from app.api.api_key.crud import hash_key as hash_api_key
 from app.api.shared.enums import CredentialType, LandingMode, UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.api.tenant import crud
@@ -32,12 +32,12 @@ _THIRD_PARTY_KEY_PREFIX_LEN = 8
 
 
 def _hash_third_party_key(raw_key: str) -> str:
-    """bcrypt hash for tenant third-party API keys.
+    """Peppered SHA-256 hash for tenant third-party API keys.
 
-    bcrypt is used (not SHA-256) because the auth endpoint validates with
-    bcrypt.checkpw — both sides must use the same algorithm.
+    Uses the same `hash_key` primitive as `api_keys.key_hash` so all api-key
+    style secrets share one hashing convention.
     """
-    return bcrypt.hashpw(raw_key.encode(), bcrypt.gensalt()).decode()
+    return hash_api_key(raw_key)
 
 
 @router.get("/public/by-domain/{domain}", response_model=TenantPublic)
@@ -381,9 +381,9 @@ async def rotate_third_party_key(
 ) -> ThirdPartyKeyRotated:
     """Generate and store a new third-party API key for this tenant.
 
-    The raw key is returned ONCE and never stored — only the bcrypt hash is
-    persisted. Rotation takes effect on the NEXT login attempt; in-flight JWTs
-    already issued remain valid until their own expiry.
+    The raw key is returned ONCE and never stored; only its peppered SHA-256
+    hash is persisted. Rotation takes effect on the NEXT login attempt;
+    in-flight JWTs already issued remain valid until their own expiry.
 
     Only ADMIN (for their own tenant) and SUPERADMIN (any tenant) may call this.
     """

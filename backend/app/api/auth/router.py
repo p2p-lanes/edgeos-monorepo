@@ -1,9 +1,10 @@
+import secrets
 import uuid
 
-import bcrypt
 from fastapi import APIRouter, Header, HTTPException, status
 from loguru import logger
 
+from app.api.api_key.crud import hash_key as hash_api_key
 from app.api.auth.crud import (
     authenticate_human,
     authenticate_user,
@@ -45,13 +46,10 @@ def _validate_third_party_key(
             detail="Third-party login not enabled for this tenant",
         )
 
-    try:
-        key_matches = bcrypt.checkpw(
-            raw_key.encode(),
-            tenant.third_party_api_key_hash.encode(),
-        )
-    except Exception:
-        key_matches = False
+    key_matches = secrets.compare_digest(
+        hash_api_key(raw_key),
+        tenant.third_party_api_key_hash,
+    )
 
     if not key_matches:
         raise HTTPException(
