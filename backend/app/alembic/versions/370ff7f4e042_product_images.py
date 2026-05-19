@@ -7,7 +7,7 @@ any additional photos rendered in the swipe carousel + lightbox.
 Default is `[]` so existing single-image products keep their current
 look (the cover-only render path doesn't read `images`).
 
-Revision ID: 0051_product_images
+Revision ID: 370ff7f4e042
 Revises: 0050_venue_display_order
 """
 
@@ -17,7 +17,7 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "0051_product_images"
+revision: str = "370ff7f4e042"
 down_revision: str | Sequence[str] | None = "0050_venue_display_order"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
