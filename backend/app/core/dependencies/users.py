@@ -8,7 +8,7 @@ from sqlmodel import Session, select
 
 from app.api.shared.enums import UserRole
 from app.core.db import engine
-from app.core.security import TokenPayload, get_token_payload
+from app.core.security import ApiKeyScope, HumanScope, TokenPayload, get_token_payload
 
 if TYPE_CHECKING:
     from app.api.human.schemas import HumanPublic
@@ -354,3 +354,239 @@ def get_human_tenant_session(
 
 
 HumanTenantSession = Annotated[Session, Depends(get_human_tenant_session)]
+
+
+# ---------------------------------------------------------------------------
+# require_human_scope — portal scope guard (Block 4, task 4.2)
+# ---------------------------------------------------------------------------
+
+
+def require_human_scope(scope: HumanScope):
+    """Return a dependency that enforces a specific HumanScope on portal routes.
+
+    Pass conditions (REQ-SE-01 through REQ-SE-05):
+      - ``portal:*`` in payload.scopes (explicit wildcard or grace-synthesised).
+      - The exact requested ``scope`` is in payload.scopes.
+
+    Raises HTTP 403 otherwise. Does NOT re-check JWT authenticity — additive on
+    top of ``get_current_human``.
+    """
+
+    def _guard(
+        token_payload: Annotated[TokenPayload, Depends(get_token_payload)],
+    ) -> None:
+        if "portal:*" in token_payload.scopes:
+            return
+        if scope in token_payload.scopes:
+            return
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "Your session does not have permission to access this resource. "
+                f"Required scope: {scope}."
+            ),
+        )
+
+    return _guard
+
+
+# ---------------------------------------------------------------------------
+# CurrentAdminOrApiKey — dual-auth guard for admin endpoints (Block 4, task 4.3)
+# ---------------------------------------------------------------------------
+
+
+def CurrentAdminOrApiKey(scope: ApiKeyScope):
+    """Return a dependency that accepts admin JWTs or scoped admin api-keys.
+
+    Path A — JWT admin:
+      token_type="user", via_api_key=False, role in (ADMIN, SUPERADMIN).
+      Scope is implicitly granted; role gates the whole catalog.
+
+    Path B — Admin api-key:
+      token_type="user", via_api_key=True, ``scope`` in payload.scopes.
+
+    Anything else (human JWT, human api-key, unauthenticated) raises 403.
+    """
+
+    def _dep(
+        token_payload: Annotated[TokenPayload, Depends(get_token_payload)],
+        db: "SessionDep",
+    ) -> "UserPublic":
+        if token_payload.token_type != "user":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="This endpoint requires an admin session or an admin API key.",
+            )
+
+        if not token_payload.via_api_key:
+            # Path A: JWT-authenticated user — enforce role.
+            user = fetch_authenticated_user(token_payload, db, require_token_type="user")
+            if user.role not in (UserRole.SUPERADMIN, UserRole.ADMIN):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Admin access required.",
+                )
+            return user
+
+        # Path B: admin-owned api-key — enforce scope.
+        if scope not in token_payload.scopes:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"API key lacks required scope: {scope}",
+            )
+        return fetch_authenticated_user(token_payload, db, require_token_type="user")
+
+    return _dep
+
+
+# ---------------------------------------------------------------------------
+# get_admin_or_api_key_tenant_session — tenant session for dual-auth (4.4)
+# ---------------------------------------------------------------------------
+
+
+def get_admin_or_api_key_tenant_session(scope: ApiKeyScope):
+    """Return a factory that yields a tenant-scoped Session.
+
+    Resolves tenant_id:
+      - api-key branch: from ``token_payload.api_key_tenant_id`` (set by
+        ``_resolve_api_key`` for admin-owned keys — FLAG-2 fix).
+      - JWT branch: delegates to ``get_tenant_session`` (existing logic —
+        supports SUPERADMIN + X-Tenant-Id and regular admin).
+
+    Design R-A1 note: the JWT branch uses ``yield from`` delegation to
+    ``get_tenant_session``. FastAPI's generator lifecycle handles cleanup
+    correctly because the outer generator itself is a generator (``yield from``
+    propagates both ``send()`` and ``throw()`` so the inner generator's
+    ``finally`` block still runs on request teardown).
+    """
+
+    def _dep(
+        current_user: Annotated["UserPublic", Depends(CurrentAdminOrApiKey(scope))],
+        token_payload: Annotated[TokenPayload, Depends(get_token_payload)],
+        db: "SessionDep",
+        x_tenant_id: Annotated[str | None, Header(alias="X-Tenant-Id")] = None,
+    ) -> Generator[Session]:
+        if token_payload.via_api_key:
+            from app.api.shared.enums import CredentialType
+            from app.core.tenant_db import tenant_connection_manager
+
+            tenant_id = token_payload.api_key_tenant_id
+            if tenant_id is None:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="API key has no tenant context.",
+                )
+
+            cached_cred = tenant_connection_manager.get_credential(
+                db, tenant_id, CredentialType.CRUD
+            )
+            if not cached_cred:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Tenant credentials not configured",
+                )
+
+            tenant_engine = tenant_connection_manager.get_engine(
+                tenant_id,
+                CredentialType.CRUD,
+                cached_cred.username,
+                cached_cred.password,
+            )
+            with Session(tenant_engine) as tenant_session:
+                yield tenant_session
+        else:
+            # JWT branch — delegate to the existing get_tenant_session logic.
+            yield from get_tenant_session(current_user, db, x_tenant_id)
+
+    return _dep
+
+
+# ---------------------------------------------------------------------------
+# Per-scope Annotated aliases (Block 4, task 4.5)
+# Design R-A2: one alias pair per scope in ADMIN_API_KEY_SCOPES (~56 LOC).
+# If this module grows past ~400 LOC, split into admin_scopes.py.
+# ---------------------------------------------------------------------------
+
+# events
+AdminOrApiKey_EventsRead = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("events:read"))]
+AdminOrApiKey_EventsWrite = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("events:write"))]
+AdminOrApiKeySession_EventsRead = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("events:read"))]
+AdminOrApiKeySession_EventsWrite = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("events:write"))]
+
+# rsvp
+AdminOrApiKey_RsvpWrite = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("rsvp:write"))]
+AdminOrApiKeySession_RsvpWrite = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("rsvp:write"))]
+
+# venues
+AdminOrApiKey_VenuesWrite = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("venues:write"))]
+AdminOrApiKeySession_VenuesWrite = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("venues:write"))]
+
+# applications
+AdminOrApiKey_ApplicationsRead = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("applications:read"))]
+AdminOrApiKey_ApplicationsWrite = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("applications:write"))]
+AdminOrApiKeySession_ApplicationsRead = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("applications:read"))]
+AdminOrApiKeySession_ApplicationsWrite = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("applications:write"))]
+
+# attendees
+AdminOrApiKey_AttendeesRead = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("attendees:read"))]
+AdminOrApiKey_AttendeesWrite = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("attendees:write"))]
+AdminOrApiKeySession_AttendeesRead = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("attendees:read"))]
+AdminOrApiKeySession_AttendeesWrite = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("attendees:write"))]
+
+# humans
+AdminOrApiKey_HumansRead = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("humans:read"))]
+AdminOrApiKey_HumansWrite = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("humans:write"))]
+AdminOrApiKeySession_HumansRead = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("humans:read"))]
+AdminOrApiKeySession_HumansWrite = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("humans:write"))]
+
+# groups
+AdminOrApiKey_GroupsRead = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("groups:read"))]
+AdminOrApiKey_GroupsWrite = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("groups:write"))]
+AdminOrApiKeySession_GroupsRead = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("groups:read"))]
+AdminOrApiKeySession_GroupsWrite = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("groups:write"))]
+
+# products
+AdminOrApiKey_ProductsRead = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("products:read"))]
+AdminOrApiKey_ProductsWrite = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("products:write"))]
+AdminOrApiKeySession_ProductsRead = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("products:read"))]
+AdminOrApiKeySession_ProductsWrite = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("products:write"))]
+
+# coupons
+AdminOrApiKey_CouponsRead = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("coupons:read"))]
+AdminOrApiKey_CouponsWrite = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("coupons:write"))]
+AdminOrApiKeySession_CouponsRead = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("coupons:read"))]
+AdminOrApiKeySession_CouponsWrite = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("coupons:write"))]
+
+# forms
+AdminOrApiKey_FormsRead = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("forms:read"))]
+AdminOrApiKey_FormsWrite = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("forms:write"))]
+AdminOrApiKeySession_FormsRead = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("forms:read"))]
+AdminOrApiKeySession_FormsWrite = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("forms:write"))]
+
+# payments (read-only; payments:write is intentionally excluded from the universe)
+AdminOrApiKey_PaymentsRead = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("payments:read"))]
+AdminOrApiKeySession_PaymentsRead = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("payments:read"))]
+
+# tracks
+AdminOrApiKey_TracksRead = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("tracks:read"))]
+AdminOrApiKey_TracksWrite = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("tracks:write"))]
+AdminOrApiKeySession_TracksRead = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("tracks:read"))]
+AdminOrApiKeySession_TracksWrite = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("tracks:write"))]
+
+# ticketing_steps
+AdminOrApiKey_TicketingStepsRead = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("ticketing_steps:read"))]
+AdminOrApiKey_TicketingStepsWrite = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("ticketing_steps:write"))]
+AdminOrApiKeySession_TicketingStepsRead = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("ticketing_steps:read"))]
+AdminOrApiKeySession_TicketingStepsWrite = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("ticketing_steps:write"))]
+
+# translations
+AdminOrApiKey_TranslationsRead = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("translations:read"))]
+AdminOrApiKey_TranslationsWrite = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("translations:write"))]
+AdminOrApiKeySession_TranslationsRead = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("translations:read"))]
+AdminOrApiKeySession_TranslationsWrite = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("translations:write"))]
+
+# Portal scope guards (require_human_scope based) — Annotated wrappers
+RequireHumanScopePortalStar = Annotated[None, Depends(require_human_scope("portal:*"))]
+RequireHumanScopeSelfRead = Annotated[None, Depends(require_human_scope("portal:self_read"))]
+RequireHumanScopeDirectoryRead = Annotated[None, Depends(require_human_scope("portal:directory_read"))]
+RequireHumanScopeApiKeysManage = Annotated[None, Depends(require_human_scope("portal:api_keys_manage"))]
