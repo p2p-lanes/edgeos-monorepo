@@ -21,10 +21,12 @@ from app.api.translation.service import (
     get_translations_bulk,
 )
 from app.core.dependencies.users import (
+    AdminOrApiKey_ProductsRead,
+    AdminOrApiKey_ProductsWrite,
+    AdminOrApiKeySession_ProductsRead,
+    AdminOrApiKeySession_ProductsWrite,
     CurrentHuman,
-    CurrentOperator,
     CurrentSuperadmin,
-    CurrentUser,
     HumanTenantSession,
     SessionDep,
     TenantSession,
@@ -59,8 +61,8 @@ async def list_product_categories(
 
 @router.get("", response_model=ListModel[ProductPublic])
 async def list_products(
-    db: TenantSession,
-    _: CurrentUser,
+    db: AdminOrApiKeySession_ProductsRead,
+    _: AdminOrApiKey_ProductsRead,
     popup_id: uuid.UUID | None = None,
     is_active: bool | None = None,
     category: str | None = None,
@@ -178,8 +180,8 @@ async def create_products_batch(
 @router.get("/{product_id}", response_model=ProductPublic)
 async def get_product(
     product_id: uuid.UUID,
-    db: TenantSession,
-    _: CurrentUser,
+    db: AdminOrApiKeySession_ProductsRead,
+    _: AdminOrApiKey_ProductsRead,
 ) -> ProductPublic:
     """Get a single product by ID."""
     product = crud.products_crud.get(db, product_id)
@@ -196,8 +198,8 @@ async def get_product(
 @router.post("", response_model=ProductPublic, status_code=status.HTTP_201_CREATED)
 async def create_product(
     product_in: ProductCreate,
-    db: TenantSession,
-    current_user: CurrentOperator,
+    db: AdminOrApiKeySession_ProductsWrite,
+    current_user: AdminOrApiKey_ProductsWrite,
 ) -> ProductPublic:
     """Create a new product."""
 
@@ -243,8 +245,8 @@ async def create_product(
 async def update_product(
     product_id: uuid.UUID,
     product_in: ProductUpdate,
-    db: TenantSession,
-    _current_user: CurrentOperator,
+    db: AdminOrApiKeySession_ProductsWrite,
+    _current_user: AdminOrApiKey_ProductsWrite,
 ) -> ProductPublic:
     """Update a product."""
 
@@ -274,8 +276,8 @@ async def update_product(
 @router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_product(
     product_id: uuid.UUID,
-    db: TenantSession,
-    _current_user: CurrentOperator,
+    db: AdminOrApiKeySession_ProductsWrite,
+    _current_user: AdminOrApiKey_ProductsWrite,
 ) -> None:
     """Delete a product.
 
