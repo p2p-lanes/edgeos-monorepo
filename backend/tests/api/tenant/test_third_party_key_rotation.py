@@ -10,14 +10,10 @@ REQ-TR-01 ... REQ-TR-04
 
 from __future__ import annotations
 
-import uuid
-
-import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
 from app.api.tenant.models import Tenants
-from app.api.user.models import Users
 
 ROTATE_URL = "/api/v1/tenants/{tenant_id}/third-party-key/rotate"
 REVOKE_URL = "/api/v1/tenants/{tenant_id}/third-party-key"

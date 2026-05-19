@@ -62,16 +62,23 @@ class TestThirdPartyJwtApiKeyMintingRestriction:
         third_party_enabled_tenant: tuple[Tenants, str],
         third_party_jwt_factory,
     ) -> None:
-        """venues:write is NOT in THIRD_PARTY_API_KEY_SCOPES → 403."""
+        """venues:write is NOT in THIRD_PARTY_API_KEY_SCOPES → 403.
+
+        expires_at is provided so schema-level write-requires-expiry does not
+        fire before our router check reaches the third-party universe guard.
+        """
+        from datetime import UTC, datetime, timedelta
+
         tenant, _raw = third_party_enabled_tenant
         email = f"tp-mint-block-{uuid.uuid4().hex[:8]}@example.com"
         human = _make_human(db, tenant=tenant, email=email)
         token = third_party_jwt_factory(human=human)
+        expiry = (datetime.now(UTC) + timedelta(days=7)).isoformat()
 
         resp = client.post(
             CREATE_URL,
             headers=_bearer(token),
-            json={"name": "tp-venues", "scopes": ["venues:write"]},
+            json={"name": "tp-venues", "scopes": ["venues:write"], "expires_at": expiry},
         )
         assert resp.status_code == 403, resp.text
 
@@ -82,16 +89,23 @@ class TestThirdPartyJwtApiKeyMintingRestriction:
         third_party_enabled_tenant: tuple[Tenants, str],
         third_party_jwt_factory,
     ) -> None:
-        """Mixed scopes where venues:write is not in subset → 403."""
+        """Mixed scopes where venues:write is not in subset → 403.
+
+        expires_at is provided so schema-level write-requires-expiry validator
+        does not reject the request before the third-party universe guard runs.
+        """
+        from datetime import UTC, datetime, timedelta
+
         tenant, _raw = third_party_enabled_tenant
         email = f"tp-mint-mixed-{uuid.uuid4().hex[:8]}@example.com"
         human = _make_human(db, tenant=tenant, email=email)
         token = third_party_jwt_factory(human=human)
+        expiry = (datetime.now(UTC) + timedelta(days=7)).isoformat()
 
         resp = client.post(
             CREATE_URL,
             headers=_bearer(token),
-            json={"name": "tp-mixed", "scopes": ["rsvp:write", "venues:write"]},
+            json={"name": "tp-mixed", "scopes": ["rsvp:write", "venues:write"], "expires_at": expiry},
         )
         assert resp.status_code == 403, resp.text
 

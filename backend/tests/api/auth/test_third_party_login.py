@@ -226,8 +226,8 @@ class TestThirdPartyAuthenticate:
 
         captured_code: list[str] = []
 
-        async def _fake_send(self, to, subject, context, **kwargs) -> bool:  # noqa: ANN001
-            captured_code.append(context.auth_code)
+        async def _fake_send(_self, **kwargs) -> bool:  # noqa: ANN001
+            captured_code.append(kwargs["context"].auth_code)
             return True
 
         from app.services.email import EmailService
@@ -270,7 +270,7 @@ class TestThirdPartyAuthenticate:
         email = f"tp-wrong-code-{uuid.uuid4().hex[:8]}@example.com"
         _make_human(db, tenant=tenant, email=email)
 
-        async def _fake_send(self, *args, **kwargs) -> bool:  # noqa: ANN001 ANN002
+        async def _fake_send(_self, *_args, **_kwargs) -> bool:  # noqa: ANN001
             return True
 
         with patch.object(EmailService, "send_login_code_human", _fake_send):
