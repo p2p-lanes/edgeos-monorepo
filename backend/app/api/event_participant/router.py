@@ -14,11 +14,12 @@ from app.api.event_participant.schemas import (
 )
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
+    AdminOrApiKey_EventsRead,
+    AdminOrApiKey_RsvpWrite,
+    AdminOrApiKeySession_EventsRead,
+    AdminOrApiKeySession_RsvpWrite,
     CurrentHuman,
-    CurrentOperator,
-    CurrentUser,
     HumanTenantSession,
-    TenantSession,
 )
 
 router = APIRouter(prefix="/event-participants", tags=["event-participants"])
@@ -56,8 +57,8 @@ def _participants_with_names(db, participants: list) -> list[EventParticipantPub
 
 @router.get("", response_model=ListModel[EventParticipantPublic])
 async def list_participants(
-    db: TenantSession,
-    _: CurrentUser,
+    db: AdminOrApiKeySession_EventsRead,
+    _: AdminOrApiKey_EventsRead,
     event_id: uuid.UUID | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
@@ -86,8 +87,8 @@ async def list_participants(
 )
 async def admin_add_participant(
     participant_in: EventParticipantCreate,
-    db: TenantSession,
-    current_user: CurrentOperator,
+    db: AdminOrApiKeySession_RsvpWrite,
+    current_user: AdminOrApiKey_RsvpWrite,
 ) -> EventParticipantPublic:
     """Admin adds a participant to an event (backoffice)."""
     from app.api.event.crud import events_crud
@@ -134,8 +135,8 @@ async def admin_add_participant(
 async def update_participant(
     participant_id: uuid.UUID,
     participant_in: EventParticipantUpdate,
-    db: TenantSession,
-    _: CurrentOperator,
+    db: AdminOrApiKeySession_RsvpWrite,
+    _: AdminOrApiKey_RsvpWrite,
 ) -> EventParticipantPublic:
     """Update a participant (backoffice)."""
 
@@ -153,8 +154,8 @@ async def update_participant(
 @router.delete("/{participant_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_participant(
     participant_id: uuid.UUID,
-    db: TenantSession,
-    _: CurrentOperator,
+    db: AdminOrApiKeySession_RsvpWrite,
+    _: AdminOrApiKey_RsvpWrite,
 ) -> None:
     """Delete a participant (backoffice)."""
 
