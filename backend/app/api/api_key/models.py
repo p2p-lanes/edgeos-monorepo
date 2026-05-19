@@ -7,7 +7,11 @@ from sqlmodel import Column, DateTime, Field, SQLModel
 
 
 class ApiKeys(SQLModel, table=True):
-    """Personal access token owned by a Human, scoped to a tenant.
+    """Access token owned by a Human (portal PAT) or a User (admin key).
+
+    Exactly one of ``human_id`` / ``user_id`` must be non-null; this is
+    enforced at the DB level by the ``api_keys_owner_check`` CHECK constraint
+    added in migration ``<hash>_third_party_otp_scoped_auth``.
 
     The raw secret never lives in the DB — only ``key_hash`` (sha256 of
     ``SECRET_KEY + raw_token``). ``prefix`` is a non-secret display fragment
@@ -15,14 +19,28 @@ class ApiKeys(SQLModel, table=True):
     """
 
     __tablename__ = "api_keys"
-    __table_args__ = (Index("ix_api_keys_human_revoked", "human_id", "revoked_at"),)
+    __table_args__ = (
+        Index("ix_api_keys_human_revoked", "human_id", "revoked_at"),
+        Index("ix_api_keys_user_revoked", "user_id", "revoked_at"),
+    )
 
     id: uuid.UUID = Field(
         default_factory=uuid.uuid4,
         sa_column=Column(UUID(as_uuid=True), primary_key=True),
     )
     tenant_id: uuid.UUID = Field(foreign_key="tenants.id", index=True)
-    human_id: uuid.UUID = Field(foreign_key="humans.id", index=True)
+    # Human-owned (portal PAT) — nullable to support admin-owned keys.
+    human_id: uuid.UUID | None = Field(
+        default=None,
+        foreign_key="humans.id",
+        index=True,
+    )
+    # Admin-owned key — nullable to support human-owned keys.
+    user_id: uuid.UUID | None = Field(
+        default=None,
+        foreign_key="users.id",
+        index=True,
+    )
     name: str = Field(max_length=100)
     key_hash: str = Field(max_length=64, unique=True)
     prefix: str = Field(max_length=20)
