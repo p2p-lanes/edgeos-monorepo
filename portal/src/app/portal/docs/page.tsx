@@ -1,6 +1,9 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { EventsApiAccessGate } from "@/components/EventsApiAccessGate"
+import { CopyAgentBrief } from "./CopyAgentBrief"
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
 
 export const metadata: Metadata = {
   title: "Events API",
@@ -89,15 +92,20 @@ function FieldList({
 function Section({
   title,
   id,
+  action,
   children,
 }: {
   title: string
   id?: string
+  action?: React.ReactNode
   children: React.ReactNode
 }) {
   return (
     <section id={id} className="space-y-3">
-      <h2 className="text-xl font-semibold">{title}</h2>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-xl font-semibold">{title}</h2>
+        {action}
+      </div>
       {children}
     </section>
   )
@@ -139,13 +147,18 @@ function ApiDocsBody() {
           </p>
         </header>
 
-        <Section title="Quick start">
+        <Section
+          title="Quick start"
+          action={<CopyAgentBrief apiBase={API_BASE} />}
+        >
           <div className="rounded-lg border bg-card divide-y text-sm">
-            <Row label="Base path">
-              <code className="font-mono text-xs">/api/v1</code>
+            <Row label="API base">
+              <code className="font-mono text-xs break-all">
+                {`${API_BASE}/api/v1`}
+              </code>
               <span className="text-muted-foreground">
                 {" "}
-                on the host the user signs in to
+                — prefix only; every endpoint path lives beneath it
               </span>
             </Row>
             <Row label="Auth header">
@@ -171,7 +184,9 @@ function ApiDocsBody() {
               <code className="font-mono text-xs">venues:write</code>
             </Row>
             <Row label="OpenAPI spec">
-              <code className="font-mono text-xs">/api/v1/openapi.json</code>
+              <code className="font-mono text-xs break-all">
+                {`${API_BASE}/openapi.json`}
+              </code>
               <span className="text-muted-foreground">
                 {" "}
                 — feed this directly to an agent

@@ -2,8 +2,9 @@
 
 import { useParams } from "next/navigation"
 import { PopupCheckoutContent } from "@/app/checkout/components/PopupCheckoutContent"
+import { CheckoutBackgroundVideo } from "@/components/CheckoutBackgroundVideo"
 import useGetPublicGroup from "@/hooks/useGetPublicGroup"
-import { getBackgroundProps } from "@/lib/background-image"
+import { getCheckoutBackground } from "@/lib/background-image"
 import { useCityProvider } from "@/providers/cityProvider"
 
 const LoadingFallback = () => (
@@ -38,14 +39,23 @@ const GroupCheckoutPage = () => {
     )
   }
 
-  const background = getBackgroundProps(popup, "groups")
+  const background = getCheckoutBackground(popup, "groups")
+  const contentBackground =
+    background.type === "image"
+      ? { className: "", style: background.style }
+      : { className: background.type === "none" ? "bg-background" : "" }
 
   return (
-    <PopupCheckoutContent
-      popup={popup}
-      background={background}
-      groupId={group.id}
-    />
+    <>
+      {background.type === "video" && (
+        <CheckoutBackgroundVideo url={background.url} />
+      )}
+      <PopupCheckoutContent
+        popup={popup}
+        background={contentBackground}
+        groupId={group.id}
+      />
+    </>
   )
 }
 

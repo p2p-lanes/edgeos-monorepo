@@ -1,3 +1,4 @@
+import { localTzNaiveToUtc, utcToLocalTzNaive } from "@edgeos/shared-events"
 import type { RecurrenceRule } from "@/client"
 import { DatePicker } from "@/components/ui/date-picker"
 import { Input } from "@/components/ui/input"
@@ -46,6 +47,7 @@ const DEFAULT_REPEAT: RepeatState = {
 
 export function parseRruleToState(
   rrule: string | null | undefined,
+  timezone: string = "UTC",
 ): RepeatState {
   if (!rrule) return { ...DEFAULT_REPEAT }
   const kv: Record<string, string> = {}
@@ -79,16 +81,36 @@ export function parseRruleToState(
     count = parseInt(kv.COUNT, 10) || count
   } else if (kv.UNTIL) {
     end = "until"
-    // Accept YYYYMMDDTHHMMSSZ or YYYYMMDD
+    // Accept YYYYMMDDTHHMMSSZ or YYYYMMDD. Date-only and legacy
+    // "midnight-UTC" encodings were written before UNTIL was
+    // timezone-aware; we keep the raw YYYY-MM-DD for those so existing
+    // events round-trip without their displayed date shifting by a day.
     const raw = kv.UNTIL.replace("Z", "")
-    if (raw.length >= 8) {
+    if (raw.length === 8) {
       until = `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`
+    } else if (raw.length >= 15) {
+      const yyyy = raw.slice(0, 4)
+      const mm = raw.slice(4, 6)
+      const dd = raw.slice(6, 8)
+      const hh = raw.slice(9, 11)
+      const mi = raw.slice(11, 13)
+      const ss = raw.slice(13, 15)
+      if (hh === "00" && mi === "00" && ss === "00") {
+        until = `${yyyy}-${mm}-${dd}`
+      } else {
+        const iso = `${yyyy}-${mm}-${dd}T${hh}:${mi}:${ss}.000Z`
+        const local = utcToLocalTzNaive(iso, timezone)
+        until = local.slice(0, 10)
+      }
     }
   }
   return { mode, interval, byDay, end, count, until }
 }
 
-export function buildRecurrence(state: RepeatState): RecurrenceRule | null {
+export function buildRecurrence(
+  state: RepeatState,
+  timezone: string = "UTC",
+): RecurrenceRule | null {
   if (state.mode === "none") return null
   const freq =
     state.mode === "daily"
@@ -106,8 +128,12 @@ export function buildRecurrence(state: RepeatState): RecurrenceRule | null {
   if (state.end === "count") {
     rule.count = Math.max(1, state.count || 1)
   } else if (state.end === "until" && state.until) {
-    const [y, m, d] = state.until.split("-").map(Number)
-    rule.until = new Date(Date.UTC(y, (m ?? 1) - 1, d ?? 1)).toISOString()
+    // Interpret the picked date as end-of-day in the event's timezone so
+    // "On Jun 16" includes every occurrence that falls on Jun 16 local —
+    // the old code emitted midnight-UTC which excluded same-day local
+    // occurrences in any non-UTC zone.
+    const endOfDayLocal = `${state.until}T23:59:59`
+    rule.until = localTzNaiveToUtc(endOfDayLocal, timezone).toISOString()
   }
   return rule
 }
@@ -116,13 +142,43 @@ interface RepeatPickerProps {
   value: RepeatState
   onChange: (next: RepeatState) => void
   disabled?: boolean
+  /**
+   * Earliest allowed UNTIL date (YYYY-MM-DD, in the event's local timezone).
+   * Days before this are greyed out in the calendar, and a stale value that
+   * predates it surfaces an inline error so the user notices before submit.
+   */
+  minDate?: string
 }
 
-export function RepeatPicker({ value, onChange, disabled }: RepeatPickerProps) {
+export function RepeatPicker({
+  value,
+  onChange,
+  disabled,
+  minDate,
+}: RepeatPickerProps) {
   const update = (patch: Partial<RepeatState>) => {
     if (disabled) return
     onChange({ ...value, ...patch })
   }
+
+  const minDateObj = minDate
+    ? (() => {
+        const [y, m, d] = minDate.split("-").map(Number)
+        return new Date(y, (m ?? 1) - 1, d ?? 1)
+      })()
+    : null
+
+  const untilBeforeStart =
+    value.end === "until" && value.until && minDate
+      ? value.until < minDate
+      : false
+
+  const disabledBeforeStart = minDateObj
+    ? (d: Date) => {
+        const day = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+        return day < minDateObj
+      }
+    : undefined
 
   const unitLabel =
     value.mode === "daily"
@@ -256,8 +312,15 @@ export function RepeatPicker({ value, onChange, disabled }: RepeatPickerProps) {
                 className="h-7 w-40"
                 placeholder="Pick date"
                 disabled={disabled}
+                disabledDays={disabledBeforeStart}
+                defaultMonth={minDateObj ?? undefined}
               />
             </label>
+            {untilBeforeStart && (
+              <p className="text-destructive">
+                The end date must be on or after the event's start date.
+              </p>
+            )}
           </div>
         </div>
       )}

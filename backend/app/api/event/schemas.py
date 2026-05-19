@@ -387,3 +387,45 @@ class EventAvailabilityResult(BaseModel):
     # into account so the portal can show a precise warning ("this time
     # requires approval") instead of a venue-wide hint.
     effective_booking_mode: str | None = None
+
+
+class EventRecurringAvailabilityCheck(BaseModel):
+    """Payload for the recurrence-aware preflight endpoint.
+
+    ``recurrence`` is optional — passing it ``None`` is equivalent to the
+    single-window ``/check-availability`` call, but routed through the
+    same result schema so the frontend has one branch.
+    """
+
+    venue_id: uuid.UUID
+    start_time: datetime
+    end_time: datetime
+    timezone: str = "UTC"
+    recurrence: RecurrenceRule | None = None
+    exdates: list[str] = Field(default_factory=list)
+    exclude_event_id: uuid.UUID | None = None
+
+
+class OccurrenceConflict(BaseModel):
+    """One offending instance returned by the recurrence preflight."""
+
+    occurrence_start: datetime
+    # Same label rendered by ``_format_occurrence_label`` so the frontend
+    # mirrors the 409 message word-for-word.
+    local_label: str
+    reason: str
+    conflicting_event_ids: list[uuid.UUID] = []
+    # Up to three titles (mirrors the 409 message). Empty when the conflict
+    # is not a booking clash (e.g. open hours, unbookable slot).
+    conflicting_titles: list[str] = []
+    effective_booking_mode: str | None = None
+
+
+class EventRecurringAvailabilityResult(BaseModel):
+    available: bool
+    total_occurrences: int
+    checked_occurrences: int
+    conflicts: list[OccurrenceConflict] = []
+    # True when the per-occurrence loop bailed at MAX_REPORTED. The UI uses
+    # this to say "many occurrences conflict" vs an exact count.
+    truncated: bool = False

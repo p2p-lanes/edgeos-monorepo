@@ -8,7 +8,8 @@ Covers:
 - Synthetic occurrence id packing/unpacking
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -172,6 +173,86 @@ def test_window_past_dtstart_weekly_byday() -> None:
         "2026-05-06",  # Wed
         "2026-05-11",  # Mon
         "2026-05-13",  # Wed
+    ]
+
+
+def test_weekly_byday_respects_event_timezone_west() -> None:
+    # 2026-06-02 20:00 America/Los_Angeles == 2026-06-03 03:00Z (Wed in UTC,
+    # Tue in local). Anchoring BYDAY against UTC would shift cards by -1 day
+    # (Mon/Wed instead of the picked Tue/Thu).
+    dtstart = datetime(2026, 6, 3, 3, 0, tzinfo=UTC)
+    rule = RecurrenceRule(freq="WEEKLY", by_day=["TU", "TH"], count=4)
+    out = expand(dtstart=dtstart, rule=rule, timezone="America/Los_Angeles")
+    la = ZoneInfo("America/Los_Angeles")
+    local = [o.astimezone(la).strftime("%a %Y-%m-%d") for o in out]
+    assert local == [
+        "Tue 2026-06-02",
+        "Thu 2026-06-04",
+        "Tue 2026-06-09",
+        "Thu 2026-06-11",
+    ]
+
+
+def test_weekly_byday_respects_event_timezone_east() -> None:
+    # 2026-06-02 02:00 Asia/Tokyo == 2026-06-01 17:00Z (Mon in UTC, Tue in
+    # local). Anchoring BYDAY against UTC would shift cards by +1 day.
+    tokyo = ZoneInfo("Asia/Tokyo")
+    dtstart = datetime(2026, 6, 2, 2, 0, tzinfo=tokyo).astimezone(UTC)
+    rule = RecurrenceRule(freq="WEEKLY", by_day=["TU", "TH"], count=4)
+    out = expand(dtstart=dtstart, rule=rule, timezone="Asia/Tokyo")
+    local = [o.astimezone(tokyo).strftime("%a %Y-%m-%d %H:%M") for o in out]
+    assert local == [
+        "Tue 2026-06-02 02:00",
+        "Thu 2026-06-04 02:00",
+        "Tue 2026-06-09 02:00",
+        "Thu 2026-06-11 02:00",
+    ]
+
+
+def test_weekly_byday_until_does_not_bail_on_unsorted_candidates() -> None:
+    # Regression: candidates within a week block are computed in
+    # weekday-code order (MO..SU). When dtstart's weekday is later in the
+    # week, the MO candidate of a block falls AFTER the WE/TH/FR
+    # candidates of the same block. If MO exceeds UNTIL but WE/TH/FR
+    # don't, the loop used to bail on MO and silently drop the
+    # later-weekday-code-but-earlier-date candidates.
+    #
+    # Repro mirrors the production "Morning Yoga" series:
+    # dtstart Wed Jun 17 09:00 PDT, BYDAY=MO,TU,WE,TH,FR, UNTIL=Jun 26.
+    # Pre-fix the second week (Jun 22-26) would lose Wed Jun 24 / Thu
+    # Jun 25 because the Mon Jun 29 candidate (processed first by
+    # weekday-code order) exceeds UNTIL and bailed the whole expansion.
+    dtstart = datetime(2026, 6, 17, 16, 0, tzinfo=UTC)
+    rule = RecurrenceRule(
+        freq="WEEKLY",
+        by_day=["MO", "TU", "WE", "TH", "FR"],
+        until=datetime(2026, 6, 26),
+    )
+    out = expand(dtstart=dtstart, rule=rule, timezone="America/Los_Angeles")
+    la = ZoneInfo("America/Los_Angeles")
+    days = [o.astimezone(la).strftime("%a %m-%d") for o in out]
+    assert days == [
+        "Wed 06-17",
+        "Thu 06-18",
+        "Fri 06-19",
+        "Mon 06-22",
+        "Tue 06-23",
+        "Wed 06-24",
+        "Thu 06-25",
+    ]
+
+
+def test_weekly_byday_utc_unchanged_when_tz_matches() -> None:
+    # Sanity: when dtstart already lines up with the event's local zone the
+    # fix is a no-op — same result as the legacy naive-datetime path.
+    dtstart = datetime(2026, 4, 14, 18, 0, tzinfo=UTC)  # Tue in UTC
+    rule = RecurrenceRule(freq="WEEKLY", by_day=["TU", "TH"], count=4)
+    out = expand(dtstart=dtstart, rule=rule, timezone="UTC")
+    assert [o.strftime("%a %Y-%m-%d") for o in out] == [
+        "Tue 2026-04-14",
+        "Thu 2026-04-16",
+        "Tue 2026-04-21",
+        "Thu 2026-04-23",
     ]
 
 

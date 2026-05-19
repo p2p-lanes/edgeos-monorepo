@@ -59,6 +59,7 @@ class CheckoutRuntimeProduct(BaseModel):
     price: Decimal
     compare_price: Decimal | None = None
     image_url: str | None = None
+    images: list[str] = []
     category: str = "ticket"
     currency: str = "USD"
     attendee_category: str | None = None

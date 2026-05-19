@@ -232,6 +232,20 @@
       "patron": "Patron",
       "buyer": "Your information",
       "confirm": "Review & Confirm"
+    },
+    "video": {
+      "tap_for_sound": "Tap for sound",
+      "play_aria": "Play background video",
+      "pause_aria": "Pause background video",
+      "mute_aria": "Mute background video",
+      "unmute_aria": "Unmute background video"
+    },
+    "housing": {
+      "carousel": {
+        "enlarge_aria": "Enlarge {{name}}",
+        "previous_image_aria": "Previous image",
+        "next_image_aria": "Next image"
+      }
     }
   },
   "openCheckout": {

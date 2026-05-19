@@ -48,6 +48,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { LoadingButton } from "@/components/ui/loading-button"
+import { MultiImageUpload } from "@/components/ui/multi-image-upload"
 import {
   Select,
   SelectContent,
@@ -191,6 +192,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
       compare_price: defaultValues?.compare_price?.toString() ?? "",
       description: defaultValues?.description ?? "",
       image_url: defaultValues?.image_url ?? "",
+      images: defaultValues?.images ?? [],
       category: (defaultValues?.category ?? "ticket") as ProductCategory,
       duration_type: (defaultValues?.duration_type ?? "full") as TicketDuration,
       requires_check_in:
@@ -221,6 +223,9 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
         ? Number.parseInt(value.max_per_order, 10)
         : null
 
+      const isHousing = value.category === "housing"
+      const housingImages = isHousing ? value.images : []
+
       if (isEdit) {
         updateMutation.mutate({
           name: value.name,
@@ -228,6 +233,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
           compare_price: effectiveComparePrice,
           description: value.description || null,
           image_url: value.image_url || null,
+          images: housingImages,
           category: value.category,
           duration_type: isTicket ? value.duration_type : null,
           sale_starts_at:
@@ -253,6 +259,7 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
           compare_price: effectiveComparePrice ?? undefined,
           description: value.description || undefined,
           image_url: value.image_url || undefined,
+          images: housingImages,
           category: value.category,
           duration_type: isTicket ? value.duration_type : undefined,
           sale_starts_at:
@@ -414,6 +421,33 @@ export function ProductForm({ defaultValues, onSuccess }: ProductFormProps) {
             </div>
           )}
         </form.Field>
+
+        {/* Additional images — housing-only, rendered as a carousel in the
+            grid/showcase checkout variants. The cover above is image #1. */}
+        <form.Subscribe selector={(state) => state.values.category}>
+          {(category) =>
+            category === "housing" ? (
+              <form.Field name="images">
+                {(field) => (
+                  <div className="space-y-2">
+                    <p className="px-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      Additional images
+                    </p>
+                    <p className="px-1 text-xs text-muted-foreground">
+                      Shown after the cover in the grid/showcase carousel. Tap
+                      enlarges to a lightbox.
+                    </p>
+                    <MultiImageUpload
+                      value={field.state.value}
+                      onChange={field.handleChange}
+                      disabled={readOnly}
+                    />
+                  </div>
+                )}
+              </form.Field>
+            ) : null
+          }
+        </form.Subscribe>
 
         <Separator />
 

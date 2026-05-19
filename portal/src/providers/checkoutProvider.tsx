@@ -18,6 +18,7 @@ import {
 } from "@/checkout/popupCheckoutPolicy"
 import type { TicketingStepPublic } from "@/client"
 import { TicketingStepsService } from "@/client"
+import { CONTENT_ONLY_TEMPLATES } from "@/components/checkout-flow/registries/variantRegistry"
 import { supportsQuantitySelector } from "@/components/ui/QuantitySelector"
 import type { StepProductResolution } from "@/hooks/checkout"
 import {
@@ -240,8 +241,14 @@ export function CheckoutProvider({
       return configuredSteps
     }
 
-    // Inherit show_title/show_watermark from confirm: buyer sits adjacent to it
-    // and admins typically want consistent display between the two.
+    // Post-migration, every direct-sale popup carries a real `buyer` row whose
+    // position the admin controls from the backoffice — use it as-is.
+    if (configuredSteps.some((step) => step.step_type === "buyer")) {
+      return configuredSteps
+    }
+
+    // Legacy fallback: popup hasn't been migrated yet. Synthesize a buyer
+    // step and slot it just before confirm so checkout still works.
     const confirmStep = configuredSteps.find(
       (step) => step.step_type === "confirm",
     )
@@ -264,21 +271,18 @@ export function CheckoutProvider({
       show_watermark: confirmStep?.show_watermark ?? true,
     }
 
-    const withoutBuyer = configuredSteps.filter(
-      (step) => step.step_type !== "buyer",
-    )
-    const confirmIndex = withoutBuyer.findIndex(
+    const confirmIndex = configuredSteps.findIndex(
       (step) => step.step_type === "confirm",
     )
 
     if (confirmIndex === -1) {
-      return [...withoutBuyer, buyerStep]
+      return [...configuredSteps, buyerStep]
     }
 
     return [
-      ...withoutBuyer.slice(0, confirmIndex),
+      ...configuredSteps.slice(0, confirmIndex),
       buyerStep,
-      ...withoutBuyer.slice(confirmIndex),
+      ...configuredSteps.slice(confirmIndex),
     ]
   }, [buyerFormSchema, cityId, configuredSteps, submitMode, t])
 
@@ -723,13 +727,31 @@ export function CheckoutProvider({
   }, [availableSteps, isBuyerInfoComplete])
 
   // findFirstProductStep: pick a step to bounce the user back to when
-  // the cart is empty at confirm time. Visited steps win (the buyer was
-  // actually there), else the first product-bearing step in funnel order.
+  // the cart is empty at confirm time. Skips structural steps (buyer,
+  // confirm, success) AND content-only steps (rich-text hero, FAQs,
+  // gallery, youtube) — none of those let a user add items, so bouncing
+  // there from "cart is empty" is a dead end. Visited steps win.
   const findFirstProductStep = useCallback(
     (visited?: Set<string>): string | null => {
-      const productSteps = (availableSteps as string[]).filter(
-        (s) => s !== "buyer" && s !== "confirm" && s !== "success",
-      )
+      const isProductStep = (stepName: string) => {
+        if (
+          stepName === "buyer" ||
+          stepName === "confirm" ||
+          stepName === "success"
+        ) {
+          return false
+        }
+        const config = effectiveConfiguredSteps.find(
+          (c) =>
+            c.step_type === stepName ||
+            (c.step_type === "tickets" && stepName === "passes"),
+        )
+        if (config?.template && CONTENT_ONLY_TEMPLATES.has(config.template)) {
+          return false
+        }
+        return true
+      }
+      const productSteps = (availableSteps as string[]).filter(isProductStep)
       if (productSteps.length === 0) return null
       if (visited && visited.size > 0) {
         const visitedProduct = productSteps.find((s) => visited.has(s))
@@ -737,7 +759,7 @@ export function CheckoutProvider({
       }
       return productSteps[0]
     },
-    [availableSteps],
+    [availableSteps, effectiveConfiguredSteps],
   )
 
   // hasAnyCartItems: mirrors CartFooter's old `canContinue` cart check,

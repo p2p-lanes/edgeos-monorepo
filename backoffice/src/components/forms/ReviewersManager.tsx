@@ -291,6 +291,7 @@ function ReviewerRow({
       </div>
       {!readOnly && (
         <Button
+          type="button"
           variant="ghost"
           size="sm"
           className="text-destructive hover:text-destructive"

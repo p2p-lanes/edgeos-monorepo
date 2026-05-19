@@ -24,7 +24,12 @@ interface FaqItem {
 function parseFaqs(templateConfig: VariantProps["templateConfig"]): FaqItem[] {
   const raw = templateConfig?.items
   if (!Array.isArray(raw) || raw.length === 0) return []
-  return raw as FaqItem[]
+  // Without a stable id, opening one row makes `openId === item.id` match every undefined item.
+  return (raw as Partial<FaqItem>[]).map((item, idx) => ({
+    id: item.id ?? `faq-${idx}`,
+    question: item.question ?? "",
+    answer: item.answer ?? "",
+  }))
 }
 
 function SectionTitle({ title }: { title?: string }) {
