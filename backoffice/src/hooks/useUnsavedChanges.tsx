@@ -47,12 +47,21 @@ function useUnsavedChangesBlocker(
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function useUnsavedChanges(form: { store: any }) {
+export function useUnsavedChanges(
+  form: { store: any },
+  // Optional escape hatch for forms whose submit handler resets the form
+  // and navigates in the same tick. Setting `bypassRef.current = true`
+  // before that navigation suppresses the blocker even if a downstream
+  // effect (auto-defaults, etc.) re-dirties the form on the next render
+  // — the `unsavedChangesRef`-based AND in `shouldBlockFn` isn't enough
+  // because its sync state gets reasserted by the useEffect below.
+  bypassRef?: React.RefObject<boolean>,
+) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const isDirty = useStore(form.store, (s: any) => s.isDirty as boolean)
   return useUnsavedChangesBlocker(
-    isDirty,
-    () => form.store.state.isDirty as boolean,
+    isDirty && !bypassRef?.current,
+    () => !bypassRef?.current && (form.store.state.isDirty as boolean),
   )
 }
 
