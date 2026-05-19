@@ -222,6 +222,13 @@
       "merch": "Vörur",
       "patron": "Styrktaraðili",
       "confirm": "Yfirfara og staðfesta"
+    },
+    "video": {
+      "tap_for_sound": "Smelltu fyrir hljóð",
+      "play_aria": "Spila bakgrunnsmyndband",
+      "pause_aria": "Stöðva bakgrunnsmyndband",
+      "mute_aria": "Slökkva á hljóði bakgrunnsmyndbands",
+      "unmute_aria": "Kveikja á hljóði bakgrunnsmyndbands"
     }
   },
   "openCheckout": {

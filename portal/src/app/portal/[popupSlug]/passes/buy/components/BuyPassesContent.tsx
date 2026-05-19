@@ -2,9 +2,10 @@
 
 import { useParams, useRouter } from "next/navigation"
 import { useEffect } from "react"
+import { CheckoutBackgroundVideo } from "@/components/CheckoutBackgroundVideo"
 import ScrollyCheckoutFlow from "@/components/checkout-flow/ScrollyCheckoutFlow"
 import { Loader } from "@/components/ui/Loader"
-import { getBackgroundProps } from "@/lib/background-image"
+import { getCheckoutBackground } from "@/lib/background-image"
 import { CheckoutProvider } from "@/providers/checkoutProvider"
 import { useCityProvider } from "@/providers/cityProvider"
 import PassesProvider, { usePassesProvider } from "@/providers/passesProvider"
@@ -14,7 +15,7 @@ export default function BuyPassesContent() {
   const router = useRouter()
   const { attendeePasses: attendees, products } = usePassesProvider()
   const { getCity } = useCityProvider()
-  const background = getBackgroundProps(getCity(), "passes")
+  const background = getCheckoutBackground(getCity(), "passes")
 
   // The portal layout owns the scroll container (<main id="portal-scroll">),
   // and the SnapDotNav indicator sits on the right edge of the viewport. The
@@ -37,9 +38,12 @@ export default function BuyPassesContent() {
   return (
     <PassesProvider attendees={attendees} restoreFromCart>
       <CheckoutProvider initialStep="passes">
+        {background.type === "video" && (
+          <CheckoutBackgroundVideo url={background.url} />
+        )}
         <div
-          className={`min-h-full w-full ${background.className}`}
-          style={background.style}
+          className={`min-h-full w-full ${background.type === "none" ? "bg-background" : ""}`.trim()}
+          style={background.type === "image" ? background.style : undefined}
         >
           <ScrollyCheckoutFlow
             onBack={handleBack}

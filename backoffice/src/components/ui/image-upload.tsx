@@ -17,6 +17,16 @@ interface ImageUploadProps {
    * pre-cropped to the display aspect instead of being cropped by CSS.
    */
   cropAspect?: number
+  /** When "image+video", also accepts .mp4. Preview switches to <video>. */
+  accept?: "image" | "image+video"
+}
+
+const IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"]
+const VIDEO_TYPES = ["video/mp4"]
+const VIDEO_MAX_BYTES = 30 * 1024 * 1024 // 30 MB — short background loops only.
+
+function isVideoUrl(url: string): boolean {
+  return url.split("?")[0].split("#")[0].toLowerCase().endsWith(".mp4")
 }
 
 export function ImageUpload({
@@ -25,8 +35,17 @@ export function ImageUpload({
   className,
   disabled,
   cropAspect,
+  accept = "image",
 }: ImageUploadProps) {
-  const { uploadFile, uploadProgress, reset, isUploading } = useFileUpload()
+  const allowVideo = accept === "image+video"
+  const acceptedTypes = allowVideo
+    ? [...IMAGE_TYPES, ...VIDEO_TYPES]
+    : IMAGE_TYPES
+  const inputAccept = acceptedTypes.join(",")
+  const { uploadFile, uploadProgress, reset, isUploading } = useFileUpload({
+    acceptedTypes,
+    maxSize: allowVideo ? VIDEO_MAX_BYTES : undefined,
+  })
   const [dragActive, setDragActive] = useState(false)
   const [pendingCrop, setPendingCrop] = useState<{
     url: string
@@ -47,7 +66,10 @@ export function ImageUpload({
 
   const handleFile = useCallback(
     async (file: File) => {
-      if (cropAspect) {
+      // Videos bypass the cropper — the cropper only knows how to crop a
+      // still image.
+      const isVideo = file.type.startsWith("video/")
+      if (cropAspect && !isVideo) {
         const url = URL.createObjectURL(file)
         setPendingCrop({ url, name: file.name })
         return
@@ -120,11 +142,22 @@ export function ImageUpload({
     return (
       <>
         <div className={cn("relative inline-block min-h-[80px] min-w-[80px]", className)}>
-          <img
-            src={value}
-            alt="Uploaded"
-            className="max-w-full h-auto rounded-lg border max-h-48 object-contain"
-          />
+          {isVideoUrl(value) ? (
+            <video
+              src={value}
+              className="max-w-full h-auto rounded-lg border max-h-48 object-contain"
+              muted
+              autoPlay
+              loop
+              playsInline
+            />
+          ) : (
+            <img
+              src={value}
+              alt="Uploaded"
+              className="max-w-full h-auto rounded-lg border max-h-48 object-contain"
+            />
+          )}
           {!disabled && (
             <Button
               type="button"
@@ -193,12 +226,14 @@ export function ImageUpload({
               Drag & drop or click to upload
             </p>
             <p className="text-xs text-muted-foreground">
-              PNG, JPG, GIF, WebP up to 10MB
+              {allowVideo
+                ? "PNG, JPG, GIF, WebP up to 10MB · MP4 up to 30MB"
+                : "PNG, JPG, GIF, WebP up to 10MB"}
             </p>
             <input
               type="file"
               className="hidden"
-              accept="image/jpeg,image/png,image/gif,image/webp"
+              accept={inputAccept}
               onChange={handleChange}
               disabled={disabled}
             />

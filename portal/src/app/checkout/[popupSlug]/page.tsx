@@ -2,10 +2,11 @@
 
 import { useParams } from "next/navigation"
 import { useTranslation } from "react-i18next"
+import { CheckoutBackgroundVideo } from "@/components/CheckoutBackgroundVideo"
 import { OpenCheckoutRuntime } from "@/components/checkout-flow/OpenCheckoutRuntime"
 import { SidebarProvider } from "@/components/Sidebar/SidebarComponents"
 import useAuth from "@/hooks/useAuth"
-import { getBackgroundProps } from "@/lib/background-image"
+import { getCheckoutBackground } from "@/lib/background-image"
 import { useCheckoutRuntime } from "./hooks/useCheckoutRuntime"
 
 export default function OpenTicketingCheckoutPage() {
@@ -48,7 +49,7 @@ export default function OpenTicketingCheckoutPage() {
     )
   }
 
-  const background = getBackgroundProps(runtime.popup, "checkout")
+  const background = getCheckoutBackground(runtime.popup, "checkout")
 
   return (
     <SidebarProvider
@@ -62,9 +63,12 @@ export default function OpenTicketingCheckoutPage() {
       }
     >
       <main
-        className={`h-svh overflow-y-auto no-scrollbar ${background.className}`.trim()}
-        style={background.style}
+        className={`h-svh overflow-y-auto no-scrollbar ${background.type === "none" ? "bg-background" : ""}`.trim()}
+        style={background.type === "image" ? background.style : undefined}
       >
+        {background.type === "video" && (
+          <CheckoutBackgroundVideo url={background.url} />
+        )}
         <OpenCheckoutRuntime
           runtime={runtime}
           popupSlug={popupSlug}
