@@ -1258,6 +1258,31 @@ export type EventPublicCalendarResponse = {
 };
 
 /**
+ * Payload for the recurrence-aware preflight endpoint.
+ *
+ * ``recurrence`` is optional — passing it ``None`` is equivalent to the
+ * single-window ``/check-availability`` call, but routed through the
+ * same result schema so the frontend has one branch.
+ */
+export type EventRecurringAvailabilityCheck = {
+    venue_id: string;
+    start_time: string;
+    end_time: string;
+    timezone?: string;
+    recurrence?: (RecurrenceRule | null);
+    exdates?: Array<(string)>;
+    exclude_event_id?: (string | null);
+};
+
+export type EventRecurringAvailabilityResult = {
+    available: boolean;
+    total_occurrences: number;
+    checked_occurrences: number;
+    conflicts?: Array<OccurrenceConflict>;
+    truncated?: boolean;
+};
+
+/**
  * Event settings schema for creation.
  */
 export type EventSettingsCreate = {
@@ -1940,6 +1965,18 @@ export type ListModel_UserPublic_ = {
  */
 export type NoParticipation = {
     type?: "none";
+};
+
+/**
+ * One offending instance returned by the recurrence preflight.
+ */
+export type OccurrenceConflict = {
+    occurrence_start: string;
+    local_label: string;
+    reason: string;
+    conflicting_event_ids?: Array<(string)>;
+    conflicting_titles?: Array<(string)>;
+    effective_booking_mode?: (string | null);
 };
 
 /**
@@ -3978,6 +4015,13 @@ export type EventsSetRecurrenceData = {
 
 export type EventsSetRecurrenceResponse = (EventPublic);
 
+export type EventsListOverridesData = {
+    eventId: string;
+    xTenantId?: (string | null);
+};
+
+export type EventsListOverridesResponse = (Array<EventPublic>);
+
 export type EventsDetachOccurrenceData = {
     eventId: string;
     requestBody: OccurrenceRef;
@@ -4006,6 +4050,13 @@ export type EventsCheckAvailabilityPortalData = {
 };
 
 export type EventsCheckAvailabilityPortalResponse = (EventAvailabilityResult);
+
+export type EventsCheckRecurringAvailabilityData = {
+    requestBody: EventRecurringAvailabilityCheck;
+    xTenantId?: (string | null);
+};
+
+export type EventsCheckRecurringAvailabilityResponse = (EventRecurringAvailabilityResult);
 
 export type EventsListInvitationsData = {
     eventId: string;

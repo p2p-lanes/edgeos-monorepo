@@ -5845,6 +5845,101 @@ export const EventPublicCalendarResponseSchema = {
     description: 'Wrapper response for ``GET /events/public/calendar``.'
 } as const;
 
+export const EventRecurringAvailabilityCheckSchema = {
+    properties: {
+        venue_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Venue Id'
+        },
+        start_time: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Start Time'
+        },
+        end_time: {
+            type: 'string',
+            format: 'date-time',
+            title: 'End Time'
+        },
+        timezone: {
+            type: 'string',
+            title: 'Timezone',
+            default: 'UTC'
+        },
+        recurrence: {
+            anyOf: [
+                {
+                    '$ref': '#/components/schemas/RecurrenceRule'
+                },
+                {
+                    type: 'null'
+                }
+            ]
+        },
+        exdates: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Exdates'
+        },
+        exclude_event_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Exclude Event Id'
+        }
+    },
+    type: 'object',
+    required: ['venue_id', 'start_time', 'end_time'],
+    title: 'EventRecurringAvailabilityCheck',
+    description: `Payload for the recurrence-aware preflight endpoint.
+
+\`\`recurrence\`\` is optional — passing it \`\`None\`\` is equivalent to the
+single-window \`\`/check-availability\`\` call, but routed through the
+same result schema so the frontend has one branch.`
+} as const;
+
+export const EventRecurringAvailabilityResultSchema = {
+    properties: {
+        available: {
+            type: 'boolean',
+            title: 'Available'
+        },
+        total_occurrences: {
+            type: 'integer',
+            title: 'Total Occurrences'
+        },
+        checked_occurrences: {
+            type: 'integer',
+            title: 'Checked Occurrences'
+        },
+        conflicts: {
+            items: {
+                '$ref': '#/components/schemas/OccurrenceConflict'
+            },
+            type: 'array',
+            title: 'Conflicts',
+            default: []
+        },
+        truncated: {
+            type: 'boolean',
+            title: 'Truncated',
+            default: false
+        }
+    },
+    type: 'object',
+    required: ['available', 'total_occurrences', 'checked_occurrences'],
+    title: 'EventRecurringAvailabilityResult'
+} as const;
+
 export const EventSettingsCreateSchema = {
     properties: {
         popup_id: {
@@ -9539,6 +9634,56 @@ export const NoParticipationSchema = {
     type: 'object',
     title: 'NoParticipation',
     description: 'Response when human has no participation in the popup.'
+} as const;
+
+export const OccurrenceConflictSchema = {
+    properties: {
+        occurrence_start: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Occurrence Start'
+        },
+        local_label: {
+            type: 'string',
+            title: 'Local Label'
+        },
+        reason: {
+            type: 'string',
+            title: 'Reason'
+        },
+        conflicting_event_ids: {
+            items: {
+                type: 'string',
+                format: 'uuid'
+            },
+            type: 'array',
+            title: 'Conflicting Event Ids',
+            default: []
+        },
+        conflicting_titles: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Conflicting Titles',
+            default: []
+        },
+        effective_booking_mode: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Effective Booking Mode'
+        }
+    },
+    type: 'object',
+    required: ['occurrence_start', 'local_label', 'reason'],
+    title: 'OccurrenceConflict',
+    description: 'One offending instance returned by the recurrence preflight.'
 } as const;
 
 export const OccurrenceRefSchema = {
