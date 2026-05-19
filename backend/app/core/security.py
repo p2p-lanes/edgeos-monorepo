@@ -284,7 +284,7 @@ def decode_access_token(token: str) -> TokenPayload:
             sub=payload["sub"],
             exp=payload["exp"],
             token_type=token_type,
-            issued_via=issued_via,  # type: ignore[arg-type]
+            issued_via=issued_via,
             scopes=raw_scopes,  # type: ignore[arg-type]
             via_api_key=via_api_key,
             api_key_id=api_key_id,
