@@ -288,6 +288,13 @@ def expand(
                 for wd in target_weekdays:
                     delta_days = (wd - base_weekday) % 7
                     candidates.append(base + timedelta(days=delta_days))
+            # ``target_weekdays`` is sorted by weekday-code (MO..SU), so the
+            # candidates above are NOT in chronological order. The loop below
+            # relies on chronological order for its UNTIL / window_end early
+            # bail-out — without this sort, a block whose first weekday-code
+            # candidate exceeds UNTIL would drop later candidates that still
+            # fall within range.
+            candidates.sort()
         else:
             candidates.append(base)
 

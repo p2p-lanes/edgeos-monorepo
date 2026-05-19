@@ -209,6 +209,39 @@ def test_weekly_byday_respects_event_timezone_east() -> None:
     ]
 
 
+def test_weekly_byday_until_does_not_bail_on_unsorted_candidates() -> None:
+    # Regression: candidates within a week block are computed in
+    # weekday-code order (MO..SU). When dtstart's weekday is later in the
+    # week, the MO candidate of a block falls AFTER the WE/TH/FR
+    # candidates of the same block. If MO exceeds UNTIL but WE/TH/FR
+    # don't, the loop used to bail on MO and silently drop the
+    # later-weekday-code-but-earlier-date candidates.
+    #
+    # Repro mirrors the production "Morning Yoga" series:
+    # dtstart Wed Jun 17 09:00 PDT, BYDAY=MO,TU,WE,TH,FR, UNTIL=Jun 26.
+    # Pre-fix the second week (Jun 22-26) would lose Wed Jun 24 / Thu
+    # Jun 25 because the Mon Jun 29 candidate (processed first by
+    # weekday-code order) exceeds UNTIL and bailed the whole expansion.
+    dtstart = datetime(2026, 6, 17, 16, 0, tzinfo=UTC)
+    rule = RecurrenceRule(
+        freq="WEEKLY",
+        by_day=["MO", "TU", "WE", "TH", "FR"],
+        until=datetime(2026, 6, 26),
+    )
+    out = expand(dtstart=dtstart, rule=rule, timezone="America/Los_Angeles")
+    la = ZoneInfo("America/Los_Angeles")
+    days = [o.astimezone(la).strftime("%a %m-%d") for o in out]
+    assert days == [
+        "Wed 06-17",
+        "Thu 06-18",
+        "Fri 06-19",
+        "Mon 06-22",
+        "Tue 06-23",
+        "Wed 06-24",
+        "Thu 06-25",
+    ]
+
+
 def test_weekly_byday_utc_unchanged_when_tz_matches() -> None:
     # Sanity: when dtstart already lines up with the event's local zone the
     # fix is a no-op — same result as the legacy naive-datetime path.
