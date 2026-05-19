@@ -44,13 +44,6 @@ function ScrollyCheckoutFlowInner({
     markStepVisited,
   } = useCheckout()
 
-  const getStepConfig = (stepType: string) =>
-    stepConfigs.find(
-      (s) =>
-        s.step_type === stepType ||
-        (s.step_type === "tickets" && stepType === "passes"),
-    )
-
   const searchParams = useSearchParams()
   const params = useParams<{ popupSlug: string }>()
   const router = useRouter()
@@ -85,24 +78,40 @@ function ScrollyCheckoutFlowInner({
   const watermarkStyle: WatermarkStyle = "bold"
 
   const allSections = useMemo(() => {
+    // Walk availableSteps in funnel order and consume one matching config per
+    // step. With duplicates (e.g. two housing rows) each section gets its OWN
+    // config and a disambiguated id — `housing-2` for the second occurrence —
+    // so React keys stay unique and the variant doesn't bleed across steps.
+    const counts: Record<string, number> = {}
+    const consumedConfigIds = new Set<string>()
+
+    const defaultLabels: Record<string, string> = {
+      passes: "Select Your Passes",
+      tickets: "Select Your Passes",
+      housing: "Choose Housing",
+      merch: "Event Merchandise",
+      patron: "Become a Patron",
+      confirm: "Review & Confirm",
+    }
+
     return availableSteps
       .filter((s) => s !== "success")
       .map((step) => {
+        counts[step] = (counts[step] ?? 0) + 1
+        const sectionId = counts[step] === 1 ? step : `${step}-${counts[step]}`
+
         const config = stepConfigs.find(
           (c) =>
-            c.step_type === step ||
-            (c.step_type === "tickets" && step === "passes"),
+            !consumedConfigIds.has(c.id) &&
+            (c.step_type === step ||
+              (c.step_type === "tickets" && step === "passes")),
         )
-        const defaultLabels: Record<string, string> = {
-          passes: "Select Your Passes",
-          tickets: "Select Your Passes",
-          housing: "Choose Housing",
-          merch: "Event Merchandise",
-          patron: "Become a Patron",
-          confirm: "Review & Confirm",
-        }
+        if (config) consumedConfigIds.add(config.id)
+
         return {
-          id: step,
+          id: sectionId,
+          stepType: step,
+          config: config ?? null,
           label: config?.title ?? defaultLabels[step] ?? step,
           template: config?.template ?? null,
           emoji: config?.emoji ?? null,
@@ -293,26 +302,19 @@ function ScrollyCheckoutFlowInner({
     }
   }, [allSections, isInitialLoading, markStepVisited])
 
-  const renderSectionContent = (stepId: string) => {
-    // Buyer and confirm are structural steps — wired explicitly, not via DynamicProductStep.
-    if (stepId === "buyer") return <OpenCheckoutBuyerStep />
-    if (stepId === "confirm") return <ConfirmStep />
+  const renderSectionContent = (section: (typeof allSections)[number]) => {
+    const { stepType, config } = section
 
-    // Passes/tickets: dynamic step or legacy PassSelectionSection fallback.
-    if (stepId === "passes" || stepId === "tickets") {
-      const ticketConfig = getStepConfig("tickets") ?? getStepConfig("passes")
-      if (shouldUseDynamicStep(ticketConfig)) {
-        return (
-          <DynamicProductStep stepConfig={ticketConfig!} onSkip={() => {}} />
-        )
+    if (stepType === "buyer") return <OpenCheckoutBuyerStep />
+    if (stepType === "confirm") return <ConfirmStep />
+
+    if (stepType === "passes" || stepType === "tickets") {
+      if (shouldUseDynamicStep(config ?? undefined)) {
+        return <DynamicProductStep stepConfig={config!} onSkip={() => {}} />
       }
       return <PassSelectionSection />
     }
 
-    // All other product steps route through DynamicProductStep.
-    // If no config found or no template, DynamicProductStep shows the appropriate
-    // empty/error state rather than a phantom legacy card.
-    const config = getStepConfig(stepId)
     if (config) {
       return <DynamicProductStep stepConfig={config} onSkip={() => {}} />
     }
@@ -353,7 +355,7 @@ function ScrollyCheckoutFlowInner({
       />
       <CheckoutToast onChipClick={scrollToStep} />
       {allSections.map((section) => {
-        const config = getStepConfig(section.id)
+        const { config } = section
         return (
           <SnapSection
             key={section.id}
@@ -369,7 +371,7 @@ function ScrollyCheckoutFlowInner({
               showTitle={config?.show_title ?? true}
               showWatermark={config?.show_watermark ?? true}
             />
-            {renderSectionContent(section.id)}
+            {renderSectionContent(section)}
             {(() => {
               const ft = (
                 config?.template_config as Record<string, unknown> | undefined
