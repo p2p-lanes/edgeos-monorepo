@@ -386,6 +386,12 @@ function ProductImageCarousel({
   const imageClickProps = hasMany
     ? {
         onClick: openLightbox,
+        onKeyDown: (e: React.KeyboardEvent) => {
+          if (e.key === "Enter" || e.key === " ") {
+            if (e.key === " ") e.preventDefault()
+            openLightbox(e)
+          }
+        },
         role: "button" as const,
         tabIndex: 0,
         "aria-label": t("checkout.housing.carousel.enlarge_aria", {
