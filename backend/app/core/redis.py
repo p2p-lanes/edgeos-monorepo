@@ -146,11 +146,23 @@ class AuthCodeStore:
         return self._store_code(self.PREFIX_USER, str(user_id), code)
 
     def store_human_code(
-        self, tenant_id: uuid.UUID, email: str, code: str, is_pending: bool = False
+        self,
+        tenant_id: uuid.UUID,
+        email: str,
+        code: str,
+        is_pending: bool = False,
+        origin: str = "portal",
     ) -> bool:
-        """Store auth code for a human (existing or pending)."""
+        """Store auth code for a human (existing or pending).
+
+        `origin` segments the key so codes emitted by different flows
+        (portal, third_party) live in separate slots and cannot be
+        redeemed cross-flow. Pending codes always use portal-origin (the
+        third-party flow rejects unknown emails before reaching the
+        pending path).
+        """
         prefix = self.PREFIX_PENDING if is_pending else self.PREFIX_HUMAN
-        identifier = f"{tenant_id}:{email.lower()}"
+        identifier = f"{origin}:{tenant_id}:{email.lower()}"
         return self._store_code(prefix, identifier, code)
 
     def _store_code(self, prefix: str, identifier: str, code: str) -> bool:
@@ -177,11 +189,20 @@ class AuthCodeStore:
         return self._verify_code(self.PREFIX_USER, str(user_id), code)
 
     def verify_human_code(
-        self, tenant_id: uuid.UUID, email: str, code: str, is_pending: bool = False
+        self,
+        tenant_id: uuid.UUID,
+        email: str,
+        code: str,
+        is_pending: bool = False,
+        origin: str = "portal",
     ) -> tuple[bool, str]:
-        """Verify auth code for a human."""
+        """Verify auth code for a human against the given origin slot.
+
+        Codes are stored per-origin (see `store_human_code`); reading the
+        portal slot will not see a code emitted by the third-party flow.
+        """
         prefix = self.PREFIX_PENDING if is_pending else self.PREFIX_HUMAN
-        identifier = f"{tenant_id}:{email.lower()}"
+        identifier = f"{origin}:{tenant_id}:{email.lower()}"
         return self._verify_code(prefix, identifier, code)
 
     def _verify_code(self, prefix: str, identifier: str, code: str) -> tuple[bool, str]:

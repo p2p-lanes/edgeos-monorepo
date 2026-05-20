@@ -220,6 +220,7 @@ async def _send_human_code(
     *,
     tenant_id: uuid.UUID,
     human: "Humans",
+    origin: str = "portal",
 ) -> tuple[str, int]:
     """Generate and send an OTP for an already-resolved human record.
 
@@ -227,19 +228,26 @@ async def _send_human_code(
     (third-party surface). Never creates a pending row — callers are
     responsible for ensuring the human record already exists.
 
+    `origin` tags the code so the verify path can enforce flow isolation
+    (a third-party code cannot be redeemed via the portal flow). Defaults
+    to "portal" to keep the regular human login backwards-compatible.
+
     Returns (email, CODE_EXPIRATION_MINUTES).
     """
     auth_code = generate_auth_code()
     tenant = session.get(Tenants, tenant_id)
 
     if is_redis_available():
-        auth_code_store.store_human_code(tenant_id, human.email, auth_code, is_pending=False)
+        auth_code_store.store_human_code(
+            tenant_id, human.email, auth_code, is_pending=False, origin=origin
+        )
         logger.debug(f"Auth code stored in Redis for existing human: {human.email}")
     else:
         code_expiration = create_code_expiration(CODE_EXPIRATION_MINUTES)
         human.auth_code = auth_code
         human.code_expiration = code_expiration
         human.auth_attempts = 0
+        human.auth_code_origin = origin
         session.add(human)
         session.commit()
 
@@ -299,7 +307,9 @@ async def login_existing_human(
             detail="Authentication failed",
         )
 
-    return await _send_human_code(session, tenant_id=tenant_id, human=existing)
+    return await _send_human_code(
+        session, tenant_id=tenant_id, human=existing, origin="third_party"
+    )
 
 
 async def login_human(
@@ -405,6 +415,7 @@ async def authenticate_human(
     email: str,
     tenant_id: uuid.UUID,
     code: str,
+    expected_origin: str = "portal",
 ) -> Humans:
     """
     Verify authentication code for a human.
@@ -412,17 +423,13 @@ async def authenticate_human(
     If human exists: authenticate using human record (like user authentication).
     If human doesn't exist: create human from pending record after validation.
 
-    Args:
-        session: Database session
-        email: Human's email address
-        tenant_id: Tenant ID
-        code: 6-digit authentication code
+    `expected_origin` scopes verification to codes that were emitted by the
+    matching flow (portal vs third_party). Codes stored with a different
+    origin will not be found in Redis (different key prefix) and will fail
+    the DB-fallback origin check. The pending-human branch is portal-only.
 
-    Returns:
-        Authenticated human
-
-    Raises:
-        HTTPException: If verification fails
+    Legacy compat: a row whose `auth_code_origin` is NULL is treated as
+    portal-origin so in-flight codes from before the upgrade still work.
     """
     # First check if human already exists
     human_statement = select(Humans).where(
@@ -435,7 +442,7 @@ async def authenticate_human(
         # Human exists: authenticate
         if is_redis_available():
             is_valid, error_message = auth_code_store.verify_human_code(
-                tenant_id, email, code, is_pending=False
+                tenant_id, email, code, is_pending=False, origin=expected_origin
             )
             if not is_valid:
                 if "Maximum" in error_message:
@@ -461,6 +468,15 @@ async def authenticate_human(
                     detail="Maximum authentication attempts exceeded. Please request a new code.",
                 )
 
+            stored_origin = existing_human.auth_code_origin or "portal"
+            if stored_origin != expected_origin:
+                # Same human, valid code in storage, but emitted by a
+                # different flow. Reject without leaking which flow.
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid authentication code",
+                )
+
             is_valid, error_message = is_code_valid(
                 stored_code=existing_human.auth_code,
                 provided_code=code,
@@ -481,6 +497,7 @@ async def authenticate_human(
             existing_human.auth_code = None
             existing_human.code_expiration = None
             existing_human.auth_attempts = 0
+            existing_human.auth_code_origin = None
             session.add(existing_human)
             session.commit()
 

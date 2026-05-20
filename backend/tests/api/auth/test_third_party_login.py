@@ -314,3 +314,55 @@ class TestThirdPartyJwtAccess:
             headers={"Authorization": f"Bearer {token}"},
         )
         assert resp.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Cross-flow OTP isolation — a code emitted by the third-party flow
+# MUST NOT be redeemable via the portal /authenticate endpoint, and
+# vice-versa.
+# ---------------------------------------------------------------------------
+
+
+class TestCrossFlowOtpIsolation:
+    def test_third_party_code_cannot_authenticate_via_portal(
+        self,
+        client: TestClient,
+        db: Session,
+        third_party_enabled_tenant: tuple[Tenants, str],
+    ) -> None:
+        """An OTP emitted via third-party login must be rejected by the
+        regular portal /auth/human/authenticate endpoint."""
+        from unittest.mock import patch
+
+        from app.services.email import EmailService
+
+        tenant, raw_key = third_party_enabled_tenant
+        email = f"tp-isolate-{uuid.uuid4().hex[:8]}@example.com"
+        _make_human(db, tenant=tenant, email=email)
+
+        captured_code: list[str] = []
+
+        async def _fake_send(_self, **kwargs) -> bool:  # noqa: ANN001
+            captured_code.append(kwargs["context"].auth_code)
+            return True
+
+        with patch.object(EmailService, "send_login_code_human", _fake_send):
+            login_resp = client.post(
+                LOGIN_URL,
+                headers=_login_headers(raw_key),
+                json={"email": email},
+            )
+        assert login_resp.status_code == 200
+        assert captured_code
+
+        portal_resp = client.post(
+            "/api/v1/auth/human/authenticate",
+            json={
+                "email": email,
+                "tenant_id": str(tenant.id),
+                "code": captured_code[0],
+            },
+        )
+        assert portal_resp.status_code == 401, (
+            "Third-party code must not be redeemable via portal authenticate"
+        )

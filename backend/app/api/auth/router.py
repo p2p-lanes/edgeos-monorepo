@@ -265,6 +265,7 @@ async def third_party_human_authenticate(
         email=request.email,
         tenant_id=tenant.id,
         code=request.code,
+        expected_origin="third_party",
     )
 
     access_token = create_access_token(
