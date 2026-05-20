@@ -37,6 +37,11 @@ class HumanBase(SQLModel):
     # current OTP so the verify path can reject cross-flow redemption.
     auth_code_origin: str | None = Field(default=None, max_length=20)
 
+    @field_validator("email", mode="after")
+    @classmethod
+    def normalize_email(cls, v: str) -> str:
+        return v.lower().strip()
+
 
 class HumanPublic(BaseModel):
     """Human schema for API responses."""
