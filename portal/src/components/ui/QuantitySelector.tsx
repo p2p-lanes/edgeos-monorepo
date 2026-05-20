@@ -123,7 +123,9 @@ const QuantitySelector = ({
 
   // Empty-slot state: single "+" add button — filled tile CTA, sized larger
   // than the +/- adjustment buttons so it reads as the primary action.
-  if (value === 0 && onAdd && !disabled) {
+  // Skip when max is 0 (sold out / unavailable) so we don't offer an action
+  // the parent will reject.
+  if (value === 0 && onAdd && !disabled && max > 0) {
     const isAccent = tone === "accent"
     const addClasses = cn(
       "transition-all duration-200 ease-out transform hover:scale-110 active:scale-95 flex items-center justify-center rounded-full shadow-sm",

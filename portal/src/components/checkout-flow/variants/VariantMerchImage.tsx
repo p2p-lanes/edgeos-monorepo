@@ -5,9 +5,10 @@ import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import ExpandableDescription from "@/components/ui/ExpandableDescription"
 import QuantitySelector, {
-  resolveMaxQuantity,
   supportsQuantitySelector,
 } from "@/components/ui/QuantitySelector"
+import SoldOutBadge from "@/components/ui/SoldOutBadge"
+import { getProductAvailability } from "@/lib/product-availability"
 import { cn } from "@/lib/utils"
 import { useCheckout } from "@/providers/checkoutProvider"
 import { formatCurrency } from "@/types/checkout"
@@ -33,7 +34,15 @@ function MerchQtyControl({
   onQuantityChange,
 }: MerchQtyControlProps) {
   const showStepper = supportsQuantitySelector(product.max_per_order)
-  const max = resolveMaxQuantity(product)
+  const {
+    state,
+    canSelect,
+    maxAllowedQuantity: max,
+  } = getProductAvailability(product)
+
+  if (!canSelect) {
+    return state === "sold_out" ? <SoldOutBadge /> : null
+  }
 
   if (showStepper) {
     return (
@@ -98,12 +107,14 @@ function MerchDefaultItem({
   const hasQuantity = quantity > 0
   const hasDiscount =
     product.compare_price != null && product.compare_price > product.price
+  const { canSelect } = getProductAvailability(product)
 
   return (
     <div
       className={cn(
         "p-4 transition-colors",
         hasQuantity ? "bg-primary/10" : "",
+        !canSelect && "opacity-60",
       )}
     >
       {/* Desktop layout */}
@@ -276,6 +287,7 @@ function MerchGrid({ products, getQuantity, onQuantityChange }: CardListProps) {
           const hasDiscount =
             product.compare_price != null &&
             product.compare_price > product.price
+          const { canSelect } = getProductAvailability(product)
 
           return (
             <div
@@ -283,6 +295,7 @@ function MerchGrid({ products, getQuantity, onQuantityChange }: CardListProps) {
               className={cn(
                 "rounded-2xl border overflow-hidden bg-checkout-card-bg transition-all",
                 hasQty ? "border-primary/30" : "border-border",
+                !canSelect && "opacity-60",
               )}
             >
               <div className="relative w-full aspect-square bg-muted flex items-center justify-center">
@@ -361,12 +374,15 @@ function MerchCompact({
         const hasQty = qty > 0
         const hasDiscount =
           product.compare_price != null && product.compare_price > product.price
+        const { canSelect } = getProductAvailability(product)
 
         const cardClassName = cn(
           "group relative w-full flex items-center gap-3 rounded-2xl border bg-checkout-card-bg px-3 py-2.5 transition-all",
           hasQty
             ? "border-primary/30 shadow-sm"
             : "border-border cursor-pointer hover:border-muted-foreground/40 hover:shadow-sm",
+          !canSelect &&
+            "opacity-60 cursor-not-allowed hover:border-border hover:shadow-none",
         )
 
         const cardBody = (
@@ -426,7 +442,15 @@ function MerchCompact({
             </div>
 
             <div className="relative shrink-0">
-              {hasQty ? (
+              {!canSelect ? (
+                <MerchQtyControl
+                  product={product}
+                  quantity={qty}
+                  onQuantityChange={(nextQty) =>
+                    onQuantityChange(product.id, nextQty)
+                  }
+                />
+              ) : hasQty ? (
                 <MerchQtyControl
                   product={product}
                   quantity={qty}
@@ -446,7 +470,7 @@ function MerchCompact({
           </>
         )
 
-        return hasQty ? (
+        return hasQty || !canSelect ? (
           <div key={product.id} className={cardClassName}>
             {cardBody}
           </div>
