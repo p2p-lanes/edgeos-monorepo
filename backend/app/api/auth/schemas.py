@@ -1,6 +1,10 @@
 import uuid
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
+
+
+def _normalize_email(v: str) -> str:
+    return v.lower().strip()
 
 
 # User (backoffice) authentication schemas
@@ -9,12 +13,16 @@ class UserAuth(BaseModel):
 
     email: EmailStr
 
+    _normalize_email = field_validator("email", mode="after")(_normalize_email)
+
 
 class UserVerify(BaseModel):
     """Request to authenticate a user."""
 
     email: EmailStr
     code: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
+
+    _normalize_email = field_validator("email", mode="after")(_normalize_email)
 
 
 # Human (external app) authentication schemas
@@ -26,6 +34,8 @@ class HumanAuth(BaseModel):
     picture_url: str | None = None
     red_flag: bool = False
 
+    _normalize_email = field_validator("email", mode="after")(_normalize_email)
+
 
 class HumanVerify(BaseModel):
     """Request to verify human authentication code."""
@@ -33,6 +43,8 @@ class HumanVerify(BaseModel):
     email: str
     tenant_id: uuid.UUID
     code: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
+
+    _normalize_email = field_validator("email", mode="after")(_normalize_email)
 
 
 # Response schemas
