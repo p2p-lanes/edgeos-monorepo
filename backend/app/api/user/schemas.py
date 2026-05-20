@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import EmailStr
+from pydantic import EmailStr, field_validator
 from sqlmodel import DateTime, Field, SQLModel
 
 from app.api.shared.enums import UserRole
@@ -22,6 +22,11 @@ class UserBase(SQLModel):
     )
     auth_attempts: int = Field(default=0)
 
+    @field_validator("email", mode="after")
+    @classmethod
+    def normalize_email(cls, v: str) -> str:
+        return v.lower().strip()
+
 
 class UserCreate(UserBase): ...
 
@@ -34,3 +39,10 @@ class UserUpdate(SQLModel):
     email: EmailStr | None = None
     full_name: str | None = None
     role: UserRole | None = None
+
+    @field_validator("email", mode="after")
+    @classmethod
+    def normalize_email(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        return v.lower().strip()

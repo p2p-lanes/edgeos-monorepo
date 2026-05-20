@@ -1,12 +1,4 @@
-import {
-  BookOpen,
-  CalendarDays,
-  FileText,
-  Key,
-  MapPin,
-  Ticket,
-  Users,
-} from "lucide-react"
+import { CalendarDays, FileText, MapPin, Ticket, Users } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { OpenClaw } from "@/components/Icons/OpenClaw"
 import useAuth from "@/hooks/useAuth"
@@ -92,25 +84,13 @@ const useResources = () => {
             status: companionEventsVisible ? "active" : "hidden",
             path: `/portal/${city?.slug}/events/venues`,
           },
-        ],
-      },
-      {
-        name: t("sidebar.agentic_access", { defaultValue: "Agentic access" }),
-        icon: OpenClaw,
-        status: companionEventsVisible ? "active" : "hidden",
-        path: "/portal/api-keys",
-        children: [
           {
-            name: t("sidebar.api_keys", { defaultValue: "API Keys" }),
-            icon: Key,
+            name: t("sidebar.agentic_access", {
+              defaultValue: "Agentic access",
+            }),
+            icon: OpenClaw,
             status: companionEventsVisible ? "active" : "hidden",
-            path: "/portal/api-keys",
-          },
-          {
-            name: t("sidebar.api_docs", { defaultValue: "API Docs" }),
-            icon: BookOpen,
-            status: companionEventsVisible ? "active" : "hidden",
-            path: "/portal/docs",
+            path: "/portal/agentic-access",
           },
         ],
       },
@@ -157,25 +137,11 @@ const useResources = () => {
           status: canSeeAttendees && eventsEnabled ? "active" : "hidden",
           path: `/portal/${city?.slug}/events/venues`,
         },
-      ],
-    },
-    {
-      name: t("sidebar.agentic_access", { defaultValue: "Agentic access" }),
-      icon: OpenClaw,
-      status: canSeeAttendees && eventsEnabled ? "active" : "hidden",
-      path: "/portal/api-keys",
-      children: [
         {
-          name: t("sidebar.api_keys", { defaultValue: "API Keys" }),
-          icon: Key,
+          name: t("sidebar.agentic_access", { defaultValue: "Agentic access" }),
+          icon: OpenClaw,
           status: canSeeAttendees && eventsEnabled ? "active" : "hidden",
-          path: "/portal/api-keys",
-        },
-        {
-          name: t("sidebar.api_docs", { defaultValue: "API Docs" }),
-          icon: BookOpen,
-          status: canSeeAttendees && eventsEnabled ? "active" : "hidden",
-          path: "/portal/docs",
+          path: "/portal/agentic-access",
         },
       ],
     },
