@@ -174,6 +174,48 @@ class TestRecurrenceConflictMessage:
         assert resp.json()["detail"] == "Venue already booked (conflicts: Lunch)"
 
 
+class TestFreedStatusesDoNotConflict:
+    """CANCELLED and REJECTED events must release their venue slot."""
+
+    def test_rejected_event_does_not_block_new_booking(
+        self,
+        client: TestClient,
+        db: Session,
+        tenant_a: Tenants,
+        admin_token_tenant_a: str,
+    ) -> None:
+        popup = _make_popup(db, tenant_a)
+        venue = _make_venue(db, tenant_a, popup)
+
+        slot = datetime(2026, 8, 4, 15, 0, tzinfo=UTC)
+        rejected = _make_event(
+            db,
+            tenant_a,
+            popup,
+            start=slot,
+            venue_id=venue.id,
+            title="Rejected Request",
+        )
+        rejected.status = EventStatus.REJECTED
+        db.add(rejected)
+        db.commit()
+
+        resp = client.post(
+            "/api/v1/events",
+            headers=_auth(admin_token_tenant_a),
+            json={
+                "popup_id": str(popup.id),
+                "title": "Replacement",
+                "start_time": slot.isoformat(),
+                "end_time": (slot + timedelta(hours=1)).isoformat(),
+                "timezone": "UTC",
+                "venue_id": str(venue.id),
+            },
+        )
+
+        assert resp.status_code == 201, resp.text
+
+
 class TestFormatOccurrenceLabel:
     """Direct coverage for the locale-independent label formatter."""
 
