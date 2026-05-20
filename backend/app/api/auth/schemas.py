@@ -47,6 +47,28 @@ class HumanVerify(BaseModel):
     _normalize_email = field_validator("email", mode="after")(_normalize_email)
 
 
+# Third-party OTP authentication schemas
+class ThirdPartyHumanLogin(BaseModel):
+    """Request body for POST /auth/human/third-party/login.
+
+    The API key comes from the X-Third-Party-Api-Key header; the tenant is
+    resolved server-side from the key.
+    """
+
+    email: EmailStr
+
+
+class ThirdPartyHumanVerify(BaseModel):
+    """Request body for POST /auth/human/third-party/authenticate.
+
+    The API key comes from the X-Third-Party-Api-Key header; the tenant is
+    resolved server-side from the key.
+    """
+
+    email: EmailStr
+    code: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
+
+
 # Response schemas
 class AuthTokenResponse(BaseModel):
     """Response containing JWT access token."""

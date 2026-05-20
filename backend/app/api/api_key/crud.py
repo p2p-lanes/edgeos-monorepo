@@ -113,6 +113,95 @@ def revoke(session: Session, row: ApiKeys) -> ApiKeys:
     return row
 
 
+def create_for_user(
+    session: Session,
+    *,
+    tenant_id: uuid.UUID,
+    user_id: uuid.UUID,
+    name: str,
+    expires_at: datetime | None,
+    scopes: list[str],
+) -> tuple[ApiKeys, str]:
+    """Mint and persist an admin-owned key. Returns (row, raw_token).
+
+    Mirrors ``create_for_human`` but persists ``user_id`` and leaves
+    ``human_id=None``, satisfying the XOR CHECK constraint.
+    """
+    raw = generate_raw_key()
+    row = ApiKeys(
+        tenant_id=tenant_id,
+        user_id=user_id,
+        human_id=None,
+        name=name,
+        key_hash=hash_key(raw),
+        prefix=display_prefix(raw),
+        scopes=scopes,
+        expires_at=expires_at,
+    )
+    session.add(row)
+    session.commit()
+    session.refresh(row)
+    return row, raw
+
+
+def list_for_user(session: Session, user_id: uuid.UUID) -> list[ApiKeys]:
+    """All keys (active + revoked) for the given user, newest first.
+
+    Includes revoked entries so the caller can display an audit trail.
+    """
+    return list(
+        session.exec(
+            select(ApiKeys)
+            .where(ApiKeys.user_id == user_id)
+            .order_by(ApiKeys.created_at.desc())
+        ).all()
+    )
+
+
+def list_all_admin_keys(session: Session) -> list[ApiKeys]:
+    """All admin keys visible on the given session, newest first.
+
+    Relies on RLS to scope the result to the correct tenant when the session
+    is a tenant-scoped engine (SUPERADMIN path). Returns only rows where
+    ``user_id`` is set (admin-owned); never returns human-owned keys.
+    """
+    return list(
+        session.exec(
+            select(ApiKeys)
+            .where(ApiKeys.user_id.is_not(None))
+            .order_by(ApiKeys.created_at.desc())
+        ).all()
+    )
+
+
+def get_for_user(
+    session: Session, key_id: uuid.UUID, user_id: uuid.UUID
+) -> ApiKeys | None:
+    """Fetch a specific key visible to the given user.
+
+    Returns None if the key doesn't exist or belongs to a different user.
+    """
+    return session.exec(
+        select(ApiKeys).where(ApiKeys.id == key_id).where(ApiKeys.user_id == user_id)
+    ).first()
+
+
+def get_any_admin_key(
+    session: Session, key_id: uuid.UUID
+) -> ApiKeys | None:
+    """Fetch an admin key by id on the current session (SUPERADMIN path).
+
+    Relies on RLS to scope to the correct tenant. Returns None if the key
+    does not exist, belongs to a different tenant (RLS hides it), or is
+    a human-owned key (user_id is None).
+    """
+    return session.exec(
+        select(ApiKeys)
+        .where(ApiKeys.id == key_id)
+        .where(ApiKeys.user_id.is_not(None))
+    ).first()
+
+
 def revoke_all_for_human(session: Session, human_id: uuid.UUID) -> int:
     rows = list(
         session.exec(

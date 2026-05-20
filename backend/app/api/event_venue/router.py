@@ -37,12 +37,12 @@ from app.api.event_venue.schemas import (
 )
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
+    AdminOrApiKey_EventsRead,
+    AdminOrApiKey_VenuesWrite,
+    AdminOrApiKeySession_EventsRead,
+    AdminOrApiKeySession_VenuesWrite,
     CurrentHuman,
-    CurrentTenant,
-    CurrentUser,
-    CurrentWriter,
     HumanTenantSession,
-    TenantSession,
 )
 
 GALLERY_MAX_PHOTOS = 10
@@ -144,8 +144,8 @@ def _get_venue_or_404(db, venue_id: uuid.UUID) -> EventVenues:
 
 @router.get("", response_model=ListModel[EventVenuePublic])
 async def list_venues(
-    db: TenantSession,
-    _: CurrentUser,
+    db: AdminOrApiKeySession_EventsRead,
+    _: AdminOrApiKey_EventsRead,
     popup_id: uuid.UUID | None = None,
     search: str | None = None,
     skip: PaginationSkip = 0,
@@ -177,8 +177,8 @@ async def list_venues(
 @router.patch("/reorder", status_code=status.HTTP_204_NO_CONTENT)
 async def reorder_venues(
     payload: VenueReorderPayload,
-    db: TenantSession,
-    _: CurrentWriter,
+    db: AdminOrApiKeySession_VenuesWrite,
+    _: AdminOrApiKey_VenuesWrite,
 ) -> None:
     """Persist a manual venue ordering for a popup.
 
@@ -225,8 +225,8 @@ async def reorder_venues(
 @router.get("/{venue_id}", response_model=EventVenuePublic)
 async def get_venue(
     venue_id: uuid.UUID,
-    db: TenantSession,
-    _: CurrentUser,
+    db: AdminOrApiKeySession_EventsRead,
+    _: AdminOrApiKey_EventsRead,
 ) -> EventVenuePublic:
     venue = _get_venue_or_404(db, venue_id)
     return EventVenuePublic.model_validate(venue)
@@ -235,8 +235,8 @@ async def get_venue(
 @router.post("", response_model=EventVenuePublic, status_code=status.HTTP_201_CREATED)
 async def create_venue(
     venue_in: EventVenueCreate,
-    db: TenantSession,
-    current_user: CurrentWriter,
+    db: AdminOrApiKeySession_VenuesWrite,
+    current_user: AdminOrApiKey_VenuesWrite,
 ) -> EventVenuePublic:
     from app.api.popup.crud import popups_crud
     from app.api.shared.enums import UserRole
@@ -269,8 +269,8 @@ async def create_venue(
 async def update_venue(
     venue_id: uuid.UUID,
     venue_in: EventVenueUpdate,
-    db: TenantSession,
-    _: CurrentWriter,
+    db: AdminOrApiKeySession_VenuesWrite,
+    _: AdminOrApiKey_VenuesWrite,
 ) -> EventVenuePublic:
     venue = _get_venue_or_404(db, venue_id)
     update_data = venue_in.model_dump(exclude_unset=True, exclude={"property_type_ids"})
@@ -286,8 +286,8 @@ async def update_venue(
 @router.delete("/{venue_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_venue(
     venue_id: uuid.UUID,
-    db: TenantSession,
-    _: CurrentWriter,
+    db: AdminOrApiKeySession_VenuesWrite,
+    _: AdminOrApiKey_VenuesWrite,
 ) -> None:
     venue = _get_venue_or_404(db, venue_id)
     crud.event_venues_crud.delete(db, venue)
@@ -302,8 +302,8 @@ async def delete_venue(
 async def set_weekly_hours(
     venue_id: uuid.UUID,
     payload: VenueWeeklyHoursUpdate,
-    db: TenantSession,
-    _: CurrentWriter,
+    db: AdminOrApiKeySession_VenuesWrite,
+    _: AdminOrApiKey_VenuesWrite,
 ) -> dict:
     venue = _get_venue_or_404(db, venue_id)
     existing = list(
@@ -351,8 +351,8 @@ async def set_weekly_hours(
 @router.get("/{venue_id}/exceptions", response_model=list[VenueExceptionPublic])
 async def list_exceptions(
     venue_id: uuid.UUID,
-    db: TenantSession,
-    _: CurrentUser,
+    db: AdminOrApiKeySession_EventsRead,
+    _: AdminOrApiKey_EventsRead,
 ) -> list[VenueExceptionPublic]:
     rows = list(
         db.exec(
@@ -372,8 +372,8 @@ async def list_exceptions(
 async def create_exception(
     venue_id: uuid.UUID,
     payload: VenueExceptionCreate,
-    db: TenantSession,
-    _: CurrentWriter,
+    db: AdminOrApiKeySession_VenuesWrite,
+    _: AdminOrApiKey_VenuesWrite,
 ) -> VenueExceptionPublic:
     venue = _get_venue_or_404(db, venue_id)
     if payload.start_datetime >= payload.end_datetime:
@@ -402,8 +402,8 @@ async def update_exception(
     venue_id: uuid.UUID,
     exception_id: uuid.UUID,
     payload: VenueExceptionUpdate,
-    db: TenantSession,
-    _: CurrentWriter,
+    db: AdminOrApiKeySession_VenuesWrite,
+    _: AdminOrApiKey_VenuesWrite,
 ) -> VenueExceptionPublic:
     exc = db.get(VenueExceptions, exception_id)
     if not exc or exc.venue_id != venue_id:
@@ -423,8 +423,8 @@ async def update_exception(
 async def delete_exception(
     venue_id: uuid.UUID,
     exception_id: uuid.UUID,
-    db: TenantSession,
-    _: CurrentWriter,
+    db: AdminOrApiKeySession_VenuesWrite,
+    _: AdminOrApiKey_VenuesWrite,
 ) -> None:
     exc = db.get(VenueExceptions, exception_id)
     if not exc or exc.venue_id != venue_id:
@@ -441,8 +441,8 @@ async def delete_exception(
 @router.get("/{venue_id}/photos", response_model=list[VenuePhotoPublic])
 async def list_photos(
     venue_id: uuid.UUID,
-    db: TenantSession,
-    _: CurrentUser,
+    db: AdminOrApiKeySession_EventsRead,
+    _: AdminOrApiKey_EventsRead,
 ) -> list[VenuePhotoPublic]:
     rows = list(
         db.exec(
@@ -462,8 +462,8 @@ async def list_photos(
 async def add_photo(
     venue_id: uuid.UUID,
     payload: VenuePhotoCreate,
-    db: TenantSession,
-    _: CurrentWriter,
+    db: AdminOrApiKeySession_VenuesWrite,
+    _: AdminOrApiKey_VenuesWrite,
 ) -> VenuePhotoPublic:
     venue = _get_venue_or_404(db, venue_id)
     current_count = len(
@@ -491,8 +491,8 @@ async def update_photo(
     venue_id: uuid.UUID,
     photo_id: uuid.UUID,
     payload: VenuePhotoUpdate,
-    db: TenantSession,
-    _: CurrentWriter,
+    db: AdminOrApiKeySession_VenuesWrite,
+    _: AdminOrApiKey_VenuesWrite,
 ) -> VenuePhotoPublic:
     photo = db.get(VenuePhotos, photo_id)
     if not photo or photo.venue_id != venue_id:
@@ -509,8 +509,8 @@ async def update_photo(
 async def delete_photo(
     venue_id: uuid.UUID,
     photo_id: uuid.UUID,
-    db: TenantSession,
-    _: CurrentWriter,
+    db: AdminOrApiKeySession_VenuesWrite,
+    _: AdminOrApiKey_VenuesWrite,
 ) -> None:
     photo = db.get(VenuePhotos, photo_id)
     if not photo or photo.venue_id != venue_id:
@@ -695,8 +695,8 @@ def _compute_availability(
 @router.get("/{venue_id}/availability", response_model=VenueAvailability)
 async def get_availability(
     venue_id: uuid.UUID,
-    db: TenantSession,
-    _: CurrentUser,
+    db: AdminOrApiKeySession_EventsRead,
+    _: AdminOrApiKey_EventsRead,
     start: datetime = Query(...),
     end: datetime = Query(...),
     exclude_event_id: uuid.UUID | None = Query(default=None),
@@ -870,8 +870,8 @@ async def create_portal_venue(
 
 @property_types_router.get("", response_model=list[VenuePropertyTypePublic])
 async def list_property_types(
-    db: TenantSession,
-    _: CurrentUser,
+    db: AdminOrApiKeySession_EventsRead,
+    _: AdminOrApiKey_EventsRead,
 ) -> list[VenuePropertyTypePublic]:
     rows = list(
         db.exec(select(VenuePropertyTypes).order_by(VenuePropertyTypes.name)).all()
@@ -886,14 +886,13 @@ async def list_property_types(
 )
 async def create_property_type(
     payload: VenuePropertyTypeCreate,
-    db: TenantSession,
-    current_tenant: CurrentTenant,
-    _: CurrentWriter,
+    db: AdminOrApiKeySession_VenuesWrite,
+    current_user: AdminOrApiKey_VenuesWrite,
 ) -> VenuePropertyTypePublic:
     # Always write to the tenant in the request's workspace context so
     # superadmins (no user.tenant_id) work too.
     pt = VenuePropertyTypes(
-        tenant_id=current_tenant.id,
+        tenant_id=current_user.tenant_id,
         name=payload.name,
         icon=payload.icon,
     )
@@ -913,8 +912,8 @@ async def create_property_type(
 async def update_property_type(
     property_type_id: uuid.UUID,
     payload: VenuePropertyTypeUpdate,
-    db: TenantSession,
-    _: CurrentWriter,
+    db: AdminOrApiKeySession_VenuesWrite,
+    _: AdminOrApiKey_VenuesWrite,
 ) -> VenuePropertyTypePublic:
     pt = db.get(VenuePropertyTypes, property_type_id)
     if not pt:
@@ -933,8 +932,8 @@ async def update_property_type(
 )
 async def delete_property_type(
     property_type_id: uuid.UUID,
-    db: TenantSession,
-    _: CurrentWriter,
+    db: AdminOrApiKeySession_VenuesWrite,
+    _: AdminOrApiKey_VenuesWrite,
 ) -> None:
     pt = db.get(VenuePropertyTypes, property_type_id)
     if not pt:

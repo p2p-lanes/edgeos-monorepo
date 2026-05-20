@@ -16,11 +16,15 @@ from app.api.human.schemas import (
 )
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
-    CurrentAdmin,
+    AdminOrApiKey_HumansRead,
+    AdminOrApiKey_HumansWrite,
+    AdminOrApiKeySession_HumansRead,
+    AdminOrApiKeySession_HumansWrite,
     CurrentHuman,
     CurrentSuperadmin,
-    CurrentWriter,
     HumanTenantSession,
+    RequireHumanScopeDirectoryRead,
+    RequireHumanScopeSelfRead,
     TenantSession,
 )
 from app.services.email_helpers import send_application_status_email
@@ -30,8 +34,8 @@ router = APIRouter(prefix="/humans", tags=["humans"])
 
 @router.get("", response_model=ListModel[HumanPublic])
 async def list_humans(
-    db: TenantSession,
-    _: CurrentAdmin,
+    db: AdminOrApiKeySession_HumansRead,
+    _: AdminOrApiKey_HumansRead,
     search: str | None = None,
     popup_id: uuid.UUID | None = None,
     incomplete_application: bool = False,
@@ -112,6 +116,7 @@ async def create_human(
 @router.get("/me", response_model=HumanPublic)
 async def get_current_human_info(
     current_user: CurrentHuman,
+    _scope: RequireHumanScopeSelfRead,
 ) -> HumanPublic:
     return HumanPublic.model_validate(current_user)
 
@@ -120,6 +125,7 @@ async def get_current_human_info(
 async def get_current_human_profile_stats(
     current_human: CurrentHuman,
     db: HumanTenantSession,
+    _scope: RequireHumanScopeSelfRead,
 ) -> HumanProfileStats:
     """Aggregate popup history and total days attended for the profile page."""
     return crud.get_profile_stats(db, current_human.id)
@@ -130,6 +136,7 @@ async def update_current_human(
     human_in: HumanProfileUpdate,
     current_human: CurrentHuman,
     db: HumanTenantSession,
+    _scope: RequireHumanScopeSelfRead,
 ) -> HumanPublic:
     """Update the current authenticated human's profile."""
     human = crud.get(db, current_human.id)
@@ -148,6 +155,7 @@ async def update_current_human(
 async def search_humans_portal(
     db: HumanTenantSession,
     _: CurrentHuman,
+    _scope: RequireHumanScopeDirectoryRead,
     search: str | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 20,
@@ -175,8 +183,8 @@ async def search_humans_portal(
 @router.get("/{human_id}", response_model=HumanPublic)
 async def get_human(
     human_id: uuid.UUID,
-    db: TenantSession,
-    _: CurrentAdmin,
+    db: AdminOrApiKeySession_HumansRead,
+    _: AdminOrApiKey_HumansRead,
 ) -> HumanPublic:
     human = crud.get(db, human_id)
 
@@ -193,8 +201,8 @@ async def get_human(
 async def update_human(
     human_id: uuid.UUID,
     human_in: HumanUpdate,
-    db: TenantSession,
-    _current_user: CurrentWriter,
+    db: AdminOrApiKeySession_HumansWrite,
+    _current_user: AdminOrApiKey_HumansWrite,
 ) -> HumanPublic:
     human = crud.get(db, human_id)
 
@@ -238,8 +246,8 @@ async def update_human(
 @router.post("/{human_id}/api-keys/revoke", status_code=status.HTTP_204_NO_CONTENT)
 async def revoke_human_api_keys(
     human_id: uuid.UUID,
-    db: TenantSession,
-    _current_user: CurrentWriter,
+    db: AdminOrApiKeySession_HumansWrite,
+    _current_user: AdminOrApiKey_HumansWrite,
 ) -> None:
     human = crud.get(db, human_id)
     if not human:
@@ -254,8 +262,8 @@ async def revoke_human_api_keys(
 @router.get("/{human_id}/api-keys", response_model=list[ApiKeyPublic])
 async def list_human_api_keys(
     human_id: uuid.UUID,
-    db: TenantSession,
-    _current_user: CurrentWriter,
+    db: AdminOrApiKeySession_HumansRead,
+    _current_user: AdminOrApiKey_HumansRead,
 ) -> list[ApiKeyPublic]:
     human = crud.get(db, human_id)
     if not human:

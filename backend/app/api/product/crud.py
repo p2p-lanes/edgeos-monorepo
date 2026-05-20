@@ -194,6 +194,27 @@ class ProductsCRUD(BaseCRUD[Products, ProductCreate, ProductUpdate]):
         session.refresh(db_obj)
         return db_obj
 
+    def _count_active_sales(
+        self, session: Session, product_id: uuid.UUID
+    ) -> int:
+        """Sum quantities of units currently holding stock for this product.
+
+        Counts payment_products rows whose payment is in a stock-holding
+        status — mirrors the same set of statuses that gate decrement /
+        restore (pending = reserved, approved = paid). Rejected / expired /
+        cancelled payments are excluded because they release stock.
+        """
+        result = session.execute(
+            text(
+                "SELECT COALESCE(SUM(pp.quantity), 0) "
+                "FROM payment_products pp "
+                "JOIN payments p ON p.id = pp.payment_id "
+                "WHERE pp.product_id = :pid "
+                "AND p.status IN ('pending', 'approved')"
+            ).bindparams(pid=product_id)
+        ).scalar()
+        return int(result or 0)
+
     def update(
         self,
         session: Session,
@@ -203,9 +224,18 @@ class ProductsCRUD(BaseCRUD[Products, ProductCreate, ProductUpdate]):
         """Update product fields.
 
         When `total_stock_cap` changes without an explicit `total_stock_remaining`,
-        recompute remaining to preserve `sold = old_cap - old_remaining`. Otherwise
-        the CHECK constraint `total_stock_remaining <= total_stock_cap` rejects
-        any cap reduction below the stale remaining.
+        recompute remaining so that the existing sold count is preserved. Two
+        cases:
+
+        1. `old_cap` and `old_remaining` are both tracked → derive sold from the
+           counter (`old_cap - old_remaining`).
+        2. Either was NULL (product was unlimited, or never seeded) → count real
+           sales from `payment_products` to avoid losing prior sales when a cap
+           is added after the fact.
+
+        Without this, the CHECK constraint `total_stock_remaining <= total_stock_cap`
+        rejects cap reductions, and (worse) sales made while the product was
+        unlimited get silently dropped when the cap is added later.
         """
         update_data = sale_dates_to_persistence(obj_in.model_dump(exclude_unset=True))
 
@@ -227,7 +257,11 @@ class ProductsCRUD(BaseCRUD[Products, ProductCreate, ProductUpdate]):
             if new_cap is None:
                 update_data["total_stock_remaining"] = None
             elif old_cap is None or old_remaining is None:
-                update_data["total_stock_remaining"] = new_cap
+                # Product was unlimited (or never seeded) — any prior sales
+                # weren't tracked in the counter. Pull sold from payment_products
+                # so we don't silently grant extra inventory.
+                sold = self._count_active_sales(session, db_obj.id)
+                update_data["total_stock_remaining"] = max(0, new_cap - sold)
             else:
                 sold = old_cap - old_remaining
                 update_data["total_stock_remaining"] = max(0, new_cap - sold)

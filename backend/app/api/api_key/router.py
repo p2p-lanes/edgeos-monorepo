@@ -5,8 +5,16 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.api.api_key import crud
 from app.api.api_key.schemas import ApiKeyCreate, ApiKeyCreated, ApiKeyPublic
-from app.core.dependencies.users import CurrentHuman, HumanTenantSession
-from app.core.security import TokenPayload, get_token_payload
+from app.core.dependencies.users import (
+    CurrentHuman,
+    HumanTenantSession,
+    RequireHumanScopeApiKeysManage,
+)
+from app.core.security import (
+    THIRD_PARTY_API_KEY_SCOPES,
+    TokenPayload,
+    get_token_payload,
+)
 
 router = APIRouter(prefix="/api-keys", tags=["api-keys"])
 
@@ -48,6 +56,7 @@ async def list_api_keys(
     current_human: CurrentHuman,
     _: JwtOnly,
     __: HumanCanManageApiKeys,
+    ___: RequireHumanScopeApiKeysManage,
 ) -> list[ApiKeyPublic]:
     rows = crud.list_for_human(db, current_human.id)
     return [ApiKeyPublic.model_validate(r) for r in rows]
@@ -58,9 +67,20 @@ async def create_api_key(
     payload: ApiKeyCreate,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    token_payload: Annotated[TokenPayload, Depends(get_token_payload)],
     _: JwtOnly,
     __: HumanCanManageApiKeys,
+    ___: RequireHumanScopeApiKeysManage,
 ) -> ApiKeyCreated:
+    # REQ-AK-04: third-party JWTs may only mint keys within THIRD_PARTY_API_KEY_SCOPES.
+    if getattr(token_payload, "issued_via", "portal") == "third_party":
+        invalid = set(payload.scopes) - THIRD_PARTY_API_KEY_SCOPES
+        if invalid:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"These scopes are not permitted for third-party sessions: {sorted(invalid)}",
+            )
+
     row, raw = crud.create_for_human(
         db,
         tenant_id=current_human.tenant_id,
@@ -79,6 +99,7 @@ async def revoke_api_key(
     current_human: CurrentHuman,
     _: JwtOnly,
     __: HumanCanManageApiKeys,
+    ___: RequireHumanScopeApiKeysManage,
 ) -> None:
     row = crud.get_for_human(db, key_id, current_human.id)
     if not row:

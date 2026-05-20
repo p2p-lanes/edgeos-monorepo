@@ -66,4 +66,22 @@ describe("useHousingSelection — id-lookup against full active product list", (
 
     expect(result.current.housing!.quantity).toBe(2)
   })
+
+  it("refuses to select a sold-out product (cap set, remaining=0)", () => {
+    const allActiveProducts = [
+      makeProduct({
+        id: "h-sold",
+        category: "housing",
+        total_stock_cap: 1,
+        total_stock_remaining: 0,
+      }),
+    ]
+    const { result } = renderHook(() => useHousingSelection(allActiveProducts))
+
+    act(() => {
+      result.current.selectHousing("h-sold", "2025-01-01", "2025-01-05")
+    })
+
+    expect(result.current.housing).toBeNull()
+  })
 })
