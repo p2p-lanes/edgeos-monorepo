@@ -7,11 +7,12 @@ from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, 
 from app.api.track import crud
 from app.api.track.schemas import TrackCreate, TrackPublic, TrackUpdate
 from app.core.dependencies.users import (
+    AdminOrApiKey_TracksRead,
+    AdminOrApiKey_TracksWrite,
+    AdminOrApiKeySession_TracksRead,
+    AdminOrApiKeySession_TracksWrite,
     CurrentHuman,
-    CurrentOperator,
-    CurrentUser,
     HumanTenantSession,
-    TenantSession,
 )
 
 router = APIRouter(prefix="/tracks", tags=["tracks"])
@@ -24,8 +25,8 @@ router = APIRouter(prefix="/tracks", tags=["tracks"])
 
 @router.get("", response_model=ListModel[TrackPublic])
 async def list_tracks(
-    db: TenantSession,
-    _: CurrentUser,
+    db: AdminOrApiKeySession_TracksRead,
+    _: AdminOrApiKey_TracksRead,
     popup_id: uuid.UUID | None = None,
     search: str | None = None,
     skip: PaginationSkip = 0,
@@ -56,8 +57,8 @@ async def list_tracks(
 @router.get("/{track_id}", response_model=TrackPublic)
 async def get_track(
     track_id: uuid.UUID,
-    db: TenantSession,
-    _: CurrentUser,
+    db: AdminOrApiKeySession_TracksRead,
+    _: AdminOrApiKey_TracksRead,
 ) -> TrackPublic:
     track = crud.tracks_crud.get(db, track_id)
     if not track:
@@ -70,8 +71,8 @@ async def get_track(
 @router.post("", response_model=TrackPublic, status_code=status.HTTP_201_CREATED)
 async def create_track(
     track_in: TrackCreate,
-    db: TenantSession,
-    current_user: CurrentOperator,
+    db: AdminOrApiKeySession_TracksWrite,
+    current_user: AdminOrApiKey_TracksWrite,
 ) -> TrackPublic:
     from app.api.popup.crud import popups_crud
     from app.api.shared.enums import UserRole
@@ -105,8 +106,8 @@ async def create_track(
 async def update_track(
     track_id: uuid.UUID,
     track_in: TrackUpdate,
-    db: TenantSession,
-    _: CurrentOperator,
+    db: AdminOrApiKeySession_TracksWrite,
+    _: AdminOrApiKey_TracksWrite,
 ) -> TrackPublic:
     track = crud.tracks_crud.get(db, track_id)
     if not track:
@@ -120,8 +121,8 @@ async def update_track(
 @router.delete("/{track_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_track(
     track_id: uuid.UUID,
-    db: TenantSession,
-    _: CurrentOperator,
+    db: AdminOrApiKeySession_TracksWrite,
+    _: AdminOrApiKey_TracksWrite,
 ) -> None:
     track = crud.tracks_crud.get(db, track_id)
     if not track:
@@ -134,8 +135,8 @@ async def delete_track(
 @router.get("/{track_id}/events", response_model=ListModel[EventPublic])
 async def list_track_events(
     track_id: uuid.UUID,
-    db: TenantSession,
-    _: CurrentUser,
+    db: AdminOrApiKeySession_TracksRead,
+    _: AdminOrApiKey_TracksRead,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
 ) -> ListModel[EventPublic]:

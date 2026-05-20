@@ -15,15 +15,20 @@ from app.api.form_section.schemas import (
 from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.api.translation.service import delete_translations_for_entity
-from app.core.dependencies.users import CurrentOperator, CurrentUser, TenantSession
+from app.core.dependencies.users import (
+    AdminOrApiKey_FormsRead,
+    AdminOrApiKey_FormsWrite,
+    AdminOrApiKeySession_FormsRead,
+    AdminOrApiKeySession_FormsWrite,
+)
 
 router = APIRouter(prefix="/form-sections", tags=["form-sections"])
 
 
 @router.get("", response_model=ListModel[FormSectionPublic])
 async def list_form_sections(
-    db: TenantSession,
-    _: CurrentUser,
+    db: AdminOrApiKeySession_FormsRead,
+    _: AdminOrApiKey_FormsRead,
     popup_id: uuid.UUID | None = None,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
@@ -63,8 +68,8 @@ def _section_allowed_by_flags(section: FormSections, popup: Any) -> bool:
 @router.get("/{section_id}", response_model=FormSectionPublic)
 async def get_form_section(
     section_id: uuid.UUID,
-    db: TenantSession,
-    _: CurrentUser,
+    db: AdminOrApiKeySession_FormsRead,
+    _: AdminOrApiKey_FormsRead,
 ) -> FormSectionPublic:
     section = crud.form_sections_crud.get(db, section_id)
 
@@ -80,8 +85,8 @@ async def get_form_section(
 @router.post("", response_model=FormSectionPublic, status_code=status.HTTP_201_CREATED)
 async def create_form_section(
     section_in: FormSectionCreate,
-    db: TenantSession,
-    current_user: CurrentOperator,
+    db: AdminOrApiKeySession_FormsWrite,
+    current_user: AdminOrApiKey_FormsWrite,
 ) -> FormSectionPublic:
     from app.api.popup.crud import popups_crud
 
@@ -135,8 +140,8 @@ async def create_form_section(
 async def update_form_section(
     section_id: uuid.UUID,
     section_in: FormSectionUpdate,
-    db: TenantSession,
-    _current_user: CurrentOperator,
+    db: AdminOrApiKeySession_FormsWrite,
+    _current_user: AdminOrApiKey_FormsWrite,
 ) -> FormSectionPublic:
     section = crud.form_sections_crud.get(db, section_id)
 
@@ -153,8 +158,8 @@ async def update_form_section(
 @router.delete("/{section_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_form_section(
     section_id: uuid.UUID,
-    db: TenantSession,
-    _current_user: CurrentOperator,
+    db: AdminOrApiKeySession_FormsWrite,
+    _current_user: AdminOrApiKey_FormsWrite,
 ) -> None:
     section = crud.form_sections_crud.get(db, section_id)
 

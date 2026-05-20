@@ -199,6 +199,26 @@ CurrentWriter = Annotated["UserPublic", Depends(require_write_permission)]
 CurrentCheckInOperator = Annotated["UserPublic", Depends(get_check_in_operator)]
 
 
+def get_operator_jwt_only(
+    token_payload: Annotated["TokenPayload", Depends(get_token_payload)],
+    current_user: Annotated["UserPublic", Depends(get_operator)],
+) -> "UserPublic":
+    """Like get_operator but explicitly rejects API-key tokens.
+
+    Used for endpoints that are intentionally JWT-only by policy (e.g. PATCH
+    /payments) — api-key callers receive 403 regardless of their scopes.
+    """
+    if token_payload.via_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This endpoint requires a JWT session; API keys are not accepted.",
+        )
+    return current_user
+
+
+CurrentOperatorJwtOnly = Annotated["UserPublic", Depends(get_operator_jwt_only)]
+
+
 def get_current_tenant(
     db: SessionDep,
     x_tenant_id: Annotated[str, Header(alias="X-Tenant-Id")],
@@ -420,8 +440,10 @@ def CurrentAdminOrApiKey(scope: ApiKeyScope):
 
         if not token_payload.via_api_key:
             # Path A: JWT-authenticated user — enforce role.
+            # Matches the former CurrentOperator gate: SUPERADMIN, ADMIN, OPERATOR.
+            # CHECK_IN_CONTROLLER and VIEWER are excluded.
             user = fetch_authenticated_user(token_payload, db, require_token_type="user")
-            if user.role not in (UserRole.SUPERADMIN, UserRole.ADMIN):
+            if user.role not in (UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.OPERATOR):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Admin access required.",
@@ -502,6 +524,97 @@ def get_admin_or_api_key_tenant_session(scope: ApiKeyScope):
 
 
 # ---------------------------------------------------------------------------
+# CurrentCheckInOrApiKey — wider JWT gate for check-in-accessible routes
+# ---------------------------------------------------------------------------
+
+
+def CurrentCheckInOrApiKey(scope: ApiKeyScope):
+    """Like CurrentAdminOrApiKey but also accepts CHECK_IN_CONTROLLER JWTs.
+
+    Used for routes that scanners (check-in controllers) need read access to
+    (e.g. GET /attendees) but that must still accept admin api-keys with the
+    appropriate scope on the api-key path.
+    """
+
+    def _dep(
+        token_payload: Annotated[TokenPayload, Depends(get_token_payload)],
+        db: "SessionDep",
+    ) -> "UserPublic":
+        if token_payload.token_type != "user":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="This endpoint requires an admin session or an admin API key.",
+            )
+
+        if not token_payload.via_api_key:
+            user = fetch_authenticated_user(token_payload, db, require_token_type="user")
+            if user.role not in (
+                UserRole.SUPERADMIN,
+                UserRole.ADMIN,
+                UserRole.OPERATOR,
+                UserRole.CHECK_IN_CONTROLLER,
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Admin access required.",
+                )
+            return user
+
+        # Api-key path: enforce scope.
+        if scope not in token_payload.scopes:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"API key lacks required scope: {scope}",
+            )
+        return fetch_authenticated_user(token_payload, db, require_token_type="user")
+
+    return _dep
+
+
+def get_check_in_or_api_key_tenant_session(scope: ApiKeyScope):
+    """Tenant session factory paired with CurrentCheckInOrApiKey."""
+
+    def _dep(
+        current_user: Annotated["UserPublic", Depends(CurrentCheckInOrApiKey(scope))],
+        token_payload: Annotated[TokenPayload, Depends(get_token_payload)],
+        db: "SessionDep",
+        x_tenant_id: Annotated[str | None, Header(alias="X-Tenant-Id")] = None,
+    ) -> Generator[Session]:
+        if token_payload.via_api_key:
+            from app.api.shared.enums import CredentialType
+            from app.core.tenant_db import tenant_connection_manager
+
+            tenant_id = token_payload.api_key_tenant_id
+            if tenant_id is None:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="API key has no tenant context.",
+                )
+
+            cached_cred = tenant_connection_manager.get_credential(
+                db, tenant_id, CredentialType.CRUD
+            )
+            if not cached_cred:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Tenant credentials not configured",
+                )
+
+            tenant_engine = tenant_connection_manager.get_engine(
+                tenant_id,
+                CredentialType.CRUD,
+                cached_cred.username,
+                cached_cred.password,
+            )
+            with Session(tenant_engine) as tenant_session:
+                yield tenant_session
+        else:
+            yield from get_tenant_session(current_user, db, x_tenant_id)
+
+    return _dep
+
+
+# ---------------------------------------------------------------------------
 # Per-scope Annotated aliases (Block 4, task 4.5)
 # Design R-A2: one alias pair per scope in ADMIN_API_KEY_SCOPES (~56 LOC).
 # If this module grows past ~400 LOC, split into admin_scopes.py.
@@ -528,10 +641,14 @@ AdminOrApiKeySession_ApplicationsRead = Annotated[Session, Depends(get_admin_or_
 AdminOrApiKeySession_ApplicationsWrite = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("applications:write"))]
 
 # attendees
+# Write routes: admin JWT or scoped api-key.
 AdminOrApiKey_AttendeesRead = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("attendees:read"))]
 AdminOrApiKey_AttendeesWrite = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("attendees:write"))]
 AdminOrApiKeySession_AttendeesRead = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("attendees:read"))]
 AdminOrApiKeySession_AttendeesWrite = Annotated[Session, Depends(get_admin_or_api_key_tenant_session("attendees:write"))]
+# Read routes with check-in controller access (scanners can list/get attendees).
+CheckInOrApiKey_AttendeesRead = Annotated["UserPublic", Depends(CurrentCheckInOrApiKey("attendees:read"))]
+CheckInOrApiKeySession_AttendeesRead = Annotated[Session, Depends(get_check_in_or_api_key_tenant_session("attendees:read"))]
 
 # humans
 AdminOrApiKey_HumansRead = Annotated["UserPublic", Depends(CurrentAdminOrApiKey("humans:read"))]

@@ -8,7 +8,12 @@ from app.api.shared.enums import UserRole
 from app.api.translation.crud import translations_crud
 from app.api.translation.schemas import TranslationCreate, TranslationPublic
 from app.api.translation.service import TRANSLATABLE_FIELDS
-from app.core.dependencies.users import CurrentOperator, CurrentUser, TenantSession
+from app.core.dependencies.users import (
+    AdminOrApiKey_TranslationsRead,
+    AdminOrApiKey_TranslationsWrite,
+    AdminOrApiKeySession_TranslationsRead,
+    AdminOrApiKeySession_TranslationsWrite,
+)
 
 router = APIRouter(prefix="/translations", tags=["translations"])
 
@@ -17,8 +22,8 @@ router = APIRouter(prefix="/translations", tags=["translations"])
 async def list_translations(
     entity_type: str,
     entity_id: uuid.UUID,
-    db: TenantSession,
-    _: CurrentUser,
+    db: AdminOrApiKeySession_TranslationsRead,
+    _: AdminOrApiKey_TranslationsRead,
 ) -> list[TranslationPublic]:
     """List all translations for an entity."""
     translations = translations_crud.find_by_entity(db, entity_type, entity_id)
@@ -28,8 +33,8 @@ async def list_translations(
 @router.post("", response_model=TranslationPublic, status_code=status.HTTP_201_CREATED)
 async def upsert_translation(
     translation_in: TranslationCreate,
-    db: TenantSession,
-    current_user: CurrentOperator,
+    db: AdminOrApiKeySession_TranslationsWrite,
+    current_user: AdminOrApiKey_TranslationsWrite,
     x_tenant_id: Annotated[str | None, Header(alias="X-Tenant-Id")] = None,
 ) -> TranslationPublic:
     """Create or update a translation for an entity."""
@@ -62,8 +67,8 @@ class AITranslateRequest(BaseModel):
 @router.post("/ai-translate", response_model=dict[str, str])
 async def ai_translate(
     request: AITranslateRequest,
-    db: TenantSession,
-    _current_user: CurrentOperator,
+    db: AdminOrApiKeySession_TranslationsWrite,
+    _current_user: AdminOrApiKey_TranslationsWrite,
 ) -> dict[str, str]:
     """Use AI to generate draft translations for an entity. Returns translated fields (not saved)."""
     if request.entity_type not in TRANSLATABLE_FIELDS:
@@ -114,8 +119,8 @@ async def ai_translate(
 @router.delete("/{translation_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_translation(
     translation_id: uuid.UUID,
-    db: TenantSession,
-    _current_user: CurrentOperator,
+    db: AdminOrApiKeySession_TranslationsWrite,
+    _current_user: AdminOrApiKey_TranslationsWrite,
     _x_tenant_id: Annotated[str | None, Header(alias="X-Tenant-Id")] = None,
 ) -> None:
     """Delete a translation."""
