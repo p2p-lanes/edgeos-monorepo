@@ -183,15 +183,6 @@ function ApiDocsBody() {
               <span className="text-muted-foreground">, </span>
               <code className="font-mono text-xs">venues:write</code>
             </Row>
-            <Row label="OpenAPI spec">
-              <code className="font-mono text-xs break-all">
-                {`${API_BASE}/openapi.json`}
-              </code>
-              <span className="text-muted-foreground">
-                {" "}
-                — feed this directly to an agent
-              </span>
-            </Row>
           </div>
         </Section>
 

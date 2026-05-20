@@ -14,7 +14,6 @@ export function CopyAgentBrief({ apiBase }: CopyAgentBriefProps) {
 
 API root:        ${apiBase}
 Endpoint prefix: /api/v1  (prepend this to every path from the OpenAPI spec — the bare prefix is not a fetchable endpoint, only paths beneath it resolve)
-OpenAPI spec:    ${apiBase}/openapi.json
 
 Authentication
   Send \`Authorization: Bearer <token>\` on every request.
