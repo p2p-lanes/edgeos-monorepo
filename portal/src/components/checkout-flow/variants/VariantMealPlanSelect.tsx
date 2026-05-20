@@ -18,7 +18,7 @@
  * (attendees, products, template_config) comes from props + providers.
  */
 
-import { Sparkles } from "lucide-react"
+import { ChefHat, Sparkles, Utensils } from "lucide-react"
 import { Fragment, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -861,10 +861,10 @@ function DayEmojiStrip({
           <div
             key={d}
             className={cn(
-              "w-6 h-6 rounded-md flex items-center justify-center text-base leading-none transition-all",
+              "w-6 h-6 rounded-md flex items-center justify-center leading-none transition-all",
               opt
-                ? "bg-white/80 shadow-sm scale-100"
-                : "bg-muted-foreground/10 text-muted-foreground/40 text-[10px]",
+                ? "bg-white/80 shadow-sm"
+                : "bg-muted-foreground/10 text-muted-foreground/40",
             )}
             title={
               opt
@@ -872,7 +872,14 @@ function DayEmojiStrip({
                 : `${formatWeekdayShort(d)}: not set`
             }
           >
-            {opt ? opt.icon : "·"}
+            {opt ? (
+              <DishIcon
+                menuKey={opt.key}
+                className="w-3.5 h-3.5 text-emerald-700"
+              />
+            ) : (
+              <span className="text-[10px]">·</span>
+            )}
           </div>
         )
       })}
@@ -1061,10 +1068,17 @@ function DishButton({
           : "border-border bg-card hover:border-primary/40 hover:bg-muted/40",
       )}
     >
-      {/* Emoji shown on desktop only — on mobile it ate column width. */}
-      <span className="hidden md:inline text-base leading-none shrink-0">
-        {option.icon}
-      </span>
+      {/* Minimalistic Lucide icon — chef hat for chef's choice, utensils
+          for any other dish. Replaces the freeform emoji from template_config
+          so dish-button widths stay consistent on desktop. Hidden on mobile
+          because column width is already tight. */}
+      <DishIcon
+        menuKey={option.key}
+        className={cn(
+          "hidden md:block w-3.5 h-3.5 shrink-0",
+          isActive ? "text-primary" : "text-muted-foreground",
+        )}
+      />
       <div
         className={cn(
           "text-[11px] font-medium leading-tight w-full md:w-auto md:flex-1 md:min-w-0 break-words",
@@ -1075,4 +1089,17 @@ function DishButton({
       </div>
     </button>
   )
+}
+
+/** Picks a Lucide icon for a menu option key. Chef's choice → ChefHat,
+ *  everything else → Utensils. Keeps the design grey/minimalistic. */
+function DishIcon({
+  menuKey,
+  className,
+}: {
+  menuKey: string
+  className?: string
+}) {
+  if (menuKey === "chef") return <ChefHat className={className} />
+  return <Utensils className={className} />
 }
