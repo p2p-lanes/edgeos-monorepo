@@ -1,10 +1,10 @@
 import type { LucideIcon } from "lucide-react"
-import { Bed, Box, Package, Ticket } from "lucide-react"
+import { Bed, Box, Package, Ticket, Utensils } from "lucide-react"
 
 /**
  * Category display helpers for the passes view-mode ticket list.
  *
- * Known categories: ticket, housing, merch, other.
+ * Known categories: ticket, housing, merch, meal_plan, other.
  * Patreon is excluded from this list (filtered upstream by AttendeeTicket).
  * Unknown categories fall through to the "other" / Box fallback.
  */
@@ -13,6 +13,7 @@ export const CATEGORY_ICONS: Record<string, LucideIcon> = {
   ticket: Ticket,
   housing: Bed,
   merch: Package,
+  meal_plan: Utensils,
   other: Box,
 }
 
@@ -38,7 +39,7 @@ export function getCategoryLabel(
   t: (key: string) => string,
 ): string {
   if (!category) return ""
-  const known = ["ticket", "housing", "merch", "other"]
+  const known = ["ticket", "housing", "merch", "meal_plan", "other"]
   if (known.includes(category)) {
     return t(`passes.categories.${category}`)
   }
@@ -59,8 +60,10 @@ export function getCategoryOrder(category: string | null | undefined): number {
       return 1
     case "merch":
       return 2
-    case "other":
+    case "meal_plan":
       return 3
+    case "other":
+      return 4
     default:
       return 99
   }
