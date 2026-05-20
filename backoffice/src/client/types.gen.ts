@@ -13,6 +13,46 @@ export type AbandonedCartPublic = {
     payments?: Array<CartPaymentInfo>;
 };
 
+/**
+ * Request body for minting a new admin API key.
+ */
+export type AdminApiKeyCreate = {
+    name: string;
+    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    expires_at?: (string | null);
+};
+
+/**
+ * Response returned only at creation.
+ *
+ * ``raw_key`` is the cleartext token shown once and never stored.
+ */
+export type AdminApiKeyCreated = {
+    id: string;
+    name: string;
+    prefix: string;
+    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    created_at: string;
+    last_used_at?: (string | null);
+    expires_at?: (string | null);
+    revoked_at?: (string | null);
+    raw_key: string;
+};
+
+/**
+ * Safe representation of an admin API key — never includes the raw secret.
+ */
+export type AdminApiKeyPublic = {
+    id: string;
+    name: string;
+    prefix: string;
+    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
+    created_at: string;
+    last_used_at?: (string | null);
+    expires_at?: (string | null);
+    revoked_at?: (string | null);
+};
+
 export type AITranslateRequest = {
     entity_type: string;
     entity_id: string;
@@ -25,7 +65,7 @@ export type AITranslateRequest = {
 export type ApiKeyCreate = {
     name: string;
     expires_at?: (string | null);
-    scopes?: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:write')>;
+    scopes?: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
 };
 
 /**
@@ -36,7 +76,7 @@ export type ApiKeyCreated = {
     id: string;
     name: string;
     prefix: string;
-    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:write')>;
+    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
     created_at: string;
     last_used_at?: (string | null);
     expires_at?: (string | null);
@@ -51,7 +91,7 @@ export type ApiKeyPublic = {
     id: string;
     name: string;
     prefix: string;
-    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:write')>;
+    scopes: Array<('events:read' | 'events:write' | 'rsvp:write' | 'venues:write' | 'applications:read' | 'applications:write' | 'attendees:read' | 'attendees:write' | 'humans:read' | 'humans:write' | 'groups:read' | 'groups:write' | 'products:read' | 'products:write' | 'coupons:read' | 'coupons:write' | 'forms:read' | 'forms:write' | 'payments:read' | 'tracks:read' | 'tracks:write' | 'ticketing_steps:read' | 'ticketing_steps:write' | 'translations:read' | 'translations:write')>;
     created_at: string;
     last_used_at?: (string | null);
     expires_at?: (string | null);
@@ -2828,6 +2868,7 @@ export type TenantPublic = {
     landing_mode?: LandingMode;
     id: string;
     active_popup_slug?: (string | null);
+    third_party_key_prefix?: (string | null);
 };
 
 export type TenantUpdate = {
@@ -2840,6 +2881,35 @@ export type TenantUpdate = {
     custom_domain?: (string | null);
     custom_domain_active?: (boolean | null);
     landing_mode?: (LandingMode | null);
+};
+
+/**
+ * Request body for POST /auth/human/third-party/login.
+ *
+ * The API key comes from the X-Third-Party-Api-Key header; the tenant is
+ * resolved server-side from the key.
+ */
+export type ThirdPartyHumanLogin = {
+    email: string;
+};
+
+/**
+ * Request body for POST /auth/human/third-party/authenticate.
+ *
+ * The API key comes from the X-Third-Party-Api-Key header; the tenant is
+ * resolved server-side from the key.
+ */
+export type ThirdPartyHumanVerify = {
+    email: string;
+    code: string;
+};
+
+/**
+ * Returned by the rotate endpoint. The raw api_key is shown ONCE and never stored.
+ */
+export type ThirdPartyKeyRotated = {
+    api_key: string;
+    prefix: string;
 };
 
 /**
@@ -3212,6 +3282,33 @@ export type VenueWeeklyHourRef = {
 export type VenueWeeklyHoursUpdate = {
     hours: Array<VenueWeeklyHourInput>;
 };
+
+export type AdminApiKeysCreateAdminApiKeyData = {
+    requestBody: AdminApiKeyCreate;
+    xTenantId?: (string | null);
+};
+
+export type AdminApiKeysCreateAdminApiKeyResponse = (AdminApiKeyCreated);
+
+export type AdminApiKeysListAdminApiKeysData = {
+    xTenantId?: (string | null);
+};
+
+export type AdminApiKeysListAdminApiKeysResponse = (Array<AdminApiKeyPublic>);
+
+export type AdminApiKeysGetAdminApiKeyData = {
+    keyId: string;
+    xTenantId?: (string | null);
+};
+
+export type AdminApiKeysGetAdminApiKeyResponse = (AdminApiKeyPublic);
+
+export type AdminApiKeysRevokeAdminApiKeyData = {
+    keyId: string;
+    xTenantId?: (string | null);
+};
+
+export type AdminApiKeysRevokeAdminApiKeyResponse = (void);
 
 export type ApiKeysListApiKeysResponse = (Array<ApiKeyPublic>);
 
@@ -3620,6 +3717,20 @@ export type AuthHumanAuthenticateData = {
 };
 
 export type AuthHumanAuthenticateResponse = (Token);
+
+export type AuthThirdPartyHumanLoginData = {
+    requestBody: ThirdPartyHumanLogin;
+    xThirdPartyApiKey: string;
+};
+
+export type AuthThirdPartyHumanLoginResponse = (AuthCodeSentResponse);
+
+export type AuthThirdPartyHumanAuthenticateData = {
+    requestBody: ThirdPartyHumanVerify;
+    xThirdPartyApiKey: string;
+};
+
+export type AuthThirdPartyHumanAuthenticateResponse = (Token);
 
 export type BaseFieldConfigsListBaseFieldConfigsData = {
     /**
@@ -5082,6 +5193,18 @@ export type TenantsDeleteCredentialsData = {
 
 export type TenantsDeleteCredentialsResponse = (void);
 
+export type TenantsRotateThirdPartyKeyData = {
+    tenantId: string;
+};
+
+export type TenantsRotateThirdPartyKeyResponse = (ThirdPartyKeyRotated);
+
+export type TenantsDeleteThirdPartyKeyData = {
+    tenantId: string;
+};
+
+export type TenantsDeleteThirdPartyKeyResponse = (void);
+
 export type TicketingStepsListPortalTicketingStepsData = {
     popupId: string;
 };
@@ -5332,7 +5455,7 @@ export type VenuePropertyTypesListPropertyTypesResponse = (Array<VenuePropertyTy
 
 export type VenuePropertyTypesCreatePropertyTypeData = {
     requestBody: VenuePropertyTypeCreate;
-    xTenantId: string;
+    xTenantId?: (string | null);
 };
 
 export type VenuePropertyTypesCreatePropertyTypeResponse = (VenuePropertyTypePublic);
