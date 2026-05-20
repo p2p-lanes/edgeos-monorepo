@@ -9,13 +9,19 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session, create_engine, select
 from testcontainers.postgres import PostgresContainer
 
+from app.api.api_key import crud as api_key_crud
+from app.api.api_key.models import ApiKeys
+from app.api.human.models import Humans
 from app.api.popup.models import Popups
 from app.api.popup.schemas import PopupStatus
 from app.api.shared.enums import SaleType, UserRole
 from app.api.tenant.models import Tenants
 from app.api.user.models import Users
 from app.core.dependencies.users import get_session
-from app.core.security import create_access_token
+from app.core.security import (
+    THIRD_PARTY_TOKEN_SCOPES,
+    create_access_token,
+)
 from app.core.tenant_db import ensure_tenant_credentials, tenant_connection_manager
 from app.main import application
 
@@ -453,6 +459,97 @@ def popup_tenant_b_summer_fest(db: Session, tenant_b: Tenants) -> Popups:
 def with_origin(host: str) -> dict[str, str]:
     """Return a headers dict with an Origin pointing at the given host."""
     return {"Origin": f"https://{host}"}
+
+
+# ---------------------------------------------------------------------------
+# Block F — Fixtures for dual-owner api keys and scope variations
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="session")
+def third_party_enabled_tenant(db: Session, tenant_a: Tenants) -> tuple[Tenants, str]:
+    """tenant_a pre-configured with a third-party API key hash.
+
+    Returns (tenant, raw_key) so tests can verify both key validation and
+    prefix display.
+    """
+    import bcrypt
+
+    raw_key = "tp_test_secret_key_for_tests_only"
+    key_hash = bcrypt.hashpw(raw_key.encode(), bcrypt.gensalt()).decode()
+
+    tenant_a.third_party_api_key_hash = key_hash
+    tenant_a.third_party_key_prefix = raw_key[:8]
+    db.add(tenant_a)
+    db.commit()
+    db.refresh(tenant_a)
+
+    return tenant_a, raw_key
+
+
+@pytest.fixture()
+def admin_api_key_factory(db: Session, tenant_a: Tenants, admin_user_tenant_a: Users):
+    """Factory fixture: creates an admin-owned ApiKeys row for the test admin user.
+
+    Usage::
+
+        def test_something(admin_api_key_factory):
+            row, raw = admin_api_key_factory(scopes=["events:read"])
+    """
+
+    created_ids: list[uuid.UUID] = []
+
+    def _factory(scopes: list[str]) -> tuple[ApiKeys, str]:
+        raw = api_key_crud.generate_raw_key()
+        row = ApiKeys(
+            tenant_id=tenant_a.id,
+            human_id=None,
+            user_id=admin_user_tenant_a.id,
+            name=f"admin-key-{uuid.uuid4().hex[:6]}",
+            key_hash=api_key_crud.hash_key(raw),
+            prefix=api_key_crud.display_prefix(raw),
+            scopes=scopes,
+        )
+        db.add(row)
+        db.commit()
+        db.refresh(row)
+        created_ids.append(row.id)
+        return row, raw
+
+    yield _factory
+
+    # Cleanup after test
+    for key_id in created_ids:
+        row = db.get(ApiKeys, key_id)
+        if row:
+            db.delete(row)
+    db.commit()
+
+
+@pytest.fixture()
+def third_party_jwt_factory():
+    """Factory fixture: mints a third-party JWT directly via create_access_token.
+
+    Usage::
+
+        def test_something(third_party_jwt_factory, some_human):
+            token = third_party_jwt_factory(human=some_human)
+            # or with custom scopes:
+            token = third_party_jwt_factory(human=some_human, scopes=["portal:self_read"])
+    """
+
+    def _factory(
+        human: Humans,
+        scopes: list[str] | None = None,
+    ) -> str:
+        return create_access_token(
+            subject=human.id,
+            token_type="human",
+            scopes=scopes if scopes is not None else list(THIRD_PARTY_TOKEN_SCOPES),
+            issued_via="third_party",
+        )
+
+    return _factory
 
 
 @pytest.fixture(autouse=True)
