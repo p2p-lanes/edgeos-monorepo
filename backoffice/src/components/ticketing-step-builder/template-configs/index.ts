@@ -2,6 +2,7 @@ import type { ComponentType } from "react"
 import { FaqsConfig } from "./FaqsConfig"
 import { HousingDateConfig } from "./HousingDateConfig"
 import { ImageGalleryConfig } from "./ImageGalleryConfig"
+import { MealPlanSelectConfig } from "./MealPlanSelectConfig"
 import { MerchImageConfig } from "./MerchImageConfig"
 import { PatronPresetConfig } from "./PatronPresetConfig"
 import { RichTextConfig } from "./RichTextConfig"
@@ -25,4 +26,5 @@ export const TEMPLATE_CONFIG_REGISTRY: Record<
   "image-gallery": ImageGalleryConfig,
   faqs: FaqsConfig,
   "rich-text": RichTextConfig,
+  "meal-plan-select": MealPlanSelectConfig,
 }
