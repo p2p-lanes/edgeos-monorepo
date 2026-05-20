@@ -631,6 +631,7 @@ export function CheckoutProvider({
     housing,
     merch,
     patron,
+    mealPlans: selectedMealPlans,
     insuranceAmount,
     isEditing,
     editCredit,

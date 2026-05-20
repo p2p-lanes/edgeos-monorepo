@@ -145,6 +145,7 @@ export interface CheckoutCartSummary {
   housingSubtotal: number
   merchSubtotal: number
   patronSubtotal: number
+  mealPlansSubtotal: number
   insuranceSubtotal: number
   dynamicSubtotal: number
   subtotal: number
@@ -268,6 +269,7 @@ export function createInitialSummary(): CheckoutCartSummary {
     housingSubtotal: 0,
     merchSubtotal: 0,
     patronSubtotal: 0,
+    mealPlansSubtotal: 0,
     insuranceSubtotal: 0,
     dynamicSubtotal: 0,
     subtotal: 0,

@@ -2,6 +2,7 @@ import { useMemo } from "react"
 import type {
   CheckoutCartSummary,
   SelectedHousingItem,
+  SelectedMealPlanItem,
   SelectedMerchItem,
   SelectedPassItem,
   SelectedPatronItem,
@@ -12,6 +13,7 @@ interface UseCartSummaryParams {
   housing: SelectedHousingItem | null
   merch: SelectedMerchItem[]
   patron: SelectedPatronItem | null
+  mealPlans: SelectedMealPlanItem[]
   insuranceAmount: number
   isEditing: boolean
   editCredit: number
@@ -25,6 +27,7 @@ export function useCartSummary({
   housing,
   merch,
   patron,
+  mealPlans,
   insuranceAmount,
   isEditing,
   editCredit,
@@ -41,6 +44,12 @@ export function useCartSummary({
     const housingSubtotal = housing?.totalPrice ?? 0
     const merchSubtotal = merch.reduce((sum, m) => sum + m.totalPrice, 0)
     const patronSubtotal = patron?.amount ?? 0
+    // One meal-plan entry = one weekly product purchase. Price already on the
+    // resolved product reference; sum across all (attendee × week) entries.
+    const mealPlansSubtotal = mealPlans.reduce(
+      (sum, m) => sum + (m.product?.price ?? 0),
+      0,
+    )
     const insuranceSubtotal = insuranceAmount
 
     const originalSubtotal =
@@ -48,6 +57,7 @@ export function useCartSummary({
       housingSubtotal +
       merchSubtotal +
       patronSubtotal +
+      mealPlansSubtotal +
       insuranceSubtotal
     // Apply discount on the original subtotal so the result is idempotent even
     // if PassesProvider has already mutated pass prices via priceStrategy.
@@ -63,13 +73,15 @@ export function useCartSummary({
       selectedPasses.length +
       (housing ? 1 : 0) +
       merch.length +
-      (patron ? 1 : 0)
+      (patron ? 1 : 0) +
+      mealPlans.length
 
     return {
       passesSubtotal,
       housingSubtotal,
       merchSubtotal,
       patronSubtotal,
+      mealPlansSubtotal,
       insuranceSubtotal,
       dynamicSubtotal: 0,
       subtotal: originalSubtotal,
@@ -83,6 +95,7 @@ export function useCartSummary({
     housing,
     merch,
     patron,
+    mealPlans,
     insuranceAmount,
     isEditing,
     editCredit,
