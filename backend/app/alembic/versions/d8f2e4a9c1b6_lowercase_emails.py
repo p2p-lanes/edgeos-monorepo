@@ -73,6 +73,16 @@ def upgrade() -> None:
     _assert_no_collisions(conn, "humans", ["tenant_id"])
     _assert_no_collisions(conn, "pending_humans", ["tenant_id"])
 
+    # Drop the legacy global unique index on users.email. It is incorrect in
+    # this multi-tenant system: uniqueness is already enforced per active
+    # (tenant_id, email) by the partial index uq_user_email_tenant_id_active,
+    # and soft-deleted rows must be allowed to share an email with active or
+    # other soft-deleted rows. The global unique index also blocks this
+    # backfill when two rows differ only by casing (one soft-deleted, one
+    # active) because their lowercased forms collide.
+    op.drop_index("ix_users_email", table_name="users")
+    op.create_index("ix_users_email", "users", ["email"], unique=False)
+
     op.execute(
         "UPDATE users SET email = LOWER(email) WHERE email <> LOWER(email)"
     )

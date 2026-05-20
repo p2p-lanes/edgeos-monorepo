@@ -8,7 +8,7 @@ from app.api.shared.enums import UserRole
 
 
 class UserBase(SQLModel):
-    email: EmailStr = Field(unique=True, index=True, max_length=255)
+    email: EmailStr = Field(index=True, max_length=255)
     full_name: str | None = Field(default=None, max_length=255)
     role: UserRole
     deleted: bool = False
