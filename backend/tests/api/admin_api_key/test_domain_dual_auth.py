@@ -19,11 +19,9 @@ from __future__ import annotations
 
 import uuid
 
-import pytest
 from fastapi.testclient import TestClient
 
 from app.api.tenant.models import Tenants
-from app.api.user.models import Users
 
 
 def _api_key_headers(raw_key: str) -> dict[str, str]:
