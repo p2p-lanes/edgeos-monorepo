@@ -76,7 +76,9 @@ export const PhoneInputForm = ({
         placeholder={placeholder}
         disabled={disabled}
         className={cn(
-          "flex w-full rounded-md border border-input bg-white px-3 py-2 text-sm [&_.PhoneInputInput]:bg-white [&_.PhoneInputInput]:outline-none [&_.PhoneInputInput]:border-0",
+          "flex h-9 w-full items-center rounded-md border border-input bg-transparent px-3 text-base shadow-sm transition-colors focus-within:ring-1 focus-within:ring-ring md:text-sm",
+          "[&_.PhoneInputInput]:bg-transparent [&_.PhoneInputInput]:text-foreground [&_.PhoneInputInput]:outline-none [&_.PhoneInputInput]:border-0 [&_.PhoneInputInput]:placeholder:text-muted-foreground",
+          disabled && "bg-muted border-muted-foreground/50 cursor-not-allowed opacity-50",
           error && "border-red-500",
         )}
       />
