@@ -2886,7 +2886,8 @@ export type TenantUpdate = {
 /**
  * Request body for POST /auth/human/third-party/login.
  *
- * Tenant ID and API key come from headers (X-Tenant-Id, X-Third-Party-Api-Key).
+ * The API key comes from the X-Third-Party-Api-Key header; the tenant is
+ * resolved server-side from the key.
  */
 export type ThirdPartyHumanLogin = {
     email: string;
@@ -2895,7 +2896,8 @@ export type ThirdPartyHumanLogin = {
 /**
  * Request body for POST /auth/human/third-party/authenticate.
  *
- * Tenant ID and API key come from headers (X-Tenant-Id, X-Third-Party-Api-Key).
+ * The API key comes from the X-Third-Party-Api-Key header; the tenant is
+ * resolved server-side from the key.
  */
 export type ThirdPartyHumanVerify = {
     email: string;
@@ -3718,7 +3720,6 @@ export type AuthHumanAuthenticateResponse = (Token);
 
 export type AuthThirdPartyHumanLoginData = {
     requestBody: ThirdPartyHumanLogin;
-    xTenantId: string;
     xThirdPartyApiKey: string;
 };
 
@@ -3726,7 +3727,6 @@ export type AuthThirdPartyHumanLoginResponse = (AuthCodeSentResponse);
 
 export type AuthThirdPartyHumanAuthenticateData = {
     requestBody: ThirdPartyHumanVerify;
-    xTenantId: string;
     xThirdPartyApiKey: string;
 };
 

@@ -1459,14 +1459,15 @@ export class AuthService {
      * Third Party Human Login
      * Initiate OTP login for an EXISTING human via a third-party integration.
      *
-     * The caller must supply a valid third-party API key in X-Third-Party-Api-Key.
-     * Unlike the portal login endpoint, this surface NEVER creates a pending human
-     * row — the partner is expected to have onboarded the user out-of-band.
+     * The caller supplies only a valid third-party API key in
+     * X-Third-Party-Api-Key; the tenant is resolved server-side from the key.
+     * Unlike the portal login endpoint, this surface NEVER creates a pending
+     * human row — the partner is expected to have onboarded the user
+     * out-of-band.
      *
-     * On any validation failure (unknown tenant, feature disabled, wrong key,
-     * unknown email) the response is 401 to prevent existence leakage.
+     * On any validation failure (wrong key, unknown email) the response is 401
+     * to prevent existence leakage.
      * @param data The data for the request.
-     * @param data.xTenantId
      * @param data.xThirdPartyApiKey
      * @param data.requestBody
      * @returns AuthCodeSentResponse Successful Response
@@ -1477,7 +1478,6 @@ export class AuthService {
             method: 'POST',
             url: '/api/v1/auth/human/third-party/login',
             headers: {
-                'X-Tenant-Id': data.xTenantId,
                 'X-Third-Party-Api-Key': data.xThirdPartyApiKey
             },
             body: data.requestBody,
@@ -1492,11 +1492,11 @@ export class AuthService {
      * Third Party Human Authenticate
      * Verify OTP and mint a third-party JWT for an existing human.
      *
+     * The tenant is resolved server-side from the third-party API key alone.
      * Returns a JWT with issued_via=third_party and scopes=THIRD_PARTY_TOKEN_SCOPES.
      * The JWT grants portal:self_read, portal:directory_read, and
      * portal:api_keys_manage on the portal surface; it does NOT grant admin access.
      * @param data The data for the request.
-     * @param data.xTenantId
      * @param data.xThirdPartyApiKey
      * @param data.requestBody
      * @returns Token Successful Response
@@ -1507,7 +1507,6 @@ export class AuthService {
             method: 'POST',
             url: '/api/v1/auth/human/third-party/authenticate',
             headers: {
-                'X-Tenant-Id': data.xTenantId,
                 'X-Third-Party-Api-Key': data.xThirdPartyApiKey
             },
             body: data.requestBody,

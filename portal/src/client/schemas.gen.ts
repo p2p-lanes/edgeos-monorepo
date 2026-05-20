@@ -14636,7 +14636,8 @@ export const ThirdPartyHumanLoginSchema = {
     title: 'ThirdPartyHumanLogin',
     description: `Request body for POST /auth/human/third-party/login.
 
-Tenant ID and API key come from headers (X-Tenant-Id, X-Third-Party-Api-Key).`
+The API key comes from the X-Third-Party-Api-Key header; the tenant is
+resolved server-side from the key.`
 } as const;
 
 export const ThirdPartyHumanVerifySchema = {
@@ -14659,7 +14660,8 @@ export const ThirdPartyHumanVerifySchema = {
     title: 'ThirdPartyHumanVerify',
     description: `Request body for POST /auth/human/third-party/authenticate.
 
-Tenant ID and API key come from headers (X-Tenant-Id, X-Third-Party-Api-Key).`
+The API key comes from the X-Third-Party-Api-Key header; the tenant is
+resolved server-side from the key.`
 } as const;
 
 export const ThirdPartyKeyRotatedSchema = {
