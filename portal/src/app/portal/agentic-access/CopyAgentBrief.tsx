@@ -17,7 +17,7 @@ Endpoint prefix: /api/v1  (prepend this to every path from the OpenAPI spec — 
 
 Authentication
   Send \`Authorization: Bearer <token>\` on every request.
-  Tokens are personal access tokens that the user issues at /portal/api-keys.
+  Tokens are personal access tokens that the user issues at /portal/agentic-access.
   Scopes: events:read, events:write, rsvp:write, venues:write.
   Write scopes (events:write, venues:write) require an expiry and rotate periodically.
 
@@ -40,7 +40,7 @@ First step: fetch the OpenAPI spec above and treat it as the source of truth for
     <button
       type="button"
       onClick={onCopy}
-      className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors"
+      className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium whitespace-nowrap shrink-0 hover:bg-muted transition-colors"
     >
       {copied ? (
         <>
