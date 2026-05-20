@@ -38,11 +38,8 @@ def _make_human(db: Session, *, tenant: Tenants, email: str) -> Humans:
     return h
 
 
-def _login_headers(tenant_id: uuid.UUID, api_key: str) -> dict[str, str]:
-    return {
-        "X-Tenant-Id": str(tenant_id),
-        "X-Third-Party-Api-Key": api_key,
-    }
+def _login_headers(api_key: str) -> dict[str, str]:
+    return {"X-Third-Party-Api-Key": api_key}
 
 
 # ---------------------------------------------------------------------------
@@ -54,27 +51,10 @@ class TestThirdPartyLoginHeaders:
     def test_missing_api_key_header_returns_422(
         self,
         client: TestClient,
-        third_party_enabled_tenant: tuple[Tenants, str],
     ) -> None:
         """X-Third-Party-Api-Key is required. Absent header → 422."""
-        tenant, _raw = third_party_enabled_tenant
         resp = client.post(
             LOGIN_URL,
-            headers={"X-Tenant-Id": str(tenant.id)},
-            json={"email": "nobody@example.com"},
-        )
-        assert resp.status_code == 422
-
-    def test_missing_tenant_id_header_returns_422(
-        self,
-        client: TestClient,
-        third_party_enabled_tenant: tuple[Tenants, str],
-    ) -> None:
-        """X-Tenant-Id is required. Absent header → 422."""
-        _, raw_key = third_party_enabled_tenant
-        resp = client.post(
-            LOGIN_URL,
-            headers={"X-Third-Party-Api-Key": raw_key},
             json={"email": "nobody@example.com"},
         )
         assert resp.status_code == 422
@@ -92,29 +72,32 @@ class TestThirdPartyLoginKeyValidation:
         third_party_enabled_tenant: tuple[Tenants, str],
         db: Session,
     ) -> None:
-        """A key that doesn't match the stored hash → 401."""
+        """A key that doesn't match any tenant's stored hash → 401."""
         tenant, _raw = third_party_enabled_tenant
         email = f"key-mismatch-{uuid.uuid4().hex[:6]}@example.com"
         _make_human(db, tenant=tenant, email=email)
 
         resp = client.post(
             LOGIN_URL,
-            headers=_login_headers(tenant.id, "definitely_wrong_key"),
+            headers=_login_headers("definitely_wrong_key"),
             json={"email": email},
         )
         assert resp.status_code == 401
 
-    def test_disabled_tenant_third_party_returns_401(
+    def test_unknown_key_returns_401(
         self,
         client: TestClient,
         tenant_b: Tenants,
     ) -> None:
-        """Tenant with third_party_api_key_hash=NULL → 401 (feature not enabled)."""
-        # tenant_b has no third_party_api_key_hash set in conftest
+        """An arbitrary key that no tenant has registered → 401 (collapses with the
+        wrong-key branch — callers cannot distinguish disabled vs unknown).
+        """
+        # tenant_b has no third_party_api_key_hash set; the key below doesn't
+        # match any row either way.
         assert tenant_b.third_party_api_key_hash is None
         resp = client.post(
             LOGIN_URL,
-            headers=_login_headers(tenant_b.id, "any_key"),
+            headers=_login_headers("any_key"),
             json={"email": "nobody@example.com"},
         )
         assert resp.status_code == 401
@@ -148,7 +131,7 @@ class TestThirdPartyLoginExistingHumanOnly:
 
         resp = client.post(
             LOGIN_URL,
-            headers=_login_headers(tenant.id, raw_key),
+            headers=_login_headers(raw_key),
             json={"email": email},
         )
         assert resp.status_code in {401, 404}
@@ -196,7 +179,7 @@ class TestThirdPartyLoginHappyPath:
 
             resp = client.post(
                 LOGIN_URL,
-                headers=_login_headers(tenant.id, raw_key),
+                headers=_login_headers(raw_key),
                 json={"email": email},
             )
 
@@ -235,7 +218,7 @@ class TestThirdPartyAuthenticate:
         with patch.object(EmailService, "send_login_code_human", _fake_send):
             login_resp = client.post(
                 LOGIN_URL,
-                headers=_login_headers(tenant.id, raw_key),
+                headers=_login_headers(raw_key),
                 json={"email": email},
             )
         assert login_resp.status_code == 200, login_resp.text
@@ -244,7 +227,7 @@ class TestThirdPartyAuthenticate:
         code = captured_code[0]
         auth_resp = client.post(
             AUTH_URL,
-            headers=_login_headers(tenant.id, raw_key),
+            headers=_login_headers(raw_key),
             json={"email": email, "code": code},
         )
         assert auth_resp.status_code == 200, auth_resp.text
@@ -276,14 +259,14 @@ class TestThirdPartyAuthenticate:
         with patch.object(EmailService, "send_login_code_human", _fake_send):
             login_resp = client.post(
                 LOGIN_URL,
-                headers=_login_headers(tenant.id, raw_key),
+                headers=_login_headers(raw_key),
                 json={"email": email},
             )
         assert login_resp.status_code == 200
 
         auth_resp = client.post(
             AUTH_URL,
-            headers=_login_headers(tenant.id, raw_key),
+            headers=_login_headers(raw_key),
             json={"email": email, "code": "000000"},
         )
         assert auth_resp.status_code != 200
@@ -301,7 +284,7 @@ class TestThirdPartyAuthenticate:
 
         resp = client.post(
             AUTH_URL,
-            headers=_login_headers(tenant.id, "wrong_key"),
+            headers=_login_headers("wrong_key"),
             json={"email": email, "code": "123456"},
         )
         assert resp.status_code == 401

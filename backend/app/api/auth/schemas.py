@@ -51,7 +51,8 @@ class HumanVerify(BaseModel):
 class ThirdPartyHumanLogin(BaseModel):
     """Request body for POST /auth/human/third-party/login.
 
-    Tenant ID and API key come from headers (X-Tenant-Id, X-Third-Party-Api-Key).
+    The API key comes from the X-Third-Party-Api-Key header; the tenant is
+    resolved server-side from the key.
     """
 
     email: EmailStr
@@ -60,7 +61,8 @@ class ThirdPartyHumanLogin(BaseModel):
 class ThirdPartyHumanVerify(BaseModel):
     """Request body for POST /auth/human/third-party/authenticate.
 
-    Tenant ID and API key come from headers (X-Tenant-Id, X-Third-Party-Api-Key).
+    The API key comes from the X-Third-Party-Api-Key header; the tenant is
+    resolved server-side from the key.
     """
 
     email: EmailStr

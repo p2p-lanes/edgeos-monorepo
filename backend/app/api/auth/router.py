@@ -1,8 +1,8 @@
 import secrets
-import uuid
 
 from fastapi import APIRouter, Header, HTTPException, status
 from loguru import logger
+from sqlmodel import select
 
 from app.api.api_key.crud import hash_key as hash_api_key
 from app.api.auth.crud import (
@@ -31,30 +31,31 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 def _validate_third_party_key(
     session,
-    tenant_id: uuid.UUID,
     raw_key: str,
 ) -> Tenants:
-    """Resolve tenant and validate the third-party API key.
+    """Resolve the tenant from the third-party API key alone.
 
-    Raises HTTP 401 for any failure (disabled feature, wrong key, unknown
-    tenant) — keeps all failure branches indistinguishable to callers.
+    Hashes the raw key, looks up the tenant by the (partially unique) hash
+    column. All failure branches collapse to a single 401 — callers cannot
+    distinguish unknown key, wrong key, or disabled tenant from each other.
     """
-    tenant = session.get(Tenants, tenant_id)
-    if tenant is None or tenant.third_party_api_key_hash is None:
+    key_hash = hash_api_key(raw_key)
+    tenant = session.exec(
+        select(Tenants).where(Tenants.third_party_api_key_hash == key_hash)
+    ).first()
+
+    if tenant is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Third-party login not enabled for this tenant",
+            detail="Invalid third-party credentials",
         )
 
-    key_matches = secrets.compare_digest(
-        hash_api_key(raw_key),
-        tenant.third_party_api_key_hash,
-    )
-
-    if not key_matches:
+    # Defensive constant-time compare — the index lookup is already a strict
+    # equality match, but the explicit check makes the timing path uniform.
+    if not secrets.compare_digest(key_hash, tenant.third_party_api_key_hash or ""):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid third-party API key",
+            detail="Invalid third-party credentials",
         )
 
     return tenant
@@ -215,23 +216,24 @@ async def human_authenticate(
 async def third_party_human_login(
     request: ThirdPartyHumanLogin,
     session: SessionDep,
-    x_tenant_id: uuid.UUID = Header(..., alias="X-Tenant-Id"),
     x_third_party_api_key: str = Header(..., alias="X-Third-Party-Api-Key"),
 ) -> AuthCodeSentResponse:
     """Initiate OTP login for an EXISTING human via a third-party integration.
 
-    The caller must supply a valid third-party API key in X-Third-Party-Api-Key.
-    Unlike the portal login endpoint, this surface NEVER creates a pending human
-    row — the partner is expected to have onboarded the user out-of-band.
+    The caller supplies only a valid third-party API key in
+    X-Third-Party-Api-Key; the tenant is resolved server-side from the key.
+    Unlike the portal login endpoint, this surface NEVER creates a pending
+    human row — the partner is expected to have onboarded the user
+    out-of-band.
 
-    On any validation failure (unknown tenant, feature disabled, wrong key,
-    unknown email) the response is 401 to prevent existence leakage.
+    On any validation failure (wrong key, unknown email) the response is 401
+    to prevent existence leakage.
     """
-    _validate_third_party_key(session, x_tenant_id, x_third_party_api_key)
+    tenant = _validate_third_party_key(session, x_third_party_api_key)
 
     email, expiration_minutes = await login_existing_human(
         session=session,
-        tenant_id=x_tenant_id,
+        tenant_id=tenant.id,
         email=request.email,
     )
 
@@ -247,21 +249,21 @@ async def third_party_human_login(
 async def third_party_human_authenticate(
     request: ThirdPartyHumanVerify,
     session: SessionDep,
-    x_tenant_id: uuid.UUID = Header(..., alias="X-Tenant-Id"),
     x_third_party_api_key: str = Header(..., alias="X-Third-Party-Api-Key"),
 ) -> Token:
     """Verify OTP and mint a third-party JWT for an existing human.
 
+    The tenant is resolved server-side from the third-party API key alone.
     Returns a JWT with issued_via=third_party and scopes=THIRD_PARTY_TOKEN_SCOPES.
     The JWT grants portal:self_read, portal:directory_read, and
     portal:api_keys_manage on the portal surface; it does NOT grant admin access.
     """
-    _validate_third_party_key(session, x_tenant_id, x_third_party_api_key)
+    tenant = _validate_third_party_key(session, x_third_party_api_key)
 
     human = await authenticate_human(
         session=session,
         email=request.email,
-        tenant_id=x_tenant_id,
+        tenant_id=tenant.id,
         code=request.code,
     )
 
