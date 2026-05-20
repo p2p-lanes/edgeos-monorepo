@@ -28,6 +28,8 @@ from app.core.dependencies.users import (
     CurrentHuman,
     CurrentOperator,
     HumanTenantSession,
+    RequireHumanScopeDirectoryRead,
+    RequireHumanScopeSelfRead,
     TenantSession,
 )
 
@@ -138,6 +140,7 @@ async def list_my_attendees_by_popup(
     popup_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    _scope: RequireHumanScopeDirectoryRead,
     skip: PaginationSkip = 0,
     limit: _AttendeeLimit = 50,
 ) -> ListModel[AttendeeWithOriginPublic]:
@@ -171,6 +174,7 @@ async def create_my_attendee_for_popup(
     attendee_in: AttendeeCreate,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    _scope: RequireHumanScopeSelfRead,
 ) -> AttendeeWithOriginPublic:
     """Create a companion attendee (spouse/child) for the current Human's application.
 
@@ -294,6 +298,7 @@ async def update_my_attendee_for_popup(
     attendee_in: AttendeeUpdate,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    _scope: RequireHumanScopeSelfRead,
 ) -> AttendeeWithOriginPublic:
     """Update a companion attendee using the dual-path auth predicate.
 
@@ -348,6 +353,7 @@ async def delete_my_attendee_for_popup(
     attendee_id: uuid.UUID,
     db: HumanTenantSession,
     current_human: CurrentHuman,
+    _scope: RequireHumanScopeSelfRead,
 ) -> dict:
     """Delete a companion attendee using the dual-path auth predicate.
 
