@@ -3,6 +3,7 @@ import type { ProductsPass } from "@/types/Products"
 import VariantFaqs from "../variants/VariantFaqs"
 import VariantHousingDate from "../variants/VariantHousingDate"
 import VariantImageGallery from "../variants/VariantImageGallery"
+import VariantMealPlanSelect from "../variants/VariantMealPlanSelect"
 import VariantMerchImage from "../variants/VariantMerchImage"
 import VariantPatronPreset from "../variants/VariantPatronPreset"
 import VariantRichText from "../variants/VariantRichText"
@@ -23,6 +24,7 @@ export const VARIANT_REGISTRY: Record<string, ComponentType<VariantProps>> = {
   "patron-preset": VariantPatronPreset,
   "housing-date": VariantHousingDate,
   "merch-image": VariantMerchImage,
+  "meal-plan-select": VariantMealPlanSelect,
   "youtube-video": VariantYouTubeVideo,
   "image-gallery": VariantImageGallery,
   faqs: VariantFaqs,

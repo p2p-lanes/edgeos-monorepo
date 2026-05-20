@@ -2100,6 +2100,18 @@ export const AttendeeProductPublicSchema = {
                 }
             ],
             title: 'Last Scan At'
+        },
+        purchase_metadata: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Metadata'
         }
     },
     additionalProperties: false,
@@ -3099,6 +3111,67 @@ export const CartItemHousingSchema = {
     description: 'Housing selection in cart.'
 } as const;
 
+export const CartItemMealPlanSchema = {
+    properties: {
+        attendee_id: {
+            type: 'string',
+            title: 'Attendee Id'
+        },
+        product_id: {
+            type: 'string',
+            title: 'Product Id'
+        },
+        daily_choices: {
+            anyOf: [
+                {
+                    additionalProperties: {
+                        type: 'string'
+                    },
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Daily Choices'
+        },
+        dietary_restriction: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Dietary Restriction'
+        },
+        special_request: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Special Request'
+        }
+    },
+    type: 'object',
+    required: ['attendee_id', 'product_id'],
+    title: 'CartItemMealPlan',
+    description: `Meal-plan selection in cart (one row per attendee × weekly product).
+
+All metadata fields are nullable in cart because the buyer fills them
+incrementally — completeness is enforced only at checkout submission.
+
+\`daily_choices\` maps ISO weekday dates (YYYY-MM-DD) to menu_option keys
+(or the literal "chef" for chef's choice). \`dietary_restriction\` and
+\`special_request\` apply at the attendee level — the frontend / reducer
+keeps them in sync across every meal_plans entry for that attendee.`
+} as const;
+
 export const CartItemMerchSchema = {
     properties: {
         product_id: {
@@ -3309,6 +3382,14 @@ export const CartStateSchema = {
                     type: 'null'
                 }
             ]
+        },
+        meal_plans: {
+            items: {
+                '$ref': '#/components/schemas/CartItemMealPlan'
+            },
+            type: 'array',
+            title: 'Meal Plans',
+            default: []
         },
         promo_code: {
             anyOf: [
@@ -10029,6 +10110,18 @@ export const PaymentProductRequest_InputSchema = {
                 }
             ],
             title: 'Unit Price Override'
+        },
+        purchase_metadata: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Metadata'
         }
     },
     type: 'object',
@@ -10065,6 +10158,18 @@ export const PaymentProductRequest_OutputSchema = {
                 }
             ],
             title: 'Unit Price Override'
+        },
+        purchase_metadata: {
+            anyOf: [
+                {
+                    additionalProperties: true,
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Purchase Metadata'
         }
     },
     type: 'object',

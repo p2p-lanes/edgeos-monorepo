@@ -12,6 +12,7 @@ import type {
   CheckoutStep,
   SelectedDynamicItem,
   SelectedHousingItem,
+  SelectedMealPlanItem,
   SelectedMerchItem,
   SelectedPassItem,
   SelectedPatronItem,
@@ -29,6 +30,7 @@ interface UsePaymentSubmitParams {
   housing: SelectedHousingItem | null
   merch: SelectedMerchItem[]
   patron: SelectedPatronItem | null
+  selectedMealPlans: SelectedMealPlanItem[]
   dynamicItems: Record<string, SelectedDynamicItem[]>
   promoCode: string
   promoCodeValid: boolean
@@ -65,6 +67,7 @@ export function usePaymentSubmit({
   housing,
   merch,
   patron,
+  selectedMealPlans,
   dynamicItems,
   promoCode,
   promoCodeValid,
@@ -116,6 +119,7 @@ export function usePaymentSubmit({
       !!housing ||
       merch.length > 0 ||
       !!patron ||
+      selectedMealPlans.length > 0 ||
       hasDynamicItems
 
     if (!hasAnyCartSelection) {
@@ -138,6 +142,7 @@ export function usePaymentSubmit({
           housing,
           merch,
           patron,
+          selectedMealPlans,
           dynamicItems,
           isEditing,
           appCredit,
@@ -268,6 +273,7 @@ export function usePaymentSubmit({
     merch,
     housing,
     patron,
+    selectedMealPlans,
     dynamicItems,
     promoCodeValid,
     promoCode,

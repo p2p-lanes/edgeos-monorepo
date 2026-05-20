@@ -97,6 +97,24 @@ export interface SelectedPatronItem {
   isCustomAmount: boolean
 }
 
+/**
+ * One meal-plan cart entry — bound to a specific (attendee, weekly product) pair.
+ * Mirrors `CartItemMealPlan` from the cart API; carries the resolved product
+ * + display fields the UI needs.
+ *
+ * `dailyChoices` maps ISO weekday dates → menu_option key (or "chef").
+ * `dietaryRestriction` and `specialRequest` are per-attendee — the reducer
+ * keeps them synced across every meal-plan entry for that attendee.
+ */
+export interface SelectedMealPlanItem {
+  productId: string
+  product: ProductsPass
+  attendeeId: string
+  dailyChoices: Record<string, string> | null
+  dietaryRestriction: string | null
+  specialRequest: string | null
+}
+
 export interface SelectedDynamicItem {
   productId: string
   product: ProductsPass
@@ -111,6 +129,7 @@ export interface CheckoutCartState {
   housing: SelectedHousingItem | null
   merch: SelectedMerchItem[]
   patron: SelectedPatronItem | null
+  mealPlans: SelectedMealPlanItem[]
   promoCode: string
   promoCodeValid: boolean
   promoCodeDiscount: number
@@ -232,6 +251,7 @@ export function createInitialCartState(): CheckoutCartState {
     housing: null,
     merch: [],
     patron: null,
+    mealPlans: [],
     promoCode: "",
     promoCodeValid: false,
     promoCodeDiscount: 0,

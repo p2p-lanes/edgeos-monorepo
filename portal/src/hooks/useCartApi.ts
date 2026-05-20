@@ -29,11 +29,20 @@ export interface CartItemPatron {
   is_custom_amount: boolean
 }
 
+export interface CartItemMealPlan {
+  attendee_id: string
+  product_id: string
+  daily_choices: Record<string, string> | null
+  dietary_restriction: string | null
+  special_request: string | null
+}
+
 export interface CartState {
   passes: CartItemPass[]
   housing: CartItemHousing | null
   merch: CartItemMerch[]
   patron: CartItemPatron | null
+  meal_plans: CartItemMealPlan[]
   promo_code: string | null
   insurance: boolean
   current_step: string | null
@@ -53,6 +62,7 @@ const EMPTY_CART: CartState = {
   housing: null,
   merch: [],
   patron: null,
+  meal_plans: [],
   promo_code: null,
   insurance: false,
   current_step: null,
