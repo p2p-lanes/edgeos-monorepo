@@ -8,6 +8,7 @@ import {
   FileText,
   FormInput,
   Home,
+  KeyRound,
   LayoutList,
   ListTree,
   Mail,
@@ -79,6 +80,11 @@ const eventItems: Item[] = [
 
 // Admin items (admins and superadmins)
 const adminItems: Item[] = [{ icon: Users, title: "Users", path: "/admin" }]
+
+// Agentic access items (admins and superadmins only)
+const agenticItems: Item[] = [
+  { icon: KeyRound, title: "API Keys", path: "/api-keys" },
+]
 
 // Superadmin only items - organizations list view
 const superadminItems: Item[] = [
@@ -186,6 +192,15 @@ export function AppSidebar() {
             <SidebarGroupLabel>Administration</SidebarGroupLabel>
             <Main items={adminNavigationItems} />
             {isSuperadmin && <Main items={superadminItems} />}
+          </SidebarGroup>
+        )}
+
+        {/* Agentic access (API Keys + Docs) — admins and superadmins only */}
+        {(currentUser?.role === "admin" ||
+          currentUser?.role === "superadmin") && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Agentic access</SidebarGroupLabel>
+            <Main items={agenticItems} />
           </SidebarGroup>
         )}
       </SidebarContent>
