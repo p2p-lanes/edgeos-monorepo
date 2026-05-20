@@ -7,7 +7,7 @@ from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.api.user import crud
 from app.api.user.schemas import UserCreate, UserPublic, UserUpdate
-from app.core.dependencies.users import CurrentOperator, CurrentUser, SessionDep
+from app.core.dependencies.users import CurrentOperatorJwtOnly, CurrentUser, SessionDep
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -37,7 +37,7 @@ ROLE_HIERARCHY = {
 @router.get("", response_model=ListModel[UserPublic])
 async def list_users(
     db: SessionDep,
-    current_user: CurrentOperator,
+    current_user: CurrentOperatorJwtOnly,
     skip: PaginationSkip = 0,
     limit: PaginationLimit = 100,
     tenant_id: uuid.UUID | None = None,
@@ -89,7 +89,7 @@ async def get_current_user_info(
 async def get_user(
     user_id: uuid.UUID,
     db: SessionDep,
-    current_user: CurrentOperator,
+    current_user: CurrentOperatorJwtOnly,
 ) -> UserPublic:
     user = crud.get(db, user_id)
 
@@ -126,7 +126,7 @@ async def get_user(
 async def create_user(
     user_in: UserCreate,
     db: SessionDep,
-    current_user: CurrentOperator,
+    current_user: CurrentOperatorJwtOnly,
 ) -> UserPublic:
     allowed_roles = ROLE_HIERARCHY.get(current_user.role, [])
     if user_in.role not in allowed_roles:
@@ -167,7 +167,7 @@ async def update_user(
     user_id: uuid.UUID,
     user_in: UserUpdate,
     db: SessionDep,
-    current_user: CurrentOperator,
+    current_user: CurrentOperatorJwtOnly,
 ) -> UserPublic:
     user = crud.get(db, user_id)
 
@@ -224,7 +224,7 @@ async def update_user(
 async def delete_user(
     user_id: uuid.UUID,
     db: SessionDep,
-    current_user: CurrentOperator,
+    current_user: CurrentOperatorJwtOnly,
 ) -> None:
     user = crud.get(db, user_id)
 

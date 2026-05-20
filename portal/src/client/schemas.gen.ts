@@ -76,6 +76,190 @@ export const AbandonedCartPublicSchema = {
     description: 'Abandoned cart with enriched info for backoffice.'
 } as const;
 
+export const AdminApiKeyCreateSchema = {
+    properties: {
+        name: {
+            type: 'string',
+            maxLength: 100,
+            minLength: 1,
+            title: 'Name'
+        },
+        scopes: {
+            items: {
+                type: 'string',
+                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
+            },
+            type: 'array',
+            minItems: 1,
+            title: 'Scopes'
+        },
+        expires_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Expires At'
+        }
+    },
+    type: 'object',
+    required: ['name', 'scopes'],
+    title: 'AdminApiKeyCreate',
+    description: 'Request body for minting a new admin API key.'
+} as const;
+
+export const AdminApiKeyCreatedSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        prefix: {
+            type: 'string',
+            title: 'Prefix'
+        },
+        scopes: {
+            items: {
+                type: 'string',
+                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
+            },
+            type: 'array',
+            title: 'Scopes'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        last_used_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Used At'
+        },
+        expires_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Expires At'
+        },
+        revoked_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Revoked At'
+        },
+        raw_key: {
+            type: 'string',
+            title: 'Raw Key'
+        }
+    },
+    type: 'object',
+    required: ['id', 'name', 'prefix', 'scopes', 'created_at', 'raw_key'],
+    title: 'AdminApiKeyCreated',
+    description: `Response returned only at creation.
+
+\`\`raw_key\`\` is the cleartext token shown once and never stored.`
+} as const;
+
+export const AdminApiKeyPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        prefix: {
+            type: 'string',
+            title: 'Prefix'
+        },
+        scopes: {
+            items: {
+                type: 'string',
+                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
+            },
+            type: 'array',
+            title: 'Scopes'
+        },
+        created_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Created At'
+        },
+        last_used_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Used At'
+        },
+        expires_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Expires At'
+        },
+        revoked_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Revoked At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'name', 'prefix', 'scopes', 'created_at'],
+    title: 'AdminApiKeyPublic',
+    description: 'Safe representation of an admin API key — never includes the raw secret.'
+} as const;
+
 export const ApiKeyCreateSchema = {
     properties: {
         name: {
@@ -99,7 +283,7 @@ export const ApiKeyCreateSchema = {
         scopes: {
             items: {
                 type: 'string',
-                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:write']
+                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
             },
             type: 'array',
             title: 'Scopes'
@@ -129,7 +313,7 @@ export const ApiKeyCreatedSchema = {
         scopes: {
             items: {
                 type: 'string',
-                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:write']
+                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
             },
             type: 'array',
             title: 'Scopes'
@@ -205,7 +389,7 @@ export const ApiKeyPublicSchema = {
         scopes: {
             items: {
                 type: 'string',
-                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:write']
+                enum: ['events:read', 'events:write', 'rsvp:write', 'venues:write', 'applications:read', 'applications:write', 'attendees:read', 'attendees:write', 'humans:read', 'humans:write', 'groups:read', 'groups:write', 'products:read', 'products:write', 'coupons:read', 'coupons:write', 'forms:read', 'forms:write', 'payments:read', 'tracks:read', 'tracks:write', 'ticketing_steps:read', 'ticketing_steps:write', 'translations:read', 'translations:write']
             },
             type: 'array',
             title: 'Scopes'
@@ -14315,6 +14499,17 @@ export const TenantPublicSchema = {
                 }
             ],
             title: 'Active Popup Slug'
+        },
+        third_party_key_prefix: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Third Party Key Prefix'
         }
     },
     type: 'object',
@@ -14426,6 +14621,64 @@ export const TenantUpdateSchema = {
     },
     type: 'object',
     title: 'TenantUpdate'
+} as const;
+
+export const ThirdPartyHumanLoginSchema = {
+    properties: {
+        email: {
+            type: 'string',
+            format: 'email',
+            title: 'Email'
+        }
+    },
+    type: 'object',
+    required: ['email'],
+    title: 'ThirdPartyHumanLogin',
+    description: `Request body for POST /auth/human/third-party/login.
+
+The API key comes from the X-Third-Party-Api-Key header; the tenant is
+resolved server-side from the key.`
+} as const;
+
+export const ThirdPartyHumanVerifySchema = {
+    properties: {
+        email: {
+            type: 'string',
+            format: 'email',
+            title: 'Email'
+        },
+        code: {
+            type: 'string',
+            maxLength: 6,
+            minLength: 6,
+            pattern: '^\\d{6}$',
+            title: 'Code'
+        }
+    },
+    type: 'object',
+    required: ['email', 'code'],
+    title: 'ThirdPartyHumanVerify',
+    description: `Request body for POST /auth/human/third-party/authenticate.
+
+The API key comes from the X-Third-Party-Api-Key header; the tenant is
+resolved server-side from the key.`
+} as const;
+
+export const ThirdPartyKeyRotatedSchema = {
+    properties: {
+        api_key: {
+            type: 'string',
+            title: 'Api Key'
+        },
+        prefix: {
+            type: 'string',
+            title: 'Prefix'
+        }
+    },
+    type: 'object',
+    required: ['api_key', 'prefix'],
+    title: 'ThirdPartyKeyRotated',
+    description: 'Returned by the rotate endpoint. The raw api_key is shown ONCE and never stored.'
 } as const;
 
 export const TicketAttendeeSnapshotSchema = {
