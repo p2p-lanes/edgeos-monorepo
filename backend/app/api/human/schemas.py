@@ -33,6 +33,9 @@ class HumanBase(SQLModel):
         default=None, sa_type=DateTime(timezone=True)
     )
     auth_attempts: int = Field(default=0)
+    # NULL = legacy/portal-origin; otherwise tags the flow that emitted the
+    # current OTP so the verify path can reject cross-flow redemption.
+    auth_code_origin: str | None = Field(default=None, max_length=20)
 
 
 class HumanPublic(BaseModel):

@@ -473,10 +473,8 @@ def third_party_enabled_tenant(db: Session, tenant_a: Tenants) -> tuple[Tenants,
     Returns (tenant, raw_key) so tests can verify both key validation and
     prefix display.
     """
-    import bcrypt
-
     raw_key = "tp_test_secret_key_for_tests_only"
-    key_hash = bcrypt.hashpw(raw_key.encode(), bcrypt.gensalt()).decode()
+    key_hash = api_key_crud.hash_key(raw_key)
 
     tenant_a.third_party_api_key_hash = key_hash
     tenant_a.third_party_key_prefix = raw_key[:8]

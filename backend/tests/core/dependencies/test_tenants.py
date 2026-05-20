@@ -50,6 +50,7 @@ def _make_tenant(tenant_id: uuid.UUID = _TENANT_A_ID) -> MagicMock:
     t.custom_domain_active = False
     t.landing_mode = LandingMode.portal
     t.active_popup_slug = None  # computed projection — not a DB column
+    t.third_party_key_prefix = None  # third-party OTP display fragment
     return t
 
 

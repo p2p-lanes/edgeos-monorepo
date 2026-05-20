@@ -15,11 +15,12 @@ from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.tenants import PublicTenant
 from app.core.dependencies.users import (
+    AdminOrApiKey_CouponsRead,
+    AdminOrApiKey_CouponsWrite,
+    AdminOrApiKeySession_CouponsRead,
+    AdminOrApiKeySession_CouponsWrite,
     CurrentHuman,
-    CurrentOperator,
-    CurrentUser,
     SessionDep,
-    TenantSession,
 )
 from app.core.rate_limit import RateLimit
 
@@ -55,8 +56,8 @@ async def validate_coupon_public(
 
 @router.get("", response_model=ListModel[CouponPublic])
 async def list_coupons(
-    db: TenantSession,
-    _: CurrentUser,
+    db: AdminOrApiKeySession_CouponsRead,
+    _: AdminOrApiKey_CouponsRead,
     popup_id: uuid.UUID | None = None,
     is_active: bool | None = None,
     search: str | None = None,
@@ -87,8 +88,8 @@ async def list_coupons(
 @router.get("/{coupon_id}", response_model=CouponPublic)
 async def get_coupon(
     coupon_id: uuid.UUID,
-    db: TenantSession,
-    _: CurrentUser,
+    db: AdminOrApiKeySession_CouponsRead,
+    _: AdminOrApiKey_CouponsRead,
 ) -> CouponPublic:
     """Get a single coupon by ID (BO only)."""
     coupon = crud.coupons_crud.get(db, coupon_id)
@@ -121,8 +122,8 @@ async def validate_coupon(
 @router.post("", response_model=CouponPublic, status_code=status.HTTP_201_CREATED)
 async def create_coupon(
     coupon_in: CouponCreate,
-    db: TenantSession,
-    current_user: CurrentOperator,
+    db: AdminOrApiKeySession_CouponsWrite,
+    current_user: AdminOrApiKey_CouponsWrite,
 ) -> CouponPublic:
     """Create a new coupon (BO only)."""
 
@@ -166,8 +167,8 @@ async def create_coupon(
 async def update_coupon(
     coupon_id: uuid.UUID,
     coupon_in: CouponUpdate,
-    db: TenantSession,
-    _current_user: CurrentOperator,
+    db: AdminOrApiKeySession_CouponsWrite,
+    _current_user: AdminOrApiKey_CouponsWrite,
 ) -> CouponPublic:
     """Update a coupon (BO only)."""
 
@@ -195,8 +196,8 @@ async def update_coupon(
 @router.delete("/{coupon_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_coupon(
     coupon_id: uuid.UUID,
-    db: TenantSession,
-    _current_user: CurrentOperator,
+    db: AdminOrApiKeySession_CouponsWrite,
+    _current_user: AdminOrApiKey_CouponsWrite,
 ) -> None:
     """Delete a coupon (BO only)."""
 

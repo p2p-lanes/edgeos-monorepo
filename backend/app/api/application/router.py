@@ -37,13 +37,14 @@ from app.api.attendee.schemas import (
 from app.api.shared.enums import SaleType, UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
-    CurrentAdmin,
+    AdminOrApiKey_ApplicationsRead,
+    AdminOrApiKey_ApplicationsWrite,
+    AdminOrApiKeySession_ApplicationsRead,
+    AdminOrApiKeySession_ApplicationsWrite,
     CurrentHuman,
-    CurrentOperator,
     HumanTenantSession,
     RequireHumanScopeDirectoryRead,
     RequireHumanScopeSelfRead,
-    TenantSession,
 )
 from app.services.email_helpers import send_application_status_email
 
@@ -139,8 +140,8 @@ def _build_application_public(
 
 @router.get("", response_model=ListModel[ApplicationPublic])
 async def list_applications(
-    db: TenantSession,
-    _: CurrentOperator,
+    db: AdminOrApiKeySession_ApplicationsRead,
+    _: AdminOrApiKey_ApplicationsRead,
     popup_id: uuid.UUID | None = None,
     human_id: uuid.UUID | None = None,
     reviewed_by: uuid.UUID | None = None,
@@ -194,8 +195,8 @@ async def list_applications(
 @router.post("", response_model=ApplicationPublic, status_code=status.HTTP_201_CREATED)
 async def create_application_admin(
     app_in: ApplicationAdminCreate,
-    db: TenantSession,
-    current_user: CurrentOperator,
+    db: AdminOrApiKeySession_ApplicationsWrite,
+    current_user: AdminOrApiKey_ApplicationsWrite,
 ) -> ApplicationPublic:
     """Create an application as admin (BO only - superadmin for testing).
 
@@ -240,8 +241,8 @@ async def create_application_admin(
 @router.get("/{application_id}", response_model=ApplicationPublic)
 async def get_application(
     application_id: uuid.UUID,
-    db: TenantSession,
-    _: CurrentOperator,
+    db: AdminOrApiKeySession_ApplicationsRead,
+    _: AdminOrApiKey_ApplicationsRead,
 ) -> ApplicationPublic:
     """Get a single application (BO only)."""
     application = crud.applications_crud.get(db, application_id)
@@ -1041,8 +1042,8 @@ async def delete_my_attendee(
 async def review_scholarship(
     application_id: uuid.UUID,
     decision: ScholarshipDecisionRequest,
-    db: TenantSession,
-    _: CurrentAdmin,
+    db: AdminOrApiKeySession_ApplicationsWrite,
+    _: AdminOrApiKey_ApplicationsWrite,
 ) -> ApplicationPublic:
     """Approve or reject a scholarship request on an application (BO admin only).
 

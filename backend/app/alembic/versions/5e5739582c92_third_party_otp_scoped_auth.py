@@ -2,8 +2,8 @@
 
 WHY:
 1. tenants.third_party_api_key_hash / third_party_key_prefix — allows a
-   tenant to enable the third-party OTP surface by storing a bcrypt hash of
-   the shared secret. Presence of a non-null hash = feature enabled.
+   tenant to enable the third-party OTP surface by storing a peppered SHA-256
+   hash of the shared secret. Presence of a non-null hash = feature enabled.
 2. api_keys.user_id — admin-owned API keys. Exactly one of (human_id,
    user_id) must be non-null, enforced by the api_keys_owner_check constraint.
 3. api_keys.human_id nullable — required so that admin-owned rows (user_id

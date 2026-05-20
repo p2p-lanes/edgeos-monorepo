@@ -22,11 +22,12 @@ from app.api.shared.enums import UserRole
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.api.translation.service import delete_translations_for_entity
 from app.core.dependencies.users import (
+    AdminOrApiKey_FormsRead,
+    AdminOrApiKey_FormsWrite,
+    AdminOrApiKeySession_FormsRead,
+    AdminOrApiKeySession_FormsWrite,
     CurrentHuman,
-    CurrentOperator,
-    CurrentUser,
     HumanTenantSession,
-    TenantSession,
 )
 
 router = APIRouter(prefix="/form-fields", tags=["form-fields"])
@@ -77,8 +78,8 @@ def _get_base_fields_as_public(db: "Session", popup: "Popups") -> list[FormField
 
 @router.get("", response_model=ListModel[FormFieldPublic])
 async def list_form_fields(
-    db: TenantSession,
-    _: CurrentUser,
+    db: AdminOrApiKeySession_FormsRead,
+    _: AdminOrApiKey_FormsRead,
     popup_id: uuid.UUID | None = None,
     search: str | None = None,
     skip: PaginationSkip = 0,
@@ -132,8 +133,8 @@ async def list_form_fields(
 @router.get("/catalog/{popup_id}", response_model=list[CatalogField])
 async def list_available_base_fields(
     popup_id: uuid.UUID,
-    db: TenantSession,
-    _: CurrentUser,
+    db: AdminOrApiKeySession_FormsRead,
+    _: AdminOrApiKey_FormsRead,
 ) -> list[CatalogField]:
     """List catalog base fields that are not yet configured for this popup.
 
@@ -185,8 +186,8 @@ async def list_available_base_fields(
 async def create_base_field_config(
     popup_id: uuid.UUID,
     field_name: str,
-    db: TenantSession,
-    _current_user: CurrentOperator,
+    db: AdminOrApiKeySession_FormsWrite,
+    _current_user: AdminOrApiKey_FormsWrite,
 ) -> FormFieldPublic:
     """Add a catalog base field to a popup by creating its BaseFieldConfig."""
     from app.api.popup.crud import popups_crud
@@ -268,8 +269,8 @@ async def create_base_field_config(
 @router.get("/{field_id}", response_model=FormFieldPublic)
 async def get_form_field(
     field_id: uuid.UUID,
-    db: TenantSession,
-    _: CurrentUser,
+    db: AdminOrApiKeySession_FormsRead,
+    _: AdminOrApiKey_FormsRead,
 ) -> FormFieldPublic:
     field = crud.form_fields_crud.get(db, field_id)
 
@@ -290,8 +291,8 @@ async def get_form_field(
 @router.post("", response_model=FormFieldPublic, status_code=status.HTTP_201_CREATED)
 async def create_form_field(
     field_in: FormFieldCreate,
-    db: TenantSession,
-    current_user: CurrentOperator,
+    db: AdminOrApiKeySession_FormsWrite,
+    current_user: AdminOrApiKey_FormsWrite,
 ) -> FormFieldPublic:
     if current_user.role == UserRole.SUPERADMIN:
         from app.api.popup.crud import popups_crud
@@ -327,8 +328,8 @@ async def create_form_field(
 async def update_form_field(
     field_id: uuid.UUID,
     field_in: FormFieldUpdate,
-    db: TenantSession,
-    _current_user: CurrentOperator,
+    db: AdminOrApiKeySession_FormsWrite,
+    _current_user: AdminOrApiKey_FormsWrite,
 ) -> FormFieldPublic:
     field = crud.form_fields_crud.get(db, field_id)
 
@@ -402,8 +403,8 @@ async def update_form_field(
 @router.delete("/{field_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_form_field(
     field_id: uuid.UUID,
-    db: TenantSession,
-    _current_user: CurrentOperator,
+    db: AdminOrApiKeySession_FormsWrite,
+    _current_user: AdminOrApiKey_FormsWrite,
 ) -> None:
     field = crud.form_fields_crud.get(db, field_id)
 
@@ -435,8 +436,8 @@ async def delete_form_field(
 @router.get("/schema/{popup_id}", response_model=dict[str, Any])
 async def get_application_schema(
     popup_id: uuid.UUID,
-    db: TenantSession,
-    _: CurrentUser,
+    db: AdminOrApiKeySession_FormsRead,
+    _: AdminOrApiKey_FormsRead,
 ) -> dict[str, Any]:
     """Get the complete application schema for a popup.
 

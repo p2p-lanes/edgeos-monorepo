@@ -41,8 +41,8 @@ class Tenants(TenantBase, table=True):
     )
 
     # Third-party OTP surface. Presence of a non-null hash means the feature
-    # is enabled for this tenant. The cleartext key is NEVER stored — only the
-    # bcrypt hash and an 8-char prefix for display.
+    # is enabled for this tenant. The cleartext key is NEVER stored; only the
+    # peppered SHA-256 hash and an 8-char prefix for display.
     third_party_api_key_hash: str | None = Field(
         default=None,
         max_length=64,

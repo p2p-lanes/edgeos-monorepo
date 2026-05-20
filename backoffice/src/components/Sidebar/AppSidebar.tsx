@@ -8,6 +8,7 @@ import {
   FileText,
   FormInput,
   Home,
+  KeyRound,
   LayoutList,
   ListTree,
   Mail,
@@ -79,6 +80,17 @@ const eventItems: Item[] = [
 
 // Admin items (admins and superadmins)
 const adminItems: Item[] = [{ icon: Users, title: "Users", path: "/admin" }]
+
+// Agentic access items (admins and superadmins only)
+const agenticItems: Item[] = [
+  { icon: KeyRound, title: "API Keys", path: "/api-keys" },
+]
+
+// Feature flag: surface the Agentic access section in the sidebar.
+// The /api-keys route and CRUD endpoints stay live (admins can still create
+// keys via the API), but the UI entry is hidden until we are ready to expose
+// it to users.
+const SHOW_AGENTIC_ACCESS = false
 
 // Superadmin only items - organizations list view
 const superadminItems: Item[] = [
@@ -188,6 +200,17 @@ export function AppSidebar() {
             {isSuperadmin && <Main items={superadminItems} />}
           </SidebarGroup>
         )}
+
+        {/* Agentic access (API Keys + Docs) — admins and superadmins only.
+            Gated behind SHOW_AGENTIC_ACCESS while the feature is hidden. */}
+        {SHOW_AGENTIC_ACCESS &&
+          (currentUser?.role === "admin" ||
+            currentUser?.role === "superadmin") && (
+            <SidebarGroup>
+              <SidebarGroupLabel>Agentic access</SidebarGroupLabel>
+              <Main items={agenticItems} />
+            </SidebarGroup>
+          )}
       </SidebarContent>
       <SidebarFooter>
         <SidebarAppearance />

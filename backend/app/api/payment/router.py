@@ -22,9 +22,10 @@ from app.api.payment.schemas import (
 )
 from app.api.shared.response import ListModel, PaginationLimit, PaginationSkip, Paging
 from app.core.dependencies.users import (
+    AdminOrApiKey_PaymentsRead,
+    AdminOrApiKeySession_PaymentsRead,
     CurrentHuman,
-    CurrentOperator,
-    CurrentUser,
+    CurrentOperatorJwtOnly,
     HumanTenantSession,
     RequireHumanScopeSelfRead,
     SessionDep,
@@ -330,8 +331,8 @@ def _require_external_id(external_id: str | None) -> str:
 
 @router.get("", response_model=ListModel[PaymentPublic])
 async def list_payments(
-    db: TenantSession,
-    _: CurrentUser,
+    db: AdminOrApiKeySession_PaymentsRead,
+    _: AdminOrApiKey_PaymentsRead,
     popup_id: uuid.UUID | None = None,
     application_id: uuid.UUID | None = None,
     external_id: str | None = None,
@@ -378,8 +379,8 @@ async def list_payments(
 @router.get("/{payment_id}", response_model=PaymentPublic)
 async def get_payment(
     payment_id: uuid.UUID,
-    db: TenantSession,
-    _: CurrentUser,
+    db: AdminOrApiKeySession_PaymentsRead,
+    _: AdminOrApiKey_PaymentsRead,
 ) -> PaymentPublic:
     """Get a single payment (BO only)."""
     payment = payments_crud.get(db, payment_id)
@@ -396,8 +397,8 @@ async def get_payment(
 @router.get("/{payment_id}/invoice")
 async def get_payment_invoice(
     payment_id: uuid.UUID,
-    db: TenantSession,
-    _: CurrentUser,
+    db: AdminOrApiKeySession_PaymentsRead,
+    _: AdminOrApiKey_PaymentsRead,
 ) -> Response:
     """Download invoice PDF for a payment (BO only).
 
@@ -462,7 +463,7 @@ async def update_payment(
     payment_id: uuid.UUID,
     payment_in: PaymentUpdate,
     db: TenantSession,
-    _current_user: CurrentOperator,
+    _current_user: CurrentOperatorJwtOnly,
 ) -> PaymentPublic:
     """Update a payment (BO only)."""
 
