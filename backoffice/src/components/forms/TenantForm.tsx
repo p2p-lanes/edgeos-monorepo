@@ -23,6 +23,7 @@ import {
 import { DangerZone } from "@/components/Common/DangerZone"
 import { FieldError } from "@/components/Common/FieldError"
 import { TenantCredentialsSection } from "@/components/forms/TenantCredentialsSection"
+import { ThirdPartyIntegrationSection } from "@/components/forms/ThirdPartyIntegrationSection"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -526,6 +527,15 @@ export function TenantForm({ defaultValues, onSuccess }: TenantFormProps) {
       {isEdit && isSuperadmin && (
         <div className="mx-auto max-w-2xl">
           <TenantCredentialsSection tenantId={defaultValues.id} />
+        </div>
+      )}
+
+      {isEdit && (
+        <div className="mx-auto max-w-2xl">
+          <ThirdPartyIntegrationSection
+            tenantId={defaultValues.id}
+            prefix={defaultValues.third_party_key_prefix}
+          />
         </div>
       )}
 
