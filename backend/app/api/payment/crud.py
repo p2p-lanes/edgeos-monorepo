@@ -492,6 +492,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                                 (popup.slug or "")[:3].upper()
                             ),
                             payment_id=payment.id,
+                            purchase_metadata=line.purchase_metadata,
                         )
                     )
                     session.add(
@@ -1881,6 +1882,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     product_id=req_prod.product_id,
                     check_in_code=generate_check_in_code(""),
                     payment_id=payment_id,
+                    purchase_metadata=req_prod.purchase_metadata,
                 )
                 session.add(attendee_product)
 
