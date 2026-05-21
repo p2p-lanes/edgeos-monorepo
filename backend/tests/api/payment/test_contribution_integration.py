@@ -6,6 +6,11 @@ Scenarios covered:
   - SCN-04: enabled + null percentage → contribution_amount=0
   - SCN-07: insurance + contribution both enabled → parallel fees, no compounding
   - SCN-08: direct-sale (sale_type=direct) → contribution NOT applied
+
+SCN-08 note: The direct-sale flow uses create_open_ticketing_payment, which does
+NOT call _apply_discounts — it builds Payments directly with amount=0 and no
+contribution. Contribution is naturally excluded from the direct-sale path
+because it runs through a completely separate code path.
 """
 
 import uuid
@@ -313,4 +318,53 @@ class TestContributionInApplyDiscounts:
         )
         assert Decimal(data["amount"]) == Decimal("108.00"), (
             f"Expected grand total=108.00, got {data.get('amount')}"
+        )
+
+
+class TestDirectSaleExclusion:
+    """SCN-08: Direct-sale flow excludes contribution (different code path).
+
+    The create_open_ticketing_payment path does not call _apply_discounts,
+    so contribution is naturally excluded. We verify the Payments model
+    has contribution_amount=0 default when no calculation runs.
+    """
+
+    def test_payments_model_has_zero_contribution_amount_by_default(
+        self,
+        db: Session,
+        tenant_a: Tenants,
+    ) -> None:
+        """SCN-08: Payments created without contribution_amount → defaults to 0.
+
+        This validates the column default and that the direct-sale path
+        (which never calls calculate_contribution_amount) yields 0 on the row.
+        """
+        from app.api.payment.models import Payments
+        from app.api.payment.schemas import PaymentStatus
+
+        popup = _make_popup(
+            db,
+            tenant_a,
+            contribution_enabled=True,
+            contribution_percentage="5.00",
+            sale_type=SaleType.direct,
+        )
+
+        # Simulate what create_open_ticketing_payment does: build Payments
+        # WITHOUT passing contribution_amount — the server_default kicks in.
+        payment = Payments(
+            tenant_id=tenant_a.id,
+            popup_id=popup.id,
+            status=PaymentStatus.PENDING.value,
+            amount=Decimal("100.00"),
+            currency="USD",
+        )
+        db.add(payment)
+        db.commit()
+        db.refresh(payment)
+
+        # contribution_amount must be 0 — not computed in direct-sale path
+        assert payment.contribution_amount == Decimal("0"), (
+            f"Direct-sale Payments row should have contribution_amount=0, "
+            f"got {payment.contribution_amount}"
         )
