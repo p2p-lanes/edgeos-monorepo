@@ -9,6 +9,7 @@ import {
   FileText,
   Globe,
   GraduationCap,
+  HandCoins,
   Image,
   Key,
   Languages,
@@ -61,6 +62,7 @@ import {
 } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
+import { Textarea } from "@/components/ui/textarea"
 import useAuth from "@/hooks/useAuth"
 import useCustomToast from "@/hooks/useCustomToast"
 import {
@@ -219,6 +221,11 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
       insurance_enabled: defaultValues?.insurance_enabled ?? false,
       insurance_percentage:
         defaultValues?.insurance_percentage?.toString() ?? "",
+      contribution_enabled: defaultValues?.contribution_enabled ?? false,
+      contribution_percentage:
+        defaultValues?.contribution_percentage?.toString() ?? "",
+      contribution_label: defaultValues?.contribution_label ?? "",
+      contribution_description: defaultValues?.contribution_description ?? "",
       events_enabled: defaultValues?.events_enabled ?? true,
       self_check_in_enabled: defaultValues?.self_check_in_enabled ?? false,
       show_attendee_directory: defaultValues?.show_attendee_directory ?? false,
@@ -262,6 +269,16 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
         insurance_enabled: value.insurance_enabled,
         insurance_percentage: value.insurance_enabled
           ? value.insurance_percentage || null
+          : null,
+        contribution_enabled: value.contribution_enabled,
+        contribution_percentage: value.contribution_enabled
+          ? value.contribution_percentage || null
+          : null,
+        contribution_label: value.contribution_enabled
+          ? value.contribution_label || null
+          : null,
+        contribution_description: value.contribution_enabled
+          ? value.contribution_description || null
           : null,
         events_enabled: value.events_enabled,
         self_check_in_enabled: value.self_check_in_enabled,
@@ -1080,6 +1097,126 @@ export function PopupForm({ defaultValues, onSuccess }: PopupFormProps) {
                   </div>
                 )}
               </form.Field>
+            )}
+          </form.Subscribe>
+        </InlineSection>
+
+        <Separator />
+
+        {/* Contribution fee */}
+        <InlineSection title="Contribution">
+          <form.Field name="contribution_enabled">
+            {(field) => (
+              <InlineRow
+                icon={<HandCoins className="h-4 w-4 text-muted-foreground" />}
+                label="Enable Contribution"
+                description="Add an optional contribution fee to orders at checkout"
+              >
+                <Switch
+                  id="contribution_enabled"
+                  checked={field.state.value}
+                  onCheckedChange={(checked) => field.handleChange(checked)}
+                  disabled={readOnly}
+                />
+              </InlineRow>
+            )}
+          </form.Field>
+
+          <form.Subscribe
+            selector={(state) => state.values.contribution_enabled}
+          >
+            {(contributionEnabled) => (
+              <>
+                <form.Field
+                  name="contribution_percentage"
+                  validators={{
+                    onBlur: ({ value }) => {
+                      if (readOnly || !contributionEnabled) return undefined
+                      const num = Number.parseFloat(value)
+                      if (!value || Number.isNaN(num) || num < 0) {
+                        return "Contribution percentage must be 0 or greater when contribution is enabled"
+                      }
+                      if (num > 100) {
+                        return "Contribution percentage cannot exceed 100"
+                      }
+                      return undefined
+                    },
+                  }}
+                >
+                  {(field) => (
+                    <div>
+                      <InlineRow
+                        icon={
+                          <HandCoins className="h-4 w-4 text-muted-foreground" />
+                        }
+                        label="Contribution Rate (%)"
+                        description="Percentage of the total order applied as a contribution fee"
+                      >
+                        <Input
+                          id="contribution_percentage"
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.01"
+                          placeholder="e.g. 2.50"
+                          value={field.state.value}
+                          onBlur={field.handleBlur}
+                          onChange={(e) => field.handleChange(e.target.value)}
+                          disabled={readOnly || !contributionEnabled}
+                          className="max-w-[120px] text-sm"
+                        />
+                      </InlineRow>
+                      <FieldError errors={field.state.meta.errors} />
+                    </div>
+                  )}
+                </form.Field>
+
+                <form.Field name="contribution_label">
+                  {(field) => (
+                    <InlineRow
+                      icon={
+                        <HandCoins className="h-4 w-4 text-muted-foreground" />
+                      }
+                      label="Contribution Label"
+                      description="Short name shown as the line item in the checkout summary"
+                    >
+                      <Input
+                        id="contribution_label"
+                        type="text"
+                        placeholder="e.g. Event support contribution"
+                        value={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                        disabled={readOnly || !contributionEnabled}
+                        className="max-w-xs text-sm"
+                      />
+                    </InlineRow>
+                  )}
+                </form.Field>
+
+                <form.Field name="contribution_description">
+                  {(field) => (
+                    <InlineRow
+                      icon={
+                        <HandCoins className="h-4 w-4 text-muted-foreground" />
+                      }
+                      label="Contribution Description"
+                      description="Longer explanation shown under the line item in the portal order summary"
+                    >
+                      <Textarea
+                        id="contribution_description"
+                        placeholder="e.g. This contribution helps fund scholarships and community programs."
+                        value={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                        disabled={readOnly || !contributionEnabled}
+                        className="w-80 max-w-xs text-sm field-sizing-fixed"
+                        rows={3}
+                      />
+                    </InlineRow>
+                  )}
+                </form.Field>
+              </>
             )}
           </form.Subscribe>
         </InlineSection>

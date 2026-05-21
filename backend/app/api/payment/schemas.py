@@ -142,6 +142,12 @@ class PaymentProductRequest(BaseModel):
     attendee_id: uuid.UUID
     quantity: int = 1
     unit_price_override: Decimal | None = None
+    # Per-purchase metadata blob. Currently populated by the meal_plan_select
+    # step with {daily_choices, dietary_restriction, special_request}. When set,
+    # the resulting AttendeeProducts row(s) carry this blob in
+    # attendee_products.purchase_metadata. NULL for products that don't collect
+    # metadata.
+    purchase_metadata: dict | None = None
 
     @model_validator(mode="after")
     def validate_unit_price_override(self) -> "PaymentProductRequest":

@@ -29,6 +29,7 @@ import {
   useCreditCalculation,
   useHousingSelection,
   useInsuranceCalculation,
+  useMealPlanSelection,
   useMerchSelection,
   usePatronSelection,
   usePaymentSubmit,
@@ -86,6 +87,26 @@ interface CheckoutContextValue {
     isCustom?: boolean,
   ) => void
   clearPatron: () => void
+  /** Add a meal-plan cart entry for (attendee, weekly product). `weekdayDates`
+   *  are the Mon–Fri ISO dates derived by the variant from the step's
+   *  template_config coverage range. The reducer seeds dailyChoices to
+   *  {date: "chef"} for every weekday. */
+  addMealPlan: (
+    attendeeId: string,
+    productId: string,
+    weekdayDates: string[],
+  ) => void
+  removeMealPlan: (attendeeId: string, productId: string) => void
+  setMealPlanDailyChoice: (
+    attendeeId: string,
+    productId: string,
+    date: string,
+    menuKey: string,
+  ) => void
+  /** Per-attendee field — synced across every meal-plan entry for the attendee. */
+  setMealPlanDietaryRestriction: (attendeeId: string, value: string) => void
+  /** Per-attendee field — synced across every meal-plan entry for the attendee. */
+  setMealPlanSpecialRequest: (attendeeId: string, value: string) => void
   applyPromoCode: (code: string) => Promise<boolean>
   clearPromoCode: () => void
   toggleInsurance: () => void
@@ -358,6 +379,16 @@ export function CheckoutProvider({
   const { patron, setPatron, setPatronAmount, clearPatron } =
     usePatronSelection(allActiveProducts)
 
+  const {
+    mealPlans: selectedMealPlans,
+    setMealPlans: setSelectedMealPlans,
+    addMealPlan,
+    removeMealPlan,
+    setMealPlanDailyChoice,
+    setMealPlanDietaryRestriction,
+    setMealPlanSpecialRequest,
+  } = useMealPlanSelection(allActiveProducts)
+
   const [insurance, setInsurance] = useState(false)
   const [termsAccepted, setTermsAccepted] = useState(false)
   const [dynamicItems, setDynamicItems] = useState<
@@ -461,6 +492,7 @@ export function CheckoutProvider({
     housing,
     merch,
     patron,
+    selectedMealPlans,
     promoCode: "",
     promoCodeValid: false,
     insurance,
@@ -484,6 +516,7 @@ export function CheckoutProvider({
       setHousing,
       setMerch,
       setPatron,
+      setMealPlans: setSelectedMealPlans,
       setInsurance,
     },
     hasRestoredCheckoutRef,
@@ -540,6 +573,7 @@ export function CheckoutProvider({
     housing,
     merch,
     patron,
+    selectedMealPlans,
     promoCode,
     promoCodeValid,
     insurance,
@@ -557,6 +591,7 @@ export function CheckoutProvider({
     housing,
     merch,
     patron,
+    selectedMealPlans,
     promoCode,
     promoCodeValid,
     insurance,
@@ -581,6 +616,28 @@ export function CheckoutProvider({
     },
   )
 
+  // Contribution fee — derived from popup config (mandatory when enabled).
+  // The popup is the single source of truth for the rate; there is no buyer
+  // opt-in toggle. We calculate client-side from popup.contribution_percentage
+  // so the summary line renders before submit (transparency requirement).
+  const contributionAmount = useMemo<number>(() => {
+    if (!city?.contribution_enabled) return 0
+    const pct = Number(city.contribution_percentage)
+    if (Number.isNaN(pct) || pct <= 0) return 0
+    // Pre-fee subtotal: passes + housing + merch + patron (mirrors backend
+    // _apply_discounts snapshot: post-discount, before insurance and contribution)
+    const passesSubtotal = selectedPasses.reduce(
+      (sum, p) => sum + (p.originalPrice ?? p.price),
+      0,
+    )
+    const housingTotal = housing?.totalPrice ?? 0
+    const merchTotal = merch.reduce((sum, m) => sum + m.totalPrice, 0)
+    const patronTotal = patron?.amount ?? 0
+    const preFeeSubtotal =
+      passesSubtotal + housingTotal + merchTotal + patronTotal
+    return Math.round(((preFeeSubtotal * pct) / 100) * 100) / 100
+  }, [city, selectedPasses, housing, merch, patron])
+
   // Defence-in-depth: take the highest discount available so the total reflects
   // it even if one of the state vectors lags (DiscountProvider's <= guard
   // rejecting an update, or usePromoCode's re-validation effect clobbering
@@ -596,7 +653,9 @@ export function CheckoutProvider({
     housing,
     merch,
     patron,
+    mealPlans: selectedMealPlans,
     insuranceAmount,
+    contributionAmount,
     isEditing,
     editCredit,
     monthUpgradeCredit,
@@ -613,6 +672,7 @@ export function CheckoutProvider({
     setHousing(null)
     setMerch([])
     setPatron(null)
+    setSelectedMealPlans([])
     setPromoCode("")
     setPromoCodeValid(false)
     setPromoCodeDiscount(0)
@@ -624,6 +684,7 @@ export function CheckoutProvider({
     setHousing,
     setMerch,
     setPatron,
+    setSelectedMealPlans,
     setPromoCode,
     setPromoCodeValid,
     setPromoCodeDiscount,
@@ -687,6 +748,7 @@ export function CheckoutProvider({
       housing,
       merch,
       patron,
+      mealPlans: selectedMealPlans,
       promoCode,
       promoCodeValid,
       promoCodeDiscount,
@@ -700,6 +762,7 @@ export function CheckoutProvider({
       housing,
       merch,
       patron,
+      selectedMealPlans,
       promoCode,
       promoCodeValid,
       promoCodeDiscount,
@@ -771,6 +834,7 @@ export function CheckoutProvider({
     !!housing ||
     merch.length > 0 ||
     !!patron ||
+    selectedMealPlans.length > 0 ||
     Object.values(dynamicItems).some((items) => items.length > 0)
 
   // Dynamic item actions
@@ -885,6 +949,7 @@ export function CheckoutProvider({
     clearHousing()
     setMerch([])
     clearPatron()
+    setSelectedMealPlans([])
     clearPromoCode()
     setInsurance(false)
     setDynamicItems({})
@@ -894,6 +959,7 @@ export function CheckoutProvider({
     clearHousing,
     setMerch,
     clearPatron,
+    setSelectedMealPlans,
     clearPromoCode,
   ])
 
@@ -909,6 +975,7 @@ export function CheckoutProvider({
     housing,
     merch,
     patron,
+    selectedMealPlans,
     dynamicItems,
     promoCode,
     promoCodeValid,
@@ -974,6 +1041,11 @@ export function CheckoutProvider({
     updateMerchQuantity,
     setPatronAmount,
     clearPatron,
+    addMealPlan,
+    removeMealPlan,
+    setMealPlanDailyChoice,
+    setMealPlanDietaryRestriction,
+    setMealPlanSpecialRequest,
     applyPromoCode,
     clearPromoCode,
     toggleInsurance,

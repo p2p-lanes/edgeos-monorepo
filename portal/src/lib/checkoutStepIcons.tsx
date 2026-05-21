@@ -2,6 +2,7 @@
 
 import {
   CheckCircle,
+  ChefHat,
   CircleUser,
   Film,
   Heart,
@@ -16,6 +17,7 @@ import {
   Tent,
   Ticket,
   User,
+  Utensils,
 } from "lucide-react"
 import type { ComponentType, SVGProps } from "react"
 
@@ -86,6 +88,12 @@ const ICON_REGISTRY: Record<string, LucideLikeIcon> = {
   shield: Shield,
   home: Home,
   check: CheckCircle,
+  utensils: Utensils,
+  fork: Utensils,
+  meal: Utensils,
+  "meal-plan": Utensils,
+  "chef-hat": ChefHat,
+  chef: ChefHat,
 }
 
 /**
@@ -95,9 +103,11 @@ const ICON_REGISTRY: Record<string, LucideLikeIcon> = {
  */
 const SECTION_ICONS: Record<string, LucideLikeIcon> = {
   passes: Ticket,
+  tickets: Ticket,
   housing: Home,
   merch: ShoppingBag,
   patron: Heart,
+  meal_plan: Utensils,
   confirm: Shield,
   buyer: User,
 }
@@ -113,6 +123,7 @@ const TEMPLATE_ICONS: Record<string, LucideLikeIcon> = {
   "patron-preset": Heart,
   "housing-date": Home,
   "merch-image": ShoppingBag,
+  "meal-plan-select": Utensils,
   "youtube-video": Play,
   "image-gallery": ImageIcon,
   faqs: HelpCircle,

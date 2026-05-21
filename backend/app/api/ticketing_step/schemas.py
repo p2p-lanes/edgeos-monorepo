@@ -1,4 +1,5 @@
 import uuid
+from datetime import date
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, model_validator
@@ -23,6 +24,85 @@ class TicketSelectSection(BaseModel):
     model_config = ConfigDict(extra="allow")
 
 
+class MealPlanMenuOption(BaseModel):
+    """One menu choice within a meal-plan product's weekly menu."""
+
+    key: str
+    icon: str | None = None
+    title: str
+    description: str | None = None
+    tags: list[str] = []
+
+    model_config = ConfigDict(extra="allow")
+
+
+class MealPlanSectionProduct(BaseModel):
+    """One product entry inside a meal_plan_select section.
+
+    Carries the product reference, its weekday coverage range, and the menu
+    options the buyer can pick per day.
+    """
+
+    product_id: uuid.UUID
+    coverage_start: date
+    coverage_end: date
+    menu_options: list[MealPlanMenuOption] = []
+
+    model_config = ConfigDict(extra="allow")
+
+    @model_validator(mode="after")
+    def _validate(self) -> "MealPlanSectionProduct":
+        if self.coverage_start > self.coverage_end:
+            raise ValueError(
+                "meal_plan_select product.coverage_start must be <= coverage_end"
+            )
+        keys = [o.key for o in self.menu_options]
+        if len(keys) != len(set(keys)):
+            raise ValueError(
+                "meal_plan_select product.menu_options[].key must be unique within a product"
+            )
+        if "chef" in keys:
+            raise ValueError(
+                "meal_plan_select product.menu_options[].key='chef' is reserved for chef's choice"
+            )
+        return self
+
+
+class MealPlanSection(BaseModel):
+    """One section inside meal_plan_select template_config.sections."""
+
+    key: str
+    label: str
+    order: int = 0
+    description: str | None = None
+    products: list[MealPlanSectionProduct] = []
+
+    model_config = ConfigDict(extra="allow")
+
+
+class MealPlanChefChoiceOption(BaseModel):
+    """Step-level chef's choice fallback option.
+
+    The `key` is hard-coded to "chef" in v0 — the cart/reducer logic uses the
+    literal string. v1 may make it configurable.
+    """
+
+    key: str = "chef"
+    icon: str | None = None
+    title: str = "Chef's choice"
+    description: str | None = None
+
+    model_config = ConfigDict(extra="allow")
+
+    @model_validator(mode="after")
+    def _validate(self) -> "MealPlanChefChoiceOption":
+        if self.key != "chef":
+            raise ValueError(
+                "meal_plan_select chef_choice_option.key must equal 'chef' in v0"
+            )
+        return self
+
+
 def _validate_sections_in_template_config(
     template: str | None,
     template_config: dict[str, Any] | None,
@@ -44,6 +124,37 @@ def _validate_sections_in_template_config(
         **template_config,
         "sections": [s.model_dump(mode="json") for s in validated],
     }
+
+
+def _validate_meal_plan_select_template_config(
+    template: str | None,
+    template_config: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Validate template_config when template == 'meal-plan-select'.
+
+    Validates sections (each with products carrying coverage dates + menu_options)
+    and the step-level chef_choice_option. No-op for other templates.
+    """
+    if template != "meal-plan-select" or not template_config:
+        return template_config
+
+    out: dict[str, Any] = dict(template_config)
+
+    sections = template_config.get("sections")
+    if sections is not None:
+        if not isinstance(sections, list):
+            raise ValueError(
+                "meal_plan_select template_config.sections must be a list"
+            )
+        validated_sections = [MealPlanSection.model_validate(s) for s in sections]
+        out["sections"] = [s.model_dump(mode="json") for s in validated_sections]
+
+    chef = template_config.get("chef_choice_option")
+    if chef is not None:
+        validated_chef = MealPlanChefChoiceOption.model_validate(chef)
+        out["chef_choice_option"] = validated_chef.model_dump(mode="json")
+
+    return out
 
 
 class TicketingStepBase(SQLModel):
@@ -110,6 +221,9 @@ class TicketingStepCreate(BaseModel):
         self.template_config = _validate_sections_in_template_config(
             self.template, self.template_config
         )
+        self.template_config = _validate_meal_plan_select_template_config(
+            self.template, self.template_config
+        )
         return self
 
 
@@ -132,6 +246,9 @@ class TicketingStepUpdate(BaseModel):
         # Note: when template is None (PATCH without template field), validation is skipped.
         # To trigger validation, send both template and template_config in the same request.
         self.template_config = _validate_sections_in_template_config(
+            self.template, self.template_config
+        )
+        self.template_config = _validate_meal_plan_select_template_config(
             self.template, self.template_config
         )
         return self

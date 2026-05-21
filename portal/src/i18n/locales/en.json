@@ -246,6 +246,10 @@
         "previous_image_aria": "Previous image",
         "next_image_aria": "Next image"
       }
+    },
+    "contribution": {
+      "fallbackLabel": "Event contribution",
+      "fallbackDescription": "Helps fund the event"
     }
   },
   "openCheckout": {
@@ -327,6 +331,7 @@
       "ticket": "Ticket",
       "housing": "Housing",
       "merch": "Merch",
+      "meal_plan": "Meal plan",
       "other": "Other"
     },
     "discounts": {

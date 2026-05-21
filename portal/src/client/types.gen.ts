@@ -494,6 +494,9 @@ export type AttendeeProductPublic = {
     product_category?: (string | null);
     duration_type?: (string | null);
     last_scan_at?: (string | null);
+    purchase_metadata?: ({
+    [key: string]: unknown;
+} | null);
 };
 
 /**
@@ -696,6 +699,27 @@ export type CartItemHousing = {
 };
 
 /**
+ * Meal-plan selection in cart (one row per attendee × weekly product).
+ *
+ * All metadata fields are nullable in cart because the buyer fills them
+ * incrementally — completeness is enforced only at checkout submission.
+ *
+ * `daily_choices` maps ISO weekday dates (YYYY-MM-DD) to menu_option keys
+ * (or the literal "chef" for chef's choice). `dietary_restriction` and
+ * `special_request` apply at the attendee level — the frontend / reducer
+ * keeps them in sync across every meal_plans entry for that attendee.
+ */
+export type CartItemMealPlan = {
+    attendee_id: string;
+    product_id: string;
+    daily_choices?: ({
+    [key: string]: (string);
+} | null);
+    dietary_restriction?: (string | null);
+    special_request?: (string | null);
+};
+
+/**
  * Merch selection in cart.
  */
 export type CartItemMerch = {
@@ -761,6 +785,7 @@ export type CartState = {
     housing?: (CartItemHousing | null);
     merch?: Array<CartItemMerch>;
     patron?: (CartItemPatron | null);
+    meal_plans?: Array<CartItemMealPlan>;
     promo_code?: (string | null);
     insurance?: boolean;
     current_step?: (string | null);
@@ -2102,6 +2127,9 @@ export type PaymentProductRequest_Input = {
     attendee_id: string;
     quantity?: number;
     unit_price_override?: (number | string | null);
+    purchase_metadata?: ({
+    [key: string]: unknown;
+} | null);
 };
 
 /**
@@ -2112,6 +2140,9 @@ export type PaymentProductRequest_Output = {
     attendee_id: string;
     quantity?: number;
     unit_price_override?: (string | null);
+    purchase_metadata?: ({
+    [key: string]: unknown;
+} | null);
 };
 
 /**
