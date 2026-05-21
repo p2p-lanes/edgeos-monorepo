@@ -73,6 +73,7 @@ def _build_application_public(
                 check_in_code=ap.check_in_code,
                 payment_id=ap.payment_id,
                 requires_check_in=ap.product.requires_check_in if ap.product else False,
+                purchase_metadata=ap.purchase_metadata,
             )
             for ap in a.attendee_products
         ]

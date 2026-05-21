@@ -69,6 +69,13 @@ class PaymentProductBase(SQLModel):
         default="USD",
         sa_column=Column(String(3), nullable=False, server_default="USD"),
     )
+    # Mirrors attendee_products.purchase_metadata. Captured at payment-creation
+    # time so the SimpleFI-webhook approval path can propagate it when
+    # materializing AttendeeProducts rows from this snapshot.
+    purchase_metadata: dict | None = Field(
+        default=None,
+        sa_column=Column(JSONB, nullable=True),
+    )
 
 
 class PaymentBase(SQLModel):

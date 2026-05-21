@@ -1521,6 +1521,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                         effective_unit_price=req_prod.unit_price_override
                         if is_patreon
                         else None,
+                        purchase_metadata=req_prod.purchase_metadata,
                     )
                     session.add(payment_product)
 
@@ -1664,6 +1665,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     effective_unit_price=req_prod.unit_price_override
                     if is_patreon
                     else None,
+                    purchase_metadata=req_prod.purchase_metadata,
                 )
                 session.add(payment_product)
 
@@ -1740,6 +1742,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     product_id=pp.product_id,
                     attendee_id=pp.attendee_id,
                     quantity=pp.quantity,
+                    purchase_metadata=pp.purchase_metadata,
                 )
                 for pp in payment.products_snapshot
             ]
@@ -2004,6 +2007,7 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
                     product_id=pp.product_id,
                     attendee_id=pp.attendee_id,
                     quantity=pp.quantity,
+                    purchase_metadata=pp.purchase_metadata,
                 )
                 for pp in payment.products_snapshot
             ]
