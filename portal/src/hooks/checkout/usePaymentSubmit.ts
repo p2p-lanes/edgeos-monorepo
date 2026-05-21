@@ -235,6 +235,15 @@ export function usePaymentSubmit({
                 queryKey: queryKeys.purchases.byPopup(popupId),
               })
             : Promise.resolve(),
+          // Defense-in-depth: the /passes view reads from the human-attendees
+          // query too (via passesProvider), which embeds products per attendee.
+          // Without this invalidation the page can render stale attendee data
+          // even after purchases.byPopup refetches.
+          popupId
+            ? queryClient.invalidateQueries({
+                queryKey: queryKeys.attendees.byHumanPopup(popupId),
+              })
+            : Promise.resolve(),
         ])
         if (popupSlug) {
           if (submitMode === "open-ticketing") {
