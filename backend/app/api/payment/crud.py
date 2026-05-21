@@ -1,11 +1,11 @@
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from typing import TYPE_CHECKING, Any
 
 from fastapi import HTTPException, status
 from loguru import logger
-from sqlalchemy import desc, or_
+from sqlalchemy import desc, or_, text
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, func, select
 
@@ -1344,6 +1344,53 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         return self._apply_discounts(session, obj, application)
 
+    def _find_recent_duplicate_payment(
+        self,
+        session: Session,
+        application_id: uuid.UUID,
+        obj: PaymentCreate,
+        preview: PaymentPreview,
+    ) -> Payments | None:
+        """Return a recently-approved payment whose products and amount match
+        the incoming request, or None.
+
+        Used as an idempotency guard against double-submits, bfcache restores,
+        and browser/network retries that re-fire an already-processed checkout.
+        A legitimate second purchase by the same buyer (different products or
+        outside the window) is left alone.
+        """
+        window_start = datetime.now(tz=UTC) - timedelta(
+            seconds=self._DUPLICATE_WINDOW_SECONDS
+        )
+
+        incoming_fingerprint = sorted(
+            (p.product_id, p.attendee_id, p.quantity) for p in obj.products
+        )
+
+        candidates = list(
+            session.exec(
+                select(Payments)
+                .where(
+                    Payments.application_id == application_id,
+                    Payments.status == PaymentStatus.APPROVED.value,
+                    Payments.created_at >= window_start,
+                    Payments.amount == preview.amount,
+                )
+                .options(selectinload(Payments.products_snapshot))  # type: ignore[arg-type]
+                .order_by(desc(Payments.created_at))
+            ).all()
+        )
+
+        for candidate in candidates:
+            snapshot = sorted(
+                (pp.product_id, pp.attendee_id, pp.quantity)
+                for pp in candidate.products_snapshot
+            )
+            if snapshot == incoming_fingerprint:
+                return candidate
+
+        return None
+
     def _get_application_with_products(
         self, session: Session, application_id: uuid.UUID
     ) -> Applications | None:
@@ -1366,6 +1413,10 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
         )
         return session.exec(statement).first()
 
+    # Idempotency window for duplicate-submit detection. Anything outside
+    # this window is treated as a legitimate new purchase intent.
+    _DUPLICATE_WINDOW_SECONDS = 300
+
     def create_payment(
         self,
         session: Session,
@@ -1376,8 +1427,38 @@ class PaymentsCRUD(BaseCRUD[Payments, PaymentCreate, PaymentUpdate]):
 
         For zero-amount payments, auto-approves and adds products directly.
         For paid payments, returns payment with checkout info from SimpleFI.
+
+        Concurrent submissions for the same application are serialized via
+        a row-level lock, and a request matching a recently-approved payment
+        is short-circuited to that existing payment.
         """
+        application_id = _require_application_id(obj.application_id)
+
+        # Serialize concurrent payment attempts for the same application.
+        # Without this, double-submits and browser retries can produce
+        # duplicate Payments + AttendeeProducts (see PR #182 follow-up).
+        session.execute(
+            text("SELECT id FROM applications WHERE id = :id FOR UPDATE"),
+            {"id": application_id},
+        )
+
         preview = self.preview_payment(session, obj)
+
+        # Idempotency short-circuit: if we just approved a payment with the
+        # same products and amount for this application, return that one
+        # instead of creating a duplicate. Stock counters, snapshot rows and
+        # ticket inserts have already happened for the original.
+        existing = self._find_recent_duplicate_payment(
+            session, application_id, obj, preview
+        )
+        if existing is not None:
+            logger.info(
+                "Duplicate payment submit short-circuited: "
+                "application={} matched existing payment={}",
+                application_id,
+                existing.id,
+            )
+            return existing, preview
 
         # Fetch products once for both validation and decrement helpers.
         product_ids = [p.product_id for p in obj.products]
